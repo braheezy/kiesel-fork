@@ -7,7 +7,7 @@ const execution = @import("../../execution.zig");
 
 const Agent = execution.Agent;
 
-pub const DataBlock = std.ArrayList(u8);
+pub const DataBlock = std.ArrayListUnmanaged(u8);
 
 /// Arbitrary size limit (32 GiB)
 pub const data_block_max_byte_length = 1024 * 1024 * 1024 * 32;

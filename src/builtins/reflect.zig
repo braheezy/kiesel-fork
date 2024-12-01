@@ -247,8 +247,8 @@ pub const namespace = struct {
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        const keys = try target.asObject().internal_methods.ownPropertyKeys(target.asObject());
-        defer keys.deinit();
+        var keys = try target.asObject().internal_methods.ownPropertyKeys(target.asObject());
+        defer keys.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keys).
         return Value.from(

@@ -39,15 +39,16 @@ pub const LexicallyScopedDeclaration = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: LexicallyScopedDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration : export default AssignmentExpression ;
             .export_declaration => {
                 // 1. Return « "*default*" ».
-                try bound_names.append("*default*");
+                try bound_names.append(allocator, "*default*");
             },
-            inline else => |node| try node.collectBoundNames(bound_names),
+            inline else => |node| try node.collectBoundNames(allocator, bound_names),
         }
     }
 
@@ -292,7 +293,7 @@ pub fn stringValueImpl(
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the maximum needed capacity upfront
     var result = try String.Builder.initCapacity(allocator, text.len);
-    defer result.deinit();
+    defer result.deinit(allocator);
     var it = std.unicode.Utf8View.initUnchecked(text).iterator();
     while (it.nextCodepoint()) |code_point| {
         switch (code_point) {
@@ -357,7 +358,7 @@ pub fn stringValueImpl(
             else => result.appendCodePointAssumeCapacity(code_point),
         }
     }
-    return result.build();
+    return result.build(allocator);
 }
 
 /// https://tc39.es/ecma262/#prod-StringLiteral
@@ -578,12 +579,15 @@ pub const TemplateLiteral = struct {
         allocator: std.mem.Allocator,
         raw: bool,
     ) std.mem.Allocator.Error![]const *const String {
-        var template_strings = std.ArrayList(*const String).init(allocator);
+        var template_strings: std.ArrayListUnmanaged(*const String) = .empty;
         for (self.spans) |span| switch (span) {
-            .text => try template_strings.append(try span.templateString(allocator, raw)),
+            .text => try template_strings.append(
+                allocator,
+                try span.templateString(allocator, raw),
+            ),
             .expression => {},
         };
-        return template_strings.toOwnedSlice();
+        return template_strings.toOwnedSlice(allocator);
     }
 };
 
@@ -846,7 +850,8 @@ pub const Statement = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: Statement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
@@ -867,18 +872,18 @@ pub const Statement = union(enum) {
             .debugger_statement,
             => {},
 
-            .block_statement => |block_statement| try block_statement.block.statement_list.collectVarDeclaredNames(var_declared_names),
-            .variable_statement => |variable_statement| try variable_statement.variable_declaration_list.collectVarDeclaredNames(var_declared_names),
-            .if_statement => |if_statement| try if_statement.collectVarDeclaredNames(var_declared_names),
+            .block_statement => |block_statement| try block_statement.block.statement_list.collectVarDeclaredNames(allocator, var_declared_names),
+            .variable_statement => |variable_statement| try variable_statement.variable_declaration_list.collectVarDeclaredNames(allocator, var_declared_names),
+            .if_statement => |if_statement| try if_statement.collectVarDeclaredNames(allocator, var_declared_names),
             .breakable_statement => |breakable_statement| switch (breakable_statement) {
                 .iteration_statement => |iteration_statement| switch (iteration_statement) {
-                    inline else => |node| try node.collectVarDeclaredNames(var_declared_names),
+                    inline else => |node| try node.collectVarDeclaredNames(allocator, var_declared_names),
                 },
-                .switch_statement => |switch_statement| try switch_statement.collectVarDeclaredNames(var_declared_names),
+                .switch_statement => |switch_statement| try switch_statement.collectVarDeclaredNames(allocator, var_declared_names),
             },
-            .with_statement => |with_statement| try with_statement.collectVarDeclaredNames(var_declared_names),
-            .labelled_statement => |labelled_statement| try labelled_statement.collectVarDeclaredNames(var_declared_names),
-            .try_statement => |try_statement| try try_statement.collectVarDeclaredNames(var_declared_names),
+            .with_statement => |with_statement| try with_statement.collectVarDeclaredNames(allocator, var_declared_names),
+            .labelled_statement => |labelled_statement| try labelled_statement.collectVarDeclaredNames(allocator, var_declared_names),
+            .try_statement => |try_statement| try try_statement.collectVarDeclaredNames(allocator, var_declared_names),
         }
     }
 
@@ -886,7 +891,8 @@ pub const Statement = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Statement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
@@ -907,18 +913,18 @@ pub const Statement = union(enum) {
             .debugger_statement,
             => {},
 
-            .block_statement => |block_statement| try block_statement.block.statement_list.collectVarScopedDeclarations(var_scoped_declarations),
-            .variable_statement => |variable_statement| try variable_statement.variable_declaration_list.collectVarScopedDeclarations(var_scoped_declarations),
-            .if_statement => |if_statement| try if_statement.collectVarScopedDeclarations(var_scoped_declarations),
+            .block_statement => |block_statement| try block_statement.block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations),
+            .variable_statement => |variable_statement| try variable_statement.variable_declaration_list.collectVarScopedDeclarations(allocator, var_scoped_declarations),
+            .if_statement => |if_statement| try if_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
             .breakable_statement => |breakable_statement| switch (breakable_statement) {
                 .iteration_statement => |iteration_statement| switch (iteration_statement) {
-                    inline else => |node| try node.collectVarScopedDeclarations(var_scoped_declarations),
+                    inline else => |node| try node.collectVarScopedDeclarations(allocator, var_scoped_declarations),
                 },
-                .switch_statement => |switch_statement| try switch_statement.collectVarScopedDeclarations(var_scoped_declarations),
+                .switch_statement => |switch_statement| try switch_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
             },
-            .with_statement => |with_statement| try with_statement.collectVarScopedDeclarations(var_scoped_declarations),
-            .labelled_statement => |labelled_statement| try labelled_statement.collectVarScopedDeclarations(var_scoped_declarations),
-            .try_statement => |try_statement| try try_statement.collectVarScopedDeclarations(var_scoped_declarations),
+            .with_statement => |with_statement| try with_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
+            .labelled_statement => |labelled_statement| try labelled_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
+            .try_statement => |try_statement| try try_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
         }
     }
 };
@@ -943,10 +949,11 @@ pub const Declaration = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: Declaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            inline else => |node| try node.collectBoundNames(bound_names),
+            inline else => |node| try node.collectBoundNames(allocator, bound_names),
         }
     }
 };
@@ -962,10 +969,11 @@ pub const HoistableDeclaration = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: HoistableDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            inline else => |node| try node.collectBoundNames(bound_names),
+            inline else => |node| try node.collectBoundNames(allocator, bound_names),
         }
     }
 
@@ -1009,14 +1017,15 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: StatementList,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the LexicallyDeclaredNames of StatementList.
         // 2. Let names2 be the LexicallyDeclaredNames of StatementListItem.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| {
-            try item.collectLexicallyDeclaredNames(lexically_declared_names);
+            try item.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
         }
     }
 
@@ -1024,14 +1033,15 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: StatementList,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the LexicallyScopedDeclarations of StatementList.
         // 2. Let declarations2 be the LexicallyScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         for (self.items) |item| {
-            try item.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+            try item.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
         }
     }
 
@@ -1039,7 +1049,8 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: StatementList,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the VarDeclaredNames of StatementList.
@@ -1048,7 +1059,7 @@ pub const StatementList = struct {
         // StatementListItem : Declaration
         // 1. Return a new empty List.
         for (self.items) |item| {
-            try item.collectVarDeclaredNames(var_declared_names);
+            try item.collectVarDeclaredNames(allocator, var_declared_names);
         }
     }
 
@@ -1056,7 +1067,8 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: StatementList,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the VarScopedDeclarations of StatementList.
@@ -1065,7 +1077,7 @@ pub const StatementList = struct {
         // StatementListItem : Declaration
         // 1. Return a new empty List.
         for (self.items) |item| {
-            try item.collectVarScopedDeclarations(var_scoped_declarations);
+            try item.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
     }
 
@@ -1073,14 +1085,15 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallydeclarednames
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementList,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the TopLevelLexicallyDeclaredNames of StatementList.
         // 2. Let names2 be the TopLevelLexicallyDeclaredNames of StatementListItem.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| {
-            try item.collectTopLevelLexicallyDeclaredNames(lexically_declared_names);
+            try item.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
         }
     }
 
@@ -1088,14 +1101,15 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementList,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelLexicallyScopedDeclarations of StatementList.
         // 2. Let declarations2 be the TopLevelLexicallyScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         for (self.items) |item| {
-            try item.collectTopLevelLexicallyScopedDeclarations(lexically_scoped_declarations);
+            try item.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
         }
     }
 
@@ -1103,7 +1117,8 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
         self: StatementList,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the TopLevelVarDeclaredNames of StatementList.
@@ -1115,11 +1130,11 @@ pub const StatementList = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarDeclaredNames of Statement.
                 if (statement.* == .labelled_statement) {
-                    try statement.labelled_statement.collectTopLevelVarDeclaredNames(var_declared_names);
+                    try statement.labelled_statement.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
                 }
                 // 2. Return the VarDeclaredNames of Statement.
                 else {
-                    try statement.collectVarDeclaredNames(var_declared_names);
+                    try statement.collectVarDeclaredNames(allocator, var_declared_names);
                 }
             },
             // StatementListItem : Declaration
@@ -1128,7 +1143,7 @@ pub const StatementList = struct {
                     // 1. If Declaration is Declaration : HoistableDeclaration , then
                     .hoistable_declaration => |hoistable_declaration| {
                         // a. Return the BoundNames of HoistableDeclaration.
-                        try hoistable_declaration.collectBoundNames(var_declared_names);
+                        try hoistable_declaration.collectBoundNames(allocator, var_declared_names);
                     },
 
                     // 2. Return a new empty List.
@@ -1142,7 +1157,8 @@ pub const StatementList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
         self: StatementList,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelVarScopedDeclarations of StatementList.
@@ -1154,11 +1170,11 @@ pub const StatementList = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarScopedDeclarations of Statement.
                 if (statement.* == .labelled_statement) {
-                    try statement.labelled_statement.collectTopLevelVarScopedDeclarations(var_scoped_declarations);
+                    try statement.labelled_statement.collectTopLevelVarScopedDeclarations(allocator, var_scoped_declarations);
                 }
                 // 2. Return the VarScopedDeclarations of Statement.
                 else {
-                    try statement.collectVarScopedDeclarations(var_scoped_declarations);
+                    try statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
                 }
             },
             // StatementListItem : Declaration
@@ -1168,7 +1184,7 @@ pub const StatementList = struct {
                     .hoistable_declaration => |hoistable_declaration| {
                         // a. Let declaration be the DeclarationPart of HoistableDeclaration.
                         // b. Return « declaration ».
-                        try var_scoped_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
+                        try var_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration });
                     },
 
                     // 2. Return a new empty List.
@@ -1210,7 +1226,8 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: StatementListItem,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1218,7 +1235,7 @@ pub const StatementListItem = union(enum) {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    LexicallyDeclaredNames of LabelledStatement.
                 .labelled_statement => |labelled_statement| {
-                    try labelled_statement.collectLexicallyDeclaredNames(lexically_declared_names);
+                    try labelled_statement.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
                 },
 
                 // 2. Return a new empty List.
@@ -1228,7 +1245,7 @@ pub const StatementListItem = union(enum) {
             // StatementListItem : Declaration
             .declaration => |declaration| {
                 // 1. Return the BoundNames of Declaration.
-                try declaration.collectBoundNames(lexically_declared_names);
+                try declaration.collectBoundNames(allocator, lexically_declared_names);
             },
         }
     }
@@ -1237,7 +1254,8 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: StatementListItem,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1245,7 +1263,7 @@ pub const StatementListItem = union(enum) {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    LexicallyScopedDeclarations of LabelledStatement.
                 .labelled_statement => |labelled_statement| {
-                    try labelled_statement.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+                    try labelled_statement.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
                 },
 
                 // 2. Return a new empty List.
@@ -1255,9 +1273,9 @@ pub const StatementListItem = union(enum) {
             // StatementListItem : Declaration
             .declaration => |declaration| switch (declaration.*) {
                 // 1. Return a List whose sole element is the DeclarationPart of Declaration.
-                .hoistable_declaration => |hoistable_declaration| try lexically_scoped_declarations.append(.{ .hoistable_declaration = hoistable_declaration }),
-                .class_declaration => |class_declaration| try lexically_scoped_declarations.append(.{ .class_declaration = class_declaration }),
-                .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(.{ .lexical_declaration = lexical_declaration }),
+                .hoistable_declaration => |hoistable_declaration| try lexically_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration }),
+                .class_declaration => |class_declaration| try lexically_scoped_declarations.append(allocator, .{ .class_declaration = class_declaration }),
+                .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(allocator, .{ .lexical_declaration = lexical_declaration }),
             },
         }
     }
@@ -1266,10 +1284,11 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: StatementListItem,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            .statement => |statement| try statement.collectVarDeclaredNames(var_declared_names),
+            .statement => |statement| try statement.collectVarDeclaredNames(allocator, var_declared_names),
             .declaration => {},
         }
     }
@@ -1278,10 +1297,11 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: StatementListItem,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            .statement => |statement| try statement.collectVarScopedDeclarations(var_scoped_declarations),
+            .statement => |statement| try statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
             .declaration => {},
         }
     }
@@ -1290,7 +1310,8 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallydeclarednames
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementListItem,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1306,8 +1327,8 @@ pub const StatementListItem = union(enum) {
                 },
 
                 // 2. Return the BoundNames of Declaration.
-                .class_declaration => |class_declaration| try class_declaration.collectBoundNames(lexically_declared_names),
-                .lexical_declaration => |lexical_declaration| try lexical_declaration.collectBoundNames(lexically_declared_names),
+                .class_declaration => |class_declaration| try class_declaration.collectBoundNames(allocator, lexically_declared_names),
+                .lexical_declaration => |lexical_declaration| try lexical_declaration.collectBoundNames(allocator, lexically_declared_names),
             },
         }
     }
@@ -1316,7 +1337,8 @@ pub const StatementListItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementListItem,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1332,8 +1354,8 @@ pub const StatementListItem = union(enum) {
                 },
 
                 // 2. Return « Declaration ».
-                .class_declaration => |class_declaration| try lexically_scoped_declarations.append(.{ .class_declaration = class_declaration }),
-                .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(.{ .lexical_declaration = lexical_declaration }),
+                .class_declaration => |class_declaration| try lexically_scoped_declarations.append(allocator, .{ .class_declaration = class_declaration }),
+                .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(allocator, .{ .lexical_declaration = lexical_declaration }),
             },
         }
     }
@@ -1359,11 +1381,12 @@ pub const LexicalDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: LexicalDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return the BoundNames of BindingList.
-        try self.binding_list.collectBoundNames(bound_names);
+        try self.binding_list.collectBoundNames(allocator, bound_names);
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -1394,14 +1417,15 @@ pub const BindingList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: BindingList,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingList : BindingList , LexicalBinding
         // 1. Let names1 be the BoundNames of BindingList.
         // 2. Let names2 be the BoundNames of LexicalBinding.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |lexical_binding| {
-            try lexical_binding.collectBoundNames(bound_names);
+            try lexical_binding.collectBoundNames(allocator, bound_names);
         }
     }
 };
@@ -1421,18 +1445,19 @@ pub const LexicalBinding = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: LexicalBinding,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // LexicalBinding : BindingIdentifier Initializer[opt]
             .binding_identifier => |binding_identifier| {
                 // 1. Return the BoundNames of BindingIdentifier.
-                try bound_names.append(binding_identifier.binding_identifier);
+                try bound_names.append(allocator, binding_identifier.binding_identifier);
             },
             // LexicalBinding : BindingPattern Initializer
             .binding_pattern => |binding_pattern| {
                 // 1. Return the BoundNames of BindingPattern.
-                try binding_pattern.binding_pattern.collectBoundNames(bound_names);
+                try binding_pattern.binding_pattern.collectBoundNames(allocator, bound_names);
             },
         }
     }
@@ -1451,18 +1476,20 @@ pub const VariableDeclarationList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: VariableDeclarationList,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // VariableStatement : var VariableDeclarationList ;
         // 1. Return the BoundNames of VariableDeclarationList.
-        try self.collectBoundNames(var_declared_names);
+        try self.collectBoundNames(allocator, var_declared_names);
     }
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: VariableDeclarationList,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
@@ -1471,7 +1498,7 @@ pub const VariableDeclarationList = struct {
         // VariableDeclaration : BindingIdentifier Initializer[opt]
         // 1. Return the BoundNames of BindingIdentifier.
         for (self.items) |variable_declaration| {
-            try variable_declaration.collectBoundNames(bound_names);
+            try variable_declaration.collectBoundNames(allocator, bound_names);
         }
     }
 
@@ -1479,14 +1506,15 @@ pub const VariableDeclarationList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: VariableDeclarationList,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
         // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
-        try var_scoped_declarations.ensureUnusedCapacity(self.items.len);
+        try var_scoped_declarations.ensureUnusedCapacity(allocator, self.items.len);
         for (self.items) |variable_declaration| {
             var_scoped_declarations.appendAssumeCapacity(.{ .variable_declaration = variable_declaration });
         }
@@ -1508,18 +1536,19 @@ pub const VariableDeclaration = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: VariableDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // VariableDeclaration : BindingIdentifier Initializer[opt]
             .binding_identifier => |binding_identifier| {
                 // 1. Return the BoundNames of BindingIdentifier.
-                try bound_names.append(binding_identifier.binding_identifier);
+                try bound_names.append(allocator, binding_identifier.binding_identifier);
             },
             // VariableDeclaration : BindingPattern Initializer
             .binding_pattern => |binding_pattern| {
                 // 1. Return the BoundNames of BindingPattern.
-                try binding_pattern.binding_pattern.collectBoundNames(bound_names);
+                try binding_pattern.binding_pattern.collectBoundNames(allocator, bound_names);
             },
         }
     }
@@ -1534,24 +1563,25 @@ pub const BindingPattern = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: BindingPattern,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ObjectBindingPattern : { }
             // ObjectBindingPattern : { BindingPropertyList , BindingRestProperty }
             .object_binding_pattern => |object_binding_pattern| for (object_binding_pattern.properties) |property| switch (property) {
-                .binding_property => |binding_property| try binding_property.collectBoundNames(bound_names),
-                .binding_rest_property => |binding_rest_property| try bound_names.append(binding_rest_property.binding_identifier),
+                .binding_property => |binding_property| try binding_property.collectBoundNames(allocator, bound_names),
+                .binding_rest_property => |binding_rest_property| try bound_names.append(allocator, binding_rest_property.binding_identifier),
             },
 
             // ArrayBindingPattern : [ Elision[opt] ]
             //     1. Return a new empty List.
             .array_binding_pattern => |array_binding_pattern| for (array_binding_pattern.elements) |element| switch (element) {
                 .elision => {},
-                .binding_element => |binding_element| try binding_element.collectBoundNames(bound_names),
+                .binding_element => |binding_element| try binding_element.collectBoundNames(allocator, bound_names),
                 .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
-                    .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
-                    .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
+                    .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
+                    .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(allocator, bound_names),
                 },
             },
         }
@@ -1615,14 +1645,15 @@ pub const BindingProperty = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: BindingProperty,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingProperty : PropertyName : BindingElement
         // 1. Return the BoundNames of BindingElement.
         switch (self) {
-            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(bound_names),
+            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(allocator, bound_names),
             .property_name_and_binding_element => |property_name_and_binding_element| {
-                try property_name_and_binding_element.binding_element.collectBoundNames(bound_names);
+                try property_name_and_binding_element.binding_element.collectBoundNames(allocator, bound_names);
             },
         }
     }
@@ -1657,13 +1688,14 @@ pub const BindingElement = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: BindingElement,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingElement : BindingPattern Initializer[opt]
         // 1. Return the BoundNames of BindingPattern.
         switch (self) {
-            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(bound_names),
-            .binding_pattern_and_expression => |binding_pattern_and_expression| try binding_pattern_and_expression.binding_pattern.collectBoundNames(bound_names),
+            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(allocator, bound_names),
+            .binding_pattern_and_expression => |binding_pattern_and_expression| try binding_pattern_and_expression.binding_pattern.collectBoundNames(allocator, bound_names),
         }
     }
 
@@ -1706,11 +1738,12 @@ pub const SingleNameBinding = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: SingleNameBinding,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // SingleNameBinding : BindingIdentifier Initializer[opt]
         // 1. Return the BoundNames of BindingIdentifier.
-        try bound_names.append(self.binding_identifier);
+        try bound_names.append(allocator, self.binding_identifier);
     }
 };
 
@@ -1723,11 +1756,12 @@ pub const BindingRestElement = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: BindingRestElement,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
-            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
+            .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
+            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(allocator, bound_names),
         }
     }
 
@@ -1764,7 +1798,8 @@ pub const IfStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: IfStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
@@ -1772,9 +1807,9 @@ pub const IfStatement = struct {
         // 1. Let names1 be the VarDeclaredNames of the first Statement.
         // 2. Let names2 be the VarDeclaredNames of the second Statement.
         // 3. Return the list-concatenation of names1 and names2.
-        try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+        try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
         if (self.alternate_statement) |alternate_statement| {
-            try alternate_statement.collectVarDeclaredNames(var_declared_names);
+            try alternate_statement.collectVarDeclaredNames(allocator, var_declared_names);
         }
     }
 
@@ -1782,7 +1817,8 @@ pub const IfStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: IfStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
@@ -1790,9 +1826,9 @@ pub const IfStatement = struct {
         // 1. Let declarations1 be the VarScopedDeclarations of the first Statement.
         // 2. Let declarations2 be the VarScopedDeclarations of the second Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
-        try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         if (self.alternate_statement) |alternate_statement| {
-            try alternate_statement.collectVarScopedDeclarations(var_scoped_declarations);
+            try alternate_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
     }
 };
@@ -1814,22 +1850,24 @@ pub const DoWhileStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: DoWhileStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarDeclaredNames of Statement.
-        try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+        try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: DoWhileStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarScopedDeclarations of Statement.
-        try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -1842,22 +1880,24 @@ pub const WhileStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: WhileStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
-        try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+        try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: WhileStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
-        try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -1878,7 +1918,8 @@ pub const ForStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ForStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
@@ -1890,18 +1931,19 @@ pub const ForStatement = struct {
         // 1. Return the VarDeclaredNames of Statement.
         if (self.initializer) |initializer| switch (initializer) {
             .variable_statement => {
-                try self.initializer.?.variable_statement.variable_declaration_list.collectBoundNames(var_declared_names);
+                try self.initializer.?.variable_statement.variable_declaration_list.collectBoundNames(allocator, var_declared_names);
             },
             else => {},
         };
-        try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+        try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ForStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
@@ -1913,11 +1955,11 @@ pub const ForStatement = struct {
         // 1. Return the VarScopedDeclarations of Statement.
         if (self.initializer) |initializer| switch (initializer) {
             .variable_statement => {
-                try self.initializer.?.variable_statement.variable_declaration_list.collectVarScopedDeclarations(var_scoped_declarations);
+                try self.initializer.?.variable_statement.variable_declaration_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
             },
             else => {},
         };
-        try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -1944,7 +1986,8 @@ pub const ForInOfStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ForInOfStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
@@ -1955,7 +1998,7 @@ pub const ForInOfStatement = struct {
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
             // 1. Return the VarDeclaredNames of Statement.
-            try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+            try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
         }
         // ForInOfStatement :
         //     for ( var ForBinding in Expression ) Statement
@@ -1965,8 +2008,8 @@ pub const ForInOfStatement = struct {
             // 1. Let names1 be the BoundNames of ForBinding.
             // 2. Let names2 be the VarDeclaredNames of Statement.
             // 3. Return the list-concatenation of names1 and names2.
-            try self.initializer.for_binding.collectBoundNames(var_declared_names);
-            try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
+            try self.initializer.for_binding.collectBoundNames(allocator, var_declared_names);
+            try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
         }
     }
 
@@ -1974,7 +2017,8 @@ pub const ForInOfStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ForInOfStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
@@ -1985,7 +2029,7 @@ pub const ForInOfStatement = struct {
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
             // 1. Return the VarScopedDeclarations of Statement.
-            try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+            try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
         // ForInOfStatement :
         //     for ( var ForBinding in Expression ) Statement
@@ -1995,7 +2039,7 @@ pub const ForInOfStatement = struct {
             // 1. Let declarations1 be « ForBinding ».
             // 2. Let declarations2 be the VarScopedDeclarations of Statement.
             // 3. Return the list-concatenation of declarations1 and declarations2.
-            try var_scoped_declarations.append(.{
+            try var_scoped_declarations.append(allocator, .{
                 .variable_declaration = switch (self.initializer.for_binding) {
                     .binding_identifier => |binding_identifier| .{
                         .binding_identifier = .{
@@ -2011,7 +2055,7 @@ pub const ForInOfStatement = struct {
                     },
                 },
             });
-            try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
+            try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
     }
 };
@@ -2031,11 +2075,12 @@ pub const ForBinding = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ForBinding,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
-            .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
-            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
+            .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
+            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(allocator, bound_names),
         }
     }
 };
@@ -2064,22 +2109,24 @@ pub const WithStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: WithStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
-        try self.statement.collectVarDeclaredNames(var_declared_names);
+        try self.statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: WithStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
-        try self.statement.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -2092,22 +2139,24 @@ pub const SwitchStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: SwitchStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarDeclaredNames of CaseBlock.
-        try self.case_block.collectVarDeclaredNames(var_declared_names);
+        try self.case_block.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: SwitchStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarScopedDeclarations of CaseBlock.
-        try self.case_block.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.case_block.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -2124,7 +2173,8 @@ pub const CaseBlock = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: CaseBlock,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2140,7 +2190,7 @@ pub const CaseBlock = struct {
         // 2. Let names2 be the LexicallyDeclaredNames of CaseClause.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| switch (item) {
-            inline else => |node| try node.collectLexicallyDeclaredNames(lexically_declared_names),
+            inline else => |node| try node.collectLexicallyDeclaredNames(allocator, lexically_declared_names),
         };
     }
 
@@ -2148,7 +2198,8 @@ pub const CaseBlock = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: CaseBlock,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2164,7 +2215,7 @@ pub const CaseBlock = struct {
         // 2. Let declarations2 be the LexicallyScopedDeclarations of CaseClause.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         for (self.items) |item| switch (item) {
-            inline else => |node| try node.collectLexicallyScopedDeclarations(lexically_scoped_declarations),
+            inline else => |node| try node.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations),
         };
     }
 
@@ -2172,7 +2223,8 @@ pub const CaseBlock = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: CaseBlock,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2188,7 +2240,7 @@ pub const CaseBlock = struct {
         // 2. Let names2 be the VarDeclaredNames of CaseClause.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| switch (item) {
-            inline else => |node| try node.collectVarDeclaredNames(var_declared_names),
+            inline else => |node| try node.collectVarDeclaredNames(allocator, var_declared_names),
         };
     }
 
@@ -2196,7 +2248,8 @@ pub const CaseBlock = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: CaseBlock,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2212,7 +2265,7 @@ pub const CaseBlock = struct {
         // 2. Let declarations2 be the VarScopedDeclarations of CaseClause.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         for (self.items) |item| switch (item) {
-            inline else => |node| try node.collectVarScopedDeclarations(var_scoped_declarations),
+            inline else => |node| try node.collectVarScopedDeclarations(allocator, var_scoped_declarations),
         };
     }
 };
@@ -2226,48 +2279,52 @@ pub const CaseClause = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: CaseClause,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementListopt
         // 1. If the StatementList is present, return the LexicallyDeclaredNames of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectLexicallyDeclaredNames(lexically_declared_names);
+        try self.statement_list.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: CaseClause,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+        try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: CaseClause,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectVarDeclaredNames(var_declared_names);
+        try self.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: CaseClause,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -2279,48 +2336,52 @@ pub const DefaultClause = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: DefaultClause,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementListopt
         // 1. If the StatementList is present, return the LexicallyDeclaredNames of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectLexicallyDeclaredNames(lexically_declared_names);
+        try self.statement_list.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: DefaultClause,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+        try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: DefaultClause,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectVarDeclaredNames(var_declared_names);
+        try self.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: DefaultClause,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
         // 2. Return a new empty List.
-        try self.statement_list.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 };
 
@@ -2345,7 +2406,8 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: LabelledStatement,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the LexicallyDeclaredNames of LabelledItem.
@@ -2358,7 +2420,7 @@ pub const LabelledStatement = struct {
             // LabelledItem : FunctionDeclaration
             .function_declaration => |function_declaration| {
                 // 1. Return the BoundNames of FunctionDeclaration.
-                try function_declaration.collectBoundNames(lexically_declared_names);
+                try function_declaration.collectBoundNames(allocator, lexically_declared_names);
             },
         }
     }
@@ -2367,7 +2429,8 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: LabelledStatement,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         //  LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the LexicallyScopedDeclarations of LabelledItem.
@@ -2380,7 +2443,7 @@ pub const LabelledStatement = struct {
             // LabelledItem : FunctionDeclaration
             .function_declaration => |function_declaration| {
                 // 1. Return « FunctionDeclaration ».
-                try lexically_scoped_declarations.append(.{
+                try lexically_scoped_declarations.append(allocator, .{
                     .hoistable_declaration = .{ .function_declaration = function_declaration },
                 });
             },
@@ -2391,13 +2454,14 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: LabelledStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             // LabelledStatement : LabelIdentifier : LabelledItem
             .statement => |statement| {
                 // 1. Return the VarDeclaredNames of LabelledItem.
-                try statement.collectVarDeclaredNames(var_declared_names);
+                try statement.collectVarDeclaredNames(allocator, var_declared_names);
             },
 
             // LabelledItem : FunctionDeclaration
@@ -2411,13 +2475,14 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: LabelledStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             //  LabelledStatement : LabelIdentifier : LabelledItem
             .statement => |statement| {
                 // 1. Return the VarScopedDeclarations of LabelledItem.
-                try statement.collectVarScopedDeclarations(var_scoped_declarations);
+                try statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
             },
 
             // LabelledItem : FunctionDeclaration
@@ -2431,7 +2496,8 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
         self: LabelledStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarDeclaredNames of LabelledItem.
@@ -2441,18 +2507,18 @@ pub const LabelledStatement = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarDeclaredNames of Statement.
                 if (statement.* == .labelled_statement) {
-                    try statement.labelled_statement.collectTopLevelVarDeclaredNames(var_declared_names);
+                    try statement.labelled_statement.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
                 }
                 // 2. Return the VarDeclaredNames of Statement.
                 else {
-                    try statement.collectVarDeclaredNames(var_declared_names);
+                    try statement.collectVarDeclaredNames(allocator, var_declared_names);
                 }
             },
 
             // LabelledItem : FunctionDeclaration
             .function_declaration => |function_declaration| {
                 // 1. Return the BoundNames of FunctionDeclaration.
-                try function_declaration.collectBoundNames(var_declared_names);
+                try function_declaration.collectBoundNames(allocator, var_declared_names);
             },
         }
     }
@@ -2461,7 +2527,8 @@ pub const LabelledStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
         self: LabelledStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarScopedDeclarations of LabelledItem.
@@ -2471,18 +2538,18 @@ pub const LabelledStatement = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarScopedDeclarations of Statement.
                 if (statement.* == .labelled_statement) {
-                    try statement.labelled_statement.collectTopLevelVarScopedDeclarations(var_scoped_declarations);
+                    try statement.labelled_statement.collectTopLevelVarScopedDeclarations(allocator, var_scoped_declarations);
                 }
                 // 2. Return the VarScopedDeclarations of Statement.
                 else {
-                    try statement.collectVarScopedDeclarations(var_scoped_declarations);
+                    try statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
                 }
             },
 
             // LabelledItem : FunctionDeclaration
             .function_declaration => |function_declaration| {
                 // 1. Return « FunctionDeclaration ».
-                try var_scoped_declarations.append(.{
+                try var_scoped_declarations.append(allocator, .{
                     .hoistable_declaration = .{ .function_declaration = function_declaration },
                 });
             },
@@ -2506,7 +2573,8 @@ pub const TryStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: TryStatement,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let names1 be the VarDeclaredNames of Block.
@@ -2523,12 +2591,12 @@ pub const TryStatement = struct {
         // 4. Return the list-concatenation of names1, names2, and names3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarDeclaredNames of Block.
-        try self.try_block.statement_list.collectVarDeclaredNames(var_declared_names);
+        try self.try_block.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
         if (self.catch_block) |catch_block| {
-            try catch_block.statement_list.collectVarDeclaredNames(var_declared_names);
+            try catch_block.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
         }
         if (self.finally_block) |finally_block| {
-            try finally_block.statement_list.collectVarDeclaredNames(var_declared_names);
+            try finally_block.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
         }
     }
 
@@ -2536,7 +2604,8 @@ pub const TryStatement = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: TryStatement,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let declarations1 be the VarScopedDeclarations of Block.
@@ -2553,12 +2622,12 @@ pub const TryStatement = struct {
         // 4. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarScopedDeclarations of Block.
-        try self.try_block.statement_list.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.try_block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         if (self.catch_block) |catch_block| {
-            try catch_block.statement_list.collectVarScopedDeclarations(var_scoped_declarations);
+            try catch_block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
         if (self.finally_block) |finally_block| {
-            try finally_block.statement_list.collectVarScopedDeclarations(var_scoped_declarations);
+            try finally_block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
     }
 };
@@ -2577,15 +2646,16 @@ pub const FormalParameters = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: FormalParameters,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // FormalParameterList : FormalParameterList , FormalParameter
         // 1. Let names1 be the BoundNames of FormalParameterList.
         // 2. Let names2 be the BoundNames of FormalParameter.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| switch (item) {
-            .formal_parameter => |formal_parameter| try formal_parameter.binding_element.collectBoundNames(bound_names),
-            .function_rest_parameter => |function_rest_parameter| try function_rest_parameter.binding_rest_element.collectBoundNames(bound_names),
+            .formal_parameter => |formal_parameter| try formal_parameter.binding_element.collectBoundNames(allocator, bound_names),
+            .function_rest_parameter => |function_rest_parameter| try function_rest_parameter.binding_rest_element.collectBoundNames(allocator, bound_names),
         };
     }
 
@@ -2677,13 +2747,14 @@ pub const FunctionDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: FunctionDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
         // 1. Return « "*default*" ».
-        try bound_names.append(self.identifier orelse "*default*");
+        try bound_names.append(allocator, self.identifier orelse "*default*");
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -2723,52 +2794,56 @@ pub const FunctionBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: FunctionBody,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return the TopLevelLexicallyDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelLexicallyDeclaredNames(lexically_declared_names);
+        try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: FunctionBody,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return the TopLevelLexicallyScopedDeclarations of StatementList.
-        try self.statement_list.collectTopLevelLexicallyScopedDeclarations(lexically_scoped_declarations);
+        try self.statement_list.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: FunctionBody,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return the TopLevelVarDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelVarDeclaredNames(var_declared_names);
+        try self.statement_list.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: FunctionBody,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return the TopLevelVarScopedDeclarations of StatementList.
-        try self.statement_list.collectTopLevelVarScopedDeclarations(var_scoped_declarations);
+        try self.statement_list.collectTopLevelVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 
     /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
@@ -2822,13 +2897,14 @@ pub const GeneratorDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: GeneratorDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // GeneratorDeclaration : function * ( FormalParameters ) { GeneratorBody }
         // 1. Return « "*default*" ».
-        try bound_names.append(self.identifier orelse "*default*");
+        try bound_names.append(allocator, self.identifier orelse "*default*");
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -2865,13 +2941,14 @@ pub const AsyncGeneratorDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: AsyncGeneratorDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // AsyncGeneratorDeclaration : async function * ( FormalParameters ) { AsyncGeneratorBody }
         // 1. Return « "*default*" ».
-        try bound_names.append(self.identifier orelse "*default*");
+        try bound_names.append(allocator, self.identifier orelse "*default*");
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -2903,13 +2980,14 @@ pub const ClassDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ClassDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassDeclaration : class BindingIdentifier ClassTail
         // 1. Return the BoundNames of BindingIdentifier.
         // ClassDeclaration : class ClassTail
         // 1. Return « "*default*" ».
-        try bound_names.append(self.identifier orelse "*default*");
+        try bound_names.append(allocator, self.identifier orelse "*default*");
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -2974,7 +3052,7 @@ pub const ClassBody = struct {
         // 2. If the ClassElementKind of ClassElement is non-constructor-method, then
         //     a. Append ClassElement to the end of list.
         // 3. Return list.
-        var class_elements = try std.ArrayList(ClassElement).initCapacity(
+        var class_elements = try std.ArrayListUnmanaged(ClassElement).initCapacity(
             allocator,
             self.class_element_list.items.len,
         );
@@ -2983,7 +3061,7 @@ pub const ClassBody = struct {
                 class_elements.appendAssumeCapacity(class_element);
             }
         }
-        return class_elements.toOwnedSlice();
+        return class_elements.toOwnedSlice(allocator);
     }
 
     /// 15.7.8 Static Semantics: PrivateBoundIdentifiers
@@ -2996,7 +3074,7 @@ pub const ClassBody = struct {
         // 1. Let names1 be the PrivateBoundIdentifiers of ClassElementList.
         // 2. Let names2 be the PrivateBoundIdentifiers of ClassElement.
         // 3. Return the list-concatenation of names1 and names2.
-        var private_bound_identifiers = std.ArrayList(PrivateIdentifier).init(allocator);
+        var private_bound_identifiers: std.ArrayListUnmanaged(PrivateIdentifier) = .empty;
         for (self.class_element_list.items) |class_element| {
             switch (class_element) {
                 // ClassElement :
@@ -3022,7 +3100,7 @@ pub const ClassBody = struct {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
                             // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
-                            try private_bound_identifiers.append(private_identifier);
+                            try private_bound_identifiers.append(allocator, private_identifier);
                         },
                         // ClassElementName : PropertyName
                         .property_name => {
@@ -3038,7 +3116,7 @@ pub const ClassBody = struct {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
                             // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
-                            try private_bound_identifiers.append(private_identifier);
+                            try private_bound_identifiers.append(allocator, private_identifier);
                         },
                         // ClassElementName : PropertyName
                         .property_name => {
@@ -3048,7 +3126,7 @@ pub const ClassBody = struct {
                 },
             }
         }
-        return private_bound_identifiers.toOwnedSlice();
+        return private_bound_identifiers.toOwnedSlice(allocator);
     }
 };
 
@@ -3162,26 +3240,28 @@ pub const ClassStaticBlock = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ClassStaticBlock,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassStaticBlockStatementList : [empty]
         // 1. Return a new empty List.
         // ClassStaticBlockStatementList : StatementList
         // 1. Return the TopLevelLexicallyDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelLexicallyDeclaredNames(lexically_declared_names);
+        try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ClassStaticBlock,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassStaticBlockStatementList : [empty]
         // 1. Return a new empty List.
         // ClassStaticBlockStatementList : StatementList
         // 1. Return the TopLevelVarDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelVarDeclaredNames(var_declared_names);
+        try self.statement_list.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
     }
 };
 
@@ -3196,13 +3276,14 @@ pub const AsyncFunctionDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: AsyncFunctionDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // AsyncFunctionDeclaration : async function ( FormalParameters ) { AsyncFunctionBody }
         // 1. Return « "*default*" ».
-        try bound_names.append(self.identifier orelse "*default*");
+        try bound_names.append(allocator, self.identifier orelse "*default*");
     }
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
@@ -3244,52 +3325,56 @@ pub const Script = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: Script,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
         // 1. Return the TopLevelLexicallyScopedDeclarations of StatementList.
-        try self.statement_list.collectTopLevelLexicallyScopedDeclarations(lexically_scoped_declarations);
+        try self.statement_list.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
     /// 8.2.4 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: Script,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
         // 1. Return the TopLevelLexicallyDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelLexicallyDeclaredNames(lexically_declared_names);
+        try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: Script,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
         // 1. Return the TopLevelVarDeclaredNames of StatementList.
-        try self.statement_list.collectTopLevelVarDeclaredNames(var_declared_names);
+        try self.statement_list.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Script,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
         // 1. Return the TopLevelVarScopedDeclarations of StatementList.
-        try self.statement_list.collectTopLevelVarScopedDeclarations(var_scoped_declarations);
+        try self.statement_list.collectTopLevelVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 
     /// 16.1.2 Static Semantics: ScriptIsStrict
@@ -3320,7 +3405,8 @@ pub const Module = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: Module,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3328,16 +3414,17 @@ pub const Module = struct {
         // 1. Let declarations1 be the LexicallyScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be the LexicallyScopedDeclarations of ModuleItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
-        try self.module_item_list.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+        try self.module_item_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Module,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
-        try self.module_item_list.collectVarScopedDeclarations(var_scoped_declarations);
+        try self.module_item_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 
     /// 16.2.1.3 Static Semantics: ModuleRequests
@@ -3357,8 +3444,8 @@ pub const Module = struct {
         // a. If moduleNames does not contain name, then
         // i. Append name to moduleNames.
         // 4. Return moduleNames.
-        var module_requests = String.ArrayHashMap(void).init(allocator);
-        defer module_requests.deinit();
+        var module_requests: String.ArrayHashMapUnmanaged(void) = .empty;
+        defer module_requests.deinit(allocator);
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem : StatementListItem
             .statement_list_item => {
@@ -3371,7 +3458,7 @@ pub const Module = struct {
             // 1. Return a List whose sole element is the SV of StringLiteral.
             .import_declaration => |import_declaration| {
                 const sv = try import_declaration.module_specifier.stringValue(allocator);
-                try module_requests.put(sv, {});
+                try module_requests.put(allocator, sv, {});
             },
 
             .export_declaration => |export_declaration| switch (export_declaration) {
@@ -3379,7 +3466,7 @@ pub const Module = struct {
                 .export_from => |export_from| {
                     // 1. Return the ModuleRequests of FromClause.
                     const sv = try export_from.module_specifier.stringValue(allocator);
-                    try module_requests.put(sv, {});
+                    try module_requests.put(allocator, sv, {});
                 },
 
                 // ExportDeclaration :
@@ -3407,7 +3494,8 @@ pub const Module = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-importentries
     pub fn collectImportEntries(
         self: Module,
-        import_entries: *std.ArrayList(ImportEntry),
+        allocator: std.mem.Allocator,
+        import_entries: *std.ArrayListUnmanaged(ImportEntry),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3415,7 +3503,6 @@ pub const Module = struct {
         // 1. Let entries1 be the ImportEntries of ModuleItemList.
         // 2. Let entries2 be the ImportEntries of ModuleItem.
         // 3. Return the list-concatenation of entries1 and entries2.
-        const allocator = import_entries.allocator;
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem :
             //     ExportDeclaration
@@ -3430,7 +3517,7 @@ pub const Module = struct {
                     const module = try import_declaration.module_specifier.stringValue(allocator);
 
                     // 2. Return the ImportEntriesForModule of ImportClause with argument module.
-                    try import_clause.collectImportEntriesForModule(import_entries, module);
+                    try import_clause.collectImportEntriesForModule(allocator, import_entries, module);
                 }
                 // ImportDeclaration : import ModuleSpecifier ;
                 // 1. Return a new empty List.
@@ -3442,7 +3529,8 @@ pub const Module = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentries
     pub fn collectExportEntries(
         self: Module,
-        export_entries: *std.ArrayList(ExportEntry),
+        allocator: std.mem.Allocator,
+        export_entries: *std.ArrayListUnmanaged(ExportEntry),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3450,7 +3538,6 @@ pub const Module = struct {
         // 1. Let entries1 be the ExportEntries of ModuleItemList.
         // 2. Let entries2 be the ExportEntries of ModuleItem.
         // 3. Return the list-concatenation of entries1 and entries2.
-        const allocator = export_entries.allocator;
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem :
             //     ImportDeclaration
@@ -3466,6 +3553,7 @@ pub const Module = struct {
 
                     // 2. Return ExportEntriesForModule of ExportFromClause with argument module.
                     try export_from.export_from_clause.collectExportEntriesForModule(
+                        allocator,
                         export_entries,
                         try module.stringValue(allocator),
                     );
@@ -3474,7 +3562,7 @@ pub const Module = struct {
                 // ExportDeclaration : export NamedExports ;
                 .named_exports => |named_exports| {
                     // 1. Return ExportEntriesForModule of NamedExports with argument null.
-                    try named_exports.collectExportEntriesForModule(export_entries, null);
+                    try named_exports.collectExportEntriesForModule(allocator, export_entries, null);
                 },
 
                 // ExportDeclaration : export VariableStatement
@@ -3482,10 +3570,10 @@ pub const Module = struct {
                     // 1. Let entries be a new empty List.
 
                     // 2. Let names be the BoundNames of VariableStatement.
-                    var names = std.ArrayList(Identifier).init(allocator);
-                    defer names.deinit();
-                    try variable_statement.variable_declaration_list.collectBoundNames(&names);
-                    try export_entries.ensureUnusedCapacity(names.items.len);
+                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    defer names.deinit(allocator);
+                    try variable_statement.variable_declaration_list.collectBoundNames(allocator, &names);
+                    try export_entries.ensureUnusedCapacity(allocator, names.items.len);
 
                     // 3. For each element name of names, do
                     for (names.items) |name| {
@@ -3509,10 +3597,10 @@ pub const Module = struct {
                     // 1. Let entries be a new empty List.
 
                     // 2. Let names be the BoundNames of Declaration.
-                    var names = std.ArrayList(Identifier).init(allocator);
-                    defer names.deinit();
-                    try declaration.collectBoundNames(&names);
-                    try export_entries.ensureUnusedCapacity(names.items.len);
+                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    defer names.deinit(allocator);
+                    try declaration.collectBoundNames(allocator, &names);
+                    try export_entries.ensureUnusedCapacity(allocator, names.items.len);
 
                     // 3. For each element name of names, do
                     for (names.items) |name| {
@@ -3534,9 +3622,9 @@ pub const Module = struct {
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
                     // 1. Let names be the BoundNames of HoistableDeclaration.
-                    var names = std.ArrayList(Identifier).init(allocator);
-                    defer names.deinit();
-                    try hoistable_declaration.collectBoundNames(&names);
+                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    defer names.deinit(allocator);
+                    try hoistable_declaration.collectBoundNames(allocator, &names);
 
                     // 2. Let localName be the sole element of names.
                     std.debug.assert(names.items.len == 1);
@@ -3546,7 +3634,7 @@ pub const Module = struct {
                     //      [[ModuleRequest]]: null, [[ImportName]]: null,
                     //      [[LocalName]]: localName, [[ExportName]]: "default"
                     //    }.
-                    try export_entries.append(.{
+                    try export_entries.append(allocator, .{
                         .module_request = null,
                         .import_name = null,
                         .local_name = local_name,
@@ -3557,9 +3645,9 @@ pub const Module = struct {
                 // ExportDeclaration : export default ClassDeclaration
                 .default_class_declaration => |class_declaration| {
                     // 1. Let names be the BoundNames of ClassDeclaration.
-                    var names = std.ArrayList(Identifier).init(allocator);
-                    defer names.deinit();
-                    try class_declaration.collectBoundNames(&names);
+                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    defer names.deinit(allocator);
+                    try class_declaration.collectBoundNames(allocator, &names);
 
                     // 2. Let localName be the sole element of names.
                     std.debug.assert(names.items.len == 1);
@@ -3569,7 +3657,7 @@ pub const Module = struct {
                     //      [[ModuleRequest]]: null, [[ImportName]]: null,
                     //      [[LocalName]]: localName, [[ExportName]]: "default"
                     //    }.
-                    try export_entries.append(.{
+                    try export_entries.append(allocator, .{
                         .module_request = null,
                         .import_name = null,
                         .local_name = local_name,
@@ -3584,7 +3672,7 @@ pub const Module = struct {
                     //      [[LocalName]]: "*default*", [[ExportName]]: "default"
                     //    }.
                     // 2. Return « entry ».
-                    try export_entries.append(.{
+                    try export_entries.append(allocator, .{
                         .module_request = null,
                         .import_name = null,
                         .local_name = "*default*",
@@ -3604,14 +3692,15 @@ pub const ModuleItemList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItemList,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let names1 be the LexicallyDeclaredNames of ModuleItemList.
         // 2. Let names2 be the LexicallyDeclaredNames of ModuleItem.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |module_item| {
-            try module_item.collectLexicallyDeclaredNames(lexically_declared_names);
+            try module_item.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
         }
     }
 
@@ -3619,11 +3708,12 @@ pub const ModuleItemList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: ModuleItemList,
-        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
+        allocator: std.mem.Allocator,
+        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         for (self.items) |item| switch (item) {
             .statement_list_item => |statement_list_item| {
-                try statement_list_item.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
+                try statement_list_item.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
             },
 
             // ModuleItem : ImportDeclaration
@@ -3644,28 +3734,28 @@ pub const ModuleItemList = struct {
                 .declaration => |declaration| {
                     // 1. Return a List whose sole element is the DeclarationPart of Declaration.
                     switch (declaration.*) {
-                        .hoistable_declaration => |hoistable_declaration| try lexically_scoped_declarations.append(.{ .hoistable_declaration = hoistable_declaration }),
-                        .class_declaration => |class_declaration| try lexically_scoped_declarations.append(.{ .class_declaration = class_declaration }),
-                        .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(.{ .lexical_declaration = lexical_declaration }),
+                        .hoistable_declaration => |hoistable_declaration| try lexically_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration }),
+                        .class_declaration => |class_declaration| try lexically_scoped_declarations.append(allocator, .{ .class_declaration = class_declaration }),
+                        .lexical_declaration => |lexical_declaration| try lexically_scoped_declarations.append(allocator, .{ .lexical_declaration = lexical_declaration }),
                     }
                 },
 
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
                     // 1. Return a List whose sole element is the DeclarationPart of HoistableDeclaration.
-                    try lexically_scoped_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
+                    try lexically_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration });
                 },
 
                 // ExportDeclaration : export default ClassDeclaration
                 .default_class_declaration => |class_declaration| {
                     // 1. Return a List whose sole element is ClassDeclaration.
-                    try lexically_scoped_declarations.append(.{ .class_declaration = class_declaration });
+                    try lexically_scoped_declarations.append(allocator, .{ .class_declaration = class_declaration });
                 },
 
                 // ExportDeclaration : export default AssignmentExpression ;
                 .default_expression => |expression| {
                     // 1. Return a List whose sole element is this ExportDeclaration.
-                    try lexically_scoped_declarations.append(.{ .export_declaration = expression });
+                    try lexically_scoped_declarations.append(allocator, .{ .export_declaration = expression });
                 },
             },
         };
@@ -3675,14 +3765,15 @@ pub const ModuleItemList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ModuleItemList,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let names1 be the VarDeclaredNames of ModuleItemList.
         // 2. Let names2 be the VarDeclaredNames of ModuleItem.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |module_item| {
-            try module_item.collectVarDeclaredNames(var_declared_names);
+            try module_item.collectVarDeclaredNames(allocator, var_declared_names);
         }
     }
 
@@ -3690,14 +3781,15 @@ pub const ModuleItemList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ModuleItemList,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let declarations1 be the VarScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be the VarScopedDeclarations of ModuleItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         for (self.items) |module_item| {
-            try module_item.collectVarScopedDeclarations(var_scoped_declarations);
+            try module_item.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
     }
 };
@@ -3712,13 +3804,14 @@ pub const ModuleItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItem,
-        lexically_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
             .import_declaration => |import_declaration| {
                 // 1. Return the BoundNames of ImportDeclaration.
-                try import_declaration.collectBoundNames(lexically_declared_names);
+                try import_declaration.collectBoundNames(allocator, lexically_declared_names);
             },
 
             // ModuleItem : ExportDeclaration
@@ -3727,13 +3820,13 @@ pub const ModuleItem = union(enum) {
                 if (export_declaration == .variable_statement) return;
 
                 // 2. Return the BoundNames of ExportDeclaration.
-                try export_declaration.collectBoundNames(lexically_declared_names);
+                try export_declaration.collectBoundNames(allocator, lexically_declared_names);
             },
 
             // ModuleItem : StatementListItem
             .statement_list_item => |statement_list_item| {
                 // 1. Return the LexicallyDeclaredNames of StatementListItem.
-                try statement_list_item.collectLexicallyDeclaredNames(lexically_declared_names);
+                try statement_list_item.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
             },
         }
     }
@@ -3742,7 +3835,8 @@ pub const ModuleItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ModuleItem,
-        var_declared_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        var_declared_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
@@ -3755,7 +3849,7 @@ pub const ModuleItem = union(enum) {
                 // 1. If ExportDeclaration is export VariableStatement, return the BoundNames of
                 //    ExportDeclaration.
                 .variable_statement => |variable_statement| {
-                    try variable_statement.variable_declaration_list.collectBoundNames(var_declared_names);
+                    try variable_statement.variable_declaration_list.collectBoundNames(allocator, var_declared_names);
                 },
 
                 // 2. Return a new empty List.
@@ -3763,7 +3857,7 @@ pub const ModuleItem = union(enum) {
             },
 
             .statement_list_item => |statement_list_item| {
-                try statement_list_item.collectVarDeclaredNames(var_declared_names);
+                try statement_list_item.collectVarDeclaredNames(allocator, var_declared_names);
             },
         }
     }
@@ -3772,7 +3866,8 @@ pub const ModuleItem = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ModuleItem,
-        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
+        allocator: std.mem.Allocator,
+        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
@@ -3785,7 +3880,7 @@ pub const ModuleItem = union(enum) {
                 // 1. If ExportDeclaration is export VariableStatement, return the
                 //    VarScopedDeclarations of VariableStatement.
                 .variable_statement => |variable_statement| {
-                    try variable_statement.variable_declaration_list.collectVarScopedDeclarations(var_scoped_declarations);
+                    try variable_statement.variable_declaration_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
                 },
 
                 // 2. Return a new empty List.
@@ -3793,7 +3888,7 @@ pub const ModuleItem = union(enum) {
             },
 
             .statement_list_item => |statement_list_item| {
-                try statement_list_item.collectVarScopedDeclarations(var_scoped_declarations);
+                try statement_list_item.collectVarScopedDeclarations(allocator, var_scoped_declarations);
             },
         }
     }
@@ -3814,14 +3909,15 @@ pub const ImportDeclaration = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ImportDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportDeclaration : import ImportClause FromClause ;
         // 1. Return the BoundNames of ImportClause.
         // ImportDeclaration : import ModuleSpecifier ;
         // 1. Return a new empty List.
         if (self.import_clause) |import_clause| {
-            try import_clause.collectBoundNames(bound_names);
+            try import_clause.collectBoundNames(allocator, bound_names);
         }
     }
 };
@@ -3847,7 +3943,8 @@ pub const ImportClause = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ImportClause,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportClause : ImportedDefaultBinding , NameSpaceImport
         // 1. Let names1 be the BoundNames of ImportedDefaultBinding.
@@ -3858,16 +3955,16 @@ pub const ImportClause = union(enum) {
         // 2. Let names2 be the BoundNames of NamedImports.
         // 3. Return the list-concatenation of names1 and names2.
         switch (self) {
-            .imported_default_binding => |imported_default_binding| try bound_names.append(imported_default_binding),
-            .namespace_import => |namespace_import| try bound_names.append(namespace_import),
-            .named_imports => |named_imports| try named_imports.collectBoundNames(bound_names),
+            .imported_default_binding => |imported_default_binding| try bound_names.append(allocator, imported_default_binding),
+            .namespace_import => |namespace_import| try bound_names.append(allocator, namespace_import),
+            .named_imports => |named_imports| try named_imports.collectBoundNames(allocator, bound_names),
             .imported_default_binding_and_namespace_import => |x| {
-                try bound_names.append(x.imported_default_binding);
-                try bound_names.append(x.namespace_import);
+                try bound_names.append(allocator, x.imported_default_binding);
+                try bound_names.append(allocator, x.namespace_import);
             },
             .imported_default_binding_and_named_imports => |x| {
-                try bound_names.append(x.imported_default_binding);
-                try x.named_imports.collectBoundNames(bound_names);
+                try bound_names.append(allocator, x.imported_default_binding);
+                try x.named_imports.collectBoundNames(allocator, bound_names);
             },
         }
     }
@@ -3876,10 +3973,10 @@ pub const ImportClause = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-importentriesformodule
     pub fn collectImportEntriesForModule(
         self: ImportClause,
-        import_entries: *std.ArrayList(ImportEntry),
+        allocator: std.mem.Allocator,
+        import_entries: *std.ArrayListUnmanaged(ImportEntry),
         module: *const String,
     ) std.mem.Allocator.Error!void {
-        const allocator = import_entries.allocator;
         switch (self) {
             // ImportedDefaultBinding : ImportedBinding
             .imported_default_binding => |imported_binding| {
@@ -3896,7 +3993,7 @@ pub const ImportClause = union(enum) {
                 };
 
                 // 3. Return « defaultEntry ».
-                try import_entries.append(default_entry);
+                try import_entries.append(allocator, default_entry);
             },
 
             // NameSpaceImport : * as ImportedBinding
@@ -3914,7 +4011,7 @@ pub const ImportClause = union(enum) {
                 };
 
                 // 3. Return « entry ».
-                try import_entries.append(entry);
+                try import_entries.append(allocator, entry);
             },
 
             // NamedImports : { }
@@ -3947,7 +4044,7 @@ pub const ImportClause = union(enum) {
                     };
 
                     // 4. Return « entry ».
-                    try import_entries.append(entry);
+                    try import_entries.append(allocator, entry);
                 }
                 // ImportSpecifier : ImportedBinding
                 else {
@@ -3964,7 +4061,7 @@ pub const ImportClause = union(enum) {
                     };
 
                     // 3. Return « entry ».
-                    try import_entries.append(entry);
+                    try import_entries.append(allocator, entry);
                 }
             },
 
@@ -3975,11 +4072,13 @@ pub const ImportClause = union(enum) {
                 // 3. Return the list-concatenation of entries1 and entries2.
                 try collectImportEntriesForModule(
                     .{ .imported_default_binding = x.imported_default_binding },
+                    allocator,
                     import_entries,
                     module,
                 );
                 try collectImportEntriesForModule(
                     .{ .namespace_import = x.namespace_import },
+                    allocator,
                     import_entries,
                     module,
                 );
@@ -3992,11 +4091,13 @@ pub const ImportClause = union(enum) {
                 // 3. Return the list-concatenation of entries1 and entries2.
                 try collectImportEntriesForModule(
                     .{ .imported_default_binding = x.imported_default_binding },
+                    allocator,
                     import_entries,
                     module,
                 );
                 try collectImportEntriesForModule(
                     .{ .named_imports = x.named_imports },
+                    allocator,
                     import_entries,
                     module,
                 );
@@ -4013,7 +4114,8 @@ pub const ImportsList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ImportsList,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // NamedImports : { }
         // 1. Return a new empty List.
@@ -4022,7 +4124,7 @@ pub const ImportsList = struct {
         // 2. Let names2 be the BoundNames of ImportSpecifier.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |import_specifier| {
-            try import_specifier.collectBoundNames(bound_names);
+            try import_specifier.collectBoundNames(allocator, bound_names);
         }
     }
 };
@@ -4036,11 +4138,12 @@ pub const ImportSpecifier = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ImportSpecifier,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportSpecifier : ModuleExportName as ImportedBinding
         // 1. Return the BoundNames of ImportedBinding.
-        try bound_names.append(self.imported_binding);
+        try bound_names.append(allocator, self.imported_binding);
     }
 };
 
@@ -4063,9 +4166,9 @@ pub const ExportDeclaration = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
         self: ExportDeclaration,
-        bound_names: *std.ArrayList(Identifier),
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
     ) std.mem.Allocator.Error!void {
-        const allocator = bound_names.allocator;
         switch (self) {
             // ExportDeclaration :
             //     export ExportFromClause FromClause ;
@@ -4077,53 +4180,53 @@ pub const ExportDeclaration = union(enum) {
             // ExportDeclaration : export VariableStatement
             .variable_statement => |variable_statement| {
                 // 1. Return the BoundNames of VariableStatement.
-                try variable_statement.variable_declaration_list.collectBoundNames(bound_names);
+                try variable_statement.variable_declaration_list.collectBoundNames(allocator, bound_names);
             },
 
             // ExportDeclaration : export Declaration
             .declaration => |declaration| {
                 // 1. Return the BoundNames of Declaration.
-                try declaration.collectBoundNames(bound_names);
+                try declaration.collectBoundNames(allocator, bound_names);
             },
 
             // ExportDeclaration : export default HoistableDeclaration
             .default_hoistable_declaration => |hoistable_declaration| {
                 // 1. Let declarationNames be the BoundNames of HoistableDeclaration.
-                var declaration_names = std.ArrayList(Identifier).init(allocator);
-                defer declaration_names.deinit();
-                try hoistable_declaration.collectBoundNames(&declaration_names);
+                var declaration_names: std.ArrayListUnmanaged(Identifier) = .empty;
+                defer declaration_names.deinit(allocator);
+                try hoistable_declaration.collectBoundNames(allocator, &declaration_names);
 
                 // 2. If declarationNames does not include the element "*default*", append
                 //    "*default*" to declarationNames.
                 if (!containsSlice(declaration_names.items, "*default*")) {
-                    try declaration_names.append("*default*");
+                    try declaration_names.append(allocator, "*default*");
                 }
 
                 // 3. Return declarationNames.
-                try bound_names.appendSlice(declaration_names.items);
+                try bound_names.appendSlice(allocator, declaration_names.items);
             },
 
             // ExportDeclaration : export default ClassDeclaration
             .default_class_declaration => |class_declaration| {
                 // 1. Let declarationNames be the BoundNames of ClassDeclaration.
-                var declaration_names = std.ArrayList(Identifier).init(allocator);
-                defer declaration_names.deinit();
-                try class_declaration.collectBoundNames(&declaration_names);
+                var declaration_names: std.ArrayListUnmanaged(Identifier) = .empty;
+                defer declaration_names.deinit(allocator);
+                try class_declaration.collectBoundNames(allocator, &declaration_names);
 
                 // 2. If declarationNames does not include the element "*default*", append
                 //    "*default*" to declarationNames.
                 if (!containsSlice(declaration_names.items, "*default*")) {
-                    try declaration_names.append("*default*");
+                    try declaration_names.append(allocator, "*default*");
                 }
 
                 // 3. Return declarationNames.
-                try bound_names.appendSlice(declaration_names.items);
+                try bound_names.appendSlice(allocator, declaration_names.items);
             },
 
             // ExportDeclaration : export default AssignmentExpression ;
             .default_expression => {
                 // 1. Return « "*default*" ».
-                try bound_names.append("*default*");
+                try bound_names.append(allocator, "*default*");
             },
         }
     }
@@ -4139,10 +4242,10 @@ pub const ExportFromClause = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
     pub fn collectExportEntriesForModule(
         self: ExportFromClause,
-        export_entries: *std.ArrayList(ExportEntry),
+        allocator: std.mem.Allocator,
+        export_entries: *std.ArrayListUnmanaged(ExportEntry),
         module: ?*const String,
     ) std.mem.Allocator.Error!void {
-        const allocator = export_entries.allocator;
         switch (self) {
             // ExportFromClause : *
             .star => {
@@ -4158,7 +4261,7 @@ pub const ExportFromClause = union(enum) {
                 };
 
                 // 2. Return « entry ».
-                try export_entries.append(entry);
+                try export_entries.append(allocator, entry);
             },
             // ExportFromClause : * as ModuleExportName
             .star_as => |module_export_name| {
@@ -4180,9 +4283,9 @@ pub const ExportFromClause = union(enum) {
                 };
 
                 // 3. Return « entry ».
-                try export_entries.append(entry);
+                try export_entries.append(allocator, entry);
             },
-            .named_exports => |named_exports| try named_exports.collectExportEntriesForModule(export_entries, module),
+            .named_exports => |named_exports| try named_exports.collectExportEntriesForModule(allocator, export_entries, module),
         }
     }
 };
@@ -4195,15 +4298,15 @@ pub const NamedExports = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
     pub fn collectExportEntriesForModule(
         self: NamedExports,
-        export_entries: *std.ArrayList(ExportEntry),
+        allocator: std.mem.Allocator,
+        export_entries: *std.ArrayListUnmanaged(ExportEntry),
         module: ?*const String,
     ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier
         // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.
         // 2. Let specs2 be the ExportEntriesForModule of ExportSpecifier with argument module.
         // 3. Return the list-concatenation of specs1 and specs2.
-        const allocator = export_entries.allocator;
-        try export_entries.ensureUnusedCapacity(self.exports_list.items.len);
+        try export_entries.ensureUnusedCapacity(allocator, self.exports_list.items.len);
         for (self.exports_list.items) |export_specifier| {
             // ExportSpecifier : ModuleExportName
             if (export_specifier.alias == null) {

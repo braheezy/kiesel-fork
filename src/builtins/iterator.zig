@@ -948,15 +948,15 @@ pub const prototype = struct {
         var iterated = try getIteratorDirect(object);
 
         // 4. Let items be a new empty List.
-        var items = std.ArrayList(Value).init(agent.gc_allocator);
-        defer items.deinit();
+        var items: std.ArrayListUnmanaged(Value) = .empty;
+        defer items.deinit(agent.gc_allocator);
 
         // 5. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return CreateArrayFromList(items).
         while (try iterated.stepValue()) |value| {
             // c. Append value to items.
-            try items.append(value);
+            try items.append(agent.gc_allocator, value);
         }
         return Value.from(try createArrayFromList(agent, items.items));
     }

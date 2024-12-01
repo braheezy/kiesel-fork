@@ -31,12 +31,12 @@ const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
-var tracked_promise_rejections: std.AutoArrayHashMap(
+var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
     *kiesel.builtins.Promise,
     HostHooks.PromiseRejectionTrackerOperation,
-) = undefined;
+) = .empty;
 
-var module_cache: std.StringHashMap(Module) = undefined;
+var module_cache: std.StringHashMapUnmanaged(Module) = .empty;
 
 // Python REPL my beloved 🐍
 const repl_preamble = std.fmt.comptimePrint(
@@ -405,7 +405,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 }
             }
         }
-        tracked_promise_rejections.clearAndFree();
+        tracked_promise_rejections.clearAndFree(agent.gc_allocator);
     }
 
     return switch (script_or_module) {
@@ -419,13 +419,13 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                     try String.fromUtf8(agent.gc_allocator, std.fs.path.basename(path)),
                 ) catch |err| break :blk err,
             };
-            try module_cache.putNoClobber(module_path, .{ .source_text_module = module });
+            try module_cache.putNoClobber(agent.gc_allocator, module_path, .{ .source_text_module = module });
             var promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
             switch (promise.fields.promise_state) {
                 .pending => unreachable,
                 .rejected => {
-                    tracked_promise_rejections.clearAndFree();
+                    tracked_promise_rejections.clearAndFree(agent.gc_allocator);
                     agent.exception = promise.fields.promise_result;
                     break :blk error.ExceptionThrown;
                 },
@@ -436,7 +436,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                     switch (promise.fields.promise_state) {
                         .pending => unreachable,
                         .rejected => {
-                            tracked_promise_rejections.clearAndFree();
+                            tracked_promise_rejections.clearAndFree(agent.gc_allocator);
                             agent.exception = promise.fields.promise_result;
                             break :blk error.ExceptionThrown;
                         },
@@ -757,11 +757,8 @@ pub fn main() !u8 {
         } else |_| {}
     }
 
-    tracked_promise_rejections = .init(agent.gc_allocator);
-    defer tracked_promise_rejections.deinit();
-
-    module_cache = .init(agent.gc_allocator);
-    defer module_cache.deinit();
+    defer tracked_promise_rejections.deinit(agent.gc_allocator);
+    defer module_cache.deinit(agent.gc_allocator);
 
     agent.host_hooks.hostLoadImportedModule = struct {
         fn func(
@@ -790,7 +787,7 @@ pub fn main() !u8 {
                 if (module_cache.get(module_path)) |module| break :blk module;
                 break :blk if (parseSourceTextModule(agent_, module_path)) |source_text_module| {
                     const module: Module = .{ .source_text_module = source_text_module };
-                    try module_cache.putNoClobber(module_path, module);
+                    try module_cache.putNoClobber(agent_.gc_allocator, module_path, module);
                     break :blk module;
                 } else |err| switch (err) {
                     error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
@@ -847,6 +844,7 @@ pub fn main() !u8 {
             promise: *kiesel.builtins.Promise,
             operation: HostHooks.PromiseRejectionTrackerOperation,
         ) void {
+            const agent_ = promise.object.agent;
             if (tracked_promise_rejections.get(promise)) |previous_operation| {
                 // Don't report `Promise.reject().catch(handler)` evaluated in a single script
                 if (previous_operation == .reject and operation == .handle) {
@@ -854,7 +852,7 @@ pub fn main() !u8 {
                     return;
                 }
             }
-            tracked_promise_rejections.put(promise, operation) catch {};
+            tracked_promise_rejections.put(agent_.gc_allocator, promise, operation) catch {};
         }
     }.func;
 

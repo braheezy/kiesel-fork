@@ -283,16 +283,16 @@ pub fn fulfillPromise(
     std.debug.assert(promise.fields.promise_state == .pending);
 
     // 2. Let reactions be promise.[[PromiseFulfillReactions]].
-    const reactions = promise.fields.promise_fulfill_reactions;
+    const reactions = &promise.fields.promise_fulfill_reactions;
 
     // 3. Set promise.[[PromiseResult]] to value.
     promise.fields.promise_result = value;
 
     // 4. Set promise.[[PromiseFulfillReactions]] to undefined.
-    defer promise.fields.promise_fulfill_reactions.deinit();
+    defer promise.fields.promise_fulfill_reactions.deinit(agent.gc_allocator);
 
     // 5. Set promise.[[PromiseRejectReactions]] to undefined.
-    defer promise.fields.promise_reject_reactions.deinit();
+    defer promise.fields.promise_reject_reactions.deinit(agent.gc_allocator);
 
     // 6. Set promise.[[PromiseState]] to fulfilled.
     promise.fields.promise_state = .fulfilled;
@@ -419,10 +419,10 @@ pub fn rejectPromise(
     promise.fields.promise_result = reason;
 
     // 4. Set promise.[[PromiseFulfillReactions]] to undefined.
-    defer promise.fields.promise_fulfill_reactions.deinit();
+    defer promise.fields.promise_fulfill_reactions.deinit(agent.gc_allocator);
 
     // 5. Set promise.[[PromiseRejectReactions]] to undefined.
-    defer promise.fields.promise_reject_reactions.deinit();
+    defer promise.fields.promise_reject_reactions.deinit(agent.gc_allocator);
 
     // 6. Set promise.[[PromiseState]] to rejected.
     promise.fields.promise_state = .rejected;
@@ -705,8 +705,8 @@ fn performPromiseAll(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
-    var values = try agent.gc_allocator.create(std.ArrayList(Value));
-    values.* = std.ArrayList(Value).init(agent.gc_allocator);
+    var values = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    values.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
@@ -740,7 +740,7 @@ fn performPromiseAll(
         };
 
         // c. Append undefined to values.
-        try values.append(.undefined);
+        try values.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -756,7 +756,7 @@ fn performPromiseAll(
             index: usize,
 
             /// [[Values]]
-            values: *std.ArrayList(Value),
+            values: *std.ArrayListUnmanaged(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -873,8 +873,8 @@ fn performPromiseAllSettled(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
-    var values = try agent.gc_allocator.create(std.ArrayList(Value));
-    values.* = std.ArrayList(Value).init(agent.gc_allocator);
+    var values = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    values.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
@@ -908,7 +908,7 @@ fn performPromiseAllSettled(
         };
 
         // c. Append undefined to values.
-        try values.append(.undefined);
+        try values.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -925,7 +925,7 @@ fn performPromiseAllSettled(
             index: usize,
 
             /// [[Values]]
-            values: *std.ArrayList(Value),
+            values: *std.ArrayListUnmanaged(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -1175,8 +1175,8 @@ fn performPromiseAny(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let errors be a new empty List.
-    var errors = try agent.gc_allocator.create(std.ArrayList(Value));
-    errors.* = std.ArrayList(Value).init(agent.gc_allocator);
+    var errors = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    errors.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
@@ -1223,7 +1223,7 @@ fn performPromiseAny(
         };
 
         // c. Append undefined to errors.
-        try errors.append(.undefined);
+        try errors.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -1239,7 +1239,7 @@ fn performPromiseAny(
             index: usize,
 
             /// [[Errors]]
-            errors: *std.ArrayList(Value),
+            errors: *std.ArrayListUnmanaged(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -1454,10 +1454,16 @@ pub fn performPromiseThen(
         // 9. If promise.[[PromiseState]] is pending, then
         .pending => {
             // a. Append fulfillReaction to promise.[[PromiseFulfillReactions]].
-            try promise.fields.promise_fulfill_reactions.append(fulfill_reaction);
+            try promise.fields.promise_fulfill_reactions.append(
+                agent.gc_allocator,
+                fulfill_reaction,
+            );
 
             // b. Append rejectReaction to promise.[[PromiseRejectReactions]].
-            try promise.fields.promise_reject_reactions.append(reject_reaction);
+            try promise.fields.promise_reject_reactions.append(
+                agent.gc_allocator,
+                reject_reaction,
+            );
         },
 
         // 10. Else if promise.[[PromiseState]] is fulfilled, then
@@ -1573,10 +1579,10 @@ pub const constructor = struct {
                 .promise_state = .pending,
 
                 // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
-                .promise_fulfill_reactions = .init(agent.gc_allocator),
+                .promise_fulfill_reactions = .empty,
 
                 // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
-                .promise_reject_reactions = .init(agent.gc_allocator),
+                .promise_reject_reactions = .empty,
 
                 // 7. Set promise.[[PromiseIsHandled]] to false.
                 .promise_is_handled = false,
@@ -2181,10 +2187,10 @@ pub const Promise = MakeObject(.{
         promise_result: Value,
 
         /// [[PromiseFulfillReactions]]
-        promise_fulfill_reactions: std.ArrayList(PromiseReaction),
+        promise_fulfill_reactions: std.ArrayListUnmanaged(PromiseReaction),
 
         /// [[PromiseRejectReactions]]
-        promise_reject_reactions: std.ArrayList(PromiseReaction),
+        promise_reject_reactions: std.ArrayListUnmanaged(PromiseReaction),
 
         /// [[PromiseIsHandled]]
         promise_is_handled: bool,

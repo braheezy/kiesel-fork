@@ -216,7 +216,7 @@ pub fn asyncBlockStart(
 
     // 4. Push asyncContext onto the execution context stack; asyncContext is now the running
     //    execution context.
-    try agent.execution_context_stack.append(async_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, async_context);
 
     // 5. Resume the suspended evaluation of asyncContext. Let result be the value returned by the
     //    resumed computation.

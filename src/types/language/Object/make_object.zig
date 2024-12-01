@@ -55,9 +55,9 @@ pub fn MakeObject(
                     .tag = options.tag,
                     .agent = agent,
                     .shape = agent.empty_shape,
-                    .private_elements = .init(agent.gc_allocator),
+                    .private_elements = .empty,
                     .internal_methods = args.internal_methods,
-                    .property_storage = .init(agent.gc_allocator),
+                    .property_storage = .empty,
                 },
             };
             if (args.prototype != null) {

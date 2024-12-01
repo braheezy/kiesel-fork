@@ -352,7 +352,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
     var iterator = try getIterator(agent, iterable, .sync);
 
     // 3. Let list be a new empty List.
-    var list = std.ArrayList([]const u8).init(agent.gc_allocator);
+    var list: std.ArrayListUnmanaged([]const u8) = .empty;
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
@@ -373,7 +373,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
         }
 
         // d. Append next to list.
-        try list.append(try next.asString().toUtf8(agent.gc_allocator));
+        try list.append(agent.gc_allocator, try next.asString().toUtf8(agent.gc_allocator));
     }
-    return list.toOwnedSlice();
+    return list.toOwnedSlice(agent.gc_allocator);
 }

@@ -545,21 +545,21 @@ fn encode(
 
     // OPTIMIZATION: If the string is ASCII we don't have to handle unpaired surrogates.
     if (string.slice == .ascii) {
-        var buffer = std.ArrayList(u8).init(agent.gc_allocator);
-        try std.Uri.Component.percentEncode(buffer.writer(), string.slice.ascii, struct {
+        var buffer: std.ArrayListUnmanaged(u8) = .empty;
+        try std.Uri.Component.percentEncode(buffer.writer(agent.gc_allocator), string.slice.ascii, struct {
             fn isValidChar(c: u8) bool {
                 return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
             }
         }.isValidChar);
-        return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice());
+        return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice(agent.gc_allocator));
     }
 
     // 1. Let len be the length of string.
     const len = string.length();
 
     // 2. Let R be the empty String.
-    var result = String.Builder.init(agent.gc_allocator);
-    defer result.deinit();
+    var result: String.Builder = .empty;
+    defer result.deinit(agent.gc_allocator);
 
     // 5. Let k be 0.
     var k: usize = 0;
@@ -577,7 +577,7 @@ fn encode(
             k += 1;
 
             // ii. Set R to the string-concatenation of R and C.
-            try result.appendChar(@intCast(c));
+            try result.appendChar(agent.gc_allocator, @intCast(c));
         }
         // c. Else,
         else {
@@ -603,6 +603,7 @@ fn encode(
                 //    hexadecimal number.
                 // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0", start).
                 try result.appendString(
+                    agent.gc_allocator,
                     try String.fromAscii(
                         agent.gc_allocator,
                         try std.fmt.allocPrint(agent.gc_allocator, "%{X:0>2}", .{byte}),
@@ -613,7 +614,7 @@ fn encode(
     }
 
     // 7. Return R.
-    return result.build();
+    return result.build(agent.gc_allocator);
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
@@ -629,8 +630,8 @@ fn decode(
     const len = input.len;
 
     // 2. Let R be the empty String.
-    var result = String.Builder.init(agent.gc_allocator);
-    defer result.deinit();
+    var result: String.Builder = .empty;
+    defer result.deinit(agent.gc_allocator);
 
     // 3. Let k be 0.
     var k: usize = 0;
@@ -730,13 +731,13 @@ fn decode(
         }
 
         // d. Set R to the string-concatenation of R and S.
-        try result.appendSegment(s);
+        try result.appendSegment(agent.gc_allocator, s);
 
         // e. Set k to k + 1.
     }
 
     // 5. Return R.
-    return result.build();
+    return result.build(agent.gc_allocator);
 }
 
 /// 19.2.6.7 ParseHexOctet ( string, position )
@@ -775,7 +776,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 3. Let R be the empty String.
     // NOTE: This allocates the exact needed capacity upfront
     var result = try String.Builder.initCapacity(agent.gc_allocator, string.length());
-    defer result.deinit();
+    defer result.deinit(agent.gc_allocator);
 
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
     const unescaped_set = String.ascii_word_characters ++ "@*+-./";
@@ -837,7 +838,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     }
 
     // 7. Return R.
-    return Value.from(try result.build());
+    return Value.from(try result.build(agent.gc_allocator));
 }
 
 /// B.2.1.2 unescape ( string )
@@ -852,8 +853,8 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const len = string.length();
 
     // 3. Let R be the empty String.
-    var result = String.Builder.init(agent.gc_allocator);
-    defer result.deinit();
+    var result: String.Builder = .empty;
+    defer result.deinit(agent.gc_allocator);
 
     const code_units = try string.toUtf16(agent.gc_allocator);
     defer agent.gc_allocator.free(code_units);
@@ -910,11 +911,11 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         }
 
         // c. Set R to the string-concatenation of R and C.
-        try result.appendCodeUnit(c);
+        try result.appendCodeUnit(agent.gc_allocator, c);
 
         // d. Set k to k + 1.
     }
 
     // 6. Return R.
-    return Value.from(try result.build());
+    return Value.from(try result.build(agent.gc_allocator));
 }

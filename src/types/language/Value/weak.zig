@@ -40,8 +40,8 @@ pub const Weak = union(enum) {
         return a.getPtr() == b.getPtr();
     }
 
-    pub fn HashMap(comptime V: type) type {
-        return std.HashMap(Value.Weak, V, struct {
+    pub fn HashMapUnmanaged(comptime V: type) type {
+        return std.HashMapUnmanaged(Value.Weak, V, struct {
             pub fn hash(_: @This(), weak: Weak) u64 {
                 // Store the masked version of the pointers.
                 return switch (weak) {

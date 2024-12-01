@@ -99,21 +99,21 @@ fn makeLocaleRecord(
     // 1-8.
     // This code ain't nice, I know.
     const str = try tag.toString(agent.gc_allocator);
-    var parts = std.ArrayList([]const u8).init(agent.gc_allocator);
-    defer parts.deinit();
+    var parts: std.ArrayListUnmanaged([]const u8) = .empty;
+    defer parts.deinit(agent.gc_allocator);
     const end = std.mem.indexOf(u8, str, "-x-");
     if (std.mem.indexOf(u8, str, "-u-")) |start| {
-        try parts.append(str[0 .. start + 2]);
+        try parts.append(agent.gc_allocator, str[0 .. start + 2]);
         const unicode_extensions = str[start + 3 .. end orelse str.len];
         var it = std.mem.splitScalar(u8, unicode_extensions, '-');
         outer: while (it.next()) |key| {
             if (key.len == 0) break;
             const value: ?[]const u8 = blk: {
-                var value_parts = std.ArrayList([]const u8).init(agent.gc_allocator);
-                defer value_parts.deinit();
+                var value_parts: std.ArrayListUnmanaged([]const u8) = .empty;
+                defer value_parts.deinit(agent.gc_allocator);
                 while (it.peek()) |next| {
                     if (next.len == 2) break;
-                    try value_parts.append(it.next().?);
+                    try value_parts.append(agent.gc_allocator, it.next().?);
                 }
                 break :blk if (value_parts.items.len > 0)
                     try std.mem.join(agent.gc_allocator, "-", value_parts.items)
@@ -125,25 +125,25 @@ fn makeLocaleRecord(
                     if (@field(options, field_name) != null) continue :outer;
                 }
             }
-            try parts.append(key);
-            if (value != null) try parts.append(value.?);
+            try parts.append(agent.gc_allocator, key);
+            if (value != null) try parts.append(agent.gc_allocator, value.?);
         }
     } else {
-        try parts.append(str[0 .. end orelse str.len]);
+        try parts.append(agent.gc_allocator, str[0 .. end orelse str.len]);
         inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
             if (@field(options, field_name) != null) {
-                try parts.append("u");
+                try parts.append(agent.gc_allocator, "u");
                 break;
             }
         }
     }
     inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
         if (@field(options, field_name)) |new_value| {
-            try parts.append(field_name);
-            try parts.append(new_value.slice.ascii); // All extensions have been validated and should be ASCII at this point
+            try parts.append(agent.gc_allocator, field_name);
+            try parts.append(agent.gc_allocator, new_value.slice.ascii); // All extensions have been validated and should be ASCII at this point
         }
     }
-    if (end != null) try parts.append(str[end.? + 1 ..]);
+    if (end != null) try parts.append(agent.gc_allocator, str[end.? + 1 ..]);
     const new_str = try std.mem.join(agent.gc_allocator, "-", parts.items);
     return icu4zig.Locale.fromString(new_str) catch unreachable;
 }

@@ -80,7 +80,7 @@ delete: *const fn (
 // [[OwnPropertyKeys]]
 ownPropertyKeys: *const fn (
     object: *Object,
-) Agent.Error!std.ArrayList(PropertyKey) = builtins.ordinary.internal_methods.ownPropertyKeys,
+) Agent.Error!std.ArrayListUnmanaged(PropertyKey) = builtins.ordinary.internal_methods.ownPropertyKeys,
 
 // [[Call]]
 call: ?*const fn (

@@ -13,7 +13,7 @@ const PrivateEnvironment = @This();
 outer_private_environment: ?*PrivateEnvironment,
 
 /// [[Names]]
-names: std.StringHashMap(PrivateName),
+names: std.StringHashMapUnmanaged(PrivateName),
 
 /// 9.2.1.2 ResolvePrivateIdentifier ( privateEnv, identifier )
 /// https://tc39.es/ecma262/#sec-resolve-private-identifier

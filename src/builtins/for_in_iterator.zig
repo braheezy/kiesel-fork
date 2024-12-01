@@ -37,10 +37,10 @@ pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Err
                 .object_was_visited = false,
 
                 // 4. Set iterator.[[VisitedKeys]] to a new empty List.
-                .visited_keys = .init(agent.gc_allocator),
+                .visited_keys = .empty,
 
                 // 5. Set iterator.[[RemainingKeys]] to a new empty List.
-                .remaining_keys = .init(agent.gc_allocator),
+                .remaining_keys = .empty,
             },
         },
     });
@@ -81,15 +81,15 @@ pub const prototype = struct {
             // a. If O.[[ObjectWasVisited]] is false, then
             if (!for_in_iterator.fields.state.object_was_visited) {
                 // i. Let keys be ? object.[[OwnPropertyKeys]]().
-                const keys = try object.internal_methods.ownPropertyKeys(object);
-                defer keys.deinit();
+                var keys = try object.internal_methods.ownPropertyKeys(object);
+                defer keys.deinit(agent.gc_allocator);
 
                 // ii. For each element key of keys, do
                 for (keys.items) |key| {
                     // 1. If key is a String, then
                     if (key == .string or key == .integer_index) {
                         // a. Append key to O.[[RemainingKeys]].
-                        try for_in_iterator.fields.state.remaining_keys.append(key);
+                        try for_in_iterator.fields.state.remaining_keys.append(agent.gc_allocator, key);
                     }
                 }
 
@@ -111,7 +111,11 @@ pub const prototype = struct {
                     // 2. If desc is not undefined, then
                     if (descriptor != null) {
                         // a. Append r to O.[[VisitedKeys]].
-                        try for_in_iterator.fields.state.visited_keys.putNoClobber(remaining_key, {});
+                        try for_in_iterator.fields.state.visited_keys.putNoClobber(
+                            agent.gc_allocator,
+                            remaining_key,
+                            {},
+                        );
 
                         // b. If desc.[[Enumerable]] is true, return CreateIteratorResultObject(r, false).
                         if (descriptor.?.enumerable == true) {
@@ -155,10 +159,10 @@ pub const ForInIterator = MakeObject(.{
             object_was_visited: bool,
 
             /// [[VisitedKeys]]
-            visited_keys: PropertyKey.ArrayHashMap(void),
+            visited_keys: PropertyKey.ArrayHashMapUnmanaged(void),
 
             /// [[RemainingKeys]]
-            remaining_keys: std.ArrayList(PropertyKey),
+            remaining_keys: std.ArrayListUnmanaged(PropertyKey),
         },
         completed,
     },

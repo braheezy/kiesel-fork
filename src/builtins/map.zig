@@ -121,7 +121,7 @@ pub const constructor = struct {
             "%Map.prototype%",
             .{
                 // 3. Set map.[[MapData]] to a new empty List.
-                .map_data = .init(agent.gc_allocator),
+                .map_data = .empty,
             },
         );
 
@@ -161,7 +161,7 @@ pub const constructor = struct {
 
             // b. Let entry be the Record { [[Key]]: g.[[Key]], [[Value]]: elements }.
             // c. Append entry to map.[[MapData]].
-            try map.as(Map).fields.map_data.putNoClobber(entry.key_ptr.*, Value.from(elements));
+            try map.as(Map).fields.map_data.putNoClobber(agent.gc_allocator, entry.key_ptr.*, Value.from(elements));
         }
 
         // 4. Return map.
@@ -230,9 +230,9 @@ pub const prototype = struct {
         // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
         //     a. Set p.[[Key]] to empty.
         //     b. Set p.[[Value]] to empty.
-        map.fields.map_data.clearAndFree();
+        map.fields.map_data.clearAndFree(agent.gc_allocator);
         if (map.fields.iterable_keys) |*iterable_keys| {
-            iterable_keys.clearAndFree();
+            iterable_keys.clearAndFree(agent.gc_allocator);
         }
 
         // 4. Return undefined.
@@ -293,8 +293,8 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
-        const iterable_keys = try map.fields.registerIterator();
-        defer map.fields.unregisterIterator();
+        const iterable_keys = try map.fields.registerIterator(agent.gc_allocator);
+        defer map.fields.unregisterIterator(agent.gc_allocator);
 
         // 4. Let entries be M.[[MapData]].
         const entries_ = &map.fields.map_data;
@@ -397,11 +397,11 @@ pub const prototype = struct {
         //         ii. Return M.
         // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
         // 6. Append p to M.[[MapData]].
-        const result = try map.fields.map_data.getOrPut(key);
+        const result = try map.fields.map_data.getOrPut(agent.gc_allocator, key);
         result.value_ptr.* = value;
         if (!result.found_existing) {
             if (map.fields.iterable_keys) |*iterable_keys| {
-                try iterable_keys.append(key);
+                try iterable_keys.append(agent.gc_allocator, key);
             }
         }
 
@@ -436,8 +436,8 @@ pub const prototype = struct {
     }
 };
 
-const MapData = Value.ArrayHashMap(Value, sameValue);
-const IterableKeys = std.ArrayList(?Value);
+const MapData = Value.ArrayHashMapUnmanaged(Value, sameValue);
+const IterableKeys = std.ArrayListUnmanaged(?Value);
 
 /// 24.1.4 Properties of Map Instances
 /// https://tc39.es/ecma262/#sec-properties-of-map-instances
@@ -451,10 +451,13 @@ pub const Map = MakeObject(.{
         iterable_keys: ?IterableKeys = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableKeys {
+        pub fn registerIterator(
+            self: *@This(),
+            allocator: std.mem.Allocator,
+        ) std.mem.Allocator.Error!*IterableKeys {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys == null);
-                self.iterable_keys = try .initCapacity(self.map_data.allocator, self.map_data.count());
+                self.iterable_keys = try .initCapacity(allocator, self.map_data.count());
                 for (self.map_data.keys()) |key| {
                     self.iterable_keys.?.appendAssumeCapacity(key);
                 }
@@ -463,11 +466,11 @@ pub const Map = MakeObject(.{
             return &self.iterable_keys.?;
         }
 
-        pub fn unregisterIterator(self: *@This()) void {
+        pub fn unregisterIterator(self: *@This(), allocator: std.mem.Allocator) void {
             self.active_iterators -= 1;
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys != null);
-                self.iterable_keys.?.deinit();
+                self.iterable_keys.?.deinit(allocator);
                 self.iterable_keys = null;
             }
         }

@@ -577,9 +577,9 @@ pub fn repeat(
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
     var builder = try Builder.initCapacity(allocator, n);
-    defer builder.deinit();
+    defer builder.deinit(allocator);
     for (0..n) |_| builder.appendStringAssumeCapacity(self);
-    return builder.build();
+    return builder.build(allocator);
 }
 
 pub fn concat(
@@ -588,13 +588,13 @@ pub fn concat(
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
     var builder = try Builder.initCapacity(allocator, strings.len);
-    defer builder.deinit();
+    defer builder.deinit(allocator);
     for (strings) |string| builder.appendStringAssumeCapacity(string);
-    return builder.build();
+    return builder.build(allocator);
 }
 
-pub fn HashMap(comptime V: type) type {
-    return std.HashMap(*const String, V, struct {
+pub fn HashMapUnmanaged(comptime V: type) type {
+    return std.HashMapUnmanaged(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u64 {
             return key.hash;
         }
@@ -605,8 +605,8 @@ pub fn HashMap(comptime V: type) type {
     }, std.hash_map.default_max_load_percentage);
 }
 
-pub fn ArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(*const String, V, struct {
+pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+    return std.ArrayHashMapUnmanaged(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u32 {
             return @truncate(key.hash);
         }

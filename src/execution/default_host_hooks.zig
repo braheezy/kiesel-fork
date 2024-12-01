@@ -52,13 +52,13 @@ pub fn hostCallJobCallback(
 /// 9.5.4 HostEnqueueGenericJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuegenericjob
 pub fn hostEnqueueGenericJob(agent: *Agent, job: Job, realm: *Realm) std.mem.Allocator.Error!void {
-    try agent.queued_jobs.append(.{ .job = job, .realm = realm });
+    try agent.queued_jobs.append(agent.gc_allocator, .{ .job = job, .realm = realm });
 }
 
 /// 9.5.5 HostEnqueuePromiseJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
 pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) std.mem.Allocator.Error!void {
-    try agent.queued_jobs.append(.{ .job = job, .realm = realm });
+    try agent.queued_jobs.append(agent.gc_allocator, .{ .job = job, .realm = realm });
 }
 
 /// 9.9.4.1 HostEnqueueFinalizationRegistryCleanupJob ( finalizationRegistry )
@@ -88,17 +88,16 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
     // An implementation of HostEnqueueFinalizationRegistryCleanupJob schedules cleanupJob
     // to be performed at some future time, if possible. It must also conform to the
     // requirements in 9.5.
-    try agent.queued_jobs.append(.{ .job = cleanup_job, .realm = null });
+    try agent.queued_jobs.append(agent.gc_allocator, .{ .job = cleanup_job, .realm = null });
 }
 
 /// 13.3.12.1.1 HostGetImportMetaProperties ( moduleRecord )
 /// https://tc39.es/ecma262/#sec-hostgetimportmetaproperties
 pub fn hostGetImportMetaProperties(
-    module: *SourceTextModule,
+    _: *Agent,
+    _: *SourceTextModule,
 ) error{}!HostHooks.ImportMetaProperties {
-    // The default implementation of HostGetImportMetaProperties is to return a new empty List.
-    const agent = module.realm.agent;
-    return HostHooks.ImportMetaProperties.init(agent.gc_allocator);
+    return .empty;
 }
 
 /// 13.3.12.1.2 HostFinalizeImportMeta ( importMeta, moduleRecord )

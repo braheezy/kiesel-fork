@@ -682,18 +682,18 @@ pub fn ordinaryDelete(object: *Object, property_key: PropertyKey) Agent.Error!bo
 
 /// 10.1.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     // 1. Return OrdinaryOwnPropertyKeys(O).
     return ordinaryOwnPropertyKeys(object);
 }
 
 /// 10.1.11.1 OrdinaryOwnPropertyKeys ( O )
 /// https://tc39.es/ecma262/#sec-ordinaryownpropertykeys
-pub fn ordinaryOwnPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+pub fn ordinaryOwnPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     const agent = object.agent;
 
     // 1. Let keys be a new empty List.
-    var keys = try std.ArrayList(PropertyKey).initCapacity(
+    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.shape.properties.count(),
     );

@@ -17,12 +17,12 @@ const sameValue = types.sameValue;
 const Executable = @This();
 
 allocator: std.mem.Allocator,
-instructions: std.ArrayList(u8),
-constants: Value.ArrayHashMap(void, sameValue),
-identifiers: String.ArrayHashMap(void),
-ast_nodes: std.ArrayList(AstNode),
-environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
-property_lookup_cache: std.ArrayList(?Object.Shape.PropertyLookupCacheEntry),
+instructions: std.ArrayListUnmanaged(u8),
+constants: Value.ArrayHashMapUnmanaged(void, sameValue),
+identifiers: String.ArrayHashMapUnmanaged(void),
+ast_nodes: std.ArrayListUnmanaged(AstNode),
+environment_lookup_cache: std.ArrayListUnmanaged(?Environment.LookupCacheEntry),
+property_lookup_cache: std.ArrayListUnmanaged(?Object.Shape.PropertyLookupCacheEntry),
 
 pub const AstNode = union(enum) {
     arrow_function: ast.ArrowFunction,
@@ -46,41 +46,41 @@ pub const Error = error{IndexOutOfRange} || std.mem.Allocator.Error;
 pub fn init(allocator: std.mem.Allocator) Executable {
     return .{
         .allocator = allocator,
-        .instructions = .init(allocator),
-        .constants = .init(allocator),
-        .identifiers = .init(allocator),
-        .ast_nodes = .init(allocator),
-        .environment_lookup_cache = .init(allocator),
-        .property_lookup_cache = .init(allocator),
+        .instructions = .empty,
+        .constants = .empty,
+        .identifiers = .empty,
+        .ast_nodes = .empty,
+        .environment_lookup_cache = .empty,
+        .property_lookup_cache = .empty,
     };
 }
 
 pub fn deinit(self: *Executable) void {
-    self.instructions.deinit();
-    self.constants.deinit();
-    self.identifiers.deinit();
-    self.ast_nodes.deinit();
-    self.environment_lookup_cache.deinit();
-    self.property_lookup_cache.deinit();
+    self.instructions.deinit(self.allocator);
+    self.constants.deinit(self.allocator);
+    self.identifiers.deinit(self.allocator);
+    self.ast_nodes.deinit(self.allocator);
+    self.environment_lookup_cache.deinit(self.allocator);
+    self.property_lookup_cache.deinit(self.allocator);
 }
 
 pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {
-    try self.instructions.append(@intFromEnum(instruction));
+    try self.instructions.append(self.allocator, @intFromEnum(instruction));
 }
 
 pub fn addConstant(self: *Executable, constant: Value) std.mem.Allocator.Error!usize {
-    const result = try self.constants.getOrPut(constant);
+    const result = try self.constants.getOrPut(self.allocator, constant);
     return result.index;
 }
 
 pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) std.mem.Allocator.Error!usize {
     const string = try String.fromUtf8(self.allocator, identifier);
-    const result = try self.identifiers.getOrPut(string);
+    const result = try self.identifiers.getOrPut(self.allocator, string);
     return result.index;
 }
 
 pub fn addAstNode(self: *Executable, ast_node: AstNode) std.mem.Allocator.Error!void {
-    try self.ast_nodes.append(ast_node);
+    try self.ast_nodes.append(self.allocator, ast_node);
 }
 
 pub fn addInstructionWithConstant(
@@ -148,8 +148,8 @@ pub fn addJumpIndex(self: *Executable) std.mem.Allocator.Error!JumpIndex {
 pub fn addIndex(self: *Executable, index: usize) Error!void {
     if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-    try self.instructions.append(bytes[0]);
-    try self.instructions.append(bytes[1]);
+    try self.instructions.append(self.allocator, bytes[0]);
+    try self.instructions.append(self.allocator, bytes[1]);
 }
 
 pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
@@ -174,7 +174,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             },
             .create_catch_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });
             },
             .evaluate_call => {
@@ -202,7 +202,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
                 const property_lookup_cache_index = iterator.instruction_args[2].?;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print(
                     "{s} [{}] (strict: {}, property_lookup_cache_index: {})",
                     .{ identifier, identifier_index, strict, property_lookup_cache_index },
@@ -236,7 +236,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             },
             .load_constant, .store_constant => {
                 const constant_index = iterator.instruction_args[0].?;
-                const constant = self.constants.unmanaged.entries.get(constant_index).key;
+                const constant = self.constants.entries.get(constant_index).key;
                 try writer.print("{pretty} [{}]", .{ constant, constant_index });
             },
             .object_define_method => {
@@ -249,7 +249,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
                 const environment_lookup_cache_index = iterator.instruction_args[2].?;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print(
                     "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
                     .{ identifier, identifier_index, strict, environment_lookup_cache_index },
@@ -258,7 +258,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             .typeof_identifier => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print(
                     "{s} [{}] (strict: {})",
                     .{ identifier, identifier_index, strict },
@@ -266,7 +266,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             },
             .has_private_element, .make_private_reference, .resolve_private_identifier => {
                 const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });
             },
             else => {},

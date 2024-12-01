@@ -69,7 +69,7 @@ pub const constructor = struct {
             "%WeakSet.prototype%",
             .{
                 // 3. Set set.[[WeakSetData]] to a new empty List.
-                .weak_set_data = .init(agent.gc_allocator),
+                .weak_set_data = .empty,
             },
         );
 
@@ -164,7 +164,7 @@ pub const prototype = struct {
         // 5. Append value to S.[[WeakSetData]].
         const weak_set_data = &set.fields.weak_set_data;
         const weak_value = Value.Weak.init(value);
-        const gop = try weak_set_data.getOrPut(weak_value);
+        const gop = try weak_set_data.getOrPut(agent.gc_allocator, weak_value);
         if (build_options.enable_libgc and !gop.found_existing) {
             // Implements 9.9.3 Execution step 1.d
             // https://tc39.es/ecma262/#sec-weakref-execution
@@ -236,7 +236,7 @@ pub const prototype = struct {
     }
 };
 
-const WeakSetData = Value.Weak.HashMap(void);
+const WeakSetData = Value.Weak.HashMapUnmanaged(void);
 
 /// 24.4.4 Properties of WeakSet Instances
 /// https://tc39.es/ecma262/#sec-properties-of-weakset-instances

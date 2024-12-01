@@ -34,7 +34,7 @@ realm: *Realm,
 ecmascript_code: ast.Script,
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMap(Module),
+loaded_modules: String.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -64,7 +64,7 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
-        .loaded_modules = .init(agent.gc_allocator),
+        .loaded_modules = .empty,
         .host_defined = host_defined orelse .null_pointer,
     };
     return self;
@@ -104,7 +104,7 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     // TODO: 9. Suspend the running execution context.
 
     // 10. Push scriptContext onto the execution context stack; scriptContext is now the running execution context.
-    try agent.execution_context_stack.append(script_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, script_context);
 
     // 11. Let script be scriptRecord.[[ECMAScriptCode]].
     const script = self.ecmascript_code;
@@ -140,14 +140,14 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
 fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
     // 1. Let lexNames be the LexicallyDeclaredNames of script.
-    var lexical_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer lexical_names.deinit();
-    try script.collectLexicallyDeclaredNames(&lexical_names);
+    var lexical_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer lexical_names.deinit(agent.gc_allocator);
+    try script.collectLexicallyDeclaredNames(agent.gc_allocator, &lexical_names);
 
     // 2. Let varNames be the VarDeclaredNames of script.
-    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer var_names.deinit();
-    try script.collectVarDeclaredNames(&var_names);
+    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer var_names.deinit(agent.gc_allocator);
+    try script.collectVarDeclaredNames(agent.gc_allocator, &var_names);
 
     // 3. For each element name of lexNames, do
     for (lexical_names.items) |name_utf8| {
@@ -190,17 +190,17 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     }
 
     // 5. Let varDeclarations be the VarScopedDeclarations of script.
-    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
-    defer var_declarations.deinit();
-    try script.collectVarScopedDeclarations(&var_declarations);
+    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    defer var_declarations.deinit(agent.gc_allocator);
+    try script.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
     // 6. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
-    defer functions_to_initialize.deinit();
+    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 7. Let declaredFunctionNames be a new empty List.
-    var declared_function_names = String.HashMap(void).init(agent.gc_allocator);
-    defer declared_function_names.deinit();
+    var declared_function_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_function_names.deinit(agent.gc_allocator);
 
     // 8. For each element d of varDeclarations, in reverse List order, do
     var it = std.mem.reverseIterator(var_declarations.items);
@@ -234,28 +234,28 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                 }
 
                 // 3. Append fn to declaredFunctionNames.
-                try declared_function_names.putNoClobber(function_name, {});
+                try declared_function_names.putNoClobber(agent.gc_allocator, function_name, {});
 
                 // 4. Insert d as the first element of functionsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(hoistable_declaration);
+                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
             }
         }
     }
 
     // 9. Let declaredVarNames be a new empty List.
-    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
-    defer declared_var_names.deinit();
+    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(agent.gc_allocator);
 
     // 10. For each element d of varDeclarations, do
     for (var_declarations.items) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
             bound_names.clearRetainingCapacity();
-            try var_declaration.variable_declaration.collectBoundNames(&bound_names);
+            try var_declaration.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
             // i. For each String vn of the BoundNames of d, do
             for (bound_names.items) |var_name_utf8| {
@@ -278,7 +278,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                     // c. If declaredVarNames does not contain vn, then
                     if (!declared_var_names.contains(var_name)) {
                         // i. Append vn to declaredVarNames.
-                        try declared_var_names.putNoClobber(var_name, {});
+                        try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
                     }
                 }
             }
@@ -292,9 +292,9 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     // 12. NOTE: Annex B.3.2.2 adds additional steps at this point.
 
     // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
-    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
-    defer lex_declarations.deinit();
-    try script.collectLexicallyScopedDeclarations(&lex_declarations);
+    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    defer lex_declarations.deinit(agent.gc_allocator);
+    try script.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 
     // 14. Let privateEnv be null.
     const private_env = null;
@@ -304,7 +304,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(&bound_names);
+        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
         // b. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
@@ -339,7 +339,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         };
 
         // c. Perform ? env.CreateGlobalFunctionBinding(fn, fo, false).
-        try env.createGlobalFunctionBinding(function_name, Value.from(function_object), false);
+        try env.createGlobalFunctionBinding(agent, function_name, Value.from(function_object), false);
     }
 
     // 17. For each String vn of declaredVarNames, do

@@ -194,7 +194,7 @@ pub const constructor = struct {
             "%Set.prototype%",
             .{
                 // 3. Set set.[[SetData]] to a new empty List.
-                .set_data = .init(agent.gc_allocator),
+                .set_data = .empty,
             },
         );
 
@@ -303,11 +303,11 @@ pub const prototype = struct {
         //     a. If e is not empty and SameValue(e, value) is true, then
         //         i. Return S.
         // 5. Append value to S.[[SetData]].
-        const result = try set.fields.set_data.getOrPut(value);
+        const result = try set.fields.set_data.getOrPut(agent.gc_allocator, value);
         if (!result.found_existing) {
             result.value_ptr.* = {};
             if (set.fields.iterable_values) |*iterable_values| {
-                try iterable_values.append(value);
+                try iterable_values.append(agent.gc_allocator, value);
             }
         }
 
@@ -325,9 +325,9 @@ pub const prototype = struct {
         // 3. For each element e of S.[[SetData]], do
         //     a. Replace the element of S.[[SetData]] whose value is e with an element whose value
         //        is empty.
-        set.fields.set_data.clearAndFree();
+        set.fields.set_data.clearAndFree(agent.gc_allocator);
         if (set.fields.iterable_values) |*iterable_values| {
-            iterable_values.clearAndFree();
+            iterable_values.clearAndFree(agent.gc_allocator);
         }
 
         // 4. Return undefined.
@@ -376,12 +376,12 @@ pub const prototype = struct {
         const other_rec = try getSetRecord(agent, other);
 
         // 4. Let resultSetData be a copy of O.[[SetData]].
-        var result_set_data = try object.fields.set_data.clone();
+        var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
 
         // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
         if (setDataSize(object.fields.set_data) <= other_rec.size) {
-            var indexes_to_remove = std.ArrayList(usize).init(agent.gc_allocator);
-            defer indexes_to_remove.deinit();
+            var indexes_to_remove: std.ArrayListUnmanaged(usize) = .empty;
+            defer indexes_to_remove.deinit(agent.gc_allocator);
 
             // a. Let thisSize be the number of elements in O.[[SetData]].
             const this_size = object.fields.set_data.count();
@@ -404,7 +404,7 @@ pub const prototype = struct {
                 // 2. If inOther is true, then
                 if (in_other) {
                     // a. Set resultSetData[index] to empty.
-                    try indexes_to_remove.append(index);
+                    try indexes_to_remove.append(agent.gc_allocator, index);
                 }
 
                 // iii. Set index to index + 1.
@@ -482,8 +482,8 @@ pub const prototype = struct {
         }
 
         // 4. Let entries be S.[[SetData]].
-        const iterable_values = try set.fields.registerIterator();
-        defer set.fields.unregisterIterator();
+        const iterable_values = try set.fields.registerIterator(agent.gc_allocator);
+        defer set.fields.unregisterIterator(agent.gc_allocator);
 
         // 5. Let numEntries be the number of elements in entries.
         var num_entries = iterable_values.items.len;
@@ -545,7 +545,7 @@ pub const prototype = struct {
         const other_rec = try getSetRecord(agent, other);
 
         // 4. Let resultSetData be a new empty List.
-        var result_set_data = SetData.init(agent.gc_allocator);
+        var result_set_data: SetData = .empty;
 
         // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
         if (setDataSize(object.fields.set_data) <= other_rec.size) {
@@ -578,7 +578,7 @@ pub const prototype = struct {
                     // c. If alreadyInResult is false, then
                     //     i. Append e to resultSetData.
                     // NOTE: We do not need to check because put allows clobbers.
-                    try result_set_data.put(element, {});
+                    try result_set_data.put(agent.gc_allocator, element, {});
                 }
 
                 // 3. NOTE: The number of elements in O.[[SetData]] may have increased during
@@ -616,7 +616,7 @@ pub const prototype = struct {
                 // 5. If alreadyInResult is false and inThis is true, then
                 if (!already_in_result and in_this) {
                     // a. Append next to resultSetData.
-                    try result_set_data.put(next, {});
+                    try result_set_data.put(agent.gc_allocator, next, {});
                 }
             }
         }
@@ -839,7 +839,7 @@ pub const prototype = struct {
         );
 
         // 5. Let resultSetData be a copy of O.[[SetData]].
-        var result_set_data = try object.fields.set_data.clone();
+        var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
 
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
@@ -863,7 +863,7 @@ pub const prototype = struct {
             else {
                 // 1. If resultIndex is not-found, append next to resultSetData.
                 if (maybe_result_index == null) {
-                    try result_set_data.put(next, {});
+                    try result_set_data.put(agent.gc_allocator, next, {});
                 }
             }
         }
@@ -903,7 +903,7 @@ pub const prototype = struct {
         );
 
         // 5. Let resultSetData be a copy of O.[[SetData]].
-        var result_set_data = try set.fields.set_data.clone();
+        var result_set_data = try set.fields.set_data.clone(agent.gc_allocator);
 
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
@@ -916,7 +916,7 @@ pub const prototype = struct {
             // ii. If SetDataHas(resultSetData, next) is false, then
             //     1. Append next to resultSetData.
             // NOTE: We do not need to check because put allows clobbers.
-            try result_set_data.put(next, {});
+            try result_set_data.put(agent.gc_allocator, next, {});
         }
 
         // 8. Let result be OrdinaryObjectCreate(%Set.prototype%, « [[SetData]] »).
@@ -945,8 +945,8 @@ pub const prototype = struct {
     }
 };
 
-const SetData = Value.ArrayHashMap(void, sameValue);
-const IterableValues = std.ArrayList(?Value);
+const SetData = Value.ArrayHashMapUnmanaged(void, sameValue);
+const IterableValues = std.ArrayListUnmanaged(?Value);
 
 /// 24.2.5 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
@@ -960,13 +960,13 @@ pub const Set = MakeObject(.{
         iterable_values: ?IterableValues = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableValues {
+        pub fn registerIterator(
+            self: *@This(),
+            allocator: std.mem.Allocator,
+        ) std.mem.Allocator.Error!*IterableValues {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values == null);
-                self.iterable_values = try .initCapacity(
-                    self.set_data.allocator,
-                    self.set_data.count(),
-                );
+                self.iterable_values = try .initCapacity(allocator, self.set_data.count());
                 for (self.set_data.keys()) |value| {
                     self.iterable_values.?.appendAssumeCapacity(value);
                 }
@@ -975,11 +975,11 @@ pub const Set = MakeObject(.{
             return &self.iterable_values.?;
         }
 
-        pub fn unregisterIterator(self: *@This()) void {
+        pub fn unregisterIterator(self: *@This(), allocator: std.mem.Allocator) void {
             self.active_iterators -= 1;
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values != null);
-                self.iterable_values.?.deinit();
+                self.iterable_values.?.deinit(allocator);
                 self.iterable_values = null;
             }
         }

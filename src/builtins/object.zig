@@ -126,8 +126,8 @@ pub const constructor = struct {
                 const from = next_source.toObject(agent) catch |err| try noexcept(err);
 
                 // ii. Let keys be ? from.[[OwnPropertyKeys]]().
-                const keys_ = try from.internal_methods.ownPropertyKeys(from);
-                defer keys_.deinit();
+                var keys_ = try from.internal_methods.ownPropertyKeys(from);
+                defer keys_.deinit(agent.gc_allocator);
 
                 // iii. For each element nextKey of keys, do
                 for (keys_.items) |next_key| {
@@ -203,8 +203,8 @@ pub const constructor = struct {
         const props = try properties.toObject(agent);
 
         // 2. Let keys be ? props.[[OwnPropertyKeys]]().
-        const keys_ = try props.internal_methods.ownPropertyKeys(props);
-        defer keys_.deinit();
+        var keys_ = try props.internal_methods.ownPropertyKeys(props);
+        defer keys_.deinit(agent.gc_allocator);
 
         const Property = struct {
             key: PropertyKey,
@@ -212,8 +212,8 @@ pub const constructor = struct {
         };
 
         // 3. Let descriptors be a new empty List.
-        var descriptors = std.ArrayList(Property).init(agent.gc_allocator);
-        defer descriptors.deinit();
+        var descriptors: std.ArrayListUnmanaged(Property) = .empty;
+        defer descriptors.deinit(agent.gc_allocator);
 
         // 4. For each element nextKey of keys, do
         for (keys_.items) |next_key| {
@@ -229,7 +229,10 @@ pub const constructor = struct {
                 const descriptor = try descriptor_object.toPropertyDescriptor(agent);
 
                 // iii. Append the Record { [[Key]]: nextKey, [[Descriptor]]: desc } to descriptors.
-                try descriptors.append(.{ .key = next_key, .descriptor = descriptor });
+                try descriptors.append(
+                    agent.gc_allocator,
+                    .{ .key = next_key, .descriptor = descriptor },
+                );
             };
         }
 
@@ -277,8 +280,8 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let entryList be ? EnumerableOwnProperties(obj, key+value).
-        const entry_list = try obj.enumerableOwnProperties(.@"key+value");
-        defer entry_list.deinit();
+        var entry_list = try obj.enumerableOwnProperties(.@"key+value");
+        defer entry_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(entryList).
         return Value.from(try createArrayFromList(agent, entry_list.items));
@@ -388,8 +391,8 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
-        const own_keys = try obj.internal_methods.ownPropertyKeys(obj);
-        defer own_keys.deinit();
+        var own_keys = try obj.internal_methods.ownPropertyKeys(obj);
+        defer own_keys.deinit(agent.gc_allocator);
 
         // 3. Let descriptors be OrdinaryObjectCreate(%Object.prototype%).
         const descriptors = try ordinaryObjectCreate(
@@ -422,8 +425,8 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, string)).
-        const property_keys = try getOwnPropertyKeys(agent, object, .string);
-        defer property_keys.deinit();
+        var property_keys = try getOwnPropertyKeys(agent, object, .string);
+        defer property_keys.deinit(agent.gc_allocator);
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
                 fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
@@ -439,8 +442,8 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, symbol)).
-        const property_keys = try getOwnPropertyKeys(agent, object, .symbol);
-        defer property_keys.deinit();
+        var property_keys = try getOwnPropertyKeys(agent, object, .symbol);
+        defer property_keys.deinit(agent.gc_allocator);
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
                 fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
@@ -456,15 +459,16 @@ pub const constructor = struct {
         agent: *Agent,
         object: Value,
         comptime @"type": enum { string, symbol },
-    ) Agent.Error!std.ArrayList(PropertyKey) {
+    ) Agent.Error!std.ArrayListUnmanaged(PropertyKey) {
         // 1. Let obj be ? ToObject(O).
         const obj = try object.toObject(agent);
 
         // 2. Let keys be ? obj.[[OwnPropertyKeys]]().
-        const keys_ = try obj.internal_methods.ownPropertyKeys(obj);
+        var keys_ = try obj.internal_methods.ownPropertyKeys(obj);
+        defer keys_.deinit(agent.gc_allocator);
 
         // 3. Let nameList be a new empty List.
-        var name_list = std.ArrayList(PropertyKey).init(agent.gc_allocator);
+        var name_list: std.ArrayListUnmanaged(PropertyKey) = .empty;
 
         // 4. For each element nextKey of keys, do
         for (keys_.items) |next_key| {
@@ -474,7 +478,7 @@ pub const constructor = struct {
                 ((next_key == .string or next_key == .integer_index) and @"type" == .string))
             {
                 // i. Append nextKey to nameList.
-                try name_list.append(next_key);
+                try name_list.append(agent.gc_allocator, next_key);
             }
         }
 
@@ -594,8 +598,8 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let keyList be ? EnumerableOwnProperties(obj, key).
-        const key_list = try obj.enumerableOwnProperties(.key);
-        defer key_list.deinit();
+        var key_list = try obj.enumerableOwnProperties(.key);
+        defer key_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keyList).
         return Value.from(try createArrayFromList(agent, key_list.items));
@@ -676,8 +680,8 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let valueList be ? EnumerableOwnProperties(obj, value).
-        const value_list = try obj.enumerableOwnProperties(.value);
-        defer value_list.deinit();
+        var value_list = try obj.enumerableOwnProperties(.value);
+        defer value_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(valueList).
         return Value.from(try createArrayFromList(agent, value_list.items));

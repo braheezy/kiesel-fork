@@ -122,7 +122,7 @@ pub fn builtinCallOrConstruct(
 
     // 9. Push calleeContext onto the execution context stack; calleeContext is now the running
     //    execution context.
-    try agent.execution_context_stack.append(callee_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, callee_context);
 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
     //     conforms to the specification of F. If thisArgument is uninitialized, the this value is

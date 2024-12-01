@@ -88,7 +88,7 @@ pub const prototype = struct {
         const kind = map_iterator.fields.state.kind;
         var index = map_iterator.fields.state.index;
 
-        if (index == 0) _ = try map.fields.registerIterator();
+        if (index == 0) _ = try map.fields.registerIterator(agent.gc_allocator);
         const iterable_keys = &map.fields.iterable_keys.?;
 
         // a. Let entries be map.[[MapData]].
@@ -113,7 +113,7 @@ pub const prototype = struct {
         // e. Return undefined.
         else {
             map_iterator.fields = .completed;
-            map.fields.unregisterIterator();
+            map.fields.unregisterIterator(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 

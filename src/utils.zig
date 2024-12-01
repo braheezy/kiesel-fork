@@ -165,10 +165,11 @@ pub fn defineBuiltinAccessorWithAttributes(
         configurable: bool,
     },
 ) std.mem.Allocator.Error!void {
+    const agent = object.agent;
     std.debug.assert(getter != null or setter != null);
     const getter_function = if (getter) |function| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(realm.agent, .{ .function = function }, .{
+        break :blk try createBuiltinFunction(agent, .{ .function = function }, .{
             .length = 0,
             .name = function_name,
             .realm = realm,
@@ -176,24 +177,24 @@ pub fn defineBuiltinAccessorWithAttributes(
     } else null;
     const setter_function = if (setter) |function| blk: {
         const function_name = std.fmt.comptimePrint("set {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(realm.agent, .{ .function = function }, .{
+        break :blk try createBuiltinFunction(agent, .{ .function = function }, .{
             .length = 0,
             .name = function_name,
             .realm = realm,
         });
     } else null;
-    const property_key = getPropertyKey(name, realm.agent);
+    const property_key = getPropertyKey(name, agent);
     const attributes_: Object.Shape.PropertyMetadata.Attributes = .{
         .writable = false,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
     object.shape = try object.shape.setPropertyWithoutTransition(
-        object.agent.gc_allocator,
+        agent.gc_allocator,
         property_key,
         attributes_,
     );
-    try object.property_storage.append(.{
+    try object.property_storage.append(agent.gc_allocator, .{
         .accessor = .{
             .get = getter_function,
             .set = setter_function,
@@ -249,7 +250,8 @@ pub fn defineBuiltinProperty(
     value_or_property_descriptor: anytype,
 ) std.mem.Allocator.Error!void {
     const T = @TypeOf(value_or_property_descriptor);
-    const property_key = getPropertyKey(name, object.agent);
+    const agent = object.agent;
+    const property_key = getPropertyKey(name, agent);
     const value: Value, const attributes: Object.Shape.PropertyMetadata.Attributes = switch (T) {
         Value => .{
             value_or_property_descriptor,
@@ -266,9 +268,9 @@ pub fn defineBuiltinProperty(
         else => @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T)),
     };
     object.shape = try object.shape.setPropertyWithoutTransition(
-        object.agent.gc_allocator,
+        agent.gc_allocator,
         property_key,
         attributes,
     );
-    try object.property_storage.append(.{ .value = value });
+    try object.property_storage.append(agent.gc_allocator, .{ .value = value });
 }

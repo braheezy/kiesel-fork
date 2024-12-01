@@ -89,9 +89,9 @@ pub fn build(b: *std.Build) void {
     const unicode_id = b.dependency("unicode_id", .{});
     const zigline = b.dependency("zigline", .{});
 
-    var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
-    defer imports.deinit();
-    imports.appendSlice(&.{
+    var imports: std.ArrayListUnmanaged(std.Build.Module.Import) = .empty;
+    defer imports.deinit(b.allocator);
+    imports.appendSlice(b.allocator, &.{
         .{
             .module = options.createModule(),
             .name = "build-options",
@@ -118,7 +118,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         })) |icu4zig| {
-            imports.append(.{
+            imports.append(b.allocator, .{
                 .module = icu4zig.module("icu4zig"),
                 .name = "icu4zig",
             }) catch @panic("OOM");

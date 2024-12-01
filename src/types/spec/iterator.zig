@@ -187,8 +187,8 @@ pub const Iterator = struct {
         const agent = self.iterator.agent;
 
         // 1. Let values be a new empty List.
-        var values = std.ArrayList(Value).init(agent.gc_allocator);
-        errdefer values.deinit();
+        var values: std.ArrayListUnmanaged(Value) = .empty;
+        errdefer values.deinit(agent.gc_allocator);
 
         // 2. Repeat,
         //     a. Let next be ? IteratorStepValue(iteratorRecord).
@@ -196,10 +196,10 @@ pub const Iterator = struct {
         //         i. Return values.
         while (try self.stepValue()) |next_| {
             // c. Append next to values.
-            try values.append(next_);
+            try values.append(agent.gc_allocator, next_);
         }
 
-        return values.toOwnedSlice();
+        return values.toOwnedSlice(agent.gc_allocator);
     }
 };
 

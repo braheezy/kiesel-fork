@@ -31,8 +31,8 @@ pub fn generateBytecode(
 ) Agent.Error!Executable {
     var executable = Executable.init(agent.gc_allocator);
 
-    var ctx = codegen.Context.init(agent.gc_allocator);
-    defer ctx.deinit();
+    var ctx = codegen.Context.init();
+    defer ctx.deinit(executable.allocator);
     ctx.contained_in_strict_mode_code = options.contained_in_strict_mode_code;
 
     const ast_node_name = comptime blk: {
@@ -53,9 +53,9 @@ pub fn generateBytecode(
     try executable.addInstruction(.end);
 
     // Already incremented by one by the last caller
-    try executable.environment_lookup_cache.resize(ctx.environment_lookup_cache_index);
+    try executable.environment_lookup_cache.resize(executable.allocator, ctx.environment_lookup_cache_index);
     @memset(executable.environment_lookup_cache.items, null);
-    try executable.property_lookup_cache.resize(ctx.property_lookup_cache_index);
+    try executable.property_lookup_cache.resize(executable.allocator, ctx.property_lookup_cache_index);
     @memset(executable.property_lookup_cache.items, null);
 
     if (agent.options.debug.print_bytecode) {

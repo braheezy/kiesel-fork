@@ -1352,8 +1352,8 @@ pub fn createListFromArrayLike(
 
     // 4. Let list be a new empty List.
     if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-    var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(len));
-    defer list.deinit();
+    var list = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, @intCast(len));
+    defer list.deinit(agent.gc_allocator);
 
     // 5. Let index be 0.
     var index: u53 = 0;
@@ -1386,7 +1386,7 @@ pub fn createListFromArrayLike(
     }
 
     // 7. Return list.
-    return list.toOwnedSlice();
+    return list.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 7.3.20 Invoke ( V, P [ , argumentsList ] )
@@ -1471,15 +1471,15 @@ fn addValueToKeyedGroup(
     if (groups.getPtr(key)) |group| {
         // i. Assert: Exactly one element of groups meets this criterion.
         // ii. Append value to g.[[Elements]].
-        try group.append(value);
+        try group.append(agent.gc_allocator, value);
 
         // iii. Return unused.
     } else {
         // 2. Let group be the Record { [[Key]]: key, [[Elements]]: « value » }.
         // 3. Append group to groups.
-        var group = std.ArrayList(Value).init(agent.gc_allocator);
-        try group.append(value);
-        try groups.putNoClobber(key, group);
+        var group: std.ArrayListUnmanaged(Value) = .empty;
+        try group.append(agent.gc_allocator, value);
+        try groups.putNoClobber(agent.gc_allocator, key, group);
 
         // 4. Return unused.
     }
@@ -1489,8 +1489,8 @@ const KeyCoercion = enum { property, collection };
 
 fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     return switch (key_coercion) {
-        .property => PropertyKey.ArrayHashMap(std.ArrayList(Value)),
-        .collection => Value.ArrayHashMap(std.ArrayList(Value), sameValue),
+        .property => PropertyKey.ArrayHashMapUnmanaged(std.ArrayListUnmanaged(Value)),
+        .collection => Value.ArrayHashMapUnmanaged(std.ArrayListUnmanaged(Value), sameValue),
     };
 }
 
@@ -1511,7 +1511,7 @@ pub fn groupBy(
     }
 
     // 3. Let groups be a new empty List.
-    var groups = GroupByContainer(key_coercion).init(agent.gc_allocator);
+    var groups: GroupByContainer(key_coercion) = .empty;
 
     // 4. Let iteratorRecord be ? GetIterator(items, sync).
     var iterator = try getIterator(agent, self, .sync);
@@ -2323,8 +2323,8 @@ pub fn getOption(
     return coerced_value;
 }
 
-pub fn ArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
-    return std.ArrayHashMap(Value, V, struct {
+pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
+    return std.ArrayHashMapUnmanaged(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {
             const value_hash = switch (key.type()) {
                 .undefined, .null => 0,

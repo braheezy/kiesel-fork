@@ -90,7 +90,7 @@ pub const prototype = struct {
 
         std.debug.assert(kind != .key);
 
-        if (index == 0) _ = try set.fields.registerIterator();
+        if (index == 0) _ = try set.fields.registerIterator(agent.gc_allocator);
         const iterable_values = &set.fields.iterable_values.?;
 
         // a. Let index be 0.
@@ -115,7 +115,7 @@ pub const prototype = struct {
         // e. Return undefined.
         else {
             set_iterator.fields = .completed;
-            set.fields.unregisterIterator();
+            set.fields.unregisterIterator(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 

@@ -120,8 +120,8 @@ fn internalizeJSONProperty(
         // c. Else,
         else {
             // i. Let keys be ? EnumerableOwnProperties(val, key).
-            const keys = try value.asObject().enumerableOwnProperties(.key);
-            defer keys.deinit();
+            var keys = try value.asObject().enumerableOwnProperties(.key);
+            defer keys.deinit(agent.gc_allocator);
 
             // ii. For each String P of keys, do
             for (keys.items) |key| {
@@ -159,13 +159,13 @@ fn internalizeJSONProperty(
 /// 25.5.2.1 JSON Serialization Record
 /// https://tc39.es/ecma262/#sec-json-serialization-record
 const JSONSerialization = struct {
-    pub const Stack = std.AutoHashMap(*Object, void);
+    pub const Stack = std.AutoHashMapUnmanaged(*Object, void);
 
     /// [[ReplacerFunction]]
     replacer_function: ?*Object,
 
     /// [[PropertyList]]
-    property_list: ?PropertyKey.ArrayHashMap(void),
+    property_list: ?PropertyKey.ArrayHashMapUnmanaged(void),
 
     /// [[Gap]]
     gap: *const String,
@@ -279,8 +279,8 @@ fn serializeJSONProperty(
 /// https://tc39.es/ecma262/#sec-quotejsonstring
 fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!*const String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
-    var product = std.ArrayList(u8).init(agent.gc_allocator);
-    try product.append('"');
+    var product: std.ArrayListUnmanaged(u8) = .empty;
+    try product.append(agent.gc_allocator, '"');
 
     // 2. For each code point C of StringToCodePoints(value), do
     var it = value.codeUnitIterator();
@@ -290,13 +290,13 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
             // i. Set product to the string-concatenation of product and the escape sequence for C
             //    as specified in the “Escape Sequence” column of the corresponding row.
             switch (c) {
-                0x08 => try product.appendSlice("\\b"),
-                0x09 => try product.appendSlice("\\t"),
-                0x0A => try product.appendSlice("\\n"),
-                0x0C => try product.appendSlice("\\f"),
-                0x0D => try product.appendSlice("\\r"),
-                0x22 => try product.appendSlice("\\\""),
-                0x5C => try product.appendSlice("\\\\"),
+                0x08 => try product.appendSlice(agent.gc_allocator, "\\b"),
+                0x09 => try product.appendSlice(agent.gc_allocator, "\\t"),
+                0x0A => try product.appendSlice(agent.gc_allocator, "\\n"),
+                0x0C => try product.appendSlice(agent.gc_allocator, "\\f"),
+                0x0D => try product.appendSlice(agent.gc_allocator, "\\r"),
+                0x22 => try product.appendSlice(agent.gc_allocator, "\\\""),
+                0x5C => try product.appendSlice(agent.gc_allocator, "\\\\"),
                 else => unreachable,
             }
         }
@@ -305,12 +305,13 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
         else if (c < 0x20 or std.unicode.utf16IsLowSurrogate(c) or std.unicode.utf16IsHighSurrogate(c)) {
             // i. Let unit be the code unit whose numeric value is the numeric value of C.
             // ii. Set product to the string-concatenation of product and UnicodeEscape(unit).
-            try product.appendSlice(try unicodeEscape(agent, c));
+            try product.appendSlice(agent.gc_allocator, try unicodeEscape(agent, c));
         }
         // c. Else,
         else {
             // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(C).
             try product.appendSlice(
+                agent.gc_allocator,
                 std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{c}) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
                     error.DanglingSurrogateHalf,
@@ -323,10 +324,10 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     }
 
     // 3. Set product to the string-concatenation of product and the code unit 0x0022 (QUOTATION MARK).
-    try product.append('"');
+    try product.append(agent.gc_allocator, '"');
 
     // 4. Return product.
-    return String.fromUtf8(agent.gc_allocator, try product.toOwnedSlice());
+    return String.fromUtf8(agent.gc_allocator, try product.toOwnedSlice(agent.gc_allocator));
 }
 
 /// 25.5.2.4 UnicodeEscape ( C )
@@ -354,7 +355,7 @@ fn serializeJSONObject(
     }
 
     // 2. Append value to state.[[Stack]].
-    try state.stack.put(value, {});
+    try state.stack.put(agent.gc_allocator, value, {});
 
     // 3. Let stepBack be state.[[Indent]].
     const step_back = state.indent;
@@ -367,20 +368,20 @@ fn serializeJSONObject(
     // 6. Else,
     //     a. Let K be ? EnumerableOwnProperties(value, key).
     var keys = state.property_list orelse blk: {
-        const keys = try value.enumerableOwnProperties(.key);
-        defer keys.deinit();
-        var converted = PropertyKey.ArrayHashMap(void).init(agent.gc_allocator);
-        try converted.ensureUnusedCapacity(keys.items.len);
+        var keys = try value.enumerableOwnProperties(.key);
+        defer keys.deinit(agent.gc_allocator);
+        var converted: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
+        try converted.ensureUnusedCapacity(agent.gc_allocator, keys.items.len);
         for (keys.items) |key| {
             converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
         }
         break :blk converted;
     };
-    defer if (state.property_list == null) keys.deinit();
+    defer if (state.property_list == null) keys.deinit(agent.gc_allocator);
 
     // 7. Let partial be a new empty List.
-    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, keys.count());
-    defer partial.deinit();
+    var partial = try std.ArrayListUnmanaged([]const u8).initCapacity(agent.gc_allocator, keys.count());
+    defer partial.deinit(agent.gc_allocator);
 
     // 8. For each element P of K, do
     for (keys.keys()) |property_key| {
@@ -413,7 +414,7 @@ fn serializeJSONObject(
             );
 
             // v. Append member to partial.
-            try partial.append(member);
+            try partial.append(agent.gc_allocator, member);
         }
     }
 
@@ -487,7 +488,7 @@ fn serializeJSONArray(
     }
 
     // 2. Append value to state.[[Stack]].
-    try state.stack.put(value, {});
+    try state.stack.put(agent.gc_allocator, value, {});
 
     // 3. Let stepBack be state.[[Indent]].
     const step_back = state.indent;
@@ -499,8 +500,8 @@ fn serializeJSONArray(
     const len = try value.lengthOfArrayLike();
 
     // 5. Let partial be a new empty List.
-    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
-    defer partial.deinit();
+    var partial = try std.ArrayListUnmanaged([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+    defer partial.deinit(agent.gc_allocator);
 
     // 7. Let index be 0.
     var index: u53 = 0;
@@ -681,15 +682,15 @@ pub const namespace = struct {
         var space = arguments.get(2);
 
         // 1. Let stack be a new empty List.
-        var stack = JSONSerialization.Stack.init(agent.gc_allocator);
-        defer stack.deinit();
+        var stack: JSONSerialization.Stack = .empty;
+        defer stack.deinit(agent.gc_allocator);
 
         // 2. Let indent be the empty String.
         const indent: *const String = .empty;
 
         // 3. Let PropertyList be undefined.
-        var property_list: ?PropertyKey.ArrayHashMap(void) = null;
-        defer if (property_list) |*p| p.deinit();
+        var property_list: ?PropertyKey.ArrayHashMapUnmanaged(void) = null;
+        defer if (property_list) |*p| p.deinit(agent.gc_allocator);
 
         // 4. Let ReplacerFunction be undefined.
         var replacer_function: ?*Object = null;
@@ -709,7 +710,7 @@ pub const namespace = struct {
                 // ii. If isArray is true, then
                 if (is_array) {
                     // 1. Set PropertyList to a new empty List.
-                    property_list = .init(agent.gc_allocator);
+                    property_list = .empty;
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
                     const len = try replacer.asObject().lengthOfArrayLike();
@@ -752,7 +753,7 @@ pub const namespace = struct {
                         // g. If item is not undefined and PropertyList does not contain item, then
                         if (item != null and !property_list.?.contains(item.?)) {
                             // i. Append item to PropertyList.
-                            try property_list.?.putNoClobber(item.?, {});
+                            try property_list.?.putNoClobber(agent.gc_allocator, item.?, {});
                         }
 
                         // h. Set k to k + 1.

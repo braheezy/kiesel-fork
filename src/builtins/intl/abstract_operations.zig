@@ -17,7 +17,7 @@ const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-const LocaleList = std.ArrayList(icu4zig.Locale);
+const LocaleList = std.ArrayListUnmanaged(icu4zig.Locale);
 
 /// https://unicode.org/reports/tr35/#Unicode_locale_identifier
 /// type = alphanum{3,8} (sep alphanum{3,8})*
@@ -153,11 +153,11 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     // 1. If locales is undefined, then
     if (locales.isUndefined()) {
         // a. Return a new empty List.
-        return LocaleList.init(agent.gc_allocator);
+        return .empty;
     }
 
     // 2. Let seen be a new empty List.
-    var seen = LocaleList.init(agent.gc_allocator);
+    var seen: LocaleList = .empty;
 
     // 3. If locales is a String or locales is an Object and locales has an [[InitializedLocale]]
     //    internal slot, then
@@ -239,7 +239,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             for (seen.items) |locale| {
                 if (locale.normalizingEq(try tag.toUtf8(agent.gc_allocator))) break;
             } else {
-                try seen.append(canonicalized_tag);
+                try seen.append(agent.gc_allocator, canonicalized_tag);
             }
         }
 

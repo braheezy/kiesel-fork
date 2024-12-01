@@ -59,27 +59,27 @@ const Vm = @This();
 
 agent: *Agent,
 ip: usize,
-stack: std.ArrayList(Value),
-iterator_stack: std.ArrayList(Iterator),
-lexical_environment_stack: std.ArrayList(Environment),
-reference_stack: std.ArrayList(Reference),
-exception_jump_target_stack: std.ArrayList(usize),
-function_arguments: std.ArrayList(Value),
+stack: std.ArrayListUnmanaged(Value),
+iterator_stack: std.ArrayListUnmanaged(Iterator),
+lexical_environment_stack: std.ArrayListUnmanaged(Environment),
+reference_stack: std.ArrayListUnmanaged(Reference),
+exception_jump_target_stack: std.ArrayListUnmanaged(usize),
+function_arguments: std.ArrayListUnmanaged(Value),
 result: ?Value = null,
 exception: ?Value = null,
 cached_this_value: ?Value = null,
 
 pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
-    const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
-    const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
+    const stack = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, 32);
+    const function_arguments = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, 8);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
-        .iterator_stack = .init(agent.gc_allocator),
-        .lexical_environment_stack = .init(agent.gc_allocator),
-        .reference_stack = .init(agent.gc_allocator),
-        .exception_jump_target_stack = .init(agent.gc_allocator),
+        .iterator_stack = .empty,
+        .lexical_environment_stack = .empty,
+        .reference_stack = .empty,
+        .exception_jump_target_stack = .empty,
         .function_arguments = function_arguments,
         .result = null,
         .exception = null,
@@ -87,13 +87,13 @@ pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
     };
 }
 
-pub fn deinit(self: Vm) void {
-    self.stack.deinit();
-    self.iterator_stack.deinit();
-    self.lexical_environment_stack.deinit();
-    self.reference_stack.deinit();
-    self.exception_jump_target_stack.deinit();
-    self.function_arguments.deinit();
+pub fn deinit(self: *Vm) void {
+    self.stack.deinit(self.agent.gc_allocator);
+    self.iterator_stack.deinit(self.agent.gc_allocator);
+    self.lexical_environment_stack.deinit(self.agent.gc_allocator);
+    self.reference_stack.deinit(self.agent.gc_allocator);
+    self.exception_jump_target_stack.deinit(self.agent.gc_allocator);
+    self.function_arguments.deinit(self.agent.gc_allocator);
 }
 
 fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
@@ -103,12 +103,12 @@ fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
 
 fn fetchConstant(self: *Vm, executable: Executable) Value {
     const index = self.fetchIndex(executable);
-    return executable.constants.unmanaged.entries.get(index).key;
+    return executable.constants.entries.get(index).key;
 }
 
 fn fetchIdentifier(self: *Vm, executable: Executable) *const String {
     const index = self.fetchIndex(executable);
-    return executable.identifiers.unmanaged.entries.get(index).key;
+    return executable.identifiers.entries.get(index).key;
 }
 
 fn fetchAstNode(self: *Vm, executable: Executable) *Executable.AstNode {
@@ -126,30 +126,30 @@ fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
     if (value.isUndefined()) return &.{};
     const array = value.asObject();
     const len = getArrayLength(array);
-    var argument_spread_indices = try std.ArrayList(usize).initCapacity(self.agent.gc_allocator, len);
+    var argument_spread_indices = try std.ArrayListUnmanaged(usize).initCapacity(self.agent.gc_allocator, len);
     for (0..len) |i| {
         const argument_spread_index = array.getPropertyValueDirect(
             PropertyKey.from(@as(u53, @intCast(i))),
         ).asNumber().i32;
         argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
     }
-    return argument_spread_indices.toOwnedSlice();
+    return argument_spread_indices.toOwnedSlice(self.agent.gc_allocator);
 }
 
 fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     self.function_arguments.clearRetainingCapacity();
-    try self.function_arguments.ensureTotalCapacity(argument_count); // May still resize when spreading
+    try self.function_arguments.ensureTotalCapacity(self.agent.gc_allocator, argument_count); // May still resize when spreading
     const argument_spread_indices = try self.getArgumentSpreadIndices();
     defer self.agent.gc_allocator.free(argument_spread_indices);
     for (0..argument_count) |i| {
         const argument = self.stack.pop();
         if (std.mem.indexOfScalar(usize, argument_spread_indices, argument_count - i - 1) == null) {
-            try self.function_arguments.insert(0, argument);
+            try self.function_arguments.insert(self.agent.gc_allocator, 0, argument);
         } else {
             var iterator = try getIterator(self.agent, argument, .sync);
             var n: usize = 0;
             while (try iterator.stepValue()) |value| : (n += 1) {
-                try self.function_arguments.insert(n, value);
+                try self.function_arguments.insert(self.agent.gc_allocator, n, value);
             }
         }
     }
@@ -508,7 +508,7 @@ fn executeCreateObjectPropertyIterator(self: *Vm, _: Executable) Agent.Error!voi
         .next_method = next_method,
         .done = false,
     };
-    try self.iterator_stack.append(iterator_);
+    try self.iterator_stack.append(self.agent.gc_allocator, iterator_);
 }
 
 fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
@@ -608,12 +608,12 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeDupIterator(self: *Vm, _: Executable) Agent.Error!void {
     const iterator = self.iterator_stack.getLast();
-    try self.iterator_stack.append(iterator);
+    try self.iterator_stack.append(self.agent.gc_allocator, iterator);
 }
 
 fn executeDupReference(self: *Vm, _: Executable) Agent.Error!void {
     const reference = self.reference_stack.getLast();
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
@@ -732,7 +732,7 @@ fn executeEvaluatePropertyAccessWithExpressionKey(self: *Vm, executable: Executa
         .strict = strict,
         .this_value = null,
     };
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 /// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
@@ -763,7 +763,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executa
         .this_value = null,
         .maybe_lookup_cache_entry = lookup_cache_entry,
     };
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -824,9 +824,9 @@ fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) 
 
     // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
     // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
-    var bound_names = std.ArrayList(ast.Identifier).init(self.agent.gc_allocator);
-    defer bound_names.deinit();
-    try lexical_declaration.collectBoundNames(&bound_names);
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(self.agent.gc_allocator);
+    try lexical_declaration.collectBoundNames(self.agent.gc_allocator, &bound_names);
 
     // 1. For each element name of the BoundNames of ForBinding, do
     for (bound_names.items) |name_utf8| {
@@ -863,7 +863,7 @@ fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) 
 fn executeGetIterator(self: *Vm, executable: Executable) Agent.Error!void {
     const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
     const iterator = try getIterator(self.agent, self.result.?, iterator_kind);
-    try self.iterator_stack.append(iterator);
+    try self.iterator_stack.append(self.agent.gc_allocator, iterator);
 }
 
 fn executeGetNewTarget(self: *Vm, _: Executable) Agent.Error!void {
@@ -887,8 +887,11 @@ fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
         const import_meta = try ordinaryObjectCreate(self.agent, null);
 
         // b. Let importMetaValues be HostGetImportMetaProperties(module).
-        var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(module);
-        defer import_meta_values.deinit();
+        var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(
+            self.agent,
+            module,
+        );
+        defer import_meta_values.deinit(self.agent.gc_allocator);
 
         // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
         var it = import_meta_values.iterator();
@@ -1213,24 +1216,24 @@ fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeLoad(self: *Vm, _: Executable) Agent.Error!void {
     // Handle null value to allow load of 'empty' result at beginning of script
-    if (self.result) |value| try self.stack.append(value);
+    if (self.result) |value| try self.stack.append(self.agent.gc_allocator, value);
 }
 
 fn executeLoadConstant(self: *Vm, executable: Executable) Agent.Error!void {
     const value = self.fetchConstant(executable);
-    try self.stack.append(value);
+    try self.stack.append(self.agent.gc_allocator, value);
 }
 
 fn executeLoadIteratorNextArgs(self: *Vm, _: Executable) Agent.Error!void {
     const iterator = self.iterator_stack.pop();
-    try self.stack.append(iterator.next_method);
-    try self.stack.append(Value.from(iterator.iterator));
+    try self.stack.append(self.agent.gc_allocator, iterator.next_method);
+    try self.stack.append(self.agent.gc_allocator, Value.from(iterator.iterator));
 }
 
 fn executeLoadThisValueForEvaluateCall(self: *Vm, _: Executable) Agent.Error!void {
     const reference = self.reference_stack.pop();
     const this_value = evaluateCallGetThisValue(reference);
-    try self.stack.append(this_value);
+    try self.stack.append(self.agent.gc_allocator, this_value);
 }
 
 fn executeLoadThisValueForMakeSuperPropertyReference(self: *Vm, _: Executable) Agent.Error!void {
@@ -1240,7 +1243,7 @@ fn executeLoadThisValueForMakeSuperPropertyReference(self: *Vm, _: Executable) A
     // 2. Let actualThis be ? env.GetThisBinding().
     const actual_this = try env.getThisBinding();
 
-    try self.stack.append(actual_this);
+    try self.stack.append(self.agent.gc_allocator, actual_this);
 }
 
 fn executeLogicalNot(self: *Vm, _: Executable) Agent.Error!void {
@@ -1272,7 +1275,7 @@ fn executeMakePrivateReference(self: *Vm, executable: Executable) Agent.Error!vo
         .strict = true,
         .this_value = null,
     };
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
@@ -1300,7 +1303,7 @@ fn executeMakeSuperPropertyReference(self: *Vm, executable: Executable) Agent.Er
         .strict = strict,
         .this_value = actual_this,
     };
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 fn executeObjectCreate(self: *Vm, _: Executable) Agent.Error!void {
@@ -1391,12 +1394,12 @@ fn executePopReference(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
-    try self.lexical_environment_stack.append(lexical_environment);
+    try self.lexical_environment_stack.append(self.agent.gc_allocator, lexical_environment);
 }
 
 fn executePushExceptionJumpTarget(self: *Vm, executable: Executable) Agent.Error!void {
     const jump_target = self.fetchIndex(executable);
-    try self.exception_jump_target_stack.append(jump_target);
+    try self.exception_jump_target_stack.append(self.agent.gc_allocator, jump_target);
 }
 
 fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
@@ -1419,7 +1422,7 @@ fn executeResolveBinding(self: *Vm, executable: Executable) Agent.Error!void {
         environment_lookup_cache_index
     ];
     const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
-    try self.reference_stack.append(reference);
+    try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 /// 15.7.16 Runtime Semantics: Evaluation

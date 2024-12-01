@@ -146,8 +146,8 @@ pub const namespace = struct {
         const locales = arguments.get(0);
 
         // 1. Let ll be ? CanonicalizeLocaleList(locales).
-        const locale_list = try canonicalizeLocaleList(agent, locales);
-        defer locale_list.deinit();
+        var locale_list = try canonicalizeLocaleList(agent, locales);
+        defer locale_list.deinit(agent.gc_allocator);
 
         // 2. Return CreateArrayFromList(ll).
         return Value.from(

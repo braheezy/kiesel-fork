@@ -54,8 +54,8 @@ pub const Transition = union(enum) {
         };
     }
 
-    pub fn HashMap(comptime V: type) type {
-        return std.HashMap(Transition, V, struct {
+    pub fn HashMapUnmanaged(comptime V: type) type {
+        return std.HashMapUnmanaged(Transition, V, struct {
             pub fn hash(_: @This(), transition: Transition) u64 {
                 return transition.hash();
             }
@@ -106,8 +106,8 @@ const State = enum {
 state: State,
 transition_count: u8,
 next_index: usize,
-transitions: Transition.HashMap(*Shape),
-properties: PropertyKey.ArrayHashMap(PropertyMetadata),
+transitions: Transition.HashMapUnmanaged(*Shape),
+properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
 
 /// [[Prototype]]
 prototype: ?*Object,
@@ -124,8 +124,8 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
         .state = .default,
         .transition_count = 0,
         .next_index = 0,
-        .transitions = .init(allocator),
-        .properties = .init(allocator),
+        .transitions = .empty,
+        .properties = .empty,
         .prototype = null,
         .extensible = true,
         .is_htmldda = if (build_options.enable_annex_b) false,
@@ -134,8 +134,8 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
 }
 
 pub fn deinit(self: *Shape, allocator: std.mem.Allocator) void {
-    self.transitions.deinit();
-    self.properties.deinit();
+    self.transitions.deinit(allocator);
+    self.properties.deinit(allocator);
     allocator.destroy(self);
 }
 
@@ -153,8 +153,8 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator, state: State) std.mem
         .state = state,
         .transition_count = self.transition_count,
         .next_index = self.next_index,
-        .transitions = .init(allocator),
-        .properties = try self.properties.clone(),
+        .transitions = .empty,
+        .properties = try self.properties.clone(allocator),
         .prototype = self.prototype,
         .extensible = self.extensible,
         .is_htmldda = self.is_htmldda,
@@ -179,7 +179,7 @@ fn getOrCreateShape(
                     return self;
                 }
             }
-            const shape_gop = try self.transitions.getOrPut(transition.?);
+            const shape_gop = try self.transitions.getOrPut(allocator, transition.?);
             if (shape_gop.found_existing) return shape_gop.value_ptr.*;
             const shape = try self.clone(allocator, self.state);
             shape.transition_count += 1;
@@ -261,7 +261,7 @@ pub fn setProperty(
 ) std.mem.Allocator.Error!*Shape {
     const transition: Transition = .{ .set_property = .{ property_key, attributes } };
     const shape = try self.getOrCreateShape(allocator, transition);
-    const property_gop = try shape.properties.getOrPut(property_key);
+    const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
     } else {
@@ -281,7 +281,7 @@ pub fn setPropertyWithoutTransition(
     attributes: PropertyMetadata.Attributes,
 ) std.mem.Allocator.Error!*Shape {
     const shape = try self.getOrCreateShape(allocator, null);
-    const property_gop = try shape.properties.getOrPut(property_key);
+    const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
     } else {

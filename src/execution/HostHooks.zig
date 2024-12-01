@@ -23,7 +23,7 @@ const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
 
-pub const ImportMetaProperties = PropertyKey.ArrayHashMap(Value);
+pub const ImportMetaProperties = PropertyKey.ArrayHashMapUnmanaged(Value);
 
 pub const ResizeArrayBufferHandled = enum {
     handled,
@@ -74,6 +74,7 @@ hostFinalizeImportMeta: *const fn (
     module: *SourceTextModule,
 ) void = default_host_hooks.hostFinalizeImportMeta,
 hostGetImportMetaProperties: *const fn (
+    agent: *Agent,
     module: *SourceTextModule,
 ) std.mem.Allocator.Error!ImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
 hostGrowSharedArrayBuffer: *const fn (

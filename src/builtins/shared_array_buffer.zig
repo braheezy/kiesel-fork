@@ -284,7 +284,7 @@ pub const prototype = struct {
         //    undefined.
         // j. Set currentByteLengthRawBytes to readByteLengthRawBytes.
         const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
-            object.fields.array_buffer_data.resize(new_byte_length_casted)
+            object.fields.array_buffer_data.resize(agent.gc_allocator, new_byte_length_casted)
         else
             error.Overflow;
         result catch return agent.throwException(

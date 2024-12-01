@@ -39,7 +39,7 @@ state: struct {
     call_expression_forbidden: bool = false,
     arguments_object_needed: bool = false,
 } = .{},
-identifier_stack: std.ArrayList(ast.Identifier),
+identifier_stack: std.ArrayListUnmanaged(ast.Identifier),
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -229,9 +229,9 @@ pub fn parseNode(
         .allocator = allocator,
         .core = core,
         .diagnostics = ctx.diagnostics,
-        .identifier_stack = .init(allocator),
+        .identifier_stack = .empty,
     };
-    defer parser.identifier_stack.deinit();
+    defer parser.identifier_stack.deinit(allocator);
     const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
     defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
@@ -380,13 +380,13 @@ fn ensureUniqueParameterNames(
 ) std.mem.Allocator.Error!void {
     var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
-    try formal_parameters.collectBoundNames(&self.identifier_stack);
+    try formal_parameters.collectBoundNames(self.allocator, &self.identifier_stack);
     bound_names.close();
-    var seen_bound_names = std.StringHashMap(void).init(self.allocator);
-    defer seen_bound_names.deinit();
-    try seen_bound_names.ensureTotalCapacity(@intCast(bound_names.slice().len));
+    var seen_bound_names: std.StringHashMapUnmanaged(void) = .empty;
+    defer seen_bound_names.deinit(self.allocator);
+    try seen_bound_names.ensureTotalCapacity(self.allocator, @intCast(bound_names.slice().len));
     for (bound_names.slice()) |bound_name| {
-        if (try seen_bound_names.fetchPut(bound_name, {})) |_| {
+        if (seen_bound_names.fetchPutAssumeCapacity(bound_name, {})) |_| {
             switch (kind) {
                 .strict => try self.emitErrorAt(
                     location,
@@ -415,7 +415,7 @@ fn ensureAllowedParameterNames(
 ) AcceptError!void {
     var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
-    try formal_parameters.collectBoundNames(&self.identifier_stack);
+    try formal_parameters.collectBoundNames(self.allocator, &self.identifier_stack);
     bound_names.close();
     for (bound_names.slice()) |bound_name| {
         try self.ensureAllowedIdentifier(.function_parameter, bound_name, location);
@@ -457,19 +457,19 @@ fn ensureUniqueLexicallyDeclaredNames(
     var_declared_names: []const ast.Identifier,
     location: ptk.Location,
 ) std.mem.Allocator.Error!void {
-    var seen = std.StringHashMap(void).init(self.allocator);
-    defer seen.deinit();
+    var seen: std.StringHashMapUnmanaged(void) = .empty;
+    defer seen.deinit(self.allocator);
 
-    var var_names_set = std.StringHashMap(void).init(self.allocator);
-    try var_names_set.ensureUnusedCapacity(@intCast(var_declared_names.len));
-    defer var_names_set.deinit();
+    var var_names_set: std.StringHashMapUnmanaged(void) = .empty;
+    try var_names_set.ensureUnusedCapacity(self.allocator, @intCast(var_declared_names.len));
+    defer var_names_set.deinit(self.allocator);
     for (var_declared_names) |name| var_names_set.putAssumeCapacity(name, {});
 
     for (lexically_declared_names) |name| {
         if (seen.contains(name)) {
             try self.emitErrorAt(location, "Duplicate lexical declaration '{s}'", .{name});
         }
-        try seen.put(name, {});
+        try seen.put(self.allocator, name, {});
 
         if (var_names_set.contains(name)) {
             try self.emitErrorAt(
@@ -1054,21 +1054,21 @@ pub fn acceptArguments(self: *Parser) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var arguments = std.ArrayList(ast.Argument).init(self.allocator);
-    errdefer arguments.deinit();
+    var arguments: std.ArrayListUnmanaged(ast.Argument) = .empty;
+    errdefer arguments.deinit(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"("));
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
         if (self.acceptExpression(ctx)) |expression| {
-            try arguments.append(.{ .expression = expression });
+            try arguments.append(self.allocator, .{ .expression = expression });
         } else |_| if (self.core.accept(RuleSet.is(.@"..."))) |_| {
             const expression = try self.acceptExpression(ctx);
-            try arguments.append(.{ .spread = expression });
+            try arguments.append(self.allocator, .{ .spread = expression });
         } else |_| break;
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     }
     _ = try self.core.accept(RuleSet.is(.@")"));
-    return arguments.toOwnedSlice();
+    return arguments.toOwnedSlice(self.allocator);
 }
 
 pub fn acceptOptionalExpression(
@@ -1204,23 +1204,23 @@ pub fn acceptArrayLiteral(self: *Parser) AcceptError!ast.ArrayLiteral {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"["));
-    var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
-    errdefer elements.deinit();
+    var elements: std.ArrayListUnmanaged(ast.ArrayLiteral.Element) = .empty;
+    errdefer elements.deinit(self.allocator);
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
         if (self.core.accept(RuleSet.is(.@"..."))) |_| {
             const expression = try self.acceptExpression(ctx);
-            try elements.append(.{ .spread = expression });
+            try elements.append(self.allocator, .{ .spread = expression });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.acceptExpression(ctx)) |expression| {
-            try elements.append(.{ .expression = expression });
+            try elements.append(self.allocator, .{ .expression = expression });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
-            try elements.append(.elision);
+            try elements.append(self.allocator, .elision);
         } else |_| break;
     }
     _ = try self.core.accept(RuleSet.is(.@"]"));
-    return .{ .element_list = try elements.toOwnedSlice() };
+    return .{ .element_list = try elements.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptObjectLiteral(self: *Parser) AcceptError!ast.ObjectLiteral {
@@ -1237,14 +1237,14 @@ pub fn acceptPropertyDefinitionList(self: *Parser) AcceptError!ast.PropertyDefin
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
-    errdefer property_definitions.deinit();
+    var property_definitions: std.ArrayListUnmanaged(ast.PropertyDefinition) = .empty;
+    errdefer property_definitions.deinit(self.allocator);
     var has_proto_setter = false;
     while (self.acceptPropertyDefinition(&has_proto_setter)) |property_definition| {
-        try property_definitions.append(property_definition);
+        try property_definitions.append(self.allocator, property_definition);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
-    return .{ .items = try property_definitions.toOwnedSlice() };
+    return .{ .items = try property_definitions.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptPropertyDefinition(self: *Parser, has_proto_setter: *bool) AcceptError!ast.PropertyDefinition {
@@ -1616,14 +1616,14 @@ pub fn acceptSequenceExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var expressions = std.ArrayList(ast.Expression).init(self.allocator);
-    errdefer expressions.deinit();
+    var expressions: std.ArrayListUnmanaged(ast.Expression) = .empty;
+    errdefer expressions.deinit(self.allocator);
     while (self.core.accept(RuleSet.is(.@","))) |_| {
         const expression = try self.acceptExpression(.{});
-        try expressions.append(expression);
+        try expressions.append(self.allocator, expression);
     } else |_| if (expressions.items.len == 0) return error.UnexpectedToken;
-    try expressions.insert(0, primary_expression);
-    return .{ .expressions = try expressions.toOwnedSlice() };
+    try expressions.insert(self.allocator, 0, primary_expression);
+    return .{ .expressions = try expressions.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptTaggedTemplate(
@@ -1858,12 +1858,12 @@ pub fn acceptBlock(self: *Parser) AcceptError!ast.Block {
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try statement_list.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try statement_list.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try statement_list.collectVarDeclaredNames(&self.identifier_stack);
+    try statement_list.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of StatementList contains any duplicate
@@ -1887,10 +1887,10 @@ pub fn acceptStatementList(self: *Parser, ctx: AcceptContext) AcceptError!ast.St
     defer tmp.restore();
     var look_for_use_strict = ctx.update_strict_mode and !self.state.in_strict_mode;
 
-    var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
-    errdefer statement_list_items.deinit();
+    var statement_list_items: std.ArrayListUnmanaged(ast.StatementListItem) = .empty;
+    errdefer statement_list_items.deinit(self.allocator);
     while (self.acceptStatementListItem()) |statement_list_item| {
-        try statement_list_items.append(statement_list_item);
+        try statement_list_items.append(self.allocator, statement_list_item);
         if (look_for_use_strict) {
             if (!statement_list_item.analyze(.is_string_literal)) {
                 look_for_use_strict = false;
@@ -1900,7 +1900,7 @@ pub fn acceptStatementList(self: *Parser, ctx: AcceptContext) AcceptError!ast.St
             self.state.in_strict_mode = statement_list.containsDirective("use strict");
         }
     } else |_| {}
-    return .{ .items = try statement_list_items.toOwnedSlice() };
+    return .{ .items = try statement_list_items.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptStatementListItem(self: *Parser) AcceptError!ast.StatementListItem {
@@ -1938,14 +1938,14 @@ pub fn acceptBindingList(self: *Parser) AcceptError!ast.BindingList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var lexical_bindings = std.ArrayList(ast.LexicalBinding).init(self.allocator);
-    errdefer lexical_bindings.deinit();
+    var lexical_bindings: std.ArrayListUnmanaged(ast.LexicalBinding) = .empty;
+    errdefer lexical_bindings.deinit(self.allocator);
     while (self.acceptLexicalBinding()) |lexical_binding| {
-        try lexical_bindings.append(lexical_binding);
+        try lexical_bindings.append(self.allocator, lexical_binding);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     if (lexical_bindings.items.len == 0) return error.UnexpectedToken;
-    return .{ .items = try lexical_bindings.toOwnedSlice() };
+    return .{ .items = try lexical_bindings.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptLexicalBinding(self: *Parser) AcceptError!ast.LexicalBinding {
@@ -1993,14 +1993,14 @@ pub fn acceptVariableDeclarationList(self: *Parser) AcceptError!ast.VariableDecl
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var variable_declarations = std.ArrayList(ast.VariableDeclaration).init(self.allocator);
-    errdefer variable_declarations.deinit();
+    var variable_declarations: std.ArrayListUnmanaged(ast.VariableDeclaration) = .empty;
+    errdefer variable_declarations.deinit(self.allocator);
     while (self.acceptVariableDeclaration()) |variable_declaration| {
-        try variable_declarations.append(variable_declaration);
+        try variable_declarations.append(self.allocator, variable_declaration);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     if (variable_declarations.items.len == 0) return error.UnexpectedToken;
-    return .{ .items = try variable_declarations.toOwnedSlice() };
+    return .{ .items = try variable_declarations.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptVariableDeclaration(self: *Parser) AcceptError!ast.VariableDeclaration {
@@ -2047,40 +2047,40 @@ pub fn acceptObjectBindingPattern(self: *Parser) AcceptError!ast.ObjectBindingPa
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var properties = std.ArrayList(ast.ObjectBindingPattern.Property).init(self.allocator);
+    var properties: std.ArrayListUnmanaged(ast.ObjectBindingPattern.Property) = .empty;
     _ = try self.core.accept(RuleSet.is(.@"{"));
     while (true) {
         if (self.acceptBindingProperty()) |binding_property| {
-            try properties.append(.{ .binding_property = binding_property });
+            try properties.append(self.allocator, .{ .binding_property = binding_property });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.acceptBindingRestProperty()) |binding_rest_property| {
-            try properties.append(.{ .binding_rest_property = binding_rest_property });
+            try properties.append(self.allocator, .{ .binding_rest_property = binding_rest_property });
             break;
         } else |_| break;
     }
     _ = try self.core.accept(RuleSet.is(.@"}"));
-    return .{ .properties = try properties.toOwnedSlice() };
+    return .{ .properties = try properties.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPattern {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var elements = std.ArrayList(ast.ArrayBindingPattern.Element).init(self.allocator);
+    var elements: std.ArrayListUnmanaged(ast.ArrayBindingPattern.Element) = .empty;
     _ = try self.core.accept(RuleSet.is(.@"["));
     while (true) {
         if (self.acceptBindingElement()) |binding_element| {
-            try elements.append(.{ .binding_element = binding_element });
+            try elements.append(self.allocator, .{ .binding_element = binding_element });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.acceptBindingRestElement()) |binding_rest_element| {
-            try elements.append(.{ .binding_rest_element = binding_rest_element });
+            try elements.append(self.allocator, .{ .binding_rest_element = binding_rest_element });
             break;
         } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
-            try elements.append(.elision);
+            try elements.append(self.allocator, .elision);
         } else |_| break;
     }
     _ = try self.core.accept(RuleSet.is(.@"]"));
-    return .{ .elements = try elements.toOwnedSlice() };
+    return .{ .elements = try elements.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptBindingRestProperty(self: *Parser) AcceptError!ast.BindingRestProperty {
@@ -2292,9 +2292,9 @@ fn acceptIfStatementFunctionDeclaration(self: *Parser) AcceptError!*ast.Statemen
         },
     };
 
-    var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
-    errdefer statement_list_items.deinit();
-    try statement_list_items.append(.{ .declaration = declaration });
+    var statement_list_items: std.ArrayListUnmanaged(ast.StatementListItem) = .empty;
+    errdefer statement_list_items.deinit(self.allocator);
+    try statement_list_items.append(self.allocator, .{ .declaration = declaration });
 
     const statement = try self.allocator.create(ast.Statement);
     errdefer self.allocator.destroy(statement);
@@ -2302,7 +2302,7 @@ fn acceptIfStatementFunctionDeclaration(self: *Parser) AcceptError!*ast.Statemen
         .block_statement = .{
             .block = .{
                 .statement_list = .{
-                    .items = try statement_list_items.toOwnedSlice(),
+                    .items = try statement_list_items.toOwnedSlice(self.allocator),
                 },
             },
         },
@@ -2601,12 +2601,12 @@ pub fn acceptSwitchStatement(self: *Parser) AcceptError!ast.SwitchStatement {
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try case_block.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try case_block.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try case_block.collectVarDeclaredNames(&self.identifier_stack);
+    try case_block.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of CaseBlock contains any duplicate
@@ -2627,15 +2627,15 @@ pub fn acceptCaseBlock(self: *Parser) AcceptError!ast.CaseBlock {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    var case_block_items = std.ArrayList(ast.CaseBlock.Item).init(self.allocator);
-    errdefer case_block_items.deinit();
+    var case_block_items: std.ArrayListUnmanaged(ast.CaseBlock.Item) = .empty;
+    errdefer case_block_items.deinit(self.allocator);
     var has_default_clause = false;
     while (self.acceptCaseBlockItem(has_default_clause)) |case_block_item| {
         if (case_block_item == .default_clause) has_default_clause = true;
-        try case_block_items.append(case_block_item);
+        try case_block_items.append(self.allocator, case_block_item);
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@"}"));
-    return .{ .items = try case_block_items.toOwnedSlice() };
+    return .{ .items = try case_block_items.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptCaseBlockItem(self: *Parser, has_default_clause: bool) AcceptError!ast.CaseBlock.Item {
@@ -2740,26 +2740,26 @@ pub fn acceptFormalParameters(self: *Parser) AcceptError!ast.FormalParameters {
     const tmp2 = temporaryChange(&self.state.arguments_object_needed, false);
     defer tmp2.restore();
 
-    var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
-    errdefer formal_parameters_items.deinit();
+    var formal_parameters_items: std.ArrayListUnmanaged(ast.FormalParameters.Item) = .empty;
+    errdefer formal_parameters_items.deinit(self.allocator);
     while (true) {
         if (self.acceptBindingRestElement()) |binding_rest_element| {
             const function_rest_parameter: ast.FunctionRestParameter = .{
                 .binding_rest_element = binding_rest_element,
             };
-            try formal_parameters_items.append(.{ .function_rest_parameter = function_rest_parameter });
+            try formal_parameters_items.append(self.allocator, .{ .function_rest_parameter = function_rest_parameter });
             _ = self.core.accept(RuleSet.is(.@",")) catch {};
             break;
         } else |_| if (self.acceptBindingElement()) |binding_element| {
             const formal_parameter: ast.FormalParameter = .{
                 .binding_element = binding_element,
             };
-            try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
+            try formal_parameters_items.append(self.allocator, .{ .formal_parameter = formal_parameter });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| break;
     }
     return .{
-        .items = try formal_parameters_items.toOwnedSlice(),
+        .items = try formal_parameters_items.toOwnedSlice(self.allocator),
         .arguments_object_needed = self.state.arguments_object_needed,
     };
 }
@@ -2883,12 +2883,12 @@ pub fn acceptFunctionBody(
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try function_body.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try function_body.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try function_body.collectVarDeclaredNames(&self.identifier_stack);
+    try function_body.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of FunctionStatementList contains any
@@ -2914,7 +2914,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     if (self.acceptBindingIdentifier()) |binding_identifier| {
         // We need to do this after consuming the identifier token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - binding_identifier.len;
-        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
+        var formal_parameters_items = try std.ArrayListUnmanaged(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
@@ -2929,7 +2929,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
             },
         });
         formal_parameters = .{
-            .items = try formal_parameters_items.toOwnedSlice(),
+            .items = try formal_parameters_items.toOwnedSlice(self.allocator),
             .arguments_object_needed = false,
         };
     } else |_| {
@@ -3370,12 +3370,12 @@ fn acceptClassElementList(self: *Parser) AcceptError!ast.ClassElementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var class_elements = std.ArrayList(ast.ClassElement).init(self.allocator);
-    errdefer class_elements.deinit();
+    var class_elements: std.ArrayListUnmanaged(ast.ClassElement) = .empty;
+    errdefer class_elements.deinit(self.allocator);
     while (self.acceptClassElement()) |class_element|
-        try class_elements.append(class_element)
+        try class_elements.append(self.allocator, class_element)
     else |_| {}
-    return .{ .items = try class_elements.toOwnedSlice() };
+    return .{ .items = try class_elements.toOwnedSlice(self.allocator) };
 }
 
 fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
@@ -3445,12 +3445,12 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try class_static_block.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try class_static_block.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try class_static_block.collectVarDeclaredNames(&self.identifier_stack);
+    try class_static_block.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ClassStaticBlockStatementList
@@ -3504,23 +3504,23 @@ fn acceptTemplateLiteral(self: *Parser) AcceptError!ast.TemplateLiteral {
     const tmp = temporaryChange(&tokenizer_.state.parsing_template_literal, true);
     defer tmp.restore();
 
-    var spans = std.ArrayList(ast.TemplateLiteral.Span).init(self.allocator);
-    errdefer spans.deinit();
+    var spans: std.ArrayListUnmanaged(ast.TemplateLiteral.Span) = .empty;
+    errdefer spans.deinit(self.allocator);
     if (self.core.accept(RuleSet.is(.template))) |template| {
-        try spans.append(.{ .text = try self.allocator.dupe(u8, template.text) });
+        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template.text) });
     } else |_| if (self.core.accept(RuleSet.is(.template_head))) |template_head| {
-        try spans.append(.{ .text = try self.allocator.dupe(u8, template_head.text) });
+        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_head.text) });
         while (true) {
             const expression = try self.acceptExpression(.{});
-            try spans.append(.{ .expression = expression });
+            try spans.append(self.allocator, .{ .expression = expression });
             if (self.core.accept(RuleSet.is(.template_middle))) |template_middle| {
-                try spans.append(.{ .text = try self.allocator.dupe(u8, template_middle.text) });
+                try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_middle.text) });
             } else |_| break;
         }
         const template_tail = try self.core.accept(RuleSet.is(.template_tail));
-        try spans.append(.{ .text = try self.allocator.dupe(u8, template_tail.text) });
+        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_tail.text) });
     } else |_| return error.UnexpectedToken;
-    return .{ .spans = try spans.toOwnedSlice() };
+    return .{ .spans = try spans.toOwnedSlice(self.allocator) };
 }
 
 fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDeclaration {
@@ -3642,7 +3642,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
     if (self.acceptBindingIdentifier()) |binding_identifier| {
-        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
+        var formal_parameters_items = try std.ArrayListUnmanaged(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
@@ -3657,7 +3657,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
             },
         });
         formal_parameters = .{
-            .items = try formal_parameters_items.toOwnedSlice(),
+            .items = try formal_parameters_items.toOwnedSlice(self.allocator),
             .arguments_object_needed = false,
         };
     } else |_| {
@@ -3720,12 +3720,12 @@ pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try script.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try script.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try script.collectVarDeclaredNames(&self.identifier_stack);
+    try script.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ScriptBody contains any duplicate
@@ -3758,12 +3758,12 @@ pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
 
     var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try module_item_list.collectLexicallyDeclaredNames(&self.identifier_stack);
+    try module_item_list.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
     lexically_declared_names.close();
 
     var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try module_item_list.collectVarDeclaredNames(&self.identifier_stack);
+    try module_item_list.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ModuleItemList contains any
@@ -3783,12 +3783,12 @@ pub fn acceptModuleItemList(self: *Parser) AcceptError!ast.ModuleItemList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var module_items = std.ArrayList(ast.ModuleItem).init(self.allocator);
-    errdefer module_items.deinit();
+    var module_items: std.ArrayListUnmanaged(ast.ModuleItem) = .empty;
+    errdefer module_items.deinit(self.allocator);
     while (self.acceptModuleItem()) |module_item|
-        try module_items.append(module_item)
+        try module_items.append(self.allocator, module_item)
     else |_| {}
-    return .{ .items = try module_items.toOwnedSlice() };
+    return .{ .items = try module_items.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptModuleItem(self: *Parser) AcceptError!ast.ModuleItem {
@@ -3877,15 +3877,15 @@ pub fn acceptImportsList(self: *Parser) AcceptError!ast.ImportsList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var import_specifiers = std.ArrayList(ast.ImportSpecifier).init(self.allocator);
-    errdefer import_specifiers.deinit();
+    var import_specifiers: std.ArrayListUnmanaged(ast.ImportSpecifier) = .empty;
+    errdefer import_specifiers.deinit(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
     while (self.acceptImportSpecifier()) |import_specifier| {
-        try import_specifiers.append(import_specifier);
+        try import_specifiers.append(self.allocator, import_specifier);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@"}"));
-    return .{ .items = try import_specifiers.toOwnedSlice() };
+    return .{ .items = try import_specifiers.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptImportSpecifier(self: *Parser) AcceptError!ast.ImportSpecifier {
@@ -3974,14 +3974,14 @@ pub fn acceptExportsList(self: *Parser) AcceptError!ast.ExportsList {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    var export_specifiers = std.ArrayList(ast.ExportSpecifier).init(self.allocator);
-    errdefer export_specifiers.deinit();
+    var export_specifiers: std.ArrayListUnmanaged(ast.ExportSpecifier) = .empty;
+    errdefer export_specifiers.deinit(self.allocator);
     while (self.acceptExportSpecifier()) |export_specifier| {
-        try export_specifiers.append(export_specifier);
+        try export_specifiers.append(self.allocator, export_specifier);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@"}"));
-    return .{ .items = try export_specifiers.toOwnedSlice() };
+    return .{ .items = try export_specifiers.toOwnedSlice(self.allocator) };
 }
 
 pub fn acceptExportSpecifier(self: *Parser) AcceptError!ast.ExportSpecifier {

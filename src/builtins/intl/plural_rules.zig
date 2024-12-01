@@ -212,7 +212,7 @@ pub const prototype = struct {
         // 4. Let pluralCategories be a List of Strings containing all possible results of
         //    PluralRuleSelect for the selected locale pr.[[Locale]], sorted according to the
         //    following order: "zero", "one", "two", "few", "many", "other".
-        const plural_categories = blk: {
+        var plural_categories = blk: {
             const data_provider = icu4zig.DataProvider.init();
             defer data_provider.deinit();
             const plural_rules_ = icu4zig.PluralRules.init(
@@ -225,16 +225,16 @@ pub const prototype = struct {
             );
             defer plural_rules_.deinit();
             const plural_categories = plural_rules_.categories();
-            var array_list = std.ArrayList(Value).init(agent.gc_allocator);
-            if (plural_categories.zero) try array_list.append(Value.from("zero"));
-            if (plural_categories.one) try array_list.append(Value.from("one"));
-            if (plural_categories.two) try array_list.append(Value.from("two"));
-            if (plural_categories.few) try array_list.append(Value.from("few"));
-            if (plural_categories.many) try array_list.append(Value.from("many"));
-            if (plural_categories.other) try array_list.append(Value.from("other"));
+            var array_list: std.ArrayListUnmanaged(Value) = .empty;
+            if (plural_categories.zero) try array_list.append(agent.gc_allocator, Value.from("zero"));
+            if (plural_categories.one) try array_list.append(agent.gc_allocator, Value.from("one"));
+            if (plural_categories.two) try array_list.append(agent.gc_allocator, Value.from("two"));
+            if (plural_categories.few) try array_list.append(agent.gc_allocator, Value.from("few"));
+            if (plural_categories.many) try array_list.append(agent.gc_allocator, Value.from("many"));
+            if (plural_categories.other) try array_list.append(agent.gc_allocator, Value.from("other"));
             break :blk array_list;
         };
-        defer plural_categories.deinit();
+        defer plural_categories.deinit(agent.gc_allocator);
 
         // 5. For each row of Table 25, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.

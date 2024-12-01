@@ -316,9 +316,9 @@ pub fn createMappedArgumentsObject(
     object.as(Arguments).fields.parameter_map = map;
 
     // 12. Let parameterNames be the BoundNames of formals.
-    var parameter_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer parameter_names.deinit();
-    try formals.collectBoundNames(&parameter_names);
+    var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer parameter_names.deinit(agent.gc_allocator);
+    try formals.collectBoundNames(agent.gc_allocator, &parameter_names);
 
     // 13. Let numberOfParameters be the number of elements in parameterNames.
     const number_of_parameters = parameter_names.items.len;
@@ -347,8 +347,8 @@ pub fn createMappedArgumentsObject(
     }) catch |err| try noexcept(err);
 
     // 17. Let mappedNames be a new empty List.
-    var mapped_names = std.StringHashMap(void).init(agent.gc_allocator);
-    defer mapped_names.deinit();
+    var mapped_names: std.StringHashMapUnmanaged(void) = .empty;
+    defer mapped_names.deinit(agent.gc_allocator);
 
     // 18. Set index to numberOfParameters - 1.
     var index: ?u53 = std.math.sub(u53, @intCast(number_of_parameters), 1) catch null;
@@ -361,7 +361,7 @@ pub fn createMappedArgumentsObject(
         // b. If mappedNames does not contain name, then
         if (!mapped_names.contains(name)) {
             // i. Append name to mappedNames.
-            try mapped_names.put(name, {});
+            try mapped_names.put(agent.gc_allocator, name, {});
 
             // ii. If index < len, then
             if (index.? < len) {

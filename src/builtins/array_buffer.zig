@@ -256,7 +256,7 @@ pub fn detachArrayBuffer(
     // 4. Set arrayBuffer.[[ArrayBufferData]] to null.
     // 5. Set arrayBuffer.[[ArrayBufferByteLength]] to 0.
     if (array_buffer.fields.array_buffer_data) |*data| {
-        data.deinit();
+        data.deinit(agent.gc_allocator);
         array_buffer.fields.array_buffer_data = null;
     }
 
@@ -836,7 +836,7 @@ pub const prototype = struct {
         // 15. Set O.[[ArrayBufferByteLength]] to newByteLength.
         const current_byte_length = object.fields.array_buffer_data.?.items.len;
         const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
-            object.fields.array_buffer_data.?.resize(new_byte_length_casted)
+            object.fields.array_buffer_data.?.resize(agent.gc_allocator, new_byte_length_casted)
         else
             error.Overflow;
         result catch return agent.throwException(

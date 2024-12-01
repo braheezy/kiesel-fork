@@ -250,11 +250,11 @@ pub fn createDynamicFunction(
     const arg_count = parameter_args.len;
 
     // 7. Let parameterStrings be a new empty List.
-    var parameter_strings = try std.ArrayList(*const String).initCapacity(
+    var parameter_strings = try std.ArrayListUnmanaged(*const String).initCapacity(
         agent.gc_allocator,
         parameter_args.len,
     );
-    defer parameter_strings.deinit();
+    defer parameter_strings.deinit(agent.gc_allocator);
 
     // 8. For each element arg of parameterArgs, do
     for (parameter_args) |arg| {
@@ -272,8 +272,8 @@ pub fn createDynamicFunction(
     try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, parameter_strings.items, body_string, false);
 
     // 12. Let P be the empty String.
-    var result = String.Builder.init(agent.gc_allocator);
-    defer result.deinit();
+    var result: String.Builder = .empty;
+    defer result.deinit(agent.gc_allocator);
 
     // 13. If argCount > 0, then
     if (arg_count > 0) {
@@ -284,12 +284,12 @@ pub fn createDynamicFunction(
         //     ii. Set P to the string-concatenation of P, "," (a comma), and nextArgString.
         //     iii. Set k to k + 1.
         for (parameter_strings.items, 0..) |next_arg_string, k| {
-            if (k > 0) try result.appendChar(',');
-            try result.appendString(next_arg_string);
+            if (k > 0) try result.appendChar(agent.gc_allocator, ',');
+            try result.appendString(agent.gc_allocator, next_arg_string);
         }
     }
 
-    const parameters_string = try (try result.build()).toUtf8(agent.gc_allocator);
+    const parameters_string = try (try result.build(agent.gc_allocator)).toUtf8(agent.gc_allocator);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).

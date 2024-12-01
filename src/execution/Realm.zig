@@ -39,10 +39,10 @@ global_object: *Object,
 global_env: *GlobalEnvironment,
 
 /// [[TemplateMap]]
-template_map: std.AutoHashMap(*ast.TemplateLiteral, *Object),
+template_map: std.AutoHashMapUnmanaged(*ast.TemplateLiteral, *Object),
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMap(Module),
+loaded_modules: String.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -82,9 +82,9 @@ pub fn initializeHostDefinedRealm(
         .global_env = undefined,
 
         // 6. Set realm.[[TemplateMap]] to a new empty List.
-        .template_map = .init(agent.gc_allocator),
+        .template_map = .empty,
 
-        .loaded_modules = .init(agent.gc_allocator),
+        .loaded_modules = .empty,
         .host_defined = .null_pointer,
     };
 
@@ -102,7 +102,7 @@ pub fn initializeHostDefinedRealm(
 
     // 11. Push newContext onto the execution context stack; newContext is now the running
     //     execution context.
-    try agent.execution_context_stack.append(new_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, new_context);
 
     // 12. If the host requires use of an exotic object to serve as realm's global object, then
     //     a. Let global be such an object created in a host-defined manner.
@@ -172,7 +172,7 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
 
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
-    try global.property_storage.ensureUnusedCapacity(global_properties_count);
+    try global.property_storage.ensureUnusedCapacity(self.agent.gc_allocator, global_properties_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {

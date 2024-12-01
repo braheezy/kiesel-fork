@@ -14,32 +14,32 @@ pub const Context = struct {
     contained_in_strict_mode_code: bool,
     environment_lookup_cache_index: Executable.IndexType,
     property_lookup_cache_index: Executable.IndexType,
-    continue_jumps: std.ArrayList(Executable.JumpIndex),
-    break_jumps: std.ArrayList(Executable.JumpIndex),
-    labelled_continue_jumps: std.StringHashMap(*std.ArrayList(Executable.JumpIndex)),
-    labelled_break_jumps: std.StringHashMap(*std.ArrayList(Executable.JumpIndex)),
+    continue_jumps: std.ArrayListUnmanaged(Executable.JumpIndex),
+    break_jumps: std.ArrayListUnmanaged(Executable.JumpIndex),
+    labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(Executable.JumpIndex)),
+    labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(Executable.JumpIndex)),
     current_label: ?[]const u8,
 
-    pub fn init(allocator: std.mem.Allocator) Context {
+    pub fn init() Context {
         return .{
             .contained_in_strict_mode_code = false,
             .environment_lookup_cache_index = 0,
             .property_lookup_cache_index = 0,
-            .continue_jumps = .init(allocator),
-            .break_jumps = .init(allocator),
-            .labelled_continue_jumps = .init(allocator),
-            .labelled_break_jumps = .init(allocator),
+            .continue_jumps = .empty,
+            .break_jumps = .empty,
+            .labelled_continue_jumps = .empty,
+            .labelled_break_jumps = .empty,
             .current_label = null,
         };
     }
 
-    pub fn deinit(self: *Context) void {
-        self.continue_jumps.deinit();
-        self.break_jumps.deinit();
+    pub fn deinit(self: *Context, allocator: std.mem.Allocator) void {
+        self.continue_jumps.deinit(allocator);
+        self.break_jumps.deinit(allocator);
         std.debug.assert(self.labelled_continue_jumps.count() == 0);
-        self.labelled_continue_jumps.deinit();
+        self.labelled_continue_jumps.deinit(allocator);
         std.debug.assert(self.labelled_break_jumps.count() == 0);
-        self.labelled_break_jumps.deinit();
+        self.labelled_break_jumps.deinit(allocator);
     }
 };
 
@@ -63,7 +63,7 @@ fn interceptContinueAndBreakJumps(
         try @call(.always_inline, codegenFn, args);
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.continue_jumps.append(jump_index);
+        try ctx.continue_jumps.append(executable.allocator, jump_index);
     }
     if (ctx.break_jumps.items.len != 0) {
         while (ctx.break_jumps.popOrNull()) |jump_index| {
@@ -72,7 +72,7 @@ fn interceptContinueAndBreakJumps(
         try @call(.always_inline, codegenFn, args);
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.break_jumps.append(jump_index);
+        try ctx.break_jumps.append(executable.allocator, jump_index);
     }
     var labelled_continue_jumps_it = ctx.labelled_continue_jumps.valueIterator();
     while (labelled_continue_jumps_it.next()) |value_ptr| {
@@ -84,7 +84,7 @@ fn interceptContinueAndBreakJumps(
             try @call(.always_inline, codegenFn, args);
             try executable.addInstruction(.jump);
             const jump_index = try executable.addJumpIndex();
-            try labelled_continue_jumps.append(jump_index);
+            try labelled_continue_jumps.append(executable.allocator, jump_index);
         }
     }
     var labelled_break_jumps_it = ctx.labelled_break_jumps.valueIterator();
@@ -97,7 +97,7 @@ fn interceptContinueAndBreakJumps(
             try @call(.always_inline, codegenFn, args);
             try executable.addInstruction(.jump);
             const jump_index = try executable.addJumpIndex();
-            try labelled_break_jumps.append(jump_index);
+            try labelled_break_jumps.append(executable.allocator, jump_index);
         }
     }
     try skip_jump.setTargetHere();
@@ -1012,8 +1012,8 @@ pub fn codegenArguments(
 ) Executable.Error!void {
     // Arguments : ( )
     // 1. Return a new empty List.
-    var spread_indices = std.ArrayList(usize).init(executable.allocator);
-    defer spread_indices.deinit();
+    var spread_indices: std.ArrayListUnmanaged(usize) = .empty;
+    defer spread_indices.deinit(executable.allocator);
     for (node, 0..) |argument, i| switch (argument) {
         // ArgumentList : AssignmentExpression
         // 1. Let ref be ? Evaluation of AssignmentExpression.
@@ -1038,7 +1038,7 @@ pub fn codegenArguments(
         // 5. Repeat,
         //     a. Let next be ? IteratorStepValue(iteratorRecord).
         //     b. If next is done, return list.
-        //     c. Append next to list.
+        //     c. Append executable.allocator, next to list.
         // ArgumentList : ArgumentList , ... AssignmentExpression
         // 1. Let precedingArgs be ? ArgumentListEvaluation of ArgumentList.
         // 2. Let spreadRef be ? Evaluation of AssignmentExpression.
@@ -1046,12 +1046,12 @@ pub fn codegenArguments(
         // 4. Repeat,
         //     a. Let next be ? IteratorStepValue(iteratorRecord).
         //     b. If next is done, return precedingArgs.
-        //     c. Append next to precedingArgs.
+        //     c. Append executable.allocator, next to precedingArgs.
         .spread => |expression| {
             try codegenExpression(expression, executable, ctx);
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
-            try spread_indices.append(i);
+            try spread_indices.append(executable.allocator, i);
         },
     };
 
@@ -2572,16 +2572,10 @@ pub fn codegenDoWhileStatement(
 ) Executable.Error!void {
     // DoWhileStatement : do Statement while ( Expression ) ;
 
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
-    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
-    defer ctx.continue_jumps = .fromOwnedSlice(
-        ctx.continue_jumps.allocator,
-        continue_jumps,
-    );
+    const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.continue_jumps = .fromOwnedSlice(continue_jumps);
 
     // 1. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -2642,16 +2636,10 @@ pub fn codegenWhileStatement(
 ) Executable.Error!void {
     // WhileStatement : while ( Expression ) Statement
 
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
-    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
-    defer ctx.continue_jumps = .fromOwnedSlice(
-        ctx.continue_jumps.allocator,
-        continue_jumps,
-    );
+    const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.continue_jumps = .fromOwnedSlice(continue_jumps);
 
     // 1. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -2715,16 +2703,10 @@ pub fn codegenForStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
-    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
-    defer ctx.continue_jumps = .fromOwnedSlice(
-        ctx.continue_jumps.allocator,
-        continue_jumps,
-    );
+    const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.continue_jumps = .fromOwnedSlice(continue_jumps);
 
     if (node.initializer) |initializer| switch (initializer) {
         // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
@@ -2985,16 +2967,10 @@ fn forInOfBodyEvaluation(
 ) Executable.Error!void {
     _ = iteration_kind;
 
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
-    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
-    defer ctx.continue_jumps = .fromOwnedSlice(
-        ctx.continue_jumps.allocator,
-        continue_jumps,
-    );
+    const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.continue_jumps = .fromOwnedSlice(continue_jumps);
 
     // 1. If iteratorKind is not present, set iteratorKind to sync.
     // NOTE: This is always passed in at the call site.
@@ -3130,11 +3106,11 @@ fn forInOfBodyEvaluation(
                     },
                 },
             };
-            var items = std.ArrayList(ast.LexicalBinding).init(executable.allocator);
-            try items.append(lexical_binding);
+            var items: std.ArrayListUnmanaged(ast.LexicalBinding) = .empty;
+            try items.append(executable.allocator, lexical_binding);
             break :blk .{
                 .type = lhs.for_declaration.type,
-                .binding_list = .{ .items = try items.toOwnedSlice() },
+                .binding_list = .{ .items = try items.toOwnedSlice(executable.allocator) },
             };
         };
 
@@ -3248,14 +3224,14 @@ pub fn codegenContinueStatement(
         // 2. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: label }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.labelled_continue_jumps.get(label).?.append(jump_index);
+        try ctx.labelled_continue_jumps.get(label).?.append(executable.allocator, jump_index);
     }
     // ContinueStatement : continue ;
     else {
         // 1. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: empty }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.continue_jumps.append(jump_index);
+        try ctx.continue_jumps.append(executable.allocator, jump_index);
     }
 }
 
@@ -3272,14 +3248,14 @@ pub fn codegenBreakStatement(
         // 2. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: label }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.labelled_break_jumps.get(label).?.append(jump_index);
+        try ctx.labelled_break_jumps.get(label).?.append(executable.allocator, jump_index);
     }
     // BreakStatement : break ;
     else {
         // 1. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.break_jumps.append(jump_index);
+        try ctx.break_jumps.append(executable.allocator, jump_index);
     }
 }
 
@@ -3413,8 +3389,8 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
 
     try executable.addInstruction(.load); // Save input value
 
-    var consequent_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
-    defer consequent_jumps.deinit();
+    var consequent_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    defer consequent_jumps.deinit(executable.allocator);
 
     var has_default_clause = false;
     for (case_block.items) |item| switch (item) {
@@ -3426,7 +3402,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
             const consequent_jump = try executable.addJumpIndex();
             const alternate_jump = try executable.addJumpIndex();
             try alternate_jump.setTargetHere();
-            try consequent_jumps.append(consequent_jump);
+            try consequent_jumps.append(executable.allocator, consequent_jump);
         },
         .default_clause => {
             std.debug.assert(!has_default_clause);
@@ -3494,11 +3470,8 @@ pub fn codegenSwitchStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
+    const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+    defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
 
     // 1. Let exprRef be ? Evaluation of Expression.
     try codegenExpression(node.expression, executable, ctx);
@@ -3557,17 +3530,17 @@ pub fn codegenLabelledStatement(
     const tmp = temporaryChange(&ctx.current_label, label);
     defer tmp.restore();
 
-    var labelled_continue_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
-    defer labelled_continue_jumps.deinit();
-    try ctx.labelled_continue_jumps.putNoClobber(label, &labelled_continue_jumps);
+    var labelled_continue_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    defer labelled_continue_jumps.deinit(executable.allocator);
+    try ctx.labelled_continue_jumps.putNoClobber(executable.allocator, label, &labelled_continue_jumps);
     defer {
         const removed = ctx.labelled_continue_jumps.remove(label);
         std.debug.assert(removed);
     }
 
-    var labelled_break_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
-    defer labelled_break_jumps.deinit();
-    try ctx.labelled_break_jumps.putNoClobber(label, &labelled_break_jumps);
+    var labelled_break_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    defer labelled_break_jumps.deinit(executable.allocator);
+    try ctx.labelled_break_jumps.putNoClobber(executable.allocator, label, &labelled_break_jumps);
     defer {
         const removed = ctx.labelled_break_jumps.remove(label);
         std.debug.assert(removed);

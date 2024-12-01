@@ -17,7 +17,7 @@ const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = builtins.weakRefDeref;
 
 const State = struct {
-    seen_objects: std.AutoHashMap(*const Object, usize),
+    seen_objects: std.AutoHashMapUnmanaged(*const Object, usize),
     print_in_progress: bool,
     tty_config: std.io.tty.Config,
 };
@@ -26,7 +26,7 @@ var fba_buf: [64 * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
 var arena = std.heap.ArenaAllocator.init(fba.allocator());
 pub var state: State = .{
-    .seen_objects = .init(arena.allocator()),
+    .seen_objects = .empty,
     .print_in_progress = false,
     .tty_config = undefined, // Set whenever an `Agent` is created
 };
@@ -933,8 +933,9 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
     const print_in_progress = state.print_in_progress;
     state.print_in_progress = true;
     defer if (!print_in_progress) {
-        state.seen_objects.clearRetainingCapacity();
+        state.seen_objects.clearAndFree(arena.allocator());
         state.print_in_progress = false;
+        _ = arena.reset(.retain_capacity);
     };
 
     const tty_config = state.tty_config;
@@ -947,7 +948,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             try tty_config.setColor(writer, .reset);
             return;
         }
-        state.seen_objects.putNoClobber(object, state.seen_objects.count()) catch return;
+        state.seen_objects.putNoClobber(arena.allocator(), object, state.seen_objects.count()) catch return;
 
         inline for (.{
             .{ builtins.Array, prettyPrintArray },

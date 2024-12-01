@@ -102,8 +102,8 @@ pub fn getSubstitution(
     std.debug.assert(position <= string_length);
 
     // 3. Let result be the empty String.
-    var result = types.String.Builder.init(agent.gc_allocator);
-    defer result.deinit();
+    var result: types.String.Builder = .empty;
+    defer result.deinit(agent.gc_allocator);
 
     // 4. Let templateRemainder be replacementTemplate.
     var template_reminder = replacement_template;
@@ -302,11 +302,11 @@ pub fn getSubstitution(
         );
 
         // k. Set result to the string-concatenation of result and refReplacement.
-        try result.appendString(ref_replacement);
+        try result.appendString(agent.gc_allocator, ref_replacement);
     }
 
     // 6. Return result.
-    return result.build();
+    return result.build(agent.gc_allocator);
 }
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
@@ -360,7 +360,7 @@ fn defineOwnProperty(
 
 /// 10.4.3.3 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     const agent = object.agent;
 
     // 2. Let str be O.[[StringData]].
@@ -371,7 +371,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
     const len = str.length();
 
     // 1. Let keys be a new empty List.
-    var keys = try std.ArrayList(PropertyKey).initCapacity(
+    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.shape.properties.count() + len,
     );
@@ -567,7 +567,7 @@ pub const constructor = struct {
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
         var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 2. For each element next of codeUnits, do
         for (arguments.values) |next| {
@@ -579,7 +579,7 @@ pub const constructor = struct {
         }
 
         // 3. Return result.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
@@ -588,7 +588,7 @@ pub const constructor = struct {
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
         var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 2. For each element next of codePoints, do
         for (arguments.values) |next| {
@@ -619,7 +619,7 @@ pub const constructor = struct {
 
         // 3. Assert: If codePoints is empty, then result is the empty String.
         // 4. Return result.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 22.1.2.4 String.raw ( template, ...substitutions )
@@ -644,8 +644,8 @@ pub const constructor = struct {
         if (literal_count == 0) return Value.from("");
 
         // 6. Let R be the empty String.
-        var result = types.String.Builder.init(agent.gc_allocator);
-        defer result.deinit();
+        var result: types.String.Builder = .empty;
+        defer result.deinit(agent.gc_allocator);
 
         // 7. Let nextIndex be 0.
         var next_index: u53 = 0;
@@ -659,10 +659,10 @@ pub const constructor = struct {
             const next_literal = try next_literal_value.toString(agent);
 
             // c. Set R to the string-concatenation of R and nextLiteral.
-            try result.appendString(next_literal);
+            try result.appendString(agent.gc_allocator, next_literal);
 
             // d. If nextIndex + 1 = literalCount, return R.
-            if (next_index + 1 == literal_count) return Value.from(try result.build());
+            if (next_index + 1 == literal_count) return Value.from(try result.build(agent.gc_allocator));
 
             // e. If nextIndex < substitutionCount, then
             if (next_index < substitution_count) {
@@ -673,7 +673,7 @@ pub const constructor = struct {
                 const next_substitution = try next_substitution_value.toString(agent);
 
                 // iii. Set R to the string-concatenation of R and nextSub.
-                try result.appendString(next_substitution);
+                try result.appendString(agent.gc_allocator, next_substitution);
             }
 
             // f. Set nextIndex to nextIndex + 1.
@@ -909,7 +909,7 @@ pub const prototype = struct {
         // 3. Let R be S.
         // NOTE: This allocates the exact needed capacity upfront
         var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count() + 1);
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
         result.appendStringAssumeCapacity(string);
 
         // 4. For each element next of args, do
@@ -922,7 +922,7 @@ pub const prototype = struct {
         }
 
         // 5. Return R.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 22.1.3.7 String.prototype.endsWith ( searchString [ , endPosition ] )
@@ -1524,8 +1524,8 @@ pub const prototype = struct {
         const advance_by = @max(1, search_length);
 
         // 9. Let matchPositions be a new empty List.
-        var match_positions = std.ArrayList(usize).init(agent.gc_allocator);
-        defer match_positions.deinit();
+        var match_positions: std.ArrayListUnmanaged(usize) = .empty;
+        defer match_positions.deinit(agent.gc_allocator);
 
         // 10. Let position be StringIndexOf(string, searchString, 0).
         var maybe_position = string.indexOf(search_string, 0);
@@ -1533,7 +1533,7 @@ pub const prototype = struct {
         // 11. Repeat, while position is not not-found,
         while (maybe_position) |position| {
             // a. Append position to matchPositions.
-            try match_positions.append(position);
+            try match_positions.append(agent.gc_allocator, position);
 
             // b. Set position to StringIndexOf(string, searchString, position + advanceBy).
             maybe_position = string.indexOf(search_string, position + advance_by);
@@ -1806,8 +1806,8 @@ pub const prototype = struct {
         }
 
         // 11. Let substrings be a new empty List.
-        var substrings = std.ArrayList(*const types.String).init(agent.gc_allocator);
-        defer substrings.deinit();
+        var substrings: std.ArrayListUnmanaged(*const types.String) = .empty;
+        defer substrings.deinit(agent.gc_allocator);
 
         // 12. Let i be 0.
         var i: usize = 0;
@@ -1821,7 +1821,7 @@ pub const prototype = struct {
             const tail = try string.substring(agent.gc_allocator, i, j.?);
 
             // b. Append T to substrings.
-            try substrings.append(tail);
+            try substrings.append(agent.gc_allocator, tail);
 
             // c. If the number of elements in substrings is lim, return CreateArrayFromList(substrings).
             if (substrings.items.len == limit) {
@@ -1845,7 +1845,7 @@ pub const prototype = struct {
         const tail = try string.substring(agent.gc_allocator, i, null);
 
         // 16. Append T to substrings.
-        try substrings.append(tail);
+        try substrings.append(agent.gc_allocator, tail);
 
         // 17. Return CreateArrayFromList(substrings).
         return Value.from(
@@ -2041,7 +2041,7 @@ pub const prototype = struct {
         // 5. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
         var result = try types.String.Builder.initCapacity(agent.gc_allocator, str_len);
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 6. Repeat, while k < strLen,
         while (k < str_len) {
@@ -2066,7 +2066,7 @@ pub const prototype = struct {
         }
 
         // 7. Return result.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 22.1.3.32 String.prototype.trim ( )

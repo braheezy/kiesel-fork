@@ -297,16 +297,16 @@ pub fn arraySetLength(
     //       most values are array holes. In that case we collect a list of known property keys,
     //       otherwise we loop through indices in reverse order and bail out if no property exists.
     var maybe_indices = if (old_len >= 1_000_000) blk: {
-        var indices = std.ArrayList(u32).init(agent.gc_allocator);
+        var indices: std.ArrayListUnmanaged(u32) = .empty;
         for (array.shape.properties.keys()) |property_key| {
             if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
-                try indices.append(@as(u32, @intCast(property_key.integer_index)));
+                try indices.append(agent.gc_allocator, @as(u32, @intCast(property_key.integer_index)));
             }
         }
         std.sort.insertion(u32, indices.items, {}, std.sort.desc(u32));
         break :blk indices;
     } else null;
-    defer if (maybe_indices) |*indices| indices.deinit();
+    defer if (maybe_indices) |*indices| indices.deinit(agent.gc_allocator);
     var index = if (maybe_indices) |*indices|
         indices.popOrNull()
     else
@@ -1703,7 +1703,7 @@ pub const prototype = struct {
         // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
         var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 6. Let k be 0.
         var k: u53 = 0;
@@ -1729,7 +1729,7 @@ pub const prototype = struct {
         }
 
         // 8. Return R.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 23.1.3.19 Array.prototype.keys ( )
@@ -2680,7 +2680,7 @@ pub const prototype = struct {
         // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
         var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 5. Let k be 0.
         var k: u53 = 0;
@@ -2709,7 +2709,7 @@ pub const prototype = struct {
         }
 
         // 7. Return R.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 23.1.3.33 Array.prototype.toReversed ( )
@@ -3177,7 +3177,7 @@ pub fn sortIndexedProperties(
     comptime holes: enum { skip_holes, read_through_holes },
 ) Agent.Error![]const Value {
     // 1. Let items be a new empty List.
-    var items = std.ArrayList(Value).init(agent.gc_allocator);
+    var items: std.ArrayListUnmanaged(Value) = .empty;
 
     // 2. Let k be 0.
     var k: u53 = 0;
@@ -3207,7 +3207,7 @@ pub fn sortIndexedProperties(
             const k_value = try object.get(property_key);
 
             // ii. Append kValue to items.
-            try items.append(k_value);
+            try items.append(agent.gc_allocator, k_value);
         }
 
         // e. Set k to k + 1.
@@ -3219,7 +3219,7 @@ pub fn sortIndexedProperties(
     try insertionSort(agent, items.items, sort_compare);
 
     // 5. Return items.
-    return items.toOwnedSlice();
+    return items.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 23.1.3.30.2 CompareArrayElements ( x, y, comparator )

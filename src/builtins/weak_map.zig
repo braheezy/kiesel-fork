@@ -69,7 +69,7 @@ pub const constructor = struct {
             "%WeakMap.prototype%",
             .{
                 // 3. Set map.[[WeakMapData]] to a new empty List.
-                .weak_map_data = .init(agent.gc_allocator),
+                .weak_map_data = .empty,
             },
         );
 
@@ -221,7 +221,7 @@ pub const prototype = struct {
         // 6. Append p to M.[[WeakMapData]].
         const weak_map_data = &map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
-        const gop = try weak_map_data.getOrPut(weak_key);
+        const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
         gop.value_ptr.* = value;
         if (build_options.enable_libgc and !gop.found_existing) {
             // Implements 9.9.3 Execution step 1.c
@@ -250,7 +250,7 @@ pub const prototype = struct {
     };
 };
 
-const WeakMapData = Value.Weak.HashMap(Value);
+const WeakMapData = Value.Weak.HashMapUnmanaged(Value);
 
 /// 24.3.4 Properties of WeakMap Instances
 /// https://tc39.es/ecma262/#sec-properties-of-weakmap-instances

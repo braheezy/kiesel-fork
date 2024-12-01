@@ -22,7 +22,7 @@ const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 
-pub const ExportStarSet = std.AutoHashMap(*const SourceTextModule, void);
+pub const ExportStarSet = std.AutoHashMapUnmanaged(*const SourceTextModule, void);
 
 /// 16.2.1.4 Abstract Module Records
 /// https://tc39.es/ecma262/#sec-abstract-module-records
@@ -74,7 +74,7 @@ pub const Module = union(enum) {
 
 /// https://tc39.es/ecma262/#graphloadingstate-record
 pub const GraphLoadingState = struct {
-    pub const Visited = std.AutoHashMap(*SourceTextModule, void);
+    pub const Visited = std.AutoHashMapUnmanaged(*SourceTextModule, void);
 
     /// [[PromiseCapability]]
     promise_capability: PromiseCapability,
@@ -328,7 +328,7 @@ pub fn finishLoadingImportedModule(
         switch (referrer) {
             inline else => |r| {
                 const module = result catch unreachable;
-                const get_or_put_result = try r.loaded_modules.getOrPut(specifier);
+                const get_or_put_result = try r.loaded_modules.getOrPut(agent.gc_allocator, specifier);
 
                 // a. If referrer.[[LoadedModules]] contains a Record whose [[Specifier]] is
                 //    specifier, then
@@ -386,8 +386,8 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
         defer agent.gc_allocator.free(exported_names);
 
         // b. Let unambiguousNames be a new empty List.
-        var unambiguous_names = std.ArrayList([]const u8).init(agent.gc_allocator);
-        defer unambiguous_names.deinit();
+        var unambiguous_names: std.ArrayListUnmanaged([]const u8) = .empty;
+        defer unambiguous_names.deinit(agent.gc_allocator);
 
         // c. For each element name of exportedNames, do
         for (exported_names) |name| {
@@ -396,7 +396,7 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
 
             // ii. If resolution is a ResolvedBinding Record, append name to unambiguousNames.
             if (resolution != null and resolution.? == .resolved_binding) {
-                try unambiguous_names.append(name);
+                try unambiguous_names.append(agent.gc_allocator, name);
             }
         }
 

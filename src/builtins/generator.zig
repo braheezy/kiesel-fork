@@ -266,7 +266,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
 
     // 8. Push genContext onto the execution context stack; genContext is now the running execution
     //    context.
-    try agent.execution_context_stack.append(generator_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
 
     // 9. Resume the suspended evaluation of genContext using NormalCompletion(value) as the result
     //    of the operation that suspended it. Let result be the value returned by the resumed
@@ -344,7 +344,7 @@ pub fn generatorResumeAbrupt(
 
     // 9. Push genContext onto the execution context stack; genContext is now the running execution
     //    context.
-    try agent.execution_context_stack.append(generator_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
 
     // 10. Resume the suspended evaluation of genContext using abruptCompletion as the result of
     //     the operation that suspended it. Let result be the Completion Record returned by the

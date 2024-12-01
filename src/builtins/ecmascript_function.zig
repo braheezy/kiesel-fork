@@ -193,11 +193,11 @@ pub const ECMAScriptFunction = MakeObject(.{
             }
 
             if (self.cached_arguments_executable == null) {
-                var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
+                var elements = try std.ArrayListUnmanaged(ast.ArrayBindingPattern.Element).initCapacity(
                     agent.gc_allocator,
                     self.formal_parameters.items.len,
                 );
-                defer elements.deinit();
+                defer elements.deinit(agent.gc_allocator);
                 for (self.formal_parameters.items) |item| {
                     const element: ast.ArrayBindingPattern.Element = switch (item) {
                         .formal_parameter => |formal_parameter| .{
@@ -241,7 +241,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             var executable = &self.cached_arguments_executable.?;
             const array = try createArrayFromList(agent, arguments.values);
             executable.constants.keys()[executable.constants.count() - 1] = Value.from(array);
-            try executable.constants.reIndex();
+            try executable.constants.reIndex(executable.allocator);
             var vm = try Vm.init(agent);
             defer vm.deinit();
             _ = try vm.run(executable.*);
@@ -351,7 +351,7 @@ fn prepareForOrdinaryCall(
     // TODO: 11. If callerContext is not already suspended, suspend callerContext.
 
     // 12. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
-    try agent.execution_context_stack.append(callee_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, callee_context);
 
     // 13. NOTE: Any exception objects produced after this point are associated with calleeRealm.
     // 14. Return calleeContext.
@@ -1062,17 +1062,17 @@ fn functionDeclarationInstantiation(
     const formals = function.fields.formal_parameters;
 
     // 5. Let parameterNames be the BoundNames of formals.
-    var parameter_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer parameter_names.deinit();
-    try formals.collectBoundNames(&parameter_names);
+    var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer parameter_names.deinit(agent.gc_allocator);
+    try formals.collectBoundNames(agent.gc_allocator, &parameter_names);
 
     // 6. If parameterNames has any duplicate entries, let hasDuplicates be true. Otherwise, let
     //    hasDuplicates be false.
     const has_duplicates = blk: {
-        var unique_names = std.StringHashMap(void).init(agent.gc_allocator);
-        defer unique_names.deinit();
+        var unique_names: std.StringHashMapUnmanaged(void) = .empty;
+        defer unique_names.deinit(agent.gc_allocator);
         if (parameter_names.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try unique_names.ensureTotalCapacity(@intCast(parameter_names.items.len));
+        try unique_names.ensureTotalCapacity(agent.gc_allocator, @intCast(parameter_names.items.len));
         for (parameter_names.items) |parameter_name| {
             if (unique_names.contains(parameter_name)) break :blk true;
             unique_names.putAssumeCapacityNoClobber(parameter_name, {});
@@ -1087,27 +1087,27 @@ fn functionDeclarationInstantiation(
     const has_parameter_expressions = formals.containsExpression();
 
     // 9. Let varNames be the VarDeclaredNames of code.
-    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer var_names.deinit();
-    try code.collectVarDeclaredNames(&var_names);
+    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer var_names.deinit(agent.gc_allocator);
+    try code.collectVarDeclaredNames(agent.gc_allocator, &var_names);
 
     // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
-    defer var_declarations.deinit();
-    try code.collectVarScopedDeclarations(&var_declarations);
+    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    defer var_declarations.deinit(agent.gc_allocator);
+    try code.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
     // 11. Let lexicalNames be the LexicallyDeclaredNames of code.
-    var lexical_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer lexical_names.deinit();
-    try code.collectLexicallyDeclaredNames(&lexical_names);
+    var lexical_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer lexical_names.deinit(agent.gc_allocator);
+    try code.collectLexicallyDeclaredNames(agent.gc_allocator, &lexical_names);
 
     // 12. Let functionNames be a new empty List.
-    var function_names = String.HashMap(void).init(agent.gc_allocator);
-    defer function_names.deinit();
+    var function_names: String.HashMapUnmanaged(void) = .empty;
+    defer function_names.deinit(agent.gc_allocator);
 
     // 13. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
-    defer functions_to_initialize.deinit();
+    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 14. For each element d of varDeclarations, in reverse List order, do
     var it = std.mem.reverseIterator(var_declarations.items);
@@ -1126,13 +1126,13 @@ fn functionDeclarationInstantiation(
             // iii. If functionNames does not contain fn, then
             if (!function_names.contains(function_name)) {
                 // 1. Insert fn as the first element of functionNames.
-                try function_names.putNoClobber(function_name, {});
+                try function_names.putNoClobber(agent.gc_allocator, function_name, {});
 
                 // 2. NOTE: If there are multiple function declarations for the same name, the last
                 //    declaration is used.
                 // 3. Insert d as the first element of functionsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(hoistable_declaration);
+                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
             }
         }
     }
@@ -1229,7 +1229,7 @@ fn functionDeclarationInstantiation(
     }
 
     // 22. If argumentsObjectNeeded is true, then
-    const parameter_bindings = if (arguments_object_needed) blk: {
+    var parameter_bindings = if (arguments_object_needed) blk: {
         // a. If strict is true or simpleParameterList is false, then
         const arguments_object = if (strict or !simple_parameter_list) ao_blk: {
             // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
@@ -1281,8 +1281,8 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
-        var parameter_bindings = try parameter_names.clone();
-        try parameter_bindings.append("arguments");
+        var parameter_bindings = try parameter_names.clone(agent.gc_allocator);
+        try parameter_bindings.append(agent.gc_allocator, "arguments");
         break :blk parameter_bindings;
     }
     // 23. Else,
@@ -1290,7 +1290,7 @@ fn functionDeclarationInstantiation(
         // a. Let parameterBindings be parameterNames.
         break :blk parameter_names;
     };
-    defer if (arguments_object_needed) parameter_bindings.deinit();
+    defer if (arguments_object_needed) parameter_bindings.deinit(agent.gc_allocator);
 
     // 24-26.
     try function.fields.evaluateArguments(agent, arguments_list, if (!has_duplicates) env else null);
@@ -1300,11 +1300,14 @@ fn functionDeclarationInstantiation(
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
 
         // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names = String.HashMap(void).init(agent.gc_allocator);
-        defer instantiated_var_names.deinit();
+        var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
+        defer instantiated_var_names.deinit(agent.gc_allocator);
 
         if (parameter_bindings.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.items.len));
+        try instantiated_var_names.ensureTotalCapacity(
+            agent.gc_allocator,
+            @intCast(parameter_bindings.items.len),
+        );
         for (parameter_bindings.items) |parameter_binding| {
             instantiated_var_names.putAssumeCapacity(
                 try String.fromUtf8(agent.gc_allocator, parameter_binding),
@@ -1319,7 +1322,7 @@ fn functionDeclarationInstantiation(
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.putNoClobber(var_name, {});
+                try instantiated_var_names.putNoClobber(agent.gc_allocator, var_name, {});
 
                 // 2. Perform ! env.CreateMutableBinding(n, false).
                 env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
@@ -1347,8 +1350,8 @@ fn functionDeclarationInstantiation(
         callee_context.ecmascript_code.?.variable_environment = var_env;
 
         // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names = String.HashMap(void).init(agent.gc_allocator);
-        defer instantiated_var_names.deinit();
+        var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
+        defer instantiated_var_names.deinit(agent.gc_allocator);
 
         // e. For each element n of varNames, do
         for (var_names.items) |var_name_utf8| {
@@ -1357,7 +1360,7 @@ fn functionDeclarationInstantiation(
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.putNoClobber(var_name, {});
+                try instantiated_var_names.putNoClobber(agent.gc_allocator, var_name, {});
 
                 // 2. Perform ! varEnv.CreateMutableBinding(n, false).
                 var_env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
@@ -1410,12 +1413,12 @@ fn functionDeclarationInstantiation(
     callee_context.ecmascript_code.?.lexical_environment = lex_env;
 
     // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
-    defer lex_declarations.deinit();
-    try code.collectLexicallyScopedDeclarations(&lex_declarations);
+    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    defer lex_declarations.deinit(agent.gc_allocator);
+    try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(agent.gc_allocator);
 
     // 34. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {
@@ -1424,7 +1427,7 @@ fn functionDeclarationInstantiation(
         //    instantiated here but not initialized.
 
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(&bound_names);
+        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
         // b. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {

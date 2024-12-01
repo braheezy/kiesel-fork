@@ -164,7 +164,7 @@ pub fn getTemplateObject(
     _ = template.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
 
     // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
-    try realm.template_map.putNoClobber(template_literal, template);
+    try realm.template_map.putNoClobber(agent.gc_allocator, template_literal, template);
 
     // 17. Return template.
     return template;
@@ -397,23 +397,23 @@ pub fn blockDeclarationInstantiation(
     std.debug.assert(env == .declarative_environment);
 
     // 1. let declarations be the LexicallyScopedDeclarations of code.
-    var declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
-    defer declarations.deinit();
+    var declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    defer declarations.deinit(agent.gc_allocator);
     switch (code) {
-        .statement_list => |node| try node.collectLexicallyScopedDeclarations(&declarations),
-        .case_block => |node| try node.collectLexicallyScopedDeclarations(&declarations),
+        .statement_list => |node| try node.collectLexicallyScopedDeclarations(agent.gc_allocator, &declarations),
+        .case_block => |node| try node.collectLexicallyScopedDeclarations(agent.gc_allocator, &declarations),
     }
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
     const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(agent.gc_allocator);
 
     // 3. For each element d of declarations, do
     for (declarations.items) |declaration| {
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(&bound_names);
+        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
         // a. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
@@ -1773,7 +1773,7 @@ pub fn classDefinitionEvaluation(
                 const name: PrivateName = .{ .symbol = symbol };
 
                 // 2. Append name to classPrivateEnvironment.[[Names]].
-                try class_private_environment.names.putNoClobber(declared_name, name);
+                try class_private_environment.names.putNoClobber(agent.gc_allocator, declared_name, name);
             }
         }
     }
@@ -1995,23 +1995,23 @@ pub fn classDefinitionEvaluation(
     defer agent.gc_allocator.free(elements);
 
     // 21. Let instancePrivateMethods be a new empty List.
-    var instance_private_methods = std.ArrayList(PrivateMethodDefinition).init(agent.gc_allocator);
+    var instance_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
     // 22. Let staticPrivateMethods be a new empty List.
-    var static_private_methods = std.ArrayList(PrivateMethodDefinition).init(agent.gc_allocator);
-    defer static_private_methods.deinit();
+    var static_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
+    defer static_private_methods.deinit(agent.gc_allocator);
 
     // 23. Let instanceFields be a new empty List.
-    var instance_fields = std.ArrayList(ClassFieldDefinition).init(agent.gc_allocator);
+    var instance_fields: std.ArrayListUnmanaged(ClassFieldDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
     // 24. Let staticElements be a new empty List.
-    var static_elements = std.ArrayList(union(enum) {
+    var static_elements: std.ArrayListUnmanaged(union(enum) {
         class_field_definition: ClassFieldDefinition,
         class_static_block_definition: ClassStaticBlockDefinition,
-    }).init(agent.gc_allocator);
-    defer static_elements.deinit();
+    }) = .empty;
+    defer static_elements.deinit(agent.gc_allocator);
 
     // 25. For each ClassElement e of elements, do
     for (elements) |class_element| {
@@ -2090,7 +2090,7 @@ pub fn classDefinitionEvaluation(
                 // v. Else,
                 else {
                     // 1. Append element to container.
-                    try container.append(private_method_definition);
+                    try container.append(agent.gc_allocator, private_method_definition);
                 }
             },
 
@@ -2099,9 +2099,10 @@ pub fn classDefinitionEvaluation(
                 // i. If IsStatic of e is false, append element to instanceFields.
                 // ii. Else, append element to staticElements.
                 if (!class_element.isStatic())
-                    try instance_fields.append(class_field_definition)
+                    try instance_fields.append(agent.gc_allocator, class_field_definition)
                 else
                     try static_elements.append(
+                        agent.gc_allocator,
                         .{ .class_field_definition = class_field_definition },
                     );
             },
@@ -2110,6 +2111,7 @@ pub fn classDefinitionEvaluation(
             .class_static_block_definition => |class_static_block_definition| {
                 // i. Append element to staticElements.
                 try static_elements.append(
+                    agent.gc_allocator,
                     .{ .class_static_block_definition = class_static_block_definition },
                 );
             },
@@ -2127,18 +2129,18 @@ pub fn classDefinitionEvaluation(
 
     // 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
     if (function.is(builtins.ECMAScriptFunction)) {
-        function.as(builtins.ECMAScriptFunction).fields.private_methods = try instance_private_methods.toOwnedSlice();
+        function.as(builtins.ECMAScriptFunction).fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
     } else if (function.is(builtins.BuiltinFunction)) {
         const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-        class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice();
+        class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
     // 29. Set F.[[Fields]] to instanceFields.
     if (function.is(builtins.ECMAScriptFunction)) {
-        function.as(builtins.ECMAScriptFunction).fields.fields = try instance_fields.toOwnedSlice();
+        function.as(builtins.ECMAScriptFunction).fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else if (function.is(builtins.BuiltinFunction)) {
         const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-        class_constructor_fields.fields = try instance_fields.toOwnedSlice();
+        class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
     // 30. For each PrivateElement method of staticPrivateMethods, do

@@ -151,7 +151,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
     // 27. Push evalContext onto the execution context stack; evalContext is now the running
     //     execution context.
-    try agent.execution_context_stack.append(eval_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, eval_context);
 
     // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv, strictEval)).
     const result_no_value = evalDeclarationInstantiation(
@@ -197,14 +197,14 @@ fn evalDeclarationInstantiation(
     strict: bool,
 ) Agent.Error!void {
     // 1. Let varNames be the VarDeclaredNames of body.
-    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer var_names.deinit();
-    try body.collectVarDeclaredNames(&var_names);
+    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer var_names.deinit(agent.gc_allocator);
+    try body.collectVarDeclaredNames(agent.gc_allocator, &var_names);
 
     // 2. Let varDeclarations be the VarScopedDeclarations of body.
-    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
-    defer var_declarations.deinit();
-    try body.collectVarScopedDeclarations(&var_declarations);
+    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    defer var_declarations.deinit(agent.gc_allocator);
+    try body.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
     // 3. If strict is false, then
     if (!strict) {
@@ -264,12 +264,12 @@ fn evalDeclarationInstantiation(
     // TODO: 4-7.
 
     // 8. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
-    defer functions_to_initialize.deinit();
+    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 9. Let declaredFunctionNames be a new empty List.
-    var declared_function_names = String.HashMap(void).init(agent.gc_allocator);
-    defer declared_function_names.deinit();
+    var declared_function_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_function_names.deinit(agent.gc_allocator);
 
     // 10. For each element d of varDeclarations, in reverse List order, do
     var it = std.mem.reverseIterator(var_declarations.items);
@@ -306,28 +306,28 @@ fn evalDeclarationInstantiation(
                 }
 
                 // 2. Append fn to declaredFunctionNames.
-                try declared_function_names.putNoClobber(function_name, {});
+                try declared_function_names.putNoClobber(agent.gc_allocator, function_name, {});
 
                 // 3. Insert d as the first element of functionsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(hoistable_declaration);
+                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
             }
         }
     }
 
     // 11. Let declaredVarNames be a new empty List.
-    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
-    defer declared_var_names.deinit();
+    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(agent.gc_allocator);
 
     // 12. For each element d of varDeclarations, do
     for (var_declarations.items) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
             bound_names.clearRetainingCapacity();
-            try var_declaration.variable_declaration.collectBoundNames(&bound_names);
+            try var_declaration.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
             // i. For each String vn of the BoundNames of d, do
             for (bound_names.items) |var_name_utf8| {
@@ -353,7 +353,7 @@ fn evalDeclarationInstantiation(
                     // b. If declaredVarNames does not contain vn, then
                     if (!declared_var_names.contains(var_name)) {
                         // i. Append vn to declaredVarNames.
-                        try declared_var_names.putNoClobber(var_name, {});
+                        try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
                     }
                 }
             }
@@ -365,16 +365,16 @@ fn evalDeclarationInstantiation(
     //     Environment Record and the global object is a Proxy exotic object.
 
     // 15. Let lexDeclarations be the LexicallyScopedDeclarations of body.
-    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
-    defer lex_declarations.deinit();
-    try body.collectLexicallyScopedDeclarations(&lex_declarations);
+    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    defer lex_declarations.deinit(agent.gc_allocator);
+    try body.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 
     // 16. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(&bound_names);
+        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
         // b. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
@@ -412,6 +412,7 @@ fn evalDeclarationInstantiation(
         if (var_env == .global_environment) {
             // i. Perform ? varEnv.CreateGlobalFunctionBinding(fn, fo, true).
             try var_env.global_environment.createGlobalFunctionBinding(
+                agent,
                 function_name,
                 Value.from(function_object),
                 true,

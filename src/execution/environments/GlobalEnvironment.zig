@@ -27,7 +27,7 @@ global_this_value: *Object,
 declarative_record: *DeclarativeEnvironment,
 
 /// [[VarNames]]
-var_names: String.HashMap(void),
+var_names: String.HashMapUnmanaged(void),
 
 /// [[OuterEnv]]
 outer_env: ?Environment,
@@ -299,7 +299,7 @@ pub fn createGlobalVarBinding(
     // 6. If envRec.[[VarNames]] does not contain N, then
     if (!self.var_names.contains(name)) {
         // a. Append N to envRec.[[VarNames]].
-        try self.var_names.putNoClobber(name, {});
+        try self.var_names.putNoClobber(agent.gc_allocator, name, {});
     }
 
     // 7. Return unused.
@@ -309,6 +309,7 @@ pub fn createGlobalVarBinding(
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
     self: *GlobalEnvironment,
+    agent: *Agent,
     name: *const String,
     value: Value,
     deletable: bool,
@@ -344,7 +345,7 @@ pub fn createGlobalFunctionBinding(
     // 8. If envRec.[[VarNames]] does not contain N, then
     if (!self.var_names.contains(name)) {
         // a. Append N to envRec.[[VarNames]].
-        try self.var_names.put(name, {});
+        try self.var_names.put(agent.gc_allocator, name, {});
     }
 
     // 9. Return unused.

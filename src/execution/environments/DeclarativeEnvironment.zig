@@ -18,7 +18,7 @@ const DeclarativeEnvironment = @This();
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
-bindings: String.HashMap(Binding),
+bindings: String.HashMapUnmanaged(Binding),
 
 pub const Binding = struct {
     value: ?Value,
@@ -39,7 +39,7 @@ pub fn hasBinding(self: DeclarativeEnvironment, name: *const String) bool {
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: *DeclarativeEnvironment,
-    _: *Agent,
+    agent: *Agent,
     name: *const String,
     deletable: bool,
 ) std.mem.Allocator.Error!void {
@@ -47,7 +47,7 @@ pub fn createMutableBinding(
     // 2. Create a mutable binding in envRec for N and record that it is uninitialized. If D is
     //    true, record that the newly created binding may be deleted by a subsequent DeleteBinding
     //    call.
-    try self.bindings.putNoClobber(name, .{
+    try self.bindings.putNoClobber(agent.gc_allocator, name, .{
         .value = null,
         .strict = false,
         .mutable = true,
@@ -61,14 +61,14 @@ pub fn createMutableBinding(
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(
     self: *DeclarativeEnvironment,
-    _: *Agent,
+    agent: *Agent,
     name: *const String,
     strict: bool,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
     //    true, record that the newly created binding is a strict binding.
-    try self.bindings.putNoClobber(name, .{
+    try self.bindings.putNoClobber(agent.gc_allocator, name, .{
         .value = null,
         .strict = strict,
         .mutable = false,

@@ -369,15 +369,15 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     match = .{ .start_index = last_index, .end_index = end_index };
 
     // 25. Let indices be a new empty List.
-    var indices = std.ArrayList(?Match).init(agent.gc_allocator);
-    defer indices.deinit();
+    var indices: std.ArrayListUnmanaged(?Match) = .empty;
+    defer indices.deinit(agent.gc_allocator);
 
     // 26. Let groupNames be a new empty List.
-    var group_names = std.ArrayList(?[]const u8).init(agent.gc_allocator);
-    defer group_names.deinit();
+    var group_names: std.ArrayListUnmanaged(?[]const u8) = .empty;
+    defer group_names.deinit(agent.gc_allocator);
 
     // 27. Append match to indices.
-    try indices.append(match);
+    try indices.append(agent.gc_allocator, match);
 
     // 28. Let matchedSubstr be GetMatchString(S, match).
     const matched_substr = try getMatchString(agent, string, match);
@@ -413,8 +413,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     ) catch |err| try noexcept(err);
 
     // 33. Let matchedGroupNames be a new empty List.
-    var matched_group_names = std.StringHashMap(void).init(agent.gc_allocator);
-    defer matched_group_names.deinit();
+    var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
+    defer matched_group_names.deinit(agent.gc_allocator);
 
     // 34. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
     var i: usize = 1;
@@ -430,7 +430,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             captured_value = .undefined;
 
             // ii. Append undefined to indices.
-            try indices.append(null);
+            try indices.append(agent.gc_allocator, null);
         }
         // c. Else,
         else {
@@ -446,7 +446,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             captured_value = Value.from(try getMatchString(agent, string, capture));
 
             // vi. Append capture to indices.
-            try indices.append(capture);
+            try indices.append(agent.gc_allocator, capture);
         }
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
@@ -467,13 +467,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 std.debug.assert(captured_value.isUndefined());
 
                 // 2. Append undefined to groupNames.
-                try group_names.append(null);
+                try group_names.append(agent.gc_allocator, null);
             }
             // iii. Else,
             else {
                 // 1. If capturedValue is not undefined, append s to matchedGroupNames.
                 if (!captured_value.isUndefined()) {
-                    try matched_group_names.put(group_name, {});
+                    try matched_group_names.put(agent.gc_allocator, group_name, {});
                 }
 
                 // 2. NOTE: If there are multiple groups named s, groups may already have an s
@@ -491,13 +491,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 ) catch |err| try noexcept(err);
 
                 // 4. Append s to groupNames.
-                try group_names.append(group_name);
+                try group_names.append(agent.gc_allocator, group_name);
             }
         }
         // f. Else,
         else {
             // i. Append undefined to groupNames.
-            try group_names.append(null);
+            try group_names.append(agent.gc_allocator, null);
         }
     }
 
@@ -868,7 +868,7 @@ pub const prototype = struct {
         const reg_exp = this_value.asObject();
 
         // 3. Let codeUnits be a new empty List.
-        var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
+        var code_units = try std.ArrayListUnmanaged(u8).initCapacity(agent.gc_allocator, 8);
 
         // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
         // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to codeUnits.
@@ -920,7 +920,12 @@ pub const prototype = struct {
 
         // 20. Return the String value whose code units are the elements of the List codeUnits. If
         //     codeUnits has no elements, the empty String is returned.
-        return Value.from(try String.fromAscii(agent.gc_allocator, try code_units.toOwnedSlice()));
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                try code_units.toOwnedSlice(agent.gc_allocator),
+            ),
+        );
     }
 
     /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
@@ -1163,8 +1168,8 @@ pub const prototype = struct {
         }
 
         // 10. Let results be a new empty List.
-        var results = std.ArrayList(*Object).init(agent.gc_allocator);
-        defer results.deinit();
+        var results: std.ArrayListUnmanaged(*Object) = .empty;
+        defer results.deinit(agent.gc_allocator);
 
         // 11. Let done be false.
         // 12. Repeat, while done is false,
@@ -1180,7 +1185,7 @@ pub const prototype = struct {
 
             // c. Else,
             // i. Append result to results.
-            try results.append(result.?);
+            try results.append(agent.gc_allocator, result.?);
 
             // ii. If global is false, then
             if (!global_) {
@@ -1211,8 +1216,8 @@ pub const prototype = struct {
         }
 
         // 13. Let accumulatedResult be the empty String.
-        var accumulated_result = String.Builder.init(agent.gc_allocator);
-        defer accumulated_result.deinit();
+        var accumulated_result: String.Builder = .empty;
+        defer accumulated_result.deinit(agent.gc_allocator);
 
         // 14. Let nextSourcePosition be 0.
         var next_source_position: usize = 0;
@@ -1244,11 +1249,11 @@ pub const prototype = struct {
             );
 
             // g. Let captures be a new empty List.
-            var captures = try std.ArrayList(?*const String).initCapacity(
+            var captures = try std.ArrayListUnmanaged(?*const String).initCapacity(
                 agent.gc_allocator,
                 @intCast(n_captures),
             );
-            defer captures.deinit();
+            defer captures.deinit(agent.gc_allocator);
 
             // h. Let n be 1.
             var n: u53 = 1;
@@ -1283,7 +1288,7 @@ pub const prototype = struct {
             const replacement_string = if (functional_replace) blk: {
                 // i. Let replacerArgs be the list-concatenation of « matched », captures, and
                 //    « 𝔽(position), S ».
-                var replacer_args = try std.ArrayList(Value).initCapacity(
+                var replacer_args = try std.ArrayListUnmanaged(Value).initCapacity(
                     agent.gc_allocator,
                     captures.items.len + 3 + @intFromBool(!named_captures.isUndefined()),
                 );
@@ -1340,13 +1345,14 @@ pub const prototype = struct {
                 // ii. Set accumulatedResult to the string-concatenation of accumulatedResult, the
                 //     substring of S from nextSourcePosition to position, and replacementString.
                 try accumulated_result.appendString(
+                    agent.gc_allocator,
                     try string.substring(
                         agent.gc_allocator,
                         next_source_position,
                         position,
                     ),
                 );
-                try accumulated_result.appendString(replacement_string);
+                try accumulated_result.appendString(agent.gc_allocator, replacement_string);
 
                 // iii. Set nextSourcePosition to position + matchLength.
                 next_source_position = position + matched_length;
@@ -1358,10 +1364,11 @@ pub const prototype = struct {
         //     nextSourcePosition.
         if (next_source_position < string_length) {
             try accumulated_result.appendString(
+                agent.gc_allocator,
                 try string.substring(agent.gc_allocator, next_source_position, null),
             );
         }
-        return Value.from(try accumulated_result.build());
+        return Value.from(try accumulated_result.build(agent.gc_allocator));
     }
 
     /// 22.2.6.12 RegExp.prototype [ %Symbol.search% ] ( string )

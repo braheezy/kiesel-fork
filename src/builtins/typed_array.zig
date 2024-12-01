@@ -335,14 +335,14 @@ fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bo
 
 /// 10.4.5.8 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     const agent = object.agent;
 
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
 
     // 2. Let keys be a new empty List.
-    var keys = try std.ArrayList(PropertyKey).initCapacity(
+    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
             @as(usize, @intCast(typedArrayLength(ta)))
@@ -1396,8 +1396,8 @@ pub const prototype = struct {
         }
 
         // 5. Let kept be a new empty List.
-        var kept = std.ArrayList(Value).init(agent.gc_allocator);
-        defer kept.deinit();
+        var kept: std.ArrayListUnmanaged(Value) = .empty;
+        defer kept.deinit(agent.gc_allocator);
 
         // 6. Let captured be 0.
         var captured: u53 = 0;
@@ -1422,7 +1422,7 @@ pub const prototype = struct {
             // d. If selected is true, then
             if (selected) {
                 // i. Append kValue to kept.
-                try kept.append(k_value);
+                try kept.append(agent.gc_allocator, k_value);
 
                 // ii. Set captured to captured + 1.
                 captured += 1;
@@ -1721,7 +1721,7 @@ pub const prototype = struct {
         // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
         var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 7. Let k be 0.
         var k: u53 = 0;
@@ -1747,7 +1747,7 @@ pub const prototype = struct {
         }
 
         // 9. Return R.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
@@ -2809,7 +2809,7 @@ pub const prototype = struct {
         // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
         var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
-        defer result.deinit();
+        defer result.deinit(agent.gc_allocator);
 
         // 5. Let k be 0.
         var k: u53 = 0;
@@ -2838,7 +2838,7 @@ pub const prototype = struct {
         }
 
         // 7. Return R.
-        return Value.from(try result.build());
+        return Value.from(try result.build(agent.gc_allocator));
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )

@@ -177,12 +177,13 @@ pub const Environment = union(enum) {
 
     pub fn createImportBinding(
         self: Environment,
+        agent: *Agent,
         name: *const String,
         module: *SourceTextModule,
         binding_name: *const String,
     ) std.mem.Allocator.Error!void {
         return switch (self) {
-            .module_environment => |env| env.createImportBinding(name, module, binding_name),
+            .module_environment => |env| env.createImportBinding(agent, name, module, binding_name),
             else => unreachable,
         };
     }
@@ -271,7 +272,7 @@ pub fn newDeclarativeEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .outer_env = outer_env,
 
-        .bindings = .init(allocator),
+        .bindings = .empty,
     };
 
     // 3. Return env.
@@ -365,7 +366,7 @@ pub fn newGlobalEnvironment(
         .declarative_record = declarative_record,
 
         // 7. Set env.[[VarNames]] to a new empty List.
-        .var_names = .init(allocator),
+        .var_names = .empty,
 
         // 8. Set env.[[OuterEnv]] to null.
         .outer_env = null,
@@ -388,7 +389,7 @@ pub fn newModuleEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .declarative_environment = try newDeclarativeEnvironment(allocator, outer_env),
 
-        .indirect_bindings = .init(allocator),
+        .indirect_bindings = .empty,
     };
 
     // 3. Return env.
@@ -402,7 +403,7 @@ pub fn newPrivateEnvironment(
     outer_private_env: ?*PrivateEnvironment,
 ) std.mem.Allocator.Error!*PrivateEnvironment {
     // 1. Let names be a new empty List.
-    const names = std.StringHashMap(PrivateName).init(allocator);
+    const names: std.StringHashMapUnmanaged(PrivateName) = .empty;
 
     // 2. Return the PrivateEnvironment Record {
     //      [[OuterPrivateEnvironment]]: outerPrivateEnv, [[Names]]: names

@@ -106,7 +106,7 @@ pub const prototype = struct {
         const completion = Completion.normal(value);
 
         // 8. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
 
         // 9. If state is either suspended-start or suspended-yield, then
         if (state == .suspended_start or state == .suspended_yield) {
@@ -150,7 +150,7 @@ pub const prototype = struct {
         const completion = Completion.@"return"(value);
 
         // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
 
         // 7. Let state be generator.[[AsyncGeneratorState]].
         const state = generator.fields.async_generator_state;
@@ -229,7 +229,7 @@ pub const prototype = struct {
         const completion = Completion.throw(exception);
 
         // 9. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
 
         // 10. If state is suspended-yield, then
         if (state == .suspended_yield) {
@@ -266,7 +266,7 @@ pub const AsyncGenerator = MakeObject(.{
         async_generator_context: ExecutionContext,
 
         /// [[AsyncGeneratorQueue]]
-        async_generator_queue: std.ArrayList(AsyncGeneratorRequest),
+        async_generator_queue: std.ArrayListUnmanaged(AsyncGeneratorRequest),
 
         // Non-standard
         evaluation_state: struct {
@@ -377,7 +377,7 @@ pub fn asyncGeneratorStart(
     generator.fields.async_generator_context = generator_context.*;
 
     // 7. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
-    generator.fields.async_generator_queue = .init(agent.gc_allocator);
+    generator.fields.async_generator_queue = .empty;
 
     // 8. Return unused.
 }
@@ -400,6 +400,7 @@ pub fn asyncGeneratorValidate(agent: *Agent, generator_value: Value) error{Excep
 /// 27.6.3.4 AsyncGeneratorEnqueue ( generator, completion, promiseCapability )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorenqueue
 pub fn asyncGeneratorEnqueue(
+    agent: *Agent,
     generator: *AsyncGenerator,
     completion: Completion,
     promise_capability: PromiseCapability,
@@ -410,7 +411,7 @@ pub fn asyncGeneratorEnqueue(
     const request: AsyncGeneratorRequest = .{ .completion = completion, .capability = promise_capability };
 
     // 2. Append request to generator.[[AsyncGeneratorQueue]].
-    try generator.fields.async_generator_queue.append(request);
+    try generator.fields.async_generator_queue.append(agent.gc_allocator, request);
 
     // 3. Return unused.
 }
@@ -504,7 +505,7 @@ pub fn asyncGeneratorResume(
 
     // 6. Push genContext onto the execution context stack; genContext is now the running execution
     //    context.
-    try agent.execution_context_stack.append(generator_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
 
     // 7. Resume the suspended evaluation of genContext using completion as the result of the
     //    operation that suspended it. Let result be the Completion Record returned by the resumed

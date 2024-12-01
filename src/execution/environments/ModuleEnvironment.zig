@@ -16,7 +16,7 @@ const Value = types.Value;
 
 const ModuleEnvironment = @This();
 
-indirect_bindings: String.HashMap(IndirectBinding),
+indirect_bindings: String.HashMapUnmanaged(IndirectBinding),
 
 // NOTE: This is how we implement the spec's inheritance of module environments.
 declarative_environment: *DeclarativeEnvironment,
@@ -105,6 +105,7 @@ pub fn getThisBinding(_: ModuleEnvironment) Value {
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
     self: *ModuleEnvironment,
+    agent: *Agent,
     name: *const String,
     module: *SourceTextModule,
     binding_name: *const String,
@@ -113,7 +114,7 @@ pub fn createImportBinding(
     // 2. Assert: When M.[[Environment]] is instantiated, it will have a direct binding for N2.
     // 3. Create an immutable indirect binding in envRec for N that references M and N2 as its
     //    target binding and record that the binding is initialized.
-    try self.indirect_bindings.putNoClobber(name, .{
+    try self.indirect_bindings.putNoClobber(agent.gc_allocator, name, .{
         .module = module,
         .binding_name = binding_name,
     });

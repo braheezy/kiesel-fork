@@ -138,8 +138,8 @@ pub const PropertyKey = union(enum) {
         };
     }
 
-    pub fn HashMap(comptime V: type) type {
-        return std.HashMap(PropertyKey, V, struct {
+    pub fn HashMapUnmanaged(comptime V: type) type {
+        return std.HashMapUnmanaged(PropertyKey, V, struct {
             pub fn hash(_: anytype, property_key: PropertyKey) u64 {
                 return property_key.hash();
             }
@@ -150,8 +150,8 @@ pub const PropertyKey = union(enum) {
         }, std.hash_map.default_max_load_percentage);
     }
 
-    pub fn ArrayHashMap(comptime V: type) type {
-        return std.ArrayHashMap(PropertyKey, V, struct {
+    pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+        return std.ArrayHashMapUnmanaged(PropertyKey, V, struct {
             pub fn hash(_: @This(), property_key: PropertyKey) u32 {
                 return @truncate(property_key.hash());
             }

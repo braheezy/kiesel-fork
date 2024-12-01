@@ -231,7 +231,7 @@ fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bo
 
 /// 10.4.6.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     const agent = object.agent;
 
     // 1. Let exports be O.[[Exports]].
@@ -240,7 +240,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
     // 2. Let symbolKeys be OrdinaryOwnPropertyKeys(O).
     // 3. Return the list-concatenation of exports and symbolKeys.
     var keys = try ordinaryOwnPropertyKeys(object);
-    try keys.ensureUnusedCapacity(exports.len);
+    try keys.ensureUnusedCapacity(agent.gc_allocator, exports.len);
     for (exports) |name| {
         keys.appendAssumeCapacity(
             PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
@@ -263,12 +263,8 @@ pub fn moduleNamespaceCreate(
 
     // 6. Let sortedExports be a List whose elements are the elements of exports, sorted according
     //    to lexicographic code unit order.
-    var sorted_exports = try std.ArrayList([]const u8).initCapacity(
-        agent.gc_allocator,
-        exports.len,
-    );
-    sorted_exports.appendSliceAssumeCapacity(exports);
-    std.mem.sortUnstable([]const u8, sorted_exports.items, {}, struct {
+    const sorted_exports = try agent.gc_allocator.dupe([]const u8, exports);
+    std.mem.sortUnstable([]const u8, sorted_exports, {}, struct {
         fn lessThanFn(_: void, a: []const u8, b: []const u8) bool {
             return std.mem.lessThan(u8, a, b);
         }
@@ -299,7 +295,7 @@ pub fn moduleNamespaceCreate(
             .module = module,
 
             // 7. Set M.[[Exports]] to sortedExports.
-            .exports = try sorted_exports.toOwnedSlice(),
+            .exports = sorted_exports,
         },
     });
 

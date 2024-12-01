@@ -102,11 +102,11 @@ pub const PropertyKind = enum {
 tag: Object.Tag,
 
 /// [[PrivateElements]]
-private_elements: PrivateName.HashMap(PrivateElement),
+private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
 
 agent: *Agent,
 internal_methods: *const InternalMethods,
-property_storage: std.ArrayList(PropertyValue),
+property_storage: std.ArrayListUnmanaged(PropertyValue),
 shape: *Shape,
 
 pub fn format(
@@ -197,7 +197,7 @@ pub fn setPropertyDirect(
             property_key,
             attributes,
         );
-        try self.property_storage.append(property_value);
+        try self.property_storage.append(self.agent.gc_allocator, property_value);
     }
 }
 
@@ -425,8 +425,8 @@ pub fn setIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool 
     if (!status) return false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internal_methods.ownPropertyKeys(self);
-    defer keys.deinit();
+    var keys = try self.internal_methods.ownPropertyKeys(self);
+    defer keys.deinit(self.agent.gc_allocator);
 
     switch (level) {
         // 4. If level is sealed,
@@ -489,8 +489,8 @@ pub fn testIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool
     if (extensible_) return false;
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internal_methods.ownPropertyKeys(self);
-    defer keys.deinit();
+    var keys = try self.internal_methods.ownPropertyKeys(self);
+    defer keys.deinit(self.agent.gc_allocator);
 
     // 5. For each element k of keys, do
     for (keys.items) |property_key| {
@@ -562,13 +562,13 @@ pub fn speciesConstructor(self: *Object, default_constructor: *Object) Agent.Err
 pub fn enumerableOwnProperties(
     self: *Object,
     comptime kind: PropertyKind,
-) Agent.Error!std.ArrayList(Value) {
+) Agent.Error!std.ArrayListUnmanaged(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
-    const own_keys = try self.internal_methods.ownPropertyKeys(self);
-    defer own_keys.deinit();
+    var own_keys = try self.internal_methods.ownPropertyKeys(self);
+    defer own_keys.deinit(self.agent.gc_allocator);
 
     // 2. Let results be a new empty List.
-    var results = std.ArrayList(Value).init(self.agent.gc_allocator);
+    var results: std.ArrayListUnmanaged(Value) = .empty;
 
     // 3. For each element key of ownKeys, do
     for (own_keys.items) |key| {
@@ -582,7 +582,7 @@ pub fn enumerableOwnProperties(
                 // 1. If kind is key, then
                 if (kind == .key) {
                     // a. Append key to results.
-                    try results.append(try key.toValue(self.agent));
+                    try results.append(self.agent.gc_allocator, try key.toValue(self.agent));
                 }
                 // 2. Else,
                 else {
@@ -592,7 +592,7 @@ pub fn enumerableOwnProperties(
                     // b. If kind is value, then
                     if (kind == .value) {
                         // i. Append value to results.
-                        try results.append(value);
+                        try results.append(self.agent.gc_allocator, value);
                     }
                     // c. Else,
                     else {
@@ -606,7 +606,7 @@ pub fn enumerableOwnProperties(
                         ));
 
                         // iii. Append entry to results.
-                        try results.append(entry);
+                        try results.append(self.agent.gc_allocator, entry);
                     }
                 }
             }
@@ -671,8 +671,8 @@ pub fn copyDataProperties(
     const from = source.toObject(self.agent) catch |err| try noexcept(err);
 
     // 3. Let keys be ? from.[[OwnPropertyKeys]]().
-    const keys = try from.internal_methods.ownPropertyKeys(from);
-    defer keys.deinit();
+    var keys = try from.internal_methods.ownPropertyKeys(from);
+    defer keys.deinit(self.agent.gc_allocator);
 
     // 4. For each element nextKey of keys, do
     for (keys.items) |next_key| {
@@ -737,7 +737,7 @@ pub fn privateFieldAdd(self: *Object, private_name: PrivateName, value: Value) A
     }
 
     // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(private_name, .{ .field = value });
+    try self.private_elements.putNoClobber(self.agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.
 }
@@ -769,7 +769,7 @@ pub fn privateMethodOrAccessorAdd(
     }
 
     // 5. Append method to O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(private_name, method);
+    try self.private_elements.putNoClobber(self.agent.gc_allocator, private_name, method);
 
     // 6. Return unused.
 }

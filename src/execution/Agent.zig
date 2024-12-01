@@ -35,10 +35,10 @@ pre_allocated: struct {
 },
 exception: ?Value = null,
 well_known_symbols: WellKnownSymbols,
-global_symbol_registry: String.HashMap(*const Symbol),
+global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
-execution_context_stack: std.ArrayList(ExecutionContext),
-queued_jobs: std.ArrayList(QueuedJob),
+execution_context_stack: std.ArrayListUnmanaged(ExecutionContext),
+queued_jobs: std.ArrayListUnmanaged(QueuedJob),
 empty_shape: *Object.Shape,
 platform: Platform,
 
@@ -73,10 +73,10 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
-        .global_symbol_registry = undefined,
+        .global_symbol_registry = .empty,
         .host_hooks = .{},
-        .execution_context_stack = undefined,
-        .queued_jobs = undefined,
+        .execution_context_stack = .empty,
+        .queued_jobs = .empty,
         .empty_shape = undefined,
         .platform = platform,
     };
@@ -85,9 +85,6 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
         .one = try BigInt.from(self.gc_allocator, 1),
     };
     self.well_known_symbols = try .init(self.gc_allocator);
-    self.global_symbol_registry = .init(self.gc_allocator);
-    self.execution_context_stack = .init(self.gc_allocator);
-    self.queued_jobs = .init(self.gc_allocator);
     self.empty_shape = try Object.Shape.init(self.gc_allocator);
     return self;
 }
@@ -96,9 +93,9 @@ pub fn deinit(self: *Agent) void {
     @constCast(self.pre_allocated.zero).deinit(self.gc_allocator);
     @constCast(self.pre_allocated.one).deinit(self.gc_allocator);
     self.well_known_symbols.deinit(self.gc_allocator);
-    self.global_symbol_registry.deinit();
-    self.execution_context_stack.deinit();
-    self.queued_jobs.deinit();
+    self.global_symbol_registry.deinit(self.gc_allocator);
+    self.execution_context_stack.deinit(self.gc_allocator);
+    self.queued_jobs.deinit(self.gc_allocator);
     self.empty_shape.deinit(self.gc_allocator);
     self.platform.deinit();
 }

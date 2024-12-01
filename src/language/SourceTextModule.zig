@@ -64,16 +64,16 @@ context: ?ExecutionContext,
 import_meta: ?*Object,
 
 /// [[ImportEntries]]
-import_entries: std.ArrayList(ImportEntry),
+import_entries: std.ArrayListUnmanaged(ImportEntry),
 
 /// [[LocalExportEntries]]
-local_export_entries: std.ArrayList(ExportEntry),
+local_export_entries: std.ArrayListUnmanaged(ExportEntry),
 
 /// [[IndirectExportEntries]]
-indirect_export_entries: std.ArrayList(ExportEntry),
+indirect_export_entries: std.ArrayListUnmanaged(ExportEntry),
 
 /// [[StarExportEntries]]
-star_export_entries: std.ArrayList(ExportEntry),
+star_export_entries: std.ArrayListUnmanaged(ExportEntry),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -91,10 +91,10 @@ dfs_index: ?usize,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.ArrayList(*const String),
+requested_modules: std.ArrayListUnmanaged(*const String),
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMap(Module),
+loaded_modules: String.HashMapUnmanaged(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*SourceTextModule,
@@ -109,7 +109,7 @@ async_evaluation: bool,
 top_level_capability: ?PromiseCapability,
 
 /// [[AsyncParentModules]]
-async_parent_modules: std.ArrayList(*SourceTextModule),
+async_parent_modules: std.ArrayListUnmanaged(*SourceTextModule),
 
 /// [[PendingAsyncDependencies]]
 pending_async_dependencies: ?usize,
@@ -187,7 +187,7 @@ pub fn loadRequestedModules(
     state.* = .{
         .is_loading = true,
         .pending_modules_count = 1,
-        .visited = .init(agent.gc_allocator),
+        .visited = .empty,
         .promise_capability = promise_capability,
         .host_defined = host_defined orelse .null_pointer,
     };
@@ -215,7 +215,7 @@ fn innerModuleLoading(
         !state.visited.contains(module.source_text_module))
     {
         // a. Append module to state.[[Visited]].
-        try state.visited.putNoClobber(module.source_text_module, {});
+        try state.visited.putNoClobber(agent.gc_allocator, module.source_text_module, {});
 
         // b. Let requestedModulesCount be the number of elements in module.[[RequestedModules]].
         const requested_modules_count = module.source_text_module.requested_modules.items.len;
@@ -327,8 +327,8 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     });
 
     // 2. Let stack be a new empty List.
-    var stack = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
-    defer stack.deinit();
+    var stack: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    defer stack.deinit(agent.gc_allocator);
 
     // 3. Let result be Completion(InnerModuleLinking(module, stack, 0)).
     const result = innerModuleLinking(agent, .{ .source_text_module = self }, &stack, 0);
@@ -368,7 +368,7 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
 fn innerModuleLinking(
     agent: *Agent,
     abstract_module: Module,
-    stack: *std.ArrayList(*SourceTextModule),
+    stack: *std.ArrayListUnmanaged(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
@@ -407,7 +407,7 @@ fn innerModuleLinking(
     var new_index = index + 1;
 
     // 8. Append module to stack.
-    try stack.append(module);
+    try stack.append(agent.gc_allocator, module);
 
     // 9. For each String required of module.[[RequestedModules]], do
     for (module.requested_modules.items) |required| {
@@ -490,33 +490,33 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
     // 3. Let requestedModules be the ModuleRequests of body.
-    var requested_modules = std.ArrayList(*const String).init(agent.gc_allocator);
+    var requested_modules: std.ArrayListUnmanaged(*const String) = .empty;
     {
         const tmp = try body.moduleRequests(agent.gc_allocator);
         defer agent.gc_allocator.free(tmp);
-        try requested_modules.appendSlice(tmp);
+        try requested_modules.appendSlice(agent.gc_allocator, tmp);
     }
 
     // 4. Let importEntries be the ImportEntries of body.
-    var import_entries = std.ArrayList(ImportEntry).init(agent.gc_allocator);
-    try body.collectImportEntries(&import_entries);
+    var import_entries: std.ArrayListUnmanaged(ImportEntry) = .empty;
+    try body.collectImportEntries(agent.gc_allocator, &import_entries);
 
     // 5. Let importedBoundNames be ImportedLocalNames(importEntries).
     // NOTE: This is lazily done with a for loop below.
 
     // 6. Let indirectExportEntries be a new empty List.
-    var indirect_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+    var indirect_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
 
     // 7. Let localExportEntries be a new empty List.
-    var local_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+    var local_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
 
     // 8. Let starExportEntries be a new empty List.
-    var star_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+    var star_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
 
     // 9. Let exportEntries be the ExportEntries of body.
-    var export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
-    defer export_entries.deinit();
-    try body.collectExportEntries(&export_entries);
+    var export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
+    defer export_entries.deinit(agent.gc_allocator);
+    try body.collectExportEntries(agent.gc_allocator, &export_entries);
 
     // 10. For each ExportEntry Record ee of exportEntries, do
     for (export_entries.items) |export_entry| {
@@ -531,7 +531,7 @@ pub fn parse(
             // i. If importedBoundNames does not contain ee.[[LocalName]], then
             if (import_entry_with_bound_name == null) {
                 // 1. Append ee to localExportEntries.
-                try local_export_entries.append(export_entry);
+                try local_export_entries.append(agent.gc_allocator, export_entry);
             }
             // ii. Else,
             else {
@@ -542,7 +542,7 @@ pub fn parse(
                 if (import_entry.import_name != null and import_entry.import_name.? == .namespace_object) {
                     // a. NOTE: This is a re-export of an imported module namespace object.
                     // b. Append ee to localExportEntries.
-                    try local_export_entries.append(export_entry);
+                    try local_export_entries.append(agent.gc_allocator, export_entry);
                 }
                 // 3. Else,
                 else {
@@ -551,7 +551,7 @@ pub fn parse(
                     //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
                     //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
                     //    } to indirectExportEntries.
-                    try indirect_export_entries.append(.{
+                    try indirect_export_entries.append(agent.gc_allocator, .{
                         .module_request = import_entry.module_request,
                         .import_name = if (import_entry.import_name) |import_name|
                             switch (import_name) {
@@ -572,12 +572,12 @@ pub fn parse(
             std.debug.assert(export_entry.export_name == null);
 
             // ii. Append ee to starExportEntries.
-            try star_export_entries.append(export_entry);
+            try star_export_entries.append(agent.gc_allocator, export_entry);
         }
         // c. Else,
         else {
             // i. Append ee to indirectExportEntries.
-            try indirect_export_entries.append(export_entry);
+            try indirect_export_entries.append(agent.gc_allocator, export_entry);
         }
     }
 
@@ -603,7 +603,7 @@ pub fn parse(
         .has_tla = @"async",
         .async_evaluation = false,
         .top_level_capability = null,
-        .async_parent_modules = .init(agent.gc_allocator),
+        .async_parent_modules = .empty,
         .pending_async_dependencies = null,
         .status = .new,
         .evaluation_error = null,
@@ -616,7 +616,7 @@ pub fn parse(
         .local_export_entries = local_export_entries,
         .indirect_export_entries = indirect_export_entries,
         .star_export_entries = star_export_entries,
-        .loaded_modules = .init(agent.gc_allocator),
+        .loaded_modules = .empty,
         .dfs_index = null,
         .dfs_ancestor_index = null,
     };
@@ -656,8 +656,8 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
     }
 
     // 5. Let stack be a new empty List.
-    var stack = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
-    defer stack.deinit();
+    var stack: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    defer stack.deinit(agent.gc_allocator);
 
     // 6. Let capability be ! NewPromiseCapability(%Promise%).
     const capability = newPromiseCapability(
@@ -741,7 +741,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 fn innerModuleEvaluation(
     agent: *Agent,
     abstract_module: Module,
-    stack: *std.ArrayList(*SourceTextModule),
+    stack: *std.ArrayListUnmanaged(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
@@ -800,7 +800,7 @@ fn innerModuleEvaluation(
     var new_index = index + 1;
 
     // 10. Append module to stack.
-    try stack.append(module);
+    try stack.append(agent.gc_allocator, module);
 
     // 11. For each String required of module.[[RequestedModules]], do
     for (module.requested_modules.items) |required| {
@@ -860,7 +860,7 @@ fn innerModuleEvaluation(
                 module.pending_async_dependencies.? += 1;
 
                 // 2. Append module to requiredModule.[[AsyncParentModules]].
-                try required_module.async_parent_modules.append(module);
+                try required_module.async_parent_modules.append(agent.gc_allocator, module);
             }
         }
     }
@@ -1005,8 +1005,9 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
 /// 16.2.1.5.3.3 GatherAvailableAncestors ( module, execList )
 /// https://tc39.es/ecma262/#sec-gather-available-ancestors
 fn gatherAvailableAncestors(
+    agent: *Agent,
     module: *SourceTextModule,
-    exec_list: *std.ArrayList(*SourceTextModule),
+    exec_list: *std.ArrayListUnmanaged(*SourceTextModule),
 ) std.mem.Allocator.Error!void {
     // 1. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
     for (module.async_parent_modules.items) |m| {
@@ -1032,11 +1033,11 @@ fn gatherAvailableAncestors(
             // vi. If m.[[PendingAsyncDependencies]] = 0, then
             if (m.pending_async_dependencies.? == 0) {
                 // 1. Append m to execList.
-                try exec_list.append(m);
+                try exec_list.append(agent.gc_allocator, m);
 
                 // 2. If m.[[HasTLA]] is false, perform GatherAvailableAncestors(m, execList).
                 if (!m.has_tla) {
-                    try gatherAvailableAncestors(m, exec_list);
+                    try gatherAvailableAncestors(agent, m, exec_list);
                 }
             }
         }
@@ -1088,11 +1089,11 @@ fn asyncModuleExecutionFulfilled(
     }
 
     // 8. Let execList be a new empty List.
-    var exec_list = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
-    defer exec_list.deinit();
+    var exec_list: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    defer exec_list.deinit(agent.gc_allocator);
 
     // 9. Perform GatherAvailableAncestors(module, execList).
-    try gatherAvailableAncestors(module, &exec_list);
+    try gatherAvailableAncestors(agent, module, &exec_list);
 
     // 10. Let sortedExecList be a List whose elements are the elements of execList, in the order
     //     in which they had their [[AsyncEvaluation]] fields set to true in InnerModuleEvaluation.
@@ -1229,11 +1230,11 @@ pub fn getExportedNames(
 
     // 2. If exportStarSet is not present, set exportStarSet to a new empty List.
     var new_export_star_set: ExportStarSet = if (maybe_export_star_set == null)
-        .init(agent.gc_allocator)
+        .empty
     else
         undefined;
     var export_star_set = maybe_export_star_set orelse &new_export_star_set;
-    defer if (maybe_export_star_set == null) new_export_star_set.deinit();
+    defer if (maybe_export_star_set == null) new_export_star_set.deinit(agent.gc_allocator);
 
     // 3. If exportStarSet contains module, then
     if (export_star_set.contains(self)) {
@@ -1243,17 +1244,17 @@ pub fn getExportedNames(
     }
 
     // 4. Append module to exportStarSet.
-    try export_star_set.putNoClobber(self, {});
+    try export_star_set.putNoClobber(agent.gc_allocator, self, {});
 
     // 5. Let exportedNames be a new empty List.
-    var exported_names = std.ArrayList([]const u8).init(agent.gc_allocator);
+    var exported_names: std.ArrayListUnmanaged([]const u8) = .empty;
 
     // 6. For each ExportEntry Record e of module.[[LocalExportEntries]], do
     for (self.local_export_entries.items) |export_entry| {
         // a. Assert: module provides the direct binding for this export.
         // b. Assert: e.[[ExportName]] is not null.
         // c. Append e.[[ExportName]] to exportedNames.
-        try exported_names.append(export_entry.export_name.?);
+        try exported_names.append(agent.gc_allocator, export_entry.export_name.?);
     }
 
     // 7. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
@@ -1261,7 +1262,7 @@ pub fn getExportedNames(
         // a. Assert: module imports a specific binding for this export.
         // b. Assert: e.[[ExportName]] is not null.
         // c. Append e.[[ExportName]] to exportedNames.
-        try exported_names.append(export_entry.export_name.?);
+        try exported_names.append(agent.gc_allocator, export_entry.export_name.?);
     }
 
     // 8. For each ExportEntry Record e of module.[[StarExportEntries]], do
@@ -1282,14 +1283,14 @@ pub fn getExportedNames(
                 // 1. If exportedNames does not contain n, then
                 if (!containsSlice(exported_names.items, name)) {
                     // a. Append n to exportedNames.
-                    try exported_names.append(name);
+                    try exported_names.append(agent.gc_allocator, name);
                 }
             }
         }
     }
 
     // 9. Return exportedNames.
-    return exported_names.toOwnedSlice();
+    return exported_names.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 16.2.1.6.3 ResolveExport ( exportName [ , resolveSet ] )
@@ -1518,6 +1519,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 // 1. Perform env.CreateImportBinding(in.[[LocalName]], resolution.[[Module]],
                 //    resolution.[[BindingName]]).
                 try env.createImportBinding(
+                    agent,
                     local_name,
                     resolution.module.source_text_module,
                     try String.fromUtf8(agent.gc_allocator, resolution.binding_name.string),
@@ -1555,30 +1557,30 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
 
     // 17. Push moduleContext onto the execution context stack; moduleContext is now the running
     //     execution context.
-    try agent.execution_context_stack.append(module_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, module_context);
 
     // 18. Let code be module.[[ECMAScriptCode]].
     const code = self.ecmascript_code;
 
     // 19. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
-    defer var_declarations.deinit();
-    try code.collectVarScopedDeclarations(&var_declarations);
+    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    defer var_declarations.deinit(agent.gc_allocator);
+    try code.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
     // 20. Let declaredVarNames be a new empty List.
-    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
-    defer declared_var_names.deinit();
+    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(agent.gc_allocator);
 
     // 21. For each element d of varDeclarations, do
     for (var_declarations.items) |var_declaration| {
         bound_names.clearRetainingCapacity();
         switch (var_declaration) {
-            .variable_declaration => |variable_declaration| try variable_declaration.collectBoundNames(&bound_names),
+            .variable_declaration => |variable_declaration| try variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names),
             .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                inline else => |function_declaration| try bound_names.append(function_declaration.identifier.?),
+                inline else => |function_declaration| try bound_names.append(agent.gc_allocator, function_declaration.identifier.?),
             },
         }
 
@@ -1595,15 +1597,15 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
 
                 // 3. Append dn to declaredVarNames.
-                try declared_var_names.putNoClobber(var_name, {});
+                try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
             }
         }
     }
 
     // 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
-    defer lex_declarations.deinit();
-    try code.collectLexicallyScopedDeclarations(&lex_declarations);
+    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    defer lex_declarations.deinit(agent.gc_allocator);
+    try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 
     // 23. Let privateEnv be null.
     const private_env = null;
@@ -1611,7 +1613,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     // 24. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(&bound_names);
+        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
         // a. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
@@ -1695,7 +1697,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
 
         // b. Push moduleContext onto the execution context stack; moduleContext is now the running
         //    execution context.
-        try agent.execution_context_stack.append(module_context);
+        try agent.execution_context_stack.append(agent.gc_allocator, module_context);
 
         // c. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
         const result = generateAndRunBytecode(agent, self.ecmascript_code, .{});

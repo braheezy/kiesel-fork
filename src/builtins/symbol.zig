@@ -209,7 +209,7 @@ pub const constructor = struct {
         const new_symbol = try types.Symbol.init(agent.gc_allocator, string_key);
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
-        try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
+        try agent.global_symbol_registry.putNoClobber(agent.gc_allocator, string_key, new_symbol);
 
         // 6. Return newSymbol.
         return Value.from(new_symbol);

@@ -766,7 +766,7 @@ fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
 
 /// 10.5.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyKey) {
     const agent = object.agent;
     const proxy = object.as(Proxy);
 
@@ -797,15 +797,15 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
 
     // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, property-key).
     const elements = try trap_result_array.createListFromArrayLike(agent, .property_key);
-    var trap_result = try std.ArrayList(PropertyKey).initCapacity(
+    var trap_result = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
         elements.len,
     );
 
-    var unique_property_keys = PropertyKey.HashMap(void).init(agent.gc_allocator);
-    defer unique_property_keys.deinit();
+    var unique_property_keys: PropertyKey.HashMapUnmanaged(void) = .empty;
+    defer unique_property_keys.deinit(agent.gc_allocator);
     if (elements.len > std.math.maxInt(u32)) return error.OutOfMemory;
-    try unique_property_keys.ensureTotalCapacity(@intCast(elements.len));
+    try unique_property_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(elements.len));
 
     for (elements) |element| {
         const property_key = switch (element.type()) {
@@ -832,15 +832,16 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
     // 11. Let targetKeys be ? target.[[OwnPropertyKeys]]().
     // 12. Assert: targetKeys is a List of property keys.
     // 13. Assert: targetKeys contains no duplicate entries.
-    const target_keys = try target.internal_methods.ownPropertyKeys(target);
+    var target_keys = try target.internal_methods.ownPropertyKeys(target);
+    defer target_keys.deinit(agent.gc_allocator);
 
     // 14. Let targetConfigurableKeys be a new empty List.
-    var target_configurable_keys = std.ArrayList(PropertyKey).init(agent.gc_allocator);
-    defer target_configurable_keys.deinit();
+    var target_configurable_keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
+    defer target_configurable_keys.deinit(agent.gc_allocator);
 
     // 15. Let targetNonconfigurableKeys be a new empty List.
-    var target_nonconfigurable_keys = std.ArrayList(PropertyKey).init(agent.gc_allocator);
-    defer target_nonconfigurable_keys.deinit();
+    var target_nonconfigurable_keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
+    defer target_nonconfigurable_keys.deinit(agent.gc_allocator);
 
     // 16. For each element key of targetKeys, do
     for (target_keys.items) |key| {
@@ -850,12 +851,12 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
         // b. If desc is not undefined and desc.[[Configurable]] is false, then
         if (property_descriptor != null and property_descriptor.?.configurable == false) {
             // i. Append key to targetNonconfigurableKeys.
-            try target_nonconfigurable_keys.append(key);
+            try target_nonconfigurable_keys.append(agent.gc_allocator, key);
         }
         // c. Else,
         else {
             // i. Append key to targetConfigurableKeys.
-            try target_configurable_keys.append(key);
+            try target_configurable_keys.append(agent.gc_allocator, key);
         }
     }
 
@@ -866,9 +867,9 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
     }
 
     // 18. Let uncheckedResultKeys be a List whose elements are the elements of trapResult.
-    var unchecked_result_keys = PropertyKey.HashMap(void).init(agent.gc_allocator);
-    defer unchecked_result_keys.deinit();
-    try unchecked_result_keys.ensureTotalCapacity(@intCast(trap_result.items.len));
+    var unchecked_result_keys: PropertyKey.HashMapUnmanaged(void) = .empty;
+    defer unchecked_result_keys.deinit(agent.gc_allocator);
+    try unchecked_result_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(trap_result.items.len));
     for (trap_result.items) |key| {
         unchecked_result_keys.putAssumeCapacity(key, {});
     }
