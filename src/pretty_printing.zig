@@ -995,7 +995,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }
         // NOTE: This needs to go before pretty-printing functions as it has [[Call]] but no name.
-        if (build_options.enable_annex_b and object.shape.is_htmldda) {
+        if (build_options.enable_annex_b and object.isHTMLDDA()) {
             // Keep colors in sync with undefined and null below :^)
             try tty_config.setColor(writer, .bright_black);
             try writer.writeAll("[[");

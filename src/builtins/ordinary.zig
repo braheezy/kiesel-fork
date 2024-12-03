@@ -43,7 +43,7 @@ fn getPrototypeOf(object: *Object) error{}!?*Object {
 /// https://tc39.es/ecma262/#sec-ordinarygetprototypeof
 pub fn ordinaryGetPrototypeOf(object: *Object) ?*Object {
     // 1. Return O.[[Prototype]].
-    return object.shape.prototype;
+    return object.prototype();
 }
 
 /// 10.1.2 [[SetPrototypeOf]] ( V )
@@ -57,13 +57,13 @@ fn setPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allocator.Error!
 /// https://tc39.es/ecma262/#sec-ordinarysetprototypeof
 pub fn ordinarySetPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allocator.Error!bool {
     // 1. Let current be O.[[Prototype]].
-    const current = object.shape.prototype;
+    const current = object.prototype();
 
     // 2. If SameValue(V, current) is true, return true.
     if (prototype == current) return true;
 
     // 3. Let extensible be O.[[Extensible]].
-    const extensible = object.shape.extensible;
+    const extensible = object.extensible();
 
     // 4. If extensible is false, return false.
     if (!extensible) return false;
@@ -89,11 +89,11 @@ pub fn ordinarySetPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allo
         if (parent_prototype_object.internal_methods.getPrototypeOf != getPrototypeOf) break;
 
         // ii. Else, set p to p.[[Prototype]].
-        parent_prototype = parent_prototype_object.shape.prototype;
+        parent_prototype = parent_prototype_object.prototype();
     }
 
     // 8. Set O.[[Prototype]] to V.
-    try object.setPrototypeDirect(prototype);
+    try object.setPrototype(prototype);
 
     // 9. Return true.
     return true;
@@ -110,7 +110,7 @@ fn isExtensible(object: *Object) error{}!bool {
 /// https://tc39.es/ecma262/#sec-ordinaryisextensible
 pub fn ordinaryIsExtensible(object: *Object) bool {
     // 1. Return O.[[Extensible]].
-    return object.shape.extensible;
+    return object.extensible();
 }
 
 /// 10.1.4 [[PreventExtensions]] ( )
@@ -124,7 +124,7 @@ fn preventExtensions(object: *Object) std.mem.Allocator.Error!bool {
 /// https://tc39.es/ecma262/#sec-ordinarypreventextensions
 pub fn ordinaryPreventExtensions(object: *Object) std.mem.Allocator.Error!bool {
     // 1. Set O.[[Extensible]] to false.
-    try object.setNonExtensibleDirect();
+    try object.setNonExtensible();
 
     // 2. Return true.
     return true;
@@ -453,7 +453,7 @@ pub fn ordinaryGet(object: *Object, property_key: PropertyKey, receiver: Value) 
         object.internal_methods.getPrototypeOf == &getPrototypeOf)
     {
         const property_metadata = object.shape.properties.get(property_key) orelse {
-            const parent = object.shape.prototype orelse return .undefined;
+            const parent = object.prototype() orelse return .undefined;
             return parent.internal_methods.get(parent, property_key, receiver);
         };
         const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
@@ -522,10 +522,10 @@ pub fn ordinarySet(
         object.internal_methods.defineOwnProperty == &defineOwnProperty)
     {
         const property_metadata = object.shape.properties.get(property_key) orelse {
-            if (object.shape.prototype) |parent| {
+            if (object.prototype()) |parent| {
                 return parent.internal_methods.set(parent, property_key, value, receiver);
             }
-            if (!object.shape.extensible) return false;
+            if (!object.extensible()) return false;
             try object.setPropertyDirect(property_key, .{
                 .value = value,
                 .writable = true,

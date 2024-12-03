@@ -535,7 +535,7 @@ pub fn typeof(self: Value) *const String {
             // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
             if (build_options.enable_annex_b) {
                 // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
-                if (self.asObject().shape.is_htmldda) break :blk String.fromLiteral("undefined");
+                if (self.asObject().isHTMLDDA()) break :blk String.fromLiteral("undefined");
             } else {
                 // 12. NOTE: This step is replaced in section B.3.6.3.
             }
@@ -744,7 +744,7 @@ pub fn toBoolean(self: Value) bool {
     if (build_options.enable_annex_b) {
         // 3. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
         //    false.
-        if (self.isObject() and self.asObject().shape.is_htmldda) return false;
+        if (self.isObject() and self.asObject().isHTMLDDA()) return false;
     } else {
         // 3. NOTE: This step is replaced in section B.3.6.1.
     }
@@ -2047,11 +2047,11 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
         // 4. Perform the following steps:
         // a. If x is an Object, x has an [[IsHTMLDDA]] internal slot, and y is either undefined or
         //    null, return true.
-        if (x.isObject() and x.asObject().shape.is_htmldda and (y.isUndefined() or y.isNull())) return true;
+        if (x.isObject() and x.asObject().isHTMLDDA() and (y.isUndefined() or y.isNull())) return true;
 
         // b. If x is either undefined or null, y is an Object, and y has an [[IsHTMLDDA]] internal
         //    slot, return true.
-        if ((x.isUndefined() or x.isNull()) and y.isObject() and y.asObject().shape.is_htmldda) return true;
+        if ((x.isUndefined() or x.isNull()) and y.isObject() and y.asObject().isHTMLDDA()) return true;
     } else {
         // 4. NOTE: This step is replaced in section B.3.6.2.
     }

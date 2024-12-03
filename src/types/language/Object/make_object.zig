@@ -61,13 +61,13 @@ pub fn MakeObject(
                 },
             };
             if (args.prototype != null) {
-                try self.object.setPrototypeDirect(args.prototype);
+                try self.object.setPrototype(args.prototype);
             }
             if (!args.extensible) {
-                try self.object.setNonExtensibleDirect();
+                try self.object.setNonExtensible();
             }
             if (has_is_htmldda and args.is_htmldda) {
-                try self.object.setIsHTMLDDADirect();
+                try self.object.setIsHTMLDDA();
             }
             return &self.object;
         }

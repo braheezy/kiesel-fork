@@ -28,7 +28,7 @@ pub const function = struct {
 
     pub fn init(_: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // The value of the [[Extensible]] internal slot of this function is false.
-        try object.setNonExtensibleDirect();
+        try object.setNonExtensible();
 
         // The "length" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false

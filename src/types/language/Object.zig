@@ -133,18 +133,30 @@ pub fn as(self: *const Object, comptime T: type) *T {
     return @constCast(@alignCast(@fieldParentPtr("object", self)));
 }
 
-pub fn setPrototypeDirect(self: *Object, prototype: ?*Object) std.mem.Allocator.Error!void {
-    if (self.shape.prototype == prototype) return;
-    self.shape = try self.shape.setPrototype(self.agent.gc_allocator, prototype);
+pub fn prototype(self: *const Object) ?*Object {
+    return self.shape.prototype;
 }
 
-pub fn setNonExtensibleDirect(self: *Object) std.mem.Allocator.Error!void {
-    if (!self.shape.extensible) return;
+pub fn setPrototype(self: *Object, new_prototype: ?*Object) std.mem.Allocator.Error!void {
+    if (self.prototype() == new_prototype) return;
+    self.shape = try self.shape.setPrototype(self.agent.gc_allocator, new_prototype);
+}
+
+pub fn extensible(self: *const Object) bool {
+    return self.shape.extensible;
+}
+
+pub fn setNonExtensible(self: *Object) std.mem.Allocator.Error!void {
+    if (!self.extensible()) return;
     self.shape = try self.shape.setNonExtensible(self.agent.gc_allocator);
 }
 
-pub fn setIsHTMLDDADirect(self: *Object) std.mem.Allocator.Error!void {
-    if (self.shape.is_htmldda) return;
+pub fn isHTMLDDA(self: *const Object) bool {
+    return self.shape.is_htmldda;
+}
+
+pub fn setIsHTMLDDA(self: *Object) std.mem.Allocator.Error!void {
+    if (self.isHTMLDDA()) return;
     self.shape = try self.shape.setIsHTMLDDA(self.agent.gc_allocator);
 }
 
@@ -321,7 +333,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
-        self.shape.extensible and for (self.shape.properties.values()) |entry| {
+        self.extensible() and for (self.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
         } else true,
     );
