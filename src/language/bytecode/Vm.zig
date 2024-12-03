@@ -187,12 +187,15 @@ fn executeArraySetValueDirect(self: *Vm, executable: Executable) Agent.Error!voi
     const index = self.fetchIndex(executable);
     const value = self.stack.pop();
     const array = self.stack.pop().asObject();
-    const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, index));
-    try array.setPropertyDirect(property_key, .{
-        .value = value,
-        .writable = true,
-        .enumerable = true,
-        .configurable = true,
+    try array.property_storage.indexed_properties.set(self.agent.gc_allocator, index, .{
+        .value_or_accessor = .{
+            .value = value,
+        },
+        .attributes = .{
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        },
     });
     self.result = Value.from(array);
 }

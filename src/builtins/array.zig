@@ -253,11 +253,21 @@ pub fn arraySetLength(
     // 11. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
         // a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-        return ordinaryDefineOwnProperty(
+        const succeeded = ordinaryDefineOwnProperty(
             array,
             PropertyKey.from("length"),
             new_len_desc,
         ) catch |err| try noexcept(err);
+
+        // Force sparse storage for array holes added to the end
+        if (new_len > old_len and succeeded) {
+            try array.property_storage.indexed_properties.migrateStorage(
+                agent.gc_allocator,
+                .sparse,
+            );
+        }
+
+        return succeeded;
     }
 
     // 12. If oldLenDesc.[[Writable]] is false, return false.
@@ -293,32 +303,29 @@ pub fn arraySetLength(
 
     // 17. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
     //     in descending numeric index order, do
-    // NOTE: After a certain length looping through all indices becomes very slow, and chances are
-    //       most values are array holes. In that case we collect a list of known property keys,
-    //       otherwise we loop through indices in reverse order and bail out if no property exists.
-    var maybe_indices = if (old_len >= 1_000_000) blk: {
-        var indices: std.ArrayListUnmanaged(u32) = .empty;
-        for (array.shape.properties.keys()) |property_key| {
-            if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
-                try indices.append(agent.gc_allocator, @as(u32, @intCast(property_key.integer_index)));
-            }
-        }
-        std.sort.insertion(u32, indices.items, {}, std.sort.desc(u32));
-        break :blk indices;
-    } else null;
-    defer if (maybe_indices) |*indices| indices.deinit(agent.gc_allocator);
-    var index = if (maybe_indices) |*indices|
+    var sparse_indices = switch (array.property_storage.indexed_properties.storage) {
+        .sparse => |sparse| blk: {
+            var indices: std.ArrayListUnmanaged(u32) = .empty;
+            try indices.ensureTotalCapacity(agent.gc_allocator, sparse.size);
+            var it = sparse.keyIterator();
+            while (it.next()) |index| indices.appendAssumeCapacity(index.*);
+            std.sort.insertion(u32, indices.items, {}, std.sort.asc(u32));
+            break :blk indices;
+        },
+        else => null,
+    };
+    defer if (sparse_indices) |*indices| indices.deinit(agent.gc_allocator);
+    var index = if (sparse_indices) |*indices|
         indices.popOrNull()
     else
         std.math.sub(u32, old_len, 1) catch null;
     while (index != null and index.? >= new_len) : ({
-        index = if (maybe_indices) |*indices|
+        index = if (sparse_indices) |*indices|
             indices.popOrNull()
         else
             std.math.sub(u32, index.?, 1) catch null;
     }) {
         const property_key = PropertyKey.from(@as(u53, index.?));
-        if (maybe_indices == null and !array.shape.properties.contains(property_key)) continue;
 
         // a. Let deleteSucceeded be ! A.[[Delete]](P).
         const delete_succeeded = array.internal_methods.delete(

@@ -54,16 +54,16 @@ fn prettyPrintArray(
     try tty_config.setColor(writer, .reset);
     if (length != 0) try writer.writeAll(" ");
     for (0..length) |i| {
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i)));
-        if (array.object.shape.properties.get(property_key)) |property_metadata| {
-            const property_value = array.object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index) catch return;
-            const property_descriptor = property_value.toPropertyDescriptor(property_metadata.attributes);
-            if (property_descriptor.value) |value| {
-                try writer.print("{pretty}", .{value});
-            } else {
-                try tty_config.setColor(writer, .dim);
-                try writer.writeAll("<accessor>");
-                try tty_config.setColor(writer, .reset);
+        if (array.object.property_storage.indexed_properties.get(@intCast(i))) |property_descriptor| {
+            switch (property_descriptor.value_or_accessor) {
+                .value => |value| {
+                    try writer.print("{pretty}", .{value});
+                },
+                .accessor => {
+                    try tty_config.setColor(writer, .dim);
+                    try writer.writeAll("<accessor>");
+                    try tty_config.setColor(writer, .reset);
+                },
             }
         } else {
             try tty_config.setColor(writer, .dim);
@@ -880,10 +880,8 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
 
     var printed_properties: usize = 0;
     for (property_keys.items) |property_key| {
-        const property_metadata = object.shape.properties.get(property_key).?;
-        const property_value = object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index) catch return;
-        const property_descriptor = property_value.toPropertyDescriptor(property_metadata.attributes);
-        if (!property_descriptor.enumerable.?) continue;
+        const property_descriptor = (object.property_storage.getCreateIntrinsicIfNeeded(property_key) catch return).?;
+        if (!property_descriptor.attributes.enumerable) continue;
 
         if (printed_properties > 0) try writer.writeAll(",");
         printed_properties += 1;
@@ -914,12 +912,15 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
         }
         try writer.writeAll(": ");
 
-        if (property_descriptor.value) |value| {
-            try writer.print("{pretty}", .{value});
-        } else {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<accessor>");
-            try tty_config.setColor(writer, .reset);
+        switch (property_descriptor.value_or_accessor) {
+            .value => |value| {
+                try writer.print("{pretty}", .{value});
+            },
+            .accessor => {
+                try tty_config.setColor(writer, .dim);
+                try writer.writeAll("<accessor>");
+                try tty_config.setColor(writer, .reset);
+            },
         }
     }
     if (printed_properties > 0) try writer.writeAll(" ");

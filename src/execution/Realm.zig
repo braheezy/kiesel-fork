@@ -112,7 +112,7 @@ pub fn initializeHostDefinedRealm(
         agent,
         try realm.intrinsics.@"%Object.prototype%"(),
     );
-    global.shape = try global.shape.detach(agent.gc_allocator);
+    global.property_storage.shape = try global.property_storage.shape.detach(agent.gc_allocator);
 
     // 14. If the host requires that the this binding in realm's global scope return an object
     //     other than the global object, then
@@ -172,7 +172,9 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
 
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
-    try global.property_storage.ensureUnusedCapacity(self.agent.gc_allocator, global_properties_count);
+    const lazy_intrinsics_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
+    try global.property_storage.values.ensureUnusedCapacity(self.agent.gc_allocator, global_properties_count);
+    try global.property_storage.lazy_intrinsics.ensureUnusedCapacity(self.agent.gc_allocator, lazy_intrinsics_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
@@ -196,13 +198,10 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
                     .enumerable = false,
                     .configurable = true,
                 });
-                const property_metadata = global.shape.properties.get(property_key).?;
-                global.property_storage.items[property_metadata.index] = .{
-                    .lazy_intrinsic = .{
-                        .realm = self,
-                        .lazyIntrinsicFn = lazyIntrinsicFn,
-                    },
-                };
+                global.property_storage.lazy_intrinsics.putAssumeCapacity(property_key, .{
+                    .realm = self,
+                    .lazyIntrinsicFn = lazyIntrinsicFn,
+                });
             },
         }
     }

@@ -344,7 +344,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
     // 2. Let keys be a new empty List.
     var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
+        object.property_storage.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
             @as(usize, @intCast(typedArrayLength(ta)))
         else
             0,
@@ -365,7 +365,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
 
     // 4. For each own property key P of O such that P is a String and P is not an integer index,
     //    in ascending chronological order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
         if (property_key == .string) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -374,7 +374,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
 
     // 5. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

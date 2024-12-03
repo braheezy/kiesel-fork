@@ -373,7 +373,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.shape.properties.count() + len,
+        object.property_storage.count() + len,
     );
 
     // 5. For each integer i such that 0 ≤ i < len, in ascending order,
@@ -384,22 +384,36 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
 
     // 6. For each own property key P of O such that P is an array index and
     //    ! ToIntegerOrInfinity(P) ≥ len, in ascending numeric index order, do
-    for (object.shape.properties.keys()) |property_key| {
-        if (property_key.isArrayIndex() and property_key.integer_index >= len) {
-            // a. Append P to keys.
-            keys.appendAssumeCapacity(property_key);
-        }
+    //     a. Append P to keys.
+    switch (object.property_storage.indexed_properties.storage) {
+        .none => {},
+        .sparse => |sparse| {
+            var it = sparse.keyIterator();
+            while (it.next()) |index| {
+                if (index.* < len) continue;
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index.*)));
+                keys.appendAssumeCapacity(property_key);
+            }
+            std.mem.sortUnstable(PropertyKey, keys.items, {}, struct {
+                fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
+                    return a.integer_index < b.integer_index;
+                }
+            }.lessThanFn);
+        },
+        else => {
+            for (len..object.property_storage.indexed_properties.count()) |index| {
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
+                keys.appendAssumeCapacity(property_key);
+            }
+        },
     }
-    std.mem.sortUnstable(PropertyKey, keys.items[len..], {}, struct {
-        fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
-            return a.integer_index < b.integer_index;
-        }
-    }.lessThanFn);
 
     // 7. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
-        if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
+        if (property_key == .string or property_key == .integer_index) {
+            std.debug.assert(!property_key.isArrayIndex());
+
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
         }
@@ -407,7 +421,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanag
 
     // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

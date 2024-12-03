@@ -509,9 +509,10 @@ fn printValueDebugInfo(
             @tagName(value.asString().slice),
         }),
         .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
-        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, tag: {s})", .{
+        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {s}, tag: {s})", .{
             @intFromPtr(value.asObject()),
-            @intFromPtr(value.asObject().shape),
+            @intFromPtr(value.asObject().property_storage.shape),
+            @tagName(value.asObject().property_storage.indexed_properties.storage),
             @tagName(value.asObject().tag),
         }),
         else => {},

@@ -147,41 +147,20 @@ pub fn ordinaryGetOwnProperty(
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. If O does not have an own property with key P, return undefined.
-    // 3. Let X be O's own property whose key is P.
-    const property_metadata = object.shape.properties.get(property_key) orelse return null;
-    const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
-
     // 2. Let D be a newly created Property Descriptor with no fields.
-    var descriptor: PropertyDescriptor = .{};
-
+    // 3. Let X be O's own property whose key is P.
     // 4. If X is a data property, then
-    if (property_value == .value) {
-        // a. Set D.[[Value]] to the value of X's [[Value]] attribute.
-        descriptor.value = property_value.value;
-
-        // b. Set D.[[Writable]] to the value of X's [[Writable]] attribute.
-        descriptor.writable = property_metadata.attributes.writable;
-    }
+    //     a. Set D.[[Value]] to the value of X's [[Value]] attribute.
+    //     b. Set D.[[Writable]] to the value of X's [[Writable]] attribute.
     // 5. Else,
-    else {
-        // a. Assert: X is an accessor property.
-        std.debug.assert(property_value == .accessor);
-
-        // b. Set D.[[Get]] to the value of X's [[Get]] attribute.
-        descriptor.get = property_value.accessor.get;
-
-        // c. Set D.[[Set]] to the value of X's [[Set]] attribute.
-        descriptor.set = property_value.accessor.set;
-    }
-
+    //     a. Assert: X is an accessor property.
+    //     b. Set D.[[Get]] to the value of X's [[Get]] attribute.
+    //     c. Set D.[[Set]] to the value of X's [[Set]] attribute.
     // 6. Set D.[[Enumerable]] to the value of X's [[Enumerable]] attribute.
-    descriptor.enumerable = property_metadata.attributes.enumerable;
-
     // 7. Set D.[[Configurable]] to the value of X's [[Configurable]] attribute.
-    descriptor.configurable = property_metadata.attributes.configurable;
-
     // 8. Return D.
-    return descriptor;
+    const property_descriptor = (try object.property_storage.getCreateIntrinsicIfNeeded(property_key)) orelse return null;
+    return property_descriptor.toPropertyDescriptor();
 }
 
 /// 10.1.6 [[DefineOwnProperty]] ( P, Desc )
@@ -257,16 +236,23 @@ fn validateAndApplyPropertyDescriptor(
         const object = maybe_object.?;
 
         // c. If IsAccessorDescriptor(Desc) is true, then
-        const property_descriptor: PropertyDescriptor = if (descriptor.isAccessorDescriptor()) blk: {
+        const property_descriptor: Object.PropertyStorage.CompletePropertyDescriptor = if (descriptor.isAccessorDescriptor()) blk: {
             // i. Create an own accessor property named P of object O whose [[Get]], [[Set]],
             //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
             break :blk .{
-                .get = descriptor.get orelse @as(?*Object, null),
-                .set = descriptor.set orelse @as(?*Object, null),
-                .enumerable = descriptor.enumerable orelse false,
-                .configurable = descriptor.configurable orelse false,
+                .value_or_accessor = .{
+                    .accessor = .{
+                        .get = descriptor.get orelse @as(?*Object, null),
+                        .set = descriptor.set orelse @as(?*Object, null),
+                    },
+                },
+                .attributes = .{
+                    .writable = false,
+                    .enumerable = descriptor.enumerable orelse false,
+                    .configurable = descriptor.configurable orelse false,
+                },
             };
         }
         // d. Else,
@@ -276,14 +262,22 @@ fn validateAndApplyPropertyDescriptor(
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
             break :blk .{
-                .value = descriptor.value orelse .undefined,
-                .writable = descriptor.writable orelse false,
-                .enumerable = descriptor.enumerable orelse false,
-                .configurable = descriptor.configurable orelse false,
+                .value_or_accessor = .{
+                    .value = descriptor.value orelse .undefined,
+                },
+                .attributes = .{
+                    .writable = descriptor.writable orelse false,
+                    .enumerable = descriptor.enumerable orelse false,
+                    .configurable = descriptor.configurable orelse false,
+                },
             };
         };
 
-        try object.setPropertyDirect(property_key, property_descriptor);
+        try object.property_storage.set(
+            object.agent.gc_allocator,
+            property_key,
+            property_descriptor,
+        );
 
         // e. Return true.
         return true;
@@ -345,7 +339,7 @@ fn validateAndApplyPropertyDescriptor(
     // 6. If O is not undefined, then
     if (maybe_object) |object| {
         // a. If IsDataDescriptor(current) is true and IsAccessorDescriptor(Desc) is true, then
-        const property_descriptor: PropertyDescriptor = if (current.isDataDescriptor() and descriptor.isAccessorDescriptor()) blk: {
+        const property_descriptor: Object.PropertyStorage.CompletePropertyDescriptor = if (current.isDataDescriptor() and descriptor.isAccessorDescriptor()) blk: {
             // i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
             //    else let configurable be current.[[Configurable]].
             const configurable = descriptor.configurable orelse current.configurable.?;
@@ -360,10 +354,17 @@ fn validateAndApplyPropertyDescriptor(
             //      the value of the corresponding field in Desc if Desc has that field, or to the
             //      attribute's default value otherwise.
             break :blk .{
-                .get = descriptor.get orelse @as(?*Object, null),
-                .set = descriptor.set orelse @as(?*Object, null),
-                .enumerable = enumerable,
-                .configurable = configurable,
+                .value_or_accessor = .{
+                    .accessor = .{
+                        .get = descriptor.get orelse @as(?*Object, null),
+                        .set = descriptor.set orelse @as(?*Object, null),
+                    },
+                },
+                .attributes = .{
+                    .writable = false,
+                    .enumerable = enumerable,
+                    .configurable = configurable,
+                },
             };
         }
         // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true, then
@@ -382,27 +383,54 @@ fn validateAndApplyPropertyDescriptor(
             //      set to the value of the corresponding field in Desc if Desc has that field, or
             //      to the attribute's default value otherwise.
             break :blk .{
-                .value = descriptor.value orelse .undefined,
-                .writable = descriptor.writable orelse false,
-                .enumerable = enumerable,
-                .configurable = configurable,
+                .value_or_accessor = .{
+                    .value = descriptor.value orelse .undefined,
+                },
+                .attributes = .{
+                    .writable = descriptor.writable orelse false,
+                    .enumerable = enumerable,
+                    .configurable = configurable,
+                },
             };
         }
         // c. Else,
         else blk: {
             // i. For each field of Desc, set the corresponding attribute of the property named P
             //    of object O to the value of the field.
-            break :blk .{
-                .value = descriptor.value orelse current.value,
-                .writable = descriptor.writable orelse current.writable,
-                .get = descriptor.get orelse current.get,
-                .set = descriptor.set orelse current.set,
-                .enumerable = descriptor.enumerable orelse current.enumerable,
-                .configurable = descriptor.configurable orelse current.configurable,
-            };
+            if (current.isDataDescriptor()) {
+                break :blk .{
+                    .value_or_accessor = .{
+                        .value = descriptor.value orelse current.value.?,
+                    },
+                    .attributes = .{
+                        .writable = descriptor.writable orelse current.writable.?,
+                        .enumerable = descriptor.enumerable orelse current.enumerable.?,
+                        .configurable = descriptor.configurable orelse current.configurable.?,
+                    },
+                };
+            } else {
+                std.debug.assert(current.isAccessorDescriptor());
+                break :blk .{
+                    .value_or_accessor = .{
+                        .accessor = .{
+                            .get = descriptor.get orelse current.get.?,
+                            .set = descriptor.set orelse current.set.?,
+                        },
+                    },
+                    .attributes = .{
+                        .writable = false,
+                        .enumerable = descriptor.enumerable orelse current.enumerable.?,
+                        .configurable = descriptor.configurable orelse current.configurable.?,
+                    },
+                };
+            }
         };
 
-        try object.setPropertyDirect(property_key, property_descriptor);
+        try object.property_storage.set(
+            object.agent.gc_allocator,
+            property_key,
+            property_descriptor,
+        );
     }
 
     // 7. Return true.
@@ -423,7 +451,7 @@ pub fn ordinaryHasProperty(object: *Object, property_key: PropertyKey) Agent.Err
     if (object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf)
     {
-        if (object.shape.properties.contains(property_key)) return true;
+        if (object.property_storage.contains(property_key)) return true;
         const parent = object.prototype() orelse return false;
         return parent.internal_methods.hasProperty(parent, property_key);
     }
@@ -461,18 +489,16 @@ pub fn ordinaryGet(object: *Object, property_key: PropertyKey, receiver: Value) 
     if (object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf)
     {
-        const property_metadata = object.shape.properties.get(property_key) orelse {
+        const property_descriptor = try object.property_storage.getCreateIntrinsicIfNeeded(property_key) orelse {
             const parent = object.prototype() orelse return .undefined;
             return parent.internal_methods.get(parent, property_key, receiver);
         };
-        const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
-        switch (property_value) {
+        switch (property_descriptor.value_or_accessor) {
             .value => |value| return value,
             .accessor => |accessor| {
                 const getter = accessor.get orelse return .undefined;
                 return Value.from(getter).callAssumeCallableNoArgs(receiver);
             },
-            .lazy_intrinsic => unreachable,
         }
     }
 
@@ -523,37 +549,42 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    // OPTIMIZATION: Fast path for ordinary objects
-    if (receiver.isObject() and object == receiver.asObject() and
+    // OPTIMIZATION: Fast path for ordinary objects and regular properties
+    // TODO: Add a fast path for indexed properties
+    if (!property_key.isArrayIndex() and
+        receiver.isObject() and object == receiver.asObject() and
         object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf and
         object.internal_methods.isExtensible == &isExtensible and
         object.internal_methods.defineOwnProperty == &defineOwnProperty)
     {
-        const property_metadata = object.shape.properties.get(property_key) orelse {
+        const property_metadata = object.property_storage.shape.properties.get(property_key) orelse {
             if (object.prototype()) |parent| {
                 return parent.internal_methods.set(parent, property_key, value, receiver);
             }
             if (!object.extensible()) return false;
-            try object.setPropertyDirect(property_key, .{
-                .value = value,
-                .writable = true,
-                .enumerable = true,
-                .configurable = true,
+            try object.property_storage.set(object.agent.gc_allocator, property_key, .{
+                .value_or_accessor = .{
+                    .value = value,
+                },
+                .attributes = .{
+                    .writable = true,
+                    .enumerable = true,
+                    .configurable = true,
+                },
             });
             return true;
         };
-        const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
-        switch (property_value) {
-            .value => {
+        switch (property_metadata.index) {
+            .value => |index| {
                 if (!property_metadata.attributes.writable) return false;
-                object.property_storage.items[property_metadata.index] = .{ .value = value };
+                object.property_storage.values.items[@intFromEnum(index)] = value;
             },
-            .accessor => |accessor| {
+            .accessor => |index| {
+                const accessor = object.property_storage.accessors.items[@intFromEnum(index)];
                 const setter = accessor.set orelse return false;
                 _ = try Value.from(setter).callAssumeCallable(receiver, &.{value});
             },
-            .lazy_intrinsic => unreachable,
         }
         return true;
     }
@@ -639,7 +670,7 @@ pub fn ordinarySetWithOwnDescriptor(
         // e. Else,
         else {
             // i. Assert: Receiver does not currently have a property P.
-            std.debug.assert(!receiver.shape.properties.contains(property_key));
+            std.debug.assert(!receiver.property_storage.contains(property_key));
 
             // ii. Return ? CreateDataProperty(Receiver, P, V).
             return receiver.createDataProperty(property_key, value);
@@ -679,7 +710,7 @@ pub fn ordinaryDelete(object: *Object, property_key: PropertyKey) Agent.Error!bo
     // 3. If desc.[[Configurable]] is true, then
     if (descriptor.?.configurable == true) {
         // a. Remove the own property with name P from O.
-        try object.deletePropertyDirect(property_key);
+        try object.property_storage.remove(object.agent.gc_allocator, property_key);
 
         // b. Return true.
         return true;
@@ -704,27 +735,40 @@ pub fn ordinaryOwnPropertyKeys(object: *Object) std.mem.Allocator.Error!std.Arra
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.shape.properties.count(),
+        object.property_storage.count(),
     );
 
     // 2. For each own property key P of O such that P is an array index, in ascending numeric
     //    index order, do
-    for (object.shape.properties.keys()) |property_key| {
-        if (property_key.isArrayIndex()) {
-            // a. Append P to keys.
-            keys.appendAssumeCapacity(property_key);
-        }
+    //     a. Append P to keys.
+    switch (object.property_storage.indexed_properties.storage) {
+        .none => {},
+        .sparse => |sparse| {
+            var it = sparse.keyIterator();
+            while (it.next()) |index| {
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index.*)));
+                keys.appendAssumeCapacity(property_key);
+            }
+            std.mem.sortUnstable(PropertyKey, keys.items, {}, struct {
+                fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
+                    return a.integer_index < b.integer_index;
+                }
+            }.lessThanFn);
+        },
+        else => {
+            for (0..object.property_storage.indexed_properties.count()) |index| {
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
+                keys.appendAssumeCapacity(property_key);
+            }
+        },
     }
-    std.mem.sortUnstable(PropertyKey, keys.items, {}, struct {
-        fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
-            return a.integer_index < b.integer_index;
-        }
-    }.lessThanFn);
 
     // 3. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
-        if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
+        if (property_key == .string or property_key == .integer_index) {
+            std.debug.assert(!property_key.isArrayIndex());
+
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
         }
@@ -732,7 +776,7 @@ pub fn ordinaryOwnPropertyKeys(object: *Object) std.mem.Allocator.Error!std.Arra
 
     // 4. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    for (object.property_storage.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

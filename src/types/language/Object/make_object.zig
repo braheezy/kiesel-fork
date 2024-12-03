@@ -54,10 +54,15 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .agent = agent,
-                    .shape = agent.empty_shape,
                     .private_elements = .empty,
                     .internal_methods = args.internal_methods,
-                    .property_storage = .empty,
+                    .property_storage = .{
+                        .shape = agent.empty_shape,
+                        .values = .empty,
+                        .accessors = .empty,
+                        .indexed_properties = .empty,
+                        .lazy_intrinsics = .empty,
+                    },
                 },
             };
             if (args.prototype != null) {

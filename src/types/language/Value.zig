@@ -2167,14 +2167,16 @@ pub fn createArrayFromList(
     // 2. Let n be 0.
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
-
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        try array.setPropertyDirect(property_key, .{
-            .value = element,
-            .writable = true,
-            .enumerable = true,
-            .configurable = true,
+        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+            .value_or_accessor = .{
+                .value = element,
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = true,
+                .configurable = true,
+            },
         });
 
         // b. Set n to n + 1.
@@ -2199,14 +2201,16 @@ pub fn createArrayFromListMapToValue(
     // 2. Let n be 0.
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
-
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        try array.setPropertyDirect(property_key, .{
-            .value = try mapFn(agent, element),
-            .writable = true,
-            .enumerable = true,
-            .configurable = true,
+        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+            .value_or_accessor = .{
+                .value = try mapFn(agent, element),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = true,
+                .configurable = true,
+            },
         });
 
         // b. Set n to n + 1.

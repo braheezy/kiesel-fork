@@ -184,21 +184,20 @@ pub fn defineBuiltinAccessorWithAttributes(
         });
     } else null;
     const property_key = getPropertyKey(name, agent);
-    const attributes_: Object.Shape.PropertyMetadata.Attributes = .{
+    const attributes_: Object.PropertyStorage.Attributes = .{
         .writable = false,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
-    object.shape = try object.shape.setPropertyWithoutTransition(
-        agent.gc_allocator,
+    object.property_storage.shape = try object.property_storage.shape.setPropertyWithoutTransition(
+        object.agent.gc_allocator,
         property_key,
         attributes_,
+        .accessor,
     );
-    try object.property_storage.append(agent.gc_allocator, .{
-        .accessor = .{
-            .get = getter_function,
-            .set = setter_function,
-        },
+    try object.property_storage.accessors.append(agent.gc_allocator, .{
+        .get = getter_function,
+        .set = setter_function,
     });
 }
 
@@ -252,7 +251,7 @@ pub fn defineBuiltinProperty(
     const T = @TypeOf(value_or_property_descriptor);
     const agent = object.agent;
     const property_key = getPropertyKey(name, agent);
-    const value: Value, const attributes: Object.Shape.PropertyMetadata.Attributes = switch (T) {
+    const value: Value, const attributes: Object.PropertyStorage.Attributes = switch (T) {
         Value => .{
             value_or_property_descriptor,
             .{
@@ -263,14 +262,15 @@ pub fn defineBuiltinProperty(
         },
         PropertyDescriptor => .{
             value_or_property_descriptor.value.?,
-            Object.Shape.PropertyMetadata.Attributes.fromPropertyDescriptor(value_or_property_descriptor),
+            .fromPropertyDescriptor(value_or_property_descriptor),
         },
         else => @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T)),
     };
-    object.shape = try object.shape.setPropertyWithoutTransition(
-        agent.gc_allocator,
+    object.property_storage.shape = try object.property_storage.shape.setPropertyWithoutTransition(
+        object.agent.gc_allocator,
         property_key,
         attributes,
+        .value,
     );
-    try object.property_storage.append(agent.gc_allocator, .{ .value = value });
+    try object.property_storage.values.append(agent.gc_allocator, value);
 }

@@ -4,8 +4,9 @@ const build_options = @import("build-options");
 const types = @import("../../../types.zig");
 
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
+const Attributes = Object.PropertyStorage.Attributes;
 const PropertyKey = types.PropertyKey;
+const PropertyType = Object.PropertyStorage.PropertyType;
 
 const Shape = @This();
 
@@ -20,7 +21,7 @@ pub const Transition = union(enum) {
     set_prototype: ?*Object,
     set_non_extensible,
     set_is_htmldda,
-    set_property: struct { PropertyKey, PropertyMetadata.Attributes },
+    set_property: struct { PropertyKey, Attributes, PropertyType },
     delete_property: PropertyKey,
 
     pub fn hash(self: Transition) u64 {
@@ -31,10 +32,11 @@ pub const Transition = union(enum) {
                 hasher.update(std.mem.asBytes(&prototype));
             },
             .set_non_extensible, .set_is_htmldda => {},
-            .set_property => |property_key_and_attributes| {
-                const property_key, const attributes = property_key_and_attributes;
+            .set_property => |property| {
+                const property_key, const attributes, const property_type = property;
                 hasher.update(std.mem.asBytes(&property_key.hash()));
                 hasher.update(std.mem.asBytes(&attributes));
+                hasher.update(std.mem.asBytes(&property_type));
             },
             .delete_property => |property_key| {
                 hasher.update(std.mem.asBytes(&property_key.hash()));
@@ -67,34 +69,22 @@ pub const Transition = union(enum) {
     }
 };
 
-pub const PropertyMetadata = struct {
-    pub const Attributes = packed struct(u3) {
-        writable: bool,
-        enumerable: bool,
-        configurable: bool,
-
-        pub fn eql(a: Attributes, b: Attributes) bool {
-            return a.writable == b.writable and
-                a.enumerable == b.enumerable and
-                a.configurable == b.configurable;
-        }
-
-        pub fn fromPropertyDescriptor(property_desciptor: PropertyDescriptor) Attributes {
-            return .{
-                .writable = property_desciptor.writable orelse false,
-                .enumerable = property_desciptor.enumerable orelse false,
-                .configurable = property_desciptor.configurable orelse false,
-            };
-        }
-    };
-
-    index: usize,
-    attributes: Attributes,
-};
-
 pub const PropertyLookupCacheEntry = struct {
     shape: *const Shape,
-    index: usize,
+    index: PropertyIndex,
+};
+
+const PropertyIndex = union(PropertyType) {
+    pub const Value = enum(u32) { _ };
+    pub const Accessor = enum(u32) { _ };
+
+    value: PropertyIndex.Value,
+    accessor: PropertyIndex.Accessor,
+};
+
+const PropertyMetadata = struct {
+    index: PropertyIndex,
+    attributes: Attributes,
 };
 
 const State = enum {
@@ -105,7 +95,8 @@ const State = enum {
 
 state: State,
 transition_count: u8,
-next_index: usize,
+next_value_index: PropertyIndex.Value,
+next_accessor_index: PropertyIndex.Accessor,
 transitions: Transition.HashMapUnmanaged(*Shape),
 properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
 
@@ -123,7 +114,8 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     self.* = .{
         .state = .default,
         .transition_count = 0,
-        .next_index = 0,
+        .next_value_index = @enumFromInt(0),
+        .next_accessor_index = @enumFromInt(0),
         .transitions = .empty,
         .properties = .empty,
         .prototype = null,
@@ -152,7 +144,8 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator, state: State) std.mem
     shape.* = .{
         .state = state,
         .transition_count = self.transition_count,
-        .next_index = self.next_index,
+        .next_value_index = self.next_value_index,
+        .next_accessor_index = self.next_accessor_index,
         .transitions = .empty,
         .properties = try self.properties.clone(allocator),
         .prototype = self.prototype,
@@ -257,20 +250,31 @@ pub fn setProperty(
     self: *Shape,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
-    attributes: PropertyMetadata.Attributes,
+    attributes: Attributes,
+    property_type: PropertyType,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .{ .set_property = .{ property_key, attributes } };
+    const transition: Transition = .{
+        .set_property = .{ property_key, attributes, property_type },
+    };
     const shape = try self.getOrCreateShape(allocator, transition);
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
-    } else {
-        property_gop.value_ptr.* = .{
-            .index = shape.next_index,
-            .attributes = attributes,
-        };
-        shape.next_index += 1;
+        if (property_type == property_gop.value_ptr.index) return shape;
     }
+    property_gop.value_ptr.* = .{
+        .index = switch (property_type) {
+            .value => blk: {
+                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
+                break :blk .{ .value = shape.next_value_index };
+            },
+            .accessor => blk: {
+                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
+                break :blk .{ .accessor = shape.next_accessor_index };
+            },
+        },
+        .attributes = attributes,
+    };
     return shape;
 }
 
@@ -278,19 +282,28 @@ pub fn setPropertyWithoutTransition(
     self: *Shape,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
-    attributes: PropertyMetadata.Attributes,
+    attributes: Attributes,
+    property_type: PropertyType,
 ) std.mem.Allocator.Error!*Shape {
     const shape = try self.getOrCreateShape(allocator, null);
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
-    } else {
-        property_gop.value_ptr.* = .{
-            .index = shape.next_index,
-            .attributes = attributes,
-        };
-        shape.next_index += 1;
+        if (property_type == property_gop.value_ptr.index) return shape;
     }
+    property_gop.value_ptr.* = .{
+        .index = switch (property_type) {
+            .value => blk: {
+                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
+                break :blk .{ .value = shape.next_value_index };
+            },
+            .accessor => blk: {
+                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
+                break :blk .{ .accessor = shape.next_accessor_index };
+            },
+        },
+        .attributes = attributes,
+    };
     return shape;
 }
 

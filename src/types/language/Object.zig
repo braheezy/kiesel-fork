@@ -23,9 +23,10 @@ const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
+pub const IndexedProperties = @import("Object/IndexedProperties.zig");
 pub const InternalMethods = @import("Object/InternalMethods.zig");
 pub const PropertyKey = @import("Object/PropertyKey.zig").PropertyKey;
-pub const PropertyValue = @import("Object/property_value.zig").PropertyValue;
+pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 pub const Shape = @import("Object/Shape.zig");
 
 const Object = @This();
@@ -106,8 +107,7 @@ private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
 
 agent: *Agent,
 internal_methods: *const InternalMethods,
-property_storage: std.ArrayListUnmanaged(PropertyValue),
-shape: *Shape,
+property_storage: PropertyStorage,
 
 pub fn format(
     self: *const Object,
@@ -134,86 +134,50 @@ pub fn as(self: *const Object, comptime T: type) *T {
 }
 
 pub fn prototype(self: *const Object) ?*Object {
-    return self.shape.prototype;
+    return self.property_storage.shape.prototype;
 }
 
 pub fn setPrototype(self: *Object, new_prototype: ?*Object) std.mem.Allocator.Error!void {
     if (self.prototype() == new_prototype) return;
-    self.shape = try self.shape.setPrototype(self.agent.gc_allocator, new_prototype);
+    self.property_storage.shape = try self.property_storage.shape.setPrototype(self.agent.gc_allocator, new_prototype);
 }
 
 pub fn extensible(self: *const Object) bool {
-    return self.shape.extensible;
+    return self.property_storage.shape.extensible;
 }
 
 pub fn setNonExtensible(self: *Object) std.mem.Allocator.Error!void {
     if (!self.extensible()) return;
-    self.shape = try self.shape.setNonExtensible(self.agent.gc_allocator);
+    self.property_storage.shape = try self.property_storage.shape.setNonExtensible(self.agent.gc_allocator);
 }
 
 pub fn isHTMLDDA(self: *const Object) bool {
-    return self.shape.is_htmldda;
+    return self.property_storage.shape.is_htmldda;
 }
 
 pub fn setIsHTMLDDA(self: *Object) std.mem.Allocator.Error!void {
     if (self.isHTMLDDA()) return;
-    self.shape = try self.shape.setIsHTMLDDA(self.agent.gc_allocator);
+    self.property_storage.shape = try self.property_storage.shape.setIsHTMLDDA(self.agent.gc_allocator);
 }
 
+/// Assumes the property exists, is a data property, and not a lazy intrinsic.
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
-    const property_metadata = self.shape.properties.get(property_key).?;
-    const property_value = self.property_storage.items[property_metadata.index];
-    return property_value.value;
-}
-
-pub fn getPropertyCreateIntrinsicIfNeeded(
-    self: *const Object,
-    index: usize,
-) std.mem.Allocator.Error!PropertyValue {
-    const property_value = &self.property_storage.items[index];
-    if (property_value.* == .lazy_intrinsic) {
-        const object = try property_value.lazy_intrinsic.lazyIntrinsicFn(
-            &property_value.lazy_intrinsic.realm.intrinsics,
-        );
-        property_value.* = .{ .value = Value.from(object) };
+    if (property_key.isArrayIndex()) {
+        const index: u32 = @intCast(property_key.integer_index);
+        return switch (self.property_storage.indexed_properties.storage) {
+            .none => unreachable,
+            .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
+            .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
+            .dense_value => |dense_value| dense_value.items[index],
+            .sparse => |sparse| sparse.get(index).?.value_or_accessor.value,
+        };
     }
-    return property_value.*;
-}
-
-pub fn setPropertyDirect(
-    self: *Object,
-    property_key: PropertyKey,
-    property_descriptor: PropertyDescriptor,
-) std.mem.Allocator.Error!void {
-    const attributes = Object.Shape.PropertyMetadata.Attributes.fromPropertyDescriptor(property_descriptor);
-    const property_value = PropertyValue.fromPropertyDescriptor(property_descriptor);
-    if (self.shape.properties.getPtr(property_key)) |property_metadata| {
-        if (!property_metadata.attributes.eql(attributes)) {
-            self.shape = try self.shape.setProperty(
-                self.agent.gc_allocator,
-                property_key,
-                attributes,
-            );
-        }
-        self.property_storage.items[property_metadata.index] = property_value;
-    } else {
-        self.shape = try self.shape.setProperty(
-            self.agent.gc_allocator,
-            property_key,
-            attributes,
-        );
-        try self.property_storage.append(self.agent.gc_allocator, property_value);
-    }
-}
-
-pub fn deletePropertyDirect(self: *Object, property_key: PropertyKey) std.mem.Allocator.Error!void {
-    const property_metadata = self.shape.properties.get(property_key).?;
-    self.shape = try self.shape.deleteProperty(self.agent.gc_allocator, property_key);
-    // By overwriting the value and keeping subsequent indices intact we can make property
-    // deletions part of the regular transition chain without making them unique and invalidating
-    // ICs. Additionally we save the cost of moving all elements after this one around, at the
-    // memory cost of wasting one element.
-    self.property_storage.items[property_metadata.index] = undefined;
+    const property_metadata = self.property_storage.shape.properties.get(property_key).?;
+    std.debug.assert(!self.property_storage.lazy_intrinsics.contains(property_key));
+    return switch (property_metadata.index) {
+        .value => |index| self.property_storage.values.items[@intFromEnum(index)],
+        .accessor => unreachable,
+    };
 }
 
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
@@ -326,9 +290,17 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
-        self.extensible() and for (self.shape.properties.values()) |entry| {
+        self.extensible() and for (self.property_storage.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
-        } else true,
+        } else true and switch (self.property_storage.indexed_properties.storage) {
+            .sparse => |sparse| blk: {
+                var it = sparse.valueIterator();
+                break :blk while (it.next()) |entry| {
+                    if (!entry.attributes.configurable) break false;
+                } else true;
+            },
+            else => true,
+        },
     );
 
     // 2. Let newDesc be the PropertyDescriptor {

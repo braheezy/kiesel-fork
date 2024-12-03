@@ -112,17 +112,19 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
 
         if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
             if (lookup_cache_entry.*) |cache| {
-                if (base_object.shape == cache.shape) {
-                    switch (base_object.property_storage.items[cache.index]) {
-                        .value => |value| return value,
-                        .accessor => |accessor| {
+                if (base_object.property_storage.shape == cache.shape) {
+                    switch (cache.index) {
+                        .value => |index| {
+                            const value = base_object.property_storage.values.items[@intFromEnum(index)];
+                            return value;
+                        },
+                        .accessor => |index| {
+                            const accessor = base_object.property_storage.accessors.items[@intFromEnum(index)];
                             // Excerpt from ordinaryGet()
                             const getter = accessor.get orelse return .undefined;
                             const receiver = self.getThisValue();
                             return Value.from(getter).callAssumeCallableNoArgs(receiver);
                         },
-                        // If we looked at if before and got a cache, the intrinsic has been created.
-                        .lazy_intrinsic => unreachable,
                     }
                 } else {
                     lookup_cache_entry.* = null;
@@ -152,9 +154,9 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         );
 
         if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
-            if (base_object.shape.properties.get(property_key)) |property_metadata| {
+            if (base_object.property_storage.shape.properties.get(property_key)) |property_metadata| {
                 lookup_cache_entry.* = .{
-                    .shape = base_object.shape,
+                    .shape = base_object.property_storage.shape,
                     .index = property_metadata.index,
                 };
             }
