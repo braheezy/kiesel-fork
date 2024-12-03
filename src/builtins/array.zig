@@ -766,7 +766,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
-        const @"%Array.prototype.values%" = object.getPropertyDescriptorDirect(PropertyKey.from("values"));
+        const @"%Array.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Array.prototype.values%");
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]

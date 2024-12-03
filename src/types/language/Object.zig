@@ -166,13 +166,6 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
     return property_value.value;
 }
 
-pub fn getPropertyDescriptorDirect(self: *const Object, property_key: PropertyKey) PropertyDescriptor {
-    const property_metadata = self.shape.properties.get(property_key).?;
-    const property_value = self.property_storage.items[property_metadata.index];
-    std.debug.assert(property_value == .value or property_value == .accessor);
-    return property_value.toPropertyDescriptor(property_metadata.attributes);
-}
-
 pub fn getPropertyCreateIntrinsicIfNeeded(
     self: *const Object,
     index: usize,

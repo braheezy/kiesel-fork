@@ -270,7 +270,7 @@ pub const prototype = struct {
 
         // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
-        const @"%Set.prototype.values%" = object.getPropertyDescriptorDirect(PropertyKey.from("values"));
+        const @"%Set.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
         try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
 
         // 24.2.4.18 Set.prototype [ %Symbol.iterator% ] ( )

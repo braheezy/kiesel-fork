@@ -952,7 +952,7 @@ pub const prototype = struct {
 
         // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
-        const @"%TypedArray.prototype.values%" = object.getPropertyDescriptorDirect(PropertyKey.from("values"));
+        const @"%TypedArray.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
     }
 

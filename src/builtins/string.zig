@@ -750,12 +750,12 @@ pub const prototype = struct {
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
-            const @"%String.prototype.trimStart%" = object.getPropertyDescriptorDirect(PropertyKey.from("trimStart"));
+            const @"%String.prototype.trimStart%" = object.getPropertyValueDirect(PropertyKey.from("trimStart"));
             try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
 
             // B.2.2.16 String.prototype.trimRight ( )
             // https://tc39.es/ecma262/#String.prototype.trimright
-            const @"%String.prototype.trimEnd%" = object.getPropertyDescriptorDirect(PropertyKey.from("trimEnd"));
+            const @"%String.prototype.trimEnd%" = object.getPropertyValueDirect(PropertyKey.from("trimEnd"));
             try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
         }
     }
