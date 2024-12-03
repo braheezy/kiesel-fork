@@ -419,6 +419,15 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
 /// 10.1.7.1 OrdinaryHasProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinaryhasproperty
 pub fn ordinaryHasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
+    // OPTIMIZATION: Fast path for ordinary objects
+    if (object.internal_methods.getOwnProperty == &getOwnProperty and
+        object.internal_methods.getPrototypeOf == &getPrototypeOf)
+    {
+        if (object.shape.properties.contains(property_key)) return true;
+        const parent = object.prototype() orelse return false;
+        return parent.internal_methods.hasProperty(parent, property_key);
+    }
+
     // 1. Let hasOwn be ? O.[[GetOwnProperty]](P).
     const has_own = try object.internal_methods.getOwnProperty(object, property_key);
 
@@ -448,7 +457,7 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
 /// 10.1.8.1 OrdinaryGet ( O, P, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinaryget
 pub fn ordinaryGet(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
-    // OPTIMIZATION: Fast path bypassing property descriptors for the common case of ordinary objects
+    // OPTIMIZATION: Fast path for ordinary objects
     if (object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf)
     {
@@ -514,7 +523,7 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    // OPTIMIZATION: Fast path bypassing property descriptors for the common case of ordinary objects
+    // OPTIMIZATION: Fast path for ordinary objects
     if (receiver.isObject() and object == receiver.asObject() and
         object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf and
