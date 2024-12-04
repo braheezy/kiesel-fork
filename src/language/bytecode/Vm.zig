@@ -191,11 +191,7 @@ fn executeArraySetValueDirect(self: *Vm, executable: Executable) Agent.Error!voi
         .value_or_accessor = .{
             .value = value,
         },
-        .attributes = .{
-            .writable = true,
-            .enumerable = true,
-            .configurable = true,
-        },
+        .attributes = .all,
     });
     self.result = Value.from(array);
 }

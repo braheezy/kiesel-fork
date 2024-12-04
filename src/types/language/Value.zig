@@ -2172,11 +2172,7 @@ pub fn createArrayFromList(
             .value_or_accessor = .{
                 .value = element,
             },
-            .attributes = .{
-                .writable = true,
-                .enumerable = true,
-                .configurable = true,
-            },
+            .attributes = .all,
         });
 
         // b. Set n to n + 1.
@@ -2206,11 +2202,7 @@ pub fn createArrayFromListMapToValue(
             .value_or_accessor = .{
                 .value = try mapFn(agent, element),
             },
-            .attributes = .{
-                .writable = true,
-                .enumerable = true,
-                .configurable = true,
-            },
+            .attributes = .all,
         });
 
         // b. Set n to n + 1.

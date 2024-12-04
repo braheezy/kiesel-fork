@@ -254,11 +254,7 @@ pub fn defineBuiltinProperty(
     const value: Value, const attributes: Object.PropertyStorage.Attributes = switch (T) {
         Value => .{
             value_or_property_descriptor,
-            .{
-                .writable = true,
-                .enumerable = false,
-                .configurable = true,
-            },
+            .builtin_default,
         },
         PropertyDescriptor => .{
             value_or_property_descriptor.value.?,

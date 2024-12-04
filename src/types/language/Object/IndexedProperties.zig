@@ -37,11 +37,7 @@ fn propertyDescriptorFromValue(value: Value) CompletePropertyDescriptor {
         .value_or_accessor = .{
             .value = value,
         },
-        .attributes = .{
-            .writable = true,
-            .enumerable = true,
-            .configurable = true,
-        },
+        .attributes = .all,
     };
 }
 
@@ -61,11 +57,8 @@ fn migrateStorageIfNeeded(
                 or
                 property_descriptor.value_or_accessor == .accessor // Accessor property
                 or
-                !property_descriptor.attributes.eql(.{ // Non-default properties
-                .writable = true,
-                .enumerable = true,
-                .configurable = true,
-            })) {
+                !property_descriptor.attributes.eql(.all) // Non-default properties
+            ) {
                 break :blk .sparse;
             }
             if (property_descriptor.value_or_accessor.value.__isI32()) {

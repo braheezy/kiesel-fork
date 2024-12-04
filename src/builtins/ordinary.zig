@@ -567,11 +567,7 @@ pub fn ordinarySet(
                 .value_or_accessor = .{
                     .value = value,
                 },
-                .attributes = .{
-                    .writable = true,
-                    .enumerable = true,
-                    .configurable = true,
-                },
+                .attributes = .all,
             });
             return true;
         };

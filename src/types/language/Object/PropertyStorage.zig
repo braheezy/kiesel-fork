@@ -44,6 +44,24 @@ pub const Attributes = packed struct(u3) {
     enumerable: bool,
     configurable: bool,
 
+    pub const all: Attributes = .{
+        .writable = true,
+        .enumerable = true,
+        .configurable = true,
+    };
+
+    pub const none: Attributes = .{
+        .writable = false,
+        .enumerable = false,
+        .configurable = false,
+    };
+
+    pub const builtin_default: Attributes = .{
+        .writable = true,
+        .enumerable = false,
+        .configurable = true,
+    };
+
     pub fn eql(a: Attributes, b: Attributes) bool {
         return a.writable == b.writable and
             a.enumerable == b.enumerable and
