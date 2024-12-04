@@ -114,6 +114,48 @@ pub const ECMAScriptFunction = MakeObject(.{
         cached_arguments_executable: ?Executable = null,
         cached_body_executable: ?Executable = null,
         cached_use_arguments_fast_path: ?bool = null,
+        cached_ast_values: ?CachedAstValues = null,
+
+        const CachedAstValues = struct {
+            parameter_names: []const ast.Identifier,
+            var_declared_names: []const ast.Identifier,
+            lexically_declared_names: []const ast.Identifier,
+            var_scoped_declarations: []const ast.VarScopedDeclaration,
+            lexically_scoped_declarations: []const ast.LexicallyScopedDeclaration,
+            lexically_scoped_declarations_bound_names: []const []const ast.Identifier,
+        };
+
+        pub fn ensureCachedAstValues(
+            self: *@This(),
+            allocator: std.mem.Allocator,
+        ) std.mem.Allocator.Error!*const CachedAstValues {
+            if (self.cached_ast_values) |*cached_ast_values| return cached_ast_values;
+            var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            try self.formal_parameters.collectBoundNames(allocator, &parameter_names);
+            var var_declared_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            try self.ecmascript_code.collectVarDeclaredNames(allocator, &var_declared_names);
+            var lexically_declared_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            try self.ecmascript_code.collectLexicallyDeclaredNames(allocator, &lexically_declared_names);
+            var var_scoped_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+            try self.ecmascript_code.collectVarScopedDeclarations(allocator, &var_scoped_declarations);
+            var lexically_scoped_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+            try self.ecmascript_code.collectLexicallyScopedDeclarations(allocator, &lexically_scoped_declarations);
+            var lexically_scoped_declarations_bound_names: std.ArrayListUnmanaged([]const ast.Identifier) = .empty;
+            for (lexically_scoped_declarations.items) |declaration| {
+                var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+                try declaration.collectBoundNames(allocator, &bound_names);
+                try lexically_scoped_declarations_bound_names.append(allocator, try bound_names.toOwnedSlice(allocator));
+            }
+            self.cached_ast_values = .{
+                .parameter_names = try parameter_names.toOwnedSlice(allocator),
+                .var_declared_names = try var_declared_names.toOwnedSlice(allocator),
+                .lexically_declared_names = try lexically_declared_names.toOwnedSlice(allocator),
+                .var_scoped_declarations = try var_scoped_declarations.toOwnedSlice(allocator),
+                .lexically_scoped_declarations = try lexically_scoped_declarations.toOwnedSlice(allocator),
+                .lexically_scoped_declarations_bound_names = try lexically_scoped_declarations_bound_names.toOwnedSlice(allocator),
+            };
+            return &self.cached_ast_values.?;
+        }
 
         /// Maybe a hack, but kind of a neat one :^)
         pub fn evaluateArguments(
@@ -1059,19 +1101,21 @@ fn functionDeclarationInstantiation(
     // 4. Let formals be func.[[FormalParameters]].
     const formals = function.fields.formal_parameters;
 
+    // OPTIMIZATION: Instead of doing this every time the function is called, we collect all of
+    //               them once and then cache them.
+    const cached_ast_values = try function.fields.ensureCachedAstValues(agent.gc_allocator);
+
     // 5. Let parameterNames be the BoundNames of formals.
-    var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-    defer parameter_names.deinit(agent.gc_allocator);
-    try formals.collectBoundNames(agent.gc_allocator, &parameter_names);
+    const parameter_names = cached_ast_values.parameter_names;
 
     // 6. If parameterNames has any duplicate entries, let hasDuplicates be true. Otherwise, let
     //    hasDuplicates be false.
     const has_duplicates = blk: {
         var unique_names: std.StringHashMapUnmanaged(void) = .empty;
         defer unique_names.deinit(agent.gc_allocator);
-        if (parameter_names.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try unique_names.ensureTotalCapacity(agent.gc_allocator, @intCast(parameter_names.items.len));
-        for (parameter_names.items) |parameter_name| {
+        if (parameter_names.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        try unique_names.ensureTotalCapacity(agent.gc_allocator, @intCast(parameter_names.len));
+        for (parameter_names) |parameter_name| {
             if (unique_names.contains(parameter_name)) break :blk true;
             unique_names.putAssumeCapacityNoClobber(parameter_name, {});
         }
@@ -1085,19 +1129,13 @@ fn functionDeclarationInstantiation(
     const has_parameter_expressions = formals.containsExpression();
 
     // 9. Let varNames be the VarDeclaredNames of code.
-    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-    defer var_names.deinit(agent.gc_allocator);
-    try code.collectVarDeclaredNames(agent.gc_allocator, &var_names);
+    const var_names = cached_ast_values.var_declared_names;
 
     // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
-    defer var_declarations.deinit(agent.gc_allocator);
-    try code.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
+    const var_declarations = cached_ast_values.var_scoped_declarations;
 
     // 11. Let lexicalNames be the LexicallyDeclaredNames of code.
-    var lexical_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-    defer lexical_names.deinit(agent.gc_allocator);
-    try code.collectLexicallyDeclaredNames(agent.gc_allocator, &lexical_names);
+    const lexical_names = cached_ast_values.lexically_declared_names;
 
     // 12. Let functionNames be a new empty List.
     var function_names: String.HashMapUnmanaged(void) = .empty;
@@ -1108,7 +1146,7 @@ fn functionDeclarationInstantiation(
     defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 14. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations.items);
+    var it = std.mem.reverseIterator(var_declarations);
     while (it.next()) |var_declaration| {
         // a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
         if (var_declaration == .hoistable_declaration) {
@@ -1147,7 +1185,7 @@ fn functionDeclarationInstantiation(
         arguments_object_needed = false;
     }
     // 17. Else if parameterNames contains "arguments", then
-    else if (containsSlice(parameter_names.items, "arguments")) {
+    else if (containsSlice(parameter_names, "arguments")) {
         // a. Set argumentsObjectNeeded to false.
         arguments_object_needed = false;
     }
@@ -1155,7 +1193,7 @@ fn functionDeclarationInstantiation(
     else if (!has_parameter_expressions) {
         // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
         if (function_names.contains(String.fromLiteral("arguments")) or
-            containsSlice(lexical_names.items, "arguments"))
+            containsSlice(lexical_names, "arguments"))
         {
             // i. Set argumentsObjectNeeded to false.
             arguments_object_needed = false;
@@ -1200,7 +1238,7 @@ fn functionDeclarationInstantiation(
     };
 
     // 21. For each String paramName of parameterNames, do
-    for (parameter_names.items) |parameter_name_utf8| {
+    for (parameter_names) |parameter_name_utf8| {
         const parameter_name = try String.fromUtf8(agent.gc_allocator, parameter_name_utf8);
 
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
@@ -1227,7 +1265,7 @@ fn functionDeclarationInstantiation(
     }
 
     // 22. If argumentsObjectNeeded is true, then
-    var parameter_bindings = if (arguments_object_needed) blk: {
+    const parameter_bindings = if (arguments_object_needed) blk: {
         // a. If strict is true or simpleParameterList is false, then
         const arguments_object = if (strict or !simple_parameter_list) ao_blk: {
             // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
@@ -1279,16 +1317,17 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
-        var parameter_bindings = try parameter_names.clone(agent.gc_allocator);
+        var parameter_bindings: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+        try parameter_bindings.appendSlice(agent.gc_allocator, parameter_names);
         try parameter_bindings.append(agent.gc_allocator, "arguments");
-        break :blk parameter_bindings;
+        break :blk try parameter_bindings.toOwnedSlice(agent.gc_allocator);
     }
     // 23. Else,
     else blk: {
         // a. Let parameterBindings be parameterNames.
         break :blk parameter_names;
     };
-    defer if (arguments_object_needed) parameter_bindings.deinit(agent.gc_allocator);
+    defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
 
     // 24-26.
     try function.fields.evaluateArguments(agent, arguments_list, if (!has_duplicates) env else null);
@@ -1301,12 +1340,12 @@ fn functionDeclarationInstantiation(
         var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
         defer instantiated_var_names.deinit(agent.gc_allocator);
 
-        if (parameter_bindings.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        if (parameter_bindings.len > std.math.maxInt(u32)) return error.OutOfMemory;
         try instantiated_var_names.ensureTotalCapacity(
             agent.gc_allocator,
-            @intCast(parameter_bindings.items.len),
+            @intCast(parameter_bindings.len),
         );
-        for (parameter_bindings.items) |parameter_binding| {
+        for (parameter_bindings) |parameter_binding| {
             instantiated_var_names.putAssumeCapacity(
                 try String.fromUtf8(agent.gc_allocator, parameter_binding),
                 {},
@@ -1314,7 +1353,7 @@ fn functionDeclarationInstantiation(
         }
 
         // c. For each element n of varNames, do
-        for (var_names.items) |var_name_utf8| {
+        for (var_names) |var_name_utf8| {
             const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
 
             // i. If instantiatedVarNames does not contain n, then
@@ -1352,7 +1391,7 @@ fn functionDeclarationInstantiation(
         defer instantiated_var_names.deinit(agent.gc_allocator);
 
         // e. For each element n of varNames, do
-        for (var_names.items) |var_name_utf8| {
+        for (var_names) |var_name_utf8| {
             const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
 
             // i. If instantiatedVarNames does not contain n, then
@@ -1367,7 +1406,7 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be undefined.
                 // 4. Else,
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const initial_value: Value = if (!containsSlice(parameter_bindings.items, var_name_utf8) or
+                const initial_value: Value = if (!containsSlice(parameter_bindings, var_name_utf8) or
                     function_names.contains(var_name))
                     .undefined
                 else
@@ -1411,24 +1450,18 @@ fn functionDeclarationInstantiation(
     callee_context.ecmascript_code.?.lexical_environment = lex_env;
 
     // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(agent.gc_allocator);
-    try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
-
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-    defer bound_names.deinit(agent.gc_allocator);
+    const lex_declarations = cached_ast_values.lexically_scoped_declarations;
 
     // 34. For each element d of lexDeclarations, do
-    for (lex_declarations.items) |declaration| {
+    for (lex_declarations, 0..) |declaration, i| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
         //    declaration, formal parameter, or a var name. Lexically declared names are only
         //    instantiated here but not initialized.
 
-        bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+        const bound_names = cached_ast_values.lexically_scoped_declarations_bound_names[i];
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name_utf8| {
+        for (bound_names) |name_utf8| {
             const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
 
             // i. If IsConstantDeclaration of d is true, then
