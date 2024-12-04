@@ -160,7 +160,7 @@ pub fn setIsHTMLDDA(self: *Object) std.mem.Allocator.Error!void {
     self.property_storage.shape = try self.property_storage.shape.setIsHTMLDDA(self.agent.gc_allocator);
 }
 
-/// Assumes the property exists, is a data property, and not a lazy intrinsic.
+/// Assumes the property exists, is a data property, and not lazy.
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
     if (property_key.isArrayIndex()) {
         const index: u32 = @intCast(property_key.integer_index);
@@ -173,7 +173,7 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
         };
     }
     const property_metadata = self.property_storage.shape.properties.get(property_key).?;
-    std.debug.assert(!self.property_storage.lazy_intrinsics.contains(property_key));
+    std.debug.assert(!self.property_storage.lazy_properties.contains(property_key));
     return switch (property_metadata.index) {
         .value => |index| self.property_storage.values.items[@intFromEnum(index)],
         .accessor => unreachable,

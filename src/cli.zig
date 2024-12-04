@@ -25,6 +25,7 @@ const String = kiesel.types.String;
 const Value = kiesel.types.Value;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
+const defineBuiltinPropertyLazy = kiesel.utils.defineBuiltinPropertyLazy;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const formatParseError = kiesel.utils.formatParseError;
 const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
@@ -77,7 +78,17 @@ fn resolveModulePath(
 }
 
 fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!void {
-    try defineBuiltinProperty(global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
+    try defineBuiltinPropertyLazy(
+        global_object,
+        "Kiesel",
+        struct {
+            fn initializer(realm_: *Realm) std.mem.Allocator.Error!Value {
+                return Value.from(try Kiesel.create(realm_));
+            }
+        }.initializer,
+        realm,
+        .builtin_default,
+    );
     try kiesel_runtime.addBindings(realm, global_object);
 }
 

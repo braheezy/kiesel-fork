@@ -15,13 +15,16 @@ shape: *Object.Shape,
 values: std.ArrayListUnmanaged(Value),
 accessors: std.ArrayListUnmanaged(Accessor),
 indexed_properties: Object.IndexedProperties,
-lazy_intrinsics: PropertyKey.HashMapUnmanaged(LazyIntrinsic),
+lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
 
-pub const LazyIntrinsic = struct {
+pub const LazyProperty = struct {
+    pub const Initializer = union(PropertyType) {
+        value: *const fn (*Realm) std.mem.Allocator.Error!Value,
+        accessor: *const fn (*Realm) std.mem.Allocator.Error!Accessor,
+    };
+
     realm: *Realm,
-    // TODO: Make this a generic function that creates an object to support lazy non-intrinsic
-    //       properties as well.
-    lazyIntrinsicFn: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!*Object,
+    initializer: Initializer,
 };
 
 pub const PropertyType = enum {
@@ -123,7 +126,7 @@ pub fn get(
         return self.indexed_properties.get(@intCast(property_key.integer_index));
     }
     const property_metadata = self.shape.properties.get(property_key) orelse return null;
-    std.debug.assert(!self.lazy_intrinsics.contains(property_key));
+    std.debug.assert(!self.lazy_properties.contains(property_key));
     const value_or_accessor: ValueOrAccessor = switch (property_metadata.index) {
         .value => |index| .{ .value = self.values.items[@intFromEnum(index)] },
         .accessor => |index| .{ .accessor = self.accessors.items[@intFromEnum(index)] },
@@ -142,17 +145,11 @@ pub fn getCreateIntrinsicIfNeeded(
         return self.indexed_properties.get(@intCast(property_key.integer_index));
     }
     const property_metadata = self.shape.properties.get(property_key) orelse return null;
-    if (self.lazy_intrinsics.fetchRemove(property_key)) |kv| {
-        const lazy_intrinsic = kv.value;
+    if (self.lazy_properties.fetchRemove(property_key)) |kv| {
+        const lazy_property = kv.value;
         switch (property_metadata.index) {
-            .value => |index| {
-                const object = try lazy_intrinsic.lazyIntrinsicFn(
-                    &lazy_intrinsic.realm.intrinsics,
-                );
-                self.values.items[@intFromEnum(index)] = Value.from(object);
-            },
-            // Lazy intrinsics are only supported for data properties at the moment.
-            .accessor => unreachable,
+            .value => |index| self.values.items[@intFromEnum(index)] = try lazy_property.initializer.value(lazy_property.realm),
+            .accessor => |index| self.accessors.items[@intFromEnum(index)] = try lazy_property.initializer.accessor(lazy_property.realm),
         }
     }
     const value_or_accessor: ValueOrAccessor = switch (property_metadata.index) {

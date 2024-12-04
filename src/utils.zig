@@ -243,6 +243,33 @@ pub fn defineBuiltinFunctionWithAttributes(
     });
 }
 
+pub fn defineBuiltinFunctionLazy(
+    object: *Object,
+    comptime name: []const u8,
+    comptime function: *const Behaviour.Function,
+    comptime length: u32,
+    realm: *Realm,
+    attributes: Object.PropertyStorage.Attributes,
+) std.mem.Allocator.Error!void {
+    const function_name = comptime getFunctionName(name);
+    try defineBuiltinPropertyLazy(
+        object,
+        name,
+        struct {
+            fn initializer(realm_: *Realm) std.mem.Allocator.Error!Value {
+                const builtin_function = try createBuiltinFunction(realm_.agent, .{ .function = function }, .{
+                    .length = length,
+                    .name = function_name,
+                    .realm = realm_,
+                });
+                return Value.from(builtin_function);
+            }
+        }.initializer,
+        realm,
+        attributes,
+    );
+}
+
 pub fn defineBuiltinProperty(
     object: *Object,
     comptime name: []const u8,
@@ -269,4 +296,30 @@ pub fn defineBuiltinProperty(
         .value,
     );
     try object.property_storage.values.append(agent.gc_allocator, value);
+}
+
+pub fn defineBuiltinPropertyLazy(
+    object: *Object,
+    comptime name: []const u8,
+    initializer: *const fn (*Realm) std.mem.Allocator.Error!Value,
+    realm: *Realm,
+    attributes: Object.PropertyStorage.Attributes,
+) std.mem.Allocator.Error!void {
+    const agent = object.agent;
+    const property_key = getPropertyKey(name, agent);
+    object.property_storage.shape = try object.property_storage.shape.setPropertyWithoutTransition(
+        object.agent.gc_allocator,
+        property_key,
+        attributes,
+        .value,
+    );
+    try object.property_storage.values.append(agent.gc_allocator, undefined);
+    try object.property_storage.lazy_properties.putNoClobber(
+        agent.gc_allocator,
+        property_key,
+        .{
+            .realm = realm,
+            .initializer = .{ .value = initializer },
+        },
+    );
 }

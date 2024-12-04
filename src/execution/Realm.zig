@@ -172,9 +172,9 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
 
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
-    const lazy_intrinsics_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
+    const lazy_properties_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
     try global.property_storage.values.ensureUnusedCapacity(self.agent.gc_allocator, global_properties_count);
-    try global.property_storage.lazy_intrinsics.ensureUnusedCapacity(self.agent.gc_allocator, lazy_intrinsics_count);
+    try global.property_storage.lazy_properties.ensureUnusedCapacity(self.agent.gc_allocator, lazy_properties_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
@@ -191,16 +191,17 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
                 // c. Perform ? DefinePropertyOrThrow(global, name, desc).
                 try global.definePropertyOrThrow(property_key, property_descriptor);
             },
-            .lazy_intrinsic => |lazyIntrinsicFn| {
+            .lazy_property => |initializer| {
+                // NOTE: There aren't any accessors on the global object so this only ever creates data properties.
                 try global.definePropertyOrThrow(property_key, .{
                     .value = undefined,
                     .writable = true,
                     .enumerable = false,
                     .configurable = true,
                 });
-                global.property_storage.lazy_intrinsics.putAssumeCapacity(property_key, .{
+                global.property_storage.lazy_properties.putAssumeCapacity(property_key, .{
                     .realm = self,
-                    .lazyIntrinsicFn = lazyIntrinsicFn,
+                    .initializer = initializer,
                 });
             },
         }

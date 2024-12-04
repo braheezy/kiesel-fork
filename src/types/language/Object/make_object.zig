@@ -61,7 +61,7 @@ pub fn MakeObject(
                         .values = .empty,
                         .accessors = .empty,
                         .indexed_properties = .empty,
-                        .lazy_intrinsics = .empty,
+                        .lazy_properties = .empty,
                     },
                 },
             };
