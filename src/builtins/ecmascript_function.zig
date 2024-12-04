@@ -120,7 +120,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             self: *@This(),
             agent: *Agent,
             arguments: Arguments,
-            environment: ?Environment,
+            maybe_environment: ?Environment,
         ) Agent.Error!void {
             // OPTIMIZATION: If there are no parameters we don't need to do anything.
             if (self.formal_parameters.items.len == 0) return;
@@ -151,6 +151,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             };
 
             if (use_fast_path) {
+                const environment = maybe_environment orelse agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
                 for (self.formal_parameters.items, 0..) |item, i| {
                     const name, const value = switch (item) {
                         .formal_parameter => |formal_parameter| blk: {
@@ -178,16 +179,13 @@ pub const ECMAScriptFunction = MakeObject(.{
                             break :blk .{ name, value };
                         },
                     };
-                    const reference = try agent.resolveBinding(
-                        name,
-                        environment,
-                        self.strict,
-                        null,
-                    );
-                    if (environment == null)
-                        try reference.putValue(agent, value)
-                    else
-                        try reference.initializeReferencedBinding(agent, value);
+                    if (maybe_environment != null) {
+                        // Uses InitializeReferencedBinding
+                        try environment.initializeBinding(agent, name, value);
+                    } else {
+                        // Uses PutValue
+                        try environment.setMutableBinding(agent, name, value, self.strict);
+                    }
                 }
                 return;
             }
@@ -215,7 +213,7 @@ pub const ECMAScriptFunction = MakeObject(.{
                 const initializer: ast.Expression = .{
                     .primary_expression = .{ .literal = .null }, // Placeholder value
                 };
-                var executable = if (environment != null)
+                var executable = if (maybe_environment != null)
                     // Uses InitializeReferencedBinding
                     try generateBytecode(agent, ast.LexicalBinding{
                         .binding_pattern = .{
