@@ -112,7 +112,7 @@ pub fn initializeHostDefinedRealm(
         agent,
         try realm.intrinsics.@"%Object.prototype%"(),
     );
-    global.property_storage.shape = try global.property_storage.shape.detach(agent.gc_allocator);
+    global.property_storage.shape = try global.property_storage.shape.makeUnique(agent.gc_allocator);
 
     // 14. If the host requires that the this binding in realm's global scope return an object
     //     other than the global object, then

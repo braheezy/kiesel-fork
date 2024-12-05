@@ -166,7 +166,7 @@ fn lazyIntrinsic(
     const intrinsic = &@field(self.lazy_intrinsics, name);
     if (intrinsic.* == null) {
         const object = try T.create(self.realm);
-        object.property_storage.shape = try object.property_storage.shape.detach(self.realm.agent.gc_allocator);
+        object.property_storage.shape = try object.property_storage.shape.makeUnique(self.realm.agent.gc_allocator);
         // Sanity check to ensure there is no dependency loop - creating the object must not
         // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
         // has been created twice and overwriting it would be a mistake.

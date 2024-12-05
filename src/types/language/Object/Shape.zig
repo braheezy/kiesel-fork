@@ -89,7 +89,6 @@ const PropertyMetadata = struct {
 
 const State = enum {
     default,
-    detached,
     unique,
 };
 
@@ -131,18 +130,18 @@ pub fn deinit(self: *Shape, allocator: std.mem.Allocator) void {
     allocator.destroy(self);
 }
 
-pub fn detach(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
+pub fn makeUnique(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     std.debug.assert(self.state == .default);
-    const shape = try self.clone(allocator, .detached);
-    shape.state = .detached;
+    const shape = try self.clone(allocator);
+    shape.state = .unique;
     return shape;
 }
 
-fn clone(self: *const Shape, allocator: std.mem.Allocator, state: State) std.mem.Allocator.Error!*Shape {
+fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const shape = try allocator.create(Shape);
     errdefer allocator.destroy(shape);
     shape.* = .{
-        .state = state,
+        .state = self.state,
         .transition_count = self.transition_count,
         .next_value_index = self.next_value_index,
         .next_accessor_index = self.next_accessor_index,
@@ -161,26 +160,18 @@ fn getOrCreateShape(
     transition: ?Transition,
 ) std.mem.Allocator.Error!*Shape {
     switch (self.state) {
-        .default, .detached => {
-            if (self.transition_count == max_transition_count) {
-                return self.clone(allocator, .unique);
-            }
-            if (transition == null) {
-                if (self.state == .default) {
-                    return self.clone(allocator, .detached);
-                } else {
-                    return self;
-                }
+        .default => {
+            if (self.transition_count == max_transition_count or transition == null) {
+                return self.makeUnique(allocator);
             }
             const shape_gop = try self.transitions.getOrPut(allocator, transition.?);
             if (shape_gop.found_existing) return shape_gop.value_ptr.*;
-            const shape = try self.clone(allocator, self.state);
+            const shape = try self.clone(allocator);
             shape.transition_count += 1;
             shape_gop.value_ptr.* = shape;
             return shape;
         },
         .unique => {
-            std.debug.assert(self.transition_count == max_transition_count);
             std.debug.assert(self.transitions.count() == 0);
             return self;
         },
