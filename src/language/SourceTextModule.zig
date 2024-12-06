@@ -16,7 +16,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
-const ExportStarSet = language.ExportStarSet;
 const GraphLoadingState = language.GraphLoadingState;
 const Module = language.Module;
 const Object = types.Object;
@@ -1223,28 +1222,30 @@ fn asyncModuleExecutionRejected(
 pub fn getExportedNames(
     self: *const SourceTextModule,
     agent: *Agent,
-    maybe_export_star_set: ?*ExportStarSet,
+    maybe_export_star_set: ?*Module.ExportStarSet,
 ) std.mem.Allocator.Error![]const []const u8 {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 
     // 2. If exportStarSet is not present, set exportStarSet to a new empty List.
-    var new_export_star_set: ExportStarSet = if (maybe_export_star_set == null)
-        .empty
-    else
-        undefined;
-    var export_star_set = maybe_export_star_set orelse &new_export_star_set;
+    var new_export_star_set: Module.ExportStarSet = undefined;
     defer if (maybe_export_star_set == null) new_export_star_set.deinit(agent.gc_allocator);
+    var export_star_set = maybe_export_star_set orelse blk: {
+        new_export_star_set = .empty;
+        break :blk &new_export_star_set;
+    };
+
+    const export_star_set_key: @FieldType(Module.ExportStarSet.KV, "key") = self;
 
     // 3. If exportStarSet contains module, then
-    if (export_star_set.contains(self)) {
+    if (export_star_set.contains(export_star_set_key)) {
         // a. Assert: We've reached the starting point of an export * circularity.
         // b. Return a new empty List.
         return &.{};
     }
 
     // 4. Append module to exportStarSet.
-    try export_star_set.putNoClobber(agent.gc_allocator, self, {});
+    try export_star_set.putNoClobber(agent.gc_allocator, export_star_set_key, {});
 
     // 5. Let exportedNames be a new empty List.
     var exported_names: std.ArrayListUnmanaged([]const u8) = .empty;
@@ -1299,11 +1300,34 @@ pub fn resolveExport(
     self: *SourceTextModule,
     agent: *Agent,
     export_name: []const u8,
+    maybe_resolve_set: ?*Module.ResolveSet,
 ) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 
-    // TODO: 2-4.
+    // 2. If resolveSet is not present, set resolveSet to a new empty List.
+    var new_resolve_set: Module.ResolveSet = undefined;
+    defer if (maybe_resolve_set == null) new_resolve_set.deinit(agent.gc_allocator);
+    var resolve_set = maybe_resolve_set orelse blk: {
+        new_resolve_set = .empty;
+        break :blk &new_resolve_set;
+    };
+
+    const resolve_set_key: @FieldType(Module.ResolveSet.KV, "key") = .{
+        .module = self,
+        .export_name = export_name,
+    };
+
+    // 3. For each Record { [[Module]], [[ExportName]] } r of resolveSet, do
+    //     a. If module and r.[[Module]] are the same Module Record and exportName is r.[[ExportName]], then
+    if (resolve_set.contains(resolve_set_key)) {
+        // i. Assert: This is a circular import request.
+        // ii. Return null.
+        return null;
+    }
+
+    // 4. Append the Record { [[Module]]: module, [[ExportName]]: exportName } to resolveSet.
+    try resolve_set.putNoClobber(agent.gc_allocator, resolve_set_key, {});
 
     // 5. For each ExportEntry Record e of module.[[LocalExportEntries]], do
     for (self.local_export_entries.items) |export_entry| {
@@ -1347,7 +1371,11 @@ pub fn resolveExport(
             else {
                 // 1. Assert: module imports a specific binding for this export.
                 // 2. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
-                return imported_module.resolveExport(agent, export_entry.import_name.?.string);
+                return imported_module.resolveExport(
+                    agent,
+                    export_entry.import_name.?.string,
+                    resolve_set,
+                );
             }
         }
     }
@@ -1372,7 +1400,11 @@ pub fn resolveExport(
         const imported_module = getImportedModule(self, export_entry.module_request.?);
 
         // c. Let resolution be importedModule.ResolveExport(exportName, resolveSet).
-        const maybe_resolution = try imported_module.resolveExport(agent, export_name);
+        const maybe_resolution = try imported_module.resolveExport(
+            agent,
+            export_name,
+            resolve_set,
+        );
 
         // d. If resolution is ambiguous, return ambiguous.
         if (maybe_resolution != null and maybe_resolution.? == .ambiguous) return .ambiguous;
@@ -1429,9 +1461,32 @@ pub fn resolveExport(
 pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     const agent = self.realm.agent;
 
-    // TODO: 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
-    //     [...]
-    // TODO: 2. Assert: All named exports from module are resolvable.
+    // 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    for (self.indirect_export_entries.items) |export_entry| {
+        // a. Assert: e.[[ExportName]] is not null.
+        // b. Let resolution be module.ResolveExport(e.[[ExportName]]).
+        const maybe_resolution = try self.resolveExport(agent, export_entry.export_name.?, null);
+
+        // c. If resolution is either null or ambiguous, throw a SyntaxError exception.
+        if (maybe_resolution) |resolution| switch (resolution) {
+            .ambiguous => return agent.throwException(
+                .syntax_error,
+                "Ambiguous star export '{s}' in module '{}'",
+                .{ export_entry.export_name.?, export_entry.module_request.? },
+            ),
+
+            // d. Assert: resolution is a ResolvedBinding Record.
+            .resolved_binding => {},
+        } else {
+            return agent.throwException(
+                .syntax_error,
+                "No export named '{s}' in module '{}'",
+                .{ export_entry.export_name.?, export_entry.module_request.? },
+            );
+        }
+    }
+
+    // 2. Assert: All named exports from module are resolvable.
 
     // 3. Let realm be module.[[Realm]].
     // 4. Assert: realm is not undefined.
@@ -1477,23 +1532,27 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
         // c. Else,
         else {
             // i. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
-            const maybe_resolution = try imported_module.resolveExport(agent, import_name.string);
+            const maybe_resolution = try imported_module.resolveExport(
+                agent,
+                import_name.string,
+                null,
+            );
 
             // ii. If resolution is either null or ambiguous, throw a SyntaxError exception.
-            if (maybe_resolution == null) {
+            const resolution = if (maybe_resolution) |resolution| switch (resolution) {
+                .ambiguous => return agent.throwException(
+                    .syntax_error,
+                    "Ambiguous star export '{s}' in module '{}'",
+                    .{ import_name.string, import_entry.module_request },
+                ),
+                .resolved_binding => |resolved_binding| resolved_binding,
+            } else {
                 return agent.throwException(
                     .syntax_error,
-                    "No export named '{s}' in module '{s}'",
+                    "No export named '{s}' in module '{}'",
                     .{ import_name.string, import_entry.module_request },
                 );
-            } else if (maybe_resolution.? == .ambiguous) {
-                return agent.throwException(
-                    .syntax_error,
-                    "Ambiguous star export '{s}' in module '{s}'",
-                    .{ import_name.string, import_entry.module_request },
-                );
-            }
-            const resolution = maybe_resolution.?.resolved_binding;
+            };
 
             // iii. If resolution.[[BindingName]] is namespace, then
             if (resolution.binding_name == .namespace) {

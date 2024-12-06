@@ -172,7 +172,11 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
 
     // 5. Let binding be m.ResolveExport(P).
     // 6. Assert: binding is a ResolvedBinding Record.
-    const binding = (try module.resolveExport(agent, property_key_string)).?.resolved_binding;
+    const binding = (try module.resolveExport(
+        agent,
+        property_key_string,
+        null,
+    )).?.resolved_binding;
 
     // 7. Let targetModule be binding.[[Module]].
     // 8. Assert: targetModule is not undefined.

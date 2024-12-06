@@ -3,7 +3,6 @@ const runtime = @import("language/runtime.zig");
 
 pub const Diagnostics = @import("ptk").Diagnostics;
 pub const ExportEntry = SourceTextModule.ExportEntry;
-pub const ExportStarSet = module.ExportStarSet;
 pub const GraphLoadingState = module.GraphLoadingState;
 pub const ImportEntry = SourceTextModule.ImportEntry;
 pub const ImportedModulePayload = module.ImportedModulePayload;

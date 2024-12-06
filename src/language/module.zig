@@ -22,12 +22,30 @@ const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 
-pub const ExportStarSet = std.AutoHashMapUnmanaged(*const SourceTextModule, void);
-
 /// 16.2.1.4 Abstract Module Records
 /// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
     source_text_module: *SourceTextModule,
+
+    const ExportStarSetKey = *const anyopaque;
+    pub const ExportStarSet = std.AutoHashMapUnmanaged(ExportStarSetKey, void);
+
+    const ResolveSetKey = struct {
+        module: *const anyopaque,
+        export_name: []const u8,
+    };
+    pub const ResolveSet = std.HashMapUnmanaged(ResolveSetKey, void, struct {
+        pub fn hash(_: anytype, key: ResolveSetKey) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            hasher.update(std.mem.asBytes(&key.module));
+            hasher.update(key.export_name);
+            return hasher.final();
+        }
+
+        pub fn eql(_: anytype, a: ResolveSetKey, b: ResolveSetKey) bool {
+            return a.module == b.module and std.mem.eql(u8, a.export_name, b.export_name);
+        }
+    }, std.hash_map.default_max_load_percentage);
 
     pub fn loadRequestedModules(
         self: Module,
@@ -42,10 +60,10 @@ pub const Module = union(enum) {
     pub fn getExportedNames(
         self: Module,
         agent: *Agent,
-        export_star_set: ?*ExportStarSet,
+        maybe_export_star_set: ?*ExportStarSet,
     ) std.mem.Allocator.Error![]const []const u8 {
         return switch (self) {
-            inline else => |module| module.getExportedNames(agent, export_star_set),
+            inline else => |module| module.getExportedNames(agent, maybe_export_star_set),
         };
     }
 
@@ -53,9 +71,10 @@ pub const Module = union(enum) {
         self: Module,
         agent: *Agent,
         export_name: []const u8,
+        maybe_resolve_set: ?*ResolveSet,
     ) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
         return switch (self) {
-            inline else => |module| module.resolveExport(agent, export_name),
+            inline else => |module| module.resolveExport(agent, export_name, maybe_resolve_set),
         };
     }
 
@@ -392,7 +411,7 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
         // c. For each element name of exportedNames, do
         for (exported_names) |name| {
             // i. Let resolution be module.ResolveExport(name).
-            const resolution = try module.resolveExport(agent, name);
+            const resolution = try module.resolveExport(agent, name, null);
 
             // ii. If resolution is a ResolvedBinding Record, append name to unambiguousNames.
             if (resolution != null and resolution.? == .resolved_binding) {
