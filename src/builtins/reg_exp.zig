@@ -38,6 +38,11 @@ pub const LreOpaque = struct {
     allocator: std.mem.Allocator,
 };
 
+var lre_alloc_sizes: if (!build_options.enable_libgc)
+    std.AutoHashMapUnmanaged(*const anyopaque, usize)
+else
+    void = if (!build_options.enable_libgc) .empty;
+
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
     // TODO: Implement stack overflow check
     return 0;
@@ -45,14 +50,22 @@ export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
 
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
     const lre_opaque = @as(*LreOpaque, @alignCast(@ptrCast(@"opaque".?)));
-    if (build_options.enable_libgc) {
-        if (maybe_ptr) |ptr| {
-            var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
-            old_mem.len = gc.GcAllocator.alignedAllocSize(old_mem.ptr);
-            return if (lre_opaque.allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
-        }
+    const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
+        var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
+        old_mem.len = if (build_options.enable_libgc)
+            gc.GcAllocator.alignedAllocSize(old_mem.ptr)
+        else
+            lre_alloc_sizes.fetchRemove(ptr).?.value;
+        break :blk old_mem;
+    } else &.{};
+    const new_mem = lre_opaque.allocator.realloc(old_mem, size) catch return null;
+    if (!build_options.enable_libgc) {
+        lre_alloc_sizes.put(lre_opaque.allocator, new_mem.ptr, new_mem.len) catch {
+            lre_opaque.allocator.free(new_mem);
+            return null;
+        };
     }
-    return if (lre_opaque.allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
+    return new_mem.ptr;
 }
 
 pub const ParsedFlags = packed struct(u8) {
