@@ -135,7 +135,7 @@ pub const constructor = struct {
 
         // 11. Set displayNames.[[Style]] to style.
         const style_map = std.StaticStringMap(
-            icu4zig.LocaleDisplayNamesFormatter.Options.Style,
+            icu4zig.DisplayNamesOptions.Style,
         ).initComptime(&.{
             .{ "narrow", .narrow },
             .{ "short", .short },
@@ -192,7 +192,7 @@ pub const constructor = struct {
 
         // 16. Set displayNames.[[Fallback]] to fallback.
         const fallback_map = std.StaticStringMap(
-            icu4zig.LocaleDisplayNamesFormatter.Options.Fallback,
+            icu4zig.DisplayNamesOptions.Fallback,
         ).initComptime(&.{
             .{ "code", .code },
             .{ "none", .none },
@@ -227,7 +227,7 @@ pub const constructor = struct {
         //     c. Assert: typeFields is a Record (see 12.2.3).
         // NOTE: We do this unconditionally as it's part of the options struct.
         const language_display_map = std.StaticStringMap(
-            icu4zig.LocaleDisplayNamesFormatter.Options.LanguageDisplay,
+            icu4zig.DisplayNamesOptions.LanguageDisplay,
         ).initComptime(&.{
             .{ "dialect", .dialect },
             .{ "standard", .standard },
@@ -293,8 +293,6 @@ pub const prototype = struct {
         // 8. Return undefined.
         const code_utf8 = try code.toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(code_utf8);
-        const data_provider = icu4zig.DataProvider.init();
-        defer data_provider.deinit();
         // ICU4X LocaleDisplayNamesFormatter and RegionDisplayNames return an error for at least
         // the 'und' locale, other engines seem to fall back to 'en' in that case.
         const fallback_locale = icu4zig.Locale.fromString("en") catch unreachable;
@@ -302,11 +300,9 @@ pub const prototype = struct {
         const value = switch (display_names.fields.type) {
             .language => blk: {
                 const locale_display_names_formatter = icu4zig.LocaleDisplayNamesFormatter.init(
-                    data_provider,
                     display_names.fields.locale,
                     display_names.fields.options,
                 ) catch icu4zig.LocaleDisplayNamesFormatter.init(
-                    data_provider,
                     fallback_locale,
                     display_names.fields.options,
                 ) catch unreachable;
@@ -322,11 +318,11 @@ pub const prototype = struct {
             },
             .region => blk: {
                 const region_display_names = icu4zig.RegionDisplayNames.init(
-                    data_provider,
                     display_names.fields.locale,
+                    display_names.fields.options,
                 ) catch icu4zig.RegionDisplayNames.init(
-                    data_provider,
                     fallback_locale,
+                    display_names.fields.options,
                 ) catch unreachable;
                 defer region_display_names.deinit();
                 break :blk region_display_names.of(agent.gc_allocator, code_utf8) catch |err| switch (err) {
@@ -422,7 +418,7 @@ pub const DisplayNames = MakeObject(.{
         type: Type,
 
         /// [[Style]], [[Fallback]], [[LanguageDisplay]]
-        options: icu4zig.LocaleDisplayNamesFormatter.Options,
+        options: icu4zig.DisplayNamesOptions,
 
         pub const ResolvedOptions = struct {
             style: *const String,

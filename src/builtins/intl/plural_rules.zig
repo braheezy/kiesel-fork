@@ -213,10 +213,7 @@ pub const prototype = struct {
         //    PluralRuleSelect for the selected locale pr.[[Locale]], sorted according to the
         //    following order: "zero", "one", "two", "few", "many", "other".
         var plural_categories = blk: {
-            const data_provider = icu4zig.DataProvider.init();
-            defer data_provider.deinit();
             const plural_rules_ = icu4zig.PluralRules.init(
-                data_provider,
                 plural_rules.fields.locale,
                 switch (plural_rules.fields.type) {
                     .cardinal => .cardinal,
@@ -330,9 +327,7 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
     const @"type" = plural_rules_object.fields.type;
 
     // 6. Let p be PluralRuleSelect(locale, type, s).
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
-    const plural_rules = icu4zig.PluralRules.init(data_provider, locale, switch (@"type") {
+    const plural_rules = icu4zig.PluralRules.init(locale, switch (@"type") {
         .cardinal => .cardinal,
         .ordinal => .ordinal,
     });

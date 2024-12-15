@@ -360,12 +360,10 @@ fn findBoundaryBefore(
     start_index: usize,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
     const segmenter: AnySegmenter = switch (granularity) {
-        .grapheme => .{ .grapheme = .init(data_provider) },
-        .word => .{ .word = .init(data_provider) },
-        .sentence => .{ .sentence = .init(data_provider) },
+        .grapheme => .{ .grapheme = .init() },
+        .word => .{ .word = .init() },
+        .sentence => .{ .sentence = .init() },
     };
     defer segmenter.deinit();
     var iterator = segmenter.segment(string);
@@ -389,12 +387,10 @@ fn findBoundaryAfter(
     start_index: usize,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
     const segmenter: AnySegmenter = switch (granularity) {
-        .grapheme => .{ .grapheme = .init(data_provider) },
-        .word => .{ .word = .init(data_provider) },
-        .sentence => .{ .sentence = .init(data_provider) },
+        .grapheme => .{ .grapheme = .init() },
+        .word => .{ .word = .init() },
+        .sentence => .{ .sentence = .init() },
     };
     defer segmenter.deinit();
     var iterator = segmenter.segment(string);

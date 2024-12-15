@@ -44,9 +44,7 @@ pub fn createDateTimeFormat(
     required: enum { date, time, any },
     defaults: enum { date, time, all },
 ) Agent.Error!*Object {
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
-    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init(data_provider);
+    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init();
     defer time_zone_id_mapper.deinit();
 
     // 1. Let dateTimeFormat be ? OrdinaryCreateFromConstructor(newTarget,
@@ -796,13 +794,10 @@ fn formatDateTimeImpl(
 ) FormatDateTimeError![]const u8 {
     const date = @import("../date.zig");
 
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
-
-    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init(data_provider);
+    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init();
     defer time_zone_id_mapper.deinit();
 
-    const calendar = icu4zig.Calendar.init(data_provider, date_time_format.fields.calendar);
+    const calendar = icu4zig.Calendar.init(date_time_format.fields.calendar);
     defer calendar.deinit();
 
     const date_time = try icu4zig.DateTime.init(
@@ -844,7 +839,6 @@ fn formatDateTimeImpl(
         .short => .short,
     };
     const zoned_date_time_formatter = try icu4zig.ZonedDateTimeFormatter.init(
-        data_provider,
         date_time_format.fields.locale,
         date_time_length,
     );

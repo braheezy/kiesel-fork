@@ -317,10 +317,7 @@ fn formatList(
     list_format: *const ListFormat,
     list: []const []const u8,
 ) std.mem.Allocator.Error!*const String {
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
     const list_formatter = icu4zig.ListFormatter.init(
-        data_provider,
         list_format.fields.locale,
         .{
             .type = switch (list_format.fields.type) {

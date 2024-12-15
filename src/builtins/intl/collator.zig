@@ -408,10 +408,7 @@ pub fn compareStrings(
     x: *const String,
     y: *const String,
 ) std.mem.Allocator.Error!Value {
-    const data_provider = icu4zig.DataProvider.init();
-    defer data_provider.deinit();
     const collator = icu4zig.Collator.init(
-        data_provider,
         collator_object.fields.locale,
         collator_object.fields.options,
     );
@@ -480,9 +477,7 @@ pub const Collator = MakeObject(.{
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
-            const data_provider = icu4zig.DataProvider.init();
-            defer data_provider.deinit();
-            const collator = icu4zig.Collator.init(data_provider, self.locale, self.options);
+            const collator = icu4zig.Collator.init(self.locale, self.options);
             defer collator.deinit();
             const resolved_options = collator.resolvedOptions();
 

@@ -416,9 +416,7 @@ pub const prototype = struct {
 
         // 3. Let maximal be the result of the Add Likely Subtags algorithm applied to
         //    loc.[[Locale]]. If an error is signaled, set maximal to loc.[[Locale]].
-        const data_provider = icu4zig.DataProvider.init();
-        defer data_provider.deinit();
-        const locale_expander = icu4zig.LocaleExpander.init(data_provider);
+        const locale_expander = icu4zig.LocaleExpander.init();
         defer locale_expander.deinit();
         var maximal = locale.fields.locale.clone();
         _ = locale_expander.maximize(&maximal);
@@ -445,9 +443,7 @@ pub const prototype = struct {
 
         // 2. Let minimal be the result of the Remove Likely Subtags algorithm applied to
         //    loc.[[Locale]]. If an error is signaled, set minimal to loc.[[Locale]].
-        const data_provider = icu4zig.DataProvider.init();
-        defer data_provider.deinit();
-        const locale_expander = icu4zig.LocaleExpander.init(data_provider);
+        const locale_expander = icu4zig.LocaleExpander.init();
         defer locale_expander.deinit();
         var minimal = locale.fields.locale.clone();
         _ = locale_expander.minimize(&minimal);
