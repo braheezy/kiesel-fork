@@ -30,7 +30,13 @@ test262-harness \
     # Ensure that the final result is always FAIL when results for the same
     # file differ (strict/non-strict) by doing a secondary sort on the result
     (if .result.pass then 0 else 1 end))
-  | map({
+  | map(
+    # Some of the SpiderMonkey staging tests are really slow which leads to
+    # spurious timeouts and mismatches between local runs and CI.
+    # There is no good way to exclude subdirectories so we filter them here.
+    # The only other solution would be to set the timeout very high or very low,
+    # which other tests would suffer from.
+    select(.file | startswith("test/staging/sm/") | not) | {
     (.file): (if .result.pass then "PASS" else "FAIL" end)
   })
   | add'
