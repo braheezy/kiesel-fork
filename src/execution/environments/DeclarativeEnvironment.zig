@@ -152,7 +152,7 @@ pub fn setMutableBinding(
         // b. If S is true, throw a TypeError exception.
         if (final_strict) {
             return agent.throwException(
-                .reference_error,
+                .type_error,
                 "Binding for '{}' is immutable",
                 .{name},
             );
