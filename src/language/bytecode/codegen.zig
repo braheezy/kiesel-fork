@@ -3309,6 +3309,7 @@ pub fn codegenWithStatement(
     try executable.addInstruction(.create_with_environment);
 
     // 6. Let C be Completion(Evaluation of Statement).
+    try executable.addInstructionWithConstant(.store_constant, .undefined);
     try codegenStatement(node.statement.*, executable, ctx);
 
     // 7. Set the running execution context's LexicalEnvironment to oldEnv.
