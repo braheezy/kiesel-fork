@@ -36,7 +36,9 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 20.5.2.1 Error.prototype
+        try defineBuiltinFunction(object, "isError", isError, 1, realm);
+
+        // 20.5.2.2 Error.prototype
         // https://tc39.es/ecma262/#sec-error.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Error.prototype%"()),
@@ -90,6 +92,19 @@ pub const constructor = struct {
 
         // 5. Return O.
         return Value.from(object);
+    }
+
+    /// 20.5.2.1 Error.isError ( arg )
+    /// https://tc39.es/ecma262/#sec-error.iserror
+    fn isError(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const arg = arguments.get(0);
+
+        // 1. If arg is not an Object, return false.
+        if (!arg.isObject()) return Value.from(false);
+
+        // 2. If arg does not have an [[ErrorData]] internal slot, return false.
+        // 3. Return true.
+        return Value.from(arg.asObject().is(builtins.Error));
     }
 };
 
