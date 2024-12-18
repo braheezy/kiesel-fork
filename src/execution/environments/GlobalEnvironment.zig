@@ -26,9 +26,6 @@ global_this_value: *Object,
 /// [[DeclarativeRecord]]
 declarative_record: *DeclarativeEnvironment,
 
-/// [[VarNames]]
-var_names: String.HashMapUnmanaged(void),
-
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
@@ -161,18 +158,8 @@ pub fn deleteBinding(self: *GlobalEnvironment, name: *const String) Agent.Error!
 
     // 6. If existingProp is true, then
     if (existing_prop) {
-        // a. Let status be ? ObjRec.DeleteBinding(N).
-        const status = try self.object_record.deleteBinding(name);
-
-        // b. If status is true and envRec.[[VarNames]] contains N, then
-        const key_ptr = self.var_names.getKeyPtr(name);
-        if (status and key_ptr != null) {
-            // i. Remove N from envRec.[[VarNames]].
-            self.var_names.removeByPtr(key_ptr.?);
-        }
-
-        // c. Return status.
-        return status;
+        // a. Return ? ObjRec.DeleteBinding(N).
+        return self.object_record.deleteBinding(name);
     }
 
     // 7. Return true.
@@ -207,23 +194,15 @@ pub fn getThisBinding(self: GlobalEnvironment) *Object {
     return self.global_this_value;
 }
 
-/// 9.1.1.4.12 HasVarDeclaration ( N )
-/// https://tc39.es/ecma262/#sec-hasvardeclaration
-pub fn hasVarDeclaration(self: GlobalEnvironment, name: *const String) bool {
-    // 1. Let varDeclaredNames be envRec.[[VarNames]].
-    // 2. If varDeclaredNames contains N, return true.
-    // 3. Return false.
-    return self.var_names.contains(name);
-}
-
-/// 9.1.1.4.13 HasLexicalDeclaration ( N )
+/// 9.1.1.4.12 HasLexicalDeclaration ( N )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
 pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool {
     // 1.Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. Return ! DclRec.HasBinding(N).
     return self.declarative_record.hasBinding(name);
 }
-/// 9.1.1.4.15 CanDeclareGlobalVar ( N )
+
+/// 9.1.1.4.14 CanDeclareGlobalVar ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
@@ -240,7 +219,7 @@ pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.
     return global_object.isExtensible();
 }
 
-/// 9.1.1.4.16 CanDeclareGlobalFunction ( N )
+/// 9.1.1.4.15 CanDeclareGlobalFunction ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
 pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
@@ -269,7 +248,7 @@ pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) A
     return false;
 }
 
-/// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
+/// 9.1.1.4.16 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
     self: *GlobalEnvironment,
@@ -296,20 +275,14 @@ pub fn createGlobalVarBinding(
         try self.object_record.initializeBinding(agent, name, .undefined);
     }
 
-    // 6. If envRec.[[VarNames]] does not contain N, then
-    if (!self.var_names.contains(name)) {
-        // a. Append N to envRec.[[VarNames]].
-        try self.var_names.putNoClobber(agent.gc_allocator, name, {});
-    }
-
-    // 7. Return unused.
+    // 6. Return unused.
 }
 
-/// 9.1.1.4.18 CreateGlobalFunctionBinding ( N, V, D )
+/// 9.1.1.4.17 CreateGlobalFunctionBinding ( N, V, D )
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
     self: *GlobalEnvironment,
-    agent: *Agent,
+    _: *Agent,
     name: *const String,
     value: Value,
     deletable: bool,
@@ -342,11 +315,5 @@ pub fn createGlobalFunctionBinding(
     // 7. Perform ? Set(globalObject, N, V, false).
     try global_object.set(property_key, value, .ignore);
 
-    // 8. If envRec.[[VarNames]] does not contain N, then
-    if (!self.var_names.contains(name)) {
-        // a. Append N to envRec.[[VarNames]].
-        try self.var_names.put(agent.gc_allocator, name, {});
-    }
-
-    // 9. Return unused.
+    // 8. Return unused.
 }

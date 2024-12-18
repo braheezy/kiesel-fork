@@ -365,14 +365,11 @@ pub fn newGlobalEnvironment(
         // 6. Set env.[[DeclarativeRecord]] to dclRec.
         .declarative_record = declarative_record,
 
-        // 7. Set env.[[VarNames]] to a new empty List.
-        .var_names = .empty,
-
-        // 8. Set env.[[OuterEnv]] to null.
+        // 7. Set env.[[OuterEnv]] to null.
         .outer_env = null,
     };
 
-    // 9. Return env.
+    // 8. Return env.
     return env;
 }
 

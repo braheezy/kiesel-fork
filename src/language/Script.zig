@@ -153,16 +153,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     for (lexical_names.items) |name_utf8| {
         const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
 
-        // a. If env.HasVarDeclaration(name) is true, throw a SyntaxError exception.
-        if (env.hasVarDeclaration(name)) {
-            return agent.throwException(
-                .syntax_error,
-                "Global environment already has a var declaration '{}'",
-                .{name},
-            );
-        }
-
-        // b. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+        // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
@@ -171,7 +162,10 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             );
         }
 
-        // TODO: c. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        // TODO: b. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        // c. NOTE: Global var and function bindings (except those that are introduced by
+        //    non-strict direct eval) are non-configurable and are therefore restricted global
+        //    properties.
         // TODO: d. If hasRestrictedGlobal is true, throw a SyntaxError exception.
     }
 
