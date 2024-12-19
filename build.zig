@@ -89,50 +89,27 @@ pub fn build(b: *std.Build) void {
     const unicode_id = b.dependency("unicode_id", .{});
     const zigline = b.dependency("zigline", .{});
 
-    var imports: std.ArrayListUnmanaged(std.Build.Module.Import) = .empty;
-    defer imports.deinit(b.allocator);
-    imports.appendSlice(b.allocator, &.{
-        .{
-            .module = options.createModule(),
-            .name = "build-options",
+    const kiesel = b.addModule("kiesel", .{
+        .root_source_file = b.path("src/kiesel.zig"),
+        .imports = &.{
+            .{ .name = "build-options", .module = options.createModule() },
+            .{ .name = "any-pointer", .module = any_pointer.module("any-pointer") },
+            .{ .name = "ptk", .module = parser_toolkit.module("parser-toolkit") },
+            .{ .name = "stackinfo", .module = stackinfo.module("stackinfo") },
+            .{ .name = "unicode-id", .module = unicode_id.module("unicode-id") },
         },
-        .{
-            .module = any_pointer.module("any-pointer"),
-            .name = "any-pointer",
-        },
-        .{
-            .module = parser_toolkit.module("parser-toolkit"),
-            .name = "ptk",
-        },
-        .{
-            .module = stackinfo.module("stackinfo"),
-            .name = "stackinfo",
-        },
-        .{
-            .module = unicode_id.module("unicode-id"),
-            .name = "unicode-id",
-        },
-    }) catch @panic("OOM");
+        .target = target,
+        .optimize = optimize,
+    });
     if (enable_intl) {
         if (b.lazyDependency("icu4zig", .{
             .target = target,
             .optimize = optimize,
         })) |icu4zig| {
-            imports.append(b.allocator, .{
-                .module = icu4zig.module("icu4zig"),
-                .name = "icu4zig",
-            }) catch @panic("OOM");
+            kiesel.addImport("icu4zig", icu4zig.module("icu4zig"));
         }
     }
-
-    const kiesel = b.addModule("kiesel", .{
-        .root_source_file = b.path("src/kiesel.zig"),
-        .imports = imports.items,
-    });
     if (enable_libgc) {
-        kiesel.addIncludePath(.{
-            .cwd_relative = libgc.builder.getInstallPath(.header, ""),
-        });
         if (target.result.os.tag == .macos) {
             if (b.lazyImport(@This(), "macos_sdk")) |build_macos_sdk| {
                 build_macos_sdk.addPaths(libgc.artifact("gc"));
@@ -152,41 +129,55 @@ pub fn build(b: *std.Build) void {
     const exe = switch (target.result.os.tag) {
         .uefi => b.addExecutable(.{
             .name = "bootx64",
-            .root_source_file = b.path("src/uefi.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/uefi.zig"),
+                .imports = &.{
+                    .{ .name = "kiesel", .module = kiesel },
+                    .{ .name = "zigline", .module = zigline.module("zigline") },
+                },
+                .target = target,
+                .optimize = optimize,
+            }),
         }),
         else => b.addExecutable(.{
             .name = "kiesel",
-            .root_source_file = b.path("src/cli.zig"),
-            .target = target,
-            .optimize = optimize,
+            .root_module = blk: {
+                const module = b.createModule(.{
+                    .root_source_file = b.path("src/cli.zig"),
+                    .imports = &.{
+                        .{ .name = "args", .module = args.module("args") },
+                        .{ .name = "kiesel", .module = kiesel },
+                        .{ .name = "zigline", .module = zigline.module("zigline") },
+                    },
+                    .target = target,
+                    .optimize = optimize,
+                });
+                if (enable_intl) {
+                    if (b.lazyDependency("icu4zig", .{
+                        .target = target,
+                        .optimize = optimize,
+                    })) |icu4zig| {
+                        module.addImport("icu4zig", icu4zig.module("icu4zig"));
+                    }
+                }
+                if (b.lazyDependency("kiesel_runtime", .{})) |kiesel_runtime| {
+                    // Ensure the runtime uses the kiesel module defined above.
+                    kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
+                    module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
+                }
+                break :blk module;
+            },
         }),
     };
-    if (enable_intl) {
-        if (b.lazyDependency("icu4zig", .{
-            .target = target,
-            .optimize = optimize,
-        })) |icu4zig| {
-            exe.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
-        }
-    }
-    exe.root_module.addImport("kiesel", kiesel);
-    if (b.lazyDependency("kiesel_runtime", .{})) |kiesel_runtime| {
-        // Ensure the runtime uses the kiesel module defined above.
-        kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
-        exe.root_module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
-    }
-    exe.root_module.addImport("args", args.module("args"));
-    exe.root_module.addImport("zigline", zigline.module("zigline"));
     if (optimize != .Debug) exe.root_module.strip = true;
 
-    b.getInstallStep().dependOn(&b.addInstallArtifact(exe, .{
+    const install_exe = b.addInstallArtifact(exe, .{
         .dest_dir = switch (target.result.os.tag) {
             .uefi => .{ .override = .{ .custom = "EFI/BOOT" } },
             else => .default,
         },
-    }).step);
+    });
+    b.getInstallStep().dependOn(&install_exe.step);
 
     const run_cmd = switch (target.result.os.tag) {
         .uefi => b.addSystemCommand(&.{
@@ -208,13 +199,8 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/kiesel.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = kiesel,
     });
-    unit_tests.linkLibrary(libgc.artifact("gc"));
-    unit_tests.linkLibrary(libregexp.artifact("regexp"));
-    for (imports.items) |import| unit_tests.root_module.addImport(import.name, import.module);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
@@ -222,11 +208,8 @@ pub fn build(b: *std.Build) void {
 
     const docs = b.addObject(.{
         .name = "kiesel",
-        .root_source_file = b.path("src/kiesel.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = kiesel,
     });
-    for (imports.items) |import| docs.root_module.addImport(import.name, import.module);
     const install_docs = b.addInstallDirectory(.{
         .source_dir = docs.getEmittedDocs(),
         .install_dir = .prefix,
