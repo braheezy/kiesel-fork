@@ -1,17 +1,32 @@
 const std = @import("std");
 
 const Executable = @import("Executable.zig");
-const IndexType = Executable.IndexType;
+const IteratorKind = @import("../../types.zig").IteratorKind;
+const MethodDefinition = @import("../../language/ast.zig").MethodDefinition;
 
-pub const Instruction = enum(u8) {
+const IndexType = Executable.IndexType;
+const AstNodeIndex = Executable.AstNodeIndex;
+const ConstantIndex = Executable.ConstantIndex;
+const EnvironmentLookupCacheIndex = Executable.EnvironmentLookupCacheIndex;
+const IdentifierIndex = Executable.IdentifierIndex;
+const InstructionIndex = Executable.InstructionIndex;
+const PropertyLookupCacheIndex = Executable.PropertyLookupCacheIndex;
+
+pub const Instruction = union(enum(u8)) {
     /// Store ArrayCreate(0) as the result value.
-    array_create,
+    array_create: struct {
+        length: u16,
+    },
     /// Append value on the stack to an array.
     array_push_value,
     /// Set the length property of an array to the given index.
-    array_set_length,
+    array_set_length: struct {
+        length: u16,
+    },
     /// Set an array value directly.
-    array_set_value_direct,
+    array_set_value_direct: struct {
+        index: u16,
+    },
     /// Spread value into an array.
     array_spread_value,
     /// Store Await() as the result value.
@@ -31,15 +46,15 @@ pub const Instruction = enum(u8) {
     binary_operator_bitwise_or,
     binary_operator_bitwise_xor,
     /// Store BindingClassDeclarationEvaluation() as the result value.
-    binding_class_declaration_evaluation,
+    binding_class_declaration_evaluation: AstNodeIndex,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
     /// Perform BlockDeclarationInstantiation().
-    block_declaration_instantiation,
+    block_declaration_instantiation: AstNodeIndex,
     /// Store ClassDefinitionEvaluation() as the result value.
-    class_definition_evaluation,
+    class_definition_evaluation: AstNodeIndex,
     /// Create bindings for the given catch parameter.
-    create_catch_bindings,
+    create_catch_bindings: AstNodeIndex,
     /// Create an object property iterator for for-in loops.
     create_object_property_iterator,
     /// Create a declarative environment for a with statement.
@@ -56,32 +71,47 @@ pub const Instruction = enum(u8) {
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
-    evaluate_call,
+    evaluate_call: struct {
+        argument_count: u16,
+    },
     /// Store EvaluateCall() as the result value, possibly invoking direct eval.
-    evaluate_call_direct_eval,
+    evaluate_call_direct_eval: struct {
+        argument_count: u16,
+        strict: bool,
+    },
     /// Store evaluation of a import() call as the result value.
     evaluate_import_call,
     /// Store EvaluateNew() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the value on the stack afterwards is the constructor to
     /// call.
-    evaluate_new,
+    evaluate_new: struct {
+        argument_count: u16,
+    },
     /// Store EvaluatePropertyAccessWithExpressionKey() as the result value.
-    evaluate_property_access_with_expression_key,
+    evaluate_property_access_with_expression_key: struct {
+        strict: bool,
+    },
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
-    evaluate_property_access_with_identifier_key,
+    evaluate_property_access_with_identifier_key: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
     /// Store evaluation of a super() call as the result value.
-    evaluate_super_call,
+    evaluate_super_call: struct {
+        argument_count: u16,
+    },
     /// Perform ForDeclarationBindingInstantiation with the given identifier and constant-ness.
-    for_declaration_binding_instantiation,
+    for_declaration_binding_instantiation: AstNodeIndex,
     /// Store GetIterator() as the result value.
-    get_iterator,
+    get_iterator: IteratorKind,
     /// Store GetNewTarget() as the result value.
     get_new_target,
     /// Store the import.meta object as the result value.
     get_or_create_import_meta,
     /// Store GetTemplateObject() as the result value.
-    get_template_object,
+    get_template_object: AstNodeIndex,
     /// Store GetValue() as the result value.
     get_value,
     /// Compare the last two values on the stack using the '>' operator rules.
@@ -89,38 +119,41 @@ pub const Instruction = enum(u8) {
     /// Compare the last two values on the stack using the '>=' operator rules.
     greater_than_equals,
     /// Store '#property in object' as the result value
-    has_private_element,
+    has_private_element: IdentifierIndex,
     /// Store HasProperty() as the result value.
     has_property,
     /// Increment the numeric result value by one.
     increment,
     /// Call InitializeBoundName() with the given identifier.
-    initialize_bound_name,
+    initialize_bound_name: IdentifierIndex,
     /// Call InitializeReferencedBinding() with the last reference on the reference stack and the result value.
     initialize_referenced_binding,
     /// Store InstanceofOperator() as the result value.
     instanceof_operator,
     /// Store InstantiateArrowFunctionExpression() as the result value.
-    instantiate_arrow_function_expression,
+    instantiate_arrow_function_expression: AstNodeIndex,
     /// Store InstantiateAsyncArrowFunctionExpression() as the result value.
-    instantiate_async_arrow_function_expression,
+    instantiate_async_arrow_function_expression: AstNodeIndex,
     /// Store InstantiateAsyncFunctionExpression() as the result value.
-    instantiate_async_function_expression,
+    instantiate_async_function_expression: AstNodeIndex,
     /// Store InstantiateAsyncGeneratorFunctionExpression() as the result value.
-    instantiate_async_generator_function_expression,
+    instantiate_async_generator_function_expression: AstNodeIndex,
     /// Store InstantiateGeneratorFunctionExpression() as the result value.
-    instantiate_generator_function_expression,
+    instantiate_generator_function_expression: AstNodeIndex,
     /// Store InstantiateOrdinaryFunctionExpression() as the result value.
-    instantiate_ordinary_function_expression,
+    instantiate_ordinary_function_expression: AstNodeIndex,
     /// Store IsLooselyEqual() as the result value.
     is_loosely_equal,
     /// Store IsStrictlyEqual() as the result value.
     is_strictly_equal,
     /// Jump to another instruction by setting the instruction pointer.
-    jump,
+    jump: InstructionIndex,
     /// Jump to one of two other instructions depending on whether the last value on the stack is
     /// truthy or not.
-    jump_conditional,
+    jump_conditional: struct {
+        consequent: InstructionIndex,
+        alternate: InstructionIndex,
+    },
     /// Compare the last two values on the stack using the '<' operator rules.
     less_than,
     /// Compare the last two values on the stack using the '<=' operator rules.
@@ -128,7 +161,7 @@ pub const Instruction = enum(u8) {
     /// Load the result value and add it to the stack.
     load,
     /// Load a constant and add it to the stack.
-    load_constant,
+    load_constant: ConstantIndex,
     /// Load the exception value and add it to the stack.
     load_and_clear_exception,
     /// Load the next method and iterator object from the top-most iterator record.
@@ -140,13 +173,18 @@ pub const Instruction = enum(u8) {
     /// Apply logical NOT to the last value on the stack and store it as the result value.
     logical_not,
     /// Store MakePrivateReference() as the result value.
-    make_private_reference,
+    make_private_reference: IdentifierIndex,
     /// Store MakeSuperPropertyReference() as the result value.
-    make_super_property_reference,
+    make_super_property_reference: struct {
+        strict: bool,
+    },
     /// Store OrdinaryObjectCreate(%Object.prototype%) as the result value.
     object_create,
     /// Set an object's property to the given function expression.
-    object_define_method,
+    object_define_method: struct {
+        ast_node: AstNodeIndex,
+        type: MethodDefinition.Type,
+    },
     /// Set an object's property to the key/value pair from the last two values on the stack.
     object_set_property,
     /// Set an object's prototype.
@@ -164,16 +202,20 @@ pub const Instruction = enum(u8) {
     /// Push the current lexical environment.
     push_lexical_environment,
     /// Push a jump target for uncaught exceptions
-    push_exception_jump_target,
+    push_exception_jump_target: InstructionIndex,
     /// Call PutValue() with the last reference on the reference stack and the result value.
     put_value,
     /// Store RegExpCreate() as the result value.
     reg_exp_create,
     /// Store ResolveBinding() as the result value.
-    resolve_binding,
+    resolve_binding: struct {
+        identifier: IdentifierIndex,
+        strict: bool,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
     /// Resolve a private identifier (#foo) to a private name in the current private environment
     /// and store the underlying symbol as the result value.
-    resolve_private_identifier,
+    resolve_private_identifier: IdentifierIndex,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
     /// Restore the last stored lexical environment.
@@ -185,7 +227,7 @@ pub const Instruction = enum(u8) {
     /// Store the last value from the stack as the result value.
     store,
     /// Store a constant as the result value.
-    store_constant,
+    store_constant: ConstantIndex,
     /// Throw the last value from the stack as an exception.
     throw,
     /// Store ToNumber() as the result value.
@@ -199,7 +241,10 @@ pub const Instruction = enum(u8) {
     /// Apply the typeof operation to the evaluated expression and set it as the result value.
     typeof,
     /// Apply the typeof operation to an identifier and set it as the result value.
-    typeof_identifier,
+    typeof_identifier: struct {
+        identifier: IdentifierIndex,
+        strict: bool,
+    },
     /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.
     unary_minus,
     /// Store Yield() as the result value.
@@ -207,89 +252,10 @@ pub const Instruction = enum(u8) {
     /// The last instruction of an executable. Required for using labeled switch loops.
     end,
 
-    pub fn argumentCount(self: Instruction) u2 {
-        return switch (self) {
-            .evaluate_property_access_with_identifier_key,
-            .resolve_binding,
-            => 3,
-            .evaluate_call_direct_eval,
-            .jump_conditional,
-            .object_define_method,
-            .typeof_identifier,
-            => 2,
-            .array_create,
-            .array_set_length,
-            .array_set_value_direct,
-            .binding_class_declaration_evaluation,
-            .block_declaration_instantiation,
-            .class_definition_evaluation,
-            .create_catch_bindings,
-            .evaluate_call,
-            .evaluate_new,
-            .evaluate_property_access_with_expression_key,
-            .evaluate_super_call,
-            .for_declaration_binding_instantiation,
-            .get_iterator,
-            .get_template_object,
-            .has_private_element,
-            .initialize_bound_name,
-            .instantiate_arrow_function_expression,
-            .instantiate_async_arrow_function_expression,
-            .instantiate_async_function_expression,
-            .instantiate_async_generator_function_expression,
-            .instantiate_generator_function_expression,
-            .instantiate_ordinary_function_expression,
-            .jump,
-            .load_constant,
-            .make_private_reference,
-            .make_super_property_reference,
-            .push_exception_jump_target,
-            .resolve_private_identifier,
-            .store_constant,
-            => 1,
-            else => 0,
-        };
-    }
+    pub const Tag = std.meta.Tag(Instruction);
 
-    pub fn hasConstantIndex(self: Instruction) bool {
-        return switch (self) {
-            .load_constant, .store_constant => true,
-            else => false,
-        };
-    }
-
-    pub fn hasIdentifierIndex(self: Instruction) bool {
-        return switch (self) {
-            .evaluate_property_access_with_identifier_key,
-            .has_private_element,
-            .initialize_bound_name,
-            .make_private_reference,
-            .resolve_binding,
-            .resolve_private_identifier,
-            .typeof_identifier,
-            => true,
-            else => false,
-        };
-    }
-
-    pub fn hasAstNodeIndex(self: Instruction) bool {
-        return switch (self) {
-            .binding_class_declaration_evaluation,
-            .block_declaration_instantiation,
-            .class_definition_evaluation,
-            .create_catch_bindings,
-            .for_declaration_binding_instantiation,
-            .get_template_object,
-            .instantiate_arrow_function_expression,
-            .instantiate_async_arrow_function_expression,
-            .instantiate_async_function_expression,
-            .instantiate_async_generator_function_expression,
-            .instantiate_generator_function_expression,
-            .instantiate_ordinary_function_expression,
-            .object_define_method,
-            => true,
-            else => false,
-        };
+    pub fn Payload(comptime tag: Instruction.Tag) type {
+        return std.meta.TagPayload(Instruction, tag);
     }
 };
 
@@ -297,18 +263,23 @@ pub const InstructionIterator = struct {
     instructions: []const u8,
     index: usize = 0,
     instruction_index: usize = 0,
-    instruction_args: [3]?IndexType = .{ null, null, null },
 
     pub fn next(self: *InstructionIterator) ?Instruction {
         if (self.index >= self.instructions.len) return null;
-        const instruction: Instruction = @enumFromInt(self.instructions[self.index]);
+        const tag: Instruction.Tag = @enumFromInt(self.instructions[self.index]);
         self.instruction_index = self.index;
         self.index += 1;
-        self.instruction_args = .{ null, null, null };
-        for (0..instruction.argumentCount()) |i| {
-            self.instruction_args[i] = std.mem.bytesToValue(IndexType, &self.instructions[self.index]);
-            self.index += @sizeOf(IndexType);
+        @setEvalBranchQuota(blk: {
+            const fields = std.meta.fields(Instruction);
+            break :blk 2 * fields.len * fields.len;
+        });
+        switch (tag) {
+            inline else => |comptime_tag| {
+                const Payload = Instruction.Payload(comptime_tag);
+                const payload_ptr: *align(1) const Payload = @ptrCast(self.instructions[self.index..][0..@sizeOf(Payload)]);
+                self.index += @sizeOf(Payload);
+                return @unionInit(Instruction, @tagName(comptime_tag), payload_ptr.*);
+            },
         }
-        return instruction;
     }
 };

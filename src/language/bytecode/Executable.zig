@@ -40,9 +40,35 @@ pub const AstNode = union(enum) {
     catch_parameter: ast.CatchParameter,
 };
 
+pub const CastIndexError = error{IndexOutOfRange};
+pub const Error = CastIndexError || std.mem.Allocator.Error;
+
 pub const IndexType = u16;
 
-pub const Error = error{IndexOutOfRange} || std.mem.Allocator.Error;
+// The name is required to avoid very long names when dumping the bytecode.
+fn Index(comptime name: []const u8, comptime BackingType: type) type {
+    return enum(BackingType) {
+        _,
+
+        pub fn init(index: usize) CastIndexError!@This() {
+            return @enumFromInt(std.math.cast(BackingType, index) orelse {
+                @branchHint(.cold);
+                return error.IndexOutOfRange;
+            });
+        }
+
+        pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            try writer.print(name ++ "({d})", .{@intFromEnum(self)});
+        }
+    };
+}
+
+pub const AstNodeIndex = Index("AstNodeIndex", u16);
+pub const ConstantIndex = Index("ConstantIndex", u16);
+pub const EnvironmentLookupCacheIndex = Index("EnvironmentLookupCacheIndex", u16);
+pub const IdentifierIndex = Index("IdentifierIndex", u16);
+pub const InstructionIndex = Index("InstructionIndex", u16);
+pub const PropertyLookupCacheIndex = Index("PropertyLookupCacheIndex", u16);
 
 pub fn init(allocator: std.mem.Allocator) Executable {
     return .{
@@ -65,92 +91,119 @@ pub fn deinit(self: *Executable) void {
     self.property_lookup_cache.deinit(self.allocator);
 }
 
-pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {
-    try self.instructions.append(self.allocator, @intFromEnum(instruction));
+pub fn nextInstructionIndex(self: *Executable) CastIndexError!InstructionIndex {
+    return InstructionIndex.init(self.instructions.items.len);
 }
 
-pub fn addConstant(self: *Executable, constant: Value) std.mem.Allocator.Error!usize {
+pub fn addInstruction(
+    self: *Executable,
+    comptime tag: Instruction.Tag,
+    payload: Instruction.Payload(tag),
+) std.mem.Allocator.Error!void {
+    const Payload = @TypeOf(payload);
+    const bytes = try self.instructions.addManyAsSlice(self.allocator, 1 + @sizeOf(Payload));
+    bytes[0] = @intFromEnum(tag);
+    const payload_ptr: *align(1) Payload = @ptrCast(bytes[1..][0..@sizeOf(Payload)]);
+    payload_ptr.* = payload;
+}
+
+pub fn addConstant(self: *Executable, constant: Value) Error!ConstantIndex {
     const result = try self.constants.getOrPut(self.allocator, constant);
-    return result.index;
+    return ConstantIndex.init(result.index);
 }
 
-pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) std.mem.Allocator.Error!usize {
+pub fn getConstant(self: Executable, index: ConstantIndex) Value {
+    return self.constants.keys()[@intFromEnum(index)];
+}
+
+pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) Error!IdentifierIndex {
     const string = try String.fromUtf8(self.allocator, identifier);
     const result = try self.identifiers.getOrPut(self.allocator, string);
-    return result.index;
+    return IdentifierIndex.init(result.index);
 }
 
-pub fn addAstNode(self: *Executable, ast_node: AstNode) std.mem.Allocator.Error!void {
+pub fn getIdentifier(self: Executable, index: IdentifierIndex) *const String {
+    return self.identifiers.keys()[@intFromEnum(index)];
+}
+
+pub fn addAstNode(self: *Executable, ast_node: AstNode) Error!AstNodeIndex {
+    const index = self.ast_nodes.items.len;
     try self.ast_nodes.append(self.allocator, ast_node);
+    return AstNodeIndex.init(index);
+}
+
+pub fn getAstNode(self: Executable, index: AstNodeIndex) *AstNode {
+    return &self.ast_nodes.items[@intFromEnum(index)];
 }
 
 pub fn addInstructionWithConstant(
     self: *Executable,
-    instruction: Instruction,
+    comptime instruction: Instruction.Tag,
     constant: Value,
 ) Error!void {
-    std.debug.assert(instruction.hasConstantIndex());
-    try self.addInstruction(instruction);
-    const index = try self.addConstant(constant);
-    try self.addIndex(index);
+    try self.addInstruction(instruction, try self.addConstant(constant));
 }
 
 pub fn addInstructionWithIdentifier(
     self: *Executable,
-    instruction: Instruction,
+    comptime tag: Instruction.Tag,
     identifier: ast.Identifier,
 ) Error!void {
-    std.debug.assert(instruction.hasIdentifierIndex());
-    try self.addInstruction(instruction);
-    const index = try self.addIdentifier(identifier);
-    try self.addIndex(index);
+    try self.addInstruction(tag, try self.addIdentifier(identifier));
 }
 
 pub fn addInstructionWithAstNode(
     self: *Executable,
-    instruction: Instruction,
+    comptime tag: Instruction.Tag,
     ast_node: AstNode,
 ) Error!void {
-    std.debug.assert(instruction.hasAstNodeIndex());
-    try self.addInstruction(instruction);
-    try self.addAstNode(ast_node);
-    try self.addIndex(self.ast_nodes.items.len - 1);
+    try self.addInstruction(tag, try self.addAstNode(ast_node));
 }
 
-pub const JumpIndex = struct {
-    executable: *Executable,
-    index: usize,
+pub fn getEnvironmentLookupCacheEntry(
+    self: Executable,
+    index: EnvironmentLookupCacheIndex,
+) *?Environment.LookupCacheEntry {
+    return &self.environment_lookup_cache.items[@intFromEnum(index)];
+}
 
-    pub fn setTarget(self: JumpIndex, index: usize) Error!void {
-        const instructions = self.executable.instructions.items;
-        if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
-        const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-        instructions[self.index] = bytes[0];
-        instructions[self.index + 1] = bytes[1];
-    }
+pub fn getPropertyLookupCacheEntry(
+    self: Executable,
+    index: PropertyLookupCacheIndex,
+) *?Object.Shape.PropertyLookupCacheEntry {
+    return &self.property_lookup_cache.items[@intFromEnum(index)];
+}
 
-    pub fn setTargetHere(self: JumpIndex) Error!void {
-        const instructions = self.executable.instructions.items;
-        try self.setTarget(instructions.len);
-    }
-};
+pub fn DeferredPayload(comptime T: type) type {
+    return struct {
+        executable: *Executable,
+        index: usize,
 
-pub fn addJumpIndex(self: *Executable) std.mem.Allocator.Error!JumpIndex {
-    self.addIndex(0) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.IndexOutOfRange => unreachable,
+        pub fn getPtr(self: @This()) *align(1) T {
+            return @ptrCast(self.executable.instructions.items[self.index..][0..@sizeOf(T)]);
+        }
+
+        pub fn getFieldDeferred(self: @This(), comptime field_name: std.meta.FieldEnum(T)) DeferredPayload(std.meta.FieldType(T, field_name)) {
+            const index = self.index + @offsetOf(T, @tagName(field_name));
+            return .{
+                .executable = self.executable,
+                .index = index,
+            };
+        }
     };
+}
+
+pub fn addInstructionDeferred(
+    self: *Executable,
+    comptime tag: Instruction.Tag,
+) std.mem.Allocator.Error!DeferredPayload(Instruction.Payload(tag)) {
+    const Payload = Instruction.Payload(tag);
+    const bytes = try self.instructions.addManyAsSlice(self.allocator, 1 + @sizeOf(Payload));
+    bytes[0] = @intFromEnum(tag);
     return .{
         .executable = self,
-        .index = self.instructions.items.len - @sizeOf(IndexType),
+        .index = self.instructions.items.len - bytes[1..].len,
     };
-}
-
-pub fn addIndex(self: *Executable, index: usize) Error!void {
-    if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
-    const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-    try self.instructions.append(self.allocator, bytes[0]);
-    try self.instructions.append(self.allocator, bytes[1]);
 }
 
 pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
@@ -163,114 +216,34 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
         try tty_config.setColor(writer, .bold);
         try writer.writeAll(@tagName(instruction));
         try tty_config.setColor(writer, .reset);
-        if (instruction.argumentCount() != 0) try writer.writeAll(" ");
         switch (instruction) {
-            .array_create => {
-                const length = iterator.instruction_args[0].?;
-                try writer.print("(length: {})", .{length});
+            inline else => |payload, comptime_instruction| {
+                switch (comptime_instruction) {
+                    .evaluate_property_access_with_identifier_key => {
+                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                    },
+                    .load_constant, .store_constant => {
+                        try writer.print(" {pretty}", .{self.getConstant(payload)});
+                    },
+                    .resolve_binding => {
+                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                    },
+                    .typeof_identifier => {
+                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                    },
+                    .has_private_element,
+                    .initialize_bound_name,
+                    .make_private_reference,
+                    .resolve_private_identifier,
+                    => {
+                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload)});
+                    },
+                    else => {},
+                }
+                if (@TypeOf(payload) != void) {
+                    try writer.print(" {}", .{payload});
+                }
             },
-            .array_set_value_direct => {
-                const index = iterator.instruction_args[0].?;
-                try writer.print("(index: {})", .{index});
-            },
-            .evaluate_call => {
-                const argument_count = iterator.instruction_args[0].?;
-                try writer.print("(argument_count: {})", .{argument_count});
-            },
-            .evaluate_call_direct_eval => {
-                const argument_count = iterator.instruction_args[0].?;
-                const strict = iterator.instruction_args[1].? == 1;
-                try writer.print("(argument_count: {}, strict: {})", .{ argument_count, strict });
-            },
-            .evaluate_new,
-            .evaluate_super_call,
-            => {
-                const argument_count = iterator.instruction_args[0].?;
-                try writer.print("(argument_count: {})", .{argument_count});
-            },
-            .evaluate_property_access_with_expression_key,
-            .make_super_property_reference,
-            => {
-                const strict = iterator.instruction_args[0].? == 1;
-                try writer.print("(strict: {})", .{strict});
-            },
-            .evaluate_property_access_with_identifier_key => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const strict = iterator.instruction_args[1].? == 1;
-                const property_lookup_cache_index = iterator.instruction_args[2].?;
-                const identifier = self.identifiers.entries.get(identifier_index).key;
-                try writer.print(
-                    "{s} [{}] (strict: {}, property_lookup_cache_index: {})",
-                    .{ identifier, identifier_index, strict, property_lookup_cache_index },
-                );
-            },
-            .get_iterator => {
-                const iterator_kind_raw = iterator.instruction_args[0].?;
-                const iterator_kind: IteratorKind = @enumFromInt(iterator_kind_raw);
-                try writer.print("(kind: {s})", .{@tagName(iterator_kind)});
-            },
-            .array_set_length,
-            .binding_class_declaration_evaluation,
-            .class_definition_evaluation,
-            .create_catch_bindings,
-            .for_declaration_binding_instantiation,
-            .instantiate_arrow_function_expression,
-            .instantiate_async_arrow_function_expression,
-            .instantiate_async_function_expression,
-            .instantiate_async_generator_function_expression,
-            .instantiate_generator_function_expression,
-            .instantiate_ordinary_function_expression,
-            .jump,
-            .push_exception_jump_target,
-            => {
-                const index = iterator.instruction_args[0].?;
-                try writer.print("{}", .{index});
-            },
-            .jump_conditional => {
-                const consequent_index = iterator.instruction_args[0].?;
-                const alternate_index = iterator.instruction_args[1].?;
-                try writer.print("{} {}", .{ consequent_index, alternate_index });
-            },
-            .load_constant, .store_constant => {
-                const constant_index = iterator.instruction_args[0].?;
-                const constant = self.constants.entries.get(constant_index).key;
-                try writer.print("{pretty} [{}]", .{ constant, constant_index });
-            },
-            .object_define_method => {
-                const function_expression_index = iterator.instruction_args[0].?;
-                const method_type_raw = iterator.instruction_args[1].?;
-                const method_type: ast.MethodDefinition.Type = @enumFromInt(method_type_raw);
-                try writer.print("[{}] (type: {s})", .{ function_expression_index, @tagName(method_type) });
-            },
-            .resolve_binding => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const strict = iterator.instruction_args[1].? == 1;
-                const environment_lookup_cache_index = iterator.instruction_args[2].?;
-                const identifier = self.identifiers.entries.get(identifier_index).key;
-                try writer.print(
-                    "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
-                    .{ identifier, identifier_index, strict, environment_lookup_cache_index },
-                );
-            },
-            .typeof_identifier => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const strict = iterator.instruction_args[1].? == 1;
-                const identifier = self.identifiers.entries.get(identifier_index).key;
-                try writer.print(
-                    "{s} [{}] (strict: {})",
-                    .{ identifier, identifier_index, strict },
-                );
-            },
-            .has_private_element,
-            .initialize_bound_name,
-            .make_private_reference,
-            .resolve_private_identifier,
-            => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.entries.get(identifier_index).key;
-                try writer.print("{s} [{}]", .{ identifier, identifier_index });
-            },
-            else => {},
         }
         try writer.writeAll("\n");
     }

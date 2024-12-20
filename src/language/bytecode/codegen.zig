@@ -10,14 +10,16 @@ const String = types.String;
 const Value = types.Value;
 const temporaryChange = utils.temporaryChange;
 
+const DeferredInstructionIndex = Executable.DeferredPayload(Executable.InstructionIndex);
+
 pub const Context = struct {
     contained_in_strict_mode_code: bool,
     environment_lookup_cache_index: Executable.IndexType,
     property_lookup_cache_index: Executable.IndexType,
-    continue_jumps: std.ArrayListUnmanaged(Executable.JumpIndex),
-    break_jumps: std.ArrayListUnmanaged(Executable.JumpIndex),
-    labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(Executable.JumpIndex)),
-    labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(Executable.JumpIndex)),
+    continue_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
+    break_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
+    labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
+    labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
     current_label: ?[]const u8,
 
     pub fn init() Context {
@@ -33,6 +35,16 @@ pub const Context = struct {
         };
     }
 
+    pub fn addEnvironmentLookupCacheIndex(self: *Context) Executable.EnvironmentLookupCacheIndex {
+        defer self.environment_lookup_cache_index += 1;
+        return @enumFromInt(self.environment_lookup_cache_index);
+    }
+
+    pub fn addPropertyLookupCacheIndex(self: *Context) Executable.PropertyLookupCacheIndex {
+        defer self.property_lookup_cache_index += 1;
+        return @enumFromInt(self.property_lookup_cache_index);
+    }
+
     pub fn deinit(self: *Context, allocator: std.mem.Allocator) void {
         self.continue_jumps.deinit(allocator);
         self.break_jumps.deinit(allocator);
@@ -42,6 +54,13 @@ pub const Context = struct {
         self.labelled_break_jumps.deinit(allocator);
     }
 };
+
+fn castIndex(comptime T: type, index: usize) Executable.CastIndexError!u16 {
+    return std.math.cast(T, index) orelse {
+        @branchHint(.cold);
+        return error.IndexOutOfRange;
+    };
+}
 
 /// Due to the lack of basic blocks we have to perform a bit of trickery to make `break` and
 /// `continue` jumps not bypass necessary cleanup (popping references and environments from their
@@ -54,24 +73,21 @@ fn interceptContinueAndBreakJumps(
     args: anytype,
 ) Executable.Error!void {
     try @call(.always_inline, codegenFn, args);
-    try executable.addInstruction(.jump);
-    const skip_jump = try executable.addJumpIndex();
+    const skip_jump = try executable.addInstructionDeferred(.jump);
     if (ctx.continue_jumps.items.len != 0) {
         while (ctx.continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
         try @call(.always_inline, codegenFn, args);
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.continue_jumps.append(executable.allocator, jump_index);
     }
     if (ctx.break_jumps.items.len != 0) {
         while (ctx.break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
         try @call(.always_inline, codegenFn, args);
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.break_jumps.append(executable.allocator, jump_index);
     }
     var labelled_continue_jumps_it = ctx.labelled_continue_jumps.valueIterator();
@@ -79,11 +95,10 @@ fn interceptContinueAndBreakJumps(
         const labelled_continue_jumps = value_ptr.*;
         if (labelled_continue_jumps.items.len != 0) {
             while (labelled_continue_jumps.popOrNull()) |jump_index| {
-                try jump_index.setTargetHere();
+                jump_index.getPtr().* = try executable.nextInstructionIndex();
             }
             try @call(.always_inline, codegenFn, args);
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
+            const jump_index = try executable.addInstructionDeferred(.jump);
             try labelled_continue_jumps.append(executable.allocator, jump_index);
         }
     }
@@ -92,15 +107,14 @@ fn interceptContinueAndBreakJumps(
         const labelled_break_jumps = value_ptr.*;
         if (labelled_break_jumps.items.len != 0) {
             while (labelled_break_jumps.popOrNull()) |jump_index| {
-                try jump_index.setTargetHere();
+                jump_index.getPtr().* = try executable.nextInstructionIndex();
             }
             try @call(.always_inline, codegenFn, args);
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
+            const jump_index = try executable.addInstructionDeferred(.jump);
             try labelled_break_jumps.append(executable.allocator, jump_index);
         }
     }
-    try skip_jump.setTargetHere();
+    skip_jump.getPtr().* = try executable.nextInstructionIndex();
 }
 
 pub fn codegenParenthesizedExpression(
@@ -122,11 +136,11 @@ pub fn codegenIdentifierReference(
     // IdentifierReference : yield
     // IdentifierReference : await
     // 1. Return ? ResolveBinding(StringValue of Identifier).
-    try executable.addInstructionWithIdentifier(.resolve_binding, node);
-    const strict = ctx.contained_in_strict_mode_code;
-    try executable.addIndex(@intFromBool(strict));
-    try executable.addIndex(ctx.environment_lookup_cache_index);
-    ctx.environment_lookup_cache_index += 1;
+    try executable.addInstruction(.resolve_binding, .{
+        .identifier = try executable.addIdentifier(node),
+        .strict = ctx.contained_in_strict_mode_code,
+        .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+    });
 }
 
 pub fn codegenPrimaryExpression(
@@ -138,7 +152,7 @@ pub fn codegenPrimaryExpression(
         // PrimaryExpression : this
         .this => {
             // 1. Return ? ResolveThisBinding().
-            try executable.addInstruction(.resolve_this_binding);
+            try executable.addInstruction(.resolve_this_binding, {});
         },
         .identifier_reference => |x| try codegenIdentifierReference(x, executable, ctx),
         .literal => |x| try codegenLiteral(x, executable, ctx),
@@ -177,23 +191,25 @@ fn codegenSingleNameBinding(
 ) Executable.Error!void {
     const strict = ctx.contained_in_strict_mode_code;
 
-    try executable.addInstruction(.load); // Save RHS
+    try executable.addInstruction(.load, {}); // Save RHS
 
     // Resolve binding and push reference
-    const identifier = node.binding_identifier;
-    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
-    try executable.addIndex(@intFromBool(strict));
-    try executable.addIndex(ctx.environment_lookup_cache_index);
-    ctx.environment_lookup_cache_index += 1;
+    try executable.addInstruction(.resolve_binding, .{
+        .identifier = try executable.addIdentifier(node.binding_identifier),
+        .strict = strict,
+        .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+    });
 
     try codegenBindingPatternValue(node.initializer, executable, ctx, property);
 
     // Initialize binding and pop reference
-    try executable.addInstruction(
-        if (environment) |_| .initialize_referenced_binding else .put_value,
-    );
+    if (environment != null) {
+        try executable.addInstruction(.initialize_referenced_binding, {});
+    } else {
+        try executable.addInstruction(.put_value, {});
+    }
 
-    try executable.addInstruction(.store); // Restore RHS
+    try executable.addInstruction(.store, {}); // Restore RHS
 }
 
 fn codegenBindingPatternAndExpression(
@@ -203,12 +219,12 @@ fn codegenBindingPatternAndExpression(
     property: BindingPatternProperty,
     environment: ?BindingPatternEnvironment,
 ) Executable.Error!void {
-    try executable.addInstruction(.load); // Save RHS
+    try executable.addInstruction(.load, {}); // Save RHS
 
     try codegenBindingPatternValue(node.initializer, executable, ctx, property);
     try bindingInitialization(node.binding_pattern, executable, ctx, environment);
 
-    try executable.addInstruction(.store); // Restore RHS
+    try executable.addInstruction(.store, {}); // Restore RHS
 }
 
 fn codegenBindingPatternValue(
@@ -220,42 +236,40 @@ fn codegenBindingPatternValue(
     const strict = ctx.contained_in_strict_mode_code;
 
     // Evaluate `rhs[n]`
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
     switch (property) {
         .value => |value| try executable.addInstructionWithConstant(.load_constant, value),
         .property_name => |property_name| {
             try codegenPropertyName(property_name, executable, ctx);
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
         },
     }
-    try executable.addInstruction(.evaluate_property_access_with_expression_key);
-    try executable.addIndex(@intFromBool(strict));
-    try executable.addInstruction(.get_value);
+    try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
+        .strict = strict,
+    });
+    try executable.addInstruction(.get_value, {});
 
     if (maybe_initializer) |initializer| {
-        try executable.addInstruction(.load); // Save RHS
+        try executable.addInstruction(.load, {}); // Save RHS
 
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
         try executable.addInstructionWithConstant(.load_constant, .undefined);
-        try executable.addInstruction(.is_strictly_equal);
+        try executable.addInstruction(.is_strictly_equal, {});
 
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
-        try consequent_jump.setTargetHere();
-        try executable.addInstruction(.store); // Drop RHS from the stack
+        jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Drop RHS from the stack
 
         try codegenExpression(initializer, executable, ctx);
-        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addInstructionDeferred(.jump);
 
-        try alternate_jump.setTargetHere();
-        try executable.addInstruction(.store); // Restore RHS
+        jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Restore RHS
 
-        try end_jump.setTargetHere();
+        end_jump.getPtr().* = try executable.nextInstructionIndex();
     }
 }
 
@@ -313,23 +327,26 @@ fn bindingInitialization(
                     },
                 },
                 .binding_rest_property => |binding_rest_property| {
-                    try executable.addInstruction(.load); // Save RHS
+                    try executable.addInstruction(.load, {}); // Save RHS
 
                     // Resolve binding and push reference
-                    try executable.addInstructionWithIdentifier(.resolve_binding, binding_rest_property.binding_identifier);
-                    try executable.addIndex(@intFromBool(strict));
-                    try executable.addIndex(ctx.environment_lookup_cache_index);
-                    ctx.environment_lookup_cache_index += 1;
+                    try executable.addInstruction(.resolve_binding, .{
+                        .identifier = try executable.addIdentifier(binding_rest_property.binding_identifier),
+                        .strict = strict,
+                        .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+                    });
 
                     // TODO: Implement this
-                    try executable.addInstruction(.object_create);
+                    try executable.addInstruction(.object_create, {});
 
                     // Initialize binding and pop reference
-                    try executable.addInstruction(
-                        if (environment) |_| .initialize_referenced_binding else .put_value,
-                    );
+                    if (environment != null) {
+                        try executable.addInstruction(.initialize_referenced_binding, {});
+                    } else {
+                        try executable.addInstruction(.put_value, {});
+                    }
 
-                    try executable.addInstruction(.store); // Restore RHS
+                    try executable.addInstruction(.store, {}); // Restore RHS
                 },
             };
         },
@@ -359,53 +376,56 @@ fn bindingInitialization(
                 // Yes, doing codegen like this is an actual crime.
                 .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
                     .binding_identifier => |binding_identifier| {
-                        try executable.addInstruction(.load); // Save RHS
+                        try executable.addInstruction(.load, {}); // Save RHS
 
                         // Resolve binding and push reference
-                        try executable.addInstructionWithIdentifier(.resolve_binding, binding_identifier);
-                        try executable.addIndex(@intFromBool(strict));
-                        try executable.addIndex(ctx.environment_lookup_cache_index);
-                        ctx.environment_lookup_cache_index += 1;
+                        try executable.addInstruction(.resolve_binding, .{
+                            .identifier = try executable.addIdentifier(binding_identifier),
+                            .strict = strict,
+                            .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+                        });
 
                         // Evaluate `rhs.slice(n)`
-                        try executable.addInstruction(.load);
-                        try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
-                        try executable.addIndex(@intFromBool(strict));
-                        try executable.addIndex(ctx.property_lookup_cache_index);
-                        ctx.property_lookup_cache_index += 1;
-                        try executable.addInstruction(.dup_reference);
-                        try executable.addInstruction(.get_value);
-                        try executable.addInstruction(.load);
-                        try executable.addInstruction(.load_this_value_for_evaluate_call);
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                            .strict = strict,
+                            .identifier = try executable.addIdentifier("slice"),
+                            .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                        });
+                        try executable.addInstruction(.dup_reference, {});
+                        try executable.addInstruction(.get_value, {});
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-                        try executable.addInstruction(.evaluate_call);
-                        try executable.addIndex(1); // One arg
+                        try executable.addInstruction(.evaluate_call, .{ .argument_count = 1 });
 
                         // Initialize binding and pop reference
-                        try executable.addInstruction(
-                            if (environment) |_| .initialize_referenced_binding else .put_value,
-                        );
+                        if (environment != null) {
+                            try executable.addInstruction(.initialize_referenced_binding, {});
+                        } else {
+                            try executable.addInstruction(.put_value, {});
+                        }
 
-                        try executable.addInstruction(.store); // Restore RHS
+                        try executable.addInstruction(.store, {}); // Restore RHS
                     },
                     .binding_pattern => |binding_pattern| {
-                        try executable.addInstruction(.load); // Save RHS
+                        try executable.addInstruction(.load, {}); // Save RHS
 
                         // Evaluate `rhs.slice(n)`
-                        try executable.addInstruction(.load);
-                        try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
-                        try executable.addIndex(@intFromBool(strict));
-                        try executable.addIndex(ctx.property_lookup_cache_index);
-                        ctx.property_lookup_cache_index += 1;
-                        try executable.addInstruction(.dup_reference);
-                        try executable.addInstruction(.get_value);
-                        try executable.addInstruction(.load);
-                        try executable.addInstruction(.load_this_value_for_evaluate_call);
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                            .strict = strict,
+                            .identifier = try executable.addIdentifier("slice"),
+                            .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                        });
+                        try executable.addInstruction(.dup_reference, {});
+                        try executable.addInstruction(.get_value, {});
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-                        try executable.addInstruction(.evaluate_call);
-                        try executable.addIndex(1); // One arg
+                        try executable.addInstruction(.evaluate_call, .{ .argument_count = 1 });
 
                         try bindingInitialization(
                             binding_pattern,
@@ -414,7 +434,7 @@ fn bindingInitialization(
                             environment,
                         );
 
-                        try executable.addInstruction(.store); // Restore RHS
+                        try executable.addInstruction(.store, {}); // Restore RHS
                     },
                 },
             };
@@ -472,18 +492,20 @@ pub fn codegenArrayLiteral(
             else => {},
         }
     } else true;
-    try executable.addInstruction(.array_create);
-    try executable.addIndex(if (is_fixed_length) node.element_list.len else 0);
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.array_create, .{
+        .length = if (is_fixed_length) try castIndex(u16, node.element_list.len) else 0,
+    });
+    try executable.addInstruction(.load, {});
     for (node.element_list, 0..) |element, i| {
         switch (element) {
             // Elision : ,
             .elision => {
                 if (is_fixed_length) continue;
-                try executable.addInstruction(.store);
-                try executable.addInstruction(.array_set_length);
-                try executable.addIndex(i + 1);
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.store, {});
+                try executable.addInstruction(.array_set_length, .{
+                    .length = try castIndex(u16, i + 1),
+                });
+                try executable.addInstruction(.load, {});
             },
 
             // ElementList : Elision[opt] AssignmentExpression
@@ -495,17 +517,18 @@ pub fn codegenArrayLiteral(
                 try codegenExpression(expression, executable, ctx);
 
                 // 3. Let initValue be ? GetValue(initResult).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try executable.addInstruction(.load, {});
 
                 // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
                 if (is_fixed_length) {
-                    try executable.addInstruction(.array_set_value_direct);
-                    try executable.addIndex(i);
+                    try executable.addInstruction(.array_set_value_direct, .{
+                        .index = try castIndex(u16, i),
+                    });
                 } else {
-                    try executable.addInstruction(.array_push_value);
+                    try executable.addInstruction(.array_push_value, {});
                 }
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.load, {});
 
                 // 5. Return nextIndex + 1.
             },
@@ -516,19 +539,18 @@ pub fn codegenArrayLiteral(
                 try codegenExpression(expression, executable, ctx);
 
                 // 2. Let spreadObj be ? GetValue(spreadRef).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
                 // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-                try executable.addInstruction(.get_iterator);
-                try executable.addIndex(@intFromEnum(IteratorKind.sync));
+                try executable.addInstruction(.get_iterator, .sync);
 
                 // 4.
-                try executable.addInstruction(.array_spread_value);
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.array_spread_value, {});
+                try executable.addInstruction(.load, {});
             },
         }
     }
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
 }
 
 /// 13.2.5.4 Runtime Semantics: Evaluation
@@ -541,7 +563,7 @@ pub fn codegenObjectLiteral(
     // ObjectLiteral : { }
     if (node.property_definition_list.items.len == 0) {
         // 1. Return OrdinaryObjectCreate(%Object.prototype%).
-        try executable.addInstruction(.object_create);
+        try executable.addInstruction(.object_create, {});
         return;
     }
 
@@ -549,7 +571,7 @@ pub fn codegenObjectLiteral(
     //     { PropertyDefinitionList }
     //     { PropertyDefinitionList , }
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-    try executable.addInstruction(.object_create);
+    try executable.addInstruction(.object_create, {});
 
     // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument obj.
     try codegenPropertyDefinitionList(node.property_definition_list, executable, ctx);
@@ -595,7 +617,7 @@ pub fn codegenPropertyName(
             try codegenExpression(expression, executable, ctx);
 
             // 2. Let propName be ? GetValue(exprValue).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. Return ? ToPropertyKey(propName).
             // NOTE: This is done in object_set_property
@@ -615,7 +637,7 @@ pub fn codegenPropertyDefinitionList(
     // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinition with argument object.
     for (node.items) |property_definition| {
         // Load object onto the stack again before each property definition is evaluated
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
         try codegenPropertyDefinition(property_definition, executable, ctx);
     }
 
@@ -636,12 +658,12 @@ pub fn codegenPropertyDefinition(
             try codegenExpression(expression, executable, ctx);
 
             // 2. Let fromValue be ? GetValue(exprValue).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 3. Let excludedNames be a new empty List.
             // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
-            try executable.addInstruction(.object_spread_value);
+            try executable.addInstruction(.object_spread_value, {});
 
             // 5. Return unused.
         },
@@ -658,12 +680,12 @@ pub fn codegenPropertyDefinition(
             try codegenIdentifierReference(identifier_reference, executable, ctx);
 
             // 3. Let propValue be ? GetValue(exprValue).
-            try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 4. Assert: object is an ordinary, extensible object with no non-configurable properties.
             // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
-            try executable.addInstruction(.object_set_property);
+            try executable.addInstruction(.object_set_property, {});
 
             // 6. Return unused.
         },
@@ -684,7 +706,7 @@ pub fn codegenPropertyDefinition(
             // 1. Let propKey be ? Evaluation of PropertyName.
             if (!is_proto_setter) {
                 try codegenPropertyName(property_name_and_expression.property_name, executable, ctx);
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.load, {});
             }
 
             // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and isProtoSetter is false, then
@@ -694,14 +716,14 @@ pub fn codegenPropertyDefinition(
             try codegenExpression(property_name_and_expression.expression, executable, ctx);
 
             // b. Let propValue be ? GetValue(exprValueRef).
-            if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 7. If isProtoSetter is true, then
             if (is_proto_setter) {
                 // a. If propValue is an Object or propValue is null, then
                 //     i. Perform ! object.[[SetPrototypeOf]](propValue).
-                try executable.addInstruction(.object_set_prototype);
+                try executable.addInstruction(.object_set_prototype, {});
 
                 // b. Return unused.
                 return;
@@ -709,7 +731,7 @@ pub fn codegenPropertyDefinition(
 
             // 8. Assert: object is an ordinary, extensible object with no non-configurable properties.
             // 9. Perform ! CreateDataPropertyOrThrow(object, propKey, propValue).
-            try executable.addInstruction(.object_set_property);
+            try executable.addInstruction(.object_set_property, {});
 
             // 10. Return unused.
         },
@@ -740,7 +762,7 @@ pub fn codegenRegularExpressionLiteral(
     try executable.addInstructionWithConstant(.load_constant, flags);
 
     // 3. Return ! RegExpCreate(pattern, flags).
-    try executable.addInstruction(.reg_exp_create);
+    try executable.addInstruction(.reg_exp_create, {});
 }
 
 /// 13.2.8.6 Runtime Semantics: Evaluation
@@ -774,9 +796,9 @@ pub fn codegenTemplateLiteral(
         switch (span) {
             .expression => |expression| {
                 try codegenExpression(expression, executable, ctx);
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.to_string);
-                try executable.addInstruction(.load);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try executable.addInstruction(.to_string, {});
+                try executable.addInstruction(.load, {});
             },
             .text => {
                 try executable.addInstructionWithConstant(
@@ -786,8 +808,8 @@ pub fn codegenTemplateLiteral(
             },
         }
         if (i != 0) {
-            try executable.addInstruction(.binary_operator_add);
-            if (i < node.spans.len - 1) try executable.addInstruction(.load);
+            try executable.addInstruction(.binary_operator_add, {});
+            if (i < node.spans.len - 1) try executable.addInstruction(.load, {});
         }
     }
 }
@@ -806,18 +828,19 @@ pub fn codegenMemberExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 3. Let strict be IsStrict(this MemberExpression).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-            try executable.addInstruction(.evaluate_property_access_with_expression_key);
-            try executable.addIndex(@intFromBool(strict));
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
+                .strict = strict,
+            });
         },
 
         // MemberExpression : MemberExpression . IdentifierName
@@ -826,20 +849,18 @@ pub fn codegenMemberExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 3. Let strict be IsStrict(this MemberExpression).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstructionWithIdentifier(
-                .evaluate_property_access_with_identifier_key,
-                identifier,
-            );
-            try executable.addIndex(@intFromBool(strict));
-            try executable.addIndex(ctx.property_lookup_cache_index);
-            ctx.property_lookup_cache_index += 1;
+            try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                .strict = strict,
+                .identifier = try executable.addIdentifier(identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
         },
 
         // MemberExpression : MemberExpression . PrivateIdentifier
@@ -848,8 +869,8 @@ pub fn codegenMemberExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
             // 4. Return MakePrivateReference(baseValue, fieldNameString).
@@ -873,13 +894,14 @@ pub fn codegenNewExpression(
     // MemberExpression : new MemberExpression Arguments
     // 1. Return ? EvaluateNew(MemberExpression, Arguments).
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     try codegenArguments(node.arguments, executable, ctx);
 
-    try executable.addInstruction(.evaluate_new);
-    try executable.addIndex(node.arguments.len);
+    try executable.addInstruction(.evaluate_new, .{
+        .argument_count = try castIndex(u16, node.arguments.len),
+    });
 }
 
 /// 13.3.6.1 Runtime Semantics: Evaluation
@@ -897,14 +919,14 @@ pub fn codegenCallExpression(
     // 3. Let arguments be the Arguments of expr.
     // 4. Let ref be ? Evaluation of memberExpr.
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
     // 5. Let func be ? GetValue(ref).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     if (node.expression.analyze(.is_reference)) {
-        try executable.addInstruction(.load_this_value_for_evaluate_call);
+        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
     } else {
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     }
@@ -917,13 +939,12 @@ pub fn codegenCallExpression(
         node.expression.primary_expression == .identifier_reference and
         std.mem.eql(u8, node.expression.primary_expression.identifier_reference, "eval"))
     {
-        const strict = ctx.contained_in_strict_mode_code;
-
         // This handles the SameValue(func, %eval%) check and then conditionally invokes
         // PerformEval or EvaluateCall.
-        try executable.addInstruction(.evaluate_call_direct_eval);
-        try executable.addIndex(node.arguments.len);
-        try executable.addIndex(@intFromBool(strict));
+        try executable.addInstruction(.evaluate_call_direct_eval, .{
+            .argument_count = try castIndex(u16, node.arguments.len),
+            .strict = ctx.contained_in_strict_mode_code,
+        });
         return;
     }
 
@@ -931,8 +952,9 @@ pub fn codegenCallExpression(
     // TODO: 8. Let tailCall be IsInTailPosition(thisCall).
 
     // 9. Return ? EvaluateCall(func, ref, arguments, tailCall).
-    try executable.addInstruction(.evaluate_call);
-    try executable.addIndex(node.arguments.len);
+    try executable.addInstruction(.evaluate_call, .{
+        .argument_count = try castIndex(u16, node.arguments.len),
+    });
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -947,14 +969,14 @@ pub fn codegenSuperProperty(
         .expression => |expression| {
             // 1. Let env be GetThisEnvironment().
             // 2. Let actualThis be ? env.GetThisBinding().
-            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+            try executable.addInstruction(.load_this_value_for_make_super_property_reference, {});
 
             // 3. Let propertyNameReference be ? Evaluation of Expression.
             try codegenExpression(expression.*, executable, ctx);
 
             // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 5. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;
@@ -964,15 +986,16 @@ pub fn codegenSuperProperty(
             //    performed until after evaluation of c.
 
             // 7. Return MakeSuperPropertyReference(actualThis, propertyNameValue, strict).
-            try executable.addInstruction(.make_super_property_reference);
-            try executable.addIndex(@intFromBool(strict));
+            try executable.addInstruction(.make_super_property_reference, .{
+                .strict = strict,
+            });
         },
 
         // SuperProperty : super . IdentifierName
         .identifier => |identifier| {
             // 1. Let env be GetThisEnvironment().
             // 2. Let actualThis be ? env.GetThisBinding().
-            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+            try executable.addInstruction(.load_this_value_for_make_super_property_reference, {});
 
             // 3. Let propertyKey be the StringValue of IdentifierName.
             const property_key = Value.from(
@@ -984,8 +1007,9 @@ pub fn codegenSuperProperty(
             const strict = ctx.contained_in_strict_mode_code;
 
             // 5. Return MakeSuperPropertyReference(actualThis, propertyKey, strict).
-            try executable.addInstruction(.make_super_property_reference);
-            try executable.addIndex(@intFromBool(strict));
+            try executable.addInstruction(.make_super_property_reference, .{
+                .strict = strict,
+            });
         },
     }
 }
@@ -999,8 +1023,9 @@ pub fn codegenSuperCall(
 ) Executable.Error!void {
     // SuperCall : super Arguments
     try codegenArguments(node.arguments, executable, ctx);
-    try executable.addInstruction(.evaluate_super_call);
-    try executable.addIndex(node.arguments.len);
+    try executable.addInstruction(.evaluate_super_call, .{
+        .argument_count = try castIndex(u16, node.arguments.len),
+    });
 }
 
 /// 13.3.8.1 Runtime Semantics: ArgumentListEvaluation
@@ -1026,8 +1051,8 @@ pub fn codegenArguments(
         // 4. Return the list-concatenation of precedingArgs and « arg ».
         .expression => |expression| {
             try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
         },
 
         // ArgumentList : ... AssignmentExpression
@@ -1049,8 +1074,8 @@ pub fn codegenArguments(
         //     c. Append executable.allocator, next to precedingArgs.
         .spread => |expression| {
             try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
             try spread_indices.append(executable.allocator, i);
         },
     };
@@ -1058,17 +1083,19 @@ pub fn codegenArguments(
     if (spread_indices.items.len == 0) {
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     } else {
-        try executable.addInstruction(.array_create);
-        try executable.addIndex(spread_indices.items.len);
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.array_create, .{
+            .length = try castIndex(u16, spread_indices.items.len),
+        });
+        try executable.addInstruction(.load, {});
         for (spread_indices.items, 0..) |spread_index, i| {
             try executable.addInstructionWithConstant(
                 .load_constant,
                 Value.from(@as(u53, @intCast(spread_index))),
             );
-            try executable.addInstruction(.array_set_value_direct);
-            try executable.addIndex(i);
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.array_set_value_direct, .{
+                .index = try castIndex(u16, i),
+            });
+            try executable.addInstruction(.load, {});
         }
     }
 }
@@ -1084,37 +1111,34 @@ pub fn codegenOptionalExpression(
 ) Executable.Error!void {
     // 1. Let baseReference be ? Evaluation of OptionalExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
     // 2. Let baseValue be ? GetValue(baseReference).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // 3. If baseValue is either undefined or null, then
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
     try executable.addInstructionWithConstant(.load_constant, .undefined);
-    try executable.addInstruction(.is_loosely_equal);
+    try executable.addInstruction(.is_loosely_equal, {});
 
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const alternate_jump = try executable.addJumpIndex();
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
     // a. Return undefined.
-    try consequent_jump.setTargetHere();
-    try executable.addInstruction(.store); // Drop baseValue from the stack
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.pop_reference);
+    jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+    try executable.addInstruction(.store, {}); // Drop baseValue from the stack
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.pop_reference, {});
     try executable.addInstructionWithConstant(.store_constant, .undefined);
-    try executable.addInstruction(.jump);
-    const end_jump = try executable.addJumpIndex();
+    const end_jump = try executable.addInstructionDeferred(.jump);
 
     // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
-    try alternate_jump.setTargetHere();
+    jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
     switch (node.property) {
         // OptionalChain : ?. Arguments
         .arguments => |arguments| {
             if (node.expression.analyze(.is_reference)) {
-                try executable.addInstruction(.load_this_value_for_evaluate_call);
+                try executable.addInstruction(.load_this_value_for_evaluate_call, {});
             } else {
                 try executable.addInstructionWithConstant(.load_constant, .undefined);
             }
@@ -1125,8 +1149,9 @@ pub fn codegenOptionalExpression(
             // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
 
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
-            try executable.addInstruction(.evaluate_call);
-            try executable.addIndex(arguments.len);
+            try executable.addInstruction(.evaluate_call, .{
+                .argument_count = try castIndex(u16, arguments.len),
+            });
         },
 
         // OptionalChain : ?. [ Expression ]
@@ -1136,10 +1161,11 @@ pub fn codegenOptionalExpression(
 
             // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-            try executable.addInstruction(.evaluate_property_access_with_expression_key);
-            try executable.addIndex(@intFromBool(strict));
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
+                .strict = strict,
+            });
         },
 
         // OptionalChain : ?. IdentifierName
@@ -1148,13 +1174,11 @@ pub fn codegenOptionalExpression(
             const strict = ctx.contained_in_strict_mode_code;
 
             // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstructionWithIdentifier(
-                .evaluate_property_access_with_identifier_key,
-                identifier,
-            );
-            try executable.addIndex(@intFromBool(strict));
-            try executable.addIndex(ctx.property_lookup_cache_index);
-            ctx.property_lookup_cache_index += 1;
+            try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                .strict = strict,
+                .identifier = try executable.addIdentifier(identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
         },
 
         // OptionalChain : ?. PrivateIdentifier
@@ -1171,9 +1195,9 @@ pub fn codegenOptionalExpression(
     // Since we don't know whether a reference will have been pushed to the stack or not we can't
     // let the caller add an unconditional get_value, therefore analyze(.is_reference) returns
     // false for optional_expression and we do it here instead.
-    if (node.property != .arguments) try executable.addInstruction(.get_value);
+    if (node.property != .arguments) try executable.addInstruction(.get_value, {});
 
-    try end_jump.setTargetHere();
+    end_jump.getPtr().* = try executable.nextInstructionIndex();
 }
 
 /// 13.3.10.1 Runtime Semantics: Evaluation
@@ -1184,9 +1208,9 @@ pub fn codegenImportCall(
     ctx: *Context,
 ) Executable.Error!void {
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-    try executable.addInstruction(.evaluate_import_call);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
+    try executable.addInstruction(.evaluate_import_call, {});
 }
 
 /// 13.3.11.1 Runtime Semantics: Evaluation
@@ -1201,17 +1225,17 @@ pub fn codegenTaggedTemplate(
 
     // 1. Let tagRef be ? Evaluation of MemberExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
     // 2. Let tagFunc be ? GetValue(tagRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // TODO: 3. Let thisCall be this MemberExpression.
     // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
     if (node.expression.analyze(.is_reference)) {
-        try executable.addInstruction(.load_this_value_for_evaluate_call);
+        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
     } else {
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     }
@@ -1231,7 +1255,7 @@ pub fn codegenTaggedTemplate(
             .get_template_object,
             .{ .template_literal = node.template_literal },
         );
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
     }
     // TemplateLiteral : SubstitutionTemplate
     else {
@@ -1241,7 +1265,7 @@ pub fn codegenTaggedTemplate(
             .get_template_object,
             .{ .template_literal = node.template_literal },
         );
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
 
         // 3. Let remaining be ? ArgumentListEvaluation of SubstitutionTemplate.
         // 4. Return the list-concatenation of « siteObj » and remaining.
@@ -1254,8 +1278,8 @@ pub fn codegenTaggedTemplate(
                     try codegenExpression(expression, executable, ctx);
 
                     // 2. Let firstSub be ? GetValue(firstSubRef).
-                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                    try executable.addInstruction(.load);
+                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                    try executable.addInstruction(.load, {});
 
                     // 3. Let restSub be ? SubstitutionEvaluation of TemplateSpans.
                     // 4. Assert: restSub is a possibly empty List.
@@ -1268,8 +1292,9 @@ pub fn codegenTaggedTemplate(
 
     // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-    try executable.addInstruction(.evaluate_call);
-    try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
+    try executable.addInstruction(.evaluate_call, .{
+        .argument_count = try castIndex(u16, @divFloor(node.template_literal.spans.len, 2) + 1),
+    });
 }
 
 /// 13.3.12.1 Runtime Semantics: Evaluation
@@ -1283,13 +1308,13 @@ pub fn codegenMetaProperty(
         // NewTarget : new . target
         .new_target => {
             // 1. Return GetNewTarget().
-            try executable.addInstruction(.get_new_target);
+            try executable.addInstruction(.get_new_target, {});
         },
 
         // ImportMeta : import . meta
         .import_meta => {
             // 1-5.
-            try executable.addInstruction(.get_or_create_import_meta);
+            try executable.addInstruction(.get_or_create_import_meta, {});
         },
     }
 }
@@ -1313,71 +1338,71 @@ pub fn codegenUpdateExpression(
     if (node.type == .postfix and node.operator == .@"++") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.to_numeric);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.to_numeric, {});
 
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
 
         // 3. If oldValue is a Number, then
         //     a. Let newValue be Number::add(oldValue, 1𝔽).
         // 4. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
-        try executable.addInstruction(.increment);
+        try executable.addInstruction(.increment, {});
 
         // 5. Perform ? PutValue(lhs, newValue).
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
         // 6. Return oldValue.
-        try executable.addInstruction(.store);
+        try executable.addInstruction(.store, {});
     }
     // UpdateExpression : LeftHandSideExpression --
     else if (node.type == .postfix and node.operator == .@"--") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.to_numeric);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.to_numeric, {});
 
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
 
         // 3. If oldValue is a Number, then
         //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
         // 4. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
-        try executable.addInstruction(.decrement);
+        try executable.addInstruction(.decrement, {});
 
         // 5. Perform ? PutValue(lhs, newValue).
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
         // 6. Return oldValue.
-        try executable.addInstruction(.store);
+        try executable.addInstruction(.store, {});
     }
     // UpdateExpression : ++ UnaryExpression
     else if (node.type == .prefix and node.operator == .@"++") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.to_numeric);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.to_numeric, {});
 
         // 3. If oldValue is a Number, then
         //     a. Let newValue be Number::add(oldValue, 1𝔽).
         // 4. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
-        try executable.addInstruction(.increment);
+        try executable.addInstruction(.increment, {});
 
         // 5. Perform ? PutValue(expr, newValue).
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
         // 6. Return newValue.
     }
@@ -1385,21 +1410,21 @@ pub fn codegenUpdateExpression(
     else if (node.type == .prefix and node.operator == .@"--") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.to_numeric);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.to_numeric, {});
 
         // 3. If oldValue is a Number, then
         //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
         // 4. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
-        try executable.addInstruction(.decrement);
+        try executable.addInstruction(.decrement, {});
 
         // 5. Perform ? PutValue(expr, newValue).
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
         // 6. Return newValue.
     } else unreachable;
@@ -1435,7 +1460,7 @@ pub fn codegenUnaryExpression(
                 try executable.addInstructionWithConstant(.store_constant, Value.from(true))
             else
                 // 3-5.
-                try executable.addInstruction(.delete);
+                try executable.addInstruction(.delete, {});
         },
 
         // UnaryExpression : void UnaryExpression
@@ -1444,7 +1469,7 @@ pub fn codegenUnaryExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Perform ? GetValue(expr).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. Return undefined.
             try executable.addInstructionWithConstant(.store_constant, .undefined);
@@ -1457,16 +1482,14 @@ pub fn codegenUnaryExpression(
                 while (primary_expression == .parenthesized_expression) {
                     primary_expression = primary_expression.parenthesized_expression.expression.primary_expression;
                 }
-                try executable.addInstructionWithIdentifier(
-                    .typeof_identifier,
-                    primary_expression.identifier_reference,
-                );
-                const strict = ctx.contained_in_strict_mode_code;
-                try executable.addIndex(@intFromBool(strict));
+                try executable.addInstruction(.typeof_identifier, .{
+                    .identifier = try executable.addIdentifier(primary_expression.identifier_reference),
+                    .strict = ctx.contained_in_strict_mode_code,
+                });
             } else {
                 try codegenExpression(node.expression.*, executable, ctx);
-                if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.typeof);
+                if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try executable.addInstruction(.typeof, {});
             }
         },
 
@@ -1476,8 +1499,8 @@ pub fn codegenUnaryExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Return ? ToNumber(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_number);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.to_number, {});
         },
 
         // UnaryExpression : - UnaryExpression
@@ -1486,15 +1509,15 @@ pub fn codegenUnaryExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.to_numeric, {});
 
             // 3. If oldValue is a Number, then
             //     a. Return Number::unaryMinus(oldValue).
             // 4. Else,
             //     a. Assert: oldValue is a BigInt.
             //     b. Return BigInt::unaryMinus(oldValue).
-            try executable.addInstruction(.unary_minus);
+            try executable.addInstruction(.unary_minus, {});
         },
 
         // UnaryExpression : ~ UnaryExpression
@@ -1503,15 +1526,15 @@ pub fn codegenUnaryExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.to_numeric, {});
 
             // 3. If oldValue is a Number, then
             //     a. Return Number::bitwiseNOT(oldValue).
             // 4. Else,
             //     a. Assert: oldValue is a BigInt.
             //     b. Return BigInt::bitwiseNOT(oldValue).
-            try executable.addInstruction(.bitwise_not);
+            try executable.addInstruction(.bitwise_not, {});
         },
 
         // UnaryExpression : ! UnaryExpression
@@ -1520,11 +1543,11 @@ pub fn codegenUnaryExpression(
             try codegenExpression(node.expression.*, executable, ctx);
 
             // 2. Let oldValue be ToBoolean(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. If oldValue is true, return false.
             // 4. Return true.
-            try executable.addInstruction(.logical_not);
+            try executable.addInstruction(.logical_not, {});
         },
     }
 }
@@ -1548,23 +1571,23 @@ pub fn codegenRelationalExpression(
             try codegenExpression(lhs_expression.*, executable, ctx);
 
             // 2. Let lVal be ? GetValue(lRef).
-            if (lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 3. Let rRef be ? Evaluation of ShiftExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // 4. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             switch (node.operator) {
-                .@"<" => try executable.addInstruction(.less_than),
-                .@">" => try executable.addInstruction(.greater_than),
-                .@"<=" => try executable.addInstruction(.less_than_equals),
-                .@">=" => try executable.addInstruction(.greater_than_equals),
-                .instanceof => try executable.addInstruction(.instanceof_operator),
-                .in => try executable.addInstruction(.has_property),
+                .@"<" => try executable.addInstruction(.less_than, {}),
+                .@">" => try executable.addInstruction(.greater_than, {}),
+                .@"<=" => try executable.addInstruction(.less_than_equals, {}),
+                .@">=" => try executable.addInstruction(.greater_than_equals, {}),
+                .instanceof => try executable.addInstruction(.instanceof_operator, {}),
+                .in => try executable.addInstruction(.has_property, {}),
             }
         },
 
@@ -1578,8 +1601,8 @@ pub fn codegenRelationalExpression(
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // 3. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try executable.addInstruction(.load, {});
 
             // 4. If rVal is not an Object, throw a TypeError exception.
             // 5. Let privateEnv be the running execution context's PrivateEnvironment.
@@ -1607,38 +1630,38 @@ pub fn codegenEqualityExpression(
     try codegenExpression(node.lhs_expression.*, executable, ctx);
 
     // 2. Let lVal be ? GetValue(lRef).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // 3. Let rRef be ? Evaluation of RelationalExpression.
     try codegenExpression(node.rhs_expression.*, executable, ctx);
 
     // 4. Let rVal be ? GetValue(rRef).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     switch (node.operator) {
         .@"==" => {
             // 5. Return ? IsLooselyEqual(rVal, lVal).
-            try executable.addInstruction(.is_loosely_equal);
+            try executable.addInstruction(.is_loosely_equal, {});
         },
         .@"!=" => {
             // 5. Let r be ? IsLooselyEqual(rVal, lVal).
-            try executable.addInstruction(.is_loosely_equal);
+            try executable.addInstruction(.is_loosely_equal, {});
 
             // 6. If r is true, return false. Otherwise, return true.
-            try executable.addInstruction(.logical_not);
+            try executable.addInstruction(.logical_not, {});
         },
         .@"===" => {
             // 5. Return IsStrictlyEqual(rVal, lVal).
-            try executable.addInstruction(.is_strictly_equal);
+            try executable.addInstruction(.is_strictly_equal, {});
         },
         .@"!==" => {
             // 5. Let r be IsStrictlyEqual(rVal, lVal).
-            try executable.addInstruction(.is_strictly_equal);
+            try executable.addInstruction(.is_strictly_equal, {});
 
             // 6. If r is true, return false. Otherwise, return true.
-            try executable.addInstruction(.logical_not);
+            try executable.addInstruction(.logical_not, {});
         },
     }
 }
@@ -1657,21 +1680,19 @@ pub fn codegenLogicalExpression(
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. If ToBoolean(lVal) is false, return lVal.
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-            try consequent_jump.setTargetHere();
+            const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+            jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
             // 4. Let rRef be ? Evaluation of BitwiseORExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // 5. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-            try alternate_jump.setTargetHere();
+            jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
         },
 
         // LogicalORExpression : LogicalORExpression || LogicalANDExpression
@@ -1680,21 +1701,19 @@ pub fn codegenLogicalExpression(
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. If ToBoolean(lVal) is true, return lVal.
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-            try alternate_jump.setTargetHere();
+            const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+            jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
             // 4. Let rRef be ? Evaluation of LogicalANDExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // 5. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-            try consequent_jump.setTargetHere();
+            jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
         },
 
         // CoalesceExpression : CoalesceExpressionHead ?? BitwiseORExpression
@@ -1703,38 +1722,35 @@ pub fn codegenLogicalExpression(
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
 
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
             try executable.addInstructionWithConstant(.load_constant, .undefined);
-            try executable.addInstruction(.is_loosely_equal);
+            try executable.addInstruction(.is_loosely_equal, {});
 
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
+            const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
             // 3. If lVal is either undefined or null, then
-            try consequent_jump.setTargetHere();
-            try executable.addInstruction(.store); // Drop lVal from the stack
+            jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+            try executable.addInstruction(.store, {}); // Drop lVal from the stack
 
             // a. Let rRef be ? Evaluation of BitwiseORExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // b. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-            try executable.addInstruction(.jump);
-            const end_jump = try executable.addJumpIndex();
+            const end_jump = try executable.addInstructionDeferred(.jump);
 
             // 4. Else,
-            try alternate_jump.setTargetHere();
+            jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
             // a. Return lVal.
-            try executable.addInstruction(.store);
+            try executable.addInstruction(.store, {});
 
-            try end_jump.setTargetHere();
+            end_jump.getPtr().* = try executable.nextInstructionIndex();
         },
     }
 }
@@ -1751,34 +1767,31 @@ pub fn codegenConditionalExpression(
     try codegenExpression(node.test_expression.*, executable, ctx);
 
     // 2. Let lVal be ToBoolean(? GetValue(lRef)).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const alternate_jump = try executable.addJumpIndex();
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
     // 3. If lVal is true, then
-    try consequent_jump.setTargetHere();
+    jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
     // a. Let trueRef be ? Evaluation of the first AssignmentExpression.
     try codegenExpression(node.consequent_expression.*, executable, ctx);
 
     // b. Return ? GetValue(trueRef).
-    if (node.consequent_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.consequent_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-    try executable.addInstruction(.jump);
-    const end_jump = try executable.addJumpIndex();
+    const end_jump = try executable.addInstructionDeferred(.jump);
 
     // 4. Else,
-    try alternate_jump.setTargetHere();
+    jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
     // a. Let falseRef be ? Evaluation of the second AssignmentExpression.
     try codegenExpression(node.alternate_expression.*, executable, ctx);
 
     // b. Return ? GetValue(falseRef).
-    if (node.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
-    try end_jump.setTargetHere();
+    end_jump.getPtr().* = try executable.nextInstructionIndex();
 }
 
 /// 13.15.2 Runtime Semantics: Evaluation
@@ -1807,12 +1820,12 @@ pub fn codegenAssignmentExpression(
                 try codegenExpression(node.rhs_expression.*, executable, ctx);
 
                 // ii. Let rVal be ? GetValue(rRef).
-                if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
             }
 
             // d. Perform ? PutValue(lRef, rVal).
             // e. Return rVal.
-            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.put_value, {});
             return;
         }
 
@@ -1823,14 +1836,14 @@ pub fn codegenAssignmentExpression(
         try codegenExpression(node.rhs_expression.*, executable, ctx);
 
         // 4. Let rVal be ? GetValue(rRef).
-        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
+        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.load, {});
 
         // 5. Perform ? DestructuringAssignmentEvaluation of assignmentPattern with argument rVal.
         try bindingInitialization(assignment_pattern, executable, ctx, null);
 
         // 6. Return rVal.
-        try executable.addInstruction(.store);
+        try executable.addInstruction(.store, {});
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
     else if (node.operator != .@"&&=" and node.operator != .@"||=" and node.operator != .@"??=") {
@@ -1838,42 +1851,42 @@ pub fn codegenAssignmentExpression(
 
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let lVal be ? GetValue(lRef).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.load, {});
 
         // 3. Let rRef be ? Evaluation of AssignmentExpression.
         try codegenExpression(node.rhs_expression.*, executable, ctx);
 
         // 4. Let rVal be ? GetValue(rRef).
-        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
+        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.load, {});
 
         // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
         // 6. Let opText be the sequence of Unicode code points associated with assignmentOpText
         //    in the following table:
         // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
-        try executable.addInstruction(switch (node.operator) {
-            .@"+=" => .binary_operator_add,
-            .@"-=" => .binary_operator_sub,
-            .@"*=" => .binary_operator_mul,
-            .@"/=" => .binary_operator_div,
-            .@"%=" => .binary_operator_mod,
-            .@"**=" => .binary_operator_exp,
-            .@"<<=" => .binary_operator_left_shift,
-            .@">>=" => .binary_operator_right_shift,
-            .@">>>=" => .binary_operator_unsigned_right_shift,
-            .@"&=" => .binary_operator_bitwise_and,
-            .@"^=" => .binary_operator_bitwise_xor,
-            .@"|=" => .binary_operator_bitwise_or,
-            else => unreachable,
-        });
+        switch (node.operator) {
+            .@"+=" => try executable.addInstruction(.binary_operator_add, {}),
+            .@"-=" => try executable.addInstruction(.binary_operator_sub, {}),
+            .@"*=" => try executable.addInstruction(.binary_operator_mul, {}),
+            .@"/=" => try executable.addInstruction(.binary_operator_div, {}),
+            .@"%=" => try executable.addInstruction(.binary_operator_mod, {}),
+            .@"**=" => try executable.addInstruction(.binary_operator_exp, {}),
+            .@"<<=" => try executable.addInstruction(.binary_operator_left_shift, {}),
+            .@">>=" => try executable.addInstruction(.binary_operator_right_shift, {}),
+            .@">>>=" => try executable.addInstruction(.binary_operator_unsigned_right_shift, {}),
+            .@"&=" => try executable.addInstruction(.binary_operator_bitwise_and, {}),
+            .@"^=" => try executable.addInstruction(.binary_operator_bitwise_xor, {}),
+            .@"|=" => try executable.addInstruction(.binary_operator_bitwise_or, {}),
+            else => {},
+        }
 
         // 8. Perform ? PutValue(lRef, r).
         // 9. Return r.
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
     }
     // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
     else if (node.operator == .@"&&=") {
@@ -1881,18 +1894,15 @@ pub fn codegenAssignmentExpression(
 
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let lVal be ? GetValue(lRef).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.load, {});
 
         // 3. If ToBoolean(lVal) is false, return lVal.
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
-
-        try consequent_jump.setTargetHere();
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+        jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
         // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
@@ -1906,21 +1916,20 @@ pub fn codegenAssignmentExpression(
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
         // 7. Return rVal.
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addInstructionDeferred(.jump);
 
-        try alternate_jump.setTargetHere();
-        try executable.addInstruction(.store); // Restore lVal as the result value
-        try executable.addInstruction(.pop_reference); // Drop lRef
+        jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Restore lVal as the result value
+        try executable.addInstruction(.pop_reference, {}); // Drop lRef
 
-        try end_jump.setTargetHere();
+        end_jump.getPtr().* = try executable.nextInstructionIndex();
     }
     // AssignmentExpression : LeftHandSideExpression ||= AssignmentExpression
     else if (node.operator == .@"||=") {
@@ -1928,17 +1937,15 @@ pub fn codegenAssignmentExpression(
 
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let lVal be ? GetValue(lRef).
-        try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value, {});
 
         // 3. If ToBoolean(lVal) is true, return lVal.
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
-        try alternate_jump.setTargetHere();
+        jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
         // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
@@ -1952,20 +1959,19 @@ pub fn codegenAssignmentExpression(
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
         // 7. Return rVal.
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addInstructionDeferred(.jump);
 
-        try consequent_jump.setTargetHere();
-        try executable.addInstruction(.pop_reference); // Drop lRef
+        jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+        try executable.addInstruction(.pop_reference, {}); // Drop lRef
 
-        try end_jump.setTargetHere();
+        end_jump.getPtr().* = try executable.nextInstructionIndex();
     }
     // AssignmentExpression : LeftHandSideExpression ??= AssignmentExpression
     else if (node.operator == .@"??=") {
@@ -1973,23 +1979,21 @@ pub fn codegenAssignmentExpression(
 
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference);
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. Let lVal be ? GetValue(lRef).
-        try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.get_value, {});
+        try executable.addInstruction(.load, {});
 
         // 3. If lVal is neither undefined nor null, return lVal.
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
         try executable.addInstructionWithConstant(.load_constant, .undefined);
-        try executable.addInstruction(.is_loosely_equal);
+        try executable.addInstruction(.is_loosely_equal, {});
 
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
-        try consequent_jump.setTargetHere();
-        try executable.addInstruction(.store); // Drop lVal from the stack
+        jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Drop lVal from the stack
 
         // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and
         //          IsIdentifierRef of LeftHandSideExpression is true, then
@@ -2003,21 +2007,20 @@ pub fn codegenAssignmentExpression(
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
         // 7. Return rVal.
-        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.put_value, {});
 
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addInstructionDeferred(.jump);
 
-        try alternate_jump.setTargetHere();
-        try executable.addInstruction(.store); // Restore lVal as the result value
-        try executable.addInstruction(.pop_reference); // Drop lRef
+        jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Restore lVal as the result value
+        try executable.addInstruction(.pop_reference, {}); // Drop lRef
 
-        try end_jump.setTargetHere();
+        end_jump.getPtr().* = try executable.nextInstructionIndex();
     } else unreachable;
 }
 
@@ -2032,31 +2035,35 @@ pub fn codegenBinaryExpression(
     try codegenExpression(node.lhs_expression.*, executable, ctx);
 
     // 2. Let lVal be ? GetValue(lRef).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // 3. Let rRef be ? Evaluation of rightOperand.
     try codegenExpression(node.rhs_expression.*, executable, ctx);
 
     // 4. Let rVal be ? GetValue(rRef).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // 5. Return ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
-    try executable.addInstruction(switch (node.operator) {
-        .@"+" => .binary_operator_add,
-        .@"-" => .binary_operator_sub,
-        .@"*" => .binary_operator_mul,
-        .@"/" => .binary_operator_div,
-        .@"%" => .binary_operator_mod,
-        .@"**" => .binary_operator_exp,
-        .@"<<" => .binary_operator_left_shift,
-        .@">>" => .binary_operator_right_shift,
-        .@">>>" => .binary_operator_unsigned_right_shift,
-        .@"&" => .binary_operator_bitwise_and,
-        .@"^" => .binary_operator_bitwise_xor,
-        .@"|" => .binary_operator_bitwise_or,
-    });
+    switch (node.operator) {
+        inline else => |comptime_operator| {
+            try executable.addInstruction(switch (comptime_operator) {
+                .@"+" => .binary_operator_add,
+                .@"-" => .binary_operator_sub,
+                .@"*" => .binary_operator_mul,
+                .@"/" => .binary_operator_div,
+                .@"%" => .binary_operator_mod,
+                .@"**" => .binary_operator_exp,
+                .@"<<" => .binary_operator_left_shift,
+                .@">>" => .binary_operator_right_shift,
+                .@">>>" => .binary_operator_unsigned_right_shift,
+                .@"&" => .binary_operator_bitwise_and,
+                .@"^" => .binary_operator_bitwise_xor,
+                .@"|" => .binary_operator_bitwise_or,
+            }, {});
+        },
+    }
 }
 
 /// 13.16.1 Runtime Semantics: Evaluation
@@ -2072,7 +2079,7 @@ pub fn codegenSequenceExpression(
     // 4. Return ? GetValue(rRef).
     for (node.expressions) |expression| {
         try codegenExpression(expression, executable, ctx);
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
     }
 }
 
@@ -2207,7 +2214,7 @@ pub fn codegenBlock(
     // Block : { StatementList }
     if (has_lexically_scoped_declarations) {
         // 1. Let oldEnv be the running execution context's LexicalEnvironment.
-        try executable.addInstruction(.push_lexical_environment);
+        try executable.addInstruction(.push_lexical_environment, {});
 
         // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
         // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
@@ -2228,8 +2235,8 @@ pub fn codegenBlock(
             ctx,
             struct {
                 fn codegen(executable_: *Executable) Executable.Error!void {
-                    try executable_.addInstruction(.restore_lexical_environment);
-                    try executable_.addInstruction(.pop_lexical_environment);
+                    try executable_.addInstruction(.restore_lexical_environment, {});
+                    try executable_.addInstruction(.pop_lexical_environment, {});
                 }
             }.codegen,
             .{executable},
@@ -2304,18 +2311,15 @@ pub fn codegenLexicalBinding(
         .binding_identifier => |binding_identifier| {
             // LexicalBinding : BindingIdentifier Initializer
             if (binding_identifier.initializer) |initializer| {
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.load, {});
 
                 // 1. Let bindingId be the StringValue of BindingIdentifier.
                 // 2. Let lhs be ! ResolveBinding(bindingId).
-                try executable.addInstructionWithIdentifier(
-                    .resolve_binding,
-                    binding_identifier.binding_identifier,
-                );
-                const strict = ctx.contained_in_strict_mode_code;
-                try executable.addIndex(@intFromBool(strict));
-                try executable.addIndex(ctx.environment_lookup_cache_index);
-                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.resolve_binding, .{
+                    .identifier = try executable.addIdentifier(binding_identifier.binding_identifier),
+                    .strict = ctx.contained_in_strict_mode_code,
+                    .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+                });
 
                 // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
                 if (false) {
@@ -2327,46 +2331,43 @@ pub fn codegenLexicalBinding(
                     try codegenExpression(initializer, executable, ctx);
 
                     // b. Let value be ? GetValue(rhs).
-                    if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                    if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
                 }
 
                 // 5. Perform ! InitializeReferencedBinding(lhs, value).
-                try executable.addInstruction(.initialize_referenced_binding);
+                try executable.addInstruction(.initialize_referenced_binding, {});
 
                 // 6. Return empty.
-                try executable.addInstruction(.store);
+                try executable.addInstruction(.store, {});
             }
             // LexicalBinding : BindingIdentifier
             else {
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.load, {});
 
                 // 1. Let lhs be ! ResolveBinding(StringValue of BindingIdentifier).
-                try executable.addInstructionWithIdentifier(
-                    .resolve_binding,
-                    binding_identifier.binding_identifier,
-                );
-                const strict = ctx.contained_in_strict_mode_code;
-                try executable.addIndex(@intFromBool(strict));
-                try executable.addIndex(ctx.environment_lookup_cache_index);
-                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.resolve_binding, .{
+                    .identifier = try executable.addIdentifier(binding_identifier.binding_identifier),
+                    .strict = ctx.contained_in_strict_mode_code,
+                    .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+                });
 
                 // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
                 try executable.addInstructionWithConstant(.store_constant, .undefined);
-                try executable.addInstruction(.initialize_referenced_binding);
+                try executable.addInstruction(.initialize_referenced_binding, {});
 
                 // 3. Return empty.
-                try executable.addInstruction(.store);
+                try executable.addInstruction(.store, {});
             }
         },
         // LexicalBinding : BindingPattern Initializer
         .binding_pattern => |binding_pattern| {
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
 
             // 1. Let rhs be ? Evaluation of Initializer.
             try codegenExpression(binding_pattern.initializer, executable, ctx);
 
             // 2. Let value be ? GetValue(rhs).
-            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. Let env be the running execution context's LexicalEnvironment.
             // 4. Return ? BindingInitialization of BindingPattern with arguments value and env.
@@ -2377,7 +2378,7 @@ pub fn codegenLexicalBinding(
                 .lexical_environment,
             );
 
-            try executable.addInstruction(.store);
+            try executable.addInstruction(.store, {});
         },
     }
 }
@@ -2424,15 +2425,12 @@ pub fn codegenVariableDeclaration(
             if (binding_identifier.initializer) |initializer| {
                 // 1. Let bindingId be the StringValue of BindingIdentifier.
                 // 2. Let lhs be ? ResolveBinding(bindingId).
-                try executable.addInstruction(.load);
-                try executable.addInstructionWithIdentifier(
-                    .resolve_binding,
-                    binding_identifier.binding_identifier,
-                );
-                const strict = ctx.contained_in_strict_mode_code;
-                try executable.addIndex(@intFromBool(strict));
-                try executable.addIndex(ctx.environment_lookup_cache_index);
-                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.load, {});
+                try executable.addInstruction(.resolve_binding, .{
+                    .identifier = try executable.addIdentifier(binding_identifier.binding_identifier),
+                    .strict = ctx.contained_in_strict_mode_code,
+                    .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+                });
 
                 // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
                 // 4. Else,
@@ -2443,13 +2441,13 @@ pub fn codegenVariableDeclaration(
                 // b. Let value be ? GetValue(rhs).
                 // FIXME: This clobbers the result value and we don't have a good way of restoring it.
                 //        Should probably use the stack more and have explicit result store instructions.
-                if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
                 // 5. Perform ? PutValue(lhs, value).
-                try executable.addInstruction(.put_value);
+                try executable.addInstruction(.put_value, {});
 
                 // 6. Return empty.
-                try executable.addInstruction(.store);
+                try executable.addInstruction(.store, {});
             }
             // VariableDeclaration : BindingIdentifier
             else {
@@ -2458,18 +2456,18 @@ pub fn codegenVariableDeclaration(
         },
         // VariableDeclaration : BindingPattern Initializer
         .binding_pattern => |binding_pattern| {
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
 
             // 1. Let rhs be ? Evaluation of Initializer.
             try codegenExpression(binding_pattern.initializer, executable, ctx);
 
             // 2. Let rVal be ? GetValue(rhs).
-            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 3. Return ? BindingInitialization of BindingPattern with arguments rVal and undefined.
             try bindingInitialization(binding_pattern.binding_pattern, executable, ctx, null);
 
-            try executable.addInstruction(.store);
+            try executable.addInstruction(.store, {});
         },
     }
 }
@@ -2486,7 +2484,7 @@ pub fn codegenExpressionStatement(
     try codegenExpression(node.expression, executable, ctx);
 
     // 2. Return ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 }
 
 /// 14.6.2 Runtime Semantics: Evaluation
@@ -2500,22 +2498,19 @@ pub fn codegenIfStatement(
     try codegenExpression(node.test_expression, executable, ctx);
 
     // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const alternate_jump = try executable.addJumpIndex();
+    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
     // 3. If exprValue is true, then
-    try consequent_jump.setTargetHere();
+    jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
     try executable.addInstructionWithConstant(.store_constant, .undefined);
 
     // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
     try codegenStatement(node.consequent_statement.*, executable, ctx);
-    try executable.addInstruction(.jump);
-    const end_jump = try executable.addJumpIndex();
+    const end_jump = try executable.addInstructionDeferred(.jump);
 
     // 4. Else,
-    try alternate_jump.setTargetHere();
+    jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
     try executable.addInstructionWithConstant(.store_constant, .undefined);
 
     if (node.alternate_statement) |alternate_statement| {
@@ -2526,7 +2521,7 @@ pub fn codegenIfStatement(
     // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
     // NOTE: This is handled by the store_constant before the consequent/alternate statements.
 
-    try end_jump.setTargetHere();
+    end_jump.getPtr().* = try executable.nextInstructionIndex();
 }
 
 /// 14.7.1.2 Runtime Semantics: LoopEvaluation
@@ -2581,14 +2576,14 @@ pub fn codegenDoWhileStatement(
     try executable.addInstructionWithConstant(.load_constant, .undefined);
 
     // 2. Repeat,
-    const start_index = executable.instructions.items.len;
+    const start_index = try executable.nextInstructionIndex();
 
     // a. Let stmtResult be Completion(Evaluation of Statement).
     // b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
     try codegenStatement(node.consequent_statement.*, executable, ctx);
-    const continue_index = executable.instructions.items.len;
-    try executable.addInstruction(.load);
+    const continue_index = try executable.nextInstructionIndex();
+    try executable.addInstruction(.load, {});
 
     // c. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
     // NOTE: This is done by the store/load sequence around each consequent execution.
@@ -2597,32 +2592,30 @@ pub fn codegenDoWhileStatement(
     try codegenExpression(node.test_expression, executable, ctx);
 
     // e. Let exprValue be ? GetValue(exprRef).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // f. If ToBoolean(exprValue) is false, return V.
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const end_jump = try executable.addJumpIndex();
-
-    try consequent_jump.setTarget(start_index);
-
-    try end_jump.setTargetHere();
-    try executable.addInstruction(.store);
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+    jump_conditional.getPtr().* = .{
+        .consequent = start_index,
+        .alternate = try executable.nextInstructionIndex(),
+    };
+    try executable.addInstruction(.store, {});
 
     while (ctx.continue_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTarget(continue_index);
+        jump_index.getPtr().* = continue_index;
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
         while (labelled_continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
+            jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
         while (labelled_break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
 }
@@ -2645,51 +2638,47 @@ pub fn codegenWhileStatement(
     try executable.addInstructionWithConstant(.load_constant, .undefined);
 
     // 2. Repeat,
-    const start_index = executable.instructions.items.len;
+    const start_index = try executable.nextInstructionIndex();
 
     // a. Let exprRef be ? Evaluation of Expression.
     try codegenExpression(node.test_expression, executable, ctx);
 
     // b. Let exprValue be ? GetValue(exprRef).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // c. If ToBoolean(exprValue) is false, return V.
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const end_jump = try executable.addJumpIndex();
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
     // d. Let stmtResult be Completion(Evaluation of Statement).
     // e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
-    try consequent_jump.setTargetHere();
-    try executable.addInstruction(.store);
+    jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
+    try executable.addInstruction(.store, {});
     try codegenStatement(node.consequent_statement.*, executable, ctx);
-    const continue_index = executable.instructions.items.len;
-    try executable.addInstruction(.load);
+    const continue_index = try executable.nextInstructionIndex();
+    try executable.addInstruction(.load, {});
 
-    try executable.addInstruction(.jump);
-    const start_jump = try executable.addJumpIndex();
-    try start_jump.setTarget(start_index);
+    try executable.addInstruction(.jump, start_index);
 
     // f. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
     // NOTE: This is done by the store/load sequence around each consequent execution.
 
-    try end_jump.setTargetHere();
-    try executable.addInstruction(.store);
+    jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
+    try executable.addInstruction(.store, {});
 
     while (ctx.continue_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTarget(continue_index);
+        jump_index.getPtr().* = continue_index;
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
         while (labelled_continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
+            jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
         while (labelled_break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
 }
@@ -2715,7 +2704,7 @@ pub fn codegenForStatement(
             //     a. Let exprRef be ? Evaluation of the first Expression.
             //     b. Perform ? GetValue(exprRef).
             try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
             // 2. If the second Expression is present, let test be the second Expression;
             //    otherwise, let test be empty.
@@ -2739,7 +2728,7 @@ pub fn codegenForStatement(
         // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
         .lexical_declaration => |lexical_declaration| {
             // 1. Let oldEnv be the running execution context's LexicalEnvironment.
-            try executable.addInstruction(.push_lexical_environment);
+            try executable.addInstruction(.push_lexical_environment, {});
 
             // 2. Let loopEnv be NewDeclarativeEnvironment(oldEnv).
             // 3. Let isConst be IsConstantDeclaration of LexicalDeclaration.
@@ -2779,9 +2768,9 @@ pub fn codegenForStatement(
     // TODO: 2. Perform ? CreatePerIterationEnvironment(perIterationBindings).
 
     // 3. Repeat,
-    const start_index = executable.instructions.items.len;
+    const start_index = try executable.nextInstructionIndex();
 
-    var end_jump: Executable.JumpIndex = undefined;
+    var end_jump: DeferredInstructionIndex = undefined;
 
     // a. If test is not empty, then
     if (node.test_expression) |test_expression| {
@@ -2789,21 +2778,20 @@ pub fn codegenForStatement(
         try codegenExpression(test_expression, executable, ctx);
 
         // ii. Let testValue be ? GetValue(testRef).
-        if (test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
         // iii. If ToBoolean(testValue) is false, return V.
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        end_jump = try executable.addJumpIndex();
-        try consequent_jump.setTargetHere();
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+        end_jump = jump_conditional.getFieldDeferred(.alternate);
+        jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
     }
 
     // b. Let result be Completion(Evaluation of stmt).
     // c. If LoopContinues(result, labelSet) is false, return ? UpdateEmpty(result, V).
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
     try codegenStatement(node.consequent_statement.*, executable, ctx);
-    const continue_index = executable.instructions.items.len;
-    try executable.addInstruction(.load);
+    const continue_index = try executable.nextInstructionIndex();
+    try executable.addInstruction(.load, {});
 
     // d. If result.[[Value]] is not empty, set V to result.[[Value]].
     // NOTE: This is done by the store/load sequence around each consequent execution.
@@ -2816,36 +2804,34 @@ pub fn codegenForStatement(
         try codegenExpression(increment_expression, executable, ctx);
 
         // ii. Perform ? GetValue(incRef).
-        if (increment_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (increment_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
     }
 
-    try executable.addInstruction(.jump);
-    const start_jump = try executable.addJumpIndex();
-    try start_jump.setTarget(start_index);
+    try executable.addInstruction(.jump, start_index);
 
-    if (node.test_expression != null) try end_jump.setTargetHere();
-    try executable.addInstruction(.store);
+    if (node.test_expression != null) end_jump.getPtr().* = try executable.nextInstructionIndex();
+    try executable.addInstruction(.store, {});
 
     while (ctx.continue_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTarget(continue_index);
+        jump_index.getPtr().* = continue_index;
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
         while (labelled_continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
+            jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
         while (labelled_break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
 
     if (node.initializer) |initializer| if (initializer == .lexical_declaration) {
-        try executable.addInstruction(.restore_lexical_environment);
-        try executable.addInstruction(.pop_lexical_environment);
+        try executable.addInstruction(.restore_lexical_environment, {});
+        try executable.addInstruction(.pop_lexical_environment, {});
     };
 }
 
@@ -2898,7 +2884,7 @@ fn forInOfHeadEvaluation(
     ctx: *Context,
     expression: ast.Expression,
     iteration_kind: ForInOfIterationKind,
-) Executable.Error!?Executable.JumpIndex {
+) Executable.Error!?DeferredInstructionIndex {
     // TODO: 1-2.
 
     // 3. Let exprRef be Completion(Evaluation of expr).
@@ -2907,30 +2893,28 @@ fn forInOfHeadEvaluation(
     // TODO: 4. Set the running execution context's LexicalEnvironment to oldEnv.
 
     // 5. Let exprValue be ? GetValue(? exprRef).
-    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // 6. If iterationKind is enumerate, then
     if (iteration_kind == .enumerate) {
-        try executable.addInstruction(.load); // Store RHS object for the iterator
+        try executable.addInstruction(.load, {}); // Store RHS object for the iterator
 
         // a. If exprValue is either undefined or null, then
         //     i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
-        try executable.addInstruction(.load);
+        try executable.addInstruction(.load, {});
         try executable.addInstructionWithConstant(.load_constant, .undefined);
-        try executable.addInstruction(.is_loosely_equal);
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
-        try alternate_jump.setTargetHere();
+        try executable.addInstruction(.is_loosely_equal, {});
+        const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+        jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
         // b. Let obj be ! ToObject(exprValue).
         // c. Let iterator be EnumerateObjectProperties(obj).
         // d. Let nextMethod be ! GetV(iterator, "next").
         // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
-        try executable.addInstruction(.store);
-        try executable.addInstruction(.create_object_property_iterator);
+        try executable.addInstruction(.store, {});
+        try executable.addInstruction(.create_object_property_iterator, {});
 
-        return consequent_jump;
+        return jump_conditional.getFieldDeferred(.consequent);
     }
     // 7. Else,
     else {
@@ -2945,8 +2929,7 @@ fn forInOfHeadEvaluation(
             .sync;
 
         // d. Return ? GetIterator(exprValue, iteratorKind).
-        try executable.addInstruction(.get_iterator);
-        try executable.addIndex(@intFromEnum(iterator_kind));
+        try executable.addInstruction(.get_iterator, iterator_kind);
 
         return null;
     }
@@ -2959,7 +2942,7 @@ fn forInOfBodyEvaluation(
     ctx: *Context,
     lhs: ast.ForInOfStatement.Initializer,
     statement: ast.Statement,
-    break_jump: ?Executable.JumpIndex,
+    break_jump: ?DeferredInstructionIndex,
     iteration_kind: ForInOfIterationKind,
     lhs_kind: ForInOfLhsKind,
     // TODO: label_set
@@ -2976,7 +2959,7 @@ fn forInOfBodyEvaluation(
     // NOTE: This is always passed in at the call site.
 
     // 2. Let oldEnv be the running execution context's LexicalEnvironment.
-    try executable.addInstruction(.push_lexical_environment);
+    try executable.addInstruction(.push_lexical_environment, {});
 
     // 3. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -2998,50 +2981,42 @@ fn forInOfBodyEvaluation(
     }
 
     // 6. Repeat,
-    const start_index = executable.instructions.items.len;
+    const start_index = try executable.nextInstructionIndex();
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
-    try executable.addInstruction(.dup_iterator);
-    try executable.addInstruction(.load_iterator_next_args);
+    try executable.addInstruction(.dup_iterator, {});
+    try executable.addInstruction(.load_iterator_next_args, {});
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-    try executable.addInstruction(.evaluate_call);
-    try executable.addIndex(0); // No arguments
+    try executable.addInstruction(.evaluate_call, .{ .argument_count = 0 });
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
-    if (iterator_kind == .@"async") try executable.addInstruction(.@"await");
+    if (iterator_kind == .@"async") try executable.addInstruction(.@"await", {});
 
     // TODO: c. If nextResult is not an Object, throw a TypeError exception.
 
     // Store result object on the stack for later `.value` access
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
 
     // d. Let done be ? IteratorComplete(nextResult).
-    try executable.addInstruction(.load);
-    try executable.addInstructionWithIdentifier(
-        .evaluate_property_access_with_identifier_key,
-        "done",
-    );
-    try executable.addIndex(0); // Strictness doesn't matter here
-    try executable.addIndex(ctx.property_lookup_cache_index);
-    ctx.property_lookup_cache_index += 1;
-    try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load, {});
+    try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+        .strict = false, // Strictness doesn't matter here
+        .identifier = try executable.addIdentifier("done"),
+        .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+    });
+    try executable.addInstruction(.get_value, {});
 
     // e. If done is true, return V.
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const alternate_jump = try executable.addJumpIndex();
-
-    try alternate_jump.setTargetHere();
+    const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+    jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
     // f. Let nextValue be ? IteratorValue(nextResult).
-    try executable.addInstructionWithIdentifier(
-        .evaluate_property_access_with_identifier_key,
-        "value",
-    );
-    try executable.addIndex(0); // Strictness doesn't matter here
-    try executable.addIndex(ctx.property_lookup_cache_index);
-    ctx.property_lookup_cache_index += 1;
-    try executable.addInstruction(.get_value);
+    try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+        .strict = false, // Strictness doesn't matter here
+        .identifier = try executable.addIdentifier("value"),
+        .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+    });
+    try executable.addInstruction(.get_value, {});
 
     // g. If lhsKind is either assignment or var-binding, then
     if (lhs_kind == .assignment or lhs_kind == .var_binding) {
@@ -3079,7 +3054,7 @@ fn forInOfBodyEvaluation(
             //     a. Let status be lhsRef.
             // 3. Else,
             //     a. Let status be Completion(PutValue(lhsRef.[[Value]], nextValue)).
-            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.put_value, {});
         }
     }
     // h. Else,
@@ -3140,74 +3115,72 @@ fn forInOfBodyEvaluation(
             const lhs_name = lhs.for_declaration.for_binding.binding_identifier;
 
             // 3. Let lhsRef be ! ResolveBinding(lhsName).
-            try executable.addInstructionWithIdentifier(.resolve_binding, lhs_name);
-            const strict = ctx.contained_in_strict_mode_code;
-            try executable.addIndex(@intFromBool(strict));
-            try executable.addIndex(ctx.environment_lookup_cache_index);
-            ctx.environment_lookup_cache_index += 1;
+            try executable.addInstruction(.resolve_binding, .{
+                .identifier = try executable.addIdentifier(lhs_name),
+                .strict = ctx.contained_in_strict_mode_code,
+                .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+            });
 
             // 4. Let status be Completion(InitializeReferencedBinding(lhsRef, nextValue)).
-            try executable.addInstruction(.initialize_referenced_binding);
+            try executable.addInstruction(.initialize_referenced_binding, {});
         }
     }
 
     // TODO: i. If status is an abrupt completion, then
 
     // j. Let result be Completion(Evaluation of stmt).
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
     try codegenStatement(statement, executable, ctx);
-    const continue_index = executable.instructions.items.len;
-    try executable.addInstruction(.load);
+    const continue_index = try executable.nextInstructionIndex();
+    try executable.addInstruction(.load, {});
 
     // k. Set the running execution context's LexicalEnvironment to oldEnv.
-    try executable.addInstruction(.restore_lexical_environment);
+    try executable.addInstruction(.restore_lexical_environment, {});
 
     // TODO: l. If LoopContinues(result, labelSet) is false, then
 
     // m. If result.[[Value]] is not empty, set V to result.[[Value]].
     // NOTE: This is done by the store/load sequence around each consequent execution.
 
-    try executable.addInstruction(.jump);
-    try executable.addIndex(start_index);
+    try executable.addInstruction(.jump, start_index);
 
-    try consequent_jump.setTargetHere();
+    jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
-    try executable.addInstruction(.store); // Pop last iterator result object
+    try executable.addInstruction(.store, {}); // Pop last iterator result object
 
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
 
     while (ctx.continue_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTarget(continue_index);
+        jump_index.getPtr().* = continue_index;
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
         while (labelled_continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
+            jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
         while (labelled_break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
+            jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
 
     // TODO: We should probably also clean this up if something throws beforehand...
-    try executable.addInstruction(.pop_iterator);
-    try executable.addInstruction(.pop_lexical_environment);
+    try executable.addInstruction(.pop_iterator, {});
+    try executable.addInstruction(.pop_lexical_environment, {});
 
     if (break_jump) |jump_index| {
-        try executable.addInstruction(.jump);
-        const skip_break_jump = try executable.addJumpIndex();
+        const skip_break_jump = try executable.addInstructionDeferred(.jump);
 
         // If this is for a for-in loop and the RHS is nullish we jump here and clean up the result
         // value that was created for the jump_conditional instruction.
-        try jump_index.setTargetHere();
-        try executable.addInstruction(.store); // Pop RHS object
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Pop RHS object
         try executable.addInstructionWithConstant(.store_constant, .undefined);
 
-        try skip_break_jump.setTargetHere();
+        skip_break_jump.getPtr().* = try executable.nextInstructionIndex();
     }
 }
 
@@ -3222,15 +3195,13 @@ pub fn codegenContinueStatement(
     if (node.label) |label| {
         // 1. Let label be the StringValue of LabelIdentifier.
         // 2. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: label }.
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.labelled_continue_jumps.get(label).?.append(executable.allocator, jump_index);
     }
     // ContinueStatement : continue ;
     else {
         // 1. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: empty }.
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.continue_jumps.append(executable.allocator, jump_index);
     }
 }
@@ -3246,15 +3217,13 @@ pub fn codegenBreakStatement(
     if (node.label) |label| {
         // 1. Let label be the StringValue of LabelIdentifier.
         // 2. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: label }.
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.labelled_break_jumps.get(label).?.append(executable.allocator, jump_index);
     }
     // BreakStatement : break ;
     else {
         // 1. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
-        try executable.addInstruction(.jump);
-        const jump_index = try executable.addJumpIndex();
+        const jump_index = try executable.addInstructionDeferred(.jump);
         try ctx.break_jumps.append(executable.allocator, jump_index);
     }
 }
@@ -3272,18 +3241,18 @@ pub fn codegenReturnStatement(
         try codegenExpression(expression, executable, ctx);
 
         // 2. Let exprValue be ? GetValue(exprRef).
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
         // TODO: 3. If GetGeneratorKind() is async, set exprValue to ? Await(exprValue).
 
         // 4. Return ReturnCompletion(exprValue).
-        try executable.addInstruction(.@"return");
+        try executable.addInstruction(.@"return", {});
     }
     // ReturnStatement : return ;
     else {
         // 1. Return ReturnCompletion(undefined).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
-        try executable.addInstruction(.@"return");
+        try executable.addInstruction(.@"return", {});
     }
 }
 
@@ -3298,15 +3267,15 @@ pub fn codegenWithStatement(
     try codegenExpression(node.expression, executable, ctx);
 
     // 2. Let obj be ? ToObject(? GetValue(val)).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.to_object);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.to_object, {});
 
     // 3. Let oldEnv be the running execution context's LexicalEnvironment.
-    try executable.addInstruction(.push_lexical_environment);
+    try executable.addInstruction(.push_lexical_environment, {});
 
     // 4. Let newEnv be NewObjectEnvironment(obj, true, oldEnv).
     // 5. Set the running execution context's LexicalEnvironment to newEnv.
-    try executable.addInstruction(.create_with_environment);
+    try executable.addInstruction(.create_with_environment, {});
 
     // 6. Let C be Completion(Evaluation of Statement).
     try executable.addInstructionWithConstant(.store_constant, .undefined);
@@ -3318,8 +3287,8 @@ pub fn codegenWithStatement(
         ctx,
         struct {
             fn codegen(executable_: *Executable) Executable.Error!void {
-                try executable_.addInstruction(.restore_lexical_environment);
-                try executable_.addInstruction(.pop_lexical_environment);
+                try executable_.addInstruction(.restore_lexical_environment, {});
+                try executable_.addInstruction(.pop_lexical_environment, {});
             }
         }.codegen,
         .{executable},
@@ -3388,61 +3357,55 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
     //     c. If R is an abrupt completion, return ? UpdateEmpty(R, V).
     // 16. Return V.
 
-    try executable.addInstruction(.load); // Save input value
+    try executable.addInstruction(.load, {}); // Save input value
 
-    var consequent_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    var consequent_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
     defer consequent_jumps.deinit(executable.allocator);
 
     var has_default_clause = false;
     for (case_block.items) |item| switch (item) {
         .case_clause => |case_clause| {
-            try executable.addInstruction(.store);
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.store, {});
+            try executable.addInstruction(.load, {});
             try caseClauseIsSelected(executable, ctx, case_clause);
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-            try alternate_jump.setTargetHere();
-            try consequent_jumps.append(executable.allocator, consequent_jump);
+            const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
+            jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
+            try consequent_jumps.append(executable.allocator, jump_conditional.getFieldDeferred(.consequent));
         },
         .default_clause => {
             std.debug.assert(!has_default_clause);
             has_default_clause = true;
         },
     };
-    try executable.addInstruction(.jump);
-    const default_or_end_jump = try executable.addJumpIndex();
+    const default_or_end_jump = try executable.addInstructionDeferred(.jump);
     var i: usize = 0;
     for (case_block.items) |item| {
         switch (item) {
             .case_clause => |case_clause| {
-                try executable.addInstruction(.jump);
-                const skip_jump = try executable.addJumpIndex();
-                try consequent_jumps.items[i].setTargetHere();
-                try executable.addInstruction(.store); // Pop input value
+                const skip_jump = try executable.addInstructionDeferred(.jump);
+                consequent_jumps.items[i].getPtr().* = try executable.nextInstructionIndex();
+                try executable.addInstruction(.store, {}); // Pop input value
                 try executable.addInstructionWithConstant(.store_constant, .undefined);
-                try skip_jump.setTargetHere();
+                skip_jump.getPtr().* = try executable.nextInstructionIndex();
                 try codegenStatementList(case_clause.statement_list, executable, ctx);
                 i += 1;
             },
             .default_clause => |default_clause| {
-                try executable.addInstruction(.jump);
-                const skip_jump = try executable.addJumpIndex();
-                try default_or_end_jump.setTargetHere();
-                try executable.addInstruction(.store); // Pop input value
+                const skip_jump = try executable.addInstructionDeferred(.jump);
+                default_or_end_jump.getPtr().* = try executable.nextInstructionIndex();
+                try executable.addInstruction(.store, {}); // Pop input value
                 try executable.addInstructionWithConstant(.store_constant, .undefined);
-                try skip_jump.setTargetHere();
+                skip_jump.getPtr().* = try executable.nextInstructionIndex();
                 try codegenStatementList(default_clause.statement_list, executable, ctx);
             },
         }
     }
     if (!has_default_clause) {
-        try executable.addInstruction(.jump);
-        const skip_jump = try executable.addJumpIndex();
-        try default_or_end_jump.setTargetHere();
-        try executable.addInstruction(.store); // Pop input value
+        const skip_jump = try executable.addInstructionDeferred(.jump);
+        default_or_end_jump.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.store, {}); // Pop input value
         try executable.addInstructionWithConstant(.store_constant, .undefined);
-        try skip_jump.setTargetHere();
+        skip_jump.getPtr().* = try executable.nextInstructionIndex();
     }
 }
 
@@ -3451,17 +3414,17 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
 fn caseClauseIsSelected(executable: *Executable, ctx: *Context, case_clause: ast.CaseClause) Executable.Error!void {
     // 1. Assert: C is an instance of the production CaseClause : case Expression : StatementList[opt] .
 
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
 
     // 2. Let exprRef be ? Evaluation of the Expression of C.
     try codegenExpression(case_clause.expression, executable, ctx);
 
     // 3. Let clauseSelector be ? GetValue(exprRef).
-    if (case_clause.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+    if (case_clause.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.load, {});
 
     // 4. Return IsStrictlyEqual(input, clauseSelector).
-    try executable.addInstruction(.is_strictly_equal);
+    try executable.addInstruction(.is_strictly_equal, {});
 }
 
 /// 14.12.4 Runtime Semantics: Evaluation
@@ -3478,10 +3441,10 @@ pub fn codegenSwitchStatement(
     try codegenExpression(node.expression, executable, ctx);
 
     // 2. Let switchValue be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // 3. Let oldEnv be the running execution context's LexicalEnvironment.
-    try executable.addInstruction(.push_lexical_environment);
+    try executable.addInstruction(.push_lexical_environment, {});
 
     // 4. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
     // 5. Perform BlockDeclarationInstantiation(CaseBlock, blockEnv).
@@ -3495,7 +3458,7 @@ pub fn codegenSwitchStatement(
     try caseBlockEvaluation(executable, ctx, node.case_block);
 
     while (ctx.break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
 
     // 8. Set the running execution context's LexicalEnvironment to oldEnv.
@@ -3504,8 +3467,8 @@ pub fn codegenSwitchStatement(
         ctx,
         struct {
             fn codegen(executable_: *Executable) Executable.Error!void {
-                try executable_.addInstruction(.restore_lexical_environment);
-                try executable_.addInstruction(.pop_lexical_environment);
+                try executable_.addInstruction(.restore_lexical_environment, {});
+                try executable_.addInstruction(.pop_lexical_environment, {});
             }
         }.codegen,
         .{executable},
@@ -3531,7 +3494,7 @@ pub fn codegenLabelledStatement(
     const tmp = temporaryChange(&ctx.current_label, label);
     defer tmp.restore();
 
-    var labelled_continue_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    var labelled_continue_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
     defer labelled_continue_jumps.deinit(executable.allocator);
     try ctx.labelled_continue_jumps.putNoClobber(executable.allocator, label, &labelled_continue_jumps);
     defer {
@@ -3539,7 +3502,7 @@ pub fn codegenLabelledStatement(
         std.debug.assert(removed);
     }
 
-    var labelled_break_jumps: std.ArrayListUnmanaged(Executable.JumpIndex) = .empty;
+    var labelled_break_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
     defer labelled_break_jumps.deinit(executable.allocator);
     try ctx.labelled_break_jumps.putNoClobber(executable.allocator, label, &labelled_break_jumps);
     defer {
@@ -3565,7 +3528,7 @@ pub fn codegenLabelledStatement(
     // more from other kinds of statements. This doesn't apply to labelled continue jumps which are
     // only valid in iterable statements anyway.
     while (labelled_break_jumps.popOrNull()) |jump_index| {
-        try jump_index.setTargetHere();
+        jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     std.debug.assert(labelled_continue_jumps.items.len == 0);
     std.debug.assert(labelled_break_jumps.items.len == 0);
@@ -3583,10 +3546,10 @@ pub fn codegenThrowStatement(
     try codegenExpression(node.expression, executable, ctx);
 
     // 2. Let exprValue be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // 3. Return ThrowCompletion(exprValue).
-    try executable.addInstruction(.throw);
+    try executable.addInstruction(.throw, {});
 }
 
 /// 14.15.3 Runtime Semantics: Evaluation
@@ -3598,30 +3561,28 @@ pub fn codegenTryStatement(
 ) Executable.Error!void {
     // TryStatement : try Block Catch
     if (node.finally_block == null) {
-        try executable.addInstruction(.push_exception_jump_target);
-        const exception_jump_to_catch = try executable.addJumpIndex();
+        const exception_jump_to_catch = try executable.addInstructionDeferred(.push_exception_jump_target);
 
         // 1. Let B be Completion(Evaluation of Block).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.try_block, executable, ctx);
         try interceptContinueAndBreakJumps(executable, ctx, struct {
             fn codegen(executable_: *Executable) Executable.Error!void {
-                try executable_.addInstruction(.pop_exception_jump_target);
+                try executable_.addInstruction(.pop_exception_jump_target, {});
             }
         }.codegen, .{executable});
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addInstructionDeferred(.jump);
 
         // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with
         //    argument B.[[Value]]).
-        try exception_jump_to_catch.setTargetHere();
-        try executable.addInstruction(.pop_exception_jump_target);
+        exception_jump_to_catch.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.pop_exception_jump_target, {});
         if (node.catch_parameter) |catch_parameter| {
-            try executable.addInstruction(.push_lexical_environment);
+            try executable.addInstruction(.push_lexical_environment, {});
             try executable.addInstructionWithAstNode(.create_catch_bindings, .{
                 .catch_parameter = catch_parameter,
             });
-            try executable.addInstruction(.load_and_clear_exception);
+            try executable.addInstruction(.load_and_clear_exception, {});
             switch (catch_parameter) {
                 .binding_identifier => |binding_identifier| {
                     try executable.addInstructionWithIdentifier(
@@ -3649,8 +3610,8 @@ pub fn codegenTryStatement(
         if (node.catch_parameter != null) {
             try interceptContinueAndBreakJumps(executable, ctx, struct {
                 fn codegen(executable_: *Executable) Executable.Error!void {
-                    try executable_.addInstruction(.restore_lexical_environment);
-                    try executable_.addInstruction(.pop_lexical_environment);
+                    try executable_.addInstruction(.restore_lexical_environment, {});
+                    try executable_.addInstruction(.pop_lexical_environment, {});
                 }
             }.codegen, .{executable});
         }
@@ -3660,50 +3621,46 @@ pub fn codegenTryStatement(
 
         // 3. Else, let C be B.
         // 4. Return ? UpdateEmpty(C, undefined).
-        try end_jump.setTargetHere();
+        end_jump.getPtr().* = try executable.nextInstructionIndex();
     }
     // TryStatement : try Block Finally
     else if (node.catch_block == null) {
-        try executable.addInstruction(.push_exception_jump_target);
-        const exception_jump_to_finally = try executable.addJumpIndex();
+        const exception_jump_to_finally = try executable.addInstructionDeferred(.push_exception_jump_target);
 
         // 1. Let B be Completion(Evaluation of Block).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.try_block, executable, ctx);
 
         // 2. Let F be Completion(Evaluation of Finally).
-        try exception_jump_to_finally.setTargetHere();
-        try executable.addInstruction(.pop_exception_jump_target);
+        exception_jump_to_finally.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.pop_exception_jump_target, {});
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.finally_block.?, executable, ctx);
-        try executable.addInstruction(.rethrow_exception_if_any);
+        try executable.addInstruction(.rethrow_exception_if_any, {});
 
         // 3. If F is a normal completion, set F to B.
         // 4. Return ? UpdateEmpty(F, undefined).
     }
     // TryStatement : try Block Catch Finally
     else {
-        try executable.addInstruction(.push_exception_jump_target);
-        const exception_jump_to_catch = try executable.addJumpIndex();
+        const exception_jump_to_catch = try executable.addInstructionDeferred(.push_exception_jump_target);
 
         // 1. Let B be Completion(Evaluation of Block).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.try_block, executable, ctx);
-        try executable.addInstruction(.jump);
-        const finally_jump = try executable.addJumpIndex();
+        const finally_jump = try executable.addInstructionDeferred(.jump);
 
         // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
         // 3. Else, let C be B.
-        try exception_jump_to_catch.setTargetHere();
-        try executable.addInstruction(.pop_exception_jump_target);
-        try executable.addInstruction(.push_exception_jump_target);
-        const exception_jump_to_finally = try executable.addJumpIndex();
+        exception_jump_to_catch.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.pop_exception_jump_target, {});
+        const exception_jump_to_finally = try executable.addInstructionDeferred(.push_exception_jump_target);
         if (node.catch_parameter) |catch_parameter| {
-            try executable.addInstruction(.push_lexical_environment);
+            try executable.addInstruction(.push_lexical_environment, {});
             try executable.addInstructionWithAstNode(.create_catch_bindings, .{
                 .catch_parameter = catch_parameter,
             });
-            try executable.addInstruction(.load_and_clear_exception);
+            try executable.addInstruction(.load_and_clear_exception, {});
             switch (catch_parameter) {
                 .binding_identifier => |binding_identifier| {
                     try executable.addInstructionWithIdentifier(
@@ -3731,8 +3688,8 @@ pub fn codegenTryStatement(
         if (node.catch_parameter != null) {
             try interceptContinueAndBreakJumps(executable, ctx, struct {
                 fn codegen(executable_: *Executable) Executable.Error!void {
-                    try executable_.addInstruction(.restore_lexical_environment);
-                    try executable_.addInstruction(.pop_lexical_environment);
+                    try executable_.addInstruction(.restore_lexical_environment, {});
+                    try executable_.addInstruction(.pop_lexical_environment, {});
                 }
             }.codegen, .{executable});
         }
@@ -3741,12 +3698,12 @@ pub fn codegenTryStatement(
         try ctx.continue_jumps.insertSlice(executable.allocator, 0, continue_jumps);
 
         // 4. Let F be Completion(Evaluation of Finally).
-        try finally_jump.setTargetHere();
-        try exception_jump_to_finally.setTargetHere();
-        try executable.addInstruction(.pop_exception_jump_target);
+        finally_jump.getPtr().* = try executable.nextInstructionIndex();
+        exception_jump_to_finally.getPtr().* = try executable.nextInstructionIndex();
+        try executable.addInstruction(.pop_exception_jump_target, {});
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.finally_block.?, executable, ctx);
-        try executable.addInstruction(.rethrow_exception_if_any);
+        try executable.addInstruction(.rethrow_exception_if_any, {});
 
         // 5. If F is a normal completion, set F to C.
         // 6. Return ? UpdateEmpty(F, undefined).
@@ -3799,18 +3756,17 @@ pub fn codegenMethodDefinition(
     ctx: *Context,
 ) Executable.Error!void {
     try codegenClassElementName(node.class_element_name, executable, ctx);
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
 
-    try executable.addInstructionWithAstNode(
-        .object_define_method,
-        switch (node.method) {
+    try executable.addInstruction(.object_define_method, .{
+        .ast_node = try executable.addAstNode(switch (node.method) {
             .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
             .generator => |generator_expression| .{ .generator_expression = generator_expression },
             .@"async" => |async_function_expression| .{ .async_function_expression = async_function_expression },
             .async_generator => |async_generator_expression| .{ .async_generator_expression = async_generator_expression },
-        },
-    );
-    try executable.addIndex(@intFromEnum(std.meta.activeTag(node.method)));
+        }),
+        .type = node.method,
+    });
 }
 
 /// 15.5.5 Runtime Semantics: Evaluation
@@ -3840,16 +3796,16 @@ pub fn codegenYieldExpression(
         try codegenExpression(expression.*, executable, ctx);
 
         // 2. Let value be ? GetValue(exprRef).
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
         // 3. Return ? Yield(value).
-        try executable.addInstruction(.yield);
+        try executable.addInstruction(.yield, {});
     }
     // YieldExpression : yield
     else {
         // 1. Return ? Yield(undefined).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
-        try executable.addInstruction(.yield);
+        try executable.addInstruction(.yield, {});
     }
 }
 
@@ -3876,14 +3832,14 @@ pub fn codegenClassDeclaration(
 ) Executable.Error!void {
     // ClassDeclaration : class BindingIdentifier ClassTail
     // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
-    try executable.addInstruction(.load);
+    try executable.addInstruction(.load, {});
     try executable.addInstructionWithAstNode(
         .binding_class_declaration_evaluation,
         .{ .class_declaration = node },
     );
 
     // 2. Return empty.
-    try executable.addInstruction(.store);
+    try executable.addInstruction(.store, {});
 }
 
 /// 15.7.16 Runtime Semantics: Evaluation
@@ -3954,10 +3910,10 @@ pub fn codegenAwaitExpression(
     try codegenExpression(node.expression.*, executable, ctx);
 
     // 2. Let value be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 
     // 3. Return ? Await(value).
-    try executable.addInstruction(.@"await");
+    try executable.addInstruction(.@"await", {});
 }
 
 /// 15.9.5 Runtime Semantics: Evaluation
@@ -4060,7 +4016,7 @@ pub fn codegenExportDeclaration(
         // ExportDeclaration : export default ClassDeclaration
         .default_class_declaration => |class_declaration| {
             // 1. Let value be ? BindingClassDeclarationEvaluation of ClassDeclaration.
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
             try executable.addInstructionWithAstNode(
                 .binding_class_declaration_evaluation,
                 .{ .class_declaration = class_declaration },
@@ -4073,17 +4029,17 @@ pub fn codegenExportDeclaration(
             if (class_name == null) {
                 // a. Let env be the running execution context's LexicalEnvironment.
                 // b. Perform ? InitializeBoundName("*default*", value, env).
-                try executable.addInstruction(.load);
+                try executable.addInstruction(.load, {});
                 try executable.addInstructionWithIdentifier(.initialize_bound_name, "*default*");
             }
 
             // 4. Return empty.
-            try executable.addInstruction(.store);
+            try executable.addInstruction(.store, {});
         },
 
         // ExportDeclaration : export default AssignmentExpression ;
         .default_expression => |expression| {
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
 
             // TODO 1. If IsAnonymousFunctionDefinition(AssignmentExpression) is true, then
             if (false) {
@@ -4095,16 +4051,16 @@ pub fn codegenExportDeclaration(
                 try codegenExpression(expression, executable, ctx);
 
                 // b. Let value be ? GetValue(rhs).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
             }
 
             // 3. Let env be the running execution context's LexicalEnvironment.
             // 4. Perform ? InitializeBoundName("*default*", value, env).
-            try executable.addInstruction(.load);
+            try executable.addInstruction(.load, {});
             try executable.addInstructionWithIdentifier(.initialize_bound_name, "*default*");
 
             // 5. Return empty.
-            try executable.addInstruction(.store);
+            try executable.addInstruction(.store, {});
         },
     }
 }

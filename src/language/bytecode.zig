@@ -50,7 +50,7 @@ pub fn generateBytecode(
     };
 
     // The VM requires this to be the last instruction.
-    try executable.addInstruction(.end);
+    try executable.addInstruction(.end, {});
 
     // Already incremented by one by the last caller
     try executable.environment_lookup_cache.resize(executable.allocator, ctx.environment_lookup_cache_index);

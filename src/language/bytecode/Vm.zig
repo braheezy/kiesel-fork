@@ -96,29 +96,9 @@ pub fn deinit(self: *Vm) void {
     self.function_arguments.deinit(self.agent.gc_allocator);
 }
 
-fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
+fn fetchInstructionTag(self: *Vm, executable: Executable) Instruction.Tag {
     defer self.ip += 1;
     return @enumFromInt(executable.instructions.items[self.ip]);
-}
-
-fn fetchConstant(self: *Vm, executable: Executable) Value {
-    const index = self.fetchIndex(executable);
-    return executable.constants.entries.get(index).key;
-}
-
-fn fetchIdentifier(self: *Vm, executable: Executable) *const String {
-    const index = self.fetchIndex(executable);
-    return executable.identifiers.entries.get(index).key;
-}
-
-fn fetchAstNode(self: *Vm, executable: Executable) *Executable.AstNode {
-    const index = self.fetchIndex(executable);
-    return &executable.ast_nodes.items[index];
-}
-
-fn fetchIndex(self: *Vm, executable: Executable) Executable.IndexType {
-    defer self.ip += @sizeOf(Executable.IndexType);
-    return std.mem.bytesToValue(Executable.IndexType, &executable.instructions.items[self.ip]);
 }
 
 fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
@@ -156,8 +136,7 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     return self.function_arguments.items;
 }
 
-fn executeArrayCreate(self: *Vm, executable: Executable) Agent.Error!void {
-    const length = self.fetchIndex(executable);
+fn executeArrayCreate(self: *Vm, length: u16, _: Executable) Agent.Error!void {
     const array = try arrayCreate(self.agent, length, null);
     self.result = Value.from(array);
 }
@@ -175,16 +154,14 @@ fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(array);
 }
 
-fn executeArraySetLength(self: *Vm, executable: Executable) Agent.Error!void {
-    const length = self.fetchIndex(executable);
+fn executeArraySetLength(self: *Vm, length: u16, _: Executable) Agent.Error!void {
     const array = self.result.?.asObject();
     // From ArrayAccumulation:
     // 2. Perform ? Set(array, "length", 𝔽(len), true).
     try array.set(PropertyKey.from("length"), Value.from(length), .throw);
 }
 
-fn executeArraySetValueDirect(self: *Vm, executable: Executable) Agent.Error!void {
-    const index = self.fetchIndex(executable);
+fn executeArraySetValueDirect(self: *Vm, index: u16, _: Executable) Agent.Error!void {
     const value = self.stack.pop();
     const array = self.stack.pop().asObject();
     try array.property_storage.indexed_properties.set(self.agent.gc_allocator, index, .{
@@ -376,8 +353,12 @@ fn executeBinaryOperatorBitwiseXor(self: *Vm, _: Executable) Agent.Error!void {
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"^", r_val);
 }
 
-fn executeBindingClassDeclarationEvaluation(self: *Vm, executable: Executable) Agent.Error!void {
-    const class_declaration = self.fetchAstNode(executable).class_declaration;
+fn executeBindingClassDeclarationEvaluation(
+    self: *Vm,
+    ast_node_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const class_declaration = executable.getAstNode(ast_node_index).class_declaration;
     self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
 }
 
@@ -397,8 +378,12 @@ fn executeBitwiseNot(self: *Vm, _: Executable) Agent.Error!void {
     };
 }
 
-fn executeBlockDeclarationInstantiation(self: *Vm, executable: Executable) Agent.Error!void {
-    const block = self.fetchAstNode(executable);
+fn executeBlockDeclarationInstantiation(
+    self: *Vm,
+    block_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const block = executable.getAstNode(block_index);
     const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
     const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
     try blockDeclarationInstantiation(
@@ -417,8 +402,12 @@ fn executeBlockDeclarationInstantiation(self: *Vm, executable: Executable) Agent
 
 /// 15.7.16 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-fn executeClassDefinitionEvaluation(self: *Vm, executable: Executable) Agent.Error!void {
-    const class_expression = self.fetchAstNode(executable).class_expression;
+fn executeClassDefinitionEvaluation(
+    self: *Vm,
+    class_expression_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const class_expression = executable.getAstNode(class_expression_index).class_expression;
 
     // ClassExpression : class BindingIdentifier ClassTail
     if (class_expression.identifier) |identifier| {
@@ -467,8 +456,12 @@ fn executeClassDefinitionEvaluation(self: *Vm, executable: Executable) Agent.Err
     }
 }
 
-fn executeCreateCatchBindings(self: *Vm, executable: Executable) Agent.Error!void {
-    const catch_parameter = self.fetchAstNode(executable).catch_parameter;
+fn executeCreateCatchBindings(
+    self: *Vm,
+    catch_parameter_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const catch_parameter = executable.getAstNode(catch_parameter_index).catch_parameter;
 
     // From CatchClauseEvaluation:
     // 1. Let oldEnv be the running execution context's LexicalEnvironment.
@@ -622,8 +615,7 @@ fn executeDupReference(self: *Vm, _: Executable) Agent.Error!void {
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
-fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
-    const argument_count = self.fetchIndex(executable);
+fn executeEvaluateCall(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
     const this_value = self.stack.pop();
     const function = self.stack.pop();
@@ -636,9 +628,12 @@ fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
     );
 }
 
-fn executeEvaluateCallDirectEval(self: *Vm, executable: Executable) Agent.Error!void {
-    const argument_count = self.fetchIndex(executable);
-    const strict = self.fetchIndex(executable) == 1;
+fn executeEvaluateCallDirectEval(
+    self: *Vm,
+    argument_count: u16,
+    strict: bool,
+    _: Executable,
+) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
     const this_value = self.stack.pop();
     const function = self.stack.pop();
@@ -705,8 +700,7 @@ fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(promise_capability.promise);
 }
 
-fn executeEvaluateNew(self: *Vm, executable: Executable) Agent.Error!void {
-    const argument_count = self.fetchIndex(executable);
+fn executeEvaluateNew(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
     const constructor = self.stack.pop();
     self.result = try evaluateNew(self.agent, constructor, arguments);
@@ -714,12 +708,15 @@ fn executeEvaluateNew(self: *Vm, executable: Executable) Agent.Error!void {
 
 /// 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
 /// https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
-fn executeEvaluatePropertyAccessWithExpressionKey(self: *Vm, executable: Executable) Agent.Error!void {
+fn executeEvaluatePropertyAccessWithExpressionKey(
+    self: *Vm,
+    strict: bool,
+    _: Executable,
+) Agent.Error!void {
     // 1. Let propertyNameReference be ? Evaluation of expression.
     // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
     const property_name_value = self.stack.pop();
 
-    const strict = self.fetchIndex(executable) == 1;
     const base_value = self.stack.pop();
 
     // 3. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
@@ -743,15 +740,17 @@ fn executeEvaluatePropertyAccessWithExpressionKey(self: *Vm, executable: Executa
 
 /// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
 /// https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
-fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executable) Agent.Error!void {
+fn executeEvaluatePropertyAccessWithIdentifierKey(
+    self: *Vm,
+    strict: bool,
+    identifier_name_index: Executable.IdentifierIndex,
+    property_name_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+    executable: Executable,
+) Agent.Error!void {
     // 1. Let propertyNameString be the StringValue of identifierName.
-    const property_name_string = self.fetchIdentifier(executable);
+    const property_name_string = executable.getIdentifier(identifier_name_index);
 
-    const strict = self.fetchIndex(executable) == 1;
-    const property_lookup_cache_index = self.fetchIndex(executable);
-    const lookup_cache_entry = &executable.property_lookup_cache.items[
-        property_lookup_cache_index
-    ];
+    const lookup_cache_entry = executable.getPropertyLookupCacheEntry(property_name_lookup_cache_index);
     const base_value = self.stack.pop();
 
     // 2. Return the Reference Record {
@@ -774,9 +773,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executa
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-fn executeEvaluateSuperCall(self: *Vm, executable: Executable) Agent.Error!void {
-    const argument_count = self.fetchIndex(executable);
-
+fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
     // 1. Let newTarget be GetNewTarget().
     const new_target = self.agent.getNewTarget();
 
@@ -818,8 +815,12 @@ fn executeEvaluateSuperCall(self: *Vm, executable: Executable) Agent.Error!void 
     self.result = Value.from(result);
 }
 
-fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) Agent.Error!void {
-    const lexical_declaration = self.fetchAstNode(executable).lexical_declaration;
+fn executeForDeclarationBindingInstantiation(
+    self: *Vm,
+    lexical_declaration_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const lexical_declaration = executable.getAstNode(lexical_declaration_index).lexical_declaration;
 
     // From ForIn/OfBodyEvaluation:
     // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
@@ -866,8 +867,7 @@ fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) 
     };
 }
 
-fn executeGetIterator(self: *Vm, executable: Executable) Agent.Error!void {
-    const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
+fn executeGetIterator(self: *Vm, iterator_kind: IteratorKind, _: Executable) Agent.Error!void {
     const iterator = try getIterator(self.agent, self.result.?, iterator_kind);
     try self.iterator_stack.append(self.agent.gc_allocator, iterator);
 }
@@ -926,8 +926,12 @@ fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
     }
 }
 
-fn executeGetTemplateObject(self: *Vm, executable: Executable) Agent.Error!void {
-    const template_literal = &self.fetchAstNode(executable).template_literal;
+fn executeGetTemplateObject(
+    self: *Vm,
+    template_literal_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const template_literal = &executable.getAstNode(template_literal_index).template_literal;
     self.result = Value.from(try getTemplateObject(self.agent, template_literal));
 }
 
@@ -978,8 +982,12 @@ fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(!(result orelse true));
 }
 
-fn executeHasPrivateElement(self: *Vm, executable: Executable) Agent.Error!void {
-    const private_identifier = self.fetchIdentifier(executable);
+fn executeHasPrivateElement(
+    self: *Vm,
+    private_identifier_index: Executable.IdentifierIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const private_identifier = executable.getIdentifier(private_identifier_index);
     const r_val = self.stack.pop();
 
     // 4. If rVal is not an Object, throw a TypeError exception.
@@ -1042,8 +1050,12 @@ fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(try value.asBigInt().add(self.agent, self.agent.pre_allocated.one));
 }
 
-fn executeInitializeBoundName(self: *Vm, executable: Executable) Agent.Error!void {
-    const name = self.fetchIdentifier(executable);
+fn executeInitializeBoundName(
+    self: *Vm,
+    name_index: Executable.IdentifierIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const name = executable.getIdentifier(name_index);
     const value = self.stack.pop();
     const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
     try initializeBoundName(
@@ -1068,8 +1080,12 @@ fn executeInstanceofOperator(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(try l_val.instanceofOperator(self.agent, r_val));
 }
 
-fn executeInstantiateArrowFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const arrow_function = self.fetchAstNode(executable).arrow_function;
+fn executeInstantiateArrowFunctionExpression(
+    self: *Vm,
+    arrow_function_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const arrow_function = executable.getAstNode(arrow_function_index).arrow_function;
     const closure = try instantiateArrowFunctionExpression(
         self.agent,
         arrow_function,
@@ -1078,8 +1094,12 @@ fn executeInstantiateArrowFunctionExpression(self: *Vm, executable: Executable) 
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncArrowFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const async_arrow_function = self.fetchAstNode(executable).async_arrow_function;
+fn executeInstantiateAsyncArrowFunctionExpression(
+    self: *Vm,
+    async_arrow_function_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const async_arrow_function = executable.getAstNode(async_arrow_function_index).async_arrow_function;
     const closure = try instantiateAsyncArrowFunctionExpression(
         self.agent,
         async_arrow_function,
@@ -1088,8 +1108,12 @@ fn executeInstantiateAsyncArrowFunctionExpression(self: *Vm, executable: Executa
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const async_function_expression = self.fetchAstNode(executable).async_function_expression;
+fn executeInstantiateAsyncFunctionExpression(
+    self: *Vm,
+    async_function_expression_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const async_function_expression = executable.getAstNode(async_function_expression_index).async_function_expression;
     const closure = try instantiateAsyncFunctionExpression(
         self.agent,
         async_function_expression,
@@ -1098,8 +1122,12 @@ fn executeInstantiateAsyncFunctionExpression(self: *Vm, executable: Executable) 
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const async_generator_expression = self.fetchAstNode(executable).async_generator_expression;
+fn executeInstantiateAsyncGeneratorFunctionExpression(
+    self: *Vm,
+    async_generator_expression_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const async_generator_expression = executable.getAstNode(async_generator_expression_index).async_generator_expression;
     const closure = try instantiateAsyncGeneratorFunctionExpression(
         self.agent,
         async_generator_expression,
@@ -1108,8 +1136,12 @@ fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Vm, executable: Exe
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateGeneratorFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const generator_expression = self.fetchAstNode(executable).generator_expression;
+fn executeInstantiateGeneratorFunctionExpression(
+    self: *Vm,
+    generator_expression_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const generator_expression = executable.getAstNode(generator_expression_index).generator_expression;
     const closure = try instantiateGeneratorFunctionExpression(
         self.agent,
         generator_expression,
@@ -1118,8 +1150,12 @@ fn executeInstantiateGeneratorFunctionExpression(self: *Vm, executable: Executab
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateOrdinaryFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
-    const function_expression = self.fetchAstNode(executable).function_expression;
+fn executeInstantiateOrdinaryFunctionExpression(
+    self: *Vm,
+    function_expression_index: Executable.AstNodeIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const function_expression = executable.getAstNode(function_expression_index).function_expression;
     const closure = try instantiateOrdinaryFunctionExpression(
         self.agent,
         function_expression,
@@ -1164,15 +1200,18 @@ fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(isStrictlyEqual(r_val, l_val));
 }
 
-fn executeJump(self: *Vm, executable: Executable) Agent.Error!void {
-    self.ip = self.fetchIndex(executable);
+fn executeJump(self: *Vm, index: Executable.InstructionIndex, _: Executable) Agent.Error!void {
+    self.ip = @intFromEnum(index);
 }
 
-fn executeJumpConditional(self: *Vm, executable: Executable) Agent.Error!void {
-    const ip_consequent = self.fetchIndex(executable);
-    const ip_alternate = self.fetchIndex(executable);
+fn executeJumpConditional(
+    self: *Vm,
+    ip_consequent: Executable.InstructionIndex,
+    ip_alternate: Executable.InstructionIndex,
+    _: Executable,
+) Agent.Error!void {
     const value = self.result.?;
-    self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
+    self.ip = if (value.toBoolean()) @intFromEnum(ip_consequent) else @intFromEnum(ip_alternate);
 }
 
 fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
@@ -1222,8 +1261,12 @@ fn executeLoad(self: *Vm, _: Executable) Agent.Error!void {
     if (self.result) |value| try self.stack.append(self.agent.gc_allocator, value);
 }
 
-fn executeLoadConstant(self: *Vm, executable: Executable) Agent.Error!void {
-    const value = self.fetchConstant(executable);
+fn executeLoadConstant(
+    self: *Vm,
+    value_index: Executable.ConstantIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const value = executable.getConstant(value_index);
     try self.stack.append(self.agent.gc_allocator, value);
 }
 
@@ -1262,8 +1305,12 @@ fn executeLogicalNot(self: *Vm, _: Executable) Agent.Error!void {
 
 /// 6.2.5.9 MakePrivateReference ( baseValue, privateIdentifier )
 /// https://tc39.es/ecma262/#sec-makeprivatereference
-fn executeMakePrivateReference(self: *Vm, executable: Executable) Agent.Error!void {
-    const private_identifier = self.fetchIdentifier(executable);
+fn executeMakePrivateReference(
+    self: *Vm,
+    private_identifier_index: Executable.IdentifierIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const private_identifier = executable.getIdentifier(private_identifier_index);
     const base_value = self.stack.pop();
 
     // 1. Let privateEnv be the running execution context's PrivateEnvironment.
@@ -1289,9 +1336,8 @@ fn executeMakePrivateReference(self: *Vm, executable: Executable) Agent.Error!vo
 
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
 /// https://tc39.es/ecma262/#sec-makesuperpropertyreference
-fn executeMakeSuperPropertyReference(self: *Vm, executable: Executable) Agent.Error!void {
+fn executeMakeSuperPropertyReference(self: *Vm, strict: bool, _: Executable) Agent.Error!void {
     const property_key = self.stack.pop();
-    const strict = self.fetchIndex(executable) == 1;
     const actual_this = self.stack.pop();
 
     // 1. Let env be GetThisEnvironment().
@@ -1323,9 +1369,13 @@ fn executeObjectCreate(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(object);
 }
 
-fn executeObjectDefineMethod(self: *Vm, executable: Executable) Agent.Error!void {
-    const function_or_class = self.fetchAstNode(executable);
-    const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
+fn executeObjectDefineMethod(
+    self: *Vm,
+    function_or_class_index: Executable.AstNodeIndex,
+    method_type: ast.MethodDefinition.Type,
+    executable: Executable,
+) Agent.Error!void {
+    const function_or_class = executable.getAstNode(function_or_class_index);
     const method = switch (method_type) {
         inline else => |@"type"| @unionInit(
             ast.MethodDefinition.Method,
@@ -1406,9 +1456,12 @@ fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     try self.lexical_environment_stack.append(self.agent.gc_allocator, lexical_environment);
 }
 
-fn executePushExceptionJumpTarget(self: *Vm, executable: Executable) Agent.Error!void {
-    const jump_target = self.fetchIndex(executable);
-    try self.exception_jump_target_stack.append(self.agent.gc_allocator, jump_target);
+fn executePushExceptionJumpTarget(
+    self: *Vm,
+    jump_target: Executable.InstructionIndex,
+    _: Executable,
+) Agent.Error!void {
+    try self.exception_jump_target_stack.append(self.agent.gc_allocator, @intFromEnum(jump_target));
 }
 
 fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
@@ -1423,22 +1476,28 @@ fn executeRegExpCreate(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
 }
 
-fn executeResolveBinding(self: *Vm, executable: Executable) Agent.Error!void {
-    const name = self.fetchIdentifier(executable);
-    const strict = self.fetchIndex(executable) == 1;
-    const environment_lookup_cache_index = self.fetchIndex(executable);
-    const lookup_cache_entry = &executable.environment_lookup_cache.items[
-        environment_lookup_cache_index
-    ];
+fn executeResolveBinding(
+    self: *Vm,
+    name_index: Executable.IdentifierIndex,
+    strict: bool,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const name = executable.getIdentifier(name_index);
+    const lookup_cache_entry = executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
     const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
 /// 15.7.16 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-fn executeResolvePrivateIdentifier(self: *Vm, executable: Executable) Agent.Error!void {
+fn executeResolvePrivateIdentifier(
+    self: *Vm,
+    private_identifier_index: Executable.IdentifierIndex,
+    executable: Executable,
+) Agent.Error!void {
     // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
-    const private_identifier = self.fetchIdentifier(executable);
+    const private_identifier = executable.getIdentifier(private_identifier_index);
 
     // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
     const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
@@ -1484,8 +1543,12 @@ fn executeStore(self: *Vm, _: Executable) Agent.Error!void {
     self.result = self.stack.popOrNull();
 }
 
-fn executeStoreConstant(self: *Vm, executable: Executable) Agent.Error!void {
-    const value = self.fetchConstant(executable);
+fn executeStoreConstant(
+    self: *Vm,
+    value_index: Executable.ConstantIndex,
+    executable: Executable,
+) Agent.Error!void {
+    const value = executable.getConstant(value_index);
     self.result = value;
 }
 
@@ -1543,9 +1606,13 @@ fn executeTypeof(self: *Vm, _: Executable) Agent.Error!void {
 
 /// 13.5.3.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
-fn executeTypeofIdentifier(self: *Vm, executable: Executable) Agent.Error!void {
-    const name = self.fetchIdentifier(executable);
-    const strict = self.fetchIndex(executable) == 1;
+fn executeTypeofIdentifier(
+    self: *Vm,
+    name_index: Executable.IdentifierIndex,
+    strict: bool,
+    executable: Executable,
+) Agent.Error!void {
+    const name = executable.getIdentifier(name_index);
 
     // 1. Let val be ? Evaluation of UnaryExpression.
     const reference = try self.agent.resolveBinding(name, null, strict, null);
@@ -1585,28 +1652,36 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
 }
 
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
-    std.debug.assert(@as(Instruction, @enumFromInt(executable.instructions.getLast())) == .end);
-    main: switch (self.fetchInstruction(executable)) {
+    std.debug.assert(@as(Instruction.Tag, @enumFromInt(executable.instructions.getLast())) == .end);
+    @setEvalBranchQuota(blk: {
+        const fields = std.meta.fields(Instruction);
+        break :blk 2 * fields.len * fields.len;
+    });
+    main: switch (self.fetchInstructionTag(executable)) {
         .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
         .yield => return yield(self.agent, self.result.?),
         .end => return Completion.normal(self.result),
-        inline else => |instruction| {
-            try self.executeInstruction(instruction, executable);
-            continue :main self.fetchInstruction(executable);
+        inline else => |tag| {
+            const Payload = Instruction.Payload(tag);
+            const payload_ptr: *align(1) const Payload = @ptrCast(executable.instructions.items[self.ip..][0..@sizeOf(Payload)]);
+            self.ip += @sizeOf(Payload);
+            try self.executeInstruction(tag, payload_ptr.*, executable);
+            continue :main self.fetchInstructionTag(executable);
         },
     }
 }
 
 fn executeInstruction(
     self: *Vm,
-    comptime instruction: Instruction,
+    comptime tag: Instruction.Tag,
+    payload: Instruction.Payload(tag),
     executable: Executable,
 ) Agent.Error!void {
-    (switch (instruction) {
-        .array_create => self.executeArrayCreate(executable),
+    (switch (tag) {
+        .array_create => self.executeArrayCreate(payload.length, executable),
         .array_push_value => self.executeArrayPushValue(executable),
-        .array_set_length => self.executeArraySetLength(executable),
-        .array_set_value_direct => self.executeArraySetValueDirect(executable),
+        .array_set_length => self.executeArraySetLength(payload.length, executable),
+        .array_set_value_direct => self.executeArraySetValueDirect(payload.index, executable),
         .array_spread_value => self.executeArraySpreadValue(executable),
         .@"await" => self.executeAwait(executable),
         .binary_operator_add => self.executeBinaryOperatorAdd(executable),
@@ -1621,61 +1696,61 @@ fn executeInstruction(
         .binary_operator_bitwise_and => self.executeBinaryOperatorBitwiseAnd(executable),
         .binary_operator_bitwise_or => self.executeBinaryOperatorBitwiseOr(executable),
         .binary_operator_bitwise_xor => self.executeBinaryOperatorBitwiseXor(executable),
-        .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
+        .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(payload, executable),
         .bitwise_not => self.executeBitwiseNot(executable),
-        .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),
-        .class_definition_evaluation => self.executeClassDefinitionEvaluation(executable),
-        .create_catch_bindings => self.executeCreateCatchBindings(executable),
+        .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(payload, executable),
+        .class_definition_evaluation => self.executeClassDefinitionEvaluation(payload, executable),
+        .create_catch_bindings => self.executeCreateCatchBindings(payload, executable),
         .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),
         .create_with_environment => self.executeCreateWithEnvironment(executable),
         .decrement => self.executeDecrement(executable),
         .delete => self.executeDelete(executable),
         .dup_iterator => self.executeDupIterator(executable),
         .dup_reference => self.executeDupReference(executable),
-        .evaluate_call => self.executeEvaluateCall(executable),
-        .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(executable),
+        .evaluate_call => self.executeEvaluateCall(payload.argument_count, executable),
+        .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(payload.argument_count, payload.strict, executable),
         .evaluate_import_call => self.executeEvaluateImportCall(executable),
-        .evaluate_new => self.executeEvaluateNew(executable),
-        .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(executable),
-        .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(executable),
-        .evaluate_super_call => self.executeEvaluateSuperCall(executable),
-        .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(executable),
-        .get_iterator => self.executeGetIterator(executable),
+        .evaluate_new => self.executeEvaluateNew(payload.argument_count, executable),
+        .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(payload.strict, executable),
+        .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(payload.strict, payload.identifier, payload.property_lookup_cache_index, executable),
+        .evaluate_super_call => self.executeEvaluateSuperCall(payload.argument_count, executable),
+        .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(payload, executable),
+        .get_iterator => self.executeGetIterator(payload, executable),
         .get_new_target => self.executeGetNewTarget(executable),
         .get_or_create_import_meta => self.executeGetOrCreateImportMeta(executable),
-        .get_template_object => self.executeGetTemplateObject(executable),
+        .get_template_object => self.executeGetTemplateObject(payload, executable),
         .get_value => self.executeGetValue(executable),
         .greater_than => self.executeGreaterThan(executable),
         .greater_than_equals => self.executeGreaterThanEquals(executable),
-        .has_private_element => self.executeHasPrivateElement(executable),
+        .has_private_element => self.executeHasPrivateElement(payload, executable),
         .has_property => self.executeHasProperty(executable),
         .increment => self.executeIncrement(executable),
-        .initialize_bound_name => self.executeInitializeBoundName(executable),
+        .initialize_bound_name => self.executeInitializeBoundName(payload, executable),
         .initialize_referenced_binding => self.executeInitializeReferencedBinding(executable),
         .instanceof_operator => self.executeInstanceofOperator(executable),
-        .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(executable),
-        .instantiate_async_arrow_function_expression => self.executeInstantiateAsyncArrowFunctionExpression(executable),
-        .instantiate_async_function_expression => self.executeInstantiateAsyncFunctionExpression(executable),
-        .instantiate_async_generator_function_expression => self.executeInstantiateAsyncGeneratorFunctionExpression(executable),
-        .instantiate_generator_function_expression => self.executeInstantiateGeneratorFunctionExpression(executable),
-        .instantiate_ordinary_function_expression => self.executeInstantiateOrdinaryFunctionExpression(executable),
+        .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(payload, executable),
+        .instantiate_async_arrow_function_expression => self.executeInstantiateAsyncArrowFunctionExpression(payload, executable),
+        .instantiate_async_function_expression => self.executeInstantiateAsyncFunctionExpression(payload, executable),
+        .instantiate_async_generator_function_expression => self.executeInstantiateAsyncGeneratorFunctionExpression(payload, executable),
+        .instantiate_generator_function_expression => self.executeInstantiateGeneratorFunctionExpression(payload, executable),
+        .instantiate_ordinary_function_expression => self.executeInstantiateOrdinaryFunctionExpression(payload, executable),
         .is_loosely_equal => self.executeIsLooselyEqual(executable),
         .is_strictly_equal => self.executeIsStrictlyEqual(executable),
-        .jump => self.executeJump(executable),
-        .jump_conditional => self.executeJumpConditional(executable),
+        .jump => self.executeJump(payload, executable),
+        .jump_conditional => self.executeJumpConditional(payload.consequent, payload.alternate, executable),
         .less_than => self.executeLessThan(executable),
         .less_than_equals => self.executeLessThanEquals(executable),
         .load => self.executeLoad(executable),
-        .load_constant => self.executeLoadConstant(executable),
+        .load_constant => self.executeLoadConstant(payload, executable),
         .load_and_clear_exception => self.executeLoadAndClearException(executable),
         .load_iterator_next_args => self.executeLoadIteratorNextArgs(executable),
         .load_this_value_for_evaluate_call => self.executeLoadThisValueForEvaluateCall(executable),
         .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),
         .logical_not => self.executeLogicalNot(executable),
-        .make_private_reference => self.executeMakePrivateReference(executable),
-        .make_super_property_reference => self.executeMakeSuperPropertyReference(executable),
+        .make_private_reference => self.executeMakePrivateReference(payload, executable),
+        .make_super_property_reference => self.executeMakeSuperPropertyReference(payload.strict, executable),
         .object_create => self.executeObjectCreate(executable),
-        .object_define_method => self.executeObjectDefineMethod(executable),
+        .object_define_method => self.executeObjectDefineMethod(payload.ast_node, payload.type, executable),
         .object_set_property => self.executeObjectSetProperty(executable),
         .object_set_prototype => self.executeObjectSetPrototype(executable),
         .object_spread_value => self.executeObjectSpreadValue(executable),
@@ -1684,23 +1759,23 @@ fn executeInstruction(
         .pop_lexical_environment => self.executePopLexicalEnvironment(executable),
         .pop_reference => self.executePopReference(executable),
         .push_lexical_environment => self.executePushLexicalEnvironment(executable),
-        .push_exception_jump_target => self.executePushExceptionJumpTarget(executable),
+        .push_exception_jump_target => self.executePushExceptionJumpTarget(payload, executable),
         .put_value => self.executePutValue(executable),
         .reg_exp_create => self.executeRegExpCreate(executable),
-        .resolve_binding => self.executeResolveBinding(executable),
-        .resolve_private_identifier => self.executeResolvePrivateIdentifier(executable),
+        .resolve_binding => self.executeResolveBinding(payload.identifier, payload.strict, payload.environment_lookup_cache_index, executable),
+        .resolve_private_identifier => self.executeResolvePrivateIdentifier(payload, executable),
         .resolve_this_binding => self.executeResolveThisBinding(executable),
         .restore_lexical_environment => self.executeRestoreLexicalEnvironment(executable),
         .rethrow_exception_if_any => self.executeRethrowExceptionIfAny(executable),
         .store => self.executeStore(executable),
-        .store_constant => self.executeStoreConstant(executable),
+        .store_constant => self.executeStoreConstant(payload, executable),
         .throw => self.executeThrow(executable),
         .to_number => self.executeToNumber(executable),
         .to_numeric => self.executeToNumeric(executable),
         .to_object => self.executeToObject(executable),
         .to_string => self.executeToString(executable),
         .typeof => self.executeTypeof(executable),
-        .typeof_identifier => self.executeTypeofIdentifier(executable),
+        .typeof_identifier => self.executeTypeofIdentifier(payload.identifier, payload.strict, executable),
         .unary_minus => self.executeUnaryMinus(executable),
         .@"return", .yield, .end => unreachable,
     }) catch |err| switch (err) {

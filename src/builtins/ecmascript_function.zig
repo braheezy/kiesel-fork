@@ -273,9 +273,16 @@ pub const ECMAScriptFunction = MakeObject(.{
                     }, .{});
                 // Patch executable to put the arguments array on the RHS
                 const dummy = Value.from(try ordinaryObjectCreate(agent, null));
-                const index = try executable.addConstant(dummy);
+                const index = executable.addConstant(dummy) catch |e| switch (e) {
+                    error.IndexOutOfRange => return agent.throwException(
+                        .internal_error,
+                        "Bytecode generation failed",
+                        .{},
+                    ),
+                    error.OutOfMemory => return error.OutOfMemory,
+                };
                 // 0 = load, 1 = store_constant, 2..3 = index
-                std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intCast(index);
+                std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intFromEnum(index);
                 self.cached_arguments_executable = executable;
             }
             var executable = &self.cached_arguments_executable.?;
