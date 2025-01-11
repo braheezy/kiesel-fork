@@ -153,7 +153,7 @@ pub const Iterator = struct {
             PropertyKey.from("return"),
         );
 
-        // 4. If innerResult a normal completion, then
+        // 4. If innerResult is a normal completion, then
         const inner_result = if (inner_result_object) |@"return"| blk: {
             // a. Let return be innerResult.[[Value]].
             // b. If return is undefined, return ? completion.
@@ -163,13 +163,13 @@ pub const Iterator = struct {
             break :blk Value.from(@"return".?).callAssumeCallableNoArgs(Value.from(iterator));
         } else |err| err;
 
-        // 5. If completion a throw completion, return ? completion.
+        // 5. If completion is a throw completion, return ? completion.
         _ = completion catch |err| {
             agent.exception = completion_exception;
             return err;
         };
 
-        // 6. If innerResult a throw completion, return ? innerResult.
+        // 6. If innerResult is a throw completion, return ? innerResult.
         const inner_result_value = inner_result catch |err| return err;
 
         // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
