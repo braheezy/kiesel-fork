@@ -11,8 +11,8 @@
             .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/aa10dc980a82a640b56a7f33f073f570760879c0.tar.gz",
-            .hash = "1220317a80840c2a7778e9f2c248c33653df5506894e69d598f918146d54f0f1b8af",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/ea2285fe98a3b09d60ba060d5113f5e15345d634.tar.gz",
+            .hash = "122047d795bf81b985121e97c742a7c4ac18b73ec660003c41330e4e41bcc436acf3",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -23,12 +23,12 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/462a6cd30b5d295d03b248a2aba331dcf67c8048.tar.gz",
-            .hash = "12208859e00e65129fd29c0142fed9a532e6083f63b62f82746e809c71a8224ec30d",
+            .url = "https://github.com/ivmai/bdwgc/archive/5fcc06d428dde9b78a9a003e6b7e30d7e3866862.tar.gz",
+            .hash = "1220860097971cf3b135403d3ba67b749b0cd424353689138bea77d541fd7a422372",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/58d03491ea1fbb65e01188b750c87cc9a6ab8323.tar.gz",
-            .hash = "1220c21ff89ae1adc96b0c7b94149bb5c7a9e7e0e9aa9aba0970b1cc6ac81fc018af",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/43ffb2ad0886d9684663274026495b67ecd8a753.tar.gz",
+            .hash = "1220d91aad40f1c5bbc1a7959e77614d12c0c30452924174a431560c8a8659dbce8a",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
