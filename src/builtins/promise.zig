@@ -1573,34 +1573,35 @@ pub const constructor = struct {
             new_target.?,
             "%Promise.prototype%",
             .{
-                .promise_result = undefined,
-
                 // 4. Set promise.[[PromiseState]] to pending.
                 .promise_state = .pending,
 
-                // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
+                // 5. Set promise.[[PromiseResult]] to empty.
+                .promise_result = undefined,
+
+                // 6. Set promise.[[PromiseFulfillReactions]] to a new empty List.
                 .promise_fulfill_reactions = .empty,
 
-                // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
+                // 7. Set promise.[[PromiseRejectReactions]] to a new empty List.
                 .promise_reject_reactions = .empty,
 
-                // 7. Set promise.[[PromiseIsHandled]] to false.
+                // 8. Set promise.[[PromiseIsHandled]] to false.
                 .promise_is_handled = false,
             },
         );
 
-        // 8. Let resolvingFunctions be CreateResolvingFunctions(promise).
+        // 9. Let resolvingFunctions be CreateResolvingFunctions(promise).
         const resolving_functions = try createResolvingFunctions(agent, promise.as(Promise));
 
-        // 9. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
-        //    resolvingFunctions.[[Reject]] »)).
+        // 10. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
+        //     resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
             .undefined,
             &.{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
 
-            // 10. If completion is an abrupt completion, then
+            // 11. If completion is an abrupt completion, then
             error.ExceptionThrown => {
                 const exception = agent.clearException();
 
@@ -1612,7 +1613,7 @@ pub const constructor = struct {
             },
         };
 
-        // 11. Return promise.
+        // 12. Return promise.
         return Value.from(promise);
     }
 
