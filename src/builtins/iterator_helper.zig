@@ -97,8 +97,8 @@ pub const prototype = struct {
             //    associated execution context is never resumed. Any execution state associated
             //    with O can be discarded at this point.
 
-            // c. Perform ? IteratorClose(O.[[UnderlyingIterator]], ReturnCompletion(undefined)).
-            _ = try underlying_iterator.close(@as(Agent.Error!Value, .undefined));
+            // c. Perform ? IteratorClose(O.[[UnderlyingIterator]], NormalCompletion(unused)).
+            _ = try underlying_iterator.close(@as(Agent.Error!void, {}));
 
             // d. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
