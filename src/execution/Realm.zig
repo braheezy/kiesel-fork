@@ -71,42 +71,38 @@ pub fn initializeHostDefinedRealm(
     realm.* = .{
         .intrinsics = realm.intrinsics,
         .rng = .init(@intFromPtr(realm)),
+        .global_object = undefined,
+        .global_env = undefined,
 
         // 3. Set realm.[[AgentSignifier]] to AgentSignifier().
         .agent = realm.agent,
 
-        // 4. Set realm.[[GlobalObject]] to undefined.
-        .global_object = undefined,
-
-        // 5. Set realm.[[GlobalEnv]] to undefined.
-        .global_env = undefined,
-
-        // 6. Set realm.[[TemplateMap]] to a new empty List.
+        // 4. Set realm.[[TemplateMap]] to a new empty List.
         .template_map = .empty,
 
         .loaded_modules = .empty,
         .host_defined = .null_pointer,
     };
 
-    // 7. Let newContext be a new execution context.
+    // 5. Let newContext be a new execution context.
     const new_context: ExecutionContext = .{
-        // 8. Set the Function of newContext to null.
+        // 6. Set the Function of newContext to null.
         .function = null,
 
-        // 9. Set the Realm of newContext to realm.
+        // 7. Set the Realm of newContext to realm.
         .realm = realm,
 
-        // 10. Set the ScriptOrModule of newContext to null.
+        // 8. Set the ScriptOrModule of newContext to null.
         .script_or_module = null,
     };
 
-    // 11. Push newContext onto the execution context stack; newContext is now the running
-    //     execution context.
+    // 9. Push newContext onto the execution context stack; newContext is now the running
+    //    execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, new_context);
 
-    // 12. If the host requires use of an exotic object to serve as realm's global object, then
+    // 10. If the host requires use of an exotic object to serve as realm's global object, then
     //     a. Let global be such an object created in a host-defined manner.
-    // 13. Else,
+    // 11. Else,
     //     a. Let global be OrdinaryObjectCreate(realm.[[Intrinsics]].[[%Object.prototype%]]).
     const global = args.global_object orelse try ordinaryObjectCreate(
         agent,
@@ -114,24 +110,24 @@ pub fn initializeHostDefinedRealm(
     );
     global.property_storage.shape = try global.property_storage.shape.makeUnique(agent.gc_allocator);
 
-    // 14. If the host requires that the this binding in realm's global scope return an object
+    // 12. If the host requires that the this binding in realm's global scope return an object
     //     other than the global object, then
     //     a. Let thisValue be such an object created in a host-defined manner.
-    // 15. Else,
+    // 13. Else,
     //     a. Let thisValue be global.
     const this_value = args.this_value orelse global;
 
-    // 16. Set realm.[[GlobalObject]] to global.
+    // 14. Set realm.[[GlobalObject]] to global.
     realm.global_object = global;
 
-    // 17. Set realm.[[GlobalEnv]] to NewGlobalEnvironment(global, thisValue).
+    // 15. Set realm.[[GlobalEnv]] to NewGlobalEnvironment(global, thisValue).
     realm.global_env = try newGlobalEnvironment(agent.gc_allocator, global, this_value);
 
-    // 18. Perform ? SetDefaultGlobalBindings(realm).
+    // 16. Perform ? SetDefaultGlobalBindings(realm).
     try realm.setDefaultGlobalBindings();
 
-    // 19. Create any host-defined global object properties on global.
-    // 20. Return unused.
+    // 17. Create any host-defined global object properties on global.
+    // 18. Return unused.
 }
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
