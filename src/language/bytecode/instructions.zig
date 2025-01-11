@@ -255,6 +255,7 @@ pub const Instruction = union(enum(u8)) {
     pub const Tag = std.meta.Tag(Instruction);
 
     pub fn Payload(comptime tag: Instruction.Tag) type {
+        @setEvalBranchQuota(100_000);
         return std.meta.TagPayload(Instruction, tag);
     }
 };
@@ -269,10 +270,6 @@ pub const InstructionIterator = struct {
         const tag: Instruction.Tag = @enumFromInt(self.instructions[self.index]);
         self.instruction_index = self.index;
         self.index += 1;
-        @setEvalBranchQuota(blk: {
-            const fields = std.meta.fields(Instruction);
-            break :blk 2 * fields.len * fields.len;
-        });
         switch (tag) {
             inline else => |comptime_tag| {
                 const Payload = Instruction.Payload(comptime_tag);

@@ -1653,10 +1653,6 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
 
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     std.debug.assert(@as(Instruction.Tag, @enumFromInt(executable.instructions.getLast())) == .end);
-    @setEvalBranchQuota(blk: {
-        const fields = std.meta.fields(Instruction);
-        break :blk 2 * fields.len * fields.len;
-    });
     main: switch (self.fetchInstructionTag(executable)) {
         .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
         .yield => return yield(self.agent, self.result.?),
