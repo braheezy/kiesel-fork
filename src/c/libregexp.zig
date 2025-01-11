@@ -2,7 +2,6 @@ const build_options = @import("build-options");
 
 pub const libregexp = if (build_options.enable_libregexp)
     @cImport({
-        @cInclude("cutils.h"); // For the BOOL typedef
         @cInclude("libregexp.h");
     })
 else
