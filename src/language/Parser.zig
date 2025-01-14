@@ -1723,6 +1723,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
         },
         .@"{", .@"[" => blk: {
             const tmp_state = self.core.saveState();
+            const error_count = self.diagnostics.errors.items.len;
             if (self.acceptBindingPattern()) |binding_pattern| {
                 if (try self.core.peek()) |next_token_| switch (next_token_.type) {
                     // Assignment expression LHS
@@ -1752,6 +1753,9 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
                 };
             } else |_| {}
             self.core.restoreState(tmp_state);
+            // If parsing the binding pattern failed we may have emitted an 'invalid binding
+            // identifier' error, e.g. for `"use strict"; ({ foo: eval })` - get rid of those
+            while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
             const primary_expression = try self.acceptPrimaryExpression();
             break :blk .{ .primary_expression = primary_expression };
         },
