@@ -4,7 +4,6 @@ const Executable = @import("Executable.zig");
 const IteratorKind = @import("../../types.zig").IteratorKind;
 const MethodDefinition = @import("../../language/ast.zig").MethodDefinition;
 
-const IndexType = Executable.IndexType;
 const AstNodeIndex = Executable.AstNodeIndex;
 const ConstantIndex = Executable.ConstantIndex;
 const EnvironmentLookupCacheIndex = Executable.EnvironmentLookupCacheIndex;

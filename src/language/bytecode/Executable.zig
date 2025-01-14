@@ -8,7 +8,6 @@ const types = @import("../../types.zig");
 const Environment = execution.Environment;
 const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
-const IteratorKind = types.IteratorKind;
 const Object = types.Object;
 const String = types.String;
 const Value = types.Value;
