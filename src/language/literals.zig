@@ -76,7 +76,7 @@ pub fn parseNumericLiteral(
                 else
                     return error.InvalidNumericLiteral;
             },
-            .integer_digit, .fraction_digit => {
+            .integer_digit => {
                 if ((c == 'b' or c == 'B') and i == 1 and str[0] == '0') {
                     state = .prefix;
                     system = .binary;
@@ -84,6 +84,13 @@ pub fn parseNumericLiteral(
                     state = .exponent_indicator;
                 } else if (system == .hexadecimal) {
                     state = .integer_digit;
+                } else {
+                    return error.InvalidNumericLiteral;
+                }
+            },
+            .fraction_period, .fraction_digit => {
+                if ((c == 'e' or c == 'E') and system == .decimal) {
+                    state = .exponent_indicator;
                 } else {
                     return error.InvalidNumericLiteral;
                 }
@@ -527,6 +534,7 @@ test "parseNumericLiteral" {
         .{ .text = "1.1", .system = .decimal, .production = .regular, .type = .number },
         .{ .text = "1.111", .system = .decimal, .production = .regular, .type = .number },
         .{ .text = "1.1e1", .system = .decimal, .production = .regular, .type = .number },
+        .{ .text = "1.e1", .system = .decimal, .production = .regular, .type = .number },
         .{ .text = "1234567890.1234567890e+1234567890", .system = .decimal, .production = .regular, .type = .number },
         .{ .text = "1_23_456_7_890.1_23_456_7_890e+1_23_456_7_890", .system = .decimal, .production = .regular, .type = .number },
         .{ .text = "0n", .system = .decimal, .production = .regular, .type = .big_int },
@@ -568,7 +576,7 @@ test "parseNumericLiteral" {
         // Invalid exponents
         "e", "E", "1e", "1E", "1+e", "1-e",
         // Invalid separators
-        "_0", "0_", "_1", "1_", "0_1", "01234567_0", "0__1", "1__1", "._1", "_.1", "1._", "1_.1", "1._1",
+        "_0", "0_", "_1", "1_", "0_1", "01234567_0", "0__1", "1__1", "._1", "_.1", "1._", "1_.1", "1._1", "1_e1", "1e_1", "1_.e1", "1._e1",
         // Invalid binary digits
         "0b2", "0b12", "0b123456789", "0b123456789abcdef",
         // Invalid octal digits
