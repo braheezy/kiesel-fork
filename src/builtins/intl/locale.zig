@@ -227,10 +227,6 @@ pub const constructor = struct {
 
         // 11. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
         // 12. Set tag to CanonicalizeUnicodeLocaleId(tag).
-        // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
-        if (tag_string.indexOf(String.fromLiteral("_"), 0) != null) {
-            return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string});
-        }
         var tag = icu4zig.Locale.fromString(try tag_string.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(
                 .range_error,

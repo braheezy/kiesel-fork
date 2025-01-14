@@ -219,14 +219,6 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
             // v. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
             // vi. Let canonicalizedTag be CanonicalizeUnicodeLocaleId(tag).
-            // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
-            if (tag.indexOf(String.fromLiteral("_"), 0) != null) {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid locale identifier '{}'",
-                    .{tag},
-                );
-            }
             const canonicalized_tag = icu4zig.Locale.fromString(try tag.toUtf8(agent.gc_allocator)) catch {
                 return agent.throwException(
                     .range_error,
