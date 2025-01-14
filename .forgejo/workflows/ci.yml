@@ -178,7 +178,7 @@ jobs:
           zig fmt --check .
       - name: Check for unused imports
         run: |
-          curl -o zigimports https://github.com/tusharsadhwani/zigimports/releases/download/v0.1.0/zigimports-$(uname -m)-linux
+          curl -L -o zigimports https://github.com/tusharsadhwani/zigimports/releases/download/v0.1.0/zigimports-$(uname -m)-linux
           chmod +x zigimports
           ./zigimports .
 
