@@ -138,10 +138,8 @@ pub const constructor = struct {
 
         // 19. If numeric is not undefined, then
         //     a. Set numeric to ! ToString(numeric).
-        // 20. Set opt.[[kn]] to numeric.
-        if (maybe_numeric) |numeric| {
-            collator.as(Collator).fields.options.numeric = if (numeric) .on else .off;
-        }
+        // TODO: 20. Set opt.[[kn]] to numeric.
+        _ = maybe_numeric;
 
         // 21. Let caseFirst be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" », undefined).
         const maybe_case_first = try getOption(
@@ -156,17 +154,8 @@ pub const constructor = struct {
             null,
         );
 
-        // 22. Set opt.[[kf]] to caseFirst.
-        const case_first_map = std.StaticStringMap(
-            icu4zig.Collator.Options.CaseFirst,
-        ).initComptime(&.{
-            .{ "upper", .upper_first },
-            .{ "lower", .lower_first },
-            .{ "false", .off },
-        });
-        if (maybe_case_first) |case_first| {
-            collator.as(Collator).fields.options.case_first = case_first_map.get(case_first.slice.ascii).?;
-        }
+        // TODO: 22. Set opt.[[kf]] to caseFirst.
+        _ = maybe_case_first;
 
         // 23. Let relevantExtensionKeys be %Intl.Collator%.[[RelevantExtensionKeys]].
         // TODO: 24. Let r be ResolveLocale(%Intl.Collator%.[[AvailableLocales]], requestedLocales,
@@ -499,8 +488,8 @@ pub const Collator = MakeObject(.{
             const collation = String.fromLiteral("default");
             const numeric = resolved_options.numeric == .on;
             const case_first = switch (resolved_options.case_first) {
-                .upper_first => String.fromLiteral("upper"),
-                .lower_first => String.fromLiteral("lower"),
+                .upper => String.fromLiteral("upper"),
+                .lower => String.fromLiteral("lower"),
                 .off => String.fromLiteral("false"),
             };
             return .{

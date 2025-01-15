@@ -784,6 +784,7 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
 const FormatDateTimeError =
     std.mem.Allocator.Error ||
     icu4zig.CalendarError ||
+    icu4zig.CalendarParseError ||
     icu4zig.DateTimeFormatterLoadError ||
     icu4zig.DateTimeFormatError;
 
@@ -792,25 +793,27 @@ fn formatDateTimeImpl(
     date_time_format: *const DateTimeFormat,
     x: f64,
 ) FormatDateTimeError![]const u8 {
-    const date = @import("../date.zig");
-
     const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init();
     defer time_zone_id_mapper.deinit();
 
     const calendar = icu4zig.Calendar.init(date_time_format.fields.calendar);
     defer calendar.deinit();
 
-    const date_time = try icu4zig.DateTime.init(
-        date.yearFromTime(x),
-        date.monthFromTime(x) + 1,
-        date.dateFromTime(x),
-        date.hourFromTime(x),
-        date.minFromTime(x),
-        date.secFromTime(x),
-        @as(u32, @intCast(date.msFromTime(x))) * 1_000_000,
+    const date = try icu4zig.Date.init(
+        builtins.date.yearFromTime(x),
+        builtins.date.monthFromTime(x) + 1,
+        builtins.date.dateFromTime(x),
         calendar,
     );
-    defer date_time.deinit();
+    defer date.deinit();
+
+    const time = try icu4zig.Time.init(
+        builtins.date.hourFromTime(x),
+        builtins.date.minFromTime(x),
+        builtins.date.secFromTime(x),
+        @as(u32, @intCast(builtins.date.msFromTime(x))) * 1_000_000,
+    );
+    defer time.deinit();
 
     var time_zone_info = icu4zig.TimeZoneInfo.unknown();
     defer time_zone_info.deinit();
@@ -844,7 +847,8 @@ fn formatDateTimeImpl(
     );
     const result = try zoned_date_time_formatter.format(
         allocator,
-        date_time,
+        date,
+        time,
         time_zone_info,
     );
 
