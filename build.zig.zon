@@ -3,12 +3,14 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            .url = "https://github.com/ikskuh/any-pointer/archive/15f40d9feddbb2b063b8817e3f248189558acf31.tar.gz",
-            .hash = "12200da24a57da99d213b012c3af926202c8535517f502caef7238d0e952e2dd1808",
+            // FIXME: This points to https://github.com/ikskuh/any-pointer/pull/11, update once merged
+            .url = "https://github.com/ikskuh/any-pointer/archive/5c2dc273b5d65ad939fa77f49c71910a70bc7b3c.tar.gz",
+            .hash = "1220af067ee5d1d79203dd80957917b522c0ed2f367fd812b5234ce6f682efc13a58",
         },
         .args = .{
-            .url = "https://github.com/ikskuh/zig-args/archive/0abdd6947a70e6d8cc83b66228cea614aa856206.tar.gz",
-            .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
+            // FIXME: This points to https://github.com/ikskuh/zig-args/pull/65, update once merged
+            .url = "https://github.com/ikskuh/zig-args/archive/ddcba09955cef489444ddbf88429fae1c3cc7380.tar.gz",
+            .hash = "12201d6ee4418abb57acd17b2dd7e62c1c05f10062e32e6ee559a577009b5fd649be",
         },
         .icu4zig = .{
             .url = "https://codeberg.org/linusg/icu4zig/archive/7f616512f99bf8f7618a19d2fd05ea0ba709e14c.tar.gz",
