@@ -1763,16 +1763,23 @@ pub fn stringToNumber(
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "Infinity")) return Number.from(std.math.inf(f64));
-    if (
-    // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
-    std.ascii.startsWithIgnoreCase(trimmed_string, "inf")
-    // Don't pass strings with sign and base to `std.fmt.parseInt()`
-    or (std.mem.indexOfAny(u8, trimmed_string, "+-") == 0 and
+    // Ensure we don't pass things that `std.fmt.parse{Float,Int}()` would understand:
+    // - "inf"
+    // - signed numbers with base prefixes
+    // - floats with base prefixes
+    // - numbers with underscore separators
+    if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf") or
+        ((std.ascii.startsWithIgnoreCase(trimmed_string, "0b") or
+        std.ascii.startsWithIgnoreCase(trimmed_string, "0o") or
+        std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) and
+        (std.mem.indexOfScalar(u8, trimmed_string, '.') != null or
+        std.mem.indexOfAny(u8, trimmed_string, "pP") != null)) or
+        (std.mem.indexOfAny(u8, trimmed_string, "+-") == 0 and
         (std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0b") or
         std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0o") or
-        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x")))
-    // Don't pass strings containing underscores to `std.fmt.parseInt()`
-    or std.mem.indexOfScalar(u8, trimmed_string, '_') != null) {
+        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x"))) or
+        std.mem.indexOfScalar(u8, trimmed_string, '_') != null)
+    {
         return Number.from(std.math.nan(f64));
     }
     if (std.fmt.parseFloat(f64, trimmed_string)) |float|
