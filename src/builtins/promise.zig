@@ -1817,7 +1817,7 @@ pub const constructor = struct {
         const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
-        _ = try Value.from(promise_capability.reject).call(agent, undefined, &.{reason});
+        _ = try Value.from(promise_capability.reject).call(agent, .undefined, &.{reason});
 
         // 4. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);

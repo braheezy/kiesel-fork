@@ -12467,7 +12467,7 @@
   "test/built-ins/Promise/reject/capability-executor-called-twice.js": "PASS",
   "test/built-ins/Promise/reject/capability-executor-not-callable.js": "PASS",
   "test/built-ins/Promise/reject/capability-invocation-error.js": "PASS",
-  "test/built-ins/Promise/reject/capability-invocation.js": "FAIL",
+  "test/built-ins/Promise/reject/capability-invocation.js": "PASS",
   "test/built-ins/Promise/reject/ctx-ctor-throws.js": "PASS",
   "test/built-ins/Promise/reject/ctx-ctor.js": "PASS",
   "test/built-ins/Promise/reject/ctx-non-ctor.js": "PASS",
