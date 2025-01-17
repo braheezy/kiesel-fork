@@ -637,11 +637,10 @@ pub const Number = union(enum) {
                 defer allocator.free(tmp);
                 break :blk try std.mem.replaceOwned(u8, allocator, tmp, "e", "e+");
             },
-            .i32 => |x| switch (radix) {
-                2 => try std.fmt.allocPrint(allocator, "{b}", .{x}),
-                8 => try std.fmt.allocPrint(allocator, "{o}", .{x}),
-                16 => try std.fmt.allocPrint(allocator, "{x}", .{x}),
-                else => try std.fmt.allocPrint(allocator, "{d}", .{x}),
+            .i32 => |x| blk: {
+                var array_list: std.ArrayListUnmanaged(u8) = .empty;
+                try std.fmt.formatInt(x, radix, .lower, .{}, array_list.writer(allocator));
+                break :blk try array_list.toOwnedSlice(allocator);
             },
         });
     }

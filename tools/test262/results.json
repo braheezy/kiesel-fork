@@ -8413,7 +8413,7 @@
   "test/built-ins/Number/prototype/toString/S15.7.4.2_A4_T03.js": "PASS",
   "test/built-ins/Number/prototype/toString/S15.7.4.2_A4_T04.js": "PASS",
   "test/built-ins/Number/prototype/toString/S15.7.4.2_A4_T05.js": "PASS",
-  "test/built-ins/Number/prototype/toString/a-z.js": "FAIL",
+  "test/built-ins/Number/prototype/toString/a-z.js": "PASS",
   "test/built-ins/Number/prototype/toString/length.js": "PASS",
   "test/built-ins/Number/prototype/toString/name.js": "PASS",
   "test/built-ins/Number/prototype/toString/not-a-constructor.js": "PASS",
