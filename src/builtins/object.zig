@@ -798,10 +798,8 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-object.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
-        const object = try this_value.toObject(agent);
-
         // 2. Return ? Invoke(O, "toString").
-        return Value.from(object).invokeNoArgs(agent, PropertyKey.from("toString"));
+        return this_value.invokeNoArgs(agent, PropertyKey.from("toString"));
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
