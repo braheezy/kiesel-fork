@@ -115,7 +115,7 @@ fn defineOwnProperty(
 
 /// 10.4.2.2 ArrayCreate ( length [ , proto ] )
 /// https://tc39.es/ecma262/#sec-arraycreate
-pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?*Object) Agent.Error!*Object {
+pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If length > 2**32 - 1, throw a RangeError exception.
@@ -153,7 +153,7 @@ pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?*Object) Agent.
 
 /// 10.4.2.3 ArraySpeciesCreate ( originalArray, length )
 /// https://tc39.es/ecma262/#sec-arrayspeciescreate
-pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u64) Agent.Error!*Object {
+pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) Agent.Error!*Object {
     // 1. Let isArray be ? IsArray(originalArray).
     const is_array = try Value.from(original_array).isArray();
 
@@ -201,7 +201,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u64) A
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor_.asObject().construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
+    return constructor_.asObject().construct(&.{Value.from(length)}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -465,7 +465,7 @@ pub const constructor = struct {
             std.debug.assert(number_of_args >= 2);
 
             // b. Let array be ? ArrayCreate(numberOfArgs, proto).
-            const array = try arrayCreate(agent, number_of_args, prototype_);
+            const array = try arrayCreate(agent, @intCast(number_of_args), prototype_);
 
             // c. Let k be 0.
             // d. Repeat, while k < numberOfArgs,
@@ -660,10 +660,10 @@ pub const constructor = struct {
     /// https://tc39.es/ecma262/#sec-array.of
     fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let len be the number of elements in items.
-        const len = arguments.count();
+        const len: u53 = @intCast(arguments.count());
 
         // 2. Let lenNumber be 𝔽(len).
-        const len_number = Value.from(@as(u53, @intCast(len)));
+        const len_number = Value.from(len);
 
         // 3. Let C be the this value.
         const constructor_ = this_value;

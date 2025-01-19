@@ -2169,7 +2169,7 @@ pub fn createArrayFromList(
     //               Array's defineOwnProperty() which does a lot of extra work.
 
     // 1. Let array be ! ArrayCreate(0).
-    const array = arrayCreate(agent, elements.len, null) catch |err| try noexcept(err);
+    const array = arrayCreate(agent, @intCast(elements.len), null) catch |err| try noexcept(err);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do
@@ -2199,7 +2199,7 @@ pub fn createArrayFromListMapToValue(
     //               Array's defineOwnProperty() which does a lot of extra work.
 
     // 1. Let array be ! ArrayCreate(0).
-    const array = arrayCreate(agent, elements.len, null) catch |err| try noexcept(err);
+    const array = arrayCreate(agent, @intCast(elements.len), null) catch |err| try noexcept(err);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do

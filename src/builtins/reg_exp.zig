@@ -364,7 +364,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
     // 20. Let A be ! ArrayCreate(n + 1).
     // 21. Assert: The mathematical value of A's "length" property is n + 1.
-    const array = arrayCreate(agent, n + 1, null) catch |err| try noexcept(err);
+    const array = arrayCreate(agent, @intCast(n + 1), null) catch |err| try noexcept(err);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
     array.createDataPropertyOrThrow(

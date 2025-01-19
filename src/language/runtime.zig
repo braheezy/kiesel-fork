@@ -99,10 +99,8 @@ pub fn getTemplateObject(
     defer agent.gc_allocator.free(cooked_strings);
 
     // 7. Let count be the number of elements in the List cookedStrings.
-    const count = cooked_strings.len;
-
     // 8. Assert: count ≤ 2**32 - 1.
-    std.debug.assert(count <= std.math.maxInt(u32));
+    const count: u32 = @intCast(cooked_strings.len);
 
     // 9. Let template be ! ArrayCreate(count).
     const template = arrayCreate(agent, count, null) catch |err| try noexcept(err);
