@@ -2773,7 +2773,7 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike();
 
         // 4. Let A be ? ArrayCreate(len).
-        const array = try arrayCreate(agent, 0, null);
+        const array = try arrayCreate(agent, len, null);
 
         // 5. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:

@@ -4057,7 +4057,7 @@
   "test/built-ins/Array/prototype/toSorted/immutable.js": "PASS",
   "test/built-ins/Array/prototype/toSorted/length-casted-to-zero.js": "PASS",
   "test/built-ins/Array/prototype/toSorted/length-decreased-while-iterating.js": "PASS",
-  "test/built-ins/Array/prototype/toSorted/length-exceeding-array-length-limit.js": "FAIL",
+  "test/built-ins/Array/prototype/toSorted/length-exceeding-array-length-limit.js": "PASS",
   "test/built-ins/Array/prototype/toSorted/length-increased-while-iterating.js": "PASS",
   "test/built-ins/Array/prototype/toSorted/length-tolength.js": "PASS",
   "test/built-ins/Array/prototype/toSorted/length.js": "PASS",
