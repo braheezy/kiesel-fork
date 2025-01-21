@@ -488,27 +488,26 @@ fn stringGetOwnProperty(
 
     // 1. If P is not a String, return undefined.
     // 2. Let index be CanonicalNumericIndexString(P).
-    // 3. If index is undefined, return undefined.
-    // 4. If index is not an integral Number, return undefined.
-    // 5. If index is -0𝔽, return undefined.
+    // 3. If index is not an integral Number, return undefined.
+    // 4. If index is -0𝔽 or index < -0𝔽, return undefined.
     if (property_key != .integer_index) return null;
     if (property_key.integer_index > std.math.maxInt(usize) - 1) return null;
     const index: usize = @intCast(property_key.integer_index);
 
-    // 6. Let str be S.[[StringData]].
-    // 7. Assert: str is a String.
+    // 5. Let str be S.[[StringData]].
+    // 6. Assert: str is a String.
     const str = string.fields.string_data;
 
-    // 8. Let len be the length of str.
+    // 7. Let len be the length of str.
     const len = str.length();
 
-    // 9. If ℝ(index) < 0 or len ≤ ℝ(index), return undefined.
-    if (len <= index) return null;
+    // 8. If ℝ(index) ≥ len, return undefined.
+    if (index >= len) return null;
 
-    // 10. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
+    // 9. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
     const result_str = try str.substring(agent.gc_allocator, index, index + 1);
 
-    // 11. Return the PropertyDescriptor {
+    // 10. Return the PropertyDescriptor {
     //       [[Value]]: resultStr, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
     //     }.
     return .{ .value = Value.from(result_str), .writable = false, .enumerable = true, .configurable = false };

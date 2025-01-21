@@ -559,8 +559,8 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     // 2. If index is not an integral Number, return false.
     if (@trunc(index) != index) return false;
 
-    // 3. If index is -0𝔽, return false.
-    if (std.math.isNegativeZero(index)) return false;
+    // 3. If index is -0𝔽 or index < -0𝔽, return false.
+    if (std.math.isNegativeZero(index) or index < 0) return false;
 
     // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, unordered).
     // 5. NOTE: Bounds checking is not a synchronizing operation when O's backing buffer is a
@@ -573,8 +573,8 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     // 7. Let length be TypedArrayLength(taRecord).
     const length = typedArrayLength(ta);
 
-    // 8. If ℝ(index) < 0 or ℝ(index) ≥ length, return false.
-    if (index < 0 or index >= @as(f64, @floatFromInt(length))) return false;
+    // 8. If ℝ(index) ≥ length, return false.
+    if (index >= @as(f64, @floatFromInt(length))) return false;
 
     // 9. Return true.
     return true;
