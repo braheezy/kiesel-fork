@@ -65,14 +65,11 @@ fn defineOwnProperty(
         std.debug.assert(length_descriptor.configurable == false);
 
         // d. Let length be lengthDesc.[[Value]].
-        const length_value = length_descriptor.value.?;
-
         // e. Assert: length is a non-negative integral Number.
-        const length = length_value.asNumber().asFloat();
-        std.debug.assert(std.math.isFinite(length) and std.math.trunc(length) == length);
+        const length = length_descriptor.value.?.asNumber().toUint32();
 
         // f. Let index be ! ToUint32(P).
-        const index: f64 = @floatFromInt(property_key.integer_index);
+        const index: u32 = @intCast(property_key.integer_index);
 
         // g. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
         if (index >= length and length_descriptor.writable == false)
