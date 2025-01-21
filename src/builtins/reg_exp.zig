@@ -658,30 +658,31 @@ fn makeMatchIndicesIndexPairArray(
             match_index_pair,
         ) catch |err| try noexcept(err);
 
-        // e. If i > 0 and groupNames[i - 1] is not undefined, then
-        if (i > 0 and group_names[i - 1] != null) {
-            // i. Assert: groups is not undefined.
-            std.debug.assert(!groups.isUndefined());
+        // e. If i > 0, then
+        if (i > 0) {
+            // i. Let s be groupNames[i - 1].
+            // ii. If s is not undefined, then
+            if (group_names[i - 1]) |group_name| {
+                // 1. Assert: groups is not undefined.
+                std.debug.assert(!groups.isUndefined());
 
-            // ii. Let s be groupNames[i - 1].
-            const group_name = group_names[i - 1].?;
+                // 2. NOTE: If there are multiple groups named s, groups may already have an s
+                //    property at this point. However, because groups is an ordinary object whose
+                //    properties are all writable data properties, the call to
+                //    CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
 
-            // iii. NOTE: If there are multiple groups named s, groups may already have an s
-            //      property at this point. However, because groups is an ordinary object whose
-            //      properties are all writable data properties, the call to
-            //      CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
-
-            // iv. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
-            const property_key = PropertyKey.from(
-                try String.fromUtf8(
-                    agent.gc_allocator,
-                    try agent.gc_allocator.dupe(u8, group_name),
-                ),
-            );
-            groups.asObject().createDataPropertyOrThrow(
-                property_key,
-                match_index_pair,
-            ) catch |err| try noexcept(err);
+                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
+                const property_key = PropertyKey.from(
+                    try String.fromUtf8(
+                        agent.gc_allocator,
+                        try agent.gc_allocator.dupe(u8, group_name),
+                    ),
+                );
+                groups.asObject().createDataPropertyOrThrow(
+                    property_key,
+                    match_index_pair,
+                ) catch |err| try noexcept(err);
+            }
         }
     }
 
