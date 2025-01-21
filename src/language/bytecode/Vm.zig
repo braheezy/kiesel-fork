@@ -777,8 +777,8 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
     // 1. Let newTarget be GetNewTarget().
     const new_target = self.agent.getNewTarget();
 
-    // 2. Assert: newTarget is an Object.
-    std.debug.assert(new_target != null);
+    // 2. Assert: newTarget is a constructor.
+    std.debug.assert(new_target.?.internal_methods.construct != null);
 
     // 3. Let func be GetSuperConstructor().
     const function = try getSuperConstructor(self.agent);
