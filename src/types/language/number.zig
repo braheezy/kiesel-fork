@@ -9,7 +9,6 @@ const utils = @import("../../utils.zig");
 
 const String = types.String;
 
-const pow_2_31 = std.math.pow(f64, 2, 31);
 const pow_2_32 = std.math.pow(f64, 2, 32);
 
 pub const Number = union(enum) {
@@ -153,8 +152,8 @@ pub const Number = union(enum) {
     }
 
     pub fn toInt32(self: Number) i32 {
-        return switch (self) {
-            .f64 => |x| blk: {
+        switch (self) {
+            .f64 => |x| {
                 // OPTIMIZATION: ARMv8.3-A has an instruction for this :^)
                 if (comptime builtin.target.cpu.arch.isAARCH64() and
                     std.Target.aarch64.featureSetHas(builtin.target.cpu.features, .jsconv))
@@ -168,33 +167,31 @@ pub const Number = union(enum) {
                 }
 
                 // Excerpt from Value.toInt32()
-                if (!std.math.isFinite(x) or x == 0) break :blk 0;
+                if (!std.math.isFinite(x) or x == 0) return 0;
                 const int = @trunc(x);
-                const int32bit = @mod(int, pow_2_32);
-                break :blk @as(
-                    i32,
-                    @intFromFloat(if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit),
-                );
+                const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
+                return @bitCast(int32bit);
             },
-            .i32 => |x| x,
-        };
+            .i32 => |x| return x,
+        }
     }
 
     pub fn toUint32(self: Number) u32 {
-        return switch (self) {
-            .f64 => |x| blk: {
+        switch (self) {
+            .f64 => |x| {
                 // Excerpt from Value.toUint32()
-                if (!std.math.isFinite(x) or x == 0) break :blk 0;
+                if (!std.math.isFinite(x) or x == 0) return 0;
                 const int = @trunc(x);
-                const int32bit = @mod(int, pow_2_32);
-                break :blk @as(u32, @intFromFloat(int32bit));
+                const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
+                return int32bit;
             },
-            .i32 => |x| blk: {
+            .i32 => |x| {
+                if (x >= 0) return @intCast(x);
                 const int = @as(i64, x);
-                const int32bit = @mod(int, comptime @as(i64, @intFromFloat(pow_2_32)));
-                break :blk @as(u32, @intCast(int32bit));
+                const int32bit: u32 = @intCast(@mod(int, comptime @as(i64, @intFromFloat(pow_2_32))));
+                return int32bit;
             },
-        };
+        }
     }
 
     pub fn toFloat16(self: Number) f16 {

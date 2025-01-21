@@ -864,10 +864,10 @@ pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
     const int = number.truncate().asFloat();
 
     // 4. Let int32bit be int modulo 2**32.
-    const int32bit = @mod(int, pow_2_32);
+    const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
 
     // 5. Return 𝔽(int32bit).
-    return @intFromFloat(int32bit);
+    return int32bit;
 }
 
 /// 7.1.8 ToInt16 ( argument )
