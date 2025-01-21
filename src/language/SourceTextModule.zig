@@ -1370,7 +1370,8 @@ pub fn resolveExport(
             // iv. Else,
             else {
                 // 1. Assert: module imports a specific binding for this export.
-                // 2. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
+                // 2. Assert: e.[[ImportName]] is a String.
+                // 3. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
                 return imported_module.resolveExport(
                     agent,
                     export_entry.import_name.?.string,
