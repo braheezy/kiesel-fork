@@ -850,9 +850,9 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
 /// 7.1.7 ToUint32 ( argument )
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
-    // OPTIMIZATION: We may already have a positive i32 :^)
-    if (self.__isI32() and self.__asI32() >= 0)
-        return @intCast(self.__asI32());
+    // OPTIMIZATION: We may already have an i32 that we can bitcast :^)
+    if (self.__isI32())
+        return @bitCast(self.__asI32());
 
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);

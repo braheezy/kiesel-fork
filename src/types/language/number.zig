@@ -185,12 +185,7 @@ pub const Number = union(enum) {
                 const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
                 return int32bit;
             },
-            .i32 => |x| {
-                if (x >= 0) return @intCast(x);
-                const int = @as(i64, x);
-                const int32bit: u32 = @intCast(@mod(int, comptime @as(i64, @intFromFloat(pow_2_32))));
-                return int32bit;
-            },
+            .i32 => |x| return @bitCast(x),
         }
     }
 
