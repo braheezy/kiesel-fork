@@ -297,6 +297,13 @@ fn executeBinaryOperatorLeftShift(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(r_val.__asI32())), 32));
+        self.result = Value.from(l_val.__asI32() << shift_count);
+        return;
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"<<", r_val);
 }
 
@@ -304,12 +311,26 @@ fn executeBinaryOperatorRightShift(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(r_val.__asI32())), 32));
+        self.result = Value.from(l_val.__asI32() >> shift_count);
+        return;
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@">>", r_val);
 }
 
 fn executeBinaryOperatorUnsignedRightShift(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(r_val.__asI32())), 32));
+        self.result = Value.from(@as(u32, @bitCast(l_val.__asI32())) >> shift_count);
+        return;
+    }
 
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@">>>", r_val);
 }
