@@ -18,6 +18,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
+const StringParser = utils.StringParser;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -491,74 +492,77 @@ pub fn timeClip(time: f64) f64 {
 /// https://tc39.es/ecma262/#sec-date-time-string-format
 pub fn parseDateTimeString(string: *const String) f64 {
     const invalid = std.math.nan(f64);
-    // Yes, this is abuse of the std.fmt.Parser :)
-    // TODO: Handle short forms (missing month/date/seconds/milliseconds), and probably rewrite
-    //       using parser-toolkit.
-    const old_parser = struct {
-        // Copy of the functions before https://github.com/ziglang/zig/pull/18533 required them to be called at comptime.
-        pub fn until(parser: *std.fmt.Parser, ch: u21) []const u8 {
-            const start = parser.iter.i;
-            while (parser.peek(0)) |code_point| {
-                if (code_point == ch)
-                    break;
-                _ = parser.iter.nextCodepoint();
-            }
-            return parser.iter.bytes[start..parser.iter.i];
-        }
-    };
-    const view = std.unicode.Utf8View.initUnchecked(switch (string.slice) {
+    var parser = StringParser.init(switch (string.slice) {
         .ascii => |ascii| ascii,
         .utf16 => return invalid,
     });
-    var parser: std.fmt.Parser = .{
-        .iter = view.iterator(),
+    var date_only = true;
+    const year, const month, const date = blk: {
+        const year = switch (parser.peek() orelse return invalid) {
+            '+', '-' => |sign| year: {
+                _ = parser.consume() orelse unreachable;
+                var value = parser.consumeDigits(Year, 6) orelse return invalid;
+                if (sign == '-') {
+                    if (value == 0) return invalid;
+                    value *= -1;
+                }
+                break :year value;
+            },
+            else => parser.consumeDigits(Year, 4) orelse return invalid,
+        };
+        if (parser.peek() != '-') break :blk .{ year, 1, 1 };
+        _ = parser.consume() orelse unreachable;
+        const month = parser.consumeDigits(Month, 2) orelse return invalid;
+        if (month < 1 or month > 12) return invalid;
+        if (parser.peek() != '-') break :blk .{ year, month, 1 };
+        _ = parser.consume() orelse unreachable;
+        const date = parser.consumeDigits(Date_, 2) orelse return invalid;
+        if (date < 1 or date > 31) return invalid;
+        break :blk .{ year, month, date };
     };
-    const sign: ?u8 = if (parser.maybe('-')) '-' else if (parser.maybe('+')) '+' else null;
-    const year_string = old_parser.until(&parser, '-');
-    if (!parser.maybe('-')) return invalid;
-    const month_string = old_parser.until(&parser, '-');
-    if (!parser.maybe('-')) return invalid;
-    const date_string = old_parser.until(&parser, 'T');
-    if (!parser.maybe('T')) return invalid;
-    const hour_string = old_parser.until(&parser, ':');
-    if (!parser.maybe(':')) return invalid;
-    const minute_string = old_parser.until(&parser, ':');
-    if (!parser.maybe(':')) return invalid;
-    const second_string = old_parser.until(&parser, '.');
-    if (!parser.maybe('.')) return invalid;
-    const millisecond_string = old_parser.until(&parser, 'Z');
-    if (!parser.maybe('Z')) return invalid;
-    if (parser.peek(0) != null) return invalid;
-    if (year_string.len != @as(usize, if (sign != null) 6 else 4) or
-        month_string.len != 2 or
-        date_string.len != 2 or
-        hour_string.len != 2 or
-        minute_string.len != 2 or
-        second_string.len != 2 or
-        millisecond_string.len != 3)
-    {
-        return invalid;
-    }
-    const year = std.fmt.parseInt(Year, year_string, 10) catch return invalid;
-    const month = std.fmt.parseInt(Month, month_string, 10) catch return invalid;
-    const date = std.fmt.parseInt(Date_, date_string, 10) catch return invalid;
-    const hour = std.fmt.parseInt(Hour, hour_string, 10) catch return invalid;
-    const minute = std.fmt.parseInt(Minute, minute_string, 10) catch return invalid;
-    const second = std.fmt.parseInt(Second, second_string, 10) catch return invalid;
-    const millisecond = std.fmt.parseInt(Millisecond, millisecond_string, 10) catch return invalid;
-    if ((sign == '-' and year == 0) or
-        month < 1 or month > 12 or
-        date < 1 or date > 31 or
-        hour > 24 or
-        minute > 59 or
-        second > 59 or
-        millisecond > 999)
-    {
-        return invalid;
-    }
+    const hour, const minute, const second, const millisecond = blk: {
+        if ((parser.consume() orelse break :blk .{ 0, 0, 0, 0 }) != 'T') return invalid;
+        date_only = false;
+        const hour = parser.consumeDigits(Hour, 2) orelse return invalid;
+        if (hour > 24) return invalid;
+        if (parser.consume() != ':') return invalid;
+        const minute = parser.consumeDigits(Minute, 2) orelse return invalid;
+        if (minute > 59) return invalid;
+        if ((parser.consume() orelse break :blk .{ hour, minute, 0, 0 }) != ':') return invalid;
+        const second = parser.consumeDigits(Second, 2) orelse return invalid;
+        if (second > 59) return invalid;
+        if ((parser.consume() orelse break :blk .{ hour, minute, second, 0 }) != '.') return invalid;
+        const millisecond = parser.consumeDigits(Millisecond, 3) orelse return invalid;
+        break :blk .{ hour, minute, second, millisecond };
+    };
+    const offset_ms = blk: {
+        if (date_only) break :blk 0;
+        switch (parser.consume() orelse {
+            // TODO: Use local time offset
+            break :blk 0;
+        }) {
+            '+', '-' => |sign| {
+                const offset_hour = parser.consumeDigits(Hour, 2) orelse return invalid;
+                if (hour > 23) return invalid;
+                if (parser.consume() != ':') return invalid;
+                const offset_minute = parser.consumeDigits(Minute, 2) orelse return invalid;
+                if (minute > 59) return invalid;
+                var value =
+                    @as(f64, @floatFromInt(offset_hour)) * std.time.ms_per_hour +
+                    @as(f64, @floatFromInt(offset_minute)) * std.time.ms_per_min;
+                // Offset sign is negated
+                if (sign == '+') value *= -1;
+                break :blk value;
+            },
+            'Z' => break :blk 0,
+            else => return invalid,
+        }
+    };
+    // Did we reach the end of the string?
+    if (parser.peek() != null) return invalid;
     const time_value = makeDate(
         makeDay(
-            @floatFromInt(if (sign == '-') -year else year),
+            @floatFromInt(year),
             @floatFromInt(month - 1),
             @floatFromInt(date),
         ),
@@ -569,7 +573,7 @@ pub fn parseDateTimeString(string: *const String) f64 {
             @floatFromInt(millisecond),
         ),
     );
-    return timeClip(time_value);
+    return timeClip(time_value + offset_ms);
 }
 
 /// 21.4.4.41.1 TimeString ( tv )
