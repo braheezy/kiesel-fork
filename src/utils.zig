@@ -85,6 +85,45 @@ pub fn containsSlice(haystack: []const []const u8, needle: []const u8) bool {
     return false;
 }
 
+pub const StringParser = struct {
+    string: []const u8,
+    index: usize,
+
+    pub fn init(string: []const u8) StringParser {
+        return .{ .string = string, .index = 0 };
+    }
+
+    pub fn peek(self: StringParser) ?u8 {
+        if (self.index + 1 > self.string.len) return null;
+        return self.string[self.index];
+    }
+
+    pub fn peekSlice(self: StringParser, count: usize) ?[]const u8 {
+        if (self.index + count > self.string.len) return null;
+        return self.string[self.index .. self.index + count];
+    }
+
+    pub fn consume(self: *StringParser) ?u8 {
+        const char = self.peek() orelse return null;
+        self.index += 1;
+        return char;
+    }
+
+    pub fn consumeSlice(self: *StringParser, count: usize) ?[]const u8 {
+        const slice = self.peekSlice(count) orelse return null;
+        self.index += count;
+        return slice;
+    }
+
+    pub fn consumeDigits(self: *StringParser, comptime T: type, count: usize) ?T {
+        const slice = self.peekSlice(count) orelse return null;
+        if (std.mem.indexOfScalar(u8, slice, '_') != null) return null;
+        const result = std.fmt.parseInt(T, slice, 10) catch return null;
+        self.index += count;
+        return result;
+    }
+};
+
 pub fn formatParseError(
     allocator: std.mem.Allocator,
     parse_error: ptk.Error,
