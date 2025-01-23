@@ -202,13 +202,15 @@ pub const constructor = struct {
         //     a. If e.[[Key]] is stringKey, return e.[[Symbol]].
         if (agent.global_symbol_registry.get(string_key)) |symbol| return Value.from(symbol);
 
-        // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.
+        // 3. Assert: The GlobalSymbolRegistry List does not currently contain an entry for
+        //    stringKey.
         std.debug.assert(!agent.global_symbol_registry.contains(string_key));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
         const new_symbol = try types.Symbol.init(agent.gc_allocator, string_key);
 
-        // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
+        // 5. Append the GlobalSymbolRegistry Record { [[Key]]: stringKey, [[Symbol]]: newSymbol }
+        //    to the GlobalSymbolRegistry List.
         try agent.global_symbol_registry.putNoClobber(agent.gc_allocator, string_key, new_symbol);
 
         // 6. Return newSymbol.
@@ -348,7 +350,7 @@ pub fn keyForSymbol(agent: *Agent, symbol: *const types.Symbol) ?*const String {
         if (entry.value_ptr.* == symbol) return entry.key_ptr.*;
     }
 
-    // 2. Assert: GlobalSymbolRegistry does not currently contain an entry for sym.
+    // 2. Assert: The GlobalSymbolRegistry List does not currently contain an entry for sym.
     // 3. Return undefined.
     return null;
 }
