@@ -261,8 +261,7 @@ fn codegenBindingPatternValue(
         jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
         try executable.addInstruction(.store, {}); // Drop RHS from the stack
 
-        try codegenExpression(initializer, executable, ctx);
-        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(initializer, executable, ctx);
 
         const end_jump = try executable.addInstructionDeferred(.jump);
 
@@ -514,10 +513,8 @@ pub fn codegenArrayLiteral(
                 // NOTE: This is handled above.
 
                 // 2. Let initResult be ? Evaluation of AssignmentExpression.
-                try codegenExpression(expression, executable, ctx);
-
                 // 3. Let initValue be ? GetValue(initResult).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(expression, executable, ctx);
                 try executable.addInstruction(.load, {});
 
                 // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
@@ -536,10 +533,8 @@ pub fn codegenArrayLiteral(
             // SpreadElement : ... AssignmentExpression
             .spread => |expression| {
                 // 1. Let spreadRef be ? Evaluation of AssignmentExpression.
-                try codegenExpression(expression, executable, ctx);
-
                 // 2. Let spreadObj be ? GetValue(spreadRef).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(expression, executable, ctx);
 
                 // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
                 try executable.addInstruction(.get_iterator, .sync);
@@ -614,10 +609,8 @@ pub fn codegenPropertyName(
         // ComputedPropertyName : [ AssignmentExpression ]
         .computed_property_name => |expression| {
             // 1. Let exprValue be ? Evaluation of AssignmentExpression.
-            try codegenExpression(expression, executable, ctx);
-
             // 2. Let propName be ? GetValue(exprValue).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression, executable, ctx);
 
             // 3. Return ? ToPropertyKey(propName).
             // NOTE: This is done in object_set_property
@@ -655,10 +648,8 @@ pub fn codegenPropertyDefinition(
         // PropertyDefinition : ... AssignmentExpression
         .spread => |expression| {
             // 1. Let exprValue be ? Evaluation of AssignmentExpression.
-            try codegenExpression(expression, executable, ctx);
-
             // 2. Let fromValue be ? GetValue(exprValue).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 3. Let excludedNames be a new empty List.
@@ -713,10 +704,8 @@ pub fn codegenPropertyDefinition(
             // 6. Else,
 
             // a. Let exprValueRef be ? Evaluation of AssignmentExpression.
-            try codegenExpression(property_name_and_expression.expression, executable, ctx);
-
             // b. Let propValue be ? GetValue(exprValueRef).
-            if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(property_name_and_expression.expression, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 7. If isProtoSetter is true, then
@@ -795,8 +784,7 @@ pub fn codegenTemplateLiteral(
         std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
         switch (span) {
             .expression => |expression| {
-                try codegenExpression(expression, executable, ctx);
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(expression, executable, ctx);
                 try executable.addInstruction(.to_string, {});
                 try executable.addInstruction(.load, {});
             },
@@ -825,18 +813,15 @@ pub fn codegenMemberExpression(
         // MemberExpression : MemberExpression [ Expression ]
         .expression => |expression| {
             // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 3. Let strict be IsStrict(this MemberExpression).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-            try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
             try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
                 .strict = strict,
@@ -846,10 +831,8 @@ pub fn codegenMemberExpression(
         // MemberExpression : MemberExpression . IdentifierName
         .identifier => |identifier| {
             // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 3. Let strict be IsStrict(this MemberExpression).
@@ -866,10 +849,8 @@ pub fn codegenMemberExpression(
         // MemberExpression : MemberExpression . PrivateIdentifier
         .private_identifier => |private_identifier| {
             // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
@@ -893,8 +874,7 @@ pub fn codegenNewExpression(
     // 1. Return ? EvaluateNew(NewExpression, empty).
     // MemberExpression : new MemberExpression Arguments
     // 1. Return ? EvaluateNew(MemberExpression, Arguments).
-    try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
     try codegenArguments(node.arguments, executable, ctx);
@@ -972,10 +952,8 @@ pub fn codegenSuperProperty(
             try executable.addInstruction(.load_this_value_for_make_super_property_reference, {});
 
             // 3. Let propertyNameReference be ? Evaluation of Expression.
-            try codegenExpression(expression.*, executable, ctx);
-
             // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 5. Let strict be IsStrict(this SuperProperty).
@@ -1050,8 +1028,7 @@ pub fn codegenArguments(
         // 3. Let arg be ? GetValue(ref).
         // 4. Return the list-concatenation of precedingArgs and « arg ».
         .expression => |expression| {
-            try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression, executable, ctx);
             try executable.addInstruction(.load, {});
         },
 
@@ -1073,8 +1050,7 @@ pub fn codegenArguments(
         //     b. If next is done, return precedingArgs.
         //     c. Append executable.allocator, next to precedingArgs.
         .spread => |expression| {
-            try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression, executable, ctx);
             try executable.addInstruction(.load, {});
             try spread_indices.append(executable.allocator, i);
         },
@@ -1160,8 +1136,7 @@ pub fn codegenOptionalExpression(
             const strict = ctx.contained_in_strict_mode_code;
 
             // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-            try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
             try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
                 .strict = strict,
@@ -1207,8 +1182,7 @@ pub fn codegenImportCall(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
     try executable.addInstruction(.evaluate_import_call, {});
 }
@@ -1275,10 +1249,8 @@ pub fn codegenTaggedTemplate(
             switch (span) {
                 .expression => |expression| {
                     // 1. Let firstSubRef be ? Evaluation of Expression.
-                    try codegenExpression(expression, executable, ctx);
-
                     // 2. Let firstSub be ? GetValue(firstSubRef).
-                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                    try codegenExpressionAndGetValue(expression, executable, ctx);
                     try executable.addInstruction(.load, {});
 
                     // 3. Let restSub be ? SubstitutionEvaluation of TemplateSpans.
@@ -1466,10 +1438,8 @@ pub fn codegenUnaryExpression(
         // UnaryExpression : void UnaryExpression
         .void => {
             // 1. Let expr be ? Evaluation of UnaryExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Perform ? GetValue(expr).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
 
             // 3. Return undefined.
             try executable.addInstructionWithConstant(.store_constant, .undefined);
@@ -1487,8 +1457,7 @@ pub fn codegenUnaryExpression(
                     .strict = ctx.contained_in_strict_mode_code,
                 });
             } else {
-                try codegenExpression(node.expression.*, executable, ctx);
-                if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
                 try executable.addInstruction(.typeof, {});
             }
         },
@@ -1496,20 +1465,16 @@ pub fn codegenUnaryExpression(
         // UnaryExpression : + UnaryExpression
         .@"+" => {
             // 1. Let expr be ? Evaluation of UnaryExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Return ? ToNumber(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.to_number, {});
         },
 
         // UnaryExpression : - UnaryExpression
         .@"-" => {
             // 1. Let expr be ? Evaluation of UnaryExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.to_numeric, {});
 
             // 3. If oldValue is a Number, then
@@ -1523,10 +1488,8 @@ pub fn codegenUnaryExpression(
         // UnaryExpression : ~ UnaryExpression
         .@"~" => {
             // 1. Let expr be ? Evaluation of UnaryExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
             try executable.addInstruction(.to_numeric, {});
 
             // 3. If oldValue is a Number, then
@@ -1540,10 +1503,8 @@ pub fn codegenUnaryExpression(
         // UnaryExpression : ! UnaryExpression
         .@"!" => {
             // 1. Let expr be ? Evaluation of UnaryExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
             // 2. Let oldValue be ToBoolean(? GetValue(expr)).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
 
             // 3. If oldValue is true, return false.
             // 4. Return true.
@@ -1568,17 +1529,13 @@ pub fn codegenRelationalExpression(
         // RelationalExpression : RelationalExpression in ShiftExpression
         .expression => |lhs_expression| {
             // 1. Let lRef be ? Evaluation of RelationalExpression.
-            try codegenExpression(lhs_expression.*, executable, ctx);
-
             // 2. Let lVal be ? GetValue(lRef).
-            if (lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(lhs_expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 3. Let rRef be ? Evaluation of ShiftExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // 4. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             switch (node.operator) {
@@ -1598,10 +1555,8 @@ pub fn codegenRelationalExpression(
             // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
 
             // 2. Let rRef be ? Evaluation of ShiftExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // 3. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             // 4. If rVal is not an Object, throw a TypeError exception.
@@ -1627,17 +1582,13 @@ pub fn codegenEqualityExpression(
     // EqualityExpression : EqualityExpression === RelationalExpression
     // EqualityExpression : EqualityExpression !== RelationalExpression
     // 1. Let lRef be ? Evaluation of EqualityExpression.
-    try codegenExpression(node.lhs_expression.*, executable, ctx);
-
     // 2. Let lVal be ? GetValue(lRef).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.lhs_expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
     // 3. Let rRef be ? Evaluation of RelationalExpression.
-    try codegenExpression(node.rhs_expression.*, executable, ctx);
-
     // 4. Let rVal be ? GetValue(rRef).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
     switch (node.operator) {
@@ -1677,20 +1628,16 @@ pub fn codegenLogicalExpression(
         // LogicalANDExpression : LogicalANDExpression && BitwiseORExpression
         .@"&&" => {
             // 1. Let lRef be ? Evaluation of LogicalANDExpression.
-            try codegenExpression(node.lhs_expression.*, executable, ctx);
-
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.lhs_expression.*, executable, ctx);
 
             // 3. If ToBoolean(lVal) is false, return lVal.
             const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
             jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
             // 4. Let rRef be ? Evaluation of BitwiseORExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // 5. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
 
             jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
         },
@@ -1698,20 +1645,16 @@ pub fn codegenLogicalExpression(
         // LogicalORExpression : LogicalORExpression || LogicalANDExpression
         .@"||" => {
             // 1. Let lRef be ? Evaluation of LogicalORExpression.
-            try codegenExpression(node.lhs_expression.*, executable, ctx);
-
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.lhs_expression.*, executable, ctx);
 
             // 3. If ToBoolean(lVal) is true, return lVal.
             const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
             jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
             // 4. Let rRef be ? Evaluation of LogicalANDExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // 5. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
 
             jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
         },
@@ -1719,11 +1662,8 @@ pub fn codegenLogicalExpression(
         // CoalesceExpression : CoalesceExpressionHead ?? BitwiseORExpression
         .@"??" => {
             // 1. Let lRef be ? Evaluation of CoalesceExpressionHead.
-            try codegenExpression(node.lhs_expression.*, executable, ctx);
-
             // 2. Let lVal be ? GetValue(lRef).
-            if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
-
+            try codegenExpressionAndGetValue(node.lhs_expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
 
             try executable.addInstruction(.load, {});
@@ -1737,10 +1677,8 @@ pub fn codegenLogicalExpression(
             try executable.addInstruction(.store, {}); // Drop lVal from the stack
 
             // a. Let rRef be ? Evaluation of BitwiseORExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // b. Return ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
 
             const end_jump = try executable.addInstructionDeferred(.jump);
 
@@ -1764,10 +1702,8 @@ pub fn codegenConditionalExpression(
 ) Executable.Error!void {
     // ConditionalExpression : ShortCircuitExpression ? AssignmentExpression : AssignmentExpression
     // 1. Let lRef be ? Evaluation of ShortCircuitExpression.
-    try codegenExpression(node.test_expression.*, executable, ctx);
-
     // 2. Let lVal be ToBoolean(? GetValue(lRef)).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.test_expression.*, executable, ctx);
 
     const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
@@ -1775,10 +1711,8 @@ pub fn codegenConditionalExpression(
     jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
 
     // a. Let trueRef be ? Evaluation of the first AssignmentExpression.
-    try codegenExpression(node.consequent_expression.*, executable, ctx);
-
     // b. Return ? GetValue(trueRef).
-    if (node.consequent_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.consequent_expression.*, executable, ctx);
 
     const end_jump = try executable.addInstructionDeferred(.jump);
 
@@ -1786,10 +1720,8 @@ pub fn codegenConditionalExpression(
     jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
     // a. Let falseRef be ? Evaluation of the second AssignmentExpression.
-    try codegenExpression(node.alternate_expression.*, executable, ctx);
-
     // b. Return ? GetValue(falseRef).
-    if (node.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.alternate_expression.*, executable, ctx);
 
     end_jump.getPtr().* = try executable.nextInstructionIndex();
 }
@@ -1817,10 +1749,8 @@ pub fn codegenAssignmentExpression(
             // c. Else,
             else {
                 // i. Let rRef be ? Evaluation of AssignmentExpression.
-                try codegenExpression(node.rhs_expression.*, executable, ctx);
-
                 // ii. Let rVal be ? GetValue(rRef).
-                if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
             }
 
             // d. Perform ? PutValue(lRef, rVal).
@@ -1833,10 +1763,8 @@ pub fn codegenAssignmentExpression(
         const assignment_pattern = node.lhs_expression.binding_pattern_for_assignment_expression;
 
         // 3. Let rRef be ? Evaluation of AssignmentExpression.
-        try codegenExpression(node.rhs_expression.*, executable, ctx);
-
         // 4. Let rVal be ? GetValue(rRef).
-        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         try executable.addInstruction(.load, {});
 
         // 5. Perform ? DestructuringAssignmentEvaluation of assignmentPattern with argument rVal.
@@ -1858,10 +1786,8 @@ pub fn codegenAssignmentExpression(
         try executable.addInstruction(.load, {});
 
         // 3. Let rRef be ? Evaluation of AssignmentExpression.
-        try codegenExpression(node.rhs_expression.*, executable, ctx);
-
         // 4. Let rVal be ? GetValue(rRef).
-        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         try executable.addInstruction(.load, {});
 
         // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
@@ -1913,10 +1839,8 @@ pub fn codegenAssignmentExpression(
         // 5. Else,
         else {
             // a. Let rRef be ? Evaluation of AssignmentExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
@@ -1956,10 +1880,8 @@ pub fn codegenAssignmentExpression(
         // 5. Else,
         else {
             // a. Let rRef be ? Evaluation of AssignmentExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
@@ -2004,10 +1926,8 @@ pub fn codegenAssignmentExpression(
         // 5. Else,
         else {
             // a. Let rRef be ? Evaluation of AssignmentExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
-
             // b. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         }
 
         // 6. Perform ? PutValue(lRef, rVal).
@@ -2032,17 +1952,13 @@ pub fn codegenBinaryExpression(
     ctx: *Context,
 ) Executable.Error!void {
     // 1. Let lRef be ? Evaluation of leftOperand.
-    try codegenExpression(node.lhs_expression.*, executable, ctx);
-
     // 2. Let lVal be ? GetValue(lRef).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.lhs_expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
     // 3. Let rRef be ? Evaluation of rightOperand.
-    try codegenExpression(node.rhs_expression.*, executable, ctx);
-
     // 4. Let rVal be ? GetValue(rRef).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
     // 5. Return ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
@@ -2078,9 +1994,40 @@ pub fn codegenSequenceExpression(
     // 3. Let rRef be ? Evaluation of AssignmentExpression.
     // 4. Return ? GetValue(rRef).
     for (node.expressions) |expression| {
-        try codegenExpression(expression, executable, ctx);
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(expression, executable, ctx);
     }
+}
+
+pub fn codegenExpressionAndGetValue(
+    node: ast.Expression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node) {
+        .primary_expression => |x| try codegenPrimaryExpression(x, executable, ctx),
+        .member_expression => |x| try codegenMemberExpression(x, executable, ctx),
+        .super_property => |x| try codegenSuperProperty(x, executable, ctx),
+        .meta_property => |x| try codegenMetaProperty(x, executable, ctx),
+        .new_expression => |x| try codegenNewExpression(x, executable, ctx),
+        .call_expression => |x| try codegenCallExpression(x, executable, ctx),
+        .super_call => |x| try codegenSuperCall(x, executable, ctx),
+        .import_call => |x| try codegenImportCall(x, executable, ctx),
+        .optional_expression => |x| try codegenOptionalExpression(x, executable, ctx),
+        .update_expression => |x| try codegenUpdateExpression(x, executable, ctx),
+        .unary_expression => |x| try codegenUnaryExpression(x, executable, ctx),
+        .binary_expression => |x| try codegenBinaryExpression(x, executable, ctx),
+        .relational_expression => |x| try codegenRelationalExpression(x, executable, ctx),
+        .equality_expression => |x| try codegenEqualityExpression(x, executable, ctx),
+        .logical_expression => |x| try codegenLogicalExpression(x, executable, ctx),
+        .conditional_expression => |x| try codegenConditionalExpression(x, executable, ctx),
+        .assignment_expression => |x| try codegenAssignmentExpression(x, executable, ctx),
+        .sequence_expression => |x| try codegenSequenceExpression(x, executable, ctx),
+        .await_expression => |x| try codegenAwaitExpression(x, executable, ctx),
+        .yield_expression => |x| try codegenYieldExpression(x, executable, ctx),
+        .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
+        .binding_pattern_for_assignment_expression => |x| try bindingInitialization(x, executable, ctx, null),
+    }
+    if (node.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
 }
 
 pub fn codegenExpression(
@@ -2328,10 +2275,8 @@ pub fn codegenLexicalBinding(
                 // 4. Else,
                 else {
                     // a. Let rhs be ? Evaluation of Initializer.
-                    try codegenExpression(initializer, executable, ctx);
-
                     // b. Let value be ? GetValue(rhs).
-                    if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                    try codegenExpressionAndGetValue(initializer, executable, ctx);
                 }
 
                 // 5. Perform ! InitializeReferencedBinding(lhs, value).
@@ -2364,10 +2309,8 @@ pub fn codegenLexicalBinding(
             try executable.addInstruction(.load, {});
 
             // 1. Let rhs be ? Evaluation of Initializer.
-            try codegenExpression(binding_pattern.initializer, executable, ctx);
-
             // 2. Let value be ? GetValue(rhs).
-            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(binding_pattern.initializer, executable, ctx);
 
             // 3. Let env be the running execution context's LexicalEnvironment.
             // 4. Return ? BindingInitialization of BindingPattern with arguments value and env.
@@ -2436,12 +2379,10 @@ pub fn codegenVariableDeclaration(
                 // 4. Else,
 
                 // a. Let rhs be ? Evaluation of Initializer.
-                try codegenExpression(initializer, executable, ctx);
-
                 // b. Let value be ? GetValue(rhs).
                 // FIXME: This clobbers the result value and we don't have a good way of restoring it.
                 //        Should probably use the stack more and have explicit result store instructions.
-                if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(initializer, executable, ctx);
 
                 // 5. Perform ? PutValue(lhs, value).
                 try executable.addInstruction(.put_value, {});
@@ -2459,10 +2400,8 @@ pub fn codegenVariableDeclaration(
             try executable.addInstruction(.load, {});
 
             // 1. Let rhs be ? Evaluation of Initializer.
-            try codegenExpression(binding_pattern.initializer, executable, ctx);
-
             // 2. Let rVal be ? GetValue(rhs).
-            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(binding_pattern.initializer, executable, ctx);
 
             // 3. Return ? BindingInitialization of BindingPattern with arguments rVal and undefined.
             try bindingInitialization(binding_pattern.binding_pattern, executable, ctx, null);
@@ -2481,10 +2420,8 @@ pub fn codegenExpressionStatement(
 ) Executable.Error!void {
     // ExpressionStatement : Expression ;
     // 1. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.expression, executable, ctx);
-
     // 2. Return ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression, executable, ctx);
 }
 
 /// 14.6.2 Runtime Semantics: Evaluation
@@ -2495,10 +2432,8 @@ pub fn codegenIfStatement(
     ctx: *Context,
 ) Executable.Error!void {
     // 1. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.test_expression, executable, ctx);
-
     // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.test_expression, executable, ctx);
     const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
 
     // 3. If exprValue is true, then
@@ -2589,10 +2524,8 @@ pub fn codegenDoWhileStatement(
     // NOTE: This is done by the store/load sequence around each consequent execution.
 
     // d. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.test_expression, executable, ctx);
-
     // e. Let exprValue be ? GetValue(exprRef).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.test_expression, executable, ctx);
 
     // f. If ToBoolean(exprValue) is false, return V.
     const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
@@ -2641,10 +2574,8 @@ pub fn codegenWhileStatement(
     const start_index = try executable.nextInstructionIndex();
 
     // a. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.test_expression, executable, ctx);
-
     // b. Let exprValue be ? GetValue(exprRef).
-    if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.test_expression, executable, ctx);
 
     // c. If ToBoolean(exprValue) is false, return V.
     const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
@@ -2703,8 +2634,7 @@ pub fn codegenForStatement(
             // 1. If the first Expression is present, then
             //     a. Let exprRef be ? Evaluation of the first Expression.
             //     b. Perform ? GetValue(exprRef).
-            try codegenExpression(expression, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+            try codegenExpressionAndGetValue(expression, executable, ctx);
 
             // 2. If the second Expression is present, let test be the second Expression;
             //    otherwise, let test be empty.
@@ -2775,10 +2705,8 @@ pub fn codegenForStatement(
     // a. If test is not empty, then
     if (node.test_expression) |test_expression| {
         // i. Let testRef be ? Evaluation of test.
-        try codegenExpression(test_expression, executable, ctx);
-
         // ii. Let testValue be ? GetValue(testRef).
-        if (test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(test_expression, executable, ctx);
 
         // iii. If ToBoolean(testValue) is false, return V.
         const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
@@ -2801,10 +2729,8 @@ pub fn codegenForStatement(
     // f. If increment is not empty, then
     if (node.increment_expression) |increment_expression| {
         // i. Let incRef be ? Evaluation of increment.
-        try codegenExpression(increment_expression, executable, ctx);
-
         // ii. Perform ? GetValue(incRef).
-        if (increment_expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(increment_expression, executable, ctx);
     }
 
     try executable.addInstruction(.jump, start_index);
@@ -2888,12 +2814,9 @@ fn forInOfHeadEvaluation(
     // TODO: 1-2.
 
     // 3. Let exprRef be Completion(Evaluation of expr).
-    try codegenExpression(expression, executable, ctx);
-
     // TODO: 4. Set the running execution context's LexicalEnvironment to oldEnv.
-
     // 5. Let exprValue be ? GetValue(? exprRef).
-    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(expression, executable, ctx);
 
     // 6. If iterationKind is enumerate, then
     if (iteration_kind == .enumerate) {
@@ -3238,10 +3161,8 @@ pub fn codegenReturnStatement(
     // ReturnStatement : return Expression ;
     if (node.expression) |expression| {
         // 1. Let exprRef be ? Evaluation of Expression.
-        try codegenExpression(expression, executable, ctx);
-
         // 2. Let exprValue be ? GetValue(exprRef).
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(expression, executable, ctx);
 
         // TODO: 3. If GetGeneratorKind() is async, set exprValue to ? Await(exprValue).
 
@@ -3264,10 +3185,8 @@ pub fn codegenWithStatement(
     ctx: *Context,
 ) Executable.Error!void {
     // 1. Let val be ? Evaluation of Expression.
-    try codegenExpression(node.expression, executable, ctx);
-
     // 2. Let obj be ? ToObject(? GetValue(val)).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression, executable, ctx);
     try executable.addInstruction(.to_object, {});
 
     // 3. Let oldEnv be the running execution context's LexicalEnvironment.
@@ -3417,10 +3336,8 @@ fn caseClauseIsSelected(executable: *Executable, ctx: *Context, case_clause: ast
     try executable.addInstruction(.load, {});
 
     // 2. Let exprRef be ? Evaluation of the Expression of C.
-    try codegenExpression(case_clause.expression, executable, ctx);
-
     // 3. Let clauseSelector be ? GetValue(exprRef).
-    if (case_clause.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(case_clause.expression, executable, ctx);
     try executable.addInstruction(.load, {});
 
     // 4. Return IsStrictlyEqual(input, clauseSelector).
@@ -3438,10 +3355,8 @@ pub fn codegenSwitchStatement(
     defer ctx.break_jumps = .fromOwnedSlice(break_jumps);
 
     // 1. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.expression, executable, ctx);
-
     // 2. Let switchValue be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression, executable, ctx);
 
     // 3. Let oldEnv be the running execution context's LexicalEnvironment.
     try executable.addInstruction(.push_lexical_environment, {});
@@ -3543,10 +3458,8 @@ pub fn codegenThrowStatement(
 ) Executable.Error!void {
     // ThrowStatement : throw Expression ;
     // 1. Let exprRef be ? Evaluation of Expression.
-    try codegenExpression(node.expression, executable, ctx);
-
     // 2. Let exprValue be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression, executable, ctx);
 
     // 3. Return ThrowCompletion(exprValue).
     try executable.addInstruction(.throw, {});
@@ -3793,10 +3706,8 @@ pub fn codegenYieldExpression(
     // YieldExpression : yield AssignmentExpression
     if (node.expression) |expression| {
         // 1. Let exprRef be ? Evaluation of AssignmentExpression.
-        try codegenExpression(expression.*, executable, ctx);
-
         // 2. Let value be ? GetValue(exprRef).
-        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+        try codegenExpressionAndGetValue(expression.*, executable, ctx);
 
         // 3. Return ? Yield(value).
         try executable.addInstruction(.yield, {});
@@ -3907,10 +3818,8 @@ pub fn codegenAwaitExpression(
 ) Executable.Error!void {
     // AwaitExpression : await UnaryExpression
     // 1. Let exprRef be ? Evaluation of UnaryExpression.
-    try codegenExpression(node.expression.*, executable, ctx);
-
     // 2. Let value be ? GetValue(exprRef).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
 
     // 3. Return ? Await(value).
     try executable.addInstruction(.@"await", {});
@@ -4048,10 +3957,8 @@ pub fn codegenExportDeclaration(
             // 2. Else,
             else {
                 // a. Let rhs be ? Evaluation of AssignmentExpression.
-                try codegenExpression(expression, executable, ctx);
-
                 // b. Let value be ? GetValue(rhs).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+                try codegenExpressionAndGetValue(expression, executable, ctx);
             }
 
             // 3. Let env be the running execution context's LexicalEnvironment.
