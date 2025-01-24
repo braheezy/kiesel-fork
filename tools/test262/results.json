@@ -6508,7 +6508,7 @@
   "test/built-ins/Function/S15.3_A2_T2.js": "PASS",
   "test/built-ins/Function/S15.3_A3_T1.js": "PASS",
   "test/built-ins/Function/S15.3_A3_T2.js": "PASS",
-  "test/built-ins/Function/S15.3_A3_T3.js": "FAIL",
+  "test/built-ins/Function/S15.3_A3_T3.js": "PASS",
   "test/built-ins/Function/S15.3_A3_T4.js": "PASS",
   "test/built-ins/Function/S15.3_A3_T5.js": "PASS",
   "test/built-ins/Function/S15.3_A3_T6.js": "PASS",

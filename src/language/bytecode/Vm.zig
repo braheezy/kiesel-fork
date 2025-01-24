@@ -1510,6 +1510,37 @@ fn executeResolveBinding(
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
+fn executeResolveBindingDirect(
+    self: *Vm,
+    name_index: Executable.IdentifierIndex,
+    strict: bool,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+    executable: Executable,
+) Agent.Error!void {
+    // Combines Agent.resolveBinding() and Reference.getValue(), entirely bypassing the creation of
+    // a reference.
+    const name = executable.getIdentifier(name_index);
+    const lookup_cache_entry = executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
+    var env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    if (lookup_cache_entry.*) |cache| {
+        for (0..cache.distance) |_| {
+            env = env.outerEnv() orelse {
+                return self.agent.throwException(.reference_error, "'{}' is not defined", .{name});
+            };
+        }
+    } else {
+        var distance: usize = 0;
+        while (!try env.hasBinding(name)) {
+            env = env.outerEnv() orelse {
+                return self.agent.throwException(.reference_error, "'{}' is not defined", .{name});
+            };
+            distance += 1;
+        }
+        lookup_cache_entry.* = .{ .distance = distance };
+    }
+    self.result = try env.getBindingValue(self.agent, name, strict);
+}
+
 /// 15.7.16 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
 fn executeResolvePrivateIdentifier(
@@ -1780,6 +1811,7 @@ fn executeInstruction(
         .put_value => self.executePutValue(executable),
         .reg_exp_create => self.executeRegExpCreate(executable),
         .resolve_binding => self.executeResolveBinding(payload.identifier, payload.strict, payload.environment_lookup_cache_index, executable),
+        .resolve_binding_direct => self.executeResolveBindingDirect(payload.identifier, payload.strict, payload.environment_lookup_cache_index, executable),
         .resolve_private_identifier => self.executeResolvePrivateIdentifier(payload, executable),
         .resolve_this_binding => self.executeResolveThisBinding(executable),
         .restore_lexical_environment => self.executeRestoreLexicalEnvironment(executable),

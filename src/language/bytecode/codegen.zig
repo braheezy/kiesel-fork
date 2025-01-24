@@ -21,6 +21,7 @@ pub const Context = struct {
     labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
     labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
     current_label: ?[]const u8,
+    fuse_get_value: bool = false,
 
     pub fn init() Context {
         return .{
@@ -122,7 +123,8 @@ pub fn codegenParenthesizedExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    try codegenExpression(node.expression.*, executable, ctx);
+    // Use codegenExpressionImpl() instead of codegenExpression() to not disable `fuse_get_value`
+    try codegenExpressionImpl(node.expression.*, executable, ctx);
 }
 
 /// 13.1.3 Runtime Semantics: Evaluation
@@ -136,11 +138,19 @@ pub fn codegenIdentifierReference(
     // IdentifierReference : yield
     // IdentifierReference : await
     // 1. Return ? ResolveBinding(StringValue of Identifier).
-    try executable.addInstruction(.resolve_binding, .{
-        .identifier = try executable.addIdentifier(node),
-        .strict = ctx.contained_in_strict_mode_code,
-        .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
-    });
+    if (ctx.fuse_get_value) {
+        try executable.addInstruction(.resolve_binding_direct, .{
+            .identifier = try executable.addIdentifier(node),
+            .strict = ctx.contained_in_strict_mode_code,
+            .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+        });
+    } else {
+        try executable.addInstruction(.resolve_binding, .{
+            .identifier = try executable.addIdentifier(node),
+            .strict = ctx.contained_in_strict_mode_code,
+            .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+        });
+    }
 }
 
 pub fn codegenPrimaryExpression(
@@ -668,11 +678,13 @@ pub fn codegenPropertyDefinition(
             try executable.addInstructionWithConstant(.load_constant, property_name);
 
             // 2. Let exprValue be ? Evaluation of IdentifierReference.
-            try codegenIdentifierReference(identifier_reference, executable, ctx);
-
             // 3. Let propValue be ? GetValue(exprValue).
-            try executable.addInstruction(.get_value, {});
-            try executable.addInstruction(.load, {});
+            {
+                const tmp = temporaryChange(&ctx.fuse_get_value, true);
+                defer tmp.restore();
+                try codegenIdentifierReference(identifier_reference, executable, ctx);
+                try executable.addInstruction(.load, {});
+            }
 
             // 4. Assert: object is an ordinary, extensible object with no non-configurable properties.
             // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
@@ -2003,34 +2015,23 @@ pub fn codegenExpressionAndGetValue(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    switch (node) {
-        .primary_expression => |x| try codegenPrimaryExpression(x, executable, ctx),
-        .member_expression => |x| try codegenMemberExpression(x, executable, ctx),
-        .super_property => |x| try codegenSuperProperty(x, executable, ctx),
-        .meta_property => |x| try codegenMetaProperty(x, executable, ctx),
-        .new_expression => |x| try codegenNewExpression(x, executable, ctx),
-        .call_expression => |x| try codegenCallExpression(x, executable, ctx),
-        .super_call => |x| try codegenSuperCall(x, executable, ctx),
-        .import_call => |x| try codegenImportCall(x, executable, ctx),
-        .optional_expression => |x| try codegenOptionalExpression(x, executable, ctx),
-        .update_expression => |x| try codegenUpdateExpression(x, executable, ctx),
-        .unary_expression => |x| try codegenUnaryExpression(x, executable, ctx),
-        .binary_expression => |x| try codegenBinaryExpression(x, executable, ctx),
-        .relational_expression => |x| try codegenRelationalExpression(x, executable, ctx),
-        .equality_expression => |x| try codegenEqualityExpression(x, executable, ctx),
-        .logical_expression => |x| try codegenLogicalExpression(x, executable, ctx),
-        .conditional_expression => |x| try codegenConditionalExpression(x, executable, ctx),
-        .assignment_expression => |x| try codegenAssignmentExpression(x, executable, ctx),
-        .sequence_expression => |x| try codegenSequenceExpression(x, executable, ctx),
-        .await_expression => |x| try codegenAwaitExpression(x, executable, ctx),
-        .yield_expression => |x| try codegenYieldExpression(x, executable, ctx),
-        .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
-        .binding_pattern_for_assignment_expression => |x| try bindingInitialization(x, executable, ctx, null),
-    }
-    if (node.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
+    const tmp = temporaryChange(&ctx.fuse_get_value, true);
+    defer tmp.restore();
+    try codegenExpressionImpl(node, executable, ctx);
+    if (node.analyze(.is_reference) and !node.analyze(.is_identifier_reference)) try executable.addInstruction(.get_value, {});
 }
 
 pub fn codegenExpression(
+    node: ast.Expression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    const tmp = temporaryChange(&ctx.fuse_get_value, false);
+    defer tmp.restore();
+    try codegenExpressionImpl(node, executable, ctx);
+}
+
+fn codegenExpressionImpl(
     node: ast.Expression,
     executable: *Executable,
     ctx: *Context,

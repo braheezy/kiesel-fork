@@ -212,6 +212,12 @@ pub const Instruction = union(enum(u8)) {
         strict: bool,
         environment_lookup_cache_index: EnvironmentLookupCacheIndex,
     },
+    /// Store ResolveBinding() + GetValue() as the result value.
+    resolve_binding_direct: struct {
+        identifier: IdentifierIndex,
+        strict: bool,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
     /// Resolve a private identifier (#foo) to a private name in the current private environment
     /// and store the underlying symbol as the result value.
     resolve_private_identifier: IdentifierIndex,

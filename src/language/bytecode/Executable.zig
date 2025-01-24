@@ -224,7 +224,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     .load_constant, .store_constant => {
                         try writer.print(" {pretty}", .{self.getConstant(payload)});
                     },
-                    .resolve_binding => {
+                    .resolve_binding, .resolve_binding_direct => {
                         try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
                     },
                     .typeof_identifier => {
