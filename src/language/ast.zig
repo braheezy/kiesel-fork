@@ -20,6 +20,7 @@ const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
 const AnalyzeQuery = enum {
     is_await_expression,
     is_identifier_reference,
+    is_member_expression,
     is_reference,
     is_string_literal,
 };
@@ -77,6 +78,7 @@ pub const ParenthesizedExpression = struct {
         return switch (query) {
             .is_await_expression,
             .is_identifier_reference,
+            .is_member_expression,
             .is_reference,
             => self.expression.analyze(query),
             .is_string_literal => false,
@@ -113,7 +115,9 @@ pub const PrimaryExpression = union(enum) {
 
     pub fn analyze(self: PrimaryExpression, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_await_expression => switch (self) {
+            .is_await_expression,
+            .is_member_expression,
+            => switch (self) {
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
                 else => false,
             },
@@ -209,6 +213,7 @@ pub const Literal = union(enum) {
         return switch (query) {
             .is_await_expression,
             .is_identifier_reference,
+            .is_member_expression,
             .is_reference,
             => false,
             .is_string_literal => self == .string,
@@ -803,15 +808,29 @@ pub const Expression = union(enum) {
     }
 
     pub fn analyze(self: Expression, query: AnalyzeQuery) bool {
-        return switch (self) {
-            .await_expression => query == .is_await_expression,
-            .member_expression,
-            .super_property,
-            // NOTE: optional_expression is omitted here on purpose, see the comment at the end of
-            //       codegenOptionalExpression()
-            => query == .is_reference,
-            .primary_expression => |primary_expression| primary_expression.analyze(query),
-            else => false,
+        return switch (query) {
+            .is_await_expression => switch (self) {
+                .await_expression => true,
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
+            .is_member_expression => switch (self) {
+                .member_expression => true,
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
+            .is_reference => switch (self) {
+                .member_expression,
+                .super_property,
+                // NOTE: optional_expression is omitted here on purpose, codegenOptionalExpression() always resolves references.
+                => true,
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
+            else => switch (self) {
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
         };
     }
 };
@@ -837,6 +856,7 @@ pub const Statement = union(enum) {
         return switch (query) {
             .is_await_expression,
             .is_identifier_reference,
+            .is_member_expression,
             .is_reference,
             .is_string_literal,
             => switch (self) {
@@ -939,6 +959,7 @@ pub const Declaration = union(enum) {
         return switch (query) {
             .is_await_expression,
             .is_identifier_reference,
+            .is_member_expression,
             .is_reference,
             .is_string_literal,
             => false,

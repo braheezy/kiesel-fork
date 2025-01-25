@@ -243,8 +243,6 @@ fn codegenBindingPatternValue(
     ctx: *Context,
     property: BindingPatternProperty,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code;
-
     // Evaluate `rhs[n]`
     try executable.addInstruction(.load, {});
     switch (property) {
@@ -254,10 +252,7 @@ fn codegenBindingPatternValue(
             try executable.addInstruction(.load, {});
         },
     }
-    try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
-        .strict = strict,
-    });
-    try executable.addInstruction(.get_value, {});
+    try executable.addInstruction(.evaluate_property_access_with_expression_key_direct, {});
 
     if (maybe_initializer) |initializer| {
         try executable.addInstruction(.load, {}); // Save RHS
@@ -835,9 +830,13 @@ pub fn codegenMemberExpression(
             // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpressionAndGetValue(expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
-            try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
-                .strict = strict,
-            });
+            if (ctx.fuse_get_value) {
+                try executable.addInstruction(.evaluate_property_access_with_expression_key_direct, {});
+            } else {
+                try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
+                    .strict = strict,
+                });
+            }
         },
 
         // MemberExpression : MemberExpression . IdentifierName
@@ -851,11 +850,18 @@ pub fn codegenMemberExpression(
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
-                .strict = strict,
-                .identifier = try executable.addIdentifier(identifier),
-                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
-            });
+            if (ctx.fuse_get_value) {
+                try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
+                    .identifier = try executable.addIdentifier(identifier),
+                    .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                });
+            } else {
+                try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                    .strict = strict,
+                    .identifier = try executable.addIdentifier(identifier),
+                    .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                });
+            }
         },
 
         // MemberExpression : MemberExpression . PrivateIdentifier
@@ -867,10 +873,17 @@ pub fn codegenMemberExpression(
 
             // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
             // 4. Return MakePrivateReference(baseValue, fieldNameString).
-            try executable.addInstructionWithIdentifier(
-                .make_private_reference,
-                private_identifier,
-            );
+            if (ctx.fuse_get_value) {
+                try executable.addInstructionWithIdentifier(
+                    .make_private_reference_direct,
+                    private_identifier,
+                );
+            } else {
+                try executable.addInstructionWithIdentifier(
+                    .make_private_reference,
+                    private_identifier,
+                );
+            }
         },
     }
 }
@@ -1145,24 +1158,17 @@ pub fn codegenOptionalExpression(
         // OptionalChain : ?. [ Expression ]
         .expression => |expression| {
             // 1. Let strict be IsStrict(this OptionalChain).
-            const strict = ctx.contained_in_strict_mode_code;
-
             // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpressionAndGetValue(expression.*, executable, ctx);
             try executable.addInstruction(.load, {});
-            try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
-                .strict = strict,
-            });
+            try executable.addInstruction(.evaluate_property_access_with_expression_key_direct, {});
         },
 
         // OptionalChain : ?. IdentifierName
         .identifier => |identifier| {
             // 1. Let strict be IsStrict(this OptionalChain).
-            const strict = ctx.contained_in_strict_mode_code;
-
             // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
-                .strict = strict,
+            try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
                 .identifier = try executable.addIdentifier(identifier),
                 .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
             });
@@ -1173,16 +1179,11 @@ pub fn codegenOptionalExpression(
             // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
             // 2. Return MakePrivateReference(baseValue, fieldNameString).
             try executable.addInstructionWithIdentifier(
-                .make_private_reference,
+                .make_private_reference_direct,
                 private_identifier,
             );
         },
     }
-
-    // Since we don't know whether a reference will have been pushed to the stack or not we can't
-    // let the caller add an unconditional get_value, therefore analyze(.is_reference) returns
-    // false for optional_expression and we do it here instead.
-    if (node.property != .arguments) try executable.addInstruction(.get_value, {});
 
     end_jump.getPtr().* = try executable.nextInstructionIndex();
 }
@@ -2018,7 +2019,11 @@ pub fn codegenExpressionAndGetValue(
     const tmp = temporaryChange(&ctx.fuse_get_value, true);
     defer tmp.restore();
     try codegenExpressionImpl(node, executable, ctx);
-    if (node.analyze(.is_reference) and !node.analyze(.is_identifier_reference)) try executable.addInstruction(.get_value, {});
+    if (node.analyze(.is_reference) and
+        !(node.analyze(.is_identifier_reference) or node.analyze(.is_member_expression)))
+    {
+        try executable.addInstruction(.get_value, {});
+    }
 }
 
 pub fn codegenExpression(
@@ -2923,24 +2928,20 @@ fn forInOfBodyEvaluation(
 
     // d. Let done be ? IteratorComplete(nextResult).
     try executable.addInstruction(.load, {});
-    try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
-        .strict = false, // Strictness doesn't matter here
+    try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
         .identifier = try executable.addIdentifier("done"),
         .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
     });
-    try executable.addInstruction(.get_value, {});
 
     // e. If done is true, return V.
     const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
     jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
     // f. Let nextValue be ? IteratorValue(nextResult).
-    try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
-        .strict = false, // Strictness doesn't matter here
+    try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
         .identifier = try executable.addIdentifier("value"),
         .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
     });
-    try executable.addInstruction(.get_value, {});
 
     // g. If lhsKind is either assignment or var-binding, then
     if (lhs_kind == .assignment or lhs_kind == .var_binding) {

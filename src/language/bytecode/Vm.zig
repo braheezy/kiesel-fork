@@ -759,6 +759,36 @@ fn executeEvaluatePropertyAccessWithExpressionKey(
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
+fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm, _: Executable) Agent.Error!void {
+    // Combines executeEvaluatePropertyAccessWithExpressionKey() and Reference.getValue(), entirely
+    // bypassing the creation of a reference.
+    const property_name_value = self.stack.pop();
+    const base_value = self.stack.pop();
+    const base_object = switch (base_value.type()) {
+        .object => base_value.asObject(),
+        .string => blk: {
+            if (property_name_value.type() == .string and property_name_value.asString().eql(String.fromLiteral("length"))) {
+                self.result = Value.from(@as(u53, @intCast(base_value.asString().length())));
+                return;
+            } else if (property_name_value.type() == .symbol) {
+                break :blk (try base_value.synthesizePrototype(self.agent)).?;
+            }
+            // Might be a property handled by String's [[GetOwnProperty]], we need to make an object
+            // TODO: This could have a fast path for numeric property lookups
+            break :blk try base_value.toObject(self.agent);
+        },
+        // Guaranteed to throw
+        .null, .undefined => try base_value.toObject(self.agent),
+        else => (try base_value.synthesizePrototype(self.agent)).?,
+    };
+    const property_key = switch (property_name_value.type()) {
+        .string => PropertyKey.from(property_name_value.asString()),
+        .symbol => PropertyKey.from(property_name_value.asSymbol()),
+        else => try property_name_value.toPropertyKey(self.agent),
+    };
+    self.result = try base_object.internal_methods.get(base_object, property_key, base_value);
+}
+
 /// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
 /// https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
 fn executeEvaluatePropertyAccessWithIdentifierKey(
@@ -790,6 +820,67 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(
         .maybe_lookup_cache_entry = lookup_cache_entry,
     };
     try self.reference_stack.append(self.agent.gc_allocator, reference);
+}
+
+fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
+    self: *Vm,
+    identifier_name_index: Executable.IdentifierIndex,
+    property_name_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+    executable: Executable,
+) Agent.Error!void {
+    // Combines executeEvaluatePropertyAccessWithIdentifierKey() and Reference.getValue(), entirely
+    // bypassing the creation of a reference.
+    const property_name_string = executable.getIdentifier(identifier_name_index);
+    const lookup_cache_entry = executable.getPropertyLookupCacheEntry(property_name_lookup_cache_index);
+    const base_value = self.stack.pop();
+
+    const base_object = switch (base_value.type()) {
+        .object => base_value.asObject(),
+        .string => blk: {
+            if (property_name_string.eql(String.fromLiteral("length"))) {
+                self.result = Value.from(@as(u53, @intCast(base_value.asString().length())));
+                return;
+            }
+            // Might be a property handled by String's [[GetOwnProperty]], we need to make an object
+            // TODO: This could have a fast path for numeric property lookups
+            break :blk try base_value.toObject(self.agent);
+        },
+        // Guaranteed to throw
+        .null, .undefined => try base_value.toObject(self.agent),
+        else => (try base_value.synthesizePrototype(self.agent)).?,
+    };
+
+    if (lookup_cache_entry.*) |cache| {
+        if (base_object.property_storage.shape == cache.shape) {
+            switch (cache.index) {
+                .value => |index| {
+                    self.result = base_object.property_storage.values.items[@intFromEnum(index)];
+                    return;
+                },
+                .accessor => |index| {
+                    const accessor = base_object.property_storage.accessors.items[@intFromEnum(index)];
+                    // Excerpt from ordinaryGet()
+                    if (accessor.get) |getter| {
+                        self.result = try Value.from(getter).callAssumeCallableNoArgs(base_value);
+                    } else {
+                        self.result = .undefined;
+                    }
+                    return;
+                },
+            }
+        } else {
+            lookup_cache_entry.* = null;
+        }
+    }
+
+    const property_key = PropertyKey.from(property_name_string);
+    self.result = try base_object.internal_methods.get(base_object, property_key, base_value);
+    if (base_object.property_storage.shape.properties.get(property_key)) |property_metadata| {
+        lookup_cache_entry.* = .{
+            .shape = base_object.property_storage.shape,
+            .index = property_metadata.index,
+        };
+    }
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -1355,6 +1446,28 @@ fn executeMakePrivateReference(
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
+fn executeMakePrivateReferenceDirect(
+    self: *Vm,
+    private_identifier_index: Executable.IdentifierIndex,
+    executable: Executable,
+) Agent.Error!void {
+    // Combines executeMakePrivateReference() and Reference.getValue(), entirely bypassing the
+    // creation of a reference.
+    const private_identifier = executable.getIdentifier(private_identifier_index);
+    const base_value = self.stack.pop();
+    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    const private_name = private_env.resolvePrivateIdentifier(
+        try private_identifier.toUtf8(self.agent.gc_allocator),
+    );
+    const base_object = switch (base_value.type()) {
+        .object => base_value.asObject(),
+        // Guaranteed to throw
+        .null, .undefined => try base_value.toObject(self.agent),
+        else => (try base_value.synthesizePrototype(self.agent)).?,
+    };
+    self.result = try base_object.privateGet(private_name);
+}
+
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
 /// https://tc39.es/ecma262/#sec-makesuperpropertyreference
 fn executeMakeSuperPropertyReference(self: *Vm, strict: bool, _: Executable) Agent.Error!void {
@@ -1760,7 +1873,9 @@ fn executeInstruction(
         .evaluate_import_call => self.executeEvaluateImportCall(executable),
         .evaluate_new => self.executeEvaluateNew(payload.argument_count, executable),
         .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(payload.strict, executable),
+        .evaluate_property_access_with_expression_key_direct => self.executeEvaluatePropertyAccessWithExpressionKeyDirect(executable),
         .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(payload.strict, payload.identifier, payload.property_lookup_cache_index, executable),
+        .evaluate_property_access_with_identifier_key_direct => self.executeEvaluatePropertyAccessWithIdentifierKeyDirect(payload.identifier, payload.property_lookup_cache_index, executable),
         .evaluate_super_call => self.executeEvaluateSuperCall(payload.argument_count, executable),
         .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(payload, executable),
         .get_iterator => self.executeGetIterator(payload, executable),
@@ -1796,6 +1911,7 @@ fn executeInstruction(
         .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),
         .logical_not => self.executeLogicalNot(executable),
         .make_private_reference => self.executeMakePrivateReference(payload, executable),
+        .make_private_reference_direct => self.executeMakePrivateReferenceDirect(payload, executable),
         .make_super_property_reference => self.executeMakeSuperPropertyReference(payload.strict, executable),
         .object_create => self.executeObjectCreate(executable),
         .object_define_method => self.executeObjectDefineMethod(payload.ast_node, payload.type, executable),

@@ -233,6 +233,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     .has_private_element,
                     .initialize_bound_name,
                     .make_private_reference,
+                    .make_private_reference_direct,
                     .resolve_private_identifier,
                     => {
                         try writer.print(" \"{s}\"", .{self.getIdentifier(payload)});

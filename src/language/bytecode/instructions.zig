@@ -91,9 +91,16 @@ pub const Instruction = union(enum(u8)) {
     evaluate_property_access_with_expression_key: struct {
         strict: bool,
     },
+    /// Store EvaluatePropertyAccessWithExpressionKey() + GetValue() as the result value.
+    evaluate_property_access_with_expression_key_direct,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
     evaluate_property_access_with_identifier_key: struct {
         strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
+    /// Store EvaluatePropertyAccessWithIdentifierKey() + GetValue() as the result value.
+    evaluate_property_access_with_identifier_key_direct: struct {
         identifier: IdentifierIndex,
         property_lookup_cache_index: PropertyLookupCacheIndex,
     },
@@ -173,6 +180,8 @@ pub const Instruction = union(enum(u8)) {
     logical_not,
     /// Store MakePrivateReference() as the result value.
     make_private_reference: IdentifierIndex,
+    /// Store MakePrivateReference() + GetValue() as the result value.
+    make_private_reference_direct: IdentifierIndex,
     /// Store MakeSuperPropertyReference() as the result value.
     make_super_property_reference: struct {
         strict: bool,
