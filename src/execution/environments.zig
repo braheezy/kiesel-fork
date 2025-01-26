@@ -197,66 +197,54 @@ pub fn getIdentifierReference(
     strict: bool,
     maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
 ) Agent.Error!Reference {
-    var env: ?Environment = start_env;
+    // 1. If env is null, then
+    //     a. Return the Reference Record {
+    //          [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+    //        }.
+    // 2. Let exists be ? env.HasBinding(name).
+    // 3. If exists is true, then
+    //     a. Return the Reference Record {
+    //          [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+    //        }.
+    // 4. Else,
+    //     a. Let outer be env.[[OuterEnv]].
+    //     b. Return ? GetIdentifierReference(outer, name, strict).
+    var env = start_env;
     if (maybe_lookup_cache_entry) |lookup_cache_entry| {
         if (lookup_cache_entry.*) |cache| {
             // In the case of an unresolvable reference we'll reach the last environment without an
             // outer env.
-            for (0..cache.distance) |_| env = env.?.outerEnv();
-            return .{
-                .base = if (env) |environment|
-                    .{ .environment = environment }
-                else
-                    .unresolvable,
-                .referenced_name = .{ .value = Value.from(name) },
-                .strict = strict,
-                .this_value = null,
-            };
-        }
-        lookup_cache_entry.* = .{ .distance = 0 };
-    }
-
-    while (true) {
-        // 2. Let exists be ? env.HasBinding(name).
-        const exists = try env.?.hasBinding(name);
-
-        // 3. If exists is true, then
-        if (exists) {
-            // a. Return the Reference Record {
-            //      [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-            //    }.
-            return .{
-                .base = .{ .environment = env.? },
-                .referenced_name = .{ .value = Value.from(name) },
-                .strict = strict,
-                .this_value = null,
-            };
-        }
-        // 4. Else,
-        else {
-            if (maybe_lookup_cache_entry) |lookup_cache_entry| {
-                lookup_cache_entry.*.?.distance += 1;
-            }
-
-            // a. Let outer be env.[[OuterEnv]].
-            env = env.?.outerEnv();
-
-            // 1. If env is null, then
-            if (env == null) {
-                // a. Return the Reference Record {
-                //      [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-                //    }.
+            for (0..cache.distance) |_| env = env.outerEnv() orelse {
                 return .{
                     .base = .unresolvable,
                     .referenced_name = .{ .value = Value.from(name) },
                     .strict = strict,
                     .this_value = null,
                 };
-            }
-
-            // b. Return ? GetIdentifierReference(outer, name, strict).
+            };
         }
     }
+    var distance: usize = 0;
+    defer if (maybe_lookup_cache_entry) |lookup_cache_entry| {
+        lookup_cache_entry.* = .{ .distance = distance };
+    };
+    while (!try env.hasBinding(name)) {
+        distance += 1;
+        env = env.outerEnv() orelse {
+            return .{
+                .base = .unresolvable,
+                .referenced_name = .{ .value = Value.from(name) },
+                .strict = strict,
+                .this_value = null,
+            };
+        };
+    }
+    return .{
+        .base = .{ .environment = env },
+        .referenced_name = .{ .value = Value.from(name) },
+        .strict = strict,
+        .this_value = null,
+    };
 }
 
 /// 9.1.2.2 NewDeclarativeEnvironment ( E )
