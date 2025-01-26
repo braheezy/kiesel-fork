@@ -81,7 +81,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
-pub fn deleteBinding(_: *ModuleEnvironment, _: *const String) bool {
+pub fn deleteBinding(_: ModuleEnvironment, _: *const String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
     unreachable;
