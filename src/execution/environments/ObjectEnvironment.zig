@@ -86,7 +86,7 @@ pub fn createMutableBinding(
 pub fn createImmutableBinding(_: ObjectEnvironment, _: *Agent, _: *const String, _: bool) noreturn {
     // The CreateImmutableBinding concrete method of an Object Environment Record is never used
     // within this specification.
-    @panic("ObjectEnvironment.createImmutableBinding() must not be called");
+    unreachable;
 }
 
 /// 9.1.1.2.4 InitializeBinding ( N, V )
