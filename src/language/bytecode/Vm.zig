@@ -1819,7 +1819,7 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     std.debug.assert(@as(Instruction.Tag, @enumFromInt(executable.instructions.getLast())) == .end);
     main: switch (self.fetchInstructionTag(executable)) {
-        .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
+        .@"return" => return Completion.@"return"(self.result.?),
         .yield => return yield(self.agent, self.result.?),
         .end => return Completion.normal(self.result),
         inline else => |tag| {
