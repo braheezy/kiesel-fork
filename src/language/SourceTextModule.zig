@@ -480,13 +480,13 @@ pub fn parse(
     source_text: []const u8,
     realm: *Realm,
     host_defined: ?SafePointer,
-    ctx: Parser.ParseContext,
+    options: Parser.Options,
 ) Parser.Error!*SourceTextModule {
     const agent = realm.agent;
 
     // 1. Let body be ParseText(sourceText, Module).
     // 2. If body is a List of errors, return body.
-    const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
+    const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, options);
 
     // 3. Let requestedModules be the ModuleRequests of body.
     var requested_modules: std.ArrayListUnmanaged(*const String) = .empty;

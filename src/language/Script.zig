@@ -49,13 +49,13 @@ pub fn parse(
     source_text: []const u8,
     realm: *Realm,
     host_defined: ?SafePointer,
-    ctx: Parser.ParseContext,
+    options: Parser.Options,
 ) Parser.Error!*Script {
     const agent = realm.agent;
 
     // 1. Let script be ParseText(sourceText, Script).
     // 2. If script is a List of errors, return script.
-    const script = try Parser.parse(ast.Script, agent.gc_allocator, source_text, ctx);
+    const script = try Parser.parse(ast.Script, agent.gc_allocator, source_text, options);
 
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined

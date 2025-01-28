@@ -51,7 +51,7 @@ pub const Error = error{
     OutOfMemory,
 };
 
-pub const ParseContext = struct {
+pub const Options = struct {
     diagnostics: *ptk.Diagnostics,
     file_name: ?[]const u8 = null,
 };
@@ -187,7 +187,7 @@ pub fn parse(
     comptime T: type,
     allocator: std.mem.Allocator,
     source_text: []const u8,
-    ctx: ParseContext,
+    options: Options,
 ) Error!T {
     if (T != ast.Script and T != ast.Module)
         @compileError("Parser.parse() is only implemented for ast.Script and ast.Module");
@@ -204,7 +204,7 @@ pub fn parse(
         }.accept,
         allocator,
         source_text,
-        ctx,
+        options,
     );
 }
 
@@ -213,11 +213,11 @@ pub fn parseNode(
     comptime acceptFn: fn (*Parser) anyerror!T,
     allocator: std.mem.Allocator,
     source_text: []const u8,
-    ctx: ParseContext,
+    options: Options,
 ) Error!T {
-    var tokenizer = initValidateUtf8(source_text, ctx.file_name) catch {
-        try ctx.diagnostics.emit(
-            .{ .source = ctx.file_name, .line = 1, .column = 1 },
+    var tokenizer = initValidateUtf8(source_text, options.file_name) catch {
+        try options.diagnostics.emit(
+            .{ .source = options.file_name, .line = 1, .column = 1 },
             .@"error",
             "invalid UTF-8 source code",
             .{},
@@ -228,7 +228,7 @@ pub fn parseNode(
     var parser: Parser = .{
         .allocator = allocator,
         .core = core,
-        .diagnostics = ctx.diagnostics,
+        .diagnostics = options.diagnostics,
         .identifier_stack = .empty,
     };
     defer parser.identifier_stack.deinit(allocator);
