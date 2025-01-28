@@ -8,6 +8,8 @@ const Diagnostics = kiesel.language.Diagnostics;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
+const formatParseError = kiesel.utils.formatParseError;
+const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
 
 const Editor = @import("zigline").Editor;
 
@@ -45,13 +47,6 @@ const Writer = std.io.GenericWriter(
         }
     }.write,
 );
-
-fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8) !Value {
-    var diagnostics = Diagnostics.init(allocator);
-    defer diagnostics.deinit();
-    const script = try Script.parse(source_text, realm, null, .{ .diagnostics = &diagnostics });
-    return script.evaluate();
-}
 
 pub fn main() std.os.uefi.Status {
     const allocator = std.os.uefi.pool_allocator;
@@ -122,11 +117,41 @@ pub fn main() std.os.uefi.Status {
         // however (and will print 'undefined').
         if (source_text.len == 0) continue;
 
-        if (run(allocator, realm, source_text)) |result| {
+        var diagnostics = Diagnostics.init(allocator);
+        defer diagnostics.deinit();
+        const script = Script.parse(source_text, realm, null, .{
+            .diagnostics = &diagnostics,
+        }) catch |err| switch (err) {
+            error.ParseError => {
+                const parse_error = diagnostics.errors.items[0];
+                const parse_error_hint = formatParseErrorHint(
+                    allocator,
+                    parse_error,
+                    source_text,
+                ) catch return .OutOfResources;
+                defer allocator.free(parse_error_hint);
+                stderr.print("{s}\n", .{parse_error_hint}) catch unreachable;
+                const syntax_error = agent.createException(
+                    .syntax_error,
+                    "{s}",
+                    .{formatParseError(
+                        agent.gc_allocator,
+                        parse_error,
+                    ) catch return .OutOfResources},
+                ) catch return .OutOfResources;
+                stderr.print(
+                    "Uncaught exception: {pretty}\n",
+                    .{Value.from(syntax_error)},
+                ) catch unreachable;
+                continue;
+            },
+            error.OutOfMemory => return .OutOfResources,
+        };
+
+        if (script.evaluate()) |result| {
             stdout.print("{pretty}\n", .{result}) catch unreachable;
         } else |err| switch (err) {
             error.OutOfMemory => return .OutOfResources,
-            error.ParseError => stderr.print("Invalid syntax in input: {s}\n", .{source_text}) catch unreachable,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 stderr.print("Uncaught exception: {pretty}\n", .{exception}) catch unreachable;
