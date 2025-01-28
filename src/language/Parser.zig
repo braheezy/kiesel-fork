@@ -52,7 +52,7 @@ pub const Error = error{
 };
 
 pub const Options = struct {
-    diagnostics: *ptk.Diagnostics,
+    diagnostics: ?*ptk.Diagnostics = null,
     file_name: ?[]const u8 = null,
 };
 
@@ -215,8 +215,14 @@ pub fn parseNode(
     source_text: []const u8,
     options: Options,
 ) Error!T {
+    var new_diagnostics: ptk.Diagnostics = undefined;
+    defer if (options.diagnostics == null) new_diagnostics.deinit();
+    var diagnostics = options.diagnostics orelse blk: {
+        new_diagnostics = .init(allocator);
+        break :blk &new_diagnostics;
+    };
     var tokenizer = initValidateUtf8(source_text, options.file_name) catch {
-        try options.diagnostics.emit(
+        try diagnostics.emit(
             .{ .source = options.file_name, .line = 1, .column = 1 },
             .@"error",
             "invalid UTF-8 source code",
@@ -228,7 +234,7 @@ pub fn parseNode(
     var parser: Parser = .{
         .allocator = allocator,
         .core = core,
-        .diagnostics = options.diagnostics,
+        .diagnostics = diagnostics,
         .identifier_stack = .empty,
     };
     defer parser.identifier_stack.deinit(allocator);
