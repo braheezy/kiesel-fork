@@ -36,6 +36,9 @@ const Writer = std.io.GenericWriter(
         fn write(context: WriterContext, bytes: []const u8) error{}!usize {
             _ = context.console_out.setAttribute(context.attribute);
             for (bytes) |c| {
+                if (c == '\n') {
+                    _ = context.console_out.outputString(@ptrCast(&[2]u16{ '\r', 0 }));
+                }
                 _ = context.console_out.outputString(@ptrCast(&[2]u16{ c, 0 }));
             }
             return bytes.len;
@@ -93,11 +96,11 @@ pub fn main() std.os.uefi.Status {
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
 
-    stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\r\n", .{
+    stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\n", .{
         .kiesel = kiesel.version,
         .zig = builtin.zig_version,
     }) catch unreachable;
-    stdout.print("{[vendor]s}, 0x{[revision]x}\r\n", .{
+    stdout.print("{[vendor]s}, 0x{[revision]x}\n", .{
         .vendor = std.unicode.fmtUtf16Le(std.mem.span(std.os.uefi.system_table.firmware_vendor)),
         .revision = std.os.uefi.system_table.firmware_revision,
     }) catch unreachable;
@@ -109,7 +112,7 @@ pub fn main() std.os.uefi.Status {
         const source_text = editor.getLine("> ") catch |err| switch (err) {
             error.Eof => break,
             else => {
-                stderr.print("Error: {!}\r\n", .{err}) catch unreachable;
+                stderr.print("Error: {!}\n", .{err}) catch unreachable;
                 continue;
             },
         };
@@ -120,13 +123,13 @@ pub fn main() std.os.uefi.Status {
         if (source_text.len == 0) continue;
 
         if (run(allocator, realm, source_text)) |result| {
-            stdout.print("{pretty}\r\n", .{result}) catch unreachable;
+            stdout.print("{pretty}\n", .{result}) catch unreachable;
         } else |err| switch (err) {
             error.OutOfMemory => return .OutOfResources,
-            error.ParseError => stderr.print("Invalid syntax in input: {s}\r\n", .{source_text}) catch unreachable,
+            error.ParseError => stderr.print("Invalid syntax in input: {s}\n", .{source_text}) catch unreachable,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                stderr.print("Uncaught exception: {pretty}\r\n", .{exception}) catch unreachable;
+                stderr.print("Uncaught exception: {pretty}\n", .{exception}) catch unreachable;
             },
         }
     }
