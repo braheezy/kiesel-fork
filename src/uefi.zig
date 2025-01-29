@@ -121,6 +121,7 @@ pub fn main() std.os.uefi.Status {
         defer diagnostics.deinit();
         const script = Script.parse(source_text, realm, null, .{
             .diagnostics = &diagnostics,
+            .file_name = "repl",
         }) catch |err| switch (err) {
             error.ParseError => {
                 const parse_error = diagnostics.errors.items[0];
