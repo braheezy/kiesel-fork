@@ -8,8 +8,8 @@ const Diagnostics = kiesel.language.Diagnostics;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
-const formatParseError = kiesel.utils.formatParseError;
-const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
+const fmtParseError = kiesel.language.fmtParseError;
+const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 
 const Editor = @import("zigline").Editor;
 
@@ -125,20 +125,14 @@ pub fn main() std.os.uefi.Status {
         }) catch |err| switch (err) {
             error.ParseError => {
                 const parse_error = diagnostics.errors.items[0];
-                const parse_error_hint = formatParseErrorHint(
-                    allocator,
-                    parse_error,
-                    source_text,
-                ) catch return .OutOfResources;
-                defer allocator.free(parse_error_hint);
-                stderr.print("{s}\n", .{parse_error_hint}) catch unreachable;
+                stderr.print(
+                    "{}\n",
+                    .{fmtParseErrorHint(parse_error, source_text)},
+                ) catch unreachable;
                 const syntax_error = agent.createException(
                     .syntax_error,
-                    "{s}",
-                    .{formatParseError(
-                        agent.gc_allocator,
-                        parse_error,
-                    ) catch return .OutOfResources},
+                    "{}",
+                    .{fmtParseError(parse_error)},
                 ) catch return .OutOfResources;
                 stderr.print(
                     "Uncaught exception: {pretty}\n",

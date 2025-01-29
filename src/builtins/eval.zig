@@ -15,7 +15,7 @@ const Parser = @import("../language/Parser.zig");
 const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
 const Value = types.Value;
-const formatParseError = utils.formatParseError;
+const fmtParseError = language.fmtParseError;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
 const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
@@ -58,11 +58,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(
-                .syntax_error,
-                "{s}",
-                .{try formatParseError(agent.gc_allocator, parse_error)},
-            );
+            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
         },
     };
 

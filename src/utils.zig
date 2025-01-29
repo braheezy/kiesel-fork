@@ -1,6 +1,5 @@
 //! Non-standard util functions
 
-const ptk = @import("ptk");
 const std = @import("std");
 
 const builtins = @import("builtins.zig");
@@ -123,37 +122,6 @@ pub const StringParser = struct {
         return result;
     }
 };
-
-pub fn formatParseError(
-    allocator: std.mem.Allocator,
-    parse_error: ptk.Error,
-) std.mem.Allocator.Error![]const u8 {
-    return std.fmt.allocPrint(allocator, "{s} ({s}:{}:{})", .{
-        parse_error.message,
-        parse_error.location.source orelse "<unknown>",
-        parse_error.location.line,
-        parse_error.location.column,
-    });
-}
-
-pub fn formatParseErrorHint(
-    allocator: std.mem.Allocator,
-    parse_error: ptk.Error,
-    source_text: []const u8,
-) std.mem.Allocator.Error![]const u8 {
-    // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
-    //       doesn't matter, and LS/PS are rare enough to not matter for now.
-    var line_iterator = std.mem.splitScalar(u8, source_text, '\n');
-    var i: usize = 0;
-    const source_line = while (line_iterator.next()) |source_line| : (i += 1) {
-        if (i == parse_error.location.line - 1) break source_line;
-    } else unreachable;
-    return std.fmt.allocPrint(allocator, "{s}\n{c: >[2]}", .{
-        source_line,
-        '^',
-        parse_error.location.column, // 1-indexed, which is fine as this means 'width' in this context
-    });
-}
 
 // NOTE: A lot of this behaviour is implied for all builtins and described at the end of
 // https://tc39.es/ecma262/#sec-ecmascript-standard-built-in-objects.

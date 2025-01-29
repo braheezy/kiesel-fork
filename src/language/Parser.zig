@@ -56,6 +56,52 @@ pub const Options = struct {
     file_name: ?[]const u8 = null,
 };
 
+pub fn fmtParseError(parse_error: ptk.Error) std.fmt.Formatter(formatParseError) {
+    return .{ .data = parse_error };
+}
+
+fn formatParseError(
+    parse_error: ptk.Error,
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    try writer.print("{s} ({s}:{}:{})", .{
+        parse_error.message,
+        parse_error.location.source orelse "<unknown>",
+        parse_error.location.line,
+        parse_error.location.column,
+    });
+}
+
+pub fn fmtParseErrorHint(
+    parse_error: ptk.Error,
+    source_text: []const u8,
+) std.fmt.Formatter(formatParseErrorHint) {
+    return .{ .data = .{ parse_error, source_text } };
+}
+
+fn formatParseErrorHint(
+    data: struct { ptk.Error, []const u8 },
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    const parse_error, const source_text = data;
+    // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
+    //       doesn't matter, and LS/PS are rare enough to not matter for now.
+    var line_iterator = std.mem.splitScalar(u8, source_text, '\n');
+    var i: usize = 0;
+    const source_line = while (line_iterator.next()) |source_line| : (i += 1) {
+        if (i == parse_error.location.line - 1) break source_line;
+    } else unreachable;
+    try writer.print("{s}\n{c: >[2]}", .{
+        source_line,
+        '^',
+        parse_error.location.column, // 1-indexed, which is fine as this means 'width' in this context
+    });
+}
+
 const AcceptContext = struct {
     precedence: Precedence = 0,
     associativity: ?Associativity = null,

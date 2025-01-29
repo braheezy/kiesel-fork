@@ -29,7 +29,7 @@ const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const formatParseError = utils.formatParseError;
+const fmtParseError = language.fmtParseError;
 const makeConstructor = builtins.makeConstructor;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -322,11 +322,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 18. If parameters is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(
-                .syntax_error,
-                "{s}",
-                .{try formatParseError(agent.gc_allocator, parse_error)},
-            );
+            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -339,11 +335,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 20. If body is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(
-                .syntax_error,
-                "{s}",
-                .{try formatParseError(agent.gc_allocator, parse_error)},
-            );
+            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -363,11 +355,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 24. If expr is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(
-                .syntax_error,
-                "{s}",
-                .{try formatParseError(agent.gc_allocator, parse_error)},
-            );
+            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
         },
     };
 

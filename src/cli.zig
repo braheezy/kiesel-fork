@@ -27,8 +27,8 @@ const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
 const defineBuiltinPropertyLazy = kiesel.utils.defineBuiltinPropertyLazy;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
-const formatParseError = kiesel.utils.formatParseError;
-const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
+const fmtParseError = kiesel.language.fmtParseError;
+const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
@@ -204,11 +204,7 @@ const Kiesel = struct {
                 const parse_error = diagnostics.errors.items[0];
 
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
-                return agent.throwException(
-                    .syntax_error,
-                    "{s}",
-                    .{try formatParseError(agent.gc_allocator, parse_error)},
-                );
+                return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
             },
         };
 
@@ -374,13 +370,11 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     const script_or_module = parse_result catch |err| switch (err) {
         error.ParseError => {
             const parse_error = diagnostics.errors.items[0];
-            const parse_error_hint = try formatParseErrorHint(allocator, parse_error, source_text);
-            defer allocator.free(parse_error_hint);
-            try stderr.print("{s}\n", .{parse_error_hint});
+            try stderr.print("{}\n", .{fmtParseErrorHint(parse_error, source_text)});
             const syntax_error = try agent.createException(
                 .syntax_error,
-                "{s}",
-                .{try formatParseError(agent.gc_allocator, parse_error)},
+                "{}",
+                .{fmtParseError(parse_error)},
             );
             try stderr.print("Uncaught exception: {pretty}\n", .{Value.from(syntax_error)});
             return null;
@@ -843,8 +837,8 @@ pub fn main() !u8 {
                     const parse_error = diagnostics.errors.items[0];
                     return agent_.throwException(
                         .syntax_error,
-                        "{s}",
-                        .{try formatParseError(agent_.gc_allocator, parse_error)},
+                        "{}",
+                        .{fmtParseError(parse_error)},
                     );
                 },
             };
