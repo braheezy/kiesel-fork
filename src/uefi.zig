@@ -31,22 +31,18 @@ const WriterContext = struct {
     attribute: usize,
 };
 
-const Writer = std.io.GenericWriter(
-    WriterContext,
-    error{},
-    struct {
-        fn write(context: WriterContext, bytes: []const u8) error{}!usize {
-            _ = context.console_out.setAttribute(context.attribute);
-            for (bytes) |c| {
-                if (c == '\n') {
-                    _ = context.console_out.outputString(@ptrCast(&[2]u16{ '\r', 0 }));
-                }
-                _ = context.console_out.outputString(@ptrCast(&[2]u16{ c, 0 }));
-            }
-            return bytes.len;
+fn writeFn(context: *const anyopaque, bytes: []const u8) anyerror!usize {
+    const writer_context: *const WriterContext = @alignCast(@ptrCast(context));
+    const console_out = writer_context.console_out;
+    _ = console_out.setAttribute(writer_context.attribute);
+    for (bytes) |c| {
+        if (c == '\n') {
+            _ = console_out.outputString(@ptrCast(&[2]u16{ '\r', 0 }));
         }
-    }.write,
-);
+        _ = console_out.outputString(@ptrCast(&[2]u16{ c, 0 }));
+    }
+    return bytes.len;
+}
 
 pub fn main() std.os.uefi.Status {
     const allocator = std.os.uefi.pool_allocator;
@@ -55,23 +51,25 @@ pub fn main() std.os.uefi.Status {
     _ = console_out.reset(true);
     _ = console_out.clearScreen();
 
-    const stdout_writer: Writer = .{
-        .context = .{
+    const stdout: std.io.AnyWriter = .{
+        .context = &WriterContext{
             .console_out = console_out,
             .attribute = 0x7, // white
         },
+        .writeFn = writeFn,
     };
-    const stderr_writer: Writer = .{
-        .context = .{
+    const stderr: std.io.AnyWriter = .{
+        .context = &WriterContext{
             .console_out = console_out,
             .attribute = 0x4, // red
         },
+        .writeFn = writeFn,
     };
 
     var agent = Agent.init(allocator, .{
         .platform = .{
-            .stdout = stdout_writer.any(),
-            .stderr = stderr_writer.any(),
+            .stdout = stdout,
+            .stderr = stderr,
             .tty_config = .no_color,
             .stack_info = null,
             .default_locale = {},
@@ -87,9 +85,6 @@ pub fn main() std.os.uefi.Status {
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
-
-    const stdout = agent.platform.stdout;
-    const stderr = agent.platform.stderr;
 
     stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\n", .{
         .kiesel = kiesel.version,
