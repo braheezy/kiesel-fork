@@ -86,8 +86,12 @@ pub fn construct(
     const agent = object.agent;
     const function = object.as(BuiltinFunction);
 
-    // 1. Return ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
-    return (try builtinCallOrConstruct(agent, function, null, arguments_list, new_target)).asObject();
+    // 1. Let result be ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
+    const result = try builtinCallOrConstruct(agent, function, null, arguments_list, new_target);
+
+    // 2. Assert: result is an Object.
+    // 3. Return result.
+    return result.asObject();
 }
 
 /// 10.3.3 BuiltinCallOrConstruct ( F, thisArgument, argumentsList, newTarget )
