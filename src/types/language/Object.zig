@@ -624,10 +624,13 @@ pub fn getFunctionRealm(self: *const Object) error{ExceptionThrown}!*Realm {
         try validateNonRevokedProxy(self.as(builtins.Proxy));
 
         // b. Let proxyTarget be obj.[[ProxyTarget]].
-        const proxy_target = self.as(builtins.Proxy).fields.proxy_target;
+        const proxy_target = self.as(builtins.Proxy).fields.proxy_target.?;
 
-        // c. Return ? GetFunctionRealm(proxyTarget).
-        return proxy_target.?.getFunctionRealm();
+        // c. Assert: proxyTarget is a function object.
+        std.debug.assert(proxy_target.internal_methods.call != null);
+
+        // d. Return ? GetFunctionRealm(proxyTarget).
+        return proxy_target.getFunctionRealm();
     }
 
     // 4. Return the current Realm Record.
