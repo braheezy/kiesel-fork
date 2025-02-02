@@ -120,7 +120,12 @@ pub const namespace = struct {
 
         // 4. Return ? target.[[DefineOwnProperty]](key, desc).
         return Value.from(
-            try target.asObject().internal_methods.defineOwnProperty(target.asObject(), key, descriptor),
+            try target.asObject().internal_methods.defineOwnProperty(
+                agent,
+                target.asObject(),
+                key,
+                descriptor,
+            ),
         );
     }
 
@@ -139,7 +144,11 @@ pub const namespace = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Return ? target.[[Delete]](key).
-        return Value.from(try target.asObject().internal_methods.delete(target.asObject(), key));
+        return Value.from(try target.asObject().internal_methods.delete(
+            agent,
+            target.asObject(),
+            key,
+        ));
     }
 
     /// 28.1.5 Reflect.get ( target, propertyKey [ , receiver ] )
@@ -161,7 +170,12 @@ pub const namespace = struct {
         const receiver = arguments.getOrNull(2) orelse target;
 
         // 4. Return ? target.[[Get]](key, receiver).
-        return try target.asObject().internal_methods.get(target.asObject(), key, receiver);
+        return try target.asObject().internal_methods.get(
+            agent,
+            target.asObject(),
+            key,
+            receiver,
+        );
     }
 
     /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, propertyKey )
@@ -179,7 +193,11 @@ pub const namespace = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Let desc be ? target.[[GetOwnProperty]](key).
-        const maybe_descriptor = try target.asObject().internal_methods.getOwnProperty(target.asObject(), key);
+        const maybe_descriptor = try target.asObject().internal_methods.getOwnProperty(
+            agent,
+            target.asObject(),
+            key,
+        );
 
         // 4. Return FromPropertyDescriptor(desc).
         if (maybe_descriptor) |descriptor|
@@ -200,7 +218,10 @@ pub const namespace = struct {
 
         // 2. Return ? target.[[GetPrototypeOf]]().
         return Value.from(
-            try target.asObject().internal_methods.getPrototypeOf(target.asObject()) orelse return .null,
+            try target.asObject().internal_methods.getPrototypeOf(
+                agent,
+                target.asObject(),
+            ) orelse return .null,
         );
     }
 
@@ -219,7 +240,9 @@ pub const namespace = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Return ? target.[[HasProperty]](key).
-        return Value.from(try target.asObject().internal_methods.hasProperty(target.asObject(), key));
+        return Value.from(
+            try target.asObject().internal_methods.hasProperty(agent, target.asObject(), key),
+        );
     }
 
     /// 28.1.9 Reflect.isExtensible ( target )
@@ -233,7 +256,9 @@ pub const namespace = struct {
         }
 
         // 2. Return ? target.[[IsExtensible]]().
-        return Value.from(try target.asObject().internal_methods.isExtensible(target.asObject()));
+        return Value.from(
+            try target.asObject().internal_methods.isExtensible(agent, target.asObject()),
+        );
     }
 
     /// 28.1.10 Reflect.ownKeys ( target )
@@ -247,7 +272,10 @@ pub const namespace = struct {
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        var keys = try target.asObject().internal_methods.ownPropertyKeys(target.asObject());
+        var keys = try target.asObject().internal_methods.ownPropertyKeys(
+            agent,
+            target.asObject(),
+        );
         defer keys.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keys).
@@ -271,7 +299,9 @@ pub const namespace = struct {
         }
 
         // 2. Return ? target.[[PreventExtensions]]().
-        return Value.from(try target.asObject().internal_methods.preventExtensions(target.asObject()));
+        return Value.from(
+            try target.asObject().internal_methods.preventExtensions(agent, target.asObject()),
+        );
     }
 
     /// 28.1.12 Reflect.set ( target, propertyKey, V [ , receiver ] )
@@ -295,7 +325,13 @@ pub const namespace = struct {
 
         // 4. Return ? target.[[Set]](key, V, receiver).
         return Value.from(
-            try target.asObject().internal_methods.set(target.asObject(), key, value, receiver),
+            try target.asObject().internal_methods.set(
+                agent,
+                target.asObject(),
+                key,
+                value,
+                receiver,
+            ),
         );
     }
 
@@ -318,6 +354,7 @@ pub const namespace = struct {
         // 3. Return ? target.[[SetPrototypeOf]](proto).
         return Value.from(
             try target.asObject().internal_methods.setPrototypeOf(
+                agent,
                 target.asObject(),
                 if (prototype.isObject()) prototype.asObject() else null,
             ),

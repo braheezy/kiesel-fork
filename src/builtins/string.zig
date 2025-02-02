@@ -312,6 +312,7 @@ pub fn getSubstitution(
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
@@ -322,12 +323,13 @@ fn getOwnProperty(
     if (property_descriptor != null) return property_descriptor;
 
     // 3. Return StringGetOwnProperty(S, P).
-    return stringGetOwnProperty(object.as(String), property_key);
+    return stringGetOwnProperty(agent, object.as(String), property_key);
 }
 
 /// 10.4.3.2 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
@@ -335,7 +337,7 @@ fn defineOwnProperty(
     const string = object.as(String);
 
     // 1. Let stringDesc be StringGetOwnProperty(S, P).
-    const maybe_string_property_descriptor = try stringGetOwnProperty(string, property_key);
+    const maybe_string_property_descriptor = try stringGetOwnProperty(agent, string, property_key);
 
     // 2. If stringDesc is not undefined, then
     if (maybe_string_property_descriptor) |string_property_descriptor| {
@@ -352,6 +354,7 @@ fn defineOwnProperty(
 
     // 3. Return ! OrdinaryDefineOwnProperty(S, P, Desc).
     return ordinaryDefineOwnProperty(
+        agent,
         object,
         property_key,
         property_descriptor,
@@ -360,9 +363,10 @@ fn defineOwnProperty(
 
 /// 10.4.3.3 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
-    const agent = object.agent;
-
+fn ownPropertyKeys(
+    agent: *Agent,
+    object: *Object,
+) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
     const str = object.as(String).fields.string_data;
@@ -481,11 +485,10 @@ pub fn stringCreate(
 /// 10.4.3.5 StringGetOwnProperty ( S, P )
 /// https://tc39.es/ecma262/#sec-stringgetownproperty
 fn stringGetOwnProperty(
+    agent: *Agent,
     string: *const String,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    const agent = string.object.agent;
-
     // 1. If P is not a String, return undefined.
     // 2. Let index be CanonicalNumericIndexString(P).
     // 3. If index is not an integral Number, return undefined.

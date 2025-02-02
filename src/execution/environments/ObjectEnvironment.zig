@@ -161,7 +161,11 @@ pub fn deleteBinding(self: ObjectEnvironment, name: *const String) Agent.Error!b
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
-    return self.binding_object.internal_methods.delete(self.binding_object, property_key);
+    return self.binding_object.internal_methods.delete(
+        self.binding_object.agent,
+        self.binding_object,
+        property_key,
+    );
 }
 
 /// 9.1.1.2.8 HasThisBinding ( )

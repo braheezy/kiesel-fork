@@ -106,7 +106,11 @@ fn internalizeJSONProperty(
                 // 3. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](prop).
-                    _ = try value.asObject().internal_methods.delete(value.asObject(), property_key);
+                    _ = try value.asObject().internal_methods.delete(
+                        agent,
+                        value.asObject(),
+                        property_key,
+                    );
                 }
                 // 4. Else,
                 else {
@@ -138,7 +142,11 @@ fn internalizeJSONProperty(
                 // 2. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](P).
-                    _ = try value.asObject().internal_methods.delete(value.asObject(), property_key);
+                    _ = try value.asObject().internal_methods.delete(
+                        agent,
+                        value.asObject(),
+                        property_key,
+                    );
                 }
                 // 3. Else,
                 else {

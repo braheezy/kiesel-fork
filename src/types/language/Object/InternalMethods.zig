@@ -18,33 +18,39 @@ const InternalMethods = @This();
 
 /// [[GetPrototypeOf]]
 getPrototypeOf: *const fn (
+    agent: *Agent,
     object: *Object,
 ) Agent.Error!?*Object = builtins.ordinary.internal_methods.getPrototypeOf,
 
 /// [[SetPrototypeOf]]
 setPrototypeOf: *const fn (
+    agent: *Agent,
     object: *Object,
     prototype: ?*Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.setPrototypeOf,
 
 /// [[IsExtensible]]
 isExtensible: *const fn (
+    agent: *Agent,
     object: *Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.isExtensible,
 
 /// [[PreventExtensions]]
 preventExtensions: *const fn (
+    agent: *Agent,
     object: *Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.preventExtensions,
 
 /// [[GetOwnProperty]]
 getOwnProperty: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!?PropertyDescriptor = builtins.ordinary.internal_methods.getOwnProperty,
 
 /// [[DefineOwnProperty]]
 defineOwnProperty: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
@@ -52,12 +58,14 @@ defineOwnProperty: *const fn (
 
 /// [[HasProperty]]
 hasProperty: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.hasProperty,
 
 /// [[Get]]
 get: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     receiver: Value,
@@ -65,6 +73,7 @@ get: *const fn (
 
 /// [[Set]]
 set: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     value: Value,
@@ -73,17 +82,20 @@ set: *const fn (
 
 /// [[Delete]]
 delete: *const fn (
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.delete,
 
 // [[OwnPropertyKeys]]
 ownPropertyKeys: *const fn (
+    agent: *Agent,
     object: *Object,
 ) Agent.Error!std.ArrayListUnmanaged(PropertyKey) = builtins.ordinary.internal_methods.ownPropertyKeys,
 
 // [[Call]]
 call: ?*const fn (
+    agent: *Agent,
     object: *Object,
     this_value: Value,
     arguments: Arguments,
@@ -91,6 +103,7 @@ call: ?*const fn (
 
 // [[Construct]]
 construct: ?*const fn (
+    agent: *Agent,
     object: *Object,
     arguments: Arguments,
     new_target: *Object,

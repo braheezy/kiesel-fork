@@ -228,6 +228,7 @@ pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) A
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
     const existing_prop = try global_object.internal_methods.getOwnProperty(
+        global_object.agent,
         global_object,
         PropertyKey.from(name),
     ) orelse {
@@ -282,7 +283,7 @@ pub fn createGlobalVarBinding(
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
     self: *GlobalEnvironment,
-    _: *Agent,
+    agent: *Agent,
     name: *const String,
     value: Value,
     deletable: bool,
@@ -294,7 +295,11 @@ pub fn createGlobalFunctionBinding(
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_prop = try global_object.internal_methods.getOwnProperty(global_object, property_key);
+    const existing_prop = try global_object.internal_methods.getOwnProperty(
+        agent,
+        global_object,
+        property_key,
+    );
 
     // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
     const property_descriptor: PropertyDescriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {

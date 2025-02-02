@@ -65,11 +65,11 @@ pub const BuiltinFunction = MakeObject(.{
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 fn call(
+    agent: *Agent,
     object: *Object,
     this_argument: Value,
     arguments_list: Arguments,
 ) Agent.Error!Value {
-    const agent = object.agent;
     const function = object.as(BuiltinFunction);
 
     // 1. Return ? BuiltinCallOrConstruct(F, thisArgument, argumentsList, undefined).
@@ -79,11 +79,11 @@ fn call(
 /// 10.3.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
 pub fn construct(
+    agent: *Agent,
     object: *Object,
     arguments_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
-    const agent = object.agent;
     const function = object.as(BuiltinFunction);
 
     // 1. Let result be ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).

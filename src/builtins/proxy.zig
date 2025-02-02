@@ -26,8 +26,7 @@ const sameValue = types.sameValue;
 
 /// 10.5.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getprototypeof
-fn getPrototypeOf(object: *Object) Agent.Error!?*Object {
-    const agent = object.agent;
+fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -46,7 +45,7 @@ fn getPrototypeOf(object: *Object) Agent.Error!?*Object {
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[GetPrototypeOf]]().
-        return target.internal_methods.getPrototypeOf(target);
+        return target.internal_methods.getPrototypeOf(agent, target);
     }
 
     // 7. Let handlerProto be ? Call(trap, handler, « target »).
@@ -73,7 +72,7 @@ fn getPrototypeOf(object: *Object) Agent.Error!?*Object {
     }
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
-    const target_prototype = try target.internal_methods.getPrototypeOf(target);
+    const target_prototype = try target.internal_methods.getPrototypeOf(agent, target);
 
     // 12. If SameValue(handlerProto, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
@@ -93,8 +92,7 @@ fn getPrototypeOf(object: *Object) Agent.Error!?*Object {
 
 /// 10.5.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-setprototypeof-v
-fn setPrototypeOf(object: *Object, prototype: ?*Object) Agent.Error!bool {
-    const agent = object.agent;
+fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -113,7 +111,7 @@ fn setPrototypeOf(object: *Object, prototype: ?*Object) Agent.Error!bool {
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[SetPrototypeOf]](V).
-        return target.internal_methods.setPrototypeOf(target, prototype);
+        return target.internal_methods.setPrototypeOf(agent, target, prototype);
     }
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
@@ -132,7 +130,7 @@ fn setPrototypeOf(object: *Object, prototype: ?*Object) Agent.Error!bool {
     if (extensible_target) return true;
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
-    const target_prototype = try target.internal_methods.getPrototypeOf(target);
+    const target_prototype = try target.internal_methods.getPrototypeOf(agent, target);
 
     // 12. If SameValue(V, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
@@ -152,8 +150,7 @@ fn setPrototypeOf(object: *Object, prototype: ?*Object) Agent.Error!bool {
 
 /// 10.5.3 [[IsExtensible]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-isextensible
-fn isExtensible(object: *Object) Agent.Error!bool {
-    const agent = object.agent;
+fn isExtensible(agent: *Agent, object: *Object) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -199,8 +196,7 @@ fn isExtensible(object: *Object) Agent.Error!bool {
 
 /// 10.5.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-preventextensions
-fn preventExtensions(object: *Object) Agent.Error!bool {
-    const agent = object.agent;
+fn preventExtensions(agent: *Agent, object: *Object) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -219,7 +215,7 @@ fn preventExtensions(object: *Object) Agent.Error!bool {
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[PreventExtensions]]().
-        return target.internal_methods.preventExtensions(target);
+        return target.internal_methods.preventExtensions(agent, target);
     }
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
@@ -249,8 +245,11 @@ fn preventExtensions(object: *Object) Agent.Error!bool {
 
 /// 10.5.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getownproperty-p
-fn getOwnProperty(object: *Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor {
-    const agent = object.agent;
+fn getOwnProperty(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+) Agent.Error!?PropertyDescriptor {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -269,7 +268,7 @@ fn getOwnProperty(object: *Object, property_key: PropertyKey) Agent.Error!?Prope
     // 6. If trap is undefined,
     if (trap == null) {
         // a. Return ? target.[[GetOwnProperty]](P).
-        return target.internal_methods.getOwnProperty(target, property_key);
+        return target.internal_methods.getOwnProperty(agent, target, property_key);
     }
 
     // 7. Let trapResultObj be ? Call(trap, handler, « target, P »).
@@ -288,7 +287,11 @@ fn getOwnProperty(object: *Object, property_key: PropertyKey) Agent.Error!?Prope
     }
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+    const target_descriptor = try target.internal_methods.getOwnProperty(
+        agent,
+        target,
+        property_key,
+    );
 
     // 10. If trapResultObj is undefined, then
     if (trap_result_obj.isUndefined()) {
@@ -380,11 +383,11 @@ fn getOwnProperty(object: *Object, property_key: PropertyKey) Agent.Error!?Prope
 /// 10.5.6 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-defineownproperty-p-desc
 fn defineOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    const agent = object.agent;
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -404,6 +407,7 @@ fn defineOwnProperty(
     if (trap == null) {
         // a. Return ? target.[[DefineOwnProperty]](P, Desc).
         return target.internal_methods.defineOwnProperty(
+            agent,
             target,
             property_key,
             property_descriptor,
@@ -427,7 +431,11 @@ fn defineOwnProperty(
     if (!boolean_trap_result) return false;
 
     // 10. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+    const target_descriptor = try target.internal_methods.getOwnProperty(
+        agent,
+        target,
+        property_key,
+    );
 
     // 11. Let extensibleTarget be ? IsExtensible(target).
     const extensible_target = try target.isExtensible();
@@ -503,8 +511,7 @@ fn defineOwnProperty(
 
 /// 10.5.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-hasproperty-p
-fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
-    const agent = object.agent;
+fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -523,7 +530,7 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[HasProperty]](P).
-        return target.internal_methods.hasProperty(target, property_key);
+        return target.internal_methods.hasProperty(agent, target, property_key);
     }
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
@@ -535,7 +542,11 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 8. If booleanTrapResult is false, then
     if (!boolean_trap_result) {
         // a. Let targetDesc be ? target.[[GetOwnProperty]](P).
-        const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+        const target_descriptor = try target.internal_methods.getOwnProperty(
+            agent,
+            target,
+            property_key,
+        );
 
         // b. If targetDesc is not undefined, then
         if (target_descriptor != null) {
@@ -568,8 +579,12 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
 
 /// 10.5.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
-fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
-    const agent = object.agent;
+fn get(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+    receiver: Value,
+) Agent.Error!Value {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -588,7 +603,7 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[Get]](P, Receiver).
-        return target.internal_methods.get(target, property_key, receiver);
+        return target.internal_methods.get(agent, target, property_key, receiver);
     }
 
     // 7. Let trapResult be ? Call(trap, handler, « target, P, Receiver »).
@@ -598,7 +613,11 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
     );
 
     // 8. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+    const target_descriptor = try target.internal_methods.getOwnProperty(
+        agent,
+        target,
+        property_key,
+    );
 
     // 9. If targetDesc is not undefined and targetDesc.[[Configurable]] is false, then
     if (target_descriptor != null and target_descriptor.?.configurable == false) {
@@ -633,8 +652,13 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
 
 /// 10.5.9 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-set-p-v-receiver
-fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
-    const agent = object.agent;
+fn set(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver: Value,
+) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -653,7 +677,7 @@ fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[Set]](P, V, Receiver).
-        return target.internal_methods.set(target, property_key, value, receiver);
+        return target.internal_methods.set(agent, target, property_key, value, receiver);
     }
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, V, Receiver »)).
@@ -666,7 +690,11 @@ fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value
     if (!boolean_trap_result) return false;
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+    const target_descriptor = try target.internal_methods.getOwnProperty(
+        agent,
+        target,
+        property_key,
+    );
 
     // 10. If targetDesc is not undefined and targetDesc.[[Configurable]] is false, then
     if (target_descriptor != null and target_descriptor.?.configurable == false) {
@@ -701,8 +729,7 @@ fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value
 
 /// 10.5.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-delete-p
-fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
-    const agent = object.agent;
+fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -721,7 +748,7 @@ fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[Delete]](P).
-        return target.internal_methods.delete(target, property_key);
+        return target.internal_methods.delete(agent, target, property_key);
     }
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
@@ -734,7 +761,11 @@ fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     if (!boolean_trap_result) return false;
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(target, property_key);
+    const target_descriptor = try target.internal_methods.getOwnProperty(
+        agent,
+        target,
+        property_key,
+    );
 
     // 10. If targetDesc is undefined, return true.
     if (target_descriptor == null) return true;
@@ -766,8 +797,10 @@ fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
 
 /// 10.5.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyKey) {
-    const agent = object.agent;
+fn ownPropertyKeys(
+    agent: *Agent,
+    object: *Object,
+) Agent.Error!std.ArrayListUnmanaged(PropertyKey) {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -786,7 +819,7 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyK
     // 6. If trap is undefined, then
     if (trap == null) {
         // a. Return ? target.[[OwnPropertyKeys]]().
-        return target.internal_methods.ownPropertyKeys(target);
+        return target.internal_methods.ownPropertyKeys(agent, target);
     }
 
     // 7. Let trapResultArray be ? Call(trap, handler, « target »).
@@ -832,7 +865,7 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyK
     // 11. Let targetKeys be ? target.[[OwnPropertyKeys]]().
     // 12. Assert: targetKeys is a List of property keys.
     // 13. Assert: targetKeys contains no duplicate entries.
-    var target_keys = try target.internal_methods.ownPropertyKeys(target);
+    var target_keys = try target.internal_methods.ownPropertyKeys(agent, target);
     defer target_keys.deinit(agent.gc_allocator);
 
     // 14. Let targetConfigurableKeys be a new empty List.
@@ -846,7 +879,7 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyK
     // 16. For each element key of targetKeys, do
     for (target_keys.items) |key| {
         // a. Let desc be ? target.[[GetOwnProperty]](key).
-        const property_descriptor = try target.internal_methods.getOwnProperty(target, key);
+        const property_descriptor = try target.internal_methods.getOwnProperty(agent, target, key);
 
         // b. If desc is not undefined and desc.[[Configurable]] is false, then
         if (property_descriptor != null and property_descriptor.?.configurable == false) {
@@ -918,8 +951,12 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayListUnmanaged(PropertyK
 
 /// 10.5.12 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-call-thisargument-argumentslist
-fn call(object: *Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
-    const agent = object.agent;
+fn call(
+    agent: *Agent,
+    object: *Object,
+    this_argument: Value,
+    arguments_list: Arguments,
+) Agent.Error!Value {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -953,8 +990,12 @@ fn call(object: *Object, this_argument: Value, arguments_list: Arguments) Agent.
 
 /// 10.5.13 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-construct-argumentslist-newtarget
-fn construct(object: *Object, arguments_list: Arguments, new_target: *Object) Agent.Error!*Object {
-    const agent = object.agent;
+fn construct(
+    agent: *Agent,
+    object: *Object,
+    arguments_list: Arguments,
+    new_target: *Object,
+) Agent.Error!*Object {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).

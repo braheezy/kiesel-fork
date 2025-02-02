@@ -871,7 +871,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
 }
 
 fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const property_keys = ordinaryOwnPropertyKeys(object) catch return;
+    const property_keys = ordinaryOwnPropertyKeys(object.agent, object) catch return;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);

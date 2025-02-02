@@ -9,16 +9,20 @@ const Object = types.Object;
 
 /// 10.4.7.1 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-immutable-prototype-exotic-objects-setprototypeof-v
-pub fn setPrototypeOf(object: *Object, prototype: ?*Object) Agent.Error!bool {
+pub fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Error!bool {
     // 1. Return ? SetImmutablePrototype(O, V).
-    return setImmutablePrototype(object, prototype);
+    return setImmutablePrototype(agent, object, prototype);
 }
 
 /// 10.4.7.2 SetImmutablePrototype ( O, V )
 /// https://tc39.es/ecma262/#sec-set-immutable-prototype
-pub fn setImmutablePrototype(object: *Object, prototype: ?*Object) Agent.Error!bool {
+pub fn setImmutablePrototype(
+    agent: *Agent,
+    object: *Object,
+    prototype: ?*Object,
+) Agent.Error!bool {
     // 1. Let current be ? O.[[GetPrototypeOf]]().
-    const current = try object.internal_methods.getPrototypeOf(object);
+    const current = try object.internal_methods.getPrototypeOf(agent, object);
 
     // 2. If SameValue(V, current) is true, return true.
     if (prototype == current) return true;

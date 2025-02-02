@@ -126,13 +126,17 @@ pub const constructor = struct {
                 const from = next_source.toObject(agent) catch |err| try noexcept(err);
 
                 // ii. Let keys be ? from.[[OwnPropertyKeys]]().
-                var keys_ = try from.internal_methods.ownPropertyKeys(from);
+                var keys_ = try from.internal_methods.ownPropertyKeys(agent, from);
                 defer keys_.deinit(agent.gc_allocator);
 
                 // iii. For each element nextKey of keys, do
                 for (keys_.items) |next_key| {
                     // 1. Let desc be ? from.[[GetOwnProperty]](nextKey).
-                    const descriptor = try from.internal_methods.getOwnProperty(from, next_key);
+                    const descriptor = try from.internal_methods.getOwnProperty(
+                        agent,
+                        from,
+                        next_key,
+                    );
 
                     // 2. If desc is not undefined and desc.[[Enumerable]] is true, then
                     if (descriptor != null and descriptor.?.enumerable == true) {
@@ -203,7 +207,7 @@ pub const constructor = struct {
         const props = try properties.toObject(agent);
 
         // 2. Let keys be ? props.[[OwnPropertyKeys]]().
-        var keys_ = try props.internal_methods.ownPropertyKeys(props);
+        var keys_ = try props.internal_methods.ownPropertyKeys(agent, props);
         defer keys_.deinit(agent.gc_allocator);
 
         const Property = struct {
@@ -218,7 +222,11 @@ pub const constructor = struct {
         // 4. For each element nextKey of keys, do
         for (keys_.items) |next_key| {
             // a. Let propDesc be ? props.[[GetOwnProperty]](nextKey).
-            const maybe_property_descriptor = try props.internal_methods.getOwnProperty(props, next_key);
+            const maybe_property_descriptor = try props.internal_methods.getOwnProperty(
+                agent,
+                props,
+                next_key,
+            );
 
             // b. If propDesc is not undefined and propDesc.[[Enumerable]] is true, then
             if (maybe_property_descriptor) |property_descriptor| if (property_descriptor.enumerable == true) {
@@ -372,7 +380,7 @@ pub const constructor = struct {
         const property_key = try property.toPropertyKey(agent);
 
         // 3. Let desc be ? obj.[[GetOwnProperty]](key).
-        const maybe_descriptor = try obj.internal_methods.getOwnProperty(obj, property_key);
+        const maybe_descriptor = try obj.internal_methods.getOwnProperty(agent, obj, property_key);
 
         // 4. Return FromPropertyDescriptor(desc).
         if (maybe_descriptor) |descriptor|
@@ -391,7 +399,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
-        var own_keys = try obj.internal_methods.ownPropertyKeys(obj);
+        var own_keys = try obj.internal_methods.ownPropertyKeys(agent, obj);
         defer own_keys.deinit(agent.gc_allocator);
 
         // 3. Let descriptors be OrdinaryObjectCreate(%Object.prototype%).
@@ -403,7 +411,7 @@ pub const constructor = struct {
         // 4. For each element key of ownKeys, do
         for (own_keys.items) |key| {
             // a. Let desc be ? obj.[[GetOwnProperty]](key).
-            if (try obj.internal_methods.getOwnProperty(obj, key)) |property_descriptor| {
+            if (try obj.internal_methods.getOwnProperty(agent, obj, key)) |property_descriptor| {
                 // b. Let descriptor be FromPropertyDescriptor(desc).
                 const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
 
@@ -464,7 +472,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let keys be ? obj.[[OwnPropertyKeys]]().
-        var keys_ = try obj.internal_methods.ownPropertyKeys(obj);
+        var keys_ = try obj.internal_methods.ownPropertyKeys(agent, obj);
         defer keys_.deinit(agent.gc_allocator);
 
         // 3. Let nameList be a new empty List.
@@ -495,7 +503,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Return ? obj.[[GetPrototypeOf]]().
-        return Value.from(try obj.internal_methods.getPrototypeOf(obj) orelse return .null);
+        return Value.from(try obj.internal_methods.getPrototypeOf(agent, obj) orelse return .null);
     }
 
     /// 20.1.2.13 Object.groupBy ( items, callback )
@@ -614,7 +622,7 @@ pub const constructor = struct {
         if (!object.isObject()) return object;
 
         // 2. Let status be ? O.[[PreventExtensions]]().
-        const status = try object.asObject().internal_methods.preventExtensions(object.asObject());
+        const status = try object.asObject().internal_methods.preventExtensions(agent, object.asObject());
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions", .{});
@@ -660,6 +668,7 @@ pub const constructor = struct {
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internal_methods.setPrototypeOf(
+            agent,
             object.asObject(),
             if (prototype_.isObject()) prototype_.asObject() else null,
         );
@@ -759,7 +768,7 @@ pub const prototype = struct {
         // 3. Repeat,
         while (true) {
             // a. Set V to ? V.[[GetPrototypeOf]]().
-            prototype_ = try prototype_.?.internal_methods.getPrototypeOf(prototype_.?);
+            prototype_ = try prototype_.?.internal_methods.getPrototypeOf(agent, prototype_.?);
 
             // b. If V is null, return false.
             if (prototype_ == null) return Value.from(false);
@@ -785,7 +794,11 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 3. Let desc be ? O.[[GetOwnProperty]](P).
-        const property_descriptor = try object.internal_methods.getOwnProperty(object, property_key);
+        const property_descriptor = try object.internal_methods.getOwnProperty(
+            agent,
+            object,
+            property_key,
+        );
 
         // 4. If desc is undefined, return false.
         if (property_descriptor == null) return Value.from(false);
@@ -879,7 +892,9 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return ? O.[[GetPrototypeOf]]().
-        return Value.from(try object.internal_methods.getPrototypeOf(object) orelse return .null);
+        return Value.from(
+            try object.internal_methods.getPrototypeOf(agent, object) orelse return .null,
+        );
     }
 
     /// 20.1.3.8.2 set Object.prototype.__proto__
@@ -898,6 +913,7 @@ pub const prototype = struct {
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internal_methods.setPrototypeOf(
+            agent,
             object.asObject(),
             if (prototype_.isObject()) prototype_.asObject() else null,
         );
@@ -993,6 +1009,7 @@ pub const prototype = struct {
             // a. Let desc be ? O.[[GetOwnProperty]](key).
             // b. If desc is not undefined, then
             if (try object.internal_methods.getOwnProperty(
+                agent,
                 object,
                 property_key,
             )) |property_descriptor| {
@@ -1006,7 +1023,7 @@ pub const prototype = struct {
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internal_methods.getPrototypeOf(object) orelse {
+            object = try object.internal_methods.getPrototypeOf(agent, object) orelse {
                 // d. If O is null, return undefined.
                 return .undefined;
             };
@@ -1029,6 +1046,7 @@ pub const prototype = struct {
             // a. Let desc be ? O.[[GetOwnProperty]](key).
             // b. If desc is not undefined, then
             if (try object.internal_methods.getOwnProperty(
+                agent,
                 object,
                 property_key,
             )) |property_descriptor| {
@@ -1042,7 +1060,7 @@ pub const prototype = struct {
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internal_methods.getPrototypeOf(object) orelse {
+            object = try object.internal_methods.getPrototypeOf(agent, object) orelse {
                 // d. If O is null, return undefined.
                 return .undefined;
             };

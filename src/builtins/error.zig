@@ -113,6 +113,7 @@ pub const constructor = struct {
 /// NOTE: Ignoring non-string values matches SpiderMonkey, V8 only remembers the original name and
 ///       message and doesn't act on property changes.
 pub fn internalSet(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     value: Value,
@@ -125,7 +126,7 @@ pub fn internalSet(
             object.as(Error).fields.error_data.message = value.asString();
         }
     }
-    return builtins.ordinarySet(object, property_key, value, receiver);
+    return builtins.ordinarySet(agent, object, property_key, value, receiver);
 }
 
 /// 20.5.3 Properties of the Error Prototype Object

@@ -605,7 +605,11 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
         };
 
         // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
-        const delete_status = try base_obj.internal_methods.delete(base_obj, property_key);
+        const delete_status = try base_obj.internal_methods.delete(
+            self.agent,
+            base_obj,
+            property_key,
+        );
 
         // f. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
         if (!delete_status and reference.strict) {
@@ -786,7 +790,12 @@ fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm, _: Executable
         .symbol => PropertyKey.from(property_name_value.asSymbol()),
         else => try property_name_value.toPropertyKey(self.agent),
     };
-    self.result = try base_object.internal_methods.get(base_object, property_key, base_value);
+    self.result = try base_object.internal_methods.get(
+        self.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
 }
 
 /// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
@@ -874,7 +883,12 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
     }
 
     const property_key = PropertyKey.from(property_name_string);
-    self.result = try base_object.internal_methods.get(base_object, property_key, base_value);
+    self.result = try base_object.internal_methods.get(
+        self.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
     if (base_object.property_storage.shape.properties.get(property_key)) |property_metadata| {
         lookup_cache_entry.* = .{
             .shape = base_object.property_storage.shape,
@@ -1552,6 +1566,7 @@ fn executeObjectSetPrototype(self: *Vm, _: Executable) Agent.Error!void {
         // i. Perform ! object.[[SetPrototypeOf]](propValue).
         const prototype = if (property_value.isObject()) property_value.asObject() else null;
         _ = object.internal_methods.setPrototypeOf(
+            self.agent,
             object,
             prototype,
         ) catch |err| try noexcept(err);

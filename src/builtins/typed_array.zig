@@ -163,7 +163,7 @@ pub const element_types = [_]struct { []const u8, ElementType }{
 
 /// 10.4.5.1 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-preventextensions
-fn preventExtensions(object: *Object) std.mem.Allocator.Error!bool {
+fn preventExtensions(_: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     // 1. NOTE: The extensibility-related invariants specified in 6.1.7.3 do not allow this method
     //    to return true when O can gain (or lose and then regain) properties, which might occur
     //    for properties with integer index names when its underlying buffer is resized.
@@ -178,11 +178,10 @@ fn preventExtensions(object: *Object) std.mem.Allocator.Error!bool {
 /// 10.4.5.2 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
 fn getOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    const agent = object.agent;
-
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -209,7 +208,7 @@ fn getOwnProperty(
 
 /// 10.4.5.3 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-hasproperty
-fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
+fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, return IsValidIntegerIndex(O, numericIndex).
@@ -220,18 +219,17 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     }
 
     // 2. Return ? OrdinaryHasProperty(O, P).
-    return ordinaryHasProperty(object, property_key);
+    return ordinaryHasProperty(agent, object, property_key);
 }
 
 /// 10.4.5.4 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-typedarray-defineownproperty
 fn defineOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    const agent = object.agent;
-
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -265,6 +263,7 @@ fn defineOwnProperty(
 
     // 2. Return ! OrdinaryDefineOwnProperty(O, P, Desc).
     return ordinaryDefineOwnProperty(
+        agent,
         object,
         property_key,
         property_descriptor,
@@ -273,9 +272,12 @@ fn defineOwnProperty(
 
 /// 10.4.5.5 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-get
-fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
-    const agent = object.agent;
-
+fn get(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+    receiver: Value,
+) Agent.Error!Value {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -285,14 +287,18 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
     }
 
     // 2. Return ? OrdinaryGet(O, P, Receiver).
-    return ordinaryGet(object, property_key, receiver);
+    return ordinaryGet(agent, object, property_key, receiver);
 }
 
 /// 10.4.5.6 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-set
-fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
-    const agent = object.agent;
-
+fn set(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver: Value,
+) Agent.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -313,12 +319,12 @@ fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value
     }
 
     // 2. Return ? OrdinarySet(O, P, V, Receiver).
-    return ordinarySet(object, property_key, value, receiver);
+    return ordinarySet(agent, object, property_key, value, receiver);
 }
 
 /// 10.4.5.7 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-delete
-fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
+fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -330,14 +336,15 @@ fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bo
     }
 
     // 2. Return ! OrdinaryDelete(O, P).
-    return ordinaryDelete(object, property_key) catch |err| try noexcept(err);
+    return ordinaryDelete(agent, object, property_key) catch |err| try noexcept(err);
 }
 
 /// 10.4.5.8 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
-fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
-    const agent = object.agent;
-
+fn ownPropertyKeys(
+    agent: *Agent,
+    object: *Object,
+) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
 

@@ -148,7 +148,7 @@ const Kiesel = struct {
                         /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
                         ///
                         /// We pick the most common one :^)
-                        fn call(_: *Object, _: Value, _: Arguments) Agent.Error!Value {
+                        fn call(_: *Agent, _: *Object, _: Value, _: Arguments) Agent.Error!Value {
                             return .null;
                         }
                     }.call,

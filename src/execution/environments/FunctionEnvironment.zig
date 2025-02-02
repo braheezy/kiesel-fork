@@ -114,6 +114,7 @@ pub fn getSuperBase(self: FunctionEnvironment) std.mem.Allocator.Error!Value {
     // 3. Assert: home is an ordinary object.
     // 4. Return ! home.[[GetPrototypeOf]]().
     return if (home.?.internal_methods.getPrototypeOf(
+        home.?.agent,
         home.?,
     ) catch |err| try noexcept(err)) |prototype|
         Value.from(prototype)

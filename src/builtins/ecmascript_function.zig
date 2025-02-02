@@ -314,8 +314,12 @@ pub const ECMAScriptFunction = MakeObject(.{
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
-fn call(object: *Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
-    const agent = object.agent;
+fn call(
+    agent: *Agent,
+    object: *Object,
+    this_argument: Value,
+    arguments_list: Arguments,
+) Agent.Error!Value {
     const function = object.as(ECMAScriptFunction);
 
     try agent.checkStackOverflow();
@@ -631,8 +635,12 @@ fn evaluateAsyncFunctionBody(
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
-fn construct(object: *Object, arguments_list: Arguments, new_target: *Object) Agent.Error!*Object {
-    const agent = object.agent;
+fn construct(
+    agent: *Agent,
+    object: *Object,
+    arguments_list: Arguments,
+    new_target: *Object,
+) Agent.Error!*Object {
     const function = object.as(ECMAScriptFunction);
 
     try agent.checkStackOverflow();

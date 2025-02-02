@@ -255,7 +255,10 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!Value {
     const active_function = &env.function_environment.function_object.object;
 
     // 5. Let superConstructor be ! activeFunction.[[GetPrototypeOf]]().
-    const super_constructor = active_function.internal_methods.getPrototypeOf(active_function) catch |err| try noexcept(err);
+    const super_constructor = active_function.internal_methods.getPrototypeOf(
+        agent,
+        active_function,
+    ) catch |err| try noexcept(err);
 
     // 6. Return superConstructor.
     return if (super_constructor) |object| Value.from(object) else .null;
@@ -1887,7 +1890,10 @@ pub fn classDefinitionEvaluation(
                     //    this function does not.
 
                     // 2. Let func be ! F.[[GetPrototypeOf]]().
-                    const prototype_function = function.internal_methods.getPrototypeOf(function) catch |err| try noexcept(err);
+                    const prototype_function = function.internal_methods.getPrototypeOf(
+                        agent_,
+                        function,
+                    ) catch |err| try noexcept(err);
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
                     if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {

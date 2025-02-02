@@ -1266,7 +1266,7 @@ pub fn get(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Va
     const object = try self.toObject(agent);
 
     // 2. Return ? O.[[Get]](P, V).
-    return object.internal_methods.get(object, property_key, self);
+    return object.internal_methods.get(agent, object, property_key, self);
 }
 
 /// 7.3.10 GetMethod ( V, P )
@@ -1304,8 +1304,10 @@ pub fn call(
     }
 
     // 3. Return ? F.[[Call]](V, argumentsList).
-    return self.asObject().internal_methods.call.?(
-        self.asObject(),
+    const object = self.asObject();
+    return object.internal_methods.call.?(
+        object.agent,
+        object,
         this_value,
         Arguments.from(arguments_list),
     );
@@ -1316,8 +1318,10 @@ pub fn callNoArgs(self: Value, agent: *Agent, this_value: Value) Agent.Error!Val
 }
 
 pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
-    return self.asObject().internal_methods.call.?(
-        self.asObject(),
+    const object = self.asObject();
+    return object.internal_methods.call.?(
+        object.agent,
+        object,
         this_value,
         Arguments.from(arguments_list),
     );
@@ -1448,7 +1452,7 @@ pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
     // 6. Repeat,
     while (true) {
         // a. Set O to ? O.[[GetPrototypeOf]]().
-        object = try object.?.internal_methods.getPrototypeOf(object.?);
+        object = try object.?.internal_methods.getPrototypeOf(agent, object.?);
 
         // b. If O is null, return false.
         if (object == null) return false;
@@ -1605,6 +1609,7 @@ pub fn setterThatIgnoresPrototypeProperties(
 
     // 3. Let desc be ? thisValue.[[GetOwnProperty]](p).
     const property_descriptor = try this_value.internal_methods.getOwnProperty(
+        agent,
         this_value,
         property_key,
     );

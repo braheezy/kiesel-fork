@@ -42,12 +42,11 @@ pub fn getArrayLength(array: *const Object) u32 {
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
+    agent: *Agent,
     array: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    const agent = array.agent;
-
     // 1. If P is "length", then
     if (property_key == .string and property_key.string.eql(String.fromLiteral("length"))) {
         // a. Return ? ArraySetLength(A, Desc).
@@ -77,6 +76,7 @@ fn defineOwnProperty(
 
         // h. Let succeeded be ! OrdinaryDefineOwnProperty(A, P, Desc).
         var succeeded = ordinaryDefineOwnProperty(
+            agent,
             array,
             property_key,
             property_descriptor,
@@ -93,6 +93,7 @@ fn defineOwnProperty(
 
             // ii. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", lengthDesc).
             succeeded = ordinaryDefineOwnProperty(
+                agent,
                 array,
                 PropertyKey.from("length"),
                 length_descriptor,
@@ -107,7 +108,7 @@ fn defineOwnProperty(
     }
 
     // 3. Return ? OrdinaryDefineOwnProperty(A, P, Desc).
-    return ordinaryDefineOwnProperty(array, property_key, property_descriptor);
+    return ordinaryDefineOwnProperty(agent, array, property_key, property_descriptor);
 }
 
 /// 10.4.2.2 ArrayCreate ( length [ , proto ] )
@@ -137,7 +138,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
     // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    _ = ordinaryDefineOwnProperty(array, PropertyKey.from("length"), .{
+    _ = ordinaryDefineOwnProperty(agent, array, PropertyKey.from("length"), .{
         .value = Value.from(@as(u32, @intCast(length))),
         .writable = true,
         .enumerable = false,
@@ -212,6 +213,7 @@ pub fn arraySetLength(
     if (property_descriptor.value == null) {
         // a. Return ! OrdinaryDefineOwnProperty(A, "length", Desc).
         return ordinaryDefineOwnProperty(
+            agent,
             array,
             PropertyKey.from("length"),
             property_descriptor,
@@ -251,6 +253,7 @@ pub fn arraySetLength(
     if (new_len >= old_len) {
         // a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
         const succeeded = ordinaryDefineOwnProperty(
+            agent,
             array,
             PropertyKey.from("length"),
             new_len_desc,
@@ -290,6 +293,7 @@ pub fn arraySetLength(
 
     // 15. Let succeeded be ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
     var succeeded = ordinaryDefineOwnProperty(
+        agent,
         array,
         PropertyKey.from("length"),
         new_len_desc,
@@ -326,6 +330,7 @@ pub fn arraySetLength(
 
         // a. Let deleteSucceeded be ! A.[[Delete]](P).
         const delete_succeeded = array.internal_methods.delete(
+            agent,
             array,
             property_key,
         ) catch |err| try noexcept(err);
@@ -340,6 +345,7 @@ pub fn arraySetLength(
 
             // iii. Perform ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
             _ = ordinaryDefineOwnProperty(
+                agent,
                 array,
                 PropertyKey.from("length"),
                 new_len_desc,
@@ -356,6 +362,7 @@ pub fn arraySetLength(
         //      [[Writable]]: false
         //    }).
         succeeded = ordinaryDefineOwnProperty(
+            agent,
             array,
             PropertyKey.from("length"),
             .{ .writable = false },

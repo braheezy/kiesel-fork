@@ -31,6 +31,7 @@ const sameValue = types.sameValue;
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
 fn getOwnProperty(
+    _: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
@@ -59,6 +60,7 @@ fn getOwnProperty(
 /// 10.4.4.2 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
@@ -86,6 +88,7 @@ fn defineOwnProperty(
 
     // 5. Let allowed be ! OrdinaryDefineOwnProperty(args, P, newArgDesc).
     const allowed = ordinaryDefineOwnProperty(
+        agent,
         object,
         property_key,
         new_arg_property_descriptor,
@@ -99,7 +102,11 @@ fn defineOwnProperty(
         // a. If IsAccessorDescriptor(Desc) is true, then
         if (property_descriptor.isAccessorDescriptor()) {
             // i. Perform ! map.[[Delete]](P).
-            _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
+            _ = map.internal_methods.delete(
+                agent,
+                map,
+                property_key,
+            ) catch |err| try noexcept(err);
         }
         // b. Else,
         else {
@@ -114,7 +121,11 @@ fn defineOwnProperty(
             // ii. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, then
             if (property_descriptor.writable == false) {
                 // 1. Perform ! map.[[Delete]](P).
-                _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
+                _ = map.internal_methods.delete(
+                    agent,
+                    map,
+                    property_key,
+                ) catch |err| try noexcept(err);
             }
         }
     }
@@ -125,7 +136,12 @@ fn defineOwnProperty(
 
 /// 10.4.4.3 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-get-p-receiver
-fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
+fn get(
+    agent: *Agent,
+    object: *Object,
+    property_key: PropertyKey,
+    receiver: Value,
+) Agent.Error!Value {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -135,7 +151,7 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
     // 3. If isMapped is false, then
     if (!is_mapped) {
         // a. Return ? OrdinaryGet(args, P, Receiver).
-        return ordinaryGet(object, property_key, receiver);
+        return ordinaryGet(agent, object, property_key, receiver);
     }
     // 4. Else,
     else {
@@ -148,6 +164,7 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
 /// 10.4.4.4 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-set-p-v-receiver
 fn set(
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
     value: Value,
@@ -173,12 +190,12 @@ fn set(
     }
 
     // 4. Return ? OrdinarySet(args, P, V, Receiver).
-    return ordinarySet(object, property_key, value, receiver);
+    return ordinarySet(agent, object, property_key, value, receiver);
 }
 
 /// 10.4.4.5 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-delete-p
-fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
+fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -186,12 +203,12 @@ fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
 
     // 3. Let result be ? OrdinaryDelete(args, P).
-    const result = try ordinaryDelete(object, property_key);
+    const result = try ordinaryDelete(agent, object, property_key);
 
     // 4. If result is true and isMapped is true, then
     if (result and is_mapped) {
         // a. Perform ! map.[[Delete]](P).
-        _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
+        _ = map.internal_methods.delete(agent, map, property_key) catch |err| try noexcept(err);
     }
 
     // 5. Return result.
@@ -382,7 +399,7 @@ pub fn createMappedArgumentsObject(
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
                 //      [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true
                 //    }).
-                _ = map.internal_methods.defineOwnProperty(map, PropertyKey.from(index.?), .{
+                _ = map.internal_methods.defineOwnProperty(agent, map, PropertyKey.from(index.?), .{
                     .set = setter,
                     .get = getter,
                     .enumerable = false,

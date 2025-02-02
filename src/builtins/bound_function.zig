@@ -14,8 +14,7 @@ const Value = types.Value;
 
 /// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
-fn call(object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
-    const agent = object.agent;
+fn call(agent: *Agent, object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -42,11 +41,11 @@ fn call(object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value 
 /// 10.4.1.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget
 fn construct(
+    agent: *Agent,
     object: *Object,
     arguments_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
-    const agent = object.agent;
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -82,7 +81,7 @@ pub fn boundFunctionCreate(
     bound_args: []const Value,
 ) Agent.Error!*Object {
     // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
-    const prototype = try target_function.internal_methods.getPrototypeOf(target_function);
+    const prototype = try target_function.internal_methods.getPrototypeOf(agent, target_function);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
     //    the internal slots listed in Table 31.
