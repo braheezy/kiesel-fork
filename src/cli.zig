@@ -31,6 +31,8 @@ const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
+const regExpCreate = kiesel.builtins.regExpCreate;
+const regExpExec = kiesel.builtins.regExpExec;
 
 var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
     *kiesel.builtins.Promise,
@@ -99,6 +101,7 @@ const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
         try defineBuiltinFunction(kiesel_object, "detachArrayBuffer", detachArrayBuffer, 1, realm);
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "isMerlin", isMerlin, 1, realm);
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
         try defineBuiltinFunction(kiesel_object, "readFile", readFile_, 1, realm);
         try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
@@ -213,6 +216,19 @@ const Kiesel = struct {
 
         // 6. Return Completion(status).
         return status;
+    }
+
+    fn isMerlin(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+        const string = try value.toString(agent);
+        // See https://github.com/DerMolly/is-merlin/blob/main/src/index.ts for the source of the regexp
+        const regexp = try regExpCreate(
+            agent,
+            Value.from("[mM][eE][rR][lL][iI][nN]|[rR][uU][hH][rR][-_\\s]*[sS][cC][hH][oO][lL][zZ]"),
+            .undefined,
+        );
+        const match = try regExpExec(agent, regexp, string);
+        return Value.from(match != null);
     }
 
     fn print(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
