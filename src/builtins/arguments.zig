@@ -36,10 +36,10 @@ fn getOwnProperty(
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(args, P).
-    var descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
-
-    // 2. If desc is undefined, return undefined.
-    if (descriptor == null) return null;
+    var descriptor = (ordinaryGetOwnProperty(object, property_key) catch unreachable) orelse {
+        // 2. If desc is undefined, return undefined.
+        return null;
+    };
 
     // 3. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
@@ -50,7 +50,7 @@ fn getOwnProperty(
     // 5. If isMapped is true, then
     if (is_mapped) {
         // a. Set desc.[[Value]] to ! Get(map, P).
-        descriptor.?.value = map.get(property_key) catch |err| try noexcept(err);
+        descriptor.value = map.get(property_key) catch |err| try noexcept(err);
     }
 
     // 6. Return desc.

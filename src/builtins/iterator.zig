@@ -259,10 +259,10 @@ pub const prototype = struct {
                     }
 
                     // ii. Let next be ? IteratorStep(iterated).
-                    const next = try iterated_.step();
-
-                    // iii. If next is done, return ReturnCompletion(undefined).
-                    if (next == null) return null;
+                    _ = try iterated_.step() orelse {
+                        // iii. If next is done, return ReturnCompletion(undefined).
+                        return null;
+                    };
                 }
 
                 // c. Repeat,

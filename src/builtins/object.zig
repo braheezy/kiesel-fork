@@ -763,18 +763,18 @@ pub const prototype = struct {
         // 2. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
-        var prototype_: ?*types.Object = value.asObject();
+        var prototype_ = value.asObject();
 
         // 3. Repeat,
         while (true) {
             // a. Set V to ? V.[[GetPrototypeOf]]().
-            prototype_ = try prototype_.?.internal_methods.getPrototypeOf(agent, prototype_.?);
-
-            // b. If V is null, return false.
-            if (prototype_ == null) return Value.from(false);
+            prototype_ = try prototype_.internal_methods.getPrototypeOf(agent, prototype_) orelse {
+                // b. If V is null, return false.
+                return Value.from(false);
+            };
 
             // c. If SameValue(O, V) is true, return true.
-            if (object == prototype_.?) return Value.from(true);
+            if (object == prototype_) return Value.from(true);
         }
     }
 
@@ -798,13 +798,13 @@ pub const prototype = struct {
             agent,
             object,
             property_key,
-        );
-
-        // 4. If desc is undefined, return false.
-        if (property_descriptor == null) return Value.from(false);
+        ) orelse {
+            // 4. If desc is undefined, return false.
+            return Value.from(false);
+        };
 
         // 5. Return desc.[[Enumerable]].
-        return Value.from(property_descriptor.?.enumerable.?);
+        return Value.from(property_descriptor.enumerable.?);
     }
 
     /// 20.1.3.5 Object.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )

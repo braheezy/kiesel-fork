@@ -104,24 +104,22 @@ pub const prototype = struct {
         const full_unicode = reg_exp_string_iterator.fields.state.full_unicode;
 
         // i. Let match be ? RegExpExec(R, S).
-        const match = try regExpExec(agent, reg_exp, string);
-
-        // ii. If match is null, return undefined.
-        if (match == null) {
+        const match = try regExpExec(agent, reg_exp, string) orelse {
+            // ii. If match is null, return undefined.
             reg_exp_string_iterator.fields = .completed;
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
-        }
+        };
 
         // iii. If global is false, then
         if (!global) {
             // 1. Perform ? GeneratorYield(CreateIteratorResultObject(match, false)).
             // 2. Return undefined.
             reg_exp_string_iterator.fields = .completed;
-            return Value.from(try createIteratorResultObject(agent, Value.from(match.?), false));
+            return Value.from(try createIteratorResultObject(agent, Value.from(match), false));
         }
 
         // iv. Let matchStr be ? ToString(? Get(match, "0")).
-        const match_str = try (try match.?.get(PropertyKey.from(0))).toString(agent);
+        const match_str = try (try match.get(PropertyKey.from(0))).toString(agent);
 
         // v. If matchStr is the empty String, then
         if (match_str.isEmpty()) {
@@ -136,7 +134,7 @@ pub const prototype = struct {
         }
 
         // vi. Perform ? GeneratorYield(CreateIteratorResultObject(match, false)).
-        return Value.from(try createIteratorResultObject(agent, Value.from(match.?), false));
+        return Value.from(try createIteratorResultObject(agent, Value.from(match), false));
     }
 };
 

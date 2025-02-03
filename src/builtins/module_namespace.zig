@@ -101,10 +101,10 @@ fn defineOwnProperty(
     }
 
     // 2. Let current be ? O.[[GetOwnProperty]](P).
-    const current = try object.internal_methods.getOwnProperty(agent, object, property_key);
-
-    // 3. If current is undefined, return false.
-    if (current == null) return false;
+    const current = try object.internal_methods.getOwnProperty(agent, object, property_key) orelse {
+        // 3. If current is undefined, return false.
+        return false;
+    };
 
     // 4. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is true, return false.
     if (property_descriptor.configurable == true) return false;
@@ -119,7 +119,7 @@ fn defineOwnProperty(
     if (property_descriptor.writable == false) return false;
 
     // 8. If Desc has a [[Value]] field, return SameValue(Desc.[[Value]], current.[[Value]]).
-    if (property_descriptor.value) |value| return sameValue(value, current.?.value.?);
+    if (property_descriptor.value) |value| return sameValue(value, current.value.?);
 
     // 9. Return true.
     return true;

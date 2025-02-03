@@ -1184,15 +1184,15 @@ pub const prototype = struct {
         // 2. If regexp is neither undefined nor null, then
         if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let matcher be ? GetMethod(regexp, %Symbol.match%).
-            const matcher = try regexp.getMethod(
+            const maybe_matcher = try regexp.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             );
 
             // b. If matcher is not undefined, then
-            if (matcher != null) {
+            if (maybe_matcher) |matcher| {
                 // i. Return ? Call(matcher, regexp, « O »).
-                return Value.from(matcher.?).callAssumeCallable(regexp, &.{object});
+                return Value.from(matcher).callAssumeCallable(regexp, &.{object});
             }
         }
 
@@ -1242,15 +1242,15 @@ pub const prototype = struct {
             }
 
             // c. Let matcher be ? GetMethod(regexp, %Symbol.matchAll%).
-            const matcher = try regexp.getMethod(
+            const maybe_matcher = try regexp.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             );
 
             // d. If matcher is not undefined, then
-            if (matcher != null) {
+            if (maybe_matcher) |matcher| {
                 // i. Return ? Call(matcher, regexp, « O »).
-                return Value.from(matcher.?).callAssumeCallable(regexp, &.{object});
+                return Value.from(matcher).callAssumeCallable(regexp, &.{object});
             }
         }
 
@@ -1382,15 +1382,15 @@ pub const prototype = struct {
         // 2. If searchValue is neither undefined nor null, then
         if (!search_value.isUndefined() and !search_value.isNull()) {
             // a. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
-            const replacer = try search_value.getMethod(
+            const maybe_replacer = try search_value.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
             );
 
             // b. If replacer is not undefined, then
-            if (replacer != null) {
+            if (maybe_replacer) |replacer| {
                 // i. Return ? Call(replacer, searchValue, « O, replaceValue »).
-                return Value.from(replacer.?).callAssumeCallable(
+                return Value.from(replacer).callAssumeCallable(
                     search_value,
                     &.{ object, replace_value },
                 );
@@ -1416,18 +1416,18 @@ pub const prototype = struct {
         const search_length = search_string.length();
 
         // 8. Let position be StringIndexOf(string, searchString, 0).
-        const position = string.indexOf(search_string, 0);
-
-        // 9. If position is not-found, return string.
-        if (position == null) return Value.from(string);
+        const position = string.indexOf(search_string, 0) orelse {
+            // 9. If position is not-found, return string.
+            return Value.from(string);
+        };
 
         // 10. Let preceding be the substring of string from 0 to position.
-        const preceding = try string.substring(agent.gc_allocator, 0, position.?);
+        const preceding = try string.substring(agent.gc_allocator, 0, position);
 
         // 11. Let following be the substring of string from position + searchLength.
         const following = try string.substring(
             agent.gc_allocator,
-            position.? + search_length,
+            position + search_length,
             null,
         );
 
@@ -1440,7 +1440,7 @@ pub const prototype = struct {
                 .undefined,
                 &.{
                     Value.from(search_string),
-                    Value.from(@as(f64, @floatFromInt(position.?))),
+                    Value.from(@as(f64, @floatFromInt(position))),
                     Value.from(string),
                 },
             )).toString(agent);
@@ -1457,7 +1457,7 @@ pub const prototype = struct {
                 agent,
                 search_string,
                 string,
-                position.?,
+                position,
                 &.{},
                 null,
                 replace_value.asString(),
@@ -1503,15 +1503,15 @@ pub const prototype = struct {
             }
 
             // c. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
-            const replacer = try search_value.getMethod(
+            const maybe_replacer = try search_value.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
             );
 
             // d. If replacer is not undefined, then
-            if (replacer != null) {
+            if (maybe_replacer) |replacer| {
                 // i. Return ? Call(replacer, searchValue, « O, replaceValue »).
-                return Value.from(replacer.?).callAssumeCallable(
+                return Value.from(replacer).callAssumeCallable(
                     search_value,
                     &.{ object, replace_value },
                 );
@@ -1637,15 +1637,15 @@ pub const prototype = struct {
         // 2. If regexp is neither undefined nor null, then
         if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let searcher be ? GetMethod(regexp, %Symbol.search%).
-            const searcher = try regexp.getMethod(
+            const maybe_searcher = try regexp.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             );
 
             // b. If searcher is not undefined, then
-            if (searcher != null) {
+            if (maybe_searcher) |searcher| {
                 // i. Return ? Call(searcher, regexp, « O »).
-                return Value.from(searcher.?).callAssumeCallable(regexp, &.{object});
+                return Value.from(searcher).callAssumeCallable(regexp, &.{object});
             }
         }
 
@@ -1741,15 +1741,15 @@ pub const prototype = struct {
         // 2. If separator is neither undefined nor null, then
         if (!separator_value.isUndefined() and !separator_value.isNull()) {
             // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
-            const splitter = try separator_value.getMethod(
+            const maybe_splitter = try separator_value.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.split%"),
             );
 
             // b. If splitter is not undefined, then
-            if (splitter != null) {
+            if (maybe_splitter) |splitter| {
                 // i. Return ? Call(splitter, separator, « O, limit »).
-                return Value.from(splitter.?).callAssumeCallable(
+                return Value.from(splitter).callAssumeCallable(
                     separator_value,
                     &.{ object, limit_value },
                 );

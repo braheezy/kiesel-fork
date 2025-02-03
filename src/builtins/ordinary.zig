@@ -736,13 +736,17 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
 /// https://tc39.es/ecma262/#sec-ordinarydelete
 pub fn ordinaryDelete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try object.internal_methods.getOwnProperty(agent, object, property_key);
-
-    // 2. If desc is undefined, return true.
-    if (descriptor == null) return true;
+    const descriptor = try object.internal_methods.getOwnProperty(
+        agent,
+        object,
+        property_key,
+    ) orelse {
+        // 2. If desc is undefined, return true.
+        return true;
+    };
 
     // 3. If desc.[[Configurable]] is true, then
-    if (descriptor.?.configurable == true) {
+    if (descriptor.configurable == true) {
         // a. Remove the own property with name P from O.
         try object.property_storage.remove(agent.gc_allocator, property_key);
 

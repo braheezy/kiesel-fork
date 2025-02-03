@@ -1189,17 +1189,15 @@ pub const prototype = struct {
         // 12. Repeat, while done is false,
         while (true) {
             // a. Let result be ? RegExpExec(rx, S).
-            const result = try regExpExec(agent, reg_exp, string);
-
-            // b. If result is null, then
-            if (result == null) {
-                // i. Set done to true.
+            const result = try regExpExec(agent, reg_exp, string) orelse {
+                // b. If result is null, then
+                //     i. Set done to true.
                 break;
-            }
+            };
 
             // c. Else,
             // i. Append result to results.
-            try results.append(agent.gc_allocator, result.?);
+            try results.append(agent.gc_allocator, result);
 
             // ii. If global is false, then
             if (!global_) {
@@ -1209,7 +1207,7 @@ pub const prototype = struct {
 
             // iii. Else,
             // 1. Let matchStr be ? ToString(? Get(result, "0")).
-            const match_str = try (try result.?.get(PropertyKey.from(0))).toString(agent);
+            const match_str = try (try result.get(PropertyKey.from(0))).toString(agent);
 
             // 2. If matchStr is the empty String, then
             if (match_str.isEmpty()) {

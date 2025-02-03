@@ -1013,15 +1013,15 @@ pub fn setFunctionName(
             // 2. If name is a Symbol, then
             .symbol => |symbol| blk: {
                 // a. Let description be name's [[Description]] value.
-                const description = symbol.description;
-
-                // b. If description is undefined, set name to the empty String.
-                if (description == null) break :blk .empty;
+                const description = symbol.description orelse {
+                    // b. If description is undefined, set name to the empty String.
+                    break :blk .empty;
+                };
 
                 // c. Else, set name to the string-concatenation of "[", description, and "]".
                 break :blk try String.concat(
                     agent.gc_allocator,
-                    &.{ String.fromLiteral("["), description.?, String.fromLiteral("]") },
+                    &.{ String.fromLiteral("["), description, String.fromLiteral("]") },
                 );
             },
         },

@@ -803,9 +803,9 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
         // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-        if (object.fields.array_buffer_max_byte_length == null) {
+        const array_buffer_max_byte_length = object.fields.array_buffer_max_byte_length orelse {
             return agent.throwException(.type_error, "ArrayBuffer is not resizable", .{});
-        }
+        };
 
         // 4. Let newByteLength be ? ToIndex(newLength).
         const new_byte_length = try new_length.toIndex(agent);
@@ -816,7 +816,7 @@ pub const prototype = struct {
         }
 
         // 6. If newByteLength > O.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
-        if (new_byte_length > object.fields.array_buffer_max_byte_length.?) {
+        if (new_byte_length > array_buffer_max_byte_length) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 

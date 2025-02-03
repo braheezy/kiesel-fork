@@ -115,17 +115,15 @@ pub const Iterator = struct {
     /// https://tc39.es/ecma262/#sec-iteratorstepvalue
     pub fn stepValue(self: *Iterator) Agent.Error!?Value {
         // 1. Let result be ? IteratorStep(iteratorRecord).
-        const result = try self.step();
-
-        // 2. If result is done, then
-        if (result == null) {
-            // a. Return done.
+        const result = try self.step() orelse {
+            // 2. If result is done, then
+            //     a. Return done.
             return null;
-        }
+        };
 
         // 3. Let value be Completion(IteratorValue(result)).
         // 4. If value is a throw completion, then
-        const value_ = value(result.?) catch |err| {
+        const value_ = value(result) catch |err| {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
@@ -245,7 +243,7 @@ pub fn getIterator(
     kind: IteratorKind,
 ) Agent.Error!Iterator {
     // 1. If kind is async, then
-    const method = if (kind == .@"async") blk: {
+    const method = (if (kind == .@"async") blk: {
         // a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
         const method = try object.getMethod(
             agent,
@@ -258,19 +256,17 @@ pub fn getIterator(
             const sync_method = try object.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
-            );
-
-            // ii. If syncMethod is undefined, throw a TypeError exception.
-            if (sync_method == null) {
+            ) orelse {
+                // ii. If syncMethod is undefined, throw a TypeError exception.
                 return agent.throwException(
                     .type_error,
                     "Object has no Symbol.asyncIterator or Symbol.iterator method",
                     .{},
                 );
-            }
+            };
 
             // iii. Let syncIteratorRecord be ? GetIteratorFromMethod(obj, syncMethod).
-            const sync_iterator = try getIteratorFromMethod(agent, object, sync_method.?);
+            const sync_iterator = try getIteratorFromMethod(agent, object, sync_method);
 
             // iv. Return CreateAsyncFromSyncIterator(syncIteratorRecord).
             return createAsyncFromSyncIterator(agent, sync_iterator);
@@ -285,15 +281,13 @@ pub fn getIterator(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
         );
+    }) orelse {
+        // 3. If method is undefined, throw a TypeError exception.
+        return agent.throwException(.type_error, "Object has no Symbol.iterator method", .{});
     };
 
-    // 3. If method is undefined, throw a TypeError exception.
-    if (method == null) {
-        return agent.throwException(.type_error, "Object has no Symbol.iterator method", .{});
-    }
-
     // 4. Return ? GetIteratorFromMethod(obj, method).
-    return getIteratorFromMethod(agent, object, method.?);
+    return getIteratorFromMethod(agent, object, method);
 }
 
 /// 7.4.5 GetIteratorFlattenable ( obj, primitiveHandling )

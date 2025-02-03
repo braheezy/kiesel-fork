@@ -69,13 +69,12 @@ pub const prototype = struct {
             iterator_helper.fields.state.executing = false;
         };
 
-        const value = try iterator_helper.fields.state.closure(agent, iterator_helper);
-        if (value == null) {
+        const value = try iterator_helper.fields.state.closure(agent, iterator_helper) orelse {
             iterator_helper.fields = .completed;
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
-        }
+        };
 
-        return Value.from(try createIteratorResultObject(agent, value.?, false));
+        return Value.from(try createIteratorResultObject(agent, value, false));
     }
 
     /// 27.1.2.1.2 %IteratorHelperPrototype%.return ( )

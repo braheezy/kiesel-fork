@@ -59,16 +59,14 @@ pub const prototype = struct {
         const return_method = try Value.from(iterator).getMethod(
             agent,
             PropertyKey.from("return"),
-        );
-
-        // 6. If returnMethod is undefined, then
-        if (return_method == null) {
-            // a. Return CreateIteratorResultObject(undefined, true).
+        ) orelse {
+            // 6. If returnMethod is undefined, then
+            //     a. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
-        }
+        };
 
         // 7. Return ? Call(returnMethod, iterator).
-        return Value.from(return_method.?).callAssumeCallableNoArgs(Value.from(iterator));
+        return Value.from(return_method).callAssumeCallableNoArgs(Value.from(iterator));
     }
 };
 

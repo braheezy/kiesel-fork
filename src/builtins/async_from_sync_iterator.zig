@@ -136,10 +136,9 @@ pub const prototype = struct {
         const return_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("return")) catch |err| {
             // 6. IfAbruptRejectPromise(return, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
-        };
-
+        }
         // 7. If return is undefined, then
-        if (return_ == null) {
+        orelse {
             // a. Let iteratorResult be CreateIteratorResultObject(value, true).
             const iterator_result = try createIteratorResultObject(
                 agent,
@@ -155,12 +154,12 @@ pub const prototype = struct {
 
             // c. Return promiseCapability.[[Promise]].
             return Value.from(promise_capability.promise);
-        }
+        };
 
         // 8. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(return, syncIterator, « value »)).
-            break :blk Value.from(return_.?).callAssumeCallable(
+            break :blk Value.from(return_).callAssumeCallable(
                 Value.from(sync_iterator),
                 &.{value},
             );
@@ -168,7 +167,7 @@ pub const prototype = struct {
         // 9. Else,
         else blk: {
             // a. Let result be Completion(Call(return, syncIterator)).
-            break :blk Value.from(return_.?).callAssumeCallableNoArgs(Value.from(sync_iterator));
+            break :blk Value.from(return_).callAssumeCallableNoArgs(Value.from(sync_iterator));
         }) catch |err| {
             // 10. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
@@ -222,10 +221,9 @@ pub const prototype = struct {
         const throw_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("throw")) catch |err| {
             // 6. IfAbruptRejectPromise(throw, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
-        };
-
+        }
         // 7. If throw is undefined, then
-        if (throw_ == null) {
+        orelse {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
@@ -234,12 +232,12 @@ pub const prototype = struct {
 
             // b. Return promiseCapability.[[Promise]].
             return Value.from(promise_capability.promise);
-        }
+        };
 
         // 8. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(throw, syncIterator, « value »)).
-            break :blk Value.from(throw_.?).callAssumeCallable(
+            break :blk Value.from(throw_).callAssumeCallable(
                 Value.from(sync_iterator),
                 &.{value},
             );
@@ -247,7 +245,7 @@ pub const prototype = struct {
         // 9. Else,
         else blk: {
             // a. Let result be Completion(Call(throw, syncIterator)).
-            break :blk Value.from(throw_.?).callAssumeCallableNoArgs(Value.from(sync_iterator));
+            break :blk Value.from(throw_).callAssumeCallableNoArgs(Value.from(sync_iterator));
         }) catch |err| {
             // 10. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));

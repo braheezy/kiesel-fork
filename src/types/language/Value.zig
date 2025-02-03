@@ -1200,10 +1200,10 @@ pub fn isArray(self: Value) error{ExceptionThrown}!bool {
         try validateNonRevokedProxy(self.asObject().as(builtins.Proxy));
 
         // b. Let proxyTarget be argument.[[ProxyTarget]].
-        const proxy_target = self.asObject().as(builtins.Proxy).fields.proxy_target;
+        const proxy_target = self.asObject().as(builtins.Proxy).fields.proxy_target.?;
 
         // c. Return ? IsArray(proxyTarget).
-        return from(proxy_target.?).isArray();
+        return from(proxy_target).isArray();
     }
 
     // 4. Return false.
@@ -1447,18 +1447,18 @@ pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
         return agent.throwException(.type_error, "'prototype' property must be an object", .{});
     }
 
-    var object: ?*Object = object_value.asObject();
+    var object = object_value.asObject();
 
     // 6. Repeat,
     while (true) {
         // a. Set O to ? O.[[GetPrototypeOf]]().
-        object = try object.?.internal_methods.getPrototypeOf(agent, object.?);
-
-        // b. If O is null, return false.
-        if (object == null) return false;
+        object = try object.internal_methods.getPrototypeOf(agent, object) orelse {
+            // b. If O is null, return false.
+            return false;
+        };
 
         // c. If SameValue(P, O) is true, return true.
-        if (prototype.asObject() == object.?) return true;
+        if (prototype.asObject() == object) return true;
     }
 }
 
@@ -2089,13 +2089,13 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 7. If x is a BigInt and y is a String, then
     if (x.isBigInt() and y.isString()) {
         // a. Let n be StringToBigInt(y).
-        const n = try stringToBigInt(agent.gc_allocator, y.asString());
-
-        // b. If n is undefined, return false.
-        if (n == null) return false;
+        const n = try stringToBigInt(agent.gc_allocator, y.asString()) orelse {
+            // b. If n is undefined, return false.
+            return false;
+        };
 
         // c. Return ! IsLooselyEqual(x, n).
-        return isLooselyEqual(agent, x, from(n.?));
+        return isLooselyEqual(agent, x, from(n));
     }
 
     // 8. If x is a String and y is a BigInt, return ! IsLooselyEqual(y, x).
