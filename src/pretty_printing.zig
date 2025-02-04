@@ -141,13 +141,48 @@ fn prettyPrintArrayIterator(
 }
 
 fn prettyPrintAsyncGenerator(
-    _: *const builtins.AsyncGenerator,
+    async_generator: *const builtins.AsyncGenerator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
-    try writer.writeAll("AsyncGenerator()");
+    try writer.writeAll("AsyncGenerator(");
+    try tty_config.setColor(writer, .reset);
+    switch (async_generator.fields.async_generator_state) {
+        .suspended_start => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .cyan);
+            try writer.writeAll("<suspended-start>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .suspended_yield => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .cyan);
+            try writer.writeAll("<suspended-yield>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .executing => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .green);
+            try writer.writeAll("<executing>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .draining_queue => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .cyan);
+            try writer.writeAll("<draining-queue>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .completed => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
@@ -218,13 +253,42 @@ fn prettyPrintFinalizationRegistry(
 }
 
 fn prettyPrintGenerator(
-    _: *const builtins.Generator,
+    generator: *const builtins.Generator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
-    try writer.writeAll("Generator()");
+    try writer.writeAll("Generator(");
+    try tty_config.setColor(writer, .reset);
+    switch (generator.fields.generator_state) {
+        .suspended_start => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .cyan);
+            try writer.writeAll("<suspended-start>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .suspended_yield => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .cyan);
+            try writer.writeAll("<suspended-yield>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .executing => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .green);
+            try writer.writeAll("<executing>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .completed => {
+            try writer.writeAll("state: ");
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
