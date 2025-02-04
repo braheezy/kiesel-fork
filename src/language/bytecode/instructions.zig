@@ -278,8 +278,12 @@ pub const Instruction = union(enum(u8)) {
 
 pub const InstructionIterator = struct {
     instructions: []const u8,
-    index: usize = 0,
-    instruction_index: usize = 0,
+    index: usize,
+    instruction_index: usize,
+
+    pub fn init(instructions: []const u8) InstructionIterator {
+        return .{ .instructions = instructions, .index = 0, .instruction_index = 0 };
+    }
 
     pub fn next(self: *InstructionIterator) ?Instruction {
         if (self.index >= self.instructions.len) return null;

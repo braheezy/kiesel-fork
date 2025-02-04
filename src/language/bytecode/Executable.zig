@@ -206,7 +206,20 @@ pub fn addInstructionDeferred(
 }
 
 pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
-    var iterator: InstructionIterator = .{ .instructions = self.instructions.items };
+    const instruction_count = blk: {
+        var n: usize = 0;
+        var iterator = InstructionIterator.init(self.instructions.items);
+        while (iterator.next()) |_| n += 1;
+        break :blk n;
+    };
+    // TODO: Record function/script/... that this executable is for any output it
+    try writer.print("Bytecode Executable (instructions: {}, constants: {}, identifiers: {}, AST nodes: {})\n", .{
+        instruction_count,
+        self.constants.count(),
+        self.identifiers.count(),
+        self.ast_nodes.items.len,
+    });
+    var iterator = InstructionIterator.init(self.instructions.items);
     while (iterator.next()) |instruction| {
         try writer.print("{:>[1]}: ", .{
             iterator.instruction_index,
