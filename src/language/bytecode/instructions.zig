@@ -111,7 +111,9 @@ pub const Instruction = union(enum(u8)) {
     /// Perform ForDeclarationBindingInstantiation with the given identifier and constant-ness.
     for_declaration_binding_instantiation: AstNodeIndex,
     /// Store GetIterator() as the result value.
-    get_iterator: IteratorKind,
+    get_iterator: struct {
+        kind: IteratorKind,
+    },
     /// Store GetNewTarget() as the result value.
     get_new_target,
     /// Store the import.meta object as the result value.

@@ -1893,7 +1893,7 @@ fn executeInstruction(
         .evaluate_property_access_with_identifier_key_direct => self.executeEvaluatePropertyAccessWithIdentifierKeyDirect(payload.identifier, payload.property_lookup_cache_index, executable),
         .evaluate_super_call => self.executeEvaluateSuperCall(payload.argument_count, executable),
         .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(payload, executable),
-        .get_iterator => self.executeGetIterator(payload, executable),
+        .get_iterator => self.executeGetIterator(payload.kind, executable),
         .get_new_target => self.executeGetNewTarget(executable),
         .get_or_create_import_meta => self.executeGetOrCreateImportMeta(executable),
         .get_template_object => self.executeGetTemplateObject(payload, executable),

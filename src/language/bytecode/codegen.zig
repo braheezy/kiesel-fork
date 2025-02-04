@@ -542,7 +542,7 @@ pub fn codegenArrayLiteral(
                 try codegenExpressionAndGetValue(expression, executable, ctx);
 
                 // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-                try executable.addInstruction(.get_iterator, .sync);
+                try executable.addInstruction(.get_iterator, .{ .kind = .sync });
 
                 // 4.
                 try executable.addInstruction(.array_spread_value, {});
@@ -2858,7 +2858,7 @@ fn forInOfHeadEvaluation(
             .sync;
 
         // d. Return ? GetIterator(exprValue, iteratorKind).
-        try executable.addInstruction(.get_iterator, iterator_kind);
+        try executable.addInstruction(.get_iterator, .{ .kind = iterator_kind });
 
         return null;
     }

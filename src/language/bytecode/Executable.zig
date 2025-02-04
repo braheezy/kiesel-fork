@@ -240,8 +240,30 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     },
                     else => {},
                 }
-                if (@TypeOf(payload) != void) {
-                    try writer.print(" {}", .{payload});
+                switch (@typeInfo(@TypeOf(payload))) {
+                    .void => {},
+                    .@"enum" => |info| {
+                        // Only indices are allowed as standalone payloads
+                        comptime std.debug.assert(!info.is_exhaustive);
+                        try writer.print(" (index: {})", .{payload});
+                    },
+                    .@"struct" => |info| {
+                        comptime std.debug.assert(!info.is_tuple);
+                        try writer.writeAll(" (");
+                        inline for (info.fields, 0..) |field, i| {
+                            if (i != 0) try writer.writeAll(", ");
+                            try writer.print("{s}: ", .{field.name});
+                            const value = @field(payload, field.name);
+                            if (@typeInfo(field.type) == .@"enum" and @typeInfo(field.type).@"enum".is_exhaustive) {
+                                // Omit type name of exhaustive enums
+                                try writer.print("{s}", .{@tagName(value)});
+                            } else {
+                                try writer.print("{}", .{value});
+                            }
+                        }
+                        try writer.writeAll(")");
+                    },
+                    else => comptime unreachable,
                 }
             },
         }
