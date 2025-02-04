@@ -255,9 +255,9 @@ pub const ECMAScriptFunction = MakeObject(.{
                 const initializer: ast.Expression = .{
                     .primary_expression = .{ .literal = .null }, // Placeholder value
                 };
-                var executable = if (maybe_environment != null)
+                var executable = (if (maybe_environment != null)
                     // Uses InitializeReferencedBinding
-                    try generateBytecode(agent, ast.LexicalBinding{
+                    generateBytecode(agent.gc_allocator, ast.LexicalBinding{
                         .binding_pattern = .{
                             .binding_pattern = binding_pattern,
                             .initializer = initializer,
@@ -265,15 +265,22 @@ pub const ECMAScriptFunction = MakeObject(.{
                     }, .{})
                 else
                     // Uses PutValue
-                    try generateBytecode(agent, ast.VariableDeclaration{
+                    generateBytecode(agent.gc_allocator, ast.VariableDeclaration{
                         .binding_pattern = .{
                             .binding_pattern = binding_pattern,
                             .initializer = initializer,
                         },
-                    }, .{});
+                    }, .{})) catch |err| switch (err) {
+                    error.IndexOutOfRange => return agent.throwException(
+                        .internal_error,
+                        "Bytecode generation failed",
+                        .{},
+                    ),
+                    error.OutOfMemory => return error.OutOfMemory,
+                };
                 // Patch executable to put the arguments array on the RHS
                 const dummy = Value.from(try ordinaryObjectCreate(agent, null));
-                const index = executable.addConstant(dummy) catch |e| switch (e) {
+                const index = executable.addConstant(dummy) catch |err| switch (err) {
                     error.IndexOutOfRange => return agent.throwException(
                         .internal_error,
                         "Bytecode generation failed",
@@ -284,6 +291,10 @@ pub const ECMAScriptFunction = MakeObject(.{
                 // 0 = load, 1 = store_constant, 2..3 = index
                 std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intFromEnum(index);
                 self.cached_arguments_executable = executable;
+
+                if (agent.options.debug.print_bytecode) {
+                    executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
+                }
             }
             var executable = &self.cached_arguments_executable.?;
             const array = try createArrayFromList(agent, arguments.values);
@@ -301,7 +312,23 @@ pub const ECMAScriptFunction = MakeObject(.{
             }
 
             if (self.cached_body_executable == null) {
-                self.cached_body_executable = try generateBytecode(agent, self.ecmascript_code, .{});
+                const executable = generateBytecode(
+                    agent.gc_allocator,
+                    self.ecmascript_code,
+                    .{},
+                ) catch |err| switch (err) {
+                    error.IndexOutOfRange => return agent.throwException(
+                        .internal_error,
+                        "Bytecode generation failed",
+                        .{},
+                    ),
+                    error.OutOfMemory => return error.OutOfMemory,
+                };
+                self.cached_body_executable = executable;
+
+                if (agent.options.debug.print_bytecode) {
+                    executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
+                }
             }
             const executable = &self.cached_body_executable.?;
             var vm = try Vm.init(agent);
