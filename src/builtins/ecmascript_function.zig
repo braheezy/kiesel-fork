@@ -306,6 +306,12 @@ pub const ECMAScriptFunction = MakeObject(.{
         }
 
         pub fn evaluateBody(self: *@This(), agent: *Agent) Agent.Error!Completion {
+            var vm = try Vm.init(agent);
+            defer vm.deinit();
+            return self.evaluateBodyWithVm(agent, &vm);
+        }
+
+        pub fn evaluateBodyWithVm(self: *@This(), agent: *Agent, vm: *Vm) Agent.Error!Completion {
             // OPTIMIZATION: If the body is empty we can directly return a normal completion.
             if (self.ecmascript_code.statement_list.items.len == 0) {
                 return Completion.normal(null);
@@ -331,8 +337,6 @@ pub const ECMAScriptFunction = MakeObject(.{
                 }
             }
             const executable = &self.cached_body_executable.?;
-            var vm = try Vm.init(agent);
-            defer vm.deinit();
             return vm.run(executable.*);
         }
     },
@@ -578,7 +582,7 @@ fn evaluateGeneratorBody(
     );
 
     // 5. Perform GeneratorStart(G, FunctionBody).
-    generatorStart(agent, generator.as(builtins.Generator), function);
+    try generatorStart(agent, generator.as(builtins.Generator), function);
 
     // 6. Return ReturnCompletion(G).
     return Value.from(generator);
@@ -614,7 +618,7 @@ fn evaluateAsyncGeneratorBody(
     );
 
     // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
-    asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
+    try asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
 
     // 6. Return ReturnCompletion(generator).
     return Value.from(generator);

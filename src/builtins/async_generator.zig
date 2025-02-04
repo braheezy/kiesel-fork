@@ -4,6 +4,7 @@
 const std = @import("std");
 
 const builtins = @import("../builtins.zig");
+const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -18,6 +19,7 @@ const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const Vm = bytecode.Vm;
 const @"await" = builtins.@"await";
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
@@ -270,7 +272,8 @@ pub const AsyncGenerator = MakeObject(.{
 
         // Non-standard
         evaluation_state: struct {
-            closure: *const fn (*Agent, *builtins.ECMAScriptFunction) std.mem.Allocator.Error!void,
+            vm: Vm,
+            closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
         },
@@ -294,7 +297,7 @@ pub fn asyncGeneratorStart(
     agent: *Agent,
     generator: *AsyncGenerator,
     generator_function: *builtins.ECMAScriptFunction,
-) void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorState]] is suspended-start.
     std.debug.assert(generator.fields.async_generator_state == .suspended_start);
 
@@ -310,6 +313,7 @@ pub fn asyncGeneratorStart(
         fn func(
             agent_: *Agent,
             generator_function_: *builtins.ECMAScriptFunction,
+            resume_completion: Completion,
         ) std.mem.Allocator.Error!void {
             // a. Let acGenContext be the running execution context.
             const closure_generator_context = agent_.runningExecutionContext();
@@ -319,8 +323,22 @@ pub fn asyncGeneratorStart(
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
+                // TODO: Integrate throw/return completions with exception handlers in the Vm
+                switch (resume_completion.type) {
+                    .normal => closure_generator.fields.evaluation_state.vm.result = resume_completion.value.?,
+                    .@"return" => break :blk resume_completion,
+                    .throw => {
+                        agent_.exception = resume_completion.value.?;
+                        break :blk error.ExceptionThrown;
+                    },
+                    else => unreachable,
+                }
+
                 // i. Let result be Completion(Evaluation of generatorBody).
-                break :blk generator_function_.fields.evaluateBody(agent_);
+                break :blk generator_function_.fields.evaluateBodyWithVm(
+                    agent_,
+                    &closure_generator.fields.evaluation_state.vm,
+                );
             }
             // d. Else,
             else {
@@ -333,8 +351,6 @@ pub fn asyncGeneratorStart(
 
             if (closure_generator.fields.evaluation_state.suspension_result) |_| {
                 closure_generator.fields.evaluation_state.suspension_result = null;
-                // TODO: Support resuming generator evaluation after a yield
-                closure_generator.fields.async_generator_state = .completed;
                 return;
             }
 
@@ -346,11 +362,14 @@ pub fn asyncGeneratorStart(
             // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
             closure_generator.fields.async_generator_state = .draining_queue;
 
-            const result_completion = if (result) |completion| blk: {
+            const result_completion: Completion = if (result) |completion| switch (completion.type) {
                 // h. If result is a normal completion, set result to NormalCompletion(undefined).
+                .normal => Completion.normal(.undefined),
+
                 // i. If result is a return completion, set result to NormalCompletion(result.[[Value]]).
-                std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                break :blk Completion.normal(completion.value orelse .undefined);
+                .@"return" => Completion.normal(completion.value.?),
+
+                else => unreachable,
             } else |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.ExceptionThrown => blk: {
@@ -371,7 +390,11 @@ pub fn asyncGeneratorStart(
 
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
-    generator.fields.evaluation_state = .{ .closure = closure, .generator_function = generator_function };
+    generator.fields.evaluation_state = .{
+        .vm = try Vm.init(agent),
+        .closure = closure,
+        .generator_function = generator_function,
+    };
 
     // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
     generator.fields.async_generator_context = generator_context.*;
@@ -511,10 +534,10 @@ pub fn asyncGeneratorResume(
     //    operation that suspended it. Let result be the Completion Record returned by the resumed
     //    computation.
     // 8. Assert: result is never an abrupt completion.
-    _ = completion;
     try generator.fields.evaluation_state.closure(
         agent,
         generator.fields.evaluation_state.generator_function,
+        completion,
     );
 
     // 9. Assert: When we return here, genContext has already been removed from the execution
