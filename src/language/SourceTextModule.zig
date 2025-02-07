@@ -1750,7 +1750,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         },
     };
 
-    // TODO: 8. Suspend the running execution context.
+    // 8. Suspend the running execution context.
 
     // 9. If module.[[HasTLA]] is false, then
     if (!self.has_tla) {
@@ -1767,7 +1767,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         // d. Suspend moduleContext and remove it from the execution context stack.
         _ = agent.execution_context_stack.pop();
 
-        // TODO: e. Resume the context that is now on the top of the execution context stack as the
+        // e. Resume the context that is now on the top of the execution context stack as the
         //    running execution context.
 
         // f. If result is an abrupt completion, then

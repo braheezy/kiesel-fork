@@ -102,7 +102,7 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
         },
     };
 
-    // TODO: 9. Suspend the running execution context.
+    // 9. Suspend the running execution context.
 
     // 10. Push scriptContext onto the execution context stack; scriptContext is now the running execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, script_context);
@@ -130,8 +130,8 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     // 15. Assert: The execution context stack is not empty.
     std.debug.assert(agent.execution_context_stack.items.len > 0);
 
-    // TODO: 16. Resume the context that is now on the top of the execution context stack as the
-    //     running execution context.
+    // 16. Resume the context that is now on the top of the execution context stack as the running
+    //     execution context.
 
     // 17. Return ? result.
     return try result;

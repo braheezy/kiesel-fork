@@ -284,7 +284,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     // 5. Let methodContext be the running execution context.
     const method_context = agent.runningExecutionContext();
 
-    // TODO: 6. Suspend methodContext.
+    // 6. Suspend methodContext.
 
     // 7. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;
@@ -360,7 +360,7 @@ pub fn generatorResumeAbrupt(
     // 6. Let methodContext be the running execution context.
     const method_context = agent.runningExecutionContext();
 
-    // TODO: 7. Suspend methodContext.
+    // 7. Suspend methodContext.
 
     // 8. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;

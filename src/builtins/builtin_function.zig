@@ -104,10 +104,7 @@ pub fn builtinCallOrConstruct(
     new_target: ?*Object,
 ) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.
-    const caller_context = agent.runningExecutionContext();
-
-    // TODO: 2. If callerContext is not already suspended, suspend callerContext.
-    _ = caller_context;
+    // 2. If callerContext is not already suspended, suspend callerContext.
 
     // 3. Let calleeContext be a new execution context.
     const callee_context = try agent.gc_allocator.create(ExecutionContext);

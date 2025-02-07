@@ -431,7 +431,7 @@ fn prepareForOrdinaryCall(
         },
     };
 
-    // TODO: 11. If callerContext is not already suspended, suspend callerContext.
+    // 11. If callerContext is not already suspended, suspend callerContext.
 
     // 12. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, callee_context);

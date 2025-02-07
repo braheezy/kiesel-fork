@@ -521,7 +521,7 @@ pub fn asyncGeneratorResume(
     // 3. Let callerContext be the running execution context.
     const caller_context = agent.runningExecutionContext();
 
-    // TODO: 4. Suspend callerContext.
+    // 4. Suspend callerContext.
 
     // 5. Set generator.[[AsyncGeneratorState]] to executing.
     generator.fields.async_generator_state = .executing;

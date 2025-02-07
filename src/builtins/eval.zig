@@ -120,7 +120,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 18. If strictEval is true, set varEnv to lexEnv.
     if (strict_eval) variable_environment = lexical_environment;
 
-    // TODO: 19. If runningContext is not already suspended, suspend runningContext.
+    // 19. If runningContext is not already suspended, suspend runningContext.
 
     // 20. Let evalContext be a new ECMAScript code execution context.
     const eval_context = try agent.gc_allocator.create(ExecutionContext);
@@ -176,7 +176,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 31. Suspend evalContext and remove it from the execution context stack.
     _ = agent.execution_context_stack.pop();
 
-    // TODO: 32. Resume the context that is now on the top of the execution context stack as the running
+    // 32. Resume the context that is now on the top of the execution context stack as the running
     //     execution context.
 
     // 33. Return ? result.
