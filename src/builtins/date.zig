@@ -528,10 +528,10 @@ pub fn parseDateTimeString(string: *const String) f64 {
         if (parser.consume() != ':') return invalid;
         const minute = parser.consumeDigits(Minute, 2) orelse return invalid;
         if (minute > 59) return invalid;
-        if ((parser.consume() orelse break :blk .{ hour, minute, 0, 0 }) != ':') return invalid;
+        if (parser.consume() != ':') break :blk .{ hour, minute, 0, 0 };
         const second = parser.consumeDigits(Second, 2) orelse return invalid;
         if (second > 59) return invalid;
-        if ((parser.consume() orelse break :blk .{ hour, minute, second, 0 }) != '.') return invalid;
+        if (parser.consume() != '.') break :blk .{ hour, minute, second, 0 };
         const millisecond = parser.consumeDigits(Millisecond, 3) orelse return invalid;
         break :blk .{ hour, minute, second, millisecond };
     };
