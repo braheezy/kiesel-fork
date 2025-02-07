@@ -113,7 +113,7 @@ pub const Generator = MakeObject(.{
         generator_state: State,
 
         /// [[GeneratorContext]]
-        generator_context: ExecutionContext,
+        generator_context: *ExecutionContext,
 
         // Non-standard
         evaluation_state: struct {
@@ -235,7 +235,7 @@ pub fn generatorStart(
     };
 
     // 6. Set generator.[[GeneratorContext]] to genContext.
-    generator.fields.generator_context = generator_context.*;
+    generator.fields.generator_context = generator_context;
 
     // 7. Return unused.
 }
@@ -304,11 +304,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
 
     // 10. Assert: When we return here, genContext has already been removed from the execution
     //     context stack and methodContext is the currently running execution context.
-    // TODO: This may not be valid, the pointer can change if the execution context stack is resized.
-    //       For this to work we need to either heap-allocate execution contexts so they have a
-    //       stable pointer or otherwise give them a unique ID.
-    // std.debug.assert(method_context == agent.runningExecutionContext());
-    _ = method_context;
+    std.debug.assert(method_context == agent.runningExecutionContext());
 
     // 11. Return ? result.
     return result;
@@ -384,11 +380,7 @@ pub fn generatorResumeAbrupt(
 
     // 11. Assert: When we return here, genContext has already been removed from the execution
     //     context stack and methodContext is the currently running execution context.
-    // TODO: This may not be valid, the pointer can change if the execution context stack is resized.
-    //       For this to work we need to either heap-allocate execution contexts so they have a
-    //       stable pointer or otherwise give them a unique ID.
-    // std.debug.assert(method_context == agent.runningExecutionContext());
-    _ = method_context;
+    std.debug.assert(method_context == agent.runningExecutionContext());
 
     // 12. Return ? result.
     return result;

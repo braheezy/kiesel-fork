@@ -407,7 +407,8 @@ fn prepareForOrdinaryCall(
     const local_env = try newFunctionEnvironment(agent.gc_allocator, function, new_target);
 
     // 2. Let calleeContext be a new ECMAScript code execution context.
-    const callee_context: ExecutionContext = .{
+    const callee_context = try agent.gc_allocator.create(ExecutionContext);
+    callee_context.* = .{
         // 3. Set the Function of calleeContext to F.
         .function = &function.object,
 
@@ -437,7 +438,7 @@ fn prepareForOrdinaryCall(
 
     // 13. NOTE: Any exception objects produced after this point are associated with calleeRealm.
     // 14. Return calleeContext.
-    return &agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1];
+    return callee_context;
 }
 
 /// 10.2.1.2 OrdinaryCallBindThis ( F, calleeContext, thisArgument )

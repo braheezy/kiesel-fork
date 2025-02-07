@@ -110,7 +110,8 @@ pub fn builtinCallOrConstruct(
     _ = caller_context;
 
     // 3. Let calleeContext be a new execution context.
-    const callee_context: ExecutionContext = .{
+    const callee_context = try agent.gc_allocator.create(ExecutionContext);
+    callee_context.* = .{
         // 4. Set the Function of calleeContext to F.
         .function = &builtin_function.object,
 

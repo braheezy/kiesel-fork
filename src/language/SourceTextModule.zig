@@ -57,7 +57,7 @@ namespace: ?*Object,
 ecmascript_code: ast.Module,
 
 /// [[Context]]
-context: ?ExecutionContext,
+context: ?*ExecutionContext,
 
 /// [[ImportMeta]]
 import_meta: ?*Object,
@@ -1589,7 +1589,8 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     }
 
     // 8. Let moduleContext be a new ECMAScript code execution context.
-    const module_context: ExecutionContext = .{
+    const module_context = try agent.gc_allocator.create(ExecutionContext);
+    module_context.* = .{
         // 9. Set the Function of moduleContext to null.
         .function = null,
 
@@ -1725,7 +1726,8 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
     const agent = self.realm.agent;
 
     // 1. Let moduleContext be a new ECMAScript code execution context.
-    const module_context: ExecutionContext = .{
+    const module_context = try agent.gc_allocator.create(ExecutionContext);
+    module_context.* = .{
         // 2. Set the Function of moduleContext to null.
         .function = null,
 

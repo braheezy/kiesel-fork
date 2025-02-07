@@ -265,7 +265,7 @@ pub const AsyncGenerator = MakeObject(.{
         async_generator_state: State,
 
         /// [[AsyncGeneratorContext]]
-        async_generator_context: ExecutionContext,
+        async_generator_context: *ExecutionContext,
 
         /// [[AsyncGeneratorQueue]]
         async_generator_queue: std.ArrayListUnmanaged(AsyncGeneratorRequest),
@@ -397,7 +397,7 @@ pub fn asyncGeneratorStart(
     };
 
     // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
-    generator.fields.async_generator_context = generator_context.*;
+    generator.fields.async_generator_context = generator_context;
 
     // 7. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
     generator.fields.async_generator_queue = .empty;
@@ -542,11 +542,7 @@ pub fn asyncGeneratorResume(
 
     // 9. Assert: When we return here, genContext has already been removed from the execution
     //    context stack and callerContext is the currently running execution context.
-    // TODO: This may not be valid, the pointer can change if the execution context stack is resized.
-    //       For this to work we need to either heap-allocate execution contexts so they have a
-    //       stable pointer or otherwise give them a unique ID.
-    // std.debug.assert(caller_context == agent.runningExecutionContext());
-    _ = caller_context;
+    std.debug.assert(caller_context == agent.runningExecutionContext());
 
     // 10. Return unused.
 }

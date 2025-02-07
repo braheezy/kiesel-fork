@@ -85,7 +85,8 @@ pub fn initializeHostDefinedRealm(
     };
 
     // 5. Let newContext be a new execution context.
-    const new_context: ExecutionContext = .{
+    const new_context = try agent.gc_allocator.create(ExecutionContext);
+    new_context.* = .{
         // 6. Set the Function of newContext to null.
         .function = null,
 

@@ -123,7 +123,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // TODO: 19. If runningContext is not already suspended, suspend runningContext.
 
     // 20. Let evalContext be a new ECMAScript code execution context.
-    const eval_context: ExecutionContext = .{
+    const eval_context = try agent.gc_allocator.create(ExecutionContext);
+    eval_context.* = .{
         // 21. Set evalContext's Function to null.
         .function = null,
 

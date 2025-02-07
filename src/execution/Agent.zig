@@ -37,7 +37,7 @@ exception: ?Value = null,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
-execution_context_stack: std.ArrayListUnmanaged(ExecutionContext),
+execution_context_stack: std.ArrayListUnmanaged(*ExecutionContext),
 queued_jobs: std.ArrayListUnmanaged(QueuedJob),
 empty_shape: *Object.Shape,
 platform: Platform,
@@ -202,7 +202,7 @@ pub fn runningExecutionContext(self: Agent) *ExecutionContext {
     // executing code. This is known as the agent's running execution context.
     // The running execution context is always the top element of this stack.
     std.debug.assert(self.execution_context_stack.items.len > 0);
-    return &self.execution_context_stack.items[self.execution_context_stack.items.len - 1];
+    return self.execution_context_stack.items[self.execution_context_stack.items.len - 1];
 }
 
 /// https://tc39.es/ecma262/#current-realm
@@ -229,7 +229,7 @@ pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
     //    ScriptOrModule component is not null.
     // 3. If no such execution context exists, return null. Otherwise, return ec's ScriptOrModule.
     var it = std.mem.reverseIterator(self.execution_context_stack.items);
-    while (it.nextPtr()) |execution_context| {
+    while (it.next()) |execution_context| {
         if (execution_context.script_or_module) |script_or_module|
             return script_or_module;
     }
