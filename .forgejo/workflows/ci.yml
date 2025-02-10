@@ -68,6 +68,10 @@ jobs:
           # TODO: Intl is disabled for now as rustc claims std can't be built for the target
           zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
+      - name: Build kiesel-linux-s390x
+        run: |
+          zig build -Dtarget=s390x-linux-musl -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-s390x
       - name: Build kiesel-linux-x86
         run: |
           zig build -Dtarget=x86-linux-musl -Doptimize=ReleaseSafe
