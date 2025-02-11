@@ -41,16 +41,16 @@
             .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
         },
         .stackinfo = .{
-            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/ce87f2e0190e6dc6f3266519783b76eec4923f26.tar.gz",
-            .hash = "122011adf14a4d9690f521665bb3623ef6a063fc409ef6dbea9eafe0442b2e500d1c",
+            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/d48774270e354d3b89576b23294a8cd001a9d50b.tar.gz",
+            .hash = "122069482f7c57b8eccbe6f4666f16cd8225e57251c235c788fa022eb7f99df8fb23",
         },
         .unicode_id = .{
             .url = "https://codeberg.org/injuly/unicode-id/archive/10e8dfae849b3e550529de663f71ae8e49e5bde8.tar.gz",
             .hash = "1220d21683f2d62b7488ca640c79cd3004cef4b7a369c8193882aec78ddb196410de",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/143afe33f43a433b829fb4619039d21ed2345d9a.tar.gz",
-            .hash = "1220f323c3f027438a8dd69c113d3eebb88e6b13c779243ad15eaf7d4105eb45ea03",
+            .url = "https://github.com/alimpfard/zigline/archive/8b4d0fec9f4ed50bef6e94826548f087af68bf66.tar.gz",
+            .hash = "1220ad280d071280e247e5f8c7dea6c16523cb69be1db62f8fd1860cff32d5ebed64",
         },
     },
     .paths = .{
