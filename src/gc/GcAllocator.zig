@@ -9,22 +9,23 @@ const libgc = @import("../c/libgc.zig").libgc;
 pub const vtable: std.mem.Allocator.VTable = .{
     .alloc = alloc,
     .resize = resize,
+    .remap = remap,
     .free = free,
 };
 
 fn getHeader(ptr: [*]u8) *[*]u8 {
-    return @as(*[*]u8, @ptrFromInt(@intFromPtr(ptr) - @sizeOf(usize)));
+    return @alignCast(@ptrCast(ptr - @sizeOf(usize)));
 }
 
-fn alignedAlloc(len: usize, log2_align: u8) ?[*]u8 {
-    const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
+fn alignedAlloc(len: usize, alignment: std.mem.Alignment) ?[*]u8 {
+    const alignment_bytes = alignment.toByteUnits();
 
     // Thin wrapper around regular malloc, overallocate to account for
     // alignment padding and store the original malloc()'ed pointer before
     // the aligned address.
-    const unaligned_ptr = @as([*]u8, @ptrCast(libgc.GC_malloc(len + alignment - 1 + @sizeOf(usize)) orelse return null));
+    const unaligned_ptr = @as([*]u8, @ptrCast(libgc.GC_malloc(len + alignment_bytes - 1 + @sizeOf(usize)) orelse return null));
     const unaligned_addr = @intFromPtr(unaligned_ptr);
-    const aligned_addr = std.mem.alignForward(usize, unaligned_addr + @sizeOf(usize), alignment);
+    const aligned_addr = std.mem.alignForward(usize, unaligned_addr + @sizeOf(usize), alignment_bytes);
     const aligned_ptr = unaligned_ptr + (aligned_addr - unaligned_addr);
     getHeader(aligned_ptr).* = unaligned_ptr;
 
@@ -45,22 +46,22 @@ pub fn alignedAllocSize(ptr: [*]u8) usize {
 fn alloc(
     _: *anyopaque,
     len: usize,
-    log2_align: u8,
+    alignment: std.mem.Alignment,
     return_address: usize,
 ) ?[*]u8 {
     _ = return_address;
     std.debug.assert(len > 0);
-    return alignedAlloc(len, log2_align);
+    return alignedAlloc(len, alignment);
 }
 
 fn resize(
     _: *anyopaque,
     buf: []u8,
-    log2_buf_align: u8,
+    alignment: std.mem.Alignment,
     new_len: usize,
     return_address: usize,
 ) bool {
-    _ = log2_buf_align;
+    _ = alignment;
     _ = return_address;
     if (new_len <= buf.len) {
         return true;
@@ -72,13 +73,23 @@ fn resize(
     return false;
 }
 
+fn remap(
+    context: *anyopaque,
+    memory: []u8,
+    alignment: std.mem.Alignment,
+    new_len: usize,
+    return_address: usize,
+) ?[*]u8 {
+    return if (resize(context, memory, alignment, new_len, return_address)) memory.ptr else null;
+}
+
 fn free(
     _: *anyopaque,
     buf: []u8,
-    log2_buf_align: u8,
+    alignment: std.mem.Alignment,
     return_address: usize,
 ) void {
-    _ = log2_buf_align;
+    _ = alignment;
     _ = return_address;
     alignedFree(buf.ptr);
 }
