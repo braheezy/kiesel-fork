@@ -76,12 +76,12 @@ pub fn main() std.os.uefi.Status {
             .currentTime = std.time.milliTimestamp,
         },
     }) catch |err| switch (err) {
-        error.OutOfMemory => return .OutOfResources,
+        error.OutOfMemory => return .out_of_resources,
     };
     defer agent.deinit();
 
     Realm.initializeHostDefinedRealm(&agent, .{}) catch |err| switch (err) {
-        error.OutOfMemory => return .OutOfResources,
+        error.OutOfMemory => return .out_of_resources,
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
@@ -128,20 +128,20 @@ pub fn main() std.os.uefi.Status {
                     .syntax_error,
                     "{}",
                     .{fmtParseError(parse_error)},
-                ) catch return .OutOfResources;
+                ) catch return .out_of_resources;
                 stderr.print(
                     "Uncaught exception: {pretty}\n",
                     .{Value.from(syntax_error)},
                 ) catch unreachable;
                 continue;
             },
-            error.OutOfMemory => return .OutOfResources,
+            error.OutOfMemory => return .out_of_resources,
         };
 
         if (script.evaluate()) |result| {
             stdout.print("{pretty}\n", .{result}) catch unreachable;
         } else |err| switch (err) {
-            error.OutOfMemory => return .OutOfResources,
+            error.OutOfMemory => return .out_of_resources,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 stderr.print("Uncaught exception: {pretty}\n", .{exception}) catch unreachable;
@@ -149,5 +149,5 @@ pub fn main() std.os.uefi.Status {
         }
     }
 
-    return .Success;
+    return .success;
 }
