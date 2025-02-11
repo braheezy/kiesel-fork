@@ -76,7 +76,7 @@ fn interceptContinueAndBreakJumps(
     try @call(.always_inline, codegenFn, args);
     const skip_jump = try executable.addInstructionDeferred(.jump);
     if (ctx.continue_jumps.items.len != 0) {
-        while (ctx.continue_jumps.popOrNull()) |jump_index| {
+        while (ctx.continue_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
         try @call(.always_inline, codegenFn, args);
@@ -84,7 +84,7 @@ fn interceptContinueAndBreakJumps(
         try ctx.continue_jumps.append(executable.allocator, jump_index);
     }
     if (ctx.break_jumps.items.len != 0) {
-        while (ctx.break_jumps.popOrNull()) |jump_index| {
+        while (ctx.break_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
         try @call(.always_inline, codegenFn, args);
@@ -95,7 +95,7 @@ fn interceptContinueAndBreakJumps(
     while (labelled_continue_jumps_it.next()) |value_ptr| {
         const labelled_continue_jumps = value_ptr.*;
         if (labelled_continue_jumps.items.len != 0) {
-            while (labelled_continue_jumps.popOrNull()) |jump_index| {
+            while (labelled_continue_jumps.pop()) |jump_index| {
                 jump_index.getPtr().* = try executable.nextInstructionIndex();
             }
             try @call(.always_inline, codegenFn, args);
@@ -107,7 +107,7 @@ fn interceptContinueAndBreakJumps(
     while (labelled_break_jumps_it.next()) |value_ptr| {
         const labelled_break_jumps = value_ptr.*;
         if (labelled_break_jumps.items.len != 0) {
-            while (labelled_break_jumps.popOrNull()) |jump_index| {
+            while (labelled_break_jumps.pop()) |jump_index| {
                 jump_index.getPtr().* = try executable.nextInstructionIndex();
             }
             try @call(.always_inline, codegenFn, args);
@@ -2541,19 +2541,19 @@ pub fn codegenDoWhileStatement(
     };
     try executable.addInstruction(.store, {});
 
-    while (ctx.continue_jumps.popOrNull()) |jump_index| {
+    while (ctx.continue_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = continue_index;
     }
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    while (ctx.break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
-        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+        while (labelled_continue_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
-        while (labelled_break_jumps.popOrNull()) |jump_index| {
+        while (labelled_break_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
@@ -2602,19 +2602,19 @@ pub fn codegenWhileStatement(
     jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
     try executable.addInstruction(.store, {});
 
-    while (ctx.continue_jumps.popOrNull()) |jump_index| {
+    while (ctx.continue_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = continue_index;
     }
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    while (ctx.break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
-        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+        while (labelled_continue_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
-        while (labelled_break_jumps.popOrNull()) |jump_index| {
+        while (labelled_break_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
@@ -2744,19 +2744,19 @@ pub fn codegenForStatement(
     if (node.test_expression != null) end_jump.getPtr().* = try executable.nextInstructionIndex();
     try executable.addInstruction(.store, {});
 
-    while (ctx.continue_jumps.popOrNull()) |jump_index| {
+    while (ctx.continue_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = continue_index;
     }
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    while (ctx.break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
-        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+        while (labelled_continue_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
-        while (labelled_break_jumps.popOrNull()) |jump_index| {
+        while (labelled_break_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
@@ -3075,19 +3075,19 @@ fn forInOfBodyEvaluation(
 
     try executable.addInstruction(.store, {});
 
-    while (ctx.continue_jumps.popOrNull()) |jump_index| {
+    while (ctx.continue_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = continue_index;
     }
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    while (ctx.break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     if (ctx.current_label) |label| {
         const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
-        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+        while (labelled_continue_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = continue_index;
         }
         const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
-        while (labelled_break_jumps.popOrNull()) |jump_index| {
+        while (labelled_break_jumps.pop()) |jump_index| {
             jump_index.getPtr().* = try executable.nextInstructionIndex();
         }
     }
@@ -3374,7 +3374,7 @@ pub fn codegenSwitchStatement(
     // 7. Let R be Completion(CaseBlockEvaluation of CaseBlock with argument switchValue).
     try caseBlockEvaluation(executable, ctx, node.case_block);
 
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    while (ctx.break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
 
@@ -3444,7 +3444,7 @@ pub fn codegenLabelledStatement(
     // Only codegen for iterable statements drains the labelled break/continue jumps, there may be
     // more from other kinds of statements. This doesn't apply to labelled continue jumps which are
     // only valid in iterable statements anyway.
-    while (labelled_break_jumps.popOrNull()) |jump_index| {
+    while (labelled_break_jumps.pop()) |jump_index| {
         jump_index.getPtr().* = try executable.nextInstructionIndex();
     }
     std.debug.assert(labelled_continue_jumps.items.len == 0);

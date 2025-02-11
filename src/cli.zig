@@ -161,7 +161,7 @@ const Kiesel = struct {
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
-        _ = agent.execution_context_stack.pop();
+        _ = agent.execution_context_stack.pop().?;
         try initializeGlobalObject(realm, realm.global_object);
         return Value.from(realm.global_object);
     }

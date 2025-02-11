@@ -268,9 +268,9 @@ pub fn remove(
     try self.migrateStorageIfNeeded(allocator, index, null);
     switch (self.storage) {
         .none => {},
-        .dense_i32 => |*dense_i32| _ = dense_i32.pop(),
-        .dense_f64 => |*dense_f64| _ = dense_f64.pop(),
-        .dense_value => |*dense_value| _ = dense_value.pop(),
+        .dense_i32 => |*dense_i32| _ = dense_i32.pop().?,
+        .dense_f64 => |*dense_f64| _ = dense_f64.pop().?,
+        .dense_value => |*dense_value| _ = dense_value.pop().?,
         .sparse => |*sparse| {
             const removed = sparse.remove(index);
             std.debug.assert(removed);

@@ -357,7 +357,7 @@ pub fn asyncGeneratorStart(
             // f. Remove acGenContext from the execution context stack and restore the execution
             //    context that is at the top of the execution context stack as the running
             //    execution context.
-            _ = agent_.execution_context_stack.pop();
+            _ = agent_.execution_context_stack.pop().?;
 
             // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
             closure_generator.fields.async_generator_state = .draining_queue;
@@ -618,7 +618,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
 
         // b. Remove genContext from the execution context stack and restore the execution context
         //    that is at the top of the execution context stack as the running execution context.
-        _ = agent.execution_context_stack.pop();
+        _ = agent.execution_context_stack.pop().?;
 
         // c. Let callerContext be the running execution context.
         // d. Resume callerContext passing undefined. If genContext is ever resumed again, let

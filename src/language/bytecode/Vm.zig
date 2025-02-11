@@ -102,7 +102,7 @@ fn fetchInstructionTag(self: *Vm, executable: Executable) Instruction.Tag {
 }
 
 fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
-    const value = self.stack.pop();
+    const value = self.stack.pop().?;
     if (value.isUndefined()) return &.{};
     const array = value.asObject();
     const len = getArrayLength(array);
@@ -122,7 +122,7 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     const argument_spread_indices = try self.getArgumentSpreadIndices();
     defer self.agent.gc_allocator.free(argument_spread_indices);
     for (0..argument_count) |i| {
-        const argument = self.stack.pop();
+        const argument = self.stack.pop().?;
         if (std.mem.indexOfScalar(usize, argument_spread_indices, argument_count - i - 1) == null) {
             try self.function_arguments.insert(self.agent.gc_allocator, 0, argument);
         } else {
@@ -142,8 +142,8 @@ fn executeArrayCreate(self: *Vm, length: u16, _: Executable) Agent.Error!void {
 }
 
 fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
-    const init_value = self.stack.pop();
-    const array = self.stack.pop().asObject();
+    const init_value = self.stack.pop().?;
+    const array = self.stack.pop().?.asObject();
     const index = getArrayLength(array);
     // From ArrayAccumulation:
     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
@@ -162,8 +162,8 @@ fn executeArraySetLength(self: *Vm, length: u16, _: Executable) Agent.Error!void
 }
 
 fn executeArraySetValueDirect(self: *Vm, index: u16, _: Executable) Agent.Error!void {
-    const value = self.stack.pop();
-    const array = self.stack.pop().asObject();
+    const value = self.stack.pop().?;
+    const array = self.stack.pop().?.asObject();
     try array.property_storage.indexed_properties.set(self.agent.gc_allocator, index, .{
         .value_or_accessor = .{
             .value = value,
@@ -174,12 +174,12 @@ fn executeArraySetValueDirect(self: *Vm, index: u16, _: Executable) Agent.Error!
 }
 
 fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
-    const array = self.stack.pop().asObject();
+    const array = self.stack.pop().?.asObject();
     var next_index: u53 = @intCast(getArrayLength(array));
 
     // From ArrayAccumulation:
     // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-    var iterator = self.iterator_stack.pop();
+    var iterator = self.iterator_stack.pop().?;
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
@@ -202,8 +202,8 @@ fn executeAwait(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorAdd(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -229,8 +229,8 @@ fn executeBinaryOperatorAdd(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorSub(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -248,8 +248,8 @@ fn executeBinaryOperatorSub(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorMul(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -267,8 +267,8 @@ fn executeBinaryOperatorMul(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorDiv(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -280,22 +280,22 @@ fn executeBinaryOperatorDiv(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorMod(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"%", r_val);
 }
 
 fn executeBinaryOperatorExp(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"**", r_val);
 }
 
 fn executeBinaryOperatorLeftShift(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -308,8 +308,8 @@ fn executeBinaryOperatorLeftShift(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorRightShift(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -322,8 +322,8 @@ fn executeBinaryOperatorRightShift(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorUnsignedRightShift(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -336,8 +336,8 @@ fn executeBinaryOperatorUnsignedRightShift(self: *Vm, _: Executable) Agent.Error
 }
 
 fn executeBinaryOperatorBitwiseAnd(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -349,8 +349,8 @@ fn executeBinaryOperatorBitwiseAnd(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorBitwiseOr(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -362,8 +362,8 @@ fn executeBinaryOperatorBitwiseOr(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeBinaryOperatorBitwiseXor(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
@@ -567,7 +567,7 @@ fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
 /// https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
 fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
     // NOTE: 1-2. are part of the generated bytecode.
-    const reference = self.reference_stack.pop();
+    const reference = self.reference_stack.pop().?;
 
     // 3. If IsUnresolvableReference(ref) is true, then
     if (reference.isUnresolvableReference()) {
@@ -642,8 +642,8 @@ fn executeDupReference(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeEvaluateCall(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
-    const this_value = self.stack.pop();
-    const function = self.stack.pop();
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
 
     self.result = try evaluateCall(
         self.agent,
@@ -660,8 +660,8 @@ fn executeEvaluateCallDirectEval(
     _: Executable,
 ) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
-    const this_value = self.stack.pop();
-    const function = self.stack.pop();
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
 
     const realm = self.agent.currentRealm();
     const eval = try realm.intrinsics.@"%eval%"();
@@ -697,7 +697,7 @@ fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
 
     // 3. Let argRef be ? Evaluation of AssignmentExpression.
     // 4. Let specifier be ? GetValue(argRef).
-    const specifier = self.stack.pop();
+    const specifier = self.stack.pop().?;
 
     // 5. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
@@ -727,7 +727,7 @@ fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeEvaluateNew(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
     const arguments = try self.getArguments(argument_count);
-    const constructor = self.stack.pop();
+    const constructor = self.stack.pop().?;
     self.result = try evaluateNew(self.agent, constructor, arguments);
 }
 
@@ -740,9 +740,9 @@ fn executeEvaluatePropertyAccessWithExpressionKey(
 ) Agent.Error!void {
     // 1. Let propertyNameReference be ? Evaluation of expression.
     // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
-    const property_name_value = self.stack.pop();
+    const property_name_value = self.stack.pop().?;
 
-    const base_value = self.stack.pop();
+    const base_value = self.stack.pop().?;
 
     // 3. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
     //    immediately after this step. However, in the case of a[b] = c, it will not be
@@ -766,8 +766,8 @@ fn executeEvaluatePropertyAccessWithExpressionKey(
 fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm, _: Executable) Agent.Error!void {
     // Combines executeEvaluatePropertyAccessWithExpressionKey() and Reference.getValue(), entirely
     // bypassing the creation of a reference.
-    const property_name_value = self.stack.pop();
-    const base_value = self.stack.pop();
+    const property_name_value = self.stack.pop().?;
+    const base_value = self.stack.pop().?;
     const base_object = switch (base_value.type()) {
         .object => base_value.asObject(),
         .string => blk: {
@@ -811,7 +811,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(
     const property_name_string = executable.getIdentifier(identifier_name_index);
 
     const lookup_cache_entry = executable.getPropertyLookupCacheEntry(property_name_lookup_cache_index);
-    const base_value = self.stack.pop();
+    const base_value = self.stack.pop().?;
 
     // 2. Return the Reference Record {
     //      [[Base]]: baseValue,
@@ -841,7 +841,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
     // bypassing the creation of a reference.
     const property_name_string = executable.getIdentifier(identifier_name_index);
     const lookup_cache_entry = executable.getPropertyLookupCacheEntry(property_name_lookup_cache_index);
-    const base_value = self.stack.pop();
+    const base_value = self.stack.pop().?;
 
     const base_object = switch (base_value.type()) {
         .object => base_value.asObject(),
@@ -1062,13 +1062,13 @@ fn executeGetTemplateObject(
 }
 
 fn executeGetValue(self: *Vm, _: Executable) Agent.Error!void {
-    const reference = self.reference_stack.pop();
+    const reference = self.reference_stack.pop().?;
     self.result = try reference.getValue(self.agent);
 }
 
 fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1088,8 +1088,8 @@ fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1114,7 +1114,7 @@ fn executeHasPrivateElement(
     executable: Executable,
 ) Agent.Error!void {
     const private_identifier = executable.getIdentifier(private_identifier_index);
-    const r_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
 
     // 4. If rVal is not an Object, throw a TypeError exception.
     if (!r_val.isObject()) {
@@ -1140,8 +1140,8 @@ fn executeHasPrivateElement(
 }
 
 fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // 5. If rVal is not an Object, throw a TypeError exception.
     if (!r_val.isObject()) {
@@ -1182,7 +1182,7 @@ fn executeInitializeBoundName(
     executable: Executable,
 ) Agent.Error!void {
     const name = executable.getIdentifier(name_index);
-    const value = self.stack.pop();
+    const value = self.stack.pop().?;
     const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
     try initializeBoundName(
         self.agent,
@@ -1193,14 +1193,14 @@ fn executeInitializeBoundName(
 }
 
 fn executeInitializeReferencedBinding(self: *Vm, _: Executable) Agent.Error!void {
-    const reference = self.reference_stack.pop();
+    const reference = self.reference_stack.pop().?;
     const value = self.result.?;
     try reference.initializeReferencedBinding(self.agent, value);
 }
 
 fn executeInstanceofOperator(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // 5. Return ? InstanceofOperator(lVal, rVal).
     self.result = Value.from(try l_val.instanceofOperator(self.agent, r_val));
@@ -1291,8 +1291,8 @@ fn executeInstantiateOrdinaryFunctionExpression(
 }
 
 fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1309,8 +1309,8 @@ fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1341,8 +1341,8 @@ fn executeJumpConditional(
 }
 
 fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1362,8 +1362,8 @@ fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
+    const r_val = self.stack.pop().?;
+    const l_val = self.stack.pop().?;
 
     // OPTIMIZATION: Fast path for number values
     if (l_val.isNumber() and r_val.isNumber()) {
@@ -1403,13 +1403,13 @@ fn executeLoadAndClearException(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeLoadIteratorNextArgs(self: *Vm, _: Executable) Agent.Error!void {
-    const iterator = self.iterator_stack.pop();
+    const iterator = self.iterator_stack.pop().?;
     try self.stack.append(self.agent.gc_allocator, iterator.next_method);
     try self.stack.append(self.agent.gc_allocator, Value.from(iterator.iterator));
 }
 
 fn executeLoadThisValueForEvaluateCall(self: *Vm, _: Executable) Agent.Error!void {
-    const reference = self.reference_stack.pop();
+    const reference = self.reference_stack.pop().?;
     const this_value = evaluateCallGetThisValue(reference);
     try self.stack.append(self.agent.gc_allocator, this_value);
 }
@@ -1437,7 +1437,7 @@ fn executeMakePrivateReference(
     executable: Executable,
 ) Agent.Error!void {
     const private_identifier = executable.getIdentifier(private_identifier_index);
-    const base_value = self.stack.pop();
+    const base_value = self.stack.pop().?;
 
     // 1. Let privateEnv be the running execution context's PrivateEnvironment.
     // 2. Assert: privateEnv is not null.
@@ -1468,7 +1468,7 @@ fn executeMakePrivateReferenceDirect(
     // Combines executeMakePrivateReference() and Reference.getValue(), entirely bypassing the
     // creation of a reference.
     const private_identifier = executable.getIdentifier(private_identifier_index);
-    const base_value = self.stack.pop();
+    const base_value = self.stack.pop().?;
     const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
     const private_name = private_env.resolvePrivateIdentifier(
         try private_identifier.toUtf8(self.agent.gc_allocator),
@@ -1485,8 +1485,8 @@ fn executeMakePrivateReferenceDirect(
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
 /// https://tc39.es/ecma262/#sec-makesuperpropertyreference
 fn executeMakeSuperPropertyReference(self: *Vm, strict: bool, _: Executable) Agent.Error!void {
-    const property_key = self.stack.pop();
-    const actual_this = self.stack.pop();
+    const property_key = self.stack.pop().?;
+    const actual_this = self.stack.pop().?;
 
     // 1. Let env be GetThisEnvironment().
     const env = self.agent.getThisEnvironment();
@@ -1536,8 +1536,8 @@ fn executeObjectDefineMethod(
             }),
         ),
     };
-    const property_name = self.stack.pop();
-    const object = self.stack.pop().asObject();
+    const property_name = self.stack.pop().?;
+    const object = self.stack.pop().?.asObject();
     _ = try methodDefinitionEvaluation(
         self.agent,
         .{ .property_name = property_name, .method = method },
@@ -1548,9 +1548,9 @@ fn executeObjectDefineMethod(
 }
 
 fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
-    const property_value = self.stack.pop();
-    const property_name = try self.stack.pop().toPropertyKey(self.agent);
-    const object = self.stack.pop().asObject();
+    const property_value = self.stack.pop().?;
+    const property_name = try self.stack.pop().?.toPropertyKey(self.agent);
+    const object = self.stack.pop().?.asObject();
     // From PropertyDefinitionEvaluation:
     // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
     object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
@@ -1558,8 +1558,8 @@ fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeObjectSetPrototype(self: *Vm, _: Executable) Agent.Error!void {
-    const property_value = self.stack.pop();
-    const object = self.stack.pop().asObject();
+    const property_value = self.stack.pop().?;
+    const object = self.stack.pop().?.asObject();
     // From PropertyDefinitionEvaluation:
     // a. If propValue is an Object or propValue is null, then
     if (property_value.isObject() or property_value.isNull()) {
@@ -1575,8 +1575,8 @@ fn executeObjectSetPrototype(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeObjectSpreadValue(self: *Vm, _: Executable) Agent.Error!void {
-    const from_value = self.stack.pop();
-    var object = self.stack.pop().asObject();
+    const from_value = self.stack.pop().?;
+    var object = self.stack.pop().?.asObject();
     const excluded_names: []const PropertyKey = &.{};
     // From PropertyDefinitionEvaluation:
     // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
@@ -1585,19 +1585,19 @@ fn executeObjectSpreadValue(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executePopExceptionJumpTarget(self: *Vm, _: Executable) Agent.Error!void {
-    _ = self.exception_jump_target_stack.pop();
+    _ = self.exception_jump_target_stack.pop().?;
 }
 
 fn executePopIterator(self: *Vm, _: Executable) Agent.Error!void {
-    _ = self.iterator_stack.pop();
+    _ = self.iterator_stack.pop().?;
 }
 
 fn executePopLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
-    _ = self.lexical_environment_stack.pop();
+    _ = self.lexical_environment_stack.pop().?;
 }
 
 fn executePopReference(self: *Vm, _: Executable) Agent.Error!void {
-    _ = self.reference_stack.pop();
+    _ = self.reference_stack.pop().?;
 }
 
 fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
@@ -1614,14 +1614,14 @@ fn executePushExceptionJumpTarget(
 }
 
 fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
-    const l_ref = self.reference_stack.pop();
+    const l_ref = self.reference_stack.pop().?;
     const r_val = self.result.?;
     try l_ref.putValue(self.agent, r_val);
 }
 
 fn executeRegExpCreate(self: *Vm, _: Executable) Agent.Error!void {
-    const flags = self.stack.pop();
-    const pattern = self.stack.pop();
+    const flags = self.stack.pop().?;
+    const pattern = self.stack.pop().?;
     self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
 }
 
@@ -1720,7 +1720,7 @@ fn executeReturn(_: *Vm, _: Executable) Agent.Error!void {
 
 fn executeStore(self: *Vm, _: Executable) Agent.Error!void {
     // Handle empty stack to allow restoring a null `.load`
-    self.result = self.stack.popOrNull();
+    self.result = self.stack.pop();
 }
 
 fn executeStoreConstant(

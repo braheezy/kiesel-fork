@@ -372,7 +372,7 @@ fn call(
 
         // c. Remove calleeContext from the execution context stack and restore callerContext as
         //    the running execution context.
-        _ = agent.execution_context_stack.pop();
+        _ = agent.execution_context_stack.pop().?;
 
         // d. Return ThrowCompletion(error).
         return err;
@@ -385,7 +385,7 @@ fn call(
     const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
 
     // 7. Remove calleeContext from the execution context stack and restore callerContext as the running execution context.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 8. If result is a return completion, return result.[[Value]].
     // 9. Assert: result is a throw completion.
@@ -715,7 +715,7 @@ fn construct(
         initialize_result catch |err| {
             // i. Remove calleeContext from the execution context stack and restore callerContext
             //    as the running execution context.
-            _ = agent.execution_context_stack.pop();
+            _ = agent.execution_context_stack.pop().?;
 
             // ii. Return ? initializeResult.
             return err;
@@ -730,7 +730,7 @@ fn construct(
 
     // 9. Remove calleeContext from the execution context stack and restore callerContext as the
     //    running execution context.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 10. If result is a throw completion, then
     //     a. Return ? result.

@@ -125,7 +125,7 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     } else |err| err;
 
     // 14. Suspend scriptContext and remove it from the execution context stack.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 15. Assert: The execution context stack is not empty.
     std.debug.assert(agent.execution_context_stack.items.len > 0);

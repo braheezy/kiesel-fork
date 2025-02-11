@@ -174,7 +174,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     } else |err| err;
 
     // 31. Suspend evalContext and remove it from the execution context stack.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 32. Resume the context that is now on the top of the execution context stack as the running
     //     execution context.

@@ -177,7 +177,7 @@ pub fn asyncBlockStart(
             // e. Remove acAsyncContext from the execution context stack and restore the execution
             //    context that is at the top of the execution context stack as the running execution
             //    context.
-            _ = agent_.execution_context_stack.pop();
+            _ = agent_.execution_context_stack.pop().?;
 
             if (result) |completion| {
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");

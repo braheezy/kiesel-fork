@@ -139,7 +139,7 @@ pub fn builtinCallOrConstruct(
 
     // 12. Remove calleeContext from the execution context stack and restore callerContext as the
     //     running execution context.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 13. Return ? result.
     return result;

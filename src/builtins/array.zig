@@ -317,12 +317,12 @@ pub fn arraySetLength(
     };
     defer if (sparse_indices) |*indices| indices.deinit(agent.gc_allocator);
     var index = if (sparse_indices) |*indices|
-        indices.popOrNull()
+        indices.pop()
     else
         std.math.sub(u32, old_len, 1) catch null;
     while (index != null and index.? >= new_len) : ({
         index = if (sparse_indices) |*indices|
-            indices.popOrNull()
+            indices.pop()
         else
             std.math.sub(u32, index.?, 1) catch null;
     }) {

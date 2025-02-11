@@ -460,7 +460,7 @@ fn innerModuleLinking(
             // i. Let requiredModule be the last element of stack.
             // ii. Remove the last element of stack.
             // iii. Assert: requiredModule is a Cyclic Module Record.
-            const required_module = stack.pop();
+            const required_module = stack.pop().?;
 
             // iv. Set requiredModule.[[Status]] to linked.
             required_module.status = .linked;
@@ -898,7 +898,7 @@ fn innerModuleEvaluation(
             // i. Let requiredModule be the last element of stack.
             // ii. Remove the last element of stack.
             // iii. Assert: requiredModule is a Cyclic Module Record.
-            const required_module = stack.pop();
+            const required_module = stack.pop().?;
 
             // iv. If requiredModule.[[AsyncEvaluation]] is false, set requiredModule.[[Status]] to evaluated.
             // v. Otherwise, set requiredModule.[[Status]] to evaluating-async.
@@ -1715,7 +1715,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     }
 
     // 25. Remove moduleContext from the execution context stack.
-    _ = agent.execution_context_stack.pop();
+    _ = agent.execution_context_stack.pop().?;
 
     // 26. Return unused.
 }
@@ -1765,7 +1765,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         const result = generateAndRunBytecode(agent, self.ecmascript_code, .{});
 
         // d. Suspend moduleContext and remove it from the execution context stack.
-        _ = agent.execution_context_stack.pop();
+        _ = agent.execution_context_stack.pop().?;
 
         // e. Resume the context that is now on the top of the execution context stack as the
         //    running execution context.
