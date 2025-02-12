@@ -46,18 +46,15 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-arm
       - name: Build kiesel-linux-mips
         run: |
-          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
-          zig build -Dtarget=mips-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=mips-linux-musleabi -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips
       - name: Build kiesel-linux-mips64
         run: |
-          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
-          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
-          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
-          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc
       - name: Build kiesel-linux-powerpc64
         run: |
@@ -65,8 +62,7 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc64
       - name: Build kiesel-linux-riscv64
         run: |
-          # TODO: Intl is disabled for now as rustc claims std can't be built for the target
-          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-s390x
         run: |
