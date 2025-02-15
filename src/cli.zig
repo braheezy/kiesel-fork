@@ -54,29 +54,21 @@ const repl_preamble = std.fmt.comptimePrint(
 });
 
 const ScriptOrModuleHostDefined = struct {
-    base_dir: std.fs.Dir,
+    base_dir: []const u8,
 };
 
 fn resolveModulePath(
-    agent: *Agent,
+    allocator: std.mem.Allocator,
     script_or_module: ScriptOrModule,
-    specifier: *const String,
-) Agent.Error![]const u8 {
-    const base_dir: std.fs.Dir = switch (script_or_module) {
+    specifier: []const u8,
+) std.mem.Allocator.Error![]const u8 {
+    const base_dir: []const u8 = switch (script_or_module) {
         inline else => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
     };
-    const specifier_utf8 = try specifier.toUtf8(agent.gc_allocator);
-    if (builtin.os.tag == .wasi) {
-        return std.fs.path.resolve(agent.gc_allocator, &.{specifier_utf8});
-    }
-    return base_dir.realpathAlloc(agent.gc_allocator, specifier_utf8) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => return agent.throwException(
-            .internal_error,
-            "Failed to import '{s}': {s}",
-            .{ specifier_utf8, @errorName(err) },
-        ),
-    };
+    std.debug.assert(std.fs.path.isAbsolute(base_dir));
+    const resolved_path = try std.fs.path.resolve(allocator, &.{ base_dir, specifier });
+    std.debug.assert(std.fs.path.isAbsolute(resolved_path));
+    return resolved_path;
 }
 
 fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!void {
@@ -342,7 +334,7 @@ const Kiesel = struct {
 };
 
 fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: struct {
-    base_dir: std.fs.Dir,
+    base_dir: []const u8,
     origin: union(enum) {
         repl,
         command,
@@ -434,9 +426,9 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
             const module_path = switch (options.origin) {
                 .repl, .command => unreachable,
                 .path => |path| resolveModulePath(
-                    agent,
+                    agent.gc_allocator,
                     script_or_module,
-                    try String.fromUtf8(agent.gc_allocator, std.fs.path.basename(path)),
+                    path,
                 ) catch |err| break :blk err,
             };
             try module_cache.putNoClobber(agent.gc_allocator, module_path, .{ .source_text_module = module });
@@ -540,6 +532,7 @@ fn printValueDebugInfo(
 }
 
 fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
+    base_dir: []const u8,
     debug: bool = false,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
@@ -658,7 +651,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         try editor.addToHistory(source_text);
 
         if (try run(allocator, realm, source_text, .{
-            .base_dir = std.fs.cwd(),
+            .base_dir = options.base_dir,
             .origin = .repl,
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
@@ -789,11 +782,18 @@ pub fn main() !u8 {
             payload: ImportedModulePayload,
         ) std.mem.Allocator.Error!void {
             const result = blk: {
-                const module_path = switch (referrer) {
-                    .script => |script| resolveModulePath(agent_, .{ .script = script }, specifier),
-                    .module => |module| resolveModulePath(agent_, .{ .module = module }, specifier),
+                const script_or_module: ScriptOrModule = switch (referrer) {
+                    .script => |script| .{ .script = script },
+                    .module => |module| .{ .module = module },
                     .realm => unreachable,
-                } catch |err| break :blk err;
+                };
+                const specifier_utf8 = try specifier.toUtf8(agent_.gc_allocator);
+                defer agent_.gc_allocator.free(specifier_utf8);
+                const module_path = resolveModulePath(
+                    agent_.gc_allocator,
+                    script_or_module,
+                    specifier_utf8,
+                ) catch |err| break :blk err;
                 // NOTE: The spec says that the same (referrer, specifier) pair must resolve to the
                 // same cached module, but also that the actual mapping is host-defined.
                 // When a module is loaded via dynamic import the referrer is a script, which then
@@ -826,16 +826,12 @@ pub fn main() !u8 {
             module_path: []const u8,
         ) (ReadFileError || error{ExceptionThrown})!*SourceTextModule {
             const realm = agent_.currentRealm();
-            const module_dir = try std.fs.cwd().openDir(
-                std.fs.path.dirname(module_path) orelse ".",
-                .{},
-            );
             const source_text = try readFile(agent_.gc_allocator, module_path);
             defer agent_.gc_allocator.free(source_text);
 
             const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
                 const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
-                ptr.* = .{ .base_dir = module_dir };
+                ptr.* = .{ .base_dir = std.fs.path.dirname(module_path).? };
                 break :blk ptr;
             });
 
@@ -880,14 +876,18 @@ pub fn main() !u8 {
     const realm = agent.currentRealm();
     try initializeGlobalObject(realm, realm.global_object);
 
+    const cwd = try std.process.getCwdAlloc(allocator);
+    defer allocator.free(cwd);
+    std.debug.assert(std.fs.path.isAbsolute(cwd));
+
     if (path_arg) |path| {
         const source_text = try readFile(allocator, path);
         defer allocator.free(source_text);
+        const resolved_path = try std.fs.path.resolve(allocator, &.{ cwd, path });
+        defer allocator.free(resolved_path);
+        std.debug.assert(std.fs.path.isAbsolute(resolved_path));
         if (try run(allocator, realm, source_text, .{
-            .base_dir = if (std.fs.path.dirname(path)) |dirname|
-                try std.fs.cwd().openDir(dirname, .{})
-            else
-                std.fs.cwd(),
+            .base_dir = std.fs.path.dirname(resolved_path).?,
             .origin = .{ .path = path },
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
@@ -897,7 +897,7 @@ pub fn main() !u8 {
         } else return 1;
     } else if (parsed_args.options.command) |source_text| {
         if (try run(allocator, realm, source_text, .{
-            .base_dir = std.fs.cwd(),
+            .base_dir = cwd,
             .origin = .command,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
@@ -907,6 +907,7 @@ pub fn main() !u8 {
         } else return 1;
     } else {
         try repl(allocator, realm, .{
+            .base_dir = cwd,
             .debug = parsed_args.options.debug,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
