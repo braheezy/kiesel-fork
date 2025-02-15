@@ -249,7 +249,6 @@ const Kiesel = struct {
         const path = try arguments.get(0).toString(agent);
         const bytes = readFile(
             agent.gc_allocator,
-            std.fs.cwd(),
             try path.toUtf8(agent.gc_allocator),
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -484,10 +483,9 @@ const ReadFileError = std.mem.Allocator.Error || std.fs.File.OpenError || std.fs
 
 fn readFile(
     allocator: std.mem.Allocator,
-    base_dir: std.fs.Dir,
-    sub_path: []const u8,
+    path: []const u8,
 ) ReadFileError![]const u8 {
-    const file = try base_dir.openFile(sub_path, .{});
+    const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
     return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
@@ -832,7 +830,7 @@ pub fn main() !u8 {
                 std.fs.path.dirname(module_path) orelse ".",
                 .{},
             );
-            const source_text = try readFile(agent_.gc_allocator, std.fs.cwd(), module_path);
+            const source_text = try readFile(agent_.gc_allocator, module_path);
             defer agent_.gc_allocator.free(source_text);
 
             const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
@@ -883,7 +881,7 @@ pub fn main() !u8 {
     try initializeGlobalObject(realm, realm.global_object);
 
     if (path_arg) |path| {
-        const source_text = try readFile(allocator, std.fs.cwd(), path);
+        const source_text = try readFile(allocator, path);
         defer allocator.free(source_text);
         if (try run(allocator, realm, source_text, .{
             .base_dir = if (std.fs.path.dirname(path)) |dirname|
