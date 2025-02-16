@@ -70,8 +70,6 @@ test format {
     };
     for (test_cases) |test_case| {
         const symbol, const expected = test_case;
-        const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{symbol});
-        defer std.testing.allocator.free(string);
-        try std.testing.expectEqualStrings(expected, string);
+        try std.testing.expectFmt(expected, "{}", .{symbol});
     }
 }

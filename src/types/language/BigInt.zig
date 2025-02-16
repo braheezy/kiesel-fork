@@ -276,8 +276,6 @@ test format {
         const value, const expected = test_case;
         const big_int = try from(std.testing.allocator, value);
         defer big_int.deinit(std.testing.allocator);
-        const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{big_int});
-        defer std.testing.allocator.free(string);
-        try std.testing.expectEqualStrings(expected, string);
+        try std.testing.expectFmt(expected, "{}", .{big_int});
     }
 }

@@ -927,10 +927,15 @@ test "format" {
     const gc = @import("../../gc.zig");
     var agent_ = try Agent.init(gc.allocator(), .{});
     defer agent_.deinit();
-    const object = try builtins.Object.create(&agent_, .{
-        .prototype = null,
-    });
-    const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{object});
-    defer std.testing.allocator.free(string);
-    try std.testing.expectEqualStrings(string, "[object Object]");
+
+    const test_cases = [_]struct { *Object, []const u8 }{
+        .{
+            try builtins.Object.create(&agent_, .{ .prototype = null }),
+            "[object Object]",
+        },
+    };
+    for (test_cases) |test_case| {
+        const object, const expected = test_case;
+        try std.testing.expectFmt(expected, "{}", .{object});
+    }
 }

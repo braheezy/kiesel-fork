@@ -651,8 +651,6 @@ test "format" {
     };
     for (test_cases) |test_case| {
         const number, const expected = test_case;
-        const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{number});
-        defer std.testing.allocator.free(string);
-        try std.testing.expectEqualStrings(expected, string);
+        try std.testing.expectFmt(expected, "{}", .{number});
     }
 }
