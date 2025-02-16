@@ -335,7 +335,7 @@ pub fn rawBytesToNumeric(
     comptime @"type": ElementType,
     raw_bytes: []const u8,
     is_little_endian: bool,
-) @"type".T {
+) @"type".type() {
     // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
@@ -346,7 +346,7 @@ pub fn rawBytesToNumeric(
     if (!is_little_endian) std.mem.reverse(u8, &bytes);
 
     // 3-8.
-    return std.mem.bytesToValue(@"type".T, &bytes);
+    return std.mem.bytesToValue(@"type".type(), &bytes);
 }
 
 /// 25.1.3.15 GetRawBytesFromSharedBlock ( block, byteIndex, type, isTypedArray, order )
@@ -357,7 +357,7 @@ pub fn getRawBytesFromSharedBlock(
     comptime @"type": ElementType,
     is_typed_array: bool,
     order: Order,
-) [@sizeOf(@"type".T)]u8 {
+) [@sizeOf(@"type".type())]u8 {
     // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
@@ -377,7 +377,7 @@ pub fn getValueFromBuffer(
     is_typed_array: bool,
     order: Order,
     maybe_is_little_endian: ?bool,
-) @"type".T {
+) @"type".type() {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
@@ -421,72 +421,74 @@ pub fn getValueFromBuffer(
 /// https://tc39.es/proposal-float16array/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
-    comptime @"type": ElementType,
+    comptime element_type: ElementType,
     value: Value,
     is_little_endian: bool,
-) std.mem.Allocator.Error![@sizeOf(@"type".T)]u8 {
-    // 1. If type is Float16, then
-    var raw_bytes = if (@"type".T == f16) blk: {
-        // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
-        //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
-        //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to any
-        //    implementation chosen IEEE 754-2019 binary16 format Not-a-Number encoding. An
-        //    implementation must always choose the same encoding for each implementation
-        //    distinguishable NaN value.
-        break :blk std.mem.toBytes(
-            if (value.asNumber().isNan())
-                std.math.nan(f16)
-            else
-                value.asNumber().toFloat16(),
-        );
-    }
-    // 2. If type is float32, then
-    else if (@"type".T == f32) blk: {
-        // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
-        //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
-        //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
-        //    any implementation chosen IEEE 754-2019 binary32 format Not-a-Number encoding. An
-        //    implementation must always choose the same encoding for each implementation
-        //    distinguishable NaN value.
-        break :blk std.mem.toBytes(
-            if (value.asNumber().isNan())
-                std.math.nan(f32)
-            else
-                @as(f32, @floatCast(value.asNumber().asFloat())),
-        );
-    }
-    // 3. Else if type is float64, then
-    else if (@"type".T == f64) blk: {
-        // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
-        //    binary64 format encoding of value. The bytes are arranged in little endian order. If
-        //    value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019 binary64
-        //    format Not-a-Number encoding. An implementation must always choose the same encoding
-        //    for each implementation distinguishable NaN value.
-        break :blk std.mem.toBytes(
-            if (value.asNumber().isNan())
-                std.math.nan(f64)
-            else
-                value.asNumber().asFloat(),
-        );
-    }
-    // 4. Else,
-    else blk: {
-        // a. Let n be the Element Size value specified in Table 71 for Element Type type.
+) std.mem.Allocator.Error![@sizeOf(element_type.type())]u8 {
+    var raw_bytes = switch (element_type) {
+        // 1. If type is Float16, then
+        .float16 => blk: {
+            // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
+            //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to any
+            //    implementation chosen IEEE 754-2019 binary16 format Not-a-Number encoding. An
+            //    implementation must always choose the same encoding for each implementation
+            //    distinguishable NaN value.
+            break :blk std.mem.toBytes(
+                if (value.asNumber().isNan())
+                    std.math.nan(f16)
+                else
+                    value.asNumber().toFloat16(),
+            );
+        },
+        // 2. If type is float32, then
+        .float32 => blk: {
+            // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
+            //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
+            //    any implementation chosen IEEE 754-2019 binary32 format Not-a-Number encoding. An
+            //    implementation must always choose the same encoding for each implementation
+            //    distinguishable NaN value.
+            break :blk std.mem.toBytes(
+                if (value.asNumber().isNan())
+                    std.math.nan(f32)
+                else
+                    @as(f32, @floatCast(value.asNumber().asFloat())),
+            );
+        },
+        // 3. Else if type is float64, then
+        .float64 => blk: {
+            // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
+            //    binary64 format encoding of value. The bytes are arranged in little endian order. If
+            //    value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019 binary64
+            //    format Not-a-Number encoding. An implementation must always choose the same encoding
+            //    for each implementation distinguishable NaN value.
+            break :blk std.mem.toBytes(
+                if (value.asNumber().isNan())
+                    std.math.nan(f64)
+                else
+                    value.asNumber().asFloat(),
+            );
+        },
+        // 4. Else,
+        else => blk: {
+            // a. Let n be the Element Size value specified in Table 71 for Element Type type.
 
-        // b. Let conversionOperation be the abstract operation named in the Conversion Operation
-        //    column in Table 71 for Element Type type.
-        const conversionOperation = @"type".conversationOperation();
+            // b. Let conversionOperation be the abstract operation named in the Conversion Operation
+            //    column in Table 71 for Element Type type.
+            const conversionOperation = element_type.conversationOperation();
 
-        // c. Let intValue be ℝ(conversionOperation(value)).
-        const int_value = conversionOperation(value, agent) catch |err| try noexcept(err);
+            // c. Let intValue be ℝ(conversionOperation(value)).
+            const int_value = conversionOperation(value, agent) catch |err| try noexcept(err);
 
-        // d. If intValue ≥ 0, then
-        //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.
-        //        The bytes are ordered in little endian order.
-        // e. Else,
-        //     i. Let rawBytes be a List whose elements are the n-byte binary two's complement
-        //        encoding of intValue. The bytes are ordered in little endian order.
-        break :blk std.mem.toBytes(int_value);
+            // d. If intValue ≥ 0, then
+            //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.
+            //        The bytes are ordered in little endian order.
+            // e. Else,
+            //     i. Let rawBytes be a List whose elements are the n-byte binary two's complement
+            //        encoding of intValue. The bytes are ordered in little endian order.
+            break :blk std.mem.toBytes(int_value);
+        },
     };
 
     // 5. If isLittleEndian is false, reverse the order of the elements of rawBytes.
@@ -556,7 +558,7 @@ pub fn getModifySetValueInBuffer(
     comptime @"type": ElementType,
     value: Value,
     comptime op: std.builtin.AtomicRmwOp,
-) std.mem.Allocator.Error!@"type".T {
+) std.mem.Allocator.Error!@"type".type() {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
@@ -581,7 +583,7 @@ pub fn getModifySetValueInBuffer(
     // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
     const raw_bytes = try numericToRawBytes(agent, @"type", value, is_little_endian);
 
-    var previous: @"type".T = undefined;
+    var previous: @"type".type() = undefined;
 
     // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (false) {
@@ -594,14 +596,14 @@ pub fn getModifySetValueInBuffer(
         // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
         // c. Store the individual bytes of rawBytesModified into block, starting at block[byteIndex].
         const ptr = std.mem.bytesAsValue(
-            @"type".T,
+            @"type".type(),
             block.items[@intCast(byte_index)..@intCast(byte_index + element_size)],
         );
         previous = @atomicRmw(
-            @"type".T,
-            @as(*@"type".T, @alignCast(ptr)),
+            @"type".type(),
+            @as(*@"type".type(), @alignCast(ptr)),
             op,
-            std.mem.bytesToValue(@"type".T, &raw_bytes),
+            std.mem.bytesToValue(@"type".type(), &raw_bytes),
             .seq_cst,
         );
     }

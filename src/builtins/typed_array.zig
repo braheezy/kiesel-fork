@@ -51,79 +51,132 @@ const sortIndexedProperties = builtins.sortIndexedProperties;
 // https://tc39.es/ecma262/#table-the-typedarray-constructors
 
 pub const int8_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Int8Array");
-    pub const prototype = MakeTypedArrayPrototype("Int8Array");
+    pub const constructor = MakeTypedArrayConstructor(.int8);
+    pub const prototype = MakeTypedArrayPrototype(.int8);
 };
 pub const uint8_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Uint8Array");
-    pub const prototype = MakeTypedArrayPrototype("Uint8Array");
+    pub const constructor = MakeTypedArrayConstructor(.uint8);
+    pub const prototype = MakeTypedArrayPrototype(.uint8);
 };
 pub const uint8_clamped_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Uint8ClampedArray");
-    pub const prototype = MakeTypedArrayPrototype("Uint8ClampedArray");
+    pub const constructor = MakeTypedArrayConstructor(.uint8_clamped);
+    pub const prototype = MakeTypedArrayPrototype(.uint8_clamped);
 };
 pub const int16_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Int16Array");
-    pub const prototype = MakeTypedArrayPrototype("Int16Array");
+    pub const constructor = MakeTypedArrayConstructor(.int16);
+    pub const prototype = MakeTypedArrayPrototype(.int16);
 };
 pub const uint16_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Uint16Array");
-    pub const prototype = MakeTypedArrayPrototype("Uint16Array");
+    pub const constructor = MakeTypedArrayConstructor(.uint16);
+    pub const prototype = MakeTypedArrayPrototype(.uint16);
 };
 pub const int32_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Int32Array");
-    pub const prototype = MakeTypedArrayPrototype("Int32Array");
+    pub const constructor = MakeTypedArrayConstructor(.int32);
+    pub const prototype = MakeTypedArrayPrototype(.int32);
 };
 pub const uint32_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Uint32Array");
-    pub const prototype = MakeTypedArrayPrototype("Uint32Array");
+    pub const constructor = MakeTypedArrayConstructor(.uint32);
+    pub const prototype = MakeTypedArrayPrototype(.uint32);
 };
 pub const big_int64_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("BigInt64Array");
-    pub const prototype = MakeTypedArrayPrototype("BigInt64Array");
+    pub const constructor = MakeTypedArrayConstructor(.bigint64);
+    pub const prototype = MakeTypedArrayPrototype(.bigint64);
 };
 pub const big_uint64_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("BigUint64Array");
-    pub const prototype = MakeTypedArrayPrototype("BigUint64Array");
+    pub const constructor = MakeTypedArrayConstructor(.biguint64);
+    pub const prototype = MakeTypedArrayPrototype(.biguint64);
 };
 pub const float16_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Float16Array");
-    pub const prototype = MakeTypedArrayPrototype("Float16Array");
+    pub const constructor = MakeTypedArrayConstructor(.float16);
+    pub const prototype = MakeTypedArrayPrototype(.float16);
 };
 pub const float32_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Float32Array");
-    pub const prototype = MakeTypedArrayPrototype("Float32Array");
+    pub const constructor = MakeTypedArrayConstructor(.float32);
+    pub const prototype = MakeTypedArrayPrototype(.float32);
 };
 pub const float64_array = struct {
-    pub const constructor = MakeTypedArrayConstructor("Float64Array");
-    pub const prototype = MakeTypedArrayPrototype("Float64Array");
+    pub const constructor = MakeTypedArrayConstructor(.float64);
+    pub const prototype = MakeTypedArrayPrototype(.float64);
 };
 
-pub const ElementType = struct {
-    pub const Clamping = enum {
-        clamped,
-        unclamped,
-    };
+pub const ElementType = enum {
+    int8,
+    uint8,
+    uint8_clamped,
+    int16,
+    uint16,
+    int32,
+    uint32,
+    bigint64,
+    biguint64,
+    float16,
+    float32,
+    float64,
 
-    T: type,
-    clamping: Clamping = .unclamped,
+    pub fn @"type"(comptime self: ElementType) type {
+        return switch (self) {
+            .int8 => i8,
+            .uint8 => u8,
+            .uint8_clamped => u8,
+            .int16 => i16,
+            .uint16 => u16,
+            .int32 => i32,
+            .uint32 => u32,
+            .bigint64 => i64,
+            .biguint64 => u64,
+            .float16 => f16,
+            .float32 => f32,
+            .float64 => f64,
+        };
+    }
 
-    pub fn elementSize(comptime self: ElementType) comptime_int {
-        return @sizeOf(self.T);
+    pub inline fn elementSize(self: ElementType) u4 {
+        return switch (self) {
+            .int8 => 1,
+            .uint8 => 1,
+            .uint8_clamped => 1,
+            .int16 => 2,
+            .uint16 => 2,
+            .int32 => 4,
+            .uint32 => 4,
+            .bigint64 => 8,
+            .biguint64 => 8,
+            .float16 => 2,
+            .float32 => 4,
+            .float64 => 8,
+        };
+    }
+
+    pub inline fn typedArrayName(self: ElementType) []const u8 {
+        return switch (self) {
+            .int8 => "Int8Array",
+            .uint8 => "Uint8Array",
+            .uint8_clamped => "Uint8ClampedArray",
+            .int16 => "Int16Array",
+            .uint16 => "Uint16Array",
+            .int32 => "Int32Array",
+            .uint32 => "Uint32Array",
+            .bigint64 => "BigInt64Array",
+            .biguint64 => "BigUint64Array",
+            .float16 => "Float16Array",
+            .float32 => "Float32Array",
+            .float64 => "Float64Array",
+        };
     }
 
     pub fn conversationOperation(
         comptime self: ElementType,
-    ) fn (Value, *Agent) Agent.Error!self.T {
-        const field_name = switch (self.T) {
-            i8 => "toInt8",
-            u8 => if (self.clamping == .unclamped) "toUint8" else "toUint8Clamp",
-            i16 => "toInt16",
-            u16 => "toUint16",
-            i32 => "toInt32",
-            u32 => "toUint32",
-            i64 => "toBigInt64",
-            u64 => "toBigUint64",
+    ) fn (Value, *Agent) Agent.Error!self.type() {
+        const field_name = switch (self) {
+            .int8 => "toInt8",
+            .uint8 => "toUint8",
+            .uint8_clamped => "toUint8Clamp",
+            .int16 => "toInt16",
+            .uint16 => "toUint16",
+            .int32 => "toInt32",
+            .uint32 => "toUint32",
+            .bigint64 => "toBigInt64",
+            .biguint64 => "toBigUint64",
             else => unreachable,
         };
         return @field(Value, field_name);
@@ -131,34 +184,27 @@ pub const ElementType = struct {
 
     /// 25.1.3.10 IsUnclampedIntegerElementType ( type )
     /// https://tc39.es/ecma262/#sec-isunclampedintegerelementtype
-    pub inline fn isUnclampedIntegerElementType(comptime self: ElementType) bool {
-        // 1. If type is one of int8, uint8, int16, uint16, int32, or uint32, return true.
-        // 2. Return false.
-        return self.clamping != .clamped and self.T != f16 and self.T != f32 and self.T != f64;
+    pub inline fn isUnclampedIntegerElementType(self: ElementType) bool {
+        return switch (self) {
+            // 1. If type is one of int8, uint8, int16, uint16, int32, or uint32, return true.
+            .int8, .uint8, .int16, .uint16, .int32, .uint32 => true,
+
+            // 2. Return false.
+            else => false,
+        };
     }
 
     /// 25.1.3.11 IsBigIntElementType ( type )
     /// https://tc39.es/ecma262/#sec-isbigintelementtype
-    pub inline fn isBigIntElementType(comptime self: ElementType) bool {
-        // 1. If type is either biguint64 or bigint64, return true.
-        // 2. Return false.
-        return self.T == u64 or self.T == i64;
-    }
-};
+    pub inline fn isBigIntElementType(self: ElementType) bool {
+        return switch (self) {
+            // 1. If type is either biguint64 or bigint64, return true.
+            .biguint64, .bigint64 => true,
 
-pub const element_types = [_]struct { []const u8, ElementType }{
-    .{ "Int8Array", .{ .T = i8 } },
-    .{ "Uint8Array", .{ .T = u8 } },
-    .{ "Uint8ClampedArray", .{ .T = u8, .clamping = .clamped } },
-    .{ "Int16Array", .{ .T = i16 } },
-    .{ "Uint16Array", .{ .T = u16 } },
-    .{ "Int32Array", .{ .T = i32 } },
-    .{ "Uint32Array", .{ .T = u32 } },
-    .{ "BigInt64Array", .{ .T = i64 } },
-    .{ "BigUint64Array", .{ .T = u64 } },
-    .{ "Float16Array", .{ .T = f16 } },
-    .{ "Float32Array", .{ .T = f32 } },
-    .{ "Float64Array", .{ .T = f64 } },
+            // 2. Return false.
+            else => false,
+        };
+    }
 };
 
 /// 10.4.5.1 [[PreventExtensions]] ( )
@@ -607,9 +653,8 @@ fn typedArrayGetElement(
     const byte_index_in_buffer = (index * element_size) + offset;
 
     // 5. Let elementType be TypedArrayElementType(O).
-    inline for (element_types) |entry| {
-        const name, const @"type" = entry;
-        if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+    switch (typed_array.fields.element_type) {
+        inline else => |@"type"| {
             // 6. Return GetValueFromBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
             //    elementType, true, unordered).
             const value = getValueFromBuffer(
@@ -625,8 +670,8 @@ fn typedArrayGetElement(
                 Value.from(try BigInt.from(agent.gc_allocator, value))
             else
                 Value.from(value);
-        }
-    } else unreachable;
+        },
+    }
 }
 
 /// 10.4.5.18 TypedArraySetElement ( O, index, value )
@@ -651,9 +696,8 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
         const byte_index_in_buffer = @as(u53, @intFromFloat(index)) * element_size + offset;
 
         // d. Let elementType be TypedArrayElementType(O).
-        inline for (element_types) |entry| {
-            const name, const @"type" = entry;
-            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+        switch (typed_array.fields.element_type) {
+            inline else => |@"type"| {
                 // e. Perform SetValueInBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
                 //    elementType, numValue, true, unordered).
                 try setValueInBuffer(
@@ -666,9 +710,8 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
                     .unordered,
                     null,
                 );
-                break;
-            }
-        } else unreachable;
+            },
+        }
     }
 
     // 4. Return unused.
@@ -1191,7 +1234,7 @@ pub const prototype = struct {
                         agent,
                         buffer_,
                         from_byte_index,
-                        .{ .T = u8 },
+                        .uint8,
                         true,
                         .unordered,
                         null,
@@ -1202,7 +1245,7 @@ pub const prototype = struct {
                         agent,
                         buffer_,
                         to_byte_index,
-                        .{ .T = u8 },
+                        .uint8,
                         Value.from(value),
                         true,
                         .unordered,
@@ -2168,7 +2211,7 @@ pub const prototype = struct {
         const src_length = typedArrayLength(src_ta);
 
         // 9. Let targetType be TypedArrayElementType(target).
-        const target_type = target.fields.typed_array_name;
+        const target_type = target.fields.element_type;
 
         // 10. Let targetElementSize be TypedArrayElementSize(target).
         const target_element_size = typedArrayElementSize(target);
@@ -2177,7 +2220,7 @@ pub const prototype = struct {
         const target_byte_offset = target.fields.byte_offset;
 
         // 12. Let srcType be TypedArrayElementType(source).
-        const src_type = source.fields.typed_array_name;
+        const src_type = source.fields.element_type;
 
         // 13. Let srcElementSize be TypedArrayElementSize(source).
         const src_element_size = typedArrayElementSize(source);
@@ -2251,7 +2294,7 @@ pub const prototype = struct {
         const limit = target_byte_index + (target_element_size * src_length);
 
         // 23. If srcType is targetType, then
-        if (std.mem.eql(u8, src_type, target_type)) {
+        if (src_type == target_type) {
             // a. NOTE: The transfer must be performed in a manner that preserves the bit-level
             //    encoding of the source data.
             // b. Repeat, while targetByteIndex < limit,
@@ -2264,7 +2307,7 @@ pub const prototype = struct {
                     agent,
                     src_buffer,
                     src_byte_index,
-                    .{ .T = u8 },
+                    .uint8,
                     true,
                     .unordered,
                     null,
@@ -2275,7 +2318,7 @@ pub const prototype = struct {
                     agent,
                     target_buffer,
                     target_byte_index,
-                    .{ .T = u8 },
+                    .uint8,
                     Value.from(value),
                     true,
                     .unordered,
@@ -2288,15 +2331,13 @@ pub const prototype = struct {
         }
         // 24. Else,
         else {
-
             // a. Repeat, while targetByteIndex < limit,
             while (target_byte_index < limit) : ({
                 src_byte_index += src_element_size;
                 target_byte_index += target_element_size;
             }) {
-                const value = inline for (element_types) |entry| {
-                    const name, const @"type" = entry;
-                    if (std.mem.eql(u8, src_type, name)) {
+                const value = switch (src_type) {
+                    inline else => |@"type"| value: {
                         // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, srcType, true, unordered).
                         const value = getValueFromBuffer(
                             agent,
@@ -2307,16 +2348,15 @@ pub const prototype = struct {
                             .unordered,
                             null,
                         );
-                        break if (@"type".isBigIntElementType())
+                        break :value if (@"type".isBigIntElementType())
                             Value.from(try BigInt.from(agent.gc_allocator, value))
                         else
                             Value.from(value);
-                    }
-                } else unreachable;
+                    },
+                };
 
-                inline for (element_types) |entry| {
-                    const name, const @"type" = entry;
-                    if (std.mem.eql(u8, target_type, name)) {
+                switch (target_type) {
+                    inline else => |@"type"| {
                         // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, targetType, value, true, unordered).
                         try setValueInBuffer(
                             agent,
@@ -2328,9 +2368,8 @@ pub const prototype = struct {
                             .unordered,
                             null,
                         );
-                        break;
-                    }
-                } else unreachable;
+                    },
+                }
 
                 // iii. Set srcByteIndex to srcByteIndex + srcElementSize.
                 // iv. Set targetByteIndex to targetByteIndex + targetElementSize.
@@ -2491,13 +2530,13 @@ pub const prototype = struct {
             count_bytes = @intFromFloat(count_bytes_f64);
 
             // e. Let srcType be TypedArrayElementType(O).
-            const src_type = typed_array.fields.typed_array_name;
+            const src_type = typed_array.fields.element_type;
 
             // f. Let targetType be TypedArrayElementType(A).
-            const target_type = new_typed_array.as(TypedArray).fields.typed_array_name;
+            const target_type = new_typed_array.as(TypedArray).fields.element_type;
 
             // g. If srcType is targetType, then
-            if (std.mem.eql(u8, src_type, target_type)) {
+            if (src_type == target_type) {
                 // i. NOTE: The transfer must be performed in a manner that preserves the bit-level
                 //    encoding of the source data.
 
@@ -2533,7 +2572,7 @@ pub const prototype = struct {
                         agent,
                         src_buffer,
                         src_byte_index,
-                        .{ .T = u8 },
+                        .uint8,
                         true,
                         .unordered,
                         null,
@@ -2545,7 +2584,7 @@ pub const prototype = struct {
                         agent,
                         target_buffer,
                         target_byte_index,
-                        .{ .T = u8 },
+                        .uint8,
                         Value.from(value),
                         true,
                         .unordered,
@@ -3057,7 +3096,7 @@ pub const prototype = struct {
         if (!object.is(TypedArray)) return .undefined;
 
         // 4. Let name be O.[[TypedArrayName]].
-        const name = object.as(TypedArray).fields.typed_array_name;
+        const name = object.as(TypedArray).fields.element_type.typedArrayName();
 
         // 5. Assert: name is a String.
         // 6. Return name.
@@ -3076,12 +3115,12 @@ fn typedArraySpeciesCreate(
 
     // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
     //    exemplar.[[TypedArrayName]] in Table 71.
-    const default_constructor = inline for (element_types) |entry| {
-        const name, _ = entry;
-        if (std.mem.eql(u8, exemplar.fields.typed_array_name, name)) {
-            break try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
-        }
-    } else unreachable;
+    const default_constructor = switch (exemplar.fields.element_type) {
+        inline else => |element_type| blk: {
+            const name = element_type.typedArrayName();
+            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
+        },
+    };
 
     // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
     const constructor_ = try @constCast(exemplar).object.speciesConstructor(default_constructor);
@@ -3153,12 +3192,12 @@ fn typedArrayCreateSameType(
 
     // 1. Let constructor be the intrinsic object associated with the constructor name
     //    exemplar.[[TypedArrayName]] in Table 71.
-    const constructor_ = inline for (element_types) |entry| {
-        const name, _ = entry;
-        if (std.mem.eql(u8, exemplar.fields.typed_array_name, name)) {
-            break try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
-        }
-    } else unreachable;
+    const constructor_ = switch (exemplar.fields.element_type) {
+        inline else => |element_type| blk: {
+            const name = element_type.typedArrayName();
+            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
+        },
+    };
 
     // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
     const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
@@ -3200,22 +3239,7 @@ pub fn validateTypedArray(
 /// https://tc39.es/ecma262/#sec-typedarrayelementsize
 pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
     // 1. Return the Element Size value specified in Table 70 for O.[[TypedArrayName]].
-    // FIXME: Would be nice to completely do this at comptime based on the struct type, but once
-    //        they are unique (for type comparison) we cannot cast to the generic TypedArray anymore.
-    return @intCast(std.StaticStringMap(u4).initComptime(.{
-        .{ "Int8Array", 1 },
-        .{ "Uint8Array", 1 },
-        .{ "Uint8ClampedArray", 1 },
-        .{ "Int16Array", 2 },
-        .{ "Uint16Array", 2 },
-        .{ "Int32Array", 4 },
-        .{ "Uint32Array", 4 },
-        .{ "BigInt64Array", 8 },
-        .{ "BigUint64Array", 8 },
-        .{ "Float16Array", 2 },
-        .{ "Float32Array", 4 },
-        .{ "Float64Array", 8 },
-    }).get(typed_array.fields.typed_array_name).?);
+    return typed_array.fields.element_type.elementSize();
 }
 
 /// 23.2.4.7 CompareTypedArrayElements ( x, y, comparator )
@@ -3279,7 +3303,7 @@ pub fn compareTypedArrayElements(
 /// https://tc39.es/ecma262/#sec-allocatetypedarray
 pub fn allocateTypedArray(
     agent: *Agent,
-    comptime constructor_name: []const u8,
+    comptime element_type: ElementType,
     new_target: *Object,
     comptime default_prototype: []const u8,
     length: ?u53,
@@ -3329,15 +3353,14 @@ pub fn allocateTypedArray(
             .viewed_array_buffer = undefined,
 
             // 4. Set obj.[[TypedArrayName]] to constructorName.
-            .typed_array_name = constructor_name,
+            .element_type = element_type,
 
             // 5. If constructorName is either "BigInt64Array" or "BigUint64Array", set
             //    obj.[[ContentType]] to bigint.
             // 6. Otherwise, set obj.[[ContentType]] to number.
-            .content_type = comptime blk: {
-                if (std.mem.eql(u8, constructor_name, "BigInt64Array")) break :blk .bigint;
-                if (std.mem.eql(u8, constructor_name, "BigUint64Array")) break :blk .bigint;
-                break :blk .number;
+            .content_type = switch (element_type) {
+                .bigint64, .biguint64 => .bigint,
+                else => .number,
             },
 
             // 7. If length is not present, then
@@ -3381,14 +3404,13 @@ fn initializeTypedArrayFromTypedArray(
     const element_size = typedArrayElementSize(typed_array);
 
     // 2. Let elementType be TypedArrayElementType(O).
-    // NOTE: These are done with a string comparison for now.
-    const element_type = typed_array.fields.typed_array_name;
+    const element_type = typed_array.fields.element_type;
 
     // 5. Let srcElementSize be TypedArrayElementSize(srcArray).
     const src_element_size = typedArrayElementSize(src_array);
 
     // 4. Let srcType be TypedArrayElementType(srcArray).
-    const src_type = src_array.fields.typed_array_name;
+    const src_type = src_array.fields.element_type;
 
     // 6. Let srcByteOffset be srcArray.[[ByteOffset]].
     const src_byte_offset = src_array.fields.byte_offset;
@@ -3414,7 +3436,7 @@ fn initializeTypedArrayFromTypedArray(
     };
 
     // 11. If elementType is srcType, then
-    const data = if (std.mem.eql(u8, element_type, src_type)) blk: {
+    const data = if (element_type == src_type) blk: {
         // a. Let data be ? CloneArrayBuffer(srcData, srcByteOffset, byteLength).
         break :blk try cloneArrayBuffer(
             agent,
@@ -3453,12 +3475,8 @@ fn initializeTypedArrayFromTypedArray(
 
         // f. Repeat, while count > 0,
         while (count > 0) : (count -= 1) {
-            // FIXME: The repeated branching and string comparisons here are definitely not ideal,
-            //        either convert this into two comptime arguments passing the actual type or at
-            //        least some kind of jump table.
-            const value = inline for (element_types) |entry| {
-                const name, const @"type" = entry;
-                if (std.mem.eql(u8, src_type, name)) {
+            const value = switch (src_type) {
+                inline else => |@"type"| value: {
                     // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true, unordered).
                     const value = getValueFromBuffer(
                         agent,
@@ -3469,16 +3487,15 @@ fn initializeTypedArrayFromTypedArray(
                         .unordered,
                         null,
                     );
-                    break if (@"type".isBigIntElementType())
+                    break :value if (@"type".isBigIntElementType())
                         Value.from(try BigInt.from(agent.gc_allocator, value))
                     else
                         Value.from(value);
-                }
-            } else unreachable;
+                },
+            };
 
-            inline for (element_types) |entry| {
-                const name, const @"type" = entry;
-                if (std.mem.eql(u8, element_type, name)) {
+            switch (element_type) {
+                inline else => |@"type"| {
                     // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true, unordered).
                     try setValueInBuffer(
                         agent,
@@ -3490,9 +3507,8 @@ fn initializeTypedArrayFromTypedArray(
                         .unordered,
                         null,
                     );
-                    break;
-                }
-            } else unreachable;
+                },
+            }
 
             // iii. Set srcByteIndex to srcByteIndex + srcElementSize.
             src_byte_index += src_element_size;
@@ -3762,7 +3778,8 @@ fn allocateTypedArrayBuffer(
 
 /// 23.2.6 Properties of the TypedArray Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
-fn MakeTypedArrayConstructor(comptime name: []const u8) type {
+fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
+    const name = element_type.typedArrayName();
     return struct {
         pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
@@ -3779,10 +3796,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
-                .value = Value.from(comptime for (element_types) |entry| {
-                    const name_, const @"type" = entry;
-                    if (std.mem.eql(u8, name, name_)) break @"type".elementSize();
-                }),
+                .value = Value.from(element_type.elementSize()),
                 .writable = false,
                 .enumerable = false,
                 .configurable = false,
@@ -3812,7 +3826,6 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
             // 2. Let constructorName be the String value of the Constructor Name value specified
             //    in Table 70 for this TypedArray constructor.
-            const constructor_name = name;
 
             // 3. Let proto be "%TypedArray.prototype%".
             const prototype_ = "%" ++ name ++ ".prototype%";
@@ -3825,7 +3838,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                 // a. Return ? AllocateTypedArray(constructorName, NewTarget, proto, 0).
                 return Value.from(try allocateTypedArray(
                     agent,
-                    constructor_name,
+                    element_type,
                     new_target.?,
                     prototype_,
                     0,
@@ -3841,7 +3854,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                     // i. Let O be ? AllocateTypedArray(constructorName, NewTarget, proto).
                     const object = try allocateTypedArray(
                         agent,
-                        constructor_name,
+                        element_type,
                         new_target.?,
                         prototype_,
                         null,
@@ -3940,7 +3953,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                     // iii. Return ? AllocateTypedArray(constructorName, NewTarget, proto, elementLength).
                     return Value.from(try allocateTypedArray(
                         agent,
-                        constructor_name,
+                        element_type,
                         new_target.?,
                         prototype_,
                         element_length,
@@ -3953,7 +3966,8 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
 /// 23.2.7 Properties of the TypedArray Prototype Objects
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
-fn MakeTypedArrayPrototype(comptime name: []const u8) type {
+fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
+    const name = element_type.typedArrayName();
     return struct {
         pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return builtins.Object.create(realm.agent, .{
@@ -3965,10 +3979,7 @@ fn MakeTypedArrayPrototype(comptime name: []const u8) type {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
-                .value = Value.from(comptime for (element_types) |entry| {
-                    const name_, const @"type" = entry;
-                    if (std.mem.eql(u8, name, name_)) break @"type".elementSize();
-                }),
+                .value = Value.from(element_type.elementSize()),
                 .writable = false,
                 .enumerable = false,
                 .configurable = false,
@@ -3997,7 +4008,7 @@ pub const TypedArray = MakeObject(.{
         };
 
         /// [[TypedArrayName]]
-        typed_array_name: []const u8,
+        element_type: ElementType,
 
         /// [[ContentType]]
         content_type: enum { bigint, number },

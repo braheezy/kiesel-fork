@@ -585,12 +585,12 @@ fn prettyPrintStringIterator(
 
 fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
     const agent = typed_array.object.agent;
-    const typed_array_name = typed_array.fields.typed_array_name;
+    const element_type = typed_array.fields.element_type;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
-    try writer.print("{s}(", .{typed_array_name});
+    try writer.print("{s}(", .{element_type.typedArrayName()});
     try tty_config.setColor(writer, .reset);
     if (viewed_array_buffer.arrayBufferData()) |data| {
         const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
@@ -603,16 +603,15 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
             try writer.writeAll("[");
             try tty_config.setColor(writer, .reset);
             try writer.writeAll(" ");
-            inline for (builtins.typed_array.element_types) |entry| {
-                const name, const @"type" = entry;
-                if (std.mem.eql(u8, typed_array_name, name)) {
+            switch (element_type) {
+                inline else => |@"type"| {
                     const element_size = @"type".elementSize();
                     var i: u53 = 0;
                     while (i < data.items.len) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
                             data.items[@intCast(byte_offset + i)..@intCast(byte_offset + i + element_size)],
                         );
-                        const value = std.mem.bytesAsValue(@"type".T, bytes).*;
+                        const value = std.mem.bytesAsValue(@"type".type(), bytes).*;
                         const numeric = if (@"type".isBigIntElementType())
                             Value.from(BigInt.from(agent.gc_allocator, value) catch return)
                         else
@@ -620,8 +619,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                         if (i != 0) try writer.writeAll(", ");
                         try writer.print("{pretty}", .{numeric});
                     }
-                    break;
-                }
+                },
             }
             try writer.writeAll(" ");
             try tty_config.setColor(writer, .white);

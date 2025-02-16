@@ -48,17 +48,17 @@ fn validateIntegerTypedArray(
     //    is a growable SharedArrayBuffer.
     const ta = try validateTypedArray(agent, typed_array_value, .unordered);
     const typed_array = ta.object;
-    const name = typed_array.fields.typed_array_name;
+    const @"type" = typed_array.fields.element_type;
 
     // 3. If waitable is true, then
     if (waitable) {
         // a. If typedArray.[[TypedArrayName]] is neither "Int32Array" nor "BigInt64Array", throw a
         //    TypeError exception.
-        if (!std.mem.eql(u8, name, "Int32Array") and !std.mem.eql(u8, name, "BigInt64Array")) {
+        if (@"type" != .int32 and @"type" != .bigint64) {
             return agent.throwException(
                 .type_error,
                 "Only Int32Array and BigInt64Array can be waited on, got {s}",
-                .{name},
+                .{@"type".typedArrayName()},
             );
         }
     }
@@ -67,11 +67,7 @@ fn validateIntegerTypedArray(
         // a. Let type be TypedArrayElementType(typedArray).
         // b. If IsUnclampedIntegerElementType(type) is false and IsBigIntElementType(type) is
         //    false, throw a TypeError exception.
-        if (std.mem.eql(u8, name, "Uint8ClampedArray") or
-            std.mem.eql(u8, name, "Float16Array") or
-            std.mem.eql(u8, name, "Float32Array") or
-            std.mem.eql(u8, name, "Float64Array"))
-        {
+        if (!@"type".isUnclampedIntegerElementType() and !@"type".isBigIntElementType()) {
             return agent.throwException(
                 .type_error,
                 "Atomic operations are only supported on integer typed arrays",
@@ -201,11 +197,9 @@ fn doWait(
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
     // 5. Let arrayTypeName be typedArray.[[TypedArrayName]].
-    const array_type_name = typed_array.fields.typed_array_name;
-
     // 6. If arrayTypeName is "BigInt64Array", let v be ? ToBigInt64(value).
     // 7. Else, let v be ? ToInt32(value).
-    const v = if (std.mem.eql(u8, array_type_name, "BigInt64Array"))
+    const v = if (typed_array.fields.element_type == .bigint64)
         Value.from(try BigInt.from(agent.gc_allocator, try value.toBigInt64(agent)))
     else
         Value.from(try value.toInt32(agent));
@@ -261,10 +255,9 @@ fn doWait(
     // TODO: 17. Perform EnterCriticalSection(WL).
 
     // 18. Let elementType be TypedArrayElementType(typedArray).
-    const w = inline for (builtins.typed_array.element_types) |entry| {
-        const name, const @"type" = entry;
-        if (!@"type".isUnclampedIntegerElementType()) continue;
-        if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+    const w = switch (typed_array.fields.element_type) {
+        .uint8_clamped, .float16, .float32, .float64 => unreachable,
+        inline else => |@"type"| blk: {
             // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
             const w = getValueFromBuffer(
                 agent,
@@ -275,12 +268,12 @@ fn doWait(
                 .seq_cst,
                 null,
             );
-            break if (@"type".isBigIntElementType())
+            break :blk if (@"type".isBigIntElementType())
                 Value.from(try BigInt.from(agent.gc_allocator, w))
             else
                 Value.from(w);
-        }
-    } else unreachable;
+        },
+    };
 
     // 20. If v ≠ w, then
     if (!sameValue(v, w)) {
@@ -383,18 +376,17 @@ fn atomicReadModifyWrite(
     const buffer = typed_array.fields.viewed_array_buffer;
 
     // 6. Let elementType be TypedArrayElementType(typedArray).
-    inline for (builtins.typed_array.element_types) |entry| {
-        const name, const @"type" = entry;
-        if (!@"type".isUnclampedIntegerElementType()) continue;
-        // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @atomicRmw()
-        if (comptime @bitSizeOf(@"type".T) > builtin.target.ptrBitWidth()) {
-            return agent.throwException(
-                .internal_error,
-                "Atomic operation on {s} not supported on this platform",
-                .{name},
-            );
-        }
-        if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+    switch (typed_array.fields.element_type) {
+        .uint8_clamped, .float16, .float32, .float64 => unreachable,
+        inline else => |@"type"| {
+            // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @atomicRmw()
+            if (comptime @bitSizeOf(@"type".type()) > builtin.target.ptrBitWidth()) {
+                return agent.throwException(
+                    .internal_error,
+                    "Atomic operation on {s} not supported on this platform",
+                    .{@"type".typedArrayName()},
+                );
+            }
             // 7. Return GetModifySetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, op).
             const modified_value = try getModifySetValueInBuffer(
                 agent,
@@ -408,8 +400,8 @@ fn atomicReadModifyWrite(
                 Value.from(try BigInt.from(agent.gc_allocator, modified_value))
             else
                 Value.from(modified_value);
-        }
-    } else unreachable;
+        },
+    }
 }
 
 pub const namespace = struct {
@@ -521,18 +513,17 @@ pub const namespace = struct {
         // 8. Let elementSize be TypedArrayElementSize(typedArray).
         // 9. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's Agent Record.
         const is_little_endian = agent.little_endian;
-        inline for (builtins.typed_array.element_types) |entry| {
-            const name, const @"type" = entry;
-            if (!@"type".isUnclampedIntegerElementType()) continue;
-            // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @cmpxchgStrong()
-            if (comptime @bitSizeOf(@"type".T) > builtin.target.ptrBitWidth()) {
-                return agent.throwException(
-                    .internal_error,
-                    "Atomic operation on {s} not supported on this platform",
-                    .{name},
-                );
-            }
-            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+        switch (typed_array.fields.element_type) {
+            .uint8_clamped, .float16, .float32, .float64 => unreachable,
+            inline else => |@"type"| {
+                // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @cmpxchgStrong()
+                if (comptime @bitSizeOf(@"type".type()) > builtin.target.ptrBitWidth()) {
+                    return agent.throwException(
+                        .internal_error,
+                        "Atomic operation on {s} not supported on this platform",
+                        .{@"type".typedArrayName()},
+                    );
+                }
                 // 10. Let expectedBytes be NumericToRawBytes(elementType, expected, isLittleEndian).
                 const expected_bytes = try numericToRawBytes(
                     agent,
@@ -550,18 +541,18 @@ pub const namespace = struct {
                 );
 
                 const raw_bytes_read = block.items[@intCast(byte_index_in_buffer)..@intCast(byte_index_in_buffer + @"type".elementSize())];
-                var previous = std.mem.bytesToValue(@"type".T, raw_bytes_read);
+                var previous = std.mem.bytesToValue(@"type".type(), raw_bytes_read);
 
                 // 12. If IsSharedArrayBuffer(buffer) is true, then
                 if (buffer == .shared_array_buffer) {
                     // a. Let rawBytesRead be AtomicCompareExchangeInSharedBlock(block,
                     //    byteIndexInBuffer, elementSize, expectedBytes, replacementBytes).
-                    const ptr = std.mem.bytesAsValue(@"type".T, raw_bytes_read);
+                    const ptr = std.mem.bytesAsValue(@"type".type(), raw_bytes_read);
                     _ = @cmpxchgStrong(
-                        @"type".T,
-                        @as(*@"type".T, @alignCast(ptr)),
-                        std.mem.bytesToValue(@"type".T, &expected_bytes),
-                        std.mem.bytesToValue(@"type".T, &replacement_bytes),
+                        @"type".type(),
+                        @as(*@"type".type(), @alignCast(ptr)),
+                        std.mem.bytesToValue(@"type".type(), &expected_bytes),
+                        std.mem.bytesToValue(@"type".type(), &replacement_bytes),
                         .seq_cst,
                         .seq_cst,
                     );
@@ -588,8 +579,8 @@ pub const namespace = struct {
                     Value.from(try BigInt.from(agent.gc_allocator, value))
                 else
                     Value.from(value);
-            }
-        } else unreachable;
+            },
+        }
     }
 
     /// 25.4.7 Atomics.exchange ( typedArray, index, value )
@@ -649,10 +640,9 @@ pub const namespace = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 4. Let elementType be TypedArrayElementType(typedArray).
-        inline for (builtins.typed_array.element_types) |entry| {
-            const name, const @"type" = entry;
-            if (!@"type".isUnclampedIntegerElementType()) continue;
-            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+        switch (typed_array.fields.element_type) {
+            .uint8_clamped, .float16, .float32, .float64 => unreachable,
+            inline else => |@"type"| {
                 // 5. Return GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
                 const value = getValueFromBuffer(
                     agent,
@@ -667,8 +657,8 @@ pub const namespace = struct {
                     Value.from(try BigInt.from(agent.gc_allocator, value))
                 else
                     Value.from(value);
-            }
-        } else unreachable;
+            },
+        }
     }
 
     /// 25.4.15 Atomics.notify ( typedArray, index, count )
@@ -796,10 +786,9 @@ pub const namespace = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 6. Let elementType be TypedArrayElementType(typedArray).
-        inline for (builtins.typed_array.element_types) |entry| {
-            const name, const @"type" = entry;
-            if (!@"type".isUnclampedIntegerElementType()) continue;
-            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+        switch (typed_array.fields.element_type) {
+            .uint8_clamped, .float16, .float32, .float64 => unreachable,
+            inline else => |@"type"| {
                 // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true, seq-cst).
                 try setValueInBuffer(
                     agent,
@@ -811,9 +800,8 @@ pub const namespace = struct {
                     .seq_cst,
                     null,
                 );
-                break;
-            }
-        } else unreachable;
+            },
+        }
 
         // 8. Return v.
         return numeric_value;
