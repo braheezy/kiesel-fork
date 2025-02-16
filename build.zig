@@ -67,13 +67,23 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_nan_boxing", enable_nan_boxing);
     options.addOption(std.SemanticVersion, "version", version);
 
+    const libgc_cflags_extra: []const u8 = blk: {
+        var cflags: std.ArrayListUnmanaged([]const u8) = .empty;
+        defer cflags.deinit(b.allocator);
+        cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR") catch @panic("OOM");
+        if (optimize != .Debug) {
+            cflags.append(b.allocator, "-DNO_GETENV") catch @panic("OOM");
+        }
+        break :blk std.mem.join(b.allocator, " ", cflags.items) catch @panic("OOM");
+    };
+
     const any_pointer = b.dependency("any_pointer", .{});
     const args = b.dependency("args", .{});
     const libgc = b.dependency("libgc", .{
         .target = target,
         .optimize = optimize,
         .BUILD_SHARED_LIBS = false,
-        .CFLAGS_EXTRA = @as([]const u8, "-DNO_MSGBOX_ON_ERROR"),
+        .CFLAGS_EXTRA = libgc_cflags_extra,
         .enable_gcj_support = false,
         .enable_java_finalization = false,
         .enable_large_config = true,
