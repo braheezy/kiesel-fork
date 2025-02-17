@@ -163,11 +163,21 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             );
         }
 
-        // TODO: b. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        // b. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        const has_restricted_global = try env.hasRestrictedGlobalProperty(name);
+
         // c. NOTE: Global var and function bindings (except those that are introduced by
         //    non-strict direct eval) are non-configurable and are therefore restricted global
         //    properties.
-        // TODO: d. If hasRestrictedGlobal is true, throw a SyntaxError exception.
+
+        // d. If hasRestrictedGlobal is true, throw a SyntaxError exception.
+        if (has_restricted_global) {
+            return agent.throwException(
+                .syntax_error,
+                "Global object already has a non-configurable property '{}'",
+                .{name},
+            );
+        }
     }
 
     // 4. For each element name of varNames, do

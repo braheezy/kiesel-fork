@@ -202,6 +202,30 @@ pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool 
     return self.declarative_record.hasBinding(name);
 }
 
+/// 9.1.1.4.13 HasRestrictedGlobalProperty ( N )
+/// https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty
+pub fn hasRestrictedGlobalProperty(self: GlobalEnvironment, name: *const String) Agent.Error!bool {
+    // 1. Let ObjRec be envRec.[[ObjectRecord]].
+    // 2. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
+    const existing_property = try global_object.internal_methods.getOwnProperty(
+        global_object.agent,
+        global_object,
+        PropertyKey.from(name),
+    ) orelse {
+        // 4. If existingProp is undefined, return false.
+        return false;
+    };
+
+    // 5. If existingProp.[[Configurable]] is true, return false.
+    if (existing_property.configurable == true) return false;
+
+    // 6. Return true.
+    return true;
+}
+
 /// 9.1.1.4.14 CanDeclareGlobalVar ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
