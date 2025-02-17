@@ -175,7 +175,7 @@ pub const prototype = struct {
 
         // 11. If result is not an Object, then
         if (!result.isObject()) {
-            const type_error = try agent.createException(
+            const type_error = try agent.createErrorObject(
                 .type_error,
                 "Return value of iterator 'return' function must be object",
                 .{},
@@ -253,7 +253,7 @@ pub const prototype = struct {
 
         // 11. If result is not an Object, then
         if (!result.isObject()) {
-            const type_error = try agent.createException(
+            const type_error = try agent.createErrorObject(
                 .type_error,
                 "Return value of iterator 'throw' function must be object",
                 .{},

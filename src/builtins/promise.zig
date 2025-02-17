@@ -132,7 +132,7 @@ pub fn createResolvingFunctions(
             // 7. If SameValue(resolution, promise) is true, then
             if (sameValue(resolution, Value.from(&promise_.object))) {
                 // a. Let selfResolutionError be a newly created TypeError object.
-                const self_resolution_error = try agent_.createException(
+                const self_resolution_error = try agent_.createErrorObject(
                     .type_error,
                     "Cannot resolve promise with itself",
                     .{},
@@ -1196,7 +1196,7 @@ fn performPromiseAny(
             // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let error be a newly created AggregateError object.
-                const error_ = try agent.createException(
+                const error_ = try agent.createErrorObject(
                     .aggregate_error,
                     "All promises were rejected",
                     .{},
@@ -1288,7 +1288,7 @@ fn performPromiseAny(
                 // 10. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
                     // a. Let error be a newly created AggregateError object.
-                    const error_ = try agent_.createException(
+                    const error_ = try agent_.createErrorObject(
                         .aggregate_error,
                         "All promises were rejected",
                         .{},

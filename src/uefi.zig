@@ -124,7 +124,7 @@ pub fn main() std.os.uefi.Status {
                     "{}\n",
                     .{fmtParseErrorHint(parse_error, source_text)},
                 ) catch unreachable;
-                const syntax_error = agent.createException(
+                const syntax_error = agent.createErrorObject(
                     .syntax_error,
                     "{}",
                     .{fmtParseError(parse_error)},

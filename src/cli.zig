@@ -378,7 +378,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         error.ParseError => {
             const parse_error = diagnostics.errors.items[0];
             try stderr.print("{}\n", .{fmtParseErrorHint(parse_error, source_text)});
-            const syntax_error = try agent.createException(
+            const syntax_error = try agent.createErrorObject(
                 .syntax_error,
                 "{}",
                 .{fmtParseError(parse_error)},

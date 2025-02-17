@@ -122,7 +122,7 @@ pub fn checkStackOverflow(self: *Agent) error{ExceptionThrown}!void {
     }
 }
 
-const ExceptionType = enum {
+const ErrorType = enum {
     // NativeError types
     aggregate_error,
     eval_error,
@@ -149,23 +149,23 @@ const ExceptionType = enum {
     }
 };
 
-pub fn createException(
+pub fn createErrorObject(
     self: Agent,
-    comptime exception_type: ExceptionType,
+    comptime error_type: ErrorType,
     comptime fmt: []const u8,
     args: anytype,
 ) std.mem.Allocator.Error!*Object {
     const realm = self.currentRealm();
     const constructor = try @field(
         Realm.Intrinsics,
-        "%" ++ exception_type.typeName() ++ "%",
+        "%" ++ error_type.typeName() ++ "%",
     )(&realm.intrinsics);
     const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
     const error_object = constructor.construct(
         &.{Value.from(try String.fromUtf8(self.gc_allocator, message))},
         null,
     ) catch |err| try noexcept(err);
-    if (exception_type == .internal_error) {
+    if (error_type == .internal_error) {
         // We don't have a dedicated type for this, but let's at least adjust the name
         error_object.as(builtins.Error).fields.error_data.name = String.fromLiteral("InternalError");
     }
@@ -181,12 +181,12 @@ pub fn clearException(self: *Agent) Value {
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(
     self: *Agent,
-    comptime exception_type: ExceptionType,
+    comptime error_type: ErrorType,
     comptime fmt: []const u8,
     args: anytype,
 ) error{ExceptionThrown} {
-    self.exception = if (self.createException(
-        exception_type,
+    self.exception = if (self.createErrorObject(
+        error_type,
         fmt,
         args,
     )) |error_object|
