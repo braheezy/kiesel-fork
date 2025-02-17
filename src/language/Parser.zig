@@ -27,6 +27,7 @@ state: struct {
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
+    in_class_static_block: bool = false,
     in_default_export: bool = false,
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
@@ -1044,7 +1045,7 @@ pub fn acceptNewTarget(self: *Parser) AcceptError!void {
     _ = try self.core.accept(RuleSet.is(.@"."));
     _ = try self.acceptKeyword("target");
 
-    if (!self.state.in_function_body) {
+    if (!(self.state.in_formal_parameters or self.state.in_function_body or self.state.in_class_static_block)) {
         try self.emitErrorAt(token.location, "'new.target' is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
@@ -3582,6 +3583,9 @@ fn acceptClassElementName(self: *Parser) AcceptError!ast.ClassElementName {
 fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&self.state.in_class_static_block, true);
+    defer tmp.restore();
 
     const token = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList(.{});
