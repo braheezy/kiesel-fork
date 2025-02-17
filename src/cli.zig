@@ -438,7 +438,9 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .pending => unreachable,
                 .rejected => {
                     tracked_promise_rejections.clearAndFree(agent.gc_allocator);
-                    agent.exception = promise.fields.promise_result;
+                    agent.exception = .{
+                        .value = promise.fields.promise_result,
+                    };
                     break :blk error.ExceptionThrown;
                 },
                 .fulfilled => {
@@ -449,7 +451,9 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                         .pending => unreachable,
                         .rejected => {
                             tracked_promise_rejections.clearAndFree(agent.gc_allocator);
-                            agent.exception = promise.fields.promise_result;
+                            agent.exception = .{
+                                .value = promise.fields.promise_result,
+                            };
                             break :blk error.ExceptionThrown;
                         },
                         .fulfilled => {
@@ -465,7 +469,8 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
             return null;
         },
         error.ExceptionThrown => {
-            try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
+            const exception = agent.clearException();
+            try stderr.print("Uncaught exception: {pretty}\n", .{exception.value});
             return null;
         },
     };

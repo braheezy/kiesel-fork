@@ -203,7 +203,7 @@ pub fn asyncBlockStart(
                     // ii. Perform ! Call(promiseCapability.[[Reject]], undefined, « result.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
                         .undefined,
-                        &.{exception},
+                        &.{exception.value},
                     ) catch |err_| try noexcept(err_);
                 },
             }
@@ -326,7 +326,9 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
     switch (promise.as(builtins.Promise).fields.promise_state) {
         .pending => return Value.from(promise), // `await properAwait()` :)
         .rejected => {
-            agent.exception = promise.as(builtins.Promise).fields.promise_result;
+            agent.exception = .{
+                .value = promise.as(builtins.Promise).fields.promise_result,
+            };
             return error.ExceptionThrown;
         },
         .fulfilled => return promise.as(builtins.Promise).fields.promise_result,

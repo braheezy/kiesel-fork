@@ -157,7 +157,7 @@ fn continueDynamicImport(
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
-                &.{exception},
+                &.{exception.value},
             ) catch |err_| try noexcept(err_);
 
             // b. Return unused.
@@ -236,7 +236,7 @@ fn continueDynamicImport(
                     // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
                         .undefined,
-                        &.{exception},
+                        &.{exception.value},
                     ) catch |err_| try noexcept(err_);
 
                     // ii. Return unused.

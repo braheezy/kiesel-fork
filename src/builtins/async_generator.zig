@@ -328,7 +328,9 @@ pub fn asyncGeneratorStart(
                     .normal => closure_generator.fields.evaluation_state.vm.result = resume_completion.value.?,
                     .@"return" => break :blk resume_completion,
                     .throw => {
-                        agent_.exception = resume_completion.value.?;
+                        agent_.exception = .{
+                            .value = resume_completion.value.?,
+                        };
                         break :blk error.ExceptionThrown;
                     },
                     else => unreachable,
@@ -374,7 +376,7 @@ pub fn asyncGeneratorStart(
                 error.OutOfMemory => return error.OutOfMemory,
                 error.ExceptionThrown => blk: {
                     const exception = agent_.clearException();
-                    break :blk Completion.throw(exception);
+                    break :blk Completion.throw(exception.value);
                 },
             };
 
@@ -561,7 +563,7 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
         error.OutOfMemory => return error.OutOfMemory,
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            return Completion.throw(exception);
+            return Completion.throw(exception.value);
         },
     };
 
@@ -732,7 +734,8 @@ pub fn asyncGeneratorAwaitReturn(
 
         // 8. If promiseCompletion is an abrupt completion, then
         error.ExceptionThrown => {
-            const promise_completion = Completion.throw(agent.clearException());
+            const exception = agent.clearException();
+            const promise_completion = Completion.throw(exception.value);
 
             // a. Set generator.[[AsyncGeneratorState]] to completed.
             generator.fields.async_generator_state = .completed;

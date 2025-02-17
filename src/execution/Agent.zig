@@ -33,7 +33,7 @@ pre_allocated: struct {
     zero: *const BigInt,
     one: *const BigInt,
 },
-exception: ?Value = null,
+exception: ?Exception = null,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
@@ -45,6 +45,7 @@ platform: Platform,
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
 
+pub const Exception = @import("Agent/Exception.zig");
 pub const Platform = @import("Agent/Platform.zig");
 
 pub const Options = struct {
@@ -172,7 +173,7 @@ pub fn createErrorObject(
     return error_object;
 }
 
-pub fn clearException(self: *Agent) Value {
+pub fn clearException(self: *Agent) Exception {
     defer self.exception = null;
     return self.exception.?;
 }
@@ -185,7 +186,7 @@ pub fn throwException(
     comptime fmt: []const u8,
     args: anytype,
 ) error{ExceptionThrown} {
-    self.exception = if (self.createErrorObject(
+    const value = if (self.createErrorObject(
         error_type,
         fmt,
         args,
@@ -193,6 +194,9 @@ pub fn throwException(
         Value.from(error_object)
     else |_|
         Value.from("Out of memory");
+    self.exception = .{
+        .value = value,
+    };
     return error.ExceptionThrown;
 }
 

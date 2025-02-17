@@ -56,7 +56,7 @@ pub const PromiseCapability = struct {
                 const exception = agent.clearException();
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
-                _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception});
+                _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception.value});
 
                 // b. Return capability.[[Promise]].
                 return self.promise;
@@ -164,7 +164,7 @@ pub fn createResolvingFunctions(
                     const exception = agent_.clearException();
 
                     // a. Perform RejectPromise(promise, then.[[Value]]).
-                    try rejectPromise(agent_, promise_, exception);
+                    try rejectPromise(agent_, promise_, exception.value);
 
                     // b. Return undefined.
                     return .undefined;
@@ -534,7 +534,10 @@ pub fn newPromiseReactionJob(
                     break :blk Completion.normal(value)
                 else |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.ExceptionThrown => break :blk Completion.throw(agent_.exception.?),
+                    error.ExceptionThrown => {
+                        const exception = agent_.clearException();
+                        break :blk Completion.throw(exception.value);
+                    },
                 }
             };
 
@@ -642,11 +645,13 @@ pub fn newPromiseResolveThenableJob(
 
                 // c. If thenCallResult is an abrupt completion, then
                 error.ExceptionThrown => {
+                    const exception = agent_.clearException();
+
                     // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
                     return Value.from(resolving_functions.reject).callAssumeCallable(
                         .undefined,
-                        &.{agent_.exception.?},
+                        &.{exception.value},
                     );
                 },
             };
@@ -1214,7 +1219,9 @@ fn performPromiseAny(
                 }) catch |err| try noexcept(err);
 
                 // 3. Return ThrowCompletion(error).
-                agent.exception = Value.from(error_);
+                agent.exception = .{
+                    .value = Value.from(error_),
+                };
                 return error.ExceptionThrown;
             }
 
@@ -1608,7 +1615,7 @@ pub const constructor = struct {
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
                 _ = try Value.from(resolving_functions.reject).callAssumeCallable(
                     .undefined,
-                    &.{exception},
+                    &.{exception.value},
                 );
             },
         };
@@ -1875,7 +1882,7 @@ pub const constructor = struct {
                 const exception = agent.clearException();
                 _ = try Value.from(promise_capability.reject).callAssumeCallable(
                     .undefined,
-                    &.{exception},
+                    &.{exception.value},
                 );
             },
         }
@@ -2100,7 +2107,9 @@ pub const prototype = struct {
                             const reason_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
 
                             // 1. Return ThrowCompletion(reason).
-                            agent__.exception = reason_;
+                            agent__.exception = .{
+                                .value = reason_,
+                            };
                             return error.ExceptionThrown;
                         }
                     }.func;

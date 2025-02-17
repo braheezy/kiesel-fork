@@ -144,7 +144,7 @@ pub fn main() std.os.uefi.Status {
             error.OutOfMemory => return .out_of_resources,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                stderr.print("Uncaught exception: {pretty}\n", .{exception}) catch unreachable;
+                stderr.print("Uncaught exception: {pretty}\n", .{exception.value}) catch unreachable;
             },
         }
     }

@@ -81,7 +81,7 @@ host_defined: SafePointer,
 status: Status,
 
 /// [[EvaluationError]]
-evaluation_error: ?Value,
+evaluation_error: ?Agent.Exception,
 
 /// [[DFSIndex]]
 dfs_index: ?usize,
@@ -308,7 +308,7 @@ pub fn continueModuleLoading(
             // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(state.promise_capability.reject).callAssumeCallable(
                 .undefined,
-                &.{exception},
+                &.{exception.value},
             ) catch |err_| try noexcept(err_);
         },
     }
@@ -697,7 +697,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
             // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
             _ = Value.from(capability.reject).callAssumeCallable(
                 .undefined,
-                &.{exception},
+                &.{exception.value},
             ) catch |err_| try noexcept(err_);
         },
     }
@@ -754,7 +754,9 @@ fn innerModuleEvaluation(
         // c. If promise.[[PromiseState]] is rejected, then
         if (promise.fields.promise_state == .rejected) {
             // i. Return ThrowCompletion(promise.[[PromiseResult]]).
-            agent.exception = promise.fields.promise_result;
+            agent.exception = .{
+                .value = promise.fields.promise_result,
+            };
             return error.ExceptionThrown;
         }
 
@@ -972,7 +974,9 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             const @"error" = arguments.get(0);
 
             // a. Perform AsyncModuleExecutionRejected(module, error).
-            try asyncModuleExecutionRejected(module_, @"error");
+            try asyncModuleExecutionRejected(module_, .{
+                .value = @"error",
+            });
 
             // b. Return undefined.
             return .undefined;
@@ -1163,7 +1167,7 @@ fn asyncModuleExecutionFulfilled(
 /// https://tc39.es/ecma262/#sec-async-module-execution-rejected
 fn asyncModuleExecutionRejected(
     module: *SourceTextModule,
-    @"error": Value,
+    @"error": Agent.Exception,
 ) std.mem.Allocator.Error!void {
     // 1. If module.[[Status]] is evaluated, then
     if (module.status == .evaluated) {
@@ -1210,7 +1214,7 @@ fn asyncModuleExecutionRejected(
         // b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]], undefined, « error »).
         _ = Value.from(top_level_capability.reject).callAssumeCallable(
             .undefined,
-            &.{@"error"},
+            &.{@"error".value},
         ) catch |err| try noexcept(err);
     }
 

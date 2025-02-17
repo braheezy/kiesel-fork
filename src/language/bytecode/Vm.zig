@@ -66,7 +66,7 @@ reference_stack: std.ArrayListUnmanaged(Reference),
 exception_jump_target_stack: std.ArrayListUnmanaged(usize),
 function_arguments: std.ArrayListUnmanaged(Value),
 result: ?Value = null,
-exception: ?Value = null,
+exception: ?Agent.Exception = null,
 cached_this_value: ?Value = null,
 
 pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
@@ -1397,7 +1397,7 @@ fn executeLoadConstant(
 }
 
 fn executeLoadAndClearException(self: *Vm, _: Executable) Agent.Error!void {
-    const value = self.exception.?;
+    const value = self.exception.?.value;
     self.exception = null;
     try self.stack.append(self.agent.gc_allocator, value);
 }
@@ -1708,8 +1708,8 @@ fn executeRestoreLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeRethrowExceptionIfAny(self: *Vm, _: Executable) Agent.Error!void {
-    if (self.exception) |value| {
-        self.agent.exception = value;
+    if (self.exception) |exception| {
+        self.agent.exception = exception;
         return error.ExceptionThrown;
     }
 }
@@ -1734,7 +1734,9 @@ fn executeStoreConstant(
 
 fn executeThrow(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
-    self.agent.exception = value;
+    self.agent.exception = .{
+        .value = value,
+    };
     return error.ExceptionThrown;
 }
 

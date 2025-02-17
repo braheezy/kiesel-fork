@@ -163,7 +163,9 @@ pub fn generatorStart(
                     .normal => closure_generator.fields.evaluation_state.vm.result = resume_completion.value.?,
                     .@"return" => break :blk resume_completion,
                     .throw => {
-                        agent_.exception = resume_completion.value.?;
+                        agent_.exception = .{
+                            .value = resume_completion.value.?,
+                        };
                         break :blk error.ExceptionThrown;
                     },
                     else => unreachable,
@@ -347,7 +349,9 @@ pub fn generatorResumeAbrupt(
 
         // b. Return ? abruptCompletion.
         std.debug.assert(abrupt_completion.type == .throw);
-        agent.exception = abrupt_completion.value.?;
+        agent.exception = .{
+            .value = abrupt_completion.value.?,
+        };
         return error.ExceptionThrown;
     }
 
