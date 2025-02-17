@@ -18,8 +18,16 @@ pub const ScriptOrModule = union(enum) {
     module: *SourceTextModule,
 };
 
+pub const Origin = union(enum) {
+    function: *Object,
+    eval,
+    script,
+    module,
+    realm,
+};
+
 /// Function
-function: ?*Object,
+origin: Origin,
 
 /// Realm
 realm: *Realm,

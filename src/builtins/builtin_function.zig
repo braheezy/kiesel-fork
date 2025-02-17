@@ -110,7 +110,7 @@ pub fn builtinCallOrConstruct(
     const callee_context = try agent.gc_allocator.create(ExecutionContext);
     callee_context.* = .{
         // 4. Set the Function of calleeContext to F.
-        .function = &builtin_function.object,
+        .origin = .{ .function = &builtin_function.object },
 
         // 5. Let calleeRealm be F.[[Realm]].
         // 6. Set the Realm of calleeContext to calleeRealm.

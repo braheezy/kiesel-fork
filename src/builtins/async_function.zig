@@ -328,6 +328,8 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
         .rejected => {
             agent.exception = .{
                 .value = promise.as(builtins.Promise).fields.promise_result,
+                // TODO: Capture stack when rejecting a promise
+                .stack = &.{},
             };
             return error.ExceptionThrown;
         },

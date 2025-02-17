@@ -756,6 +756,8 @@ fn innerModuleEvaluation(
             // i. Return ThrowCompletion(promise.[[PromiseResult]]).
             agent.exception = .{
                 .value = promise.fields.promise_result,
+                // TODO: Capture stack when rejecting a promise
+                .stack = &.{},
             };
             return error.ExceptionThrown;
         }
@@ -976,6 +978,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             // a. Perform AsyncModuleExecutionRejected(module, error).
             try asyncModuleExecutionRejected(module_, .{
                 .value = @"error",
+                .stack = try agent_.captureStack(),
             });
 
             // b. Return undefined.
@@ -1596,7 +1599,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     const module_context = try agent.gc_allocator.create(ExecutionContext);
     module_context.* = .{
         // 9. Set the Function of moduleContext to null.
-        .function = null,
+        .origin = .module,
 
         // 10. Assert: module.[[Realm]] is not undefined.
         // 11. Set the Realm of moduleContext to module.[[Realm]].
@@ -1733,7 +1736,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
     const module_context = try agent.gc_allocator.create(ExecutionContext);
     module_context.* = .{
         // 2. Set the Function of moduleContext to null.
-        .function = null,
+        .origin = .module,
 
         // 3. Set the Realm of moduleContext to module.[[Realm]].
         .realm = self.realm,

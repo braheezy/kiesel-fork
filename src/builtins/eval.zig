@@ -126,7 +126,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     const eval_context = try agent.gc_allocator.create(ExecutionContext);
     eval_context.* = .{
         // 21. Set evalContext's Function to null.
-        .function = null,
+        .origin = .eval,
 
         // 22. Set evalContext's Realm to evalRealm.
         .realm = eval_realm,

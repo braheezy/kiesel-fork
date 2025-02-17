@@ -196,8 +196,27 @@ pub fn throwException(
         Value.from("Out of memory");
     self.exception = .{
         .value = value,
+        .stack = self.captureStack() catch &.{},
     };
     return error.ExceptionThrown;
+}
+
+/// Capture stack frames for an exception, skipping the Realm's root execution context and the
+/// script or module execution context if present.
+pub fn captureStack(self: *Agent) std.mem.Allocator.Error!Exception.Stack {
+    var stack: std.ArrayListUnmanaged(Exception.StackFrame) = .empty;
+    errdefer stack.deinit(self.gc_allocator);
+    for (self.execution_context_stack.items) |execution_context| {
+        switch (execution_context.origin) {
+            .function, .eval => {
+                try stack.append(self.gc_allocator, .{
+                    .origin = execution_context.origin,
+                });
+            },
+            .script, .module, .realm => {},
+        }
+    }
+    return stack.toOwnedSlice(self.gc_allocator);
 }
 
 /// https://tc39.es/ecma262/#running-execution-context
@@ -220,7 +239,7 @@ pub fn currentRealm(self: Agent) *Realm {
 pub fn activeFunctionObject(self: Agent) *Object {
     // The value of the Function component of the running execution context is also called the
     // active function object.
-    return self.runningExecutionContext().function.?;
+    return self.runningExecutionContext().origin.function;
 }
 
 /// 9.4.1 GetActiveScriptOrModule ( )

@@ -82,7 +82,7 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     const script_context = try agent.gc_allocator.create(ExecutionContext);
     script_context.* = .{
         // 3. Set the Function of scriptContext to null.
-        .function = null,
+        .origin = .script,
 
         // 4. Set the Realm of scriptContext to scriptRecord.[[Realm]].
         .realm = self.realm,

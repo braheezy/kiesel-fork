@@ -330,6 +330,7 @@ pub fn asyncGeneratorStart(
                     .throw => {
                         agent_.exception = .{
                             .value = resume_completion.value.?,
+                            .stack = try agent_.captureStack(),
                         };
                         break :blk error.ExceptionThrown;
                     },

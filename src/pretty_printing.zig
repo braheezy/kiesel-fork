@@ -3,8 +3,10 @@ const std = @import("std");
 
 const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
+const execution = @import("execution.zig");
 const types = @import("types.zig");
 
+const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -910,6 +912,8 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
     const name = object.getPropertyValueDirect(PropertyKey.from("name")).asString();
     const tty_config = state.tty_config;
 
+    try tty_config.setColor(writer, .bold);
+    try tty_config.setColor(writer, .blue);
     if (object.is(builtins.ECMAScriptFunction)) {
         const function_body = object.as(builtins.ECMAScriptFunction).fields.ecmascript_code;
         switch (function_body.type) {
@@ -921,10 +925,9 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
     } else {
         try writer.writeAll("fn ");
     }
+    try tty_config.setColor(writer, .reset);
     if (!name.isEmpty()) {
-        try tty_config.setColor(writer, .red);
         try writer.print("{}", .{name});
-        try tty_config.setColor(writer, .reset);
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<anonymous>");
@@ -1087,4 +1090,28 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
     try tty_config.setColor(writer, color);
     try writer.print("{}", .{value});
     try tty_config.setColor(writer, .reset);
+}
+
+pub fn prettyPrintException(exception: Agent.Exception, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = state.tty_config;
+    try writer.print("Uncaught exception: {pretty}", .{exception.value});
+    var it = std.mem.reverseIterator(exception.stack);
+    while (it.next()) |stack_frame| {
+        try writer.writeAll("\n  at ");
+        switch (stack_frame.origin) {
+            .function => |function| {
+                try writer.print("{pretty}", .{Value.from(function)});
+            },
+            .eval => {
+                // Keep this in sync with prettyPrintFunction()
+                try tty_config.setColor(writer, .bold);
+                try tty_config.setColor(writer, .blue);
+                try writer.writeAll("fn");
+                try tty_config.setColor(writer, .reset);
+                try writer.writeAll(" eval");
+            },
+            // These should never be recorded
+            .realm, .script, .module => unreachable,
+        }
+    }
 }

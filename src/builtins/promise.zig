@@ -1221,6 +1221,7 @@ fn performPromiseAny(
                 // 3. Return ThrowCompletion(error).
                 agent.exception = .{
                     .value = Value.from(error_),
+                    .stack = try agent.captureStack(),
                 };
                 return error.ExceptionThrown;
             }
@@ -2109,6 +2110,7 @@ pub const prototype = struct {
                             // 1. Return ThrowCompletion(reason).
                             agent__.exception = .{
                                 .value = reason_,
+                                .stack = try agent__.captureStack(),
                             };
                             return error.ExceptionThrown;
                         }

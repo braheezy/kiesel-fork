@@ -410,7 +410,7 @@ fn prepareForOrdinaryCall(
     const callee_context = try agent.gc_allocator.create(ExecutionContext);
     callee_context.* = .{
         // 3. Set the Function of calleeContext to F.
-        .function = &function.object,
+        .origin = .{ .function = &function.object },
 
         // 4. Let calleeRealm be F.[[Realm]].
         // 5. Set the Realm of calleeContext to calleeRealm.

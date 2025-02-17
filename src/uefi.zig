@@ -129,10 +129,11 @@ pub fn main() std.os.uefi.Status {
                     "{}",
                     .{fmtParseError(parse_error)},
                 ) catch return .out_of_resources;
-                stderr.print(
-                    "Uncaught exception: {pretty}\n",
-                    .{Value.from(syntax_error)},
-                ) catch unreachable;
+                const exception: Agent.Exception = .{
+                    .value = Value.from(syntax_error),
+                    .stack = &.{},
+                };
+                stderr.print("{pretty}\n", .{exception}) catch unreachable;
                 continue;
             },
             error.OutOfMemory => return .out_of_resources,
@@ -144,7 +145,7 @@ pub fn main() std.os.uefi.Status {
             error.OutOfMemory => return .out_of_resources,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                stderr.print("Uncaught exception: {pretty}\n", .{exception.value}) catch unreachable;
+                stderr.print("{pretty}\n", .{exception}) catch unreachable;
             },
         }
     }

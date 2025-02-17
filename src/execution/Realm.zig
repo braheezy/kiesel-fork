@@ -88,7 +88,7 @@ pub fn initializeHostDefinedRealm(
     const new_context = try agent.gc_allocator.create(ExecutionContext);
     new_context.* = .{
         // 6. Set the Function of newContext to null.
-        .function = null,
+        .origin = .realm,
 
         // 7. Set the Realm of newContext to realm.
         .realm = realm,

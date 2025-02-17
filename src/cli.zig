@@ -383,7 +383,11 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 "{}",
                 .{fmtParseError(parse_error)},
             );
-            try stderr.print("Uncaught exception: {pretty}\n", .{Value.from(syntax_error)});
+            const exception: Agent.Exception = .{
+                .value = Value.from(syntax_error),
+                .stack = &.{},
+            };
+            try stderr.print("{pretty}\n", .{exception});
             return null;
         },
         error.OutOfMemory => return error.OutOfMemory,
@@ -440,6 +444,8 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                     tracked_promise_rejections.clearAndFree(agent.gc_allocator);
                     agent.exception = .{
                         .value = promise.fields.promise_result,
+                        // TODO: Capture stack when rejecting a promise
+                        .stack = &.{},
                     };
                     break :blk error.ExceptionThrown;
                 },
@@ -453,6 +459,8 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                             tracked_promise_rejections.clearAndFree(agent.gc_allocator);
                             agent.exception = .{
                                 .value = promise.fields.promise_result,
+                                // TODO: Capture stack when rejecting a promise
+                                .stack = &.{},
                             };
                             break :blk error.ExceptionThrown;
                         },
@@ -470,7 +478,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            try stderr.print("Uncaught exception: {pretty}\n", .{exception.value});
+            try stderr.print("{pretty}\n", .{exception});
             return null;
         },
     };
