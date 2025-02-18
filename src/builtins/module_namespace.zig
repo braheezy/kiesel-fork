@@ -249,14 +249,17 @@ fn ownPropertyKeys(
     const exports = object.as(ModuleNamespace).fields.exports;
 
     // 2. Let symbolKeys be OrdinaryOwnPropertyKeys(O).
+    var symbol_keys = try ordinaryOwnPropertyKeys(agent, object);
+    defer symbol_keys.deinit(agent.gc_allocator);
+
     // 3. Return the list-concatenation of exports and symbolKeys.
-    var keys = try ordinaryOwnPropertyKeys(agent, object);
-    try keys.ensureUnusedCapacity(agent.gc_allocator, exports.len);
+    var keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
+    try keys.ensureUnusedCapacity(agent.gc_allocator, exports.len + symbol_keys.items.len);
     for (exports) |name| {
-        keys.appendAssumeCapacity(
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-        );
+        const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+        keys.appendAssumeCapacity(property_key);
     }
+    keys.appendSliceAssumeCapacity(symbol_keys.items);
     return keys;
 }
 
