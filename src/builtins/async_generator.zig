@@ -640,24 +640,14 @@ pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
     generator: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
-    // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
+    // 1. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
     std.debug.assert(generator.fields.async_generator_state == .draining_queue);
 
     // 2. Let queue be generator.[[AsyncGeneratorQueue]].
     const queue = &generator.fields.async_generator_queue;
 
-    // 3. If queue is empty, then
-    if (queue.items.len == 0) {
-        // a. Set generator.[[AsyncGeneratorState]] to completed.
-        generator.fields.async_generator_state = .completed;
-
-        // b. Return unused.
-        return;
-    }
-
-    // 4. Let done be false.
-    // 5. Repeat, while done is false,
-    while (true) {
+    // 3. Repeat, while queue is not empty,
+    while (queue.items.len != 0) {
         // a. Let next be the first element of queue.
         const next = queue.items[0];
 
@@ -669,8 +659,8 @@ pub fn asyncGeneratorDrainQueue(
             // i. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
 
-            // ii. Set done to true.
-            break;
+            // ii. Return unused.
+            return;
         }
         // d. Else,
         else {
@@ -682,19 +672,13 @@ pub fn asyncGeneratorDrainQueue(
 
             // ii. Perform AsyncGeneratorCompleteStep(generator, completion, true).
             try asyncGeneratorCompleteStep(agent, generator, completion, true, null);
-
-            // iii. If queue is empty, then
-            if (queue.items.len == 0) {
-                // 1. Set generator.[[AsyncGeneratorState]] to completed.
-                generator.fields.async_generator_state = .completed;
-
-                // 2. Set done to true.
-                break;
-            }
         }
     }
 
-    // 6. Return unused.
+    // 4. Set generator.[[AsyncGeneratorState]] to completed.
+    generator.fields.async_generator_state = .completed;
+
+    // 5. Return unused.
 }
 
 /// 27.6.3.9 AsyncGeneratorAwaitReturn ( generator )
