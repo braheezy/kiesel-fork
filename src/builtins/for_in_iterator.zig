@@ -64,7 +64,7 @@ pub const prototype = struct {
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Assert: O is an Object.
-        // 3. Assert: O has all of the internal slots of a For-In Iterator Instance (14.7.5.10.3).
+        // 3. Assert: O has all of the internal slots of a For-In Iterator instance (14.7.5.10.3).
         std.debug.assert(this_value.isObject());
         std.debug.assert(this_value.asObject().is(ForInIterator));
         const for_in_iterator = this_value.asObject().as(ForInIterator);
