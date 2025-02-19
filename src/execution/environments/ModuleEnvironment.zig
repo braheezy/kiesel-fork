@@ -101,7 +101,7 @@ pub fn getThisBinding(_: ModuleEnvironment) Value {
     return .undefined;
 }
 
-/// 9.1.1.5.5 CreateImportBinding ( N, M, N2 )
+/// 9.1.1.5.5 CreateImportBinding ( envRec, N, M, N2 )
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
     self: *ModuleEnvironment,

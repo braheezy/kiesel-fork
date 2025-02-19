@@ -5,7 +5,6 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
@@ -13,7 +12,6 @@ const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const PrivateName = types.PrivateName;
 const Reference = types.Reference;
-const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
 
@@ -158,33 +156,6 @@ pub const Environment = union(enum) {
             => unreachable,
             .global_environment => |env| Value.from(env.getThisBinding()),
             inline else => |env| env.getThisBinding(),
-        };
-    }
-
-    pub fn bindThisValue(self: Environment, value: Value) error{ExceptionThrown}!Value {
-        return switch (self) {
-            .function_environment => |env| env.bindThisValue(value),
-            else => unreachable,
-        };
-    }
-
-    pub fn getSuperBase(self: Environment) std.mem.Allocator.Error!Value {
-        return switch (self) {
-            .function_environment => |env| env.getSuperBase(),
-            else => unreachable,
-        };
-    }
-
-    pub fn createImportBinding(
-        self: Environment,
-        agent: *Agent,
-        name: *const String,
-        module: *SourceTextModule,
-        binding_name: *const String,
-    ) std.mem.Allocator.Error!void {
-        return switch (self) {
-            .module_environment => |env| env.createImportBinding(agent, name, module, binding_name),
-            else => unreachable,
         };
     }
 };

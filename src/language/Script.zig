@@ -154,7 +154,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     for (lexical_names.items) |name_utf8| {
         const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
 
-        // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+        // a. If HasVarDeclaration(env, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
@@ -163,7 +163,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             );
         }
 
-        // b. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        // b. Let hasRestrictedGlobal be ? HasRestrictedGlobalProperty(env, name).
         const has_restricted_global = try env.hasRestrictedGlobalProperty(name);
 
         // c. NOTE: Global var and function bindings (except those that are introduced by
@@ -184,7 +184,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     for (var_names.items) |name_utf8| {
         const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
 
-        // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+        // a. If HasLexicalDeclaration(env, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
@@ -226,7 +226,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
             // iv. If declaredFunctionNames does not contain fn, then
             if (!declared_function_names.contains(function_name)) {
-                // 1. Let fnDefinable be ? env.CanDeclareGlobalFunction(fn).
+                // 1. Let fnDefinable be ? CanDeclareGlobalFunction(env, fn).
                 const function_definable = try env.canDeclareGlobalFunction(function_name);
 
                 // 2. If fnDefinable is false, throw a TypeError exception.
@@ -268,7 +268,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
-                    // a. Let vnDefinable be ? env.CanDeclareGlobalVar(vn).
+                    // a. Let vnDefinable be ? CanDeclareGlobalVar(env, vn).
                     const var_name_definable = try env.canDeclareGlobalVar(var_name);
 
                     // b. If vnDefinable is false, throw a TypeError exception.
@@ -343,7 +343,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, .{ .global_environment = env }, private_env),
         };
 
-        // c. Perform ? env.CreateGlobalFunctionBinding(fn, fo, false).
+        // c. Perform ? CreateGlobalFunctionBinding(env, fn, fo, false).
         try env.createGlobalFunctionBinding(agent, function_name, Value.from(function_object), false);
     }
 
@@ -352,7 +352,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     while (it_.next()) |ptr| {
         const var_name = ptr.*;
 
-        // a. Perform ? env.CreateGlobalVarBinding(vn, false).
+        // a. Perform ? CreateGlobalVarBinding(env, vn, false).
         try env.createGlobalVarBinding(agent, var_name, false);
     }
 

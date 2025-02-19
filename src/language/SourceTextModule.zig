@@ -1583,9 +1583,9 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
             }
             // iv. Else,
             else {
-                // 1. Perform env.CreateImportBinding(in.[[LocalName]], resolution.[[Module]],
+                // 1. Perform CreateImportBinding(env, in.[[LocalName]], resolution.[[Module]],
                 //    resolution.[[BindingName]]).
-                try env.createImportBinding(
+                try env.module_environment.createImportBinding(
                     agent,
                     local_name,
                     resolution.module.source_text_module,

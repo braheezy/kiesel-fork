@@ -488,11 +488,10 @@ pub fn ordinaryCallBindThis(
     };
 
     // 7. Assert: localEnv is a Function Environment Record.
-    std.debug.assert(local_env == .function_environment);
-
-    // 8. Assert: The next step never returns an abrupt completion because localEnv.[[ThisBindingStatus]] is not initialized.
-    // 9. Perform ! localEnv.BindThisValue(thisValue).
-    _ = local_env.bindThisValue(this_value) catch unreachable;
+    // 8. Assert: The next step never returns an abrupt completion because
+    //    localEnv.[[ThisBindingStatus]] is not initialized.
+    // 9. Perform ! BindThisValue(localEnv, thisValue).
+    local_env.function_environment.bindThisValue(this_value) catch unreachable;
 
     // 10. Return unused.
 }

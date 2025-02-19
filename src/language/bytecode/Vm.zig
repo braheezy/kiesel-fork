@@ -927,17 +927,18 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
     // 7. Let thisER be GetThisEnvironment().
     const this_environment = self.agent.getThisEnvironment();
 
-    // 8. Perform ? thisER.BindThisValue(result).
-    _ = try this_environment.bindThisValue(Value.from(result));
+    // 8. Assert: thisER is a Function Environment Record.
+    // 9. Perform ? BindThisValue(thisER, result).
+    try this_environment.function_environment.bindThisValue(Value.from(result));
 
-    // 9. Let F be thisER.[[FunctionObject]].
-    // 10. Assert: F is an ECMAScript function object.
+    // 10. Let F be thisER.[[FunctionObject]].
+    // 11. Assert: F is an ECMAScript function object.
     const constructor = &this_environment.function_environment.function_object.object;
 
-    // 11. Perform ? InitializeInstanceElements(result, F).
+    // 12. Perform ? InitializeInstanceElements(result, F).
     try result.initializeInstanceElements(constructor);
 
-    // 12. Return result.
+    // 13. Return result.
     self.result = Value.from(result);
 }
 
@@ -1494,10 +1495,11 @@ fn executeMakeSuperPropertyReference(self: *Vm, strict: bool, _: Executable) Age
     // 2. Assert: env.HasSuperBinding() is true.
     std.debug.assert(env.hasSuperBinding());
 
-    // 3. Let baseValue be env.GetSuperBase().
-    const base_value = try env.getSuperBase();
+    // 3. Assert: env is a Function Environment Record.
+    // 4. Let baseValue be GetSuperBase(env).
+    const base_value = try env.function_environment.getSuperBase();
 
-    // 4. Return the Reference Record {
+    // 5. Return the Reference Record {
     //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
     //    }.
     const reference: Reference = .{

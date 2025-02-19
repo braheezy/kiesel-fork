@@ -194,7 +194,7 @@ pub fn getThisBinding(self: GlobalEnvironment) *Object {
     return self.global_this_value;
 }
 
-/// 9.1.1.4.12 HasLexicalDeclaration ( N )
+/// 9.1.1.4.12 HasLexicalDeclaration ( envRec, N )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
 pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool {
     // 1.Let DclRec be envRec.[[DeclarativeRecord]].
@@ -202,7 +202,7 @@ pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool 
     return self.declarative_record.hasBinding(name);
 }
 
-/// 9.1.1.4.13 HasRestrictedGlobalProperty ( N )
+/// 9.1.1.4.13 HasRestrictedGlobalProperty ( envRec, N )
 /// https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty
 pub fn hasRestrictedGlobalProperty(self: GlobalEnvironment, name: *const String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
@@ -226,7 +226,7 @@ pub fn hasRestrictedGlobalProperty(self: GlobalEnvironment, name: *const String)
     return true;
 }
 
-/// 9.1.1.4.14 CanDeclareGlobalVar ( N )
+/// 9.1.1.4.14 CanDeclareGlobalVar ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
@@ -243,7 +243,7 @@ pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.
     return global_object.isExtensible();
 }
 
-/// 9.1.1.4.15 CanDeclareGlobalFunction ( N )
+/// 9.1.1.4.15 CanDeclareGlobalFunction ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
 pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
@@ -273,7 +273,7 @@ pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) A
     return false;
 }
 
-/// 9.1.1.4.16 CreateGlobalVarBinding ( N, D )
+/// 9.1.1.4.16 CreateGlobalVarBinding ( envRec, N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
     self: *GlobalEnvironment,
@@ -303,7 +303,7 @@ pub fn createGlobalVarBinding(
     // 6. Return unused.
 }
 
-/// 9.1.1.4.17 CreateGlobalFunctionBinding ( N, V, D )
+/// 9.1.1.4.17 CreateGlobalFunctionBinding ( envRec, N, V, D )
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
     self: *GlobalEnvironment,

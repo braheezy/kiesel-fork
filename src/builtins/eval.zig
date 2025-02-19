@@ -211,7 +211,7 @@ fn evalDeclarationInstantiation(
             for (var_names.items) |name_utf8| {
                 const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
 
-                // 1. If varEnv.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+                // 1. If HasLexicalDeclaration(varEnv, name) is true, throw a SyntaxError exception.
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
                     return agent.throwException(
                         .syntax_error,
@@ -289,7 +289,7 @@ fn evalDeclarationInstantiation(
             if (!declared_function_names.contains(function_name)) {
                 // 1. If varEnv is a Global Environment Record, then
                 if (var_env == .global_environment) {
-                    // a. Let fnDefinable be ? varEnv.CanDeclareGlobalFunction(fn).
+                    // a. Let fnDefinable be ? CanDeclareGlobalFunction(varEnv, fn).
                     const function_definable = try var_env.global_environment.canDeclareGlobalFunction(function_name);
 
                     // b. If fnDefinable is false, throw a TypeError exception.
@@ -334,7 +334,7 @@ fn evalDeclarationInstantiation(
                 if (!declared_function_names.contains(var_name)) {
                     // a. If varEnv is a Global Environment Record, then
                     if (var_env == .global_environment) {
-                        // i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
+                        // i. Let vnDefinable be ? CanDeclareGlobalVar(varEn, vn).
                         const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(var_name);
 
                         // ii. If vnDefinable is false, throw a TypeError exception.
@@ -407,7 +407,7 @@ fn evalDeclarationInstantiation(
 
         // c. If varEnv is a Global Environment Record, then
         if (var_env == .global_environment) {
-            // i. Perform ? varEnv.CreateGlobalFunctionBinding(fn, fo, true).
+            // i. Perform ? CreateGlobalFunctionBinding(varEnv, fn, fo, true).
             try var_env.global_environment.createGlobalFunctionBinding(
                 agent,
                 function_name,
@@ -459,7 +459,7 @@ fn evalDeclarationInstantiation(
 
         // a. If varEnv is a Global Environment Record, then
         if (var_env == .global_environment) {
-            // i. Perform ? varEnv.CreateGlobalVarBinding(vn, true).
+            // i. Perform ? CreateGlobalVarBinding(varEnv, vn, true).
             try var_env.global_environment.createGlobalVarBinding(agent, var_name, true);
         }
         // b. Else,
