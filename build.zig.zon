@@ -23,8 +23,9 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/47e0ef445d1aa48b8c48ef166b117386e4e0100c.tar.gz",
-            .hash = "12205ce7e6d86ca2ee36d99ae2f6ecc6eb39cc1263f5064d9c58c3325371708f5bf0",
+            // FIXME: This points to https://github.com/ivmai/bdwgc/pull/706, update once merged
+            .url = "https://github.com/ivmai/bdwgc/archive/1574d38e92009f850b5145fa994879ca7e3a8cd5.tar.gz",
+            .hash = "1220a1391ef5c780e43d5f85a5ea8eda32c3bd06be04f5667adb3dfe9f276c37b385",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/43ffb2ad0886d9684663274026495b67ecd8a753.tar.gz",
