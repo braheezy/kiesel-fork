@@ -131,7 +131,7 @@ pub fn main() std.os.uefi.Status {
                 ) catch return .out_of_resources;
                 const exception: Agent.Exception = .{
                     .value = Value.from(syntax_error),
-                    .stack = &.{},
+                    .stack_trace = &.{},
                 };
                 stderr.print("{pretty}\n", .{exception}) catch unreachable;
                 continue;

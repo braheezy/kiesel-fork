@@ -165,7 +165,7 @@ pub fn generatorStart(
                     .throw => {
                         agent_.exception = .{
                             .value = resume_completion.value.?,
-                            .stack = try agent_.captureStack(),
+                            .stack_trace = try agent_.captureStackTrace(),
                         };
                         break :blk error.ExceptionThrown;
                     },
@@ -352,7 +352,7 @@ pub fn generatorResumeAbrupt(
         std.debug.assert(abrupt_completion.type == .throw);
         agent.exception = .{
             .value = abrupt_completion.value.?,
-            .stack = try agent.captureStack(),
+            .stack_trace = try agent.captureStackTrace(),
         };
         return error.ExceptionThrown;
     }

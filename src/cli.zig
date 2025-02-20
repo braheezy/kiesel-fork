@@ -385,7 +385,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
             );
             const exception: Agent.Exception = .{
                 .value = Value.from(syntax_error),
-                .stack = &.{},
+                .stack_trace = &.{},
             };
             try stderr.print("{pretty}\n", .{exception});
             return null;
@@ -445,7 +445,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                     agent.exception = .{
                         .value = promise.fields.promise_result,
                         // TODO: Capture stack when rejecting a promise
-                        .stack = &.{},
+                        .stack_trace = &.{},
                     };
                     break :blk error.ExceptionThrown;
                 },
@@ -460,7 +460,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                             agent.exception = .{
                                 .value = promise.fields.promise_result,
                                 // TODO: Capture stack when rejecting a promise
-                                .stack = &.{},
+                                .stack_trace = &.{},
                             };
                             break :blk error.ExceptionThrown;
                         },

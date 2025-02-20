@@ -757,7 +757,7 @@ fn innerModuleEvaluation(
             agent.exception = .{
                 .value = promise.fields.promise_result,
                 // TODO: Capture stack when rejecting a promise
-                .stack = &.{},
+                .stack_trace = &.{},
             };
             return error.ExceptionThrown;
         }
@@ -978,7 +978,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             // a. Perform AsyncModuleExecutionRejected(module, error).
             try asyncModuleExecutionRejected(module_, .{
                 .value = @"error",
-                .stack = try agent_.captureStack(),
+                .stack_trace = try agent_.captureStackTrace(),
             });
 
             // b. Return undefined.

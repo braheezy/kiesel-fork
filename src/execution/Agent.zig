@@ -196,27 +196,27 @@ pub fn throwException(
         Value.from("Out of memory");
     self.exception = .{
         .value = value,
-        .stack = self.captureStack() catch &.{},
+        .stack_trace = self.captureStackTrace() catch &.{},
     };
     return error.ExceptionThrown;
 }
 
 /// Capture stack frames for an exception, skipping the Realm's root execution context and the
 /// script or module execution context if present.
-pub fn captureStack(self: *Agent) std.mem.Allocator.Error!Exception.Stack {
-    var stack: std.ArrayListUnmanaged(Exception.StackFrame) = .empty;
-    errdefer stack.deinit(self.gc_allocator);
+pub fn captureStackTrace(self: *Agent) std.mem.Allocator.Error!Exception.StackTrace {
+    var stack_trace: std.ArrayListUnmanaged(Exception.StackFrame) = .empty;
+    errdefer stack_trace.deinit(self.gc_allocator);
     for (self.execution_context_stack.items) |execution_context| {
         switch (execution_context.origin) {
             .function, .eval => {
-                try stack.append(self.gc_allocator, .{
+                try stack_trace.append(self.gc_allocator, .{
                     .origin = execution_context.origin,
                 });
             },
             .script, .module, .realm => {},
         }
     }
-    return stack.toOwnedSlice(self.gc_allocator);
+    return stack_trace.toOwnedSlice(self.gc_allocator);
 }
 
 /// https://tc39.es/ecma262/#running-execution-context

@@ -1095,7 +1095,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
 pub fn prettyPrintException(exception: Agent.Exception, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
     const tty_config = state.tty_config;
     try writer.print("Uncaught exception: {pretty}", .{exception.value});
-    var it = std.mem.reverseIterator(exception.stack);
+    var it = std.mem.reverseIterator(exception.stack_trace);
     while (it.next()) |stack_frame| {
         try writer.writeAll("\n  at ");
         switch (stack_frame.origin) {

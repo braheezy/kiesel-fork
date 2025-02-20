@@ -12,9 +12,9 @@ const prettyPrintException = pretty_printing.prettyPrintException;
 const Exception = @This();
 
 value: Value,
-stack: Stack,
+stack_trace: StackTrace,
 
-pub const Stack = []const StackFrame;
+pub const StackTrace = []const StackFrame;
 
 pub const StackFrame = struct {
     origin: ExecutionContext.Origin,

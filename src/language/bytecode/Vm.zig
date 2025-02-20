@@ -1738,7 +1738,7 @@ fn executeThrow(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.agent.exception = .{
         .value = value,
-        .stack = try self.agent.captureStack(),
+        .stack_trace = try self.agent.captureStackTrace(),
     };
     return error.ExceptionThrown;
 }
