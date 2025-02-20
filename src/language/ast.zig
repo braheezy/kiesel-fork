@@ -8,9 +8,11 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const BigInt = types.BigInt;
+const ImportAttribute = language.ImportAttribute;
 const ExportEntry = language.ExportEntry;
 const ImportEntry = language.ImportEntry;
 const LreOpaque = builtins.reg_exp.LreOpaque;
+const ModuleRequest = language.ModuleRequest;
 const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
 const Value = types.Value;
@@ -58,7 +60,7 @@ pub const LexicallyScopedDeclaration = union(enum) {
     pub fn isConstantDeclaration(self: LexicallyScopedDeclaration) bool {
         switch (self) {
             // ExportDeclaration :
-            //     export ExportFromClause FromClause ;
+            //     export ExportFromClause FromClause WithClause[opt] ;
             //     export NamedExports ;
             //     export default AssignmentExpression ;
             .export_declaration => {
@@ -179,7 +181,8 @@ pub const SuperCall = struct {
 
 /// https://tc39.es/ecma262/#prod-ImportCall
 pub const ImportCall = struct {
-    expression: *Expression,
+    specifier_expression: *Expression,
+    options_expression: ?*Expression,
 };
 
 /// https://tc39.es/ecma262/#prod-Arguments
@@ -3467,67 +3470,47 @@ pub const Module = struct {
         try self.module_item_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
 
-    /// 16.2.1.3 Static Semantics: ModuleRequests
+    /// 16.2.1.4 Static Semantics: ModuleRequests
     /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
     pub fn moduleRequests(
         self: Module,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error![]const *const String {
+    ) std.mem.Allocator.Error![]const ModuleRequest {
         // Module : [empty]
         // 1. Return a new empty List.
+        if (self.module_item_list.items.len == 0) return &.{};
+
         // ModuleItemList : ModuleItem
         // 1. Return the ModuleRequests of ModuleItem.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let moduleNames be the ModuleRequests of ModuleItemList.
-        // 2. Let additionalNames be the ModuleRequests of ModuleItem.
-        // 3. For each String name of additionalNames, do
-        // a. If moduleNames does not contain name, then
-        // i. Append name to moduleNames.
-        // 4. Return moduleNames.
-        var module_requests: String.ArrayHashMapUnmanaged(void) = .empty;
+        // 1. Let requests be the ModuleRequests of ModuleItemList.
+        // 2. Let additionalRequests be the ModuleRequests of ModuleItem.
+        var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
         defer module_requests.deinit(allocator);
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem : StatementListItem
             .statement_list_item => {
                 // 1. Return a new empty List.
             },
-
-            // ImportDeclaration : import ImportClause FromClause ;
-            // 1. Return the ModuleRequests of FromClause.
-            // ModuleSpecifier : StringLiteral
-            // 1. Return a List whose sole element is the SV of StringLiteral.
             .import_declaration => |import_declaration| {
-                const sv = try import_declaration.module_specifier.stringValue(allocator);
-                try module_requests.put(allocator, sv, {});
+                try import_declaration.collectModuleRequests(allocator, &module_requests);
             },
-
-            .export_declaration => |export_declaration| switch (export_declaration) {
-                // ExportDeclaration : export ExportFromClause FromClause ;
-                .export_from => |export_from| {
-                    // 1. Return the ModuleRequests of FromClause.
-                    const sv = try export_from.module_specifier.stringValue(allocator);
-                    try module_requests.put(allocator, sv, {});
-                },
-
-                // ExportDeclaration :
-                // export NamedExports ;
-                // export VariableStatement
-                // export Declaration
-                // export default HoistableDeclaration
-                // export default ClassDeclaration
-                // export default AssignmentExpression ;
-                .named_exports,
-                .variable_statement,
-                .declaration,
-                .default_hoistable_declaration,
-                .default_class_declaration,
-                .default_expression,
-                => {
-                    // 1. Return a new empty List.
-                },
+            .export_declaration => |export_declaration| {
+                try export_declaration.collectModuleRequests(allocator, &module_requests);
             },
         };
-        return allocator.dupe(*const String, module_requests.keys());
+
+        // 3. For each ModuleRequest Record mr of additionalRequests, do
+        //      a. If requests does not contain a ModuleRequest Record mr2 such that
+        //         ModuleRequestsEqual(mr, mr2) is true, then
+        //          i. Append mr to requests.
+        var deduplicated: ModuleRequest.ArrayHashMapUnmanaged(void) = .empty;
+        for (module_requests.items) |module_request| {
+            try deduplicated.put(allocator, module_request, {});
+        }
+
+        // 4. Return requests.
+        return allocator.dupe(ModuleRequest, deduplicated.keys());
     }
 
     /// 16.2.2.2 Static Semantics: ImportEntries
@@ -3551,15 +3534,24 @@ pub const Module = struct {
                 // 1. Return a new empty List.
             },
             .import_declaration => |import_declaration| {
-                // ImportDeclaration : import ImportClause FromClause ;
+                //  ImportDeclaration : import ImportClause FromClause WithClause[opt] ;
                 if (import_declaration.import_clause) |import_clause| {
-                    // 1. Let module be the sole element of the ModuleRequests of FromClause.
-                    const module = try import_declaration.module_specifier.stringValue(allocator);
+                    var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+                    defer module_requests.deinit(allocator);
+                    try import_declaration.collectModuleRequests(allocator, &module_requests);
+
+                    // 1. Let module be the sole element of the ModuleRequests of ImportDeclaration.
+                    std.debug.assert(module_requests.items.len == 1);
+                    const module = module_requests.items[0];
 
                     // 2. Return the ImportEntriesForModule of ImportClause with argument module.
-                    try import_clause.collectImportEntriesForModule(allocator, import_entries, module);
+                    try import_clause.collectImportEntriesForModule(
+                        allocator,
+                        import_entries,
+                        module,
+                    );
                 }
-                // ImportDeclaration : import ModuleSpecifier ;
+                // ImportDeclaration : import ModuleSpecifier WithClause[opt] ;
                 // 1. Return a new empty List.
             },
         };
@@ -3586,16 +3578,21 @@ pub const Module = struct {
                 // 1. Return a new empty List.
             },
             .export_declaration => |export_declaration| switch (export_declaration) {
-                // ExportDeclaration : export ExportFromClause FromClause ;
+                // ExportDeclaration : export ExportFromClause FromClause WithClause[opt] ;
                 .export_from => |export_from| {
-                    // 1. Let module be the sole element of the ModuleRequests of FromClause.
-                    const module = export_from.module_specifier;
+                    var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+                    defer module_requests.deinit(allocator);
+                    try export_declaration.collectModuleRequests(allocator, &module_requests);
+
+                    // 1. Let module be the sole element of the ModuleRequests of ExportDeclaration.
+                    std.debug.assert(module_requests.items.len == 1);
+                    const module = module_requests.items[0];
 
                     // 2. Return ExportEntriesForModule of ExportFromClause with argument module.
                     try export_from.export_from_clause.collectExportEntriesForModule(
                         allocator,
                         export_entries,
-                        try module.stringValue(allocator),
+                        module,
                     );
                 },
 
@@ -3763,7 +3760,7 @@ pub const ModuleItemList = struct {
 
             .export_declaration => |export_declaration| switch (export_declaration) {
                 // ExportDeclaration :
-                //     export ExportFromClause FromClause ;
+                //     export ExportFromClause FromClause WithClause[opt] ;
                 //     export NamedExports ;
                 //     export VariableStatement
                 .export_from, .named_exports, .variable_statement => {
@@ -3944,6 +3941,7 @@ pub const ModuleExportName = union(enum) {
 pub const ImportDeclaration = struct {
     import_clause: ?ImportClause,
     module_specifier: StringLiteral,
+    with_clause: ?WithClause,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3959,6 +3957,47 @@ pub const ImportDeclaration = struct {
         if (self.import_clause) |import_clause| {
             try import_clause.collectBoundNames(allocator, bound_names);
         }
+    }
+
+    /// 16.2.1.4 Static Semantics: ModuleRequests
+    /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
+    pub fn collectModuleRequests(
+        self: ImportDeclaration,
+        allocator: std.mem.Allocator,
+        module_requests: *std.ArrayListUnmanaged(ModuleRequest),
+    ) std.mem.Allocator.Error!void {
+        // ImportDeclaration : import ImportClause FromClause ;
+        // 1. Let specifier be the SV of FromClause.
+        // 2. Return a List whose sole element is the ModuleRequest Record {
+        //      [[Specifier]]: specifier, [[Attributes]]: « »
+        //    }.
+        // ImportDeclaration : import ImportClause FromClause WithClause ;
+        // 1. Let specifier be the SV of FromClause.
+        // 2. Let attributes be WithClauseToAttributes of WithClause.
+        // 3. Return a List whose sole element is the ModuleRequest Record {
+        //      [[Specifier]]: specifier, [[Attributes]]: attributes
+        //    }.
+        // ImportDeclaration : import ModuleSpecifier ;
+        // 1. Let specifier be the SV of ModuleSpecifier.
+        // 2. Return a List whose sole element is the ModuleRequest Record {
+        //      [[Specifier]]: specifier, [[Attributes]]: « »
+        //    }.
+        // ImportDeclaration : import ModuleSpecifier WithClause ;
+        // 1. Let specifier be the SV of ModuleSpecifier.
+        // 2. Let attributes be WithClauseToAttributes of WithClause.
+        // 3. Return a List whose sole element is the ModuleRequest Record {
+        //      [[Specifier]]: specifier, [[Attributes]]: attributes
+        //    }.
+        const specifier = try self.module_specifier.stringValue(allocator);
+        const attributes = if (self.with_clause) |with_clause|
+            try with_clause.toAttributes(allocator)
+        else
+            &.{};
+        const module_request: ModuleRequest = .{
+            .specifier = specifier,
+            .attributes = attributes,
+        };
+        try module_requests.append(allocator, module_request);
     }
 };
 
@@ -4015,7 +4054,7 @@ pub const ImportClause = union(enum) {
         self: ImportClause,
         allocator: std.mem.Allocator,
         import_entries: *std.ArrayListUnmanaged(ImportEntry),
-        module: *const String,
+        module: ModuleRequest,
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ImportedDefaultBinding : ImportedBinding
@@ -4187,11 +4226,78 @@ pub const ImportSpecifier = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-WithClause
+pub const WithClause = struct {
+    pub const Item = struct {
+        key: AttributeKey,
+        value: StringLiteral,
+    };
+
+    items: []const Item,
+
+    /// 16.2.2.4 Static Semantics: WithClauseToAttributes
+    /// https://tc39.es/ecma262/#sec-withclausetoattributes
+    pub fn toAttributes(
+        self: WithClause,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error![]const ImportAttribute {
+        // WithClause : with { }
+        // 1. Return a new empty List.
+        // WithClause : with { WithEntries ,[opt] }
+        // 1. Let attributes be WithClauseToAttributes of WithEntries.
+        // 2. Sort attributes according to the lexicographic order of their [[Key]] field, treating
+        //    the value of each such field as a sequence of UTF-16 code unit values. NOTE: This
+        //    sorting is observable only in that hosts are prohibited from changing behaviour based
+        //    on the order in which attributes are enumerated.
+        // 3. Return attributes.
+        // WithEntries : AttributeKey : StringLiteral
+        // 1. Let key be the PropName of AttributeKey.
+        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of StringLiteral }.
+        // 3. Return « entry ».
+        // WithEntries : AttributeKey : StringLiteral , WithEntries
+        // 1. Let key be the PropName of AttributeKey.
+        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of StringLiteral }.
+        // 3. Let rest be WithClauseToAttributes of WithEntries.
+        // 4. Return the list-concatenation of « entry » and rest.
+        var attributes: std.ArrayListUnmanaged(ImportAttribute) = .empty;
+        try attributes.ensureUnusedCapacity(allocator, self.items.len);
+        for (self.items) |item| {
+            const key = switch (item.key) {
+                .identifier => |identifier| try String.fromUtf8(allocator, identifier),
+                .string_literal => |string_literal| try string_literal.stringValue(allocator),
+            };
+            const value = try item.value.stringValue(allocator);
+            attributes.appendAssumeCapacity(.{ .key = key, .value = value });
+        }
+        std.mem.sort(ImportAttribute, attributes.items, {}, struct {
+            fn lessThanFn(_: void, lhs: ImportAttribute, rhs: ImportAttribute) bool {
+                const lhs_len = lhs.key.length();
+                const rhs_len = rhs.key.length();
+                for (0..@min(lhs_len, rhs_len)) |i| {
+                    const cx = lhs.key.codeUnitAt(i);
+                    const cy = rhs.key.codeUnitAt(i);
+                    if (cx < cy) return true;
+                    if (cx > cy) return false;
+                }
+                return lhs_len < rhs_len;
+            }
+        }.lessThanFn);
+        return attributes.toOwnedSlice(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-AttributeKey
+pub const AttributeKey = union(enum) {
+    identifier: Identifier,
+    string_literal: StringLiteral,
+};
+
 /// https://tc39.es/ecma262/#prod-ExportDeclaration
 pub const ExportDeclaration = union(enum) {
     pub const ExportFrom = struct {
         export_from_clause: ExportFromClause,
         module_specifier: StringLiteral,
+        with_clause: ?WithClause,
     };
 
     export_from: ExportFrom,
@@ -4211,7 +4317,7 @@ pub const ExportDeclaration = union(enum) {
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration :
-            //     export ExportFromClause FromClause ;
+            //     export ExportFromClause FromClause WithClause[opt] ;
             //     export NamedExports ;
             .export_from, .named_exports => {
                 // 1. Return a new empty List.
@@ -4270,6 +4376,57 @@ pub const ExportDeclaration = union(enum) {
             },
         }
     }
+
+    /// 16.2.1.4 Static Semantics: ModuleRequests
+    /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
+    pub fn collectModuleRequests(
+        self: ExportDeclaration,
+        allocator: std.mem.Allocator,
+        module_requests: *std.ArrayListUnmanaged(ModuleRequest),
+    ) std.mem.Allocator.Error!void {
+        switch (self) {
+            // ExportDeclaration : export ExportFromClause FromClause ;
+            // 1. Let specifier be the SV of FromClause.
+            // 2. Return a List whose sole element is the ModuleRequest Record {
+            //      [[Specifier]]: specifier, [[Attributes]]: « »
+            //    }.
+            // ExportDeclaration : export ExportFromClause FromClause WithClause ;
+            // 1. Let specifier be the SV of FromClause.
+            // 2. Let attributes be WithClauseToAttributes of WithClause.
+            // 3. Return a List whose sole element is the ModuleRequest Record {
+            //      [[Specifier]]: specifier, [[Attributes]]: attributes
+            //    }.
+            .export_from => |export_from| {
+                const specifier = try export_from.module_specifier.stringValue(allocator);
+                const attributes = if (export_from.with_clause) |with_clause|
+                    try with_clause.toAttributes(allocator)
+                else
+                    &.{};
+                const module_request: ModuleRequest = .{
+                    .specifier = specifier,
+                    .attributes = attributes,
+                };
+                try module_requests.append(allocator, module_request);
+            },
+
+            // ExportDeclaration :
+            // export NamedExports ;
+            // export VariableStatement
+            // export Declaration
+            // export default HoistableDeclaration
+            // export default ClassDeclaration
+            // export default AssignmentExpression ;
+            .named_exports,
+            .variable_statement,
+            .declaration,
+            .default_hoistable_declaration,
+            .default_class_declaration,
+            .default_expression,
+            => {
+                // 1. Return a new empty List.
+            },
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportFromClause
@@ -4284,7 +4441,7 @@ pub const ExportFromClause = union(enum) {
         self: ExportFromClause,
         allocator: std.mem.Allocator,
         export_entries: *std.ArrayListUnmanaged(ExportEntry),
-        module: ?*const String,
+        module: ?ModuleRequest,
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportFromClause : *
@@ -4325,7 +4482,13 @@ pub const ExportFromClause = union(enum) {
                 // 3. Return « entry ».
                 try export_entries.append(allocator, entry);
             },
-            .named_exports => |named_exports| try named_exports.collectExportEntriesForModule(allocator, export_entries, module),
+            .named_exports => |named_exports| {
+                try named_exports.collectExportEntriesForModule(
+                    allocator,
+                    export_entries,
+                    module,
+                );
+            },
         }
     }
 };
@@ -4340,7 +4503,7 @@ pub const NamedExports = struct {
         self: NamedExports,
         allocator: std.mem.Allocator,
         export_entries: *std.ArrayListUnmanaged(ExportEntry),
-        module: ?*const String,
+        module: ?ModuleRequest,
     ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier
         // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.

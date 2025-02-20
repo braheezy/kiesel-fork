@@ -98,7 +98,8 @@ pub fn printSuperCall(node: ast.SuperCall, writer: anytype, indentation: usize) 
 
 pub fn printImportCall(node: ast.ImportCall, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ImportCall", writer, indentation);
-    try printExpression(node.expression.*, writer, indentation + 1);
+    try printExpression(node.specifier_expression.*, writer, indentation + 1);
+    if (node.options_expression) |options_expression| try printExpression(options_expression.*, writer, indentation + 1);
 }
 
 pub fn printArguments(node: ast.Arguments, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -943,6 +944,7 @@ pub fn printImportDeclaration(node: ast.ImportDeclaration, writer: anytype, inde
     try print("ImportDeclaration", writer, indentation);
     if (node.import_clause) |import_clause| try printImportClause(import_clause, writer, indentation + 1);
     try print(node.module_specifier.text, writer, indentation + 1);
+    if (node.with_clause) |with_clause| try printWithClause(with_clause, writer, indentation + 1);
 }
 
 pub fn printImportClause(node: ast.ImportClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -984,6 +986,18 @@ pub fn printImportsList(node: ast.ImportsList, writer: anytype, indentation: usi
     }
 }
 
+pub fn printWithClause(node: ast.WithClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("WithClause", writer, indentation);
+    for (node.items) |item| {
+        const key = switch (item.key) {
+            .identifier => |identifier| identifier,
+            .string_literal => |string_literal| string_literal.text,
+        };
+        try printIndentation(writer, indentation + 1);
+        try writer.print("{s} : {s}\n", .{ key, item.value.text });
+    }
+}
+
 pub fn printExportDeclaration(node: ast.ExportDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ExportDeclaration", writer, indentation);
     switch (node) {
@@ -998,6 +1012,7 @@ pub fn printExportDeclaration(node: ast.ExportDeclaration, writer: anytype, inde
             try printExportFromClause(export_from.export_from_clause, writer, indentation);
             try print("from", writer, indentation);
             try print(export_from.module_specifier.text, writer, indentation + 1);
+            if (export_from.with_clause) |with_clause| try printWithClause(with_clause, writer, indentation + 1);
         },
         .named_exports => |x| try printNamedExports(x, writer, indentation + 1),
         .declaration => |x| try printDeclaration(x.*, writer, indentation + 1),

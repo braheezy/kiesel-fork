@@ -22,7 +22,74 @@ const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 
-/// 16.2.1.4 Abstract Module Records
+/// https://tc39.es/ecma262/#modulerequest-record
+pub const ModuleRequest = struct {
+    specifier: *const String,
+    attributes: []const ImportAttribute,
+
+    /// 16.2.1.3.1 ModuleRequestsEqual ( left, right )
+    /// https://tc39.es/ecma262/#sec-ModuleRequestsEqual
+    pub fn eql(left: ModuleRequest, right: ModuleRequest) bool {
+        // 1. If left.[[Specifier]] is not right.[[Specifier]], return false.
+        if (!left.specifier.eql(right.specifier)) return false;
+
+        // 2. Let leftAttrs be left.[[Attributes]].
+        // 3. Let rightAttrs be right.[[Attributes]].
+
+        // 4. Let leftAttrsCount be the number of elements in leftAttrs.
+        // 5. Let rightAttrsCount be the number of elements in rightAttrs.
+        // 6. If leftAttrsCount ≠ rightAttrsCount, return false.
+        if (left.attributes.len != right.attributes.len) return false;
+
+        // 7. For each ImportAttribute Record l of leftAttrs, do
+        for (left.attributes) |l| {
+            // a. If rightAttrs does not contain an ImportAttribute Record r such that l.[[Key]] is
+            //    r.[[Key]] and l.[[Value]] is r.[[Value]], return false.
+            for (right.attributes) |r| {
+                if (l.key.eql(r.key) and l.value.eql(r.value)) break;
+            } else return false;
+        }
+
+        // 8. Return true.
+        return true;
+    }
+
+    pub fn HashMapUnmanaged(comptime V: type) type {
+        return std.HashMapUnmanaged(ModuleRequest, V, struct {
+            pub fn hash(_: @This(), key: ModuleRequest) u64 {
+                // The order of import attributes doesn't matter so we force a hash collision for
+                // equal specifiers and defer to eql() for the final decision.
+                return key.specifier.hash;
+            }
+
+            pub fn eql(_: @This(), a: ModuleRequest, b: ModuleRequest) bool {
+                return a.eql(b);
+            }
+        }, std.hash_map.default_max_load_percentage);
+    }
+
+    pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+        return std.ArrayHashMapUnmanaged(ModuleRequest, V, struct {
+            pub fn hash(_: @This(), key: ModuleRequest) u32 {
+                // The order of import attributes doesn't matter so we force a hash collision for
+                // equal specifiers and defer to eql() for the final decision.
+                return @truncate(key.specifier.hash);
+            }
+
+            pub fn eql(_: @This(), a: ModuleRequest, b: ModuleRequest, _: usize) bool {
+                return a.eql(b);
+            }
+        }, true);
+    }
+};
+
+/// https://tc39.es/ecma262/#importattribute-record
+pub const ImportAttribute = struct {
+    key: *const String,
+    value: *const String,
+};
+
+/// 16.2.1.5 Abstract Module Records
 /// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
     source_text_module: *SourceTextModule,
@@ -139,7 +206,7 @@ pub const ResolvedBindingOrAmbiguous = union(enum) {
     ambiguous,
 };
 
-/// 13.3.10.1.1 ContinueDynamicImport ( promiseCapability, moduleCompletion )
+/// 13.3.10.3 ContinueDynamicImport ( promiseCapability, moduleCompletion )
 /// https://tc39.es/ecma262/#sec-ContinueDynamicImport
 fn continueDynamicImport(
     agent: *Agent,
@@ -322,23 +389,24 @@ fn continueDynamicImport(
     // 9. Return unused.
 }
 
-/// 16.2.1.7 GetImportedModule ( referrer, specifier )
+/// 16.2.1.8 GetImportedModule ( referrer, request )
 /// https://tc39.es/ecma262/#sec-GetImportedModule
-pub fn getImportedModule(referrer: *const SourceTextModule, specifier: *const String) Module {
-    // 1. Assert: Exactly one element of referrer.[[LoadedModules]] is a Record whose [[Specifier]]
-    //    is specifier, since LoadRequestedModules has completed successfully on referrer prior to
-    //    invoking this abstract operation.
-    // 2. Let record be the Record in referrer.[[LoadedModules]] whose [[Specifier]] is specifier.
-    // 3. Return record.[[Module]].
-    return referrer.loaded_modules.get(specifier).?;
+pub fn getImportedModule(referrer: *const SourceTextModule, request: ModuleRequest) Module {
+    // 1. Let records be a List consisting of each LoadedModuleRequest Record r of
+    //    referrer.[[LoadedModules]] such that ModuleRequestsEqual(r, request) is true.
+    // 2. Assert: records has exactly one element, since LoadRequestedModules has completed
+    //    successfully on referrer prior to invoking this abstract operation.
+    // 3. Let record be the sole element of records.
+    // 4. Return record.[[Module]].
+    return referrer.loaded_modules.get(request).?;
 }
 
-/// 16.2.1.9 FinishLoadingImportedModule ( referrer, specifier, payload, result )
+/// 16.2.1.10 FinishLoadingImportedModule ( referrer, moduleRequest, payload, result )
 /// https://tc39.es/ecma262/#sec-FinishLoadingImportedModule
 pub fn finishLoadingImportedModule(
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: *const String,
+    module_request: ModuleRequest,
     payload: ImportedModulePayload,
     result: Agent.Error!Module,
 ) std.mem.Allocator.Error!void {
@@ -347,18 +415,20 @@ pub fn finishLoadingImportedModule(
         switch (referrer) {
             inline else => |r| {
                 const module = result catch unreachable;
-                const get_or_put_result = try r.loaded_modules.getOrPut(agent.gc_allocator, specifier);
+                const get_or_put_result = try r.loaded_modules.getOrPut(agent.gc_allocator, module_request);
 
-                // a. If referrer.[[LoadedModules]] contains a Record whose [[Specifier]] is
-                //    specifier, then
+                // a. If referrer.[[LoadedModules]] contains a LoadedModuleRequest Record record
+                //    such that ModuleRequestsEqual(record, moduleRequest) is true, then
                 if (get_or_put_result.found_existing) {
-                    // i. Assert: That Record's [[Module]] is result.[[Value]].
+                    // i. Assert: record.[[Module]] and result.[[Value]] are the same Module Record.
                     std.debug.assert(get_or_put_result.value_ptr.source_text_module == module.source_text_module);
                 }
                 // b. Else,
                 else {
-                    // i. Append the Record {
-                    //      [[Specifier]]: specifier, [[Module]]: result.[[Value]]
+                    // i. Append the LoadedModuleRequest Record {
+                    //      [[Specifier]]: moduleRequest.[[Specifier]],
+                    //      [[Attributes]]: moduleRequest.[[Attributes]],
+                    //      [[Module]]: result.[[Value]]
                     //    } to referrer.[[LoadedModules]].
                     get_or_put_result.value_ptr.* = module;
                 }
@@ -382,7 +452,26 @@ pub fn finishLoadingImportedModule(
     // 4. Return unused.
 }
 
-/// 16.2.1.10 GetModuleNamespace ( module )
+/// 16.2.1.11 AllImportAttributesSupported ( attributes )
+/// https://tc39.es/ecma262/#sec-AllImportAttributesSupported
+pub fn allImportAttributesSupported(
+    agent: *Agent,
+    attributes: []const ImportAttribute,
+) std.mem.Allocator.Error!?*const String {
+    // 1. Let supported be HostGetSupportedImportAttributes().
+    const supported = try agent.host_hooks.hostGetSupportedImportAttributes(agent);
+
+    // 2. For each ImportAttribute Record attribute of attributes, do
+    for (attributes) |attribute| {
+        // a. If supported does not contain attribute.[[Key]], return false.
+        if (!supported.contains(attribute.key)) return attribute.key;
+    }
+
+    // 3. Return true.
+    return null;
+}
+
+/// 16.2.1.12 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
 pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error!*Object {
     // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.

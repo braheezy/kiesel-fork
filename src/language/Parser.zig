@@ -5,8 +5,10 @@ const build_options = @import("build-options");
 const ast = @import("ast.zig");
 const literals = @import("literals.zig");
 const tokenizer_ = @import("tokenizer.zig");
+const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const String = types.String;
 const TemporaryChange = utils.TemporaryChange;
 const Tokenizer = tokenizer_.Tokenizer;
 const initValidateUtf8 = tokenizer_.initValidateUtf8;
@@ -1140,11 +1142,22 @@ pub fn acceptImportCall(self: *Parser) AcceptError!ast.ImportCall {
 
     _ = try self.core.accept(RuleSet.is(.import));
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const expression = try self.allocator.create(ast.Expression);
-    errdefer self.allocator.destroy(expression);
-    expression.* = try self.acceptExpression(.{});
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+    const specifier_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(specifier_expression);
+    specifier_expression.* = try self.acceptExpression(ctx);
+    _ = self.core.accept(RuleSet.is(.@",")) catch {};
+    var options_expression: ?*ast.Expression = null;
+    if (self.acceptExpression(ctx)) |expression| {
+        options_expression = try self.allocator.create(ast.Expression);
+        options_expression.?.* = expression;
+        _ = self.core.accept(RuleSet.is(.@",")) catch {};
+    } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@")"));
-    return .{ .expression = expression };
+    return .{
+        .specifier_expression = specifier_expression,
+        .options_expression = options_expression,
+    };
 }
 
 pub fn acceptArguments(self: *Parser) AcceptError!ast.Arguments {
@@ -3976,8 +3989,13 @@ pub fn acceptImportDeclaration(self: *Parser) AcceptError!ast.ImportDeclaration 
         break :blk import_clause;
     } else |_| null;
     const module_specifier = try self.acceptStringLiteral();
+    const with_clause = self.acceptWithClause() catch null;
     _ = try self.acceptOrInsertSemicolon();
-    return .{ .import_clause = import_clause, .module_specifier = module_specifier };
+    return .{
+        .import_clause = import_clause,
+        .module_specifier = module_specifier,
+        .with_clause = with_clause,
+    };
 }
 
 pub fn acceptImportClause(self: *Parser) AcceptError!ast.ImportClause {
@@ -4056,6 +4074,61 @@ pub fn acceptImportSpecifier(self: *Parser) AcceptError!ast.ImportSpecifier {
         return error.UnexpectedToken;
 }
 
+pub fn acceptWithClause(self: *Parser) AcceptError!ast.WithClause {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.with));
+    var with_clause_items: std.ArrayListUnmanaged(ast.WithClause.Item) = .empty;
+    errdefer with_clause_items.deinit(self.allocator);
+    var seen_keys: String.HashMapUnmanaged(void) = .empty;
+    defer seen_keys.deinit(self.allocator);
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    while (self.acceptWithClauseItem(&seen_keys)) |with_clause_item| {
+        try with_clause_items.append(self.allocator, with_clause_item);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .items = try with_clause_items.toOwnedSlice(self.allocator) };
+}
+
+pub fn acceptWithClauseItem(
+    self: *Parser,
+    seen_keys: *String.HashMapUnmanaged(void),
+) AcceptError!ast.WithClause.Item {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const location = (try self.peekToken()).location;
+    const key = try self.acceptAttributeKey();
+    const key_string = switch (key) {
+        .identifier => |identifier| try String.fromUtf8(self.allocator, identifier),
+        .string_literal => |string_literal| try string_literal.stringValue(self.allocator),
+    };
+    // It is a Syntax Error if WithClauseToAttributes of WithClause has two different entries a and
+    // b such that a.[[Key]] is b.[[Key]].
+    const gop = try seen_keys.getOrPut(self.allocator, key_string);
+    if (gop.found_existing) {
+        try self.emitErrorAt(location, "Duplicate import attribute '{}'", .{key_string});
+        return error.UnexpectedToken;
+    }
+    _ = try self.core.accept(RuleSet.is(.@":"));
+    const value = try self.acceptStringLiteral();
+    return .{ .key = key, .value = value };
+}
+
+pub fn acceptAttributeKey(self: *Parser) AcceptError!ast.AttributeKey {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptIdentifierName()) |identifier|
+        return .{ .identifier = identifier }
+    else |_| if (self.acceptStringLiteral()) |string_literal|
+        return .{ .string_literal = string_literal }
+    else |_|
+        return error.UnexpectedToken;
+}
+
 pub fn acceptExportDeclaration(self: *Parser) AcceptError!ast.ExportDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -4091,8 +4164,13 @@ pub fn acceptExportFrom(self: *Parser) AcceptError!ast.ExportDeclaration.ExportF
     const export_from_clause = try self.acceptExportFromClause();
     _ = try self.acceptKeyword("from");
     const module_specifier = try self.acceptStringLiteral();
+    const with_clause = self.acceptWithClause() catch null;
     _ = try self.acceptOrInsertSemicolon();
-    return .{ .export_from_clause = export_from_clause, .module_specifier = module_specifier };
+    return .{
+        .export_from_clause = export_from_clause,
+        .module_specifier = module_specifier,
+        .with_clause = with_clause,
+    };
 }
 
 pub fn acceptExportFromClause(self: *Parser) AcceptError!ast.ExportFromClause {

@@ -15,6 +15,7 @@ const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("Job.zig");
 const JobCallback = @import("JobCallback.zig");
+const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -24,6 +25,7 @@ const String = types.String;
 const Value = types.Value;
 
 pub const ImportMetaProperties = PropertyKey.ArrayHashMapUnmanaged(Value);
+pub const SupportedImportAttributes = String.ArrayHashMapUnmanaged(void);
 
 pub const ResizeArrayBufferHandled = enum {
     handled,
@@ -40,6 +42,9 @@ pub const PromiseRejectionTrackerOperation = enum {
     handle,
 };
 
+hostGetSupportedImportAttributes: *const fn (
+    agent: *Agent,
+) std.mem.Allocator.Error!SupportedImportAttributes = default_host_hooks.hostGetSupportedImportAttributes,
 hostCallJobCallback: *const fn (
     job_callback: JobCallback,
     this_value: Value,
@@ -87,7 +92,7 @@ hostHasSourceTextAvailable: *const fn (
 hostLoadImportedModule: *const fn (
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: *const String,
+    module_request: ModuleRequest,
     host_defined: SafePointer,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void = default_host_hooks.hostLoadImportedModule,

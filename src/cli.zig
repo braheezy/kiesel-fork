@@ -15,6 +15,7 @@ const HostHooks = kiesel.execution.HostHooks;
 const ImportedModulePayload = kiesel.language.ImportedModulePayload;
 const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
 const Module = kiesel.language.Module;
+const ModuleRequest = kiesel.language.ModuleRequest;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
 const SafePointer = kiesel.types.SafePointer;
@@ -39,7 +40,7 @@ var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
     HostHooks.PromiseRejectionTrackerOperation,
 ) = .empty;
 
-var module_cache: std.StringHashMapUnmanaged(Module) = .empty;
+var module_cache: ModuleRequest.HashMapUnmanaged(Module) = .empty;
 
 // Python REPL my beloved 🐍
 const repl_preamble = std.fmt.comptimePrint(
@@ -426,16 +427,18 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
 
     return switch (script_or_module) {
         .script => |script| script.evaluate(),
-        .module => |module| blk: {
-            const module_path = switch (options.origin) {
-                .repl, .command => unreachable,
-                .path => |path| resolveModulePath(
-                    agent.gc_allocator,
-                    script_or_module,
-                    path,
-                ) catch |err| break :blk err,
+        .module => |source_text_module| blk: {
+            const module_path = resolveModulePath(
+                agent.gc_allocator,
+                script_or_module,
+                options.origin.path,
+            ) catch |err| break :blk err;
+            const cache_key: ModuleRequest = .{
+                .specifier = try String.fromUtf8(agent.gc_allocator, module_path),
+                .attributes = &.{},
             };
-            try module_cache.putNoClobber(agent.gc_allocator, module_path, .{ .source_text_module = module });
+            const module: Module = .{ .source_text_module = source_text_module };
+            try module_cache.putNoClobber(agent.gc_allocator, cache_key, module);
             var promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
             switch (promise.fields.promise_state) {
@@ -790,7 +793,7 @@ pub fn main() !u8 {
         fn func(
             agent_: *Agent,
             referrer: ImportedModuleReferrer,
-            specifier: *const String,
+            module_request: ModuleRequest,
             _: SafePointer,
             payload: ImportedModulePayload,
         ) std.mem.Allocator.Error!void {
@@ -800,15 +803,15 @@ pub fn main() !u8 {
                     .module => |module| .{ .module = module },
                     .realm => unreachable,
                 };
-                const specifier_utf8 = try specifier.toUtf8(agent_.gc_allocator);
+                const specifier_utf8 = try module_request.specifier.toUtf8(agent_.gc_allocator);
                 defer agent_.gc_allocator.free(specifier_utf8);
                 const module_path = resolveModulePath(
                     agent_.gc_allocator,
                     script_or_module,
                     specifier_utf8,
                 ) catch |err| break :blk err;
-                // NOTE: The spec says that the same (referrer, specifier) pair must resolve to the
-                // same cached module, but also that the actual mapping is host-defined.
+                // NOTE: The spec says that the same (referrer, moduleRequest) pair must resolve to
+                // the same cached module, but also that the actual mapping is host-defined.
                 // When a module is loaded via dynamic import the referrer is a script, which then
                 // doesn't have a cache hit if the module imports itself (referrer is a module) and
                 // causes infinite recursion.
@@ -817,21 +820,25 @@ pub fn main() !u8 {
                 // - https://github.com/boa-dev/boa/blob/fc2a6e09969772feba98eaa89aaf89ca4797e925/core/engine/src/module/loader.rs#L248C5-L248C15
                 // - https://github.com/SerenityOS/serenity/blob/648b36f3c53bf3fd83a8dbf5fc788046abe10e29/Userland/Libraries/LibJS/Runtime/VM.cpp#L481-L487
                 // - https://github.com/bellard/quickjs/blob/36911f0d3ab1a4c190a4d5cbe7c2db225a455389/quickjs.c#L27590-L27596
-                if (module_cache.get(module_path)) |module| break :blk module;
+                const cache_key: ModuleRequest = .{
+                    .specifier = try String.fromUtf8(agent_.gc_allocator, module_path),
+                    .attributes = module_request.attributes,
+                };
+                if (module_cache.get(cache_key)) |module| break :blk module;
                 break :blk if (parseSourceTextModule(agent_, module_path)) |source_text_module| {
                     const module: Module = .{ .source_text_module = source_text_module };
-                    try module_cache.putNoClobber(agent_.gc_allocator, module_path, module);
+                    try module_cache.putNoClobber(agent_.gc_allocator, cache_key, module);
                     break :blk module;
                 } else |err| switch (err) {
                     error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
                     else => agent_.throwException(
                         .internal_error,
                         "Failed to import '{}': {s}",
-                        .{ specifier, @errorName(err) },
+                        .{ module_request.specifier, @errorName(err) },
                     ),
                 };
             };
-            try finishLoadingImportedModule(agent_, referrer, specifier, payload, result);
+            try finishLoadingImportedModule(agent_, referrer, module_request, payload, result);
         }
 
         fn parseSourceTextModule(

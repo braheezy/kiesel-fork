@@ -4,7 +4,6 @@ const ast = @import("../ast.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
-const language = @import("../../language.zig");
 const runtime = @import("../runtime.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
@@ -14,7 +13,6 @@ const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
-const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Instruction = instructions_.Instruction;
 const Iterator = types.Iterator;
 const IteratorKind = types.IteratorKind;
@@ -32,6 +30,7 @@ const createForInIterator = builtins.createForInIterator;
 const directEval = runtime.directEval;
 const evaluateCall = runtime.evaluateCall;
 const evaluateCallGetThisValue = runtime.evaluateCallGetThisValue;
+const evaluateImportCall = runtime.evaluateImportCall;
 const evaluateNew = runtime.evaluateNew;
 const getArrayLength = builtins.array.getArrayLength;
 const getIterator = types.getIterator;
@@ -50,7 +49,6 @@ const isStrictlyEqual = types.isStrictlyEqual;
 const methodDefinitionEvaluation = runtime.methodDefinitionEvaluation;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
-const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const yield = builtins.yield;
@@ -680,49 +678,10 @@ fn executeEvaluateCallDirectEval(
     );
 }
 
-/// 13.3.10.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
 fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
-    const realm = self.agent.currentRealm();
-
-    // 1. Let referrer be GetActiveScriptOrModule().
-    // 2. If referrer is null, set referrer to the current Realm Record.
-    const referrer: ImportedModuleReferrer = if (self.agent.getActiveScriptOrModule()) |script_or_module|
-        switch (script_or_module) {
-            .script => |script| .{ .script = script },
-            .module => |module| .{ .module = module },
-        }
-    else
-        .{ .realm = realm };
-
-    // 3. Let argRef be ? Evaluation of AssignmentExpression.
-    // 4. Let specifier be ? GetValue(argRef).
+    const options = self.stack.pop().?;
     const specifier = self.stack.pop().?;
-
-    // 5. Let promiseCapability be ! NewPromiseCapability(%Promise%).
-    const promise_capability = newPromiseCapability(
-        self.agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
-    ) catch |err| try noexcept(err);
-
-    // 6. Let specifierString be Completion(ToString(specifier)).
-    const specifier_string = specifier.toString(self.agent) catch |err| {
-        // 7. IfAbruptRejectPromise(specifierString, promiseCapability).
-        self.result = Value.from(try promise_capability.rejectPromise(self.agent, err));
-        return;
-    };
-
-    // 8. Perform HostLoadImportedModule(referrer, specifierString, empty, promiseCapability).
-    try self.agent.host_hooks.hostLoadImportedModule(
-        self.agent,
-        referrer,
-        specifier_string,
-        .null_pointer,
-        .{ .promise_capability = promise_capability },
-    );
-
-    // 9. Return promiseCapability.[[Promise]].
-    self.result = Value.from(promise_capability.promise);
+    self.result = try evaluateImportCall(self.agent, specifier, options);
 }
 
 fn executeEvaluateNew(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {

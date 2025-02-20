@@ -13,6 +13,7 @@ const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const GlobalEnvironment = environments.GlobalEnvironment;
 const Module = language.Module;
+const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
@@ -42,7 +43,7 @@ global_env: *GlobalEnvironment,
 template_map: std.AutoHashMapUnmanaged(*ast.TemplateLiteral, *Object),
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,

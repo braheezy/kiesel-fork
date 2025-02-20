@@ -1195,8 +1195,18 @@ pub fn codegenImportCall(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
+    // ImportCall : import ( AssignmentExpression ,[opt] )
+    // 1. Return ? EvaluateImportCall(AssignmentExpression).
+    // ImportCall : import ( AssignmentExpression , AssignmentExpression ,[opt] )
+    // 1. Return ? EvaluateImportCall(the first AssignmentExpression, the second AssignmentExpression).
+    try codegenExpressionAndGetValue(node.specifier_expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
+    if (node.options_expression) |options_expression| {
+        try codegenExpressionAndGetValue(options_expression.*, executable, ctx);
+        try executable.addInstruction(.load, {});
+    } else {
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+    }
     try executable.addInstruction(.evaluate_import_call, {});
 }
 
@@ -3900,7 +3910,7 @@ pub fn codegenExportDeclaration(
 ) Executable.Error!void {
     switch (node) {
         // ExportDeclaration :
-        //     export ExportFromClause FromClause ;
+        //     export ExportFromClause FromClause WithClause[opt] ;
         //     export NamedExports ;
         .export_from, .named_exports => {
             // 1. Return empty.

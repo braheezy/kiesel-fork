@@ -14,6 +14,7 @@ const Agent = execution.Agent;
 const ExecutionContext = execution.ExecutionContext;
 const GlobalEnvironment = execution.GlobalEnvironment;
 const Module = language.Module;
+const ModuleRequest = language.ModuleRequest;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -34,7 +35,7 @@ realm: *Realm,
 ecmascript_code: ast.Script,
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,

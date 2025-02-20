@@ -12,6 +12,7 @@ const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = execution.Job;
 const JobCallback = execution.JobCallback;
+const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -106,17 +107,26 @@ pub fn hostFinalizeImportMeta(_: *Object, _: *SourceTextModule) void {
     // The default implementation of HostFinalizeImportMeta is to return unused.
 }
 
-/// 16.2.1.8 HostLoadImportedModule ( referrer, specifier, hostDefined, payload )
+/// 16.2.1.8 HostLoadImportedModule ( referrer, moduleRequest, hostDefined, payload )
 /// https://tc39.es/ecma262/#sec-HostLoadImportedModule
 pub fn hostLoadImportedModule(
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: *const String,
+    module_request: ModuleRequest,
     _: SafePointer,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void {
     const result = agent.throwException(.internal_error, "Module loading is disabled", .{});
-    try finishLoadingImportedModule(agent, referrer, specifier, payload, result);
+    try finishLoadingImportedModule(agent, referrer, module_request, payload, result);
+}
+
+/// 16.2.1.11.1 HostGetSupportedImportAttributes ( )
+/// https://tc39.es/ecma262/#sec-hostgetsupportedimportattributes
+pub fn hostGetSupportedImportAttributes(
+    _: *Agent,
+) std.mem.Allocator.Error!HostHooks.SupportedImportAttributes {
+    // The default implementation of HostGetSupportedImportAttributes is to return a new empty List.
+    return .empty;
 }
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, parameterStrings, bodyString, direct )

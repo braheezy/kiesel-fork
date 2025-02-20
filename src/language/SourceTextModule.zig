@@ -1,4 +1,4 @@
-//! 16.2.1.6 Source Text Module Records
+//! 16.2.1.7 Source Text Module Records
 //! https://tc39.es/ecma262/#sec-source-text-module-records
 
 const std = @import("std");
@@ -18,6 +18,7 @@ const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const GraphLoadingState = language.GraphLoadingState;
 const Module = language.Module;
+const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = builtins.promise.PromiseCapability;
@@ -27,6 +28,7 @@ const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
+const allImportAttributesSupported = language.allImportAttributesSupported;
 const asyncBlockStart = builtins.asyncBlockStart;
 const containsSlice = utils.containsSlice;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -90,10 +92,10 @@ dfs_index: ?usize,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.ArrayListUnmanaged(*const String),
+requested_modules: std.ArrayListUnmanaged(ModuleRequest),
 
 /// [[LoadedModules]]
-loaded_modules: String.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*SourceTextModule,
@@ -126,7 +128,7 @@ const Status = enum {
 /// https://tc39.es/ecma262/#importentry-record
 pub const ImportEntry = struct {
     /// [[ModuleRequest]]
-    module_request: *const String,
+    module_request: ModuleRequest,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -144,7 +146,7 @@ pub const ExportEntry = struct {
     export_name: ?[]const u8,
 
     /// [[ModuleRequest]]
-    module_request: ?*const String,
+    module_request: ?ModuleRequest,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -161,7 +163,7 @@ pub fn print(self: SourceTextModule, writer: anytype) @TypeOf(writer).Error!void
     try ast_printing.printModule(self.ecmascript_code, writer, 0);
 }
 
-/// 16.2.1.5.1 LoadRequestedModules ( [ hostDefined ] )
+/// 16.2.1.6.1 LoadRequestedModules ( [ hostDefined ] )
 /// https://tc39.es/ecma262/#sec-LoadRequestedModules
 pub fn loadRequestedModules(
     self: *SourceTextModule,
@@ -198,7 +200,7 @@ pub fn loadRequestedModules(
     return promise_capability.promise.as(builtins.Promise);
 }
 
-/// 16.2.1.5.1.1 InnerModuleLoading ( state, module )
+/// 16.2.1.6.1.1 InnerModuleLoading ( state, module )
 fn innerModuleLoading(
     agent: *Agent,
     state: *GraphLoadingState,
@@ -223,29 +225,41 @@ fn innerModuleLoading(
         //    requestedModulesCount.
         state.pending_modules_count += requested_modules_count;
 
-        // d. For each String required of module.[[RequestedModules]], do
-        for (module.source_text_module.requested_modules.items) |required| {
-            // i. If module.[[LoadedModules]] contains a Record whose [[Specifier]] is required, then
-            if (module.source_text_module.loaded_modules.get(required)) |loaded_module| {
-                // 1. Let record be that Record.
-                // 2. Perform InnerModuleLoading(state, record.[[Module]]).
+        // d. For each ModuleRequest Record request of module.[[RequestedModules]], do
+        for (module.source_text_module.requested_modules.items) |request| {
+            // a. If AllImportAttributesSupported(request.[[Attributes]]) is false, then
+            if (try allImportAttributesSupported(agent, request.attributes)) |unsupported| {
+                // 1. Let error be ThrowCompletion(a newly created SyntaxError object).
+                const @"error" = agent.throwException(
+                    .syntax_error,
+                    "Import attribute '{}' is not supported",
+                    .{unsupported},
+                );
+
+                // 2. Perform ContinueModuleLoading(state, error).
+                try continueModuleLoading(agent, state, @as(Agent.Error!Module, @"error"));
+            }
+            // ii. Else if module.[[LoadedModules]] contains a LoadedModuleRequest Record record
+            //     such that ModuleRequestsEqual(record, request) is true, then
+            else if (module.source_text_module.loaded_modules.get(request)) |loaded_module| {
+                // 1. Perform InnerModuleLoading(state, record.[[Module]]).
                 try innerModuleLoading(agent, state, loaded_module);
             }
-            // ii. Else,
+            // iii. Else,
             else {
-                // 1. Perform HostLoadImportedModule(module, required, state.[[HostDefined]], state).
+                // 1. Perform HostLoadImportedModule(module, request, state.[[HostDefined]], state).
                 // 2. NOTE: HostLoadImportedModule will call FinishLoadingImportedModule, which
                 //    re-enters the graph loading process through ContinueModuleLoading.
                 try agent.host_hooks.hostLoadImportedModule(
                     agent,
                     .{ .module = module.source_text_module },
-                    required,
+                    request,
                     state.host_defined,
                     .{ .graph_loading_state = state },
                 );
             }
 
-            // iii. If state.[[IsLoading]] is false, return unused.
+            // iv. If state.[[IsLoading]] is false, return unused.
             if (!state.is_loading) return;
         }
     }
@@ -280,7 +294,7 @@ fn innerModuleLoading(
     // 6. Return unused.
 }
 
-/// 16.2.1.5.1.2 ContinueModuleLoading ( state, moduleCompletion )
+/// 16.2.1.6.1.2 ContinueModuleLoading ( state, moduleCompletion )
 /// https://tc39.es/ecma262/#sec-ContinueModuleLoading
 pub fn continueModuleLoading(
     agent: *Agent,
@@ -316,7 +330,7 @@ pub fn continueModuleLoading(
     // 4. Return unused.
 }
 
-/// 16.2.1.5.2 Link ( )
+/// 16.2.1.6.2 Link ( )
 /// https://tc39.es/ecma262/#sec-moduledeclarationlinking
 pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 1. Assert: module.[[Status]] is one of unlinked, linked, evaluating-async, or evaluated.
@@ -362,7 +376,7 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 7. Return unused.
 }
 
-/// 16.2.1.5.2.1 InnerModuleLinking ( module, stack, index )
+/// 16.2.1.6.2.1 InnerModuleLinking ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-InnerModuleLinking
 fn innerModuleLinking(
     agent: *Agent,
@@ -408,10 +422,10 @@ fn innerModuleLinking(
     // 8. Append module to stack.
     try stack.append(agent.gc_allocator, module);
 
-    // 9. For each String required of module.[[RequestedModules]], do
-    for (module.requested_modules.items) |required| {
+    // 9. For each ModuleRequest Record request of module.[[RequestedModules]], do
+    for (module.requested_modules.items) |request| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        const abstract_required_module = getImportedModule(module, required);
+        const abstract_required_module = getImportedModule(module, request);
 
         // b. Set index to ? InnerModuleLinking(requiredModule, stack, index).
         new_index = try innerModuleLinking(agent, abstract_required_module, stack, new_index);
@@ -474,7 +488,7 @@ fn innerModuleLinking(
     return new_index;
 }
 
-/// 16.2.1.6.1 ParseModule ( sourceText, realm, hostDefined )
+/// 16.2.1.7.1 ParseModule ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parsemodule
 pub fn parse(
     source_text: []const u8,
@@ -489,7 +503,7 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, options);
 
     // 3. Let requestedModules be the ModuleRequests of body.
-    var requested_modules: std.ArrayListUnmanaged(*const String) = .empty;
+    var requested_modules: std.ArrayListUnmanaged(ModuleRequest) = .empty;
     {
         const tmp = try body.moduleRequests(agent.gc_allocator);
         defer agent.gc_allocator.free(tmp);
@@ -622,7 +636,7 @@ pub fn parse(
     return self;
 }
 
-/// 16.2.1.5.3 Evaluate ( )
+/// 16.2.1.6.3 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-moduleevaluation
 pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
@@ -735,7 +749,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
     return capability.promise.as(builtins.Promise);
 }
 
-/// 16.2.1.5.3.1 InnerModuleEvaluation ( module, stack, index )
+/// 16.2.1.6.3.1 InnerModuleEvaluation ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-innermoduleevaluation
 fn innerModuleEvaluation(
     agent: *Agent,
@@ -805,10 +819,10 @@ fn innerModuleEvaluation(
     // 10. Append module to stack.
     try stack.append(agent.gc_allocator, module);
 
-    // 11. For each String required of module.[[RequestedModules]], do
-    for (module.requested_modules.items) |required| {
+    // 11. For each ModuleRequest Record request of module.[[RequestedModules]], do
+    for (module.requested_modules.items) |request| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        const abstract_required_module = getImportedModule(module, required);
+        const abstract_required_module = getImportedModule(module, request);
 
         // b. Set index to ? InnerModuleEvaluation(requiredModule, stack, index).
         new_index = try innerModuleEvaluation(agent, abstract_required_module, stack, new_index);
@@ -875,7 +889,7 @@ fn innerModuleEvaluation(
 
         // b. Set module.[[AsyncEvaluation]] to true.
         // c. NOTE: The order in which module records have their [[AsyncEvaluation]] fields
-        //    transition to true is significant. (See 16.2.1.5.3.4.)
+        //    transition to true is significant. (See 16.2.1.6.3.4.)
         module.async_evaluation = true;
 
         // d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
@@ -920,7 +934,7 @@ fn innerModuleEvaluation(
     return new_index;
 }
 
-/// 16.2.1.5.3.2 ExecuteAsyncModule ( module )
+/// 16.2.1.6.3.2 ExecuteAsyncModule ( module )
 /// https://tc39.es/ecma262/#sec-execute-async-module
 fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
@@ -1008,7 +1022,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     // 10. Return unused.
 }
 
-/// 16.2.1.5.3.3 GatherAvailableAncestors ( module, execList )
+/// 16.2.1.6.3.3 GatherAvailableAncestors ( module, execList )
 /// https://tc39.es/ecma262/#sec-gather-available-ancestors
 fn gatherAvailableAncestors(
     agent: *Agent,
@@ -1052,7 +1066,7 @@ fn gatherAvailableAncestors(
     // 2. Return unused.
 }
 
-/// 16.2.1.5.3.4 AsyncModuleExecutionFulfilled ( module )
+/// 16.2.1.6.3.4 AsyncModuleExecutionFulfilled ( module )
 /// https://tc39.es/ecma262/#sec-async-module-execution-fulfilled
 fn asyncModuleExecutionFulfilled(
     agent: *Agent,
@@ -1166,7 +1180,7 @@ fn asyncModuleExecutionFulfilled(
     // 13. Return unused.
 }
 
-/// 16.2.1.5.3.5 AsyncModuleExecutionRejected ( module, error )
+/// 16.2.1.6.3.5 AsyncModuleExecutionRejected ( module, error )
 /// https://tc39.es/ecma262/#sec-async-module-execution-rejected
 fn asyncModuleExecutionRejected(
     module: *SourceTextModule,
@@ -1224,7 +1238,7 @@ fn asyncModuleExecutionRejected(
     // 11. Return unused.
 }
 
-/// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
+/// 16.2.1.7.2 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-getexportednames
 pub fn getExportedNames(
     self: *const SourceTextModule,
@@ -1480,7 +1494,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
             .ambiguous => return agent.throwException(
                 .syntax_error,
                 "Ambiguous star export '{s}' in module '{}'",
-                .{ export_entry.export_name.?, export_entry.module_request.? },
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier },
             ),
 
             // d. Assert: resolution is a ResolvedBinding Record.
@@ -1489,7 +1503,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
             return agent.throwException(
                 .syntax_error,
                 "No export named '{s}' in module '{}'",
-                .{ export_entry.export_name.?, export_entry.module_request.? },
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier },
             );
         }
     }
@@ -1551,14 +1565,14 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 .ambiguous => return agent.throwException(
                     .syntax_error,
                     "Ambiguous star export '{s}' in module '{}'",
-                    .{ import_name.string, import_entry.module_request },
+                    .{ import_name.string, import_entry.module_request.specifier },
                 ),
                 .resolved_binding => |resolved_binding| resolved_binding,
             } else {
                 return agent.throwException(
                     .syntax_error,
                     "No export named '{s}' in module '{}'",
-                    .{ import_name.string, import_entry.module_request },
+                    .{ import_name.string, import_entry.module_request.specifier },
                 );
             };
 
