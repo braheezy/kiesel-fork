@@ -280,7 +280,10 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
     const referrer: ImportedModuleReferrer = if (agent.getActiveScriptOrModule()) |script_or_module|
         switch (script_or_module) {
             .script => |script| .{ .script = script },
-            .module => |module| .{ .module = module },
+            .module => |module| switch (module) {
+                .source_text_module => |source_text_module| .{ .module = source_text_module },
+                .synthetic_module => unreachable,
+            },
         }
     else
         .{ .realm = realm };

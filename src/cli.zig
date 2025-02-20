@@ -32,6 +32,7 @@ const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
+const parseJSONModule = kiesel.language.parseJSONModule;
 const regExpCreate = kiesel.builtins.regExpCreate;
 const regExpExec = kiesel.builtins.regExpExec;
 
@@ -63,9 +64,14 @@ fn resolveModulePath(
     script_or_module: ScriptOrModule,
     specifier: []const u8,
 ) std.mem.Allocator.Error![]const u8 {
-    const base_dir: []const u8 = switch (script_or_module) {
-        inline else => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
+    const host_defined = switch (script_or_module) {
+        .script => |script| script.host_defined,
+        .module => |module| switch (module) {
+            .source_text_module => |m| m.host_defined,
+            .synthetic_module => unreachable,
+        },
     };
+    const base_dir: []const u8 = host_defined.cast(*ScriptOrModuleHostDefined).base_dir;
     std.debug.assert(std.fs.path.isAbsolute(base_dir));
     const resolved_path = try std.fs.path.resolve(allocator, &.{ base_dir, specifier });
     std.debug.assert(std.fs.path.isAbsolute(resolved_path));
@@ -179,7 +185,11 @@ const Kiesel = struct {
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
         //    an implementation dependent manner)
         const host_defined = switch (agent.getActiveScriptOrModule().?) {
-            inline else => |x| x.host_defined,
+            .script => |script| script.host_defined,
+            .module => |module| switch (module) {
+                .source_text_module => |m| m.host_defined,
+                .synthetic_module => unreachable,
+            },
         };
 
         // 2. Let realm be the current Realm Record.
@@ -367,7 +377,9 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         break :blk if (SourceTextModule.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = file_name,
-        })) |module| .{ .module = module } else |err| err;
+        })) |source_text_module| .{
+            .module = .{ .source_text_module = source_text_module },
+        } else |err| err;
     } else blk: {
         break :blk if (Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
@@ -397,7 +409,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     if (agent.options.debug.print_ast) {
         switch (script_or_module) {
             .script => |script| try script.print(stdout),
-            .module => |module| try module.print(stdout),
+            .module => |module| try module.source_text_module.print(stdout),
         }
     }
 
@@ -427,7 +439,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
 
     return switch (script_or_module) {
         .script => |script| script.evaluate(),
-        .module => |source_text_module| blk: {
+        .module => |module| blk: {
             const module_path = resolveModulePath(
                 agent.gc_allocator,
                 script_or_module,
@@ -437,7 +449,6 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .specifier = try String.fromUtf8(agent.gc_allocator, module_path),
                 .attributes = &.{},
             };
-            const module: Module = .{ .source_text_module = source_text_module };
             try module_cache.putNoClobber(agent.gc_allocator, cache_key, module);
             var promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
@@ -789,6 +800,14 @@ pub fn main() !u8 {
     defer tracked_promise_rejections.deinit(agent.gc_allocator);
     defer module_cache.deinit(agent.gc_allocator);
 
+    agent.host_hooks.hostGetSupportedImportAttributes = struct {
+        fn func(agent_: *Agent) std.mem.Allocator.Error!HostHooks.SupportedImportAttributes {
+            var supported_import_attributes: HostHooks.SupportedImportAttributes = .empty;
+            try supported_import_attributes.put(agent_.gc_allocator, String.fromLiteral("type"), {});
+            return supported_import_attributes;
+        }
+    }.func;
+
     agent.host_hooks.hostLoadImportedModule = struct {
         fn func(
             agent_: *Agent,
@@ -800,7 +819,9 @@ pub fn main() !u8 {
             const result = blk: {
                 const script_or_module: ScriptOrModule = switch (referrer) {
                     .script => |script| .{ .script = script },
-                    .module => |module| .{ .module = module },
+                    .module => |source_text_module| .{
+                        .module = .{ .source_text_module = source_text_module },
+                    },
                     .realm => unreachable,
                 };
                 const specifier_utf8 = try module_request.specifier.toUtf8(agent_.gc_allocator);
@@ -825,29 +846,45 @@ pub fn main() !u8 {
                     .attributes = module_request.attributes,
                 };
                 if (module_cache.get(cache_key)) |module| break :blk module;
-                break :blk if (parseSourceTextModule(agent_, module_path)) |source_text_module| {
-                    const module: Module = .{ .source_text_module = source_text_module };
+                if (loadImportedModule(agent_, module_request, module_path)) |module| {
                     try module_cache.putNoClobber(agent_.gc_allocator, cache_key, module);
                     break :blk module;
-                } else |err| switch (err) {
-                    error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
-                    else => agent_.throwException(
-                        .internal_error,
-                        "Failed to import '{}': {s}",
-                        .{ module_request.specifier, @errorName(err) },
-                    ),
-                };
+                } else |err| break :blk err;
             };
             try finishLoadingImportedModule(agent_, referrer, module_request, payload, result);
         }
 
-        fn parseSourceTextModule(
+        fn loadImportedModule(
             agent_: *Agent,
+            module_request: ModuleRequest,
             module_path: []const u8,
-        ) (ReadFileError || error{ExceptionThrown})!*SourceTextModule {
+        ) Agent.Error!Module {
             const realm = agent_.currentRealm();
-            const source_text = try readFile(agent_.gc_allocator, module_path);
+            const source_text = readFile(agent_.gc_allocator, module_path) catch |err| {
+                return agent_.throwException(
+                    .internal_error,
+                    "Failed to import '{}': {s}",
+                    .{ module_request.specifier, @errorName(err) },
+                );
+            };
             defer agent_.gc_allocator.free(source_text);
+
+            for (module_request.attributes) |import_attribute| {
+                if (import_attribute.key.eql(String.fromLiteral("type"))) {
+                    if (import_attribute.value.eql(String.fromLiteral("json"))) {
+                        const synthetic_module = try parseJSONModule(
+                            agent_,
+                            try String.fromUtf8(agent_.gc_allocator, source_text),
+                        );
+                        return .{ .synthetic_module = synthetic_module };
+                    }
+                    return agent_.throwException(
+                        .internal_error,
+                        "Failed to import '{}' with unknown module type '{}'",
+                        .{ module_request.specifier, import_attribute.value },
+                    );
+                }
+            }
 
             const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
                 const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
@@ -858,7 +895,7 @@ pub fn main() !u8 {
             var diagnostics = Diagnostics.init(agent_.gc_allocator);
             defer diagnostics.deinit();
 
-            return SourceTextModule.parse(source_text, realm, host_defined, .{
+            const source_text_module = SourceTextModule.parse(source_text, realm, host_defined, .{
                 .diagnostics = &diagnostics,
                 .file_name = std.fs.path.basename(module_path),
             }) catch |err| switch (err) {
@@ -872,6 +909,7 @@ pub fn main() !u8 {
                     );
                 },
             };
+            return .{ .source_text_module = source_text_module };
         }
     }.func;
 

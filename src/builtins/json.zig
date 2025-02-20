@@ -617,6 +617,9 @@ pub const namespace = struct {
 
         try defineBuiltinFunction(object, "parse", parse, 2, realm);
         try defineBuiltinFunction(object, "stringify", stringify, 3, realm);
+
+        // Ensure function intrinsics are set right after the object is created
+        _ = try realm.intrinsics.@"%JSON.parse%"();
     }
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )

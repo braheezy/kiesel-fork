@@ -10,7 +10,7 @@ const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
-const SourceTextModule = language.SourceTextModule;
+const Module = language.Module;
 const String = types.String;
 const Value = types.Value;
 
@@ -22,7 +22,7 @@ indirect_bindings: String.HashMapUnmanaged(IndirectBinding),
 declarative_environment: *DeclarativeEnvironment,
 
 pub const IndirectBinding = struct {
-    module: *SourceTextModule,
+    module: Module,
     binding_name: *const String,
 };
 
@@ -53,7 +53,9 @@ pub fn getBindingValue(
         const binding_name = indirect_binding.binding_name;
 
         // b. Let targetEnv be M.[[Environment]].
-        const target_env = module.environment;
+        const target_env = switch (module) {
+            inline else => |m| m.environment,
+        };
 
         // c. If targetEnv is empty, throw a ReferenceError exception.
         if (target_env == null) {
@@ -107,7 +109,7 @@ pub fn createImportBinding(
     self: *ModuleEnvironment,
     agent: *Agent,
     name: *const String,
-    module: *SourceTextModule,
+    module: Module,
     binding_name: *const String,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.

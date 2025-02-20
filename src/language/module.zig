@@ -14,6 +14,7 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
+const SyntheticModule = language.SyntheticModule;
 const String = types.String;
 const Value = types.Value;
 const continueModuleLoading = language.continueModuleLoading;
@@ -93,6 +94,7 @@ pub const ImportAttribute = struct {
 /// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
     source_text_module: *SourceTextModule,
+    synthetic_module: *SyntheticModule,
 
     const ExportStarSetKey = *const anyopaque;
     pub const ExportStarSet = std.AutoHashMapUnmanaged(ExportStarSetKey, void);
@@ -120,7 +122,8 @@ pub const Module = union(enum) {
         host_defined: ?SafePointer,
     ) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
-            inline else => |module| module.loadRequestedModules(agent, host_defined),
+            .source_text_module => |module| module.loadRequestedModules(agent, host_defined),
+            .synthetic_module => |module| module.loadRequestedModules(agent),
         };
     }
 
@@ -130,7 +133,8 @@ pub const Module = union(enum) {
         maybe_export_star_set: ?*ExportStarSet,
     ) std.mem.Allocator.Error![]const []const u8 {
         return switch (self) {
-            inline else => |module| module.getExportedNames(agent, maybe_export_star_set),
+            .source_text_module => |module| module.getExportedNames(agent, maybe_export_star_set),
+            .synthetic_module => |module| module.getExportedNames(agent),
         };
     }
 
@@ -141,19 +145,22 @@ pub const Module = union(enum) {
         maybe_resolve_set: ?*ResolveSet,
     ) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
         return switch (self) {
-            inline else => |module| module.resolveExport(agent, export_name, maybe_resolve_set),
+            .source_text_module => |module| module.resolveExport(agent, export_name, maybe_resolve_set),
+            .synthetic_module => |module| module.resolveExport(export_name),
         };
     }
 
     pub fn link(self: Module, agent: *Agent) Agent.Error!void {
         return switch (self) {
-            inline else => |module| module.link(agent),
+            .source_text_module => |module| module.link(agent),
+            .synthetic_module => |module| module.link(agent),
         };
     }
 
-    pub fn evaluate(self: Module, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
+    pub fn evaluate(self: Module, agent: *Agent) Agent.Error!*builtins.Promise {
         return switch (self) {
-            inline else => |module| module.evaluate(agent),
+            .source_text_module => |module| module.evaluate(agent),
+            .synthetic_module => |module| module.evaluate(agent),
         };
     }
 };
@@ -421,7 +428,7 @@ pub fn finishLoadingImportedModule(
                 //    such that ModuleRequestsEqual(record, moduleRequest) is true, then
                 if (get_or_put_result.found_existing) {
                     // i. Assert: record.[[Module]] and result.[[Value]] are the same Module Record.
-                    std.debug.assert(get_or_put_result.value_ptr.source_text_module == module.source_text_module);
+                    std.debug.assert(std.meta.eql(get_or_put_result.value_ptr.*, module));
                 }
                 // b. Else,
                 else {
@@ -484,7 +491,7 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
 
     // 2. Let namespace be module.[[Namespace]].
     var namespace = switch (module) {
-        .source_text_module => |source_text_module| source_text_module.namespace,
+        inline else => |m| m.namespace,
     };
 
     // 3. If namespace is empty, then

@@ -1602,7 +1602,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 try env.module_environment.createImportBinding(
                     agent,
                     local_name,
-                    resolution.module.source_text_module,
+                    resolution.module,
                     try String.fromUtf8(agent.gc_allocator, resolution.binding_name.string),
                 );
             }
@@ -1620,7 +1620,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
         .realm = self.realm,
 
         // 12. Set the ScriptOrModule of moduleContext to module.
-        .script_or_module = .{ .module = self },
+        .script_or_module = .{ .module = .{ .source_text_module = self } },
 
         .ecmascript_code = .{
             // 13. Set the VariableEnvironment of moduleContext to module.[[Environment]].
@@ -1756,7 +1756,7 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         .realm = self.realm,
 
         // 4. Set the ScriptOrModule of moduleContext to module.
-        .script_or_module = .{ .module = self },
+        .script_or_module = .{ .module = .{ .source_text_module = self } },
 
         // 5. Assert: module has been linked and declarations in its module environment have been
         //    instantiated.

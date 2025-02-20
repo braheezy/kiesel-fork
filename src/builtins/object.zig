@@ -733,7 +733,7 @@ pub const prototype = struct {
             try defineBuiltinFunction(object, "__lookupSetter__", __lookupSetter__, 1, realm);
         }
 
-        // Ensure prototype function intrinsics
+        // Ensure function intrinsics are set right after the object is created
         _ = try realm.intrinsics.@"%Object.prototype.toString%"();
     }
 

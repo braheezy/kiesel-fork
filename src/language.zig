@@ -14,8 +14,10 @@ pub const ResolvedBinding = module.ResolvedBinding;
 pub const ResolvedBindingOrAmbiguous = module.ResolvedBindingOrAmbiguous;
 pub const Script = @import("language/Script.zig");
 pub const SourceTextModule = @import("language/SourceTextModule.zig");
+pub const SyntheticModule = @import("language/SyntheticModule.zig");
 pub const allImportAttributesSupported = module.allImportAttributesSupported;
 pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
+pub const createDefaultExportSyntheticModule = SyntheticModule.createDefaultExportSyntheticModule;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
 pub const fmtParseError = @import("language/Parser.zig").fmtParseError;
 pub const fmtParseErrorHint = @import("language/Parser.zig").fmtParseErrorHint;
@@ -25,6 +27,7 @@ pub const instantiateAsyncFunctionObject = runtime.instantiateAsyncFunctionObjec
 pub const instantiateAsyncGeneratorFunctionObject = runtime.instantiateAsyncGeneratorFunctionObject;
 pub const instantiateGeneratorFunctionObject = runtime.instantiateGeneratorFunctionObject;
 pub const instantiateOrdinaryFunctionObject = runtime.instantiateOrdinaryFunctionObject;
+pub const parseJSONModule = SyntheticModule.parseJSONModule;
 pub const tokenizer = @import("language/tokenizer.zig");
 
 test {
@@ -32,6 +35,7 @@ test {
 
     _ = Script;
     _ = SourceTextModule;
+    _ = SyntheticModule;
     _ = tokenizer;
     _ = @import("language/literals.zig");
 }

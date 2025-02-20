@@ -822,7 +822,7 @@ pub const prototype = struct {
             .configurable = true,
         });
 
-        // Ensure prototype function intrinsics
+        // Ensure function intrinsics are set right after the object is created
         _ = try realm.intrinsics.@"%Array.prototype.toString%"();
         _ = try realm.intrinsics.@"%Array.prototype.values%"();
     }

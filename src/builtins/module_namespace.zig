@@ -198,7 +198,7 @@ fn get(
 
     // 10. Let targetEnv be targetModule.[[Environment]].
     const target_env = switch (target_module) {
-        .source_text_module => |source_text_module| source_text_module.environment,
+        inline else => |m| m.environment,
     } orelse {
         // 11. If targetEnv is empty, throw a ReferenceError exception.
         return agent.throwException(.reference_error, "Module is not linked", .{});
@@ -272,7 +272,7 @@ pub fn moduleNamespaceCreate(
 ) std.mem.Allocator.Error!*Object {
     // 1. Assert: module.[[Namespace]] is empty.
     switch (module) {
-        .source_text_module => |source_text_module| std.debug.assert(source_text_module.namespace == null),
+        inline else => |m| std.debug.assert(m.namespace == null),
     }
 
     // 6. Let sortedExports be a List whose elements are the elements of exports, sorted according
@@ -326,7 +326,9 @@ pub fn moduleNamespaceCreate(
     }
 
     // 9. Set module.[[Namespace]] to M.
-    module.source_text_module.namespace = namespace;
+    switch (module) {
+        inline else => |m| m.namespace = namespace,
+    }
 
     // 10. Return M.
     return namespace;

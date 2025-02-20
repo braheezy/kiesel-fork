@@ -7,15 +7,15 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Environment = environments.Environment;
+const Module = language.Module;
 const Object = types.Object;
 const PrivateEnvironment = environments.PrivateEnvironment;
 const Realm = @import("Realm.zig");
 const Script = language.Script;
-const SourceTextModule = language.SourceTextModule;
 
 pub const ScriptOrModule = union(enum) {
     script: *Script,
-    module: *SourceTextModule,
+    module: Module,
 };
 
 pub const Origin = union(enum) {

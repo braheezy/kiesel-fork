@@ -970,7 +970,7 @@ fn executeGetNewTarget(self: *Vm, _: Executable) Agent.Error!void {
 fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
     // 1. Let module be GetActiveScriptOrModule().
     // 2. Assert: module is a Source Text Module Record.
-    var module = self.agent.getActiveScriptOrModule().?.module;
+    var module = self.agent.getActiveScriptOrModule().?.module.source_text_module;
 
     // 3. Let importMeta be module.[[ImportMeta]].
     // 4. If importMeta is empty, then
