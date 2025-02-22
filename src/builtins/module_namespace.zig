@@ -341,7 +341,7 @@ pub const ModuleNamespace = MakeObject(.{
         /// [[Module]]
         module: Module,
 
-        // [[Exports]]
+        /// [[Exports]]
         exports: []const []const u8,
     },
     .tag = .module_namespace,

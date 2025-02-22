@@ -41,7 +41,7 @@ const DataViewWithBufferWitness = struct {
     /// [[Object]]
     object: *const DataView,
 
-    // [[CachedBufferByteLength]]
+    /// [[CachedBufferByteLength]]
     cached_buffer_byte_length: CachedBufferByteLength,
 };
 

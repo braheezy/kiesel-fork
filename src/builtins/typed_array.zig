@@ -449,7 +449,7 @@ pub const TypedArrayWithBufferWitness = struct {
     /// [[Object]]
     object: *const TypedArray,
 
-    // [[CachedBufferByteLength]]
+    /// [[CachedBufferByteLength]]
     cached_buffer_byte_length: CachedBufferByteLength,
 };
 

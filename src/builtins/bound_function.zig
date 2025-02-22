@@ -125,7 +125,7 @@ pub fn boundFunctionCreate(
 /// https://tc39.es/ecma262/#table-internal-slots-of-bound-function-exotic-objects
 pub const BoundFunction = MakeObject(.{
     .Fields = struct {
-        // [[BoundTargetFunction]]
+        /// [[BoundTargetFunction]]
         bound_target_function: *Object,
 
         /// [[BoundThis]]
