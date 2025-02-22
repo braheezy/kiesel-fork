@@ -376,7 +376,7 @@ pub fn format(
     writer: anytype,
 ) @TypeOf(writer).Error!void {
     _ = options;
-    if (std.mem.eql(u8, fmt, "pretty")) {
+    if (comptime std.mem.eql(u8, fmt, "pretty")) {
         return prettyPrintValue(self, writer) catch |err| {
             // NOTE: When targeting Windows the error set contains error.Unexpected (from the
             //       `std.io.tty.Config.setColor()` calls), which `std.fmt.formatType()`
