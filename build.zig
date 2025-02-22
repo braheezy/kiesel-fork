@@ -228,4 +228,24 @@ pub fn build(b: *std.Build) void {
 
     const docs_step = b.step("docs", "Build and install documentation");
     docs_step.dependOn(&install_docs.step);
+
+    const fuzzilli = b.addExecutable(.{
+        .name = "kiesel-fuzzilli",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/fuzzilli/main.zig"),
+            .imports = &.{
+                .{ .name = "kiesel", .module = kiesel },
+            },
+            .link_libc = true,
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    fuzzilli.sanitize_coverage_trace_pc_guard = true;
+    fuzzilli.root_module.addCSourceFile(.{
+        .file = b.path("tools/fuzzilli/coverage.c"),
+    });
+
+    const fuzzilli_step = b.step("fuzzilli", "Build and install fuzzilli shell");
+    fuzzilli_step.dependOn(&b.addInstallArtifact(fuzzilli, .{}).step);
 }

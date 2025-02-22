@@ -196,6 +196,10 @@ jobs:
       - name: Run tests
         run: |
           zig build -Denable-intl=false test
+      - name: Build fuzzilli shell
+        run: |
+          # This doesn't run anything, only make sure it keeps building
+          zig build -Denable-intl=false fuzzilli
 
   test262:
     runs-on: meow
