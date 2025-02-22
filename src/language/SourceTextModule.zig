@@ -424,7 +424,7 @@ fn innerModuleLinking(
 
     // 9. For each ModuleRequest Record request of module.[[RequestedModules]], do
     for (module.requested_modules.items) |request| {
-        // a. Let requiredModule be GetImportedModule(module, required).
+        // a. Let requiredModule be GetImportedModule(module, request).
         const abstract_required_module = getImportedModule(module, request);
 
         // b. Set index to ? InnerModuleLinking(requiredModule, stack, index).
@@ -821,7 +821,7 @@ fn innerModuleEvaluation(
 
     // 11. For each ModuleRequest Record request of module.[[RequestedModules]], do
     for (module.requested_modules.items) |request| {
-        // a. Let requiredModule be GetImportedModule(module, required).
+        // a. Let requiredModule be GetImportedModule(module, request).
         const abstract_required_module = getImportedModule(module, request);
 
         // b. Set index to ? InnerModuleEvaluation(requiredModule, stack, index).
