@@ -66,8 +66,7 @@ pub const namespace = struct {
         // 2. Let args be ? CreateListFromArrayLike(argumentsList).
         const args = try arguments_list.createListFromArrayLike(agent, null);
 
-        // TODO: 3. Perform PrepareForTailCall().
-
+        // 3. Perform PrepareForTailCall().
         // 4. Return ? Call(target, thisArgument, args).
         return target.call(agent, this_argument, args);
     }

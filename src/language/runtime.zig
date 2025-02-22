@@ -241,8 +241,7 @@ pub fn evaluateCall(
         return agent.throwException(.type_error, "{} is not callable", .{function});
     }
 
-    // TODO: 6. If tailPosition is true, perform PrepareForTailCall().
-
+    // 6. If tailPosition is true, perform PrepareForTailCall().
     // 7. Return ? Call(func, thisValue, argList).
     return function.callAssumeCallable(this_value, arguments);
 }

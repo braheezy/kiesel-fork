@@ -489,8 +489,7 @@ pub const prototype = struct {
 
         // 3. If argArray is either undefined or null, then
         if (arg_array.isUndefined() or arg_array.isNull()) {
-            // TODO: a. Perform PrepareForTailCall().
-
+            // a. Perform PrepareForTailCall().
             // b. Return ? Call(func, thisArg).
             return func.callAssumeCallableNoArgs(this_arg);
         }
@@ -498,8 +497,7 @@ pub const prototype = struct {
         // 4. Let argList be ? CreateListFromArrayLike(argArray).
         const arg_list = try arg_array.createListFromArrayLike(agent, null);
 
-        // TODO: 5. Perform PrepareForTailCall().
-
+        // 5. Perform PrepareForTailCall().
         // 6. Return ? Call(func, thisArg, argList).
         return func.callAssumeCallable(this_arg, arg_list);
     }
@@ -591,8 +589,7 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{} is not a function", .{func});
         }
 
-        // TODO: 3. Perform PrepareForTailCall().
-
+        // 3. Perform PrepareForTailCall().
         // 4. Return ? Call(func, thisArg, args).
         return func.callAssumeCallable(this_arg, args);
     }

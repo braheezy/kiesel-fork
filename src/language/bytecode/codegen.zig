@@ -953,9 +953,8 @@ pub fn codegenCallExpression(
         return;
     }
 
-    // TODO: 7. Let thisCall be this CallExpression.
-    // TODO: 8. Let tailCall be IsInTailPosition(thisCall).
-
+    // 7. Let thisCall be this CallExpression.
+    // 8. Let tailCall be IsInTailPosition(thisCall).
     // 9. Return ? EvaluateCall(func, ref, arguments, tailCall).
     try executable.addInstruction(.evaluate_call, .{
         .argument_count = try castIndex(u16, node.arguments.len),
@@ -1146,9 +1145,8 @@ pub fn codegenOptionalExpression(
 
             try codegenArguments(arguments, executable, ctx);
 
-            // TODO: 1. Let thisChain be this OptionalChain.
-            // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
-
+            // 1. Let thisChain be this OptionalChain.
+            // 2. Let tailCall be IsInTailPosition(thisChain).
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
             try executable.addInstruction(.evaluate_call, .{
                 .argument_count = try castIndex(u16, arguments.len),
@@ -1228,9 +1226,6 @@ pub fn codegenTaggedTemplate(
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
     try executable.addInstruction(.load, {});
 
-    // TODO: 3. Let thisCall be this MemberExpression.
-    // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
-
     if (node.expression.analyze(.is_reference)) {
         try executable.addInstruction(.load_this_value_for_evaluate_call, {});
     } else {
@@ -1285,6 +1280,8 @@ pub fn codegenTaggedTemplate(
         }
     }
 
+    // 3. Let thisCall be this MemberExpression.
+    // 4. Let tailCall be IsInTailPosition(thisCall).
     // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call, .{
