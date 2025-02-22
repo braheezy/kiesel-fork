@@ -157,7 +157,7 @@ pub const Module = union(enum) {
         };
     }
 
-    pub fn evaluate(self: Module, agent: *Agent) Agent.Error!*builtins.Promise {
+    pub fn evaluate(self: Module, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
             .source_text_module => |module| module.evaluate(agent),
             .synthetic_module => |module| module.evaluate(agent),

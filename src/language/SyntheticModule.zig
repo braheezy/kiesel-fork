@@ -218,7 +218,7 @@ pub fn link(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!void 
 
 /// 16.2.1.8.4.5 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-smr-Evaluate
-pub fn evaluate(self: *SyntheticModule, agent: *Agent) Agent.Error!*builtins.Promise {
+pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 
     // 1. Let moduleContext be a new ECMAScript code execution context.
@@ -270,7 +270,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) Agent.Error!*builtins.Pro
 
     // 14. IfAbruptRejectPromise(result, pc).
     result catch |err| {
-        const promise = try promise_capability.rejectPromise(agent, err);
+        const promise = promise_capability.rejectPromise(agent, err) catch |err_| try noexcept(err_);
         return promise.as(builtins.Promise);
     };
 
