@@ -16,10 +16,10 @@
             .lazy = true,
         },
         .kiesel_runtime = .{
-            // Uncommend for local development:
+            // Uncomment for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/c406c0c13da831a56c6b42fa858b2b0264753ae1.tar.gz",
-            .hash = "1220acbf2ef3f6afac858186643b1cfb1ba7b73167af118f38f845fbc6d49fc51024",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/8e2a23ce8a5f4ced62133ff1b9c06b521d784730.tar.gz",
+            .hash = "122086de5969eddbce58fd20badec9210c83befdf78a309e6d36da38bdedb7e789a1",
             .lazy = true,
         },
         .libgc = .{
