@@ -434,9 +434,8 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 
         // b. If R ≠ 16, set stripPrefix to false.
         if (radix != 16) strip_prefix = false;
-    }
-    // 9. Else,
-    else {
+    } else {
+        // 9. Else,
         // a. Set R to 10.
         radix = 10;
     }
@@ -590,9 +589,8 @@ fn encode(
 
             // ii. Set R to the string-concatenation of R and C.
             try result.appendChar(agent.gc_allocator, @intCast(c));
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Let cp be CodePointAt(string, k).
             const code_point = string.codePointAt(k);
 
@@ -687,9 +685,8 @@ fn decode(
                     .{ .string = try String.fromUtf16(agent.gc_allocator, escape_) }
                 else
                     .{ .code_unit = byte };
-            }
-            // viii. Else,
-            else {
+            } else {
+                // viii. Else,
                 // 1. If n = 1 or n > 4, throw a URIError exception.
                 if (byte_sequence_length == null) {
                     return agent.throwException(.uri_error, "Invalid UTF-8 start byte", .{});
@@ -803,9 +800,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const s: String.Builder.Segment = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
             // i. Let S be C.
             break :blk .{ .char = @intCast(c) };
-        }
-        // c. Else,
-        else blk: {
+        } else blk: {
+            // c. Else,
             // i. Let n be the numeric value of C.
             // ii. If n < 256, then
             if (c < 256) {
@@ -822,9 +818,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                         ),
                     ),
                 };
-            }
-            // iii. Else,
-            else {
+            } else {
+                // iii. Else,
                 // 1. Let hex be the String representation of n, formatted as an uppercase
                 //    hexadecimal number.
                 // 2. Let S be the string-concatenation of "%u" and StringPad(hex, 4, "0", start).

@@ -602,7 +602,7 @@ test identifierNameMatcher {
 
 test escapeSequenceMatcher {
     for ([_][]const u8
-    // zig fmt: off
+        // zig fmt: off
     {
         // Garbage input
         "", "\\", "foo",
@@ -618,7 +618,7 @@ test escapeSequenceMatcher {
     }
 
     for ([_][]const u8
-    // zig fmt: off
+        // zig fmt: off
     {
         // Valid no-op escapes
         "\\a", "\\z", "\\A", "\\Z", "\\1", "\\9",

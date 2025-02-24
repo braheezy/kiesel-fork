@@ -453,9 +453,8 @@ fn defineOwnProperty(
                 .{},
             );
         }
-    }
-    // 15. Else,
-    else {
+    } else {
+        // 15. Else,
         // a. If IsCompatiblePropertyDescriptor(extensibleTarget, Desc, targetDesc) is false, throw
         //    a TypeError exception.
         if (!isCompatiblePropertyDescriptor(extensible_target, property_descriptor, target_descriptor)) {
@@ -863,9 +862,8 @@ fn ownPropertyKeys(
         if (property_descriptor != null and property_descriptor.?.configurable == false) {
             // i. Append key to targetNonconfigurableKeys.
             try target_nonconfigurable_keys.append(agent.gc_allocator, key);
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Append key to targetConfigurableKeys.
             try target_configurable_keys.append(agent.gc_allocator, key);
         }

@@ -109,9 +109,8 @@ pub const prototype = struct {
                 index += 1;
                 break .{ key, value };
             }
-        }
-        // e. Return undefined.
-        else {
+        } else {
+            // e. Return undefined.
             map_iterator.fields = .completed;
             map.fields.unregisterIterator(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));

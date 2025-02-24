@@ -1839,7 +1839,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
         expression == .primary_expression and
         expression.primary_expression == .identifier_reference and
         (std.mem.eql(u8, expression.primary_expression.identifier_reference, "arguments") or
-        std.mem.eql(u8, expression.primary_expression.identifier_reference, "eval")))
+            std.mem.eql(u8, expression.primary_expression.identifier_reference, "eval")))
     {
         self.state.arguments_object_needed = true;
     }

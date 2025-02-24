@@ -95,9 +95,8 @@ pub fn allocateSharedArrayBuffer(
 
         // e. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
         object.as(SharedArrayBuffer).fields.array_buffer_max_byte_length = max_byte_length.?;
-    }
-    // 10. Else,
-    else {
+    } else {
+        // 10. Else,
         // a. Set obj.[[ArrayBufferByteLength]] to byteLength.
     }
 
@@ -317,14 +316,13 @@ pub const prototype = struct {
         const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
 
         // 4. If IsFixedLengthArrayBuffer(O) is true, then
-        const length =
-            if (isFixedLengthArrayBuffer(ArrayBufferLike{ .shared_array_buffer = object }))
-        blk: {
+        const length = if (isFixedLengthArrayBuffer(ArrayBufferLike{
+            .shared_array_buffer = object,
+        })) blk: {
             // a. Let length be O.[[ArrayBufferByteLength]].
             break :blk object.fields.array_buffer_data.items.len;
-        }
-        // 5. Else,
-        else blk: {
+        } else blk: {
+            // 5. Else,
             // a. Let length be O.[[ArrayBufferMaxByteLength]].
             break :blk object.fields.array_buffer_max_byte_length.?;
         };
@@ -358,13 +356,11 @@ pub const prototype = struct {
         // 6. If relativeStart = -∞, let first be 0.
         const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 7. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 7. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 8. Else, let first be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 8. Else, let first be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const first: u53 = @intFromFloat(first_f64);
@@ -379,13 +375,11 @@ pub const prototype = struct {
         // 10. If relativeEnd = -∞, let final be 0.
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 11. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 11. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 12. Else, let final be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 12. Else, let final be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
 

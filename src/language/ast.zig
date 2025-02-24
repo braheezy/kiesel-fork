@@ -4524,9 +4524,8 @@ pub const NamedExports = struct {
                     // a. Let localName be sourceName.
                     // b. Let importName be null.
                     break :blk .{ source_name, null };
-                }
-                // 3. Else,
-                else blk: {
+                } else blk: {
+                    // 3. Else,
                     // a. Let localName be null.
                     // b. Let importName be sourceName.
                     break :blk .{ null, source_name };
@@ -4562,9 +4561,8 @@ pub const NamedExports = struct {
                     // a. Let localName be sourceName.
                     // b. Let importName be null.
                     break :blk .{ source_name, null };
-                }
-                // 4. Else,
-                else blk: {
+                } else blk: {
+                    // 4. Else,
                     // a. Let localName be null.
                     // b. Let importName be sourceName.
                     break :blk .{ null, source_name };

@@ -99,9 +99,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
         // c. Let privateEnv be runningContext's PrivateEnvironment.
         private_environment = running_context.ecmascript_code.?.private_environment;
-    }
-    // 17. Else,
-    else {
+    } else {
+        // 17. Else,
         // a. Let lexEnv be NewDeclarativeEnvironment(evalRealm.[[GlobalEnv]]).
         lexical_environment = .{
             .declarative_environment = try newDeclarativeEnvironment(
@@ -381,9 +380,8 @@ fn evalDeclarationInstantiation(
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ? lexEnv.CreateImmutableBinding(dn, true).
                 try lex_env.createImmutableBinding(agent, name, true);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Perform ? lexEnv.CreateMutableBinding(dn, false).
                 try lex_env.createMutableBinding(agent, name, false);
             }
@@ -414,9 +412,8 @@ fn evalDeclarationInstantiation(
                 Value.from(function_object),
                 true,
             );
-        }
-        // d. Else,
-        else {
+        } else {
+            // d. Else,
             // i. Let bindingExists be ! varEnv.HasBinding(fn).
             const binding_exists = var_env.hasBinding(function_name) catch |err| try noexcept(err);
 
@@ -438,9 +435,8 @@ fn evalDeclarationInstantiation(
                     function_name,
                     Value.from(function_object),
                 ) catch |err| try noexcept(err);
-            }
-            // iii. Else,
-            else {
+            } else {
+                // iii. Else,
                 // 1. Perform ! varEnv.SetMutableBinding(fn, fo, false).
                 var_env.setMutableBinding(
                     agent,
@@ -461,9 +457,8 @@ fn evalDeclarationInstantiation(
         if (var_env == .global_environment) {
             // i. Perform ? CreateGlobalVarBinding(varEnv, vn, true).
             try var_env.global_environment.createGlobalVarBinding(agent, var_name, true);
-        }
-        // b. Else,
-        else {
+        } else {
+            // b. Else,
             // i. Let bindingExists be ! varEnv.HasBinding(vn).
             const binding_exists = var_env.hasBinding(var_name) catch |err| try noexcept(err);
 

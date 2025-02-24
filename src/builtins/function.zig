@@ -541,9 +541,8 @@ pub const prototype = struct {
                 else if (target_length.asNumber().isNegativeInf()) {
                     // 1. Set L to 0.
                     length = 0;
-                }
-                // iii. Else,
-                else {
+                } else {
+                    // iii. Else,
                     // 1. Let targetLenAsInt be ! ToIntegerOrInfinity(targetLen).
                     const target_length_as_int = target_length.toIntegerOrInfinity(agent) catch unreachable;
 

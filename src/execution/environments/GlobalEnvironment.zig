@@ -331,9 +331,8 @@ pub fn createGlobalFunctionBinding(
         //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
         //    }.
         break :blk .{ .value = value, .writable = true, .enumerable = true, .configurable = deletable };
-    }
-    // 5. Else,
-    else blk: {
+    } else blk: {
+        // 5. Else,
         // a. Let desc be the PropertyDescriptor { [[Value]]: V }.
         break :blk .{ .value = value };
     };

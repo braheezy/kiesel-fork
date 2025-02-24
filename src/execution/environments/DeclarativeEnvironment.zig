@@ -145,9 +145,8 @@ pub fn setMutableBinding(
     if (binding.mutable) {
         // a. Change its bound value to V.
         binding.value = value;
-    }
-    // 5. Else,
-    else {
+    } else {
+        // 5. Else,
         // a. Assert: This is an attempt to change the value of an immutable binding.
         // b. If S is true, throw a TypeError exception.
         if (final_strict) {

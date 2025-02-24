@@ -443,9 +443,8 @@ pub fn setIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool 
                     if (current_descriptor.isAccessorDescriptor()) {
                         // a. Let desc be the PropertyDescriptor { [[Configurable]]: false }.
                         descriptor = .{ .configurable = false };
-                    }
-                    // 2. Else,
-                    else {
+                    } else {
+                        // 2. Else,
                         // a. Let desc be the PropertyDescriptor {
                         //      [[Configurable]]: false, [[Writable]]: false
                         //    }.
@@ -569,9 +568,8 @@ pub fn enumerableOwnProperties(
                 if (kind == .key) {
                     // a. Append key to results.
                     try results.append(self.agent.gc_allocator, try key.toValue(self.agent));
-                }
-                // 2. Else,
-                else {
+                } else {
+                    // 2. Else,
                     // a. Let value be ? Get(O, key).
                     const value = try self.get(key);
 
@@ -579,9 +577,8 @@ pub fn enumerableOwnProperties(
                     if (kind == .value) {
                         // i. Append value to results.
                         try results.append(self.agent.gc_allocator, value);
-                    }
-                    // c. Else,
-                    else {
+                    } else {
+                        // c. Else,
                         // i. Assert: kind is key+value.
                         std.debug.assert(kind == .@"key+value");
 
@@ -865,9 +862,8 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
         break :blk try Value.from(&initializer.object).callAssumeCallableNoArgs(Value.from(self));
-    }
-    // 4. Else,
-    else blk: {
+    } else blk: {
+        // 4. Else,
         // a. Let initValue be undefined.
         break :blk .undefined;
     };

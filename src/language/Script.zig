@@ -320,9 +320,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ? env.CreateImmutableBinding(dn, true).
                 try env.createImmutableBinding(agent, name, true);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Perform ? env.CreateMutableBinding(dn, false).
                 try env.createMutableBinding(agent, name, false);
             }

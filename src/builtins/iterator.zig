@@ -569,9 +569,8 @@ pub const prototype = struct {
                         if (inner_value == null) {
                             // a. Set innerAlive to false.
                             continue :loop .outer;
-                        }
-                        // 4. Else,
-                        else {
+                        } else {
+                            // 4. Else,
                             // a. Let completion be Completion(Yield(innerValue)).
                             // b. If completion is an abrupt completion, then
                             //     i. Let backupCompletion be Completion(IteratorClose(innerIterator, completion)).
@@ -764,9 +763,8 @@ pub const prototype = struct {
 
             // c. Let counter be 1.
             counter = 1;
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. Let accumulator be initialValue.
             accumulator = initial_value.?;
 

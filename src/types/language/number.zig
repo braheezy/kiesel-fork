@@ -250,9 +250,8 @@ pub const Number = union(enum) {
                     return .{ .f64 = -std.math.inf(f64) }
                 else
                     return .{ .f64 = std.math.inf(f64) };
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
@@ -279,9 +278,8 @@ pub const Number = union(enum) {
                     return .{ .f64 = -0.0 }
                 else
                     return .{ .i32 = 0 };
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }

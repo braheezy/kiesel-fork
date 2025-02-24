@@ -105,9 +105,8 @@ pub const prototype = struct {
 
             // 3. Let len be TypedArrayLength(taRecord).
             break :blk typedArrayLength(ta);
-        }
-        // ii. Else,
-        else blk: {
+        } else blk: {
+            // ii. Else,
             // 1. Let len be ? LengthOfArrayLike(array).
             break :blk try array.lengthOfArrayLike();
         };
@@ -125,9 +124,8 @@ pub const prototype = struct {
         const result = if (kind == .key) blk: {
             // 1. Let result be indexNumber.
             break :blk index_number;
-        }
-        // vi. Else,
-        else blk: {
+        } else blk: {
+            // vi. Else,
             // 1. Let elementKey be ! ToString(indexNumber).
             const element_key = PropertyKey.from(index);
 
@@ -137,9 +135,8 @@ pub const prototype = struct {
             if (kind == .value) {
                 // a. Let result be elementValue.
                 break :blk element_value;
-            }
-            // 4. Else,
-            else {
+            } else {
+                // 4. Else,
                 // a. Assert: kind is key+value.
                 std.debug.assert(kind == .@"key+value");
 

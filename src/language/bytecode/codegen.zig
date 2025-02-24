@@ -1765,9 +1765,8 @@ pub fn codegenAssignmentExpression(
             if (false) {
                 // i. Let lhs be the StringValue of LeftHandSideExpression.
                 // ii. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
-            }
-            // c. Else,
-            else {
+            } else {
+                // c. Else,
                 // i. Let rRef be ? Evaluation of AssignmentExpression.
                 // ii. Let rVal be ? GetValue(rRef).
                 try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
@@ -1855,9 +1854,8 @@ pub fn codegenAssignmentExpression(
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
             // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
-        }
-        // 5. Else,
-        else {
+        } else {
+            // 5. Else,
             // a. Let rRef be ? Evaluation of AssignmentExpression.
             // b. Let rVal be ? GetValue(rRef).
             try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
@@ -1896,9 +1894,8 @@ pub fn codegenAssignmentExpression(
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
             // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
-        }
-        // 5. Else,
-        else {
+        } else {
+            // 5. Else,
             // a. Let rRef be ? Evaluation of AssignmentExpression.
             // b. Let rVal be ? GetValue(rRef).
             try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
@@ -1942,9 +1939,8 @@ pub fn codegenAssignmentExpression(
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
             // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
-        }
-        // 5. Else,
-        else {
+        } else {
+            // 5. Else,
             // a. Let rRef be ? Evaluation of AssignmentExpression.
             // b. Let rVal be ? GetValue(rRef).
             try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
@@ -2284,9 +2280,8 @@ pub fn codegenLexicalBinding(
                 // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
                 if (false) {
                     // a. Let value be ? NamedEvaluation of Initializer with argument bindingId.
-                }
-                // 4. Else,
-                else {
+                } else {
+                    // 4. Else,
                     // a. Let rhs be ? Evaluation of Initializer.
                     // b. Let value be ? GetValue(rhs).
                     try codegenExpressionAndGetValue(initializer, executable, ctx);
@@ -2851,9 +2846,8 @@ fn forInOfHeadEvaluation(
         try executable.addInstruction(.create_object_property_iterator, {});
 
         return jump_conditional.getFieldDeferred(.consequent);
-    }
-    // 7. Else,
-    else {
+    } else {
+        // 7. Else,
         // a. Assert: iterationKind is either iterate or async-iterate.
         std.debug.assert(iteration_kind == .iterate or iteration_kind == .async_iterate);
 
@@ -2959,9 +2953,8 @@ fn forInOfBodyEvaluation(
                 // a. Let status be Completion(DestructuringAssignmentEvaluation of
                 //    assignmentPattern with argument nextValue).
                 try bindingInitialization(assignment_pattern, executable, ctx, null);
-            }
-            // 2. Else,
-            else {
+            } else {
+                // 2. Else,
                 // a. Assert: lhsKind is var-binding.
                 std.debug.assert(lhs_kind == .var_binding);
 
@@ -2972,9 +2965,8 @@ fn forInOfBodyEvaluation(
                 //    nextValue and undefined).
                 try bindingInitialization(lhs.for_binding.binding_pattern, executable, ctx, null);
             }
-        }
-        // ii. Else,
-        else {
+        } else {
+            // ii. Else,
             // 1. Let lhsRef be Completion(Evaluation of lhs). (It may be evaluated repeatedly.)
             switch (lhs) {
                 .expression => |expression| try codegenExpression(expression, executable, ctx),
@@ -2988,9 +2980,8 @@ fn forInOfBodyEvaluation(
             //     a. Let status be Completion(PutValue(lhsRef.[[Value]], nextValue)).
             try executable.addInstruction(.put_value, {});
         }
-    }
-    // h. Else,
-    else {
+    } else {
+        // h. Else,
         // i. Assert: lhsKind is lexical-binding.
         std.debug.assert(lhs_kind == .lexical_binding);
 
@@ -3039,9 +3030,8 @@ fn forInOfBodyEvaluation(
                 ctx,
                 .lexical_environment,
             );
-        }
-        // vii. Else,
-        else {
+        } else {
+            // vii. Else,
             // 1. Assert: lhs binds a single name.
             // 2. Let lhsName be the sole element of the BoundNames of lhs.
             const lhs_name = lhs.for_declaration.for_binding.binding_identifier;
@@ -3962,9 +3952,8 @@ pub fn codegenExportDeclaration(
             // TODO 1. If IsAnonymousFunctionDefinition(AssignmentExpression) is true, then
             if (false) {
                 // a. Let value be ? NamedEvaluation of AssignmentExpression with argument "default".
-            }
-            // 2. Else,
-            else {
+            } else {
+                // 2. Else,
                 // a. Let rhs be ? Evaluation of AssignmentExpression.
                 // b. Let value be ? GetValue(rhs).
                 try codegenExpressionAndGetValue(expression, executable, ctx);

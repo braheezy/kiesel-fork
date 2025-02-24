@@ -37,9 +37,8 @@ pub const Iterator = struct {
         const result_completion = if (value_ == null) blk: {
             // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]])).
             break :blk self.next_method.callNoArgs(agent, Value.from(self.iterator));
-        }
-        // 2. Else,
-        else blk: {
+        } else blk: {
+            // 2. Else,
             // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »)).
             break :blk self.next_method.call(agent, Value.from(self.iterator), &.{value_.?});
         };
@@ -273,9 +272,8 @@ pub fn getIterator(
         }
 
         break :blk method;
-    }
-    // 2. Else,
-    else blk: {
+    } else blk: {
+        // 2. Else,
         // a. Let method be ? GetMethod(obj, %Symbol.iterator%).
         break :blk try object.getMethod(
             agent,
@@ -328,9 +326,8 @@ pub fn getIteratorFlattenable(
     const iterator = if (method == null) blk: {
         // a. Let iterator be obj.
         break :blk object;
-    }
-    // 4. Else,
-    else blk: {
+    } else blk: {
+        // 4. Else,
         // a. Let iterator be ? Call(method, obj).
         break :blk try Value.from(method.?).callAssumeCallable(object, &.{});
     };

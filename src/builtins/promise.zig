@@ -526,9 +526,8 @@ pub fn newPromiseReactionJob(
                         break :blk Completion.throw(argument_);
                     },
                 }
-            }
-            // e. Else,
-            else blk: {
+            } else blk: {
+                // e. Else,
                 // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined, « argument »)).
                 if (agent_.host_hooks.hostCallJobCallback(handler.?, .undefined, &.{argument_})) |value|
                     break :blk Completion.normal(value)
@@ -558,9 +557,8 @@ pub fn newPromiseReactionJob(
                     .undefined,
                     &.{handler_result.value.?},
                 );
-            }
-            // i. Else,
-            else {
+            } else {
+                // i. Else,
                 // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.resolve).callAssumeCallable(
                     .undefined,
@@ -669,9 +667,8 @@ pub fn newPromiseResolveThenableJob(
     //    getThenRealmResult.[[Value]].
     const then_realm = if (get_handler_realm_result) |realm| blk: {
         break :blk realm;
-    }
-    // 4. Else, let thenRealm be the current Realm Record.
-    else |_| blk: {
+    } else |_| blk: {
+        // 4. Else, let thenRealm be the current Realm Record.
         break :blk agent.currentRealm();
     };
 
@@ -1422,9 +1419,8 @@ pub fn performPromiseThen(
     const on_fulfilled_job_callback = if (!on_fulfilled.isCallable()) blk: {
         // a. Let onFulfilledJobCallback be empty.
         break :blk null;
-    }
-    // 4. Else,
-    else blk: {
+    } else blk: {
+        // 4. Else,
         // a. Let onFulfilledJobCallback be HostMakeJobCallback(onFulfilled).
         break :blk agent.host_hooks.hostMakeJobCallback(on_fulfilled.asObject());
     };
@@ -1433,9 +1429,8 @@ pub fn performPromiseThen(
     const on_rejected_job_callback = if (!on_rejected.isCallable()) blk: {
         // a. Let onRejectedJobCallback be empty.
         break :blk null;
-    }
-    // 6. Else,
-    else blk: {
+    } else blk: {
+        // 6. Else,
         // a. Let onRejectedJobCallback be HostMakeJobCallback(onRejected).
         break :blk agent.host_hooks.hostMakeJobCallback(on_rejected.asObject());
     };
@@ -1512,9 +1507,8 @@ pub fn performPromiseThen(
     if (result_capability == null) {
         // a. Return undefined.
         return null;
-    }
-    // 14. Else,
-    else {
+    } else {
+        // 14. Else,
         // a. Return resultCapability.[[Promise]].
         return result_capability.?.promise;
     }
@@ -2013,9 +2007,8 @@ pub const prototype = struct {
 
             // b. Let catchFinally be onFinally.
             catch_finally = on_finally;
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             const Captures = struct {
                 on_finally: Value,
                 constructor: *Object,

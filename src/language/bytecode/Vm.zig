@@ -616,9 +616,8 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
 
         // g. Return deleteStatus.
         self.result = Value.from(delete_status);
-    }
-    // 5. Else,
-    else {
+    } else {
+        // 5. Else,
         // a. Let base be ref.[[Base]].
         // b. Assert: base is an Environment Record.
         const base = reference.base.environment;
@@ -933,9 +932,8 @@ fn executeForDeclarationBindingInstantiation(
                 name,
                 true,
             ) catch |err| try noexcept(err);
-        }
-        // b. Else,
-        else {
+        } else {
+            // b. Else,
             // i. Perform ! environment.CreateMutableBinding(name, false).
             environment.createMutableBinding(
                 self.agent,
@@ -1003,9 +1001,8 @@ fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
 
         // f. Return importMeta.
         self.result = Value.from(import_meta);
-    }
-    // 5. Else,
-    else {
+    } else {
+        // 5. Else,
         // a. Assert: importMeta is an Object.
         // b. Return importMeta.
         self.result = Value.from(module.import_meta.?);

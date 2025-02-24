@@ -466,9 +466,8 @@ pub fn ordinaryCallBindThis(
         if (this_mode == .strict) {
             // a. Let thisValue be thisArgument.
             break :blk this_argument;
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. If thisArgument is either undefined or null, then
             if (this_argument.isUndefined() or this_argument.isNull()) {
                 // i. Let globalEnv be calleeRealm.[[GlobalEnv]].
@@ -477,9 +476,8 @@ pub fn ordinaryCallBindThis(
                 // ii. Assert: globalEnv is a Global Environment Record.
                 // iii. Let thisValue be globalEnv.[[GlobalThisValue]].
                 break :blk Value.from(global_env.global_this_value);
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. Let thisValue be ! ToObject(thisArgument).
                 // ii. NOTE: ToObject produces wrapper objects using calleeRealm.
                 break :blk Value.from(this_argument.toObject(agent) catch |err| try noexcept(err));
@@ -907,9 +905,8 @@ pub fn makeConstructor(
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
         function.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.internal_methods, &.{ .construct = construct });
-    }
-    // 2. Else,
-    else {
+    } else {
+        // 2. Else,
         // a. Set F.[[Construct]] to the definition specified in 10.3.2.
         function.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.internal_methods, &.{ .construct = builtin_function.construct });
     }
@@ -1254,9 +1251,8 @@ fn functionDeclarationInstantiation(
 
         // b. Let env be the LexicalEnvironment of calleeContext.
         break :blk callee_context.ecmascript_code.?.lexical_environment;
-    }
-    // 20. Else,
-    else blk: {
+    } else blk: {
+        // 20. Else,
         // a. NOTE: A separate Environment Record is needed to ensure that bindings created by
         //    direct eval calls in the formal parameter list are outside the environment where
         //    parameters are declared.
@@ -1316,9 +1312,8 @@ fn functionDeclarationInstantiation(
         const arguments_object = if (strict or !simple_parameter_list) ao_blk: {
             // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
             break :ao_blk try createUnmappedArgumentsObject(agent, arguments_list.values);
-        }
-        // b. Else,
-        else ao_blk: {
+        } else ao_blk: {
+            // b. Else,
             // i. NOTE: A mapped argument object is only provided for non-strict functions that
             //    don't have a rest parameter, any parameter default value initializers, or any
             //    destructured parameters.
@@ -1344,9 +1339,8 @@ fn functionDeclarationInstantiation(
 
             // ii. NOTE: In strict mode code early errors prevent attempting to assign to this
             //     binding, so its mutability is not observable.
-        }
-        // d. Else,
-        else {
+        } else {
+            // d. Else,
             // i. Perform ! env.CreateMutableBinding("arguments", false).
             env.createMutableBinding(
                 agent,
@@ -1367,9 +1361,8 @@ fn functionDeclarationInstantiation(
         try parameter_bindings.appendSlice(agent.gc_allocator, parameter_names);
         try parameter_bindings.append(agent.gc_allocator, "arguments");
         break :blk try parameter_bindings.toOwnedSlice(agent.gc_allocator);
-    }
-    // 23. Else,
-    else blk: {
+    } else blk: {
+        // 23. Else,
         // a. Let parameterBindings be parameterNames.
         break :blk parameter_names;
     };
@@ -1417,9 +1410,8 @@ fn functionDeclarationInstantiation(
 
         // d. Let varEnv be env.
         break :blk env;
-    }
-    // 28. Else,
-    else blk: {
+    } else blk: {
+        // 28. Else,
         // a. NOTE: A separate Environment Record is needed to ensure that closures created by
         //    expressions in the formal parameter list do not have visibility of declarations in
         //    the function body.
@@ -1485,9 +1477,8 @@ fn functionDeclarationInstantiation(
         //    always places all declarations into a new Environment Record.
 
         break :blk lex_env;
-    }
-    // 31. Else,
-    else blk: {
+    } else blk: {
+        // 31. Else,
         // a. Let lexEnv be varEnv.
         break :blk var_env;
     };
@@ -1514,9 +1505,8 @@ fn functionDeclarationInstantiation(
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).
                 lex_env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Perform ! lexEnv.CreateMutableBinding(dn, false).
                 lex_env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
             }

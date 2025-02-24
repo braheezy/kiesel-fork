@@ -1562,9 +1562,8 @@ pub fn groupBy(
                 // ii. IfAbruptCloseIterator(key, iteratorRecord).
                 return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), err));
             };
-        }
-        // h. Else,
-        else blk: {
+        } else blk: {
+            // h. Else,
             // i. Assert: keyCoercion is collection.
             std.debug.assert(key_coercion == .collection);
 
@@ -1618,9 +1617,8 @@ pub fn setterThatIgnoresPrototypeProperties(
     if (property_descriptor == null) {
         // a. Perform ? CreateDataPropertyOrThrow(thisValue, p, v).
         try this_value.createDataPropertyOrThrow(property_key, value);
-    }
-    // 5. Else,
-    else {
+    } else {
+        // 5. Else,
         // a. Perform ? Set(thisValue, p, v, true).
         try this_value.set(property_key, value, .throw);
     }
@@ -1775,14 +1773,14 @@ pub fn stringToNumber(
     // - numbers with underscore separators
     if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf") or
         ((std.ascii.startsWithIgnoreCase(trimmed_string, "0b") or
-        std.ascii.startsWithIgnoreCase(trimmed_string, "0o") or
-        std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) and
-        (std.mem.indexOfScalar(u8, trimmed_string, '.') != null or
-        std.mem.indexOfAny(u8, trimmed_string, "pP") != null)) or
+            std.ascii.startsWithIgnoreCase(trimmed_string, "0o") or
+            std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) and
+            (std.mem.indexOfScalar(u8, trimmed_string, '.') != null or
+                std.mem.indexOfAny(u8, trimmed_string, "pP") != null)) or
         (std.mem.indexOfAny(u8, trimmed_string, "+-") == 0 and
-        (std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0b") or
-        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0o") or
-        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x"))) or
+            (std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0b") or
+                std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0o") or
+                std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x"))) or
         std.mem.indexOfScalar(u8, trimmed_string, '_') != null)
     {
         return Number.from(std.math.nan(f64));
@@ -1935,9 +1933,8 @@ pub fn isLessThan(
 
         // b. Let py be ? ToPrimitive(y, number).
         py = try y.toPrimitive(agent, .number);
-    }
-    // 2. Else,
-    else {
+    } else {
+        // 2. Else,
         // a. NOTE: The order of evaluation needs to be reversed to preserve left to right
         //          evaluation.
 
@@ -1973,9 +1970,8 @@ pub fn isLessThan(
 
         // d. If lx < ly, return true. Otherwise, return false.
         return lx < ly;
-    }
-    // 4. Else,
-    else {
+    } else {
+        // 4. Else,
         // a. If px is a BigInt and py is a String, then
         if (px.isBigInt() and py.isString()) {
             //     i. Let ny be StringToBigInt(py).
@@ -2004,9 +2000,8 @@ pub fn isLessThan(
             if (nx == .number) {
                 // 1. Return Number::lessThan(nx, ny).
                 return nx.number.lessThan(ny.number);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Assert: nx is a BigInt.
                 std.debug.assert(nx == .big_int);
 

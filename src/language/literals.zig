@@ -565,7 +565,7 @@ test "parseNumericLiteral" {
     }
 
     for ([_][]const u8
-    // zig fmt: off
+        // zig fmt: off
     {
         // Garbage input
         "", "foo", "0foo", "foo0",
@@ -615,7 +615,7 @@ test "parseStringLiteral" {
     }
 
     for ([_][]const u8
-    // zig fmt: off
+        // zig fmt: off
     {
         // Garbage input
         "", "foo", "123",
@@ -648,7 +648,7 @@ test "parseRegularExpressionLiteral" {
     }
 
     for ([_][]const u8
-    // zig fmt: off
+        // zig fmt: off
     {
         // Garbage input
         "", "//", "foo",

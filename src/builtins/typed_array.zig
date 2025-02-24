@@ -466,9 +466,8 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
     const byte_length: TypedArrayWithBufferWitness.CachedBufferByteLength = if (isDetachedBuffer(buffer)) blk: {
         // a. Let byteLength be detached.
         break :blk .detached;
-    }
-    // 3. Else,
-    else blk: {
+    } else blk: {
+        // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
         break :blk .{ .value = arrayBufferByteLength(buffer, order) };
     };
@@ -560,9 +559,8 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     const byte_offset_end = if (typed_array.fields.array_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
         break :blk buffer_byte_length.value;
-    }
-    // 7. Else,
-    else blk: {
+    } else blk: {
+        // 7. Else,
         // a. Let elementSize be TypedArrayElementSize(O).
         const element_size = typedArrayElementSize(typed_array);
 
@@ -774,9 +772,8 @@ pub const constructor = struct {
         const mapping = if (mapper.isUndefined()) blk: {
             // a. Let mapping be false.
             break :blk false;
-        }
-        // 4. Else,
-        else blk: {
+        } else blk: {
+            // 4. Else,
             // a. If IsCallable(mapper) is false, throw a TypeError exception.
             if (!mapper.isCallable()) {
                 return agent.throwException(.type_error, "{} is not callable", .{mapper});
@@ -827,9 +824,8 @@ pub const constructor = struct {
                 const mapped_value = if (mapping) blk: {
                     // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                     break :blk try mapper.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
-                }
-                // v. Else,
-                else blk: {
+                } else blk: {
+                    // v. Else,
                     // 1. Let mappedValue be kValue.
                     break :blk k_value;
                 };
@@ -878,9 +874,8 @@ pub const constructor = struct {
                     this_arg,
                     &.{ k_value, Value.from(k) },
                 );
-            }
-            // d. Else,
-            else blk: {
+            } else blk: {
+                // d. Else,
                 // i. Let mappedValue be kValue.
                 break :blk k_value;
             };
@@ -1116,13 +1111,11 @@ pub const prototype = struct {
         // 5. If relativeTarget = -∞, let targetIndex be 0.
         const target_index_f64 = if (std.math.isNegativeInf(relative_target)) blk: {
             break :blk 0;
-        }
-        // 6. Else if relativeTarget < 0, let targetIndex be max(len + relativeTarget, 0).
-        else if (relative_target < 0) blk: {
+        } else if (relative_target < 0) blk: {
+            // 6. Else if relativeTarget < 0, let targetIndex be max(len + relativeTarget, 0).
             break :blk @max(len_f64 + relative_target, 0);
-        }
-        // 7. Else, let targetIndex be min(relativeTarget, len).
-        else blk: {
+        } else blk: {
+            // 7. Else, let targetIndex be min(relativeTarget, len).
             break :blk @min(relative_target, len_f64);
         };
         const target_index: u53 = @intFromFloat(target_index_f64);
@@ -1133,13 +1126,11 @@ pub const prototype = struct {
         // 9. If relativeStart = -∞, let startIndex be 0.
         const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 10. Else if relativeStart < 0, let startIndex be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 10. Else if relativeStart < 0, let startIndex be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 11. Else, let startIndex be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 11. Else, let startIndex be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const start_index: u53 = @intFromFloat(start_index_f64);
@@ -1154,13 +1145,11 @@ pub const prototype = struct {
         // 13. If relativeEnd = -∞, let endIndex be 0.
         const end_index_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 14. Else if relativeEnd < 0, let endIndex be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 14. Else if relativeEnd < 0, let endIndex be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 15. Else, let endIndex be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 15. Else, let endIndex be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
 
@@ -1218,9 +1207,8 @@ pub const prototype = struct {
 
                 // i. Let direction be -1.
                 break :blk -1;
-            }
-            // m. Else,
-            else blk: {
+            } else blk: {
+                // m. Else,
                 // i. Let direction be 1.
                 break :blk 1;
             };
@@ -1260,9 +1248,8 @@ pub const prototype = struct {
 
                     // 5. Set countBytes to countBytes - 1.
                     count_bytes -= 1;
-                }
-                // ii. Else,
-                else {
+                } else {
+                    // ii. Else,
                     // 1. Set countBytes to 0.
                     count_bytes = 0;
                 }
@@ -1362,13 +1349,11 @@ pub const prototype = struct {
         // 7. If relativeStart = -∞, let startIndex be 0.
         const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 8. Else if relativeStart < 0, let startIndex be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 8. Else if relativeStart < 0, let startIndex be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 9. Else, let startIndex be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 9. Else, let startIndex be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const start_index: u53 = @intFromFloat(start_index_f64);
@@ -1383,13 +1368,11 @@ pub const prototype = struct {
         // 11. If relativeEnd = -∞, let endIndex be 0.
         const end_index_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 12. Else if relativeEnd < 0, let endIndex be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 12. Else if relativeEnd < 0, let endIndex be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 13. Else, let endIndex be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 13. Else, let endIndex be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
         var end_index: u53 = @intFromFloat(end_index_f64);
@@ -1990,9 +1973,8 @@ pub const prototype = struct {
         if (initial_value != null) {
             // a. Set accumulator to initialValue.
             accumulator = initial_value.?;
-        }
-        // 9. Else,
-        else {
+        } else {
+            // 9. Else,
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2062,9 +2044,8 @@ pub const prototype = struct {
         if (initial_value != null) {
             // a. Set accumulator to initialValue.
             accumulator = initial_value.?;
-        }
-        // 9. Else,
-        else {
+        } else {
+            // 9. Else,
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k.?);
 
@@ -2167,9 +2148,8 @@ pub const prototype = struct {
         if (source.isObject() and source.asObject().is(TypedArray)) {
             // a. Perform ? SetTypedArrayFromTypedArray(target, targetOffset, source).
             try setTypedArrayFromTypedArray(agent, target, target_offset, source.asObject().as(TypedArray));
-        }
-        // 7. Else,
-        else {
+        } else {
+            // 7. Else,
             // a. Perform ? SetTypedArrayFromArrayLike(target, targetOffset, source).
             try setTypedArrayFromArrayLike(agent, target, target_offset, source);
         }
@@ -2267,7 +2247,7 @@ pub const prototype = struct {
         const same_shared_array_buffer = src_buffer == .shared_array_buffer and
             target_buffer == .shared_array_buffer and
             src_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr ==
-            target_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr;
+                target_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr;
 
         // 19. If SameValue(srcBuffer, targetBuffer) is true or sameSharedArrayBuffer is true, then
         var src_byte_index = if (src_buffer.object() == target_buffer.object() or same_shared_array_buffer) blk: {
@@ -2286,9 +2266,8 @@ pub const prototype = struct {
 
             // c. Let srcByteIndex be 0.
             break :blk 0;
-        }
-        // 20. Else,
-        else blk: {
+        } else blk: {
+            // 20. Else,
             // a. Let srcByteIndex be srcByteOffset.
             break :blk src_byte_offset;
         };
@@ -2334,9 +2313,8 @@ pub const prototype = struct {
                 // iii. Set srcByteIndex to srcByteIndex + 1.
                 // iv. Set targetByteIndex to targetByteIndex + 1.
             }
-        }
-        // 24. Else,
-        else {
+        } else {
+            // 24. Else,
             // a. Repeat, while targetByteIndex < limit,
             while (target_byte_index < limit) : ({
                 src_byte_index += src_element_size;
@@ -2474,13 +2452,11 @@ pub const prototype = struct {
         // 5. If relativeStart = -∞, let startIndex be 0.
         const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 6. Else if relativeStart < 0, let startIndex be max(srcArrayLength + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 6. Else if relativeStart < 0, let startIndex be max(srcArrayLength + relativeStart, 0).
             break :blk @max(src_array_length + relative_start, 0);
-        }
-        // 7. Else, let startIndex be min(relativeStart, srcArrayLength).
-        else blk: {
+        } else blk: {
+            // 7. Else, let startIndex be min(relativeStart, srcArrayLength).
             break :blk @min(relative_start, src_array_length);
         };
         const start_index: u53 = @intFromFloat(start_index_f64);
@@ -2495,13 +2471,11 @@ pub const prototype = struct {
         // 9. If relativeEnd = -∞, let endIndex be 0.
         var end_index_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 10. Else if relativeEnd < 0, let endIndex be max(srcArrayLength + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 10. Else if relativeEnd < 0, let endIndex be max(srcArrayLength + relativeEnd, 0).
             break :blk @max(src_array_length + relative_end, 0);
-        }
-        // 11. Else, let endIndex be min(relativeEnd, srcArrayLength).
-        else blk: {
+        } else blk: {
+            // 11. Else, let endIndex be min(relativeEnd, srcArrayLength).
             break :blk @min(relative_end, src_array_length);
         };
         var end_index: u53 = @intFromFloat(end_index_f64);
@@ -2600,9 +2574,8 @@ pub const prototype = struct {
                     // 3. Set srcByteIndex to srcByteIndex + 1.
                     // 4. Set targetByteIndex to targetByteIndex + 1.
                 }
-            }
-            // h. Else,
-            else {
+            } else {
+                // h. Else,
                 // i. Let n be 0.
                 var n: u53 = 0;
 
@@ -2765,9 +2738,8 @@ pub const prototype = struct {
         const src_length: f64 = if (isTypedArrayOutOfBounds(src)) blk: {
             // a. Let srcLength be 0.
             break :blk 0;
-        }
-        // 7. Else,
-        else blk: {
+        } else blk: {
+            // 7. Else,
             // a. Let srcLength be TypedArrayLength(srcRecord).
             break :blk @floatFromInt(typedArrayLength(src));
         };
@@ -2778,13 +2750,11 @@ pub const prototype = struct {
         // 9. If relativeStart = -∞, let startIndex be 0.
         const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 10. Else if relativeStart < 0, let startIndex be max(srcLength + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 10. Else if relativeStart < 0, let startIndex be max(srcLength + relativeStart, 0).
             break :blk @max(src_length + relative_start, 0);
-        }
-        // 11. Else, let startIndex be min(relativeStart, srcLength).
-        else blk: {
+        } else blk: {
+            // 11. Else, let startIndex be min(relativeStart, srcLength).
             break :blk @min(relative_start, src_length);
         };
         const start_index: u53 = @intFromFloat(start_index_f64);
@@ -2802,9 +2772,8 @@ pub const prototype = struct {
         const arguments_list = if (typed_array.fields.array_length == .auto and end.isUndefined()) blk_args: {
             // a. Let argumentsList be « buffer, 𝔽(beginByteOffset) ».
             break :blk_args &.{ Value.from(buffer_.object()), Value.from(begin_byte_offset) };
-        }
-        // 16. Else,
-        else blk_args: {
+        } else blk_args: {
+            // 16. Else,
             // a. If end is undefined, let relativeEnd be srcLength; else let relativeEnd be
             //    ? ToIntegerOrInfinity(end).
             const relative_end = if (end.isUndefined())
@@ -2815,13 +2784,11 @@ pub const prototype = struct {
             // b. If relativeEnd = -∞, let endIndex be 0.
             const end_index = if (std.math.isNegativeInf(relative_end)) blk: {
                 break :blk 0;
-            }
-            // c. Else if relativeEnd < 0, let endIndex be max(srcLength + relativeEnd, 0).
-            else if (relative_end < 0) blk: {
+            } else if (relative_end < 0) blk: {
+                // c. Else if relativeEnd < 0, let endIndex be max(srcLength + relativeEnd, 0).
                 break :blk @max(src_length + relative_end, 0);
-            }
-            // d. Else, let endIndex be min(relativeEnd, srcLength).
-            else blk: {
+            } else blk: {
+                // d. Else, let endIndex be min(relativeEnd, srcLength).
                 break :blk @min(relative_end, src_length);
             };
 
@@ -3450,9 +3417,8 @@ fn initializeTypedArrayFromTypedArray(
             src_byte_offset,
             byte_length,
         );
-    }
-    // 12. Else,
-    else blk: {
+    } else blk: {
+        // 12. Else,
         // a. Let data be ? AllocateArrayBuffer(%ArrayBuffer%, byteLength).
         const data = try allocateArrayBuffer(
             agent,
@@ -3598,9 +3564,8 @@ fn initializeTypedArrayFromArrayBuffer(
 
         // c. Set O.[[ArrayLength]] to auto.
         typed_array.fields.array_length = .auto;
-    }
-    // 9. Else,
-    else {
+    } else {
+        // 9. Else,
         // a. If length is undefined, then
         const new_byte_length = if (length.isUndefined()) blk: {
             // i. If bufferByteLength modulo elementSize ≠ 0, throw a RangeError exception.
@@ -3621,9 +3586,8 @@ fn initializeTypedArrayFromArrayBuffer(
                     .{ buffer_byte_length, offset },
                 );
             };
-        }
-        // b. Else,
-        else blk: {
+        } else blk: {
+            // b. Else,
             // i. Let newByteLength be newLength × elementSize.
             const new_byte_length = std.math.mul(u53, new_length, element_size) catch {
                 return agent.throwException(
@@ -3849,9 +3813,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     prototype_,
                     0,
                 ));
-            }
-            // 6. Else,
-            else {
+            } else {
+                // 6. Else,
                 // a. Let firstArgument be args[0].
                 const first_argument = arguments.get(0);
 
@@ -3899,9 +3862,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                             byte_offset,
                             length,
                         );
-                    }
-                    // iv. Else,
-                    else {
+                    } else {
+                        // iv. Else,
                         // 1. Assert: firstArgument is an Object and firstArgument does not have
                         //    either a [[TypedArrayName]] or an [[ArrayBufferData]] internal slot.
                         std.debug.assert(
@@ -3931,9 +3893,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
                             // b. Perform ? InitializeTypedArrayFromList(O, values).
                             try initializeTypedArrayFromList(agent, object.as(TypedArray), values);
-                        }
-                        // 4. Else,
-                        else {
+                        } else {
+                            // 4. Else,
                             // a. NOTE: firstArgument is not an iterable object, so assume it is
                             //    already an array-like object.
                             // b. Perform ? InitializeTypedArrayFromArrayLike(O, firstArgument).
@@ -3947,9 +3908,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
                     // v. Return O.
                     return Value.from(object);
-                }
-                // c. Else,
-                else {
+                } else {
+                    // c. Else,
                     // i. Assert: firstArgument is not an Object.
                     std.debug.assert(!first_argument.isObject());
 

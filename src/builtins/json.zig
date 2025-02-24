@@ -111,18 +111,16 @@ fn internalizeJSONProperty(
                         value.asObject(),
                         property_key,
                     );
-                }
-                // 4. Else,
-                else {
+                } else {
+                    // 4. Else,
                     // a. Perform ? CreateDataProperty(val, prop, newElement).
                     _ = try value.asObject().createDataProperty(property_key, new_element);
                 }
 
                 // 5. Set I to I + 1.
             }
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Let keys be ? EnumerableOwnProperties(val, key).
             var keys = try value.asObject().enumerableOwnProperties(.key);
             defer keys.deinit(agent.gc_allocator);
@@ -147,9 +145,8 @@ fn internalizeJSONProperty(
                         value.asObject(),
                         property_key,
                     );
-                }
-                // 3. Else,
-                else {
+                } else {
+                    // 3. Else,
                     // a. Perform ? CreateDataProperty(val, P, newElement).
                     _ = try value.asObject().createDataProperty(property_key, new_element);
                 }
@@ -314,9 +311,8 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
             // i. Let unit be the code unit whose numeric value is the numeric value of C.
             // ii. Set product to the string-concatenation of product and UnicodeEscape(unit).
             try product.appendSlice(agent.gc_allocator, try unicodeEscape(agent, c));
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(C).
             try product.appendSlice(
                 agent.gc_allocator,
@@ -430,9 +426,8 @@ fn serializeJSONObject(
     const final = if (partial.items.len == 0) blk: {
         // a. Let final be "{}".
         break :blk String.fromLiteral("{}");
-    }
-    // 10. Else,
-    else blk: {
+    } else blk: {
+        // 10. Else,
         // a. If state.[[Gap]] is the empty String, then
         if (state.gap.isEmpty()) {
             // i. Let properties be the String value formed by concatenating all the element
@@ -446,9 +441,8 @@ fn serializeJSONObject(
                 agent.gc_allocator,
                 try std.fmt.allocPrint(agent.gc_allocator, "{{{s}}}", .{properties}),
             );
-        }
-        // b. Else,
-        else {
+        } else {
+            // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
             const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{}", .{state.indent});
@@ -528,9 +522,8 @@ fn serializeJSONArray(
         if (str_property == null) {
             // i. Append "null" to partial.
             partial.appendAssumeCapacity("null");
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Append strP to partial.
             partial.appendAssumeCapacity(try str_property.?.toUtf8(agent.gc_allocator));
         }
@@ -542,9 +535,8 @@ fn serializeJSONArray(
     const final = if (partial.items.len == 0) blk: {
         // a. Let final be "[]".
         break :blk String.fromLiteral("[]");
-    }
-    // 10. Else,
-    else blk: {
+    } else blk: {
+        // 10. Else,
         // a. If state.[[Gap]] is the empty String, then
         if (state.gap.isEmpty()) {
             // i. Let properties be the String value formed by concatenating all the element
@@ -558,9 +550,8 @@ fn serializeJSONArray(
                 agent.gc_allocator,
                 try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{properties}),
             );
-        }
-        // b. Else,
-        else {
+        } else {
+            // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
             const separator = try std.fmt.allocPrint(
@@ -676,9 +667,8 @@ pub const namespace = struct {
 
             // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
             return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
-        }
-        // 12. Else,
-        else {
+        } else {
+            // 12. Else,
             // a. Return unfiltered.
             return convertJsonValue(agent, unfiltered);
         }
@@ -712,9 +702,8 @@ pub const namespace = struct {
             if (replacer.isCallable()) {
                 // i. Set ReplacerFunction to replacer.
                 replacer_function = replacer.asObject();
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. Let isArray be ? IsArray(replacer).
                 const is_array = try replacer.isArray();
 
@@ -802,18 +791,16 @@ pub const namespace = struct {
                 @memset(s, ' ');
                 break :blk try String.fromAscii(agent.gc_allocator, s);
             }
-        }
-        // 8. Else if space is a String, then
-        else if (space.isString()) blk: {
+        } else if (space.isString()) blk: {
+            // 8. Else if space is a String, then
             // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
             //    substring of space from 0 to 10.
             break :blk if (space.asString().length() <= 10)
                 space.asString()
             else
                 try space.asString().substring(agent.gc_allocator, 0, 10);
-        }
-        // 9. Else,
-        else blk: {
+        } else blk: {
+            // 9. Else,
             // a. Let gap be the empty String.
             break :blk .empty;
         };

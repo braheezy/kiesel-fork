@@ -107,9 +107,8 @@ fn defineOwnProperty(
                 map,
                 property_key,
             ) catch |err| try noexcept(err);
-        }
-        // b. Else,
-        else {
+        } else {
+            // b. Else,
             // i. If Desc has a [[Value]] field, then
             if (property_descriptor.value) |value| {
                 // 1. Assert: The following Set will succeed, since formal parameters mapped by
@@ -152,9 +151,8 @@ fn get(
     if (!is_mapped) {
         // a. Return ? OrdinaryGet(args, P, Receiver).
         return ordinaryGet(agent, object, property_key, receiver);
-    }
-    // 4. Else,
-    else {
+    } else {
+        // 4. Else,
         // a. Assert: map contains a formal parameter mapping for P.
         // b. Return ! Get(map, P).
         return map.get(property_key) catch |err| try noexcept(err);

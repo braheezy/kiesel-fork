@@ -208,9 +208,8 @@ pub fn createDateTimeFormat(
     var time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
         break :blk systemTimeZoneIdentifier();
-    }
-    // 28. Else,
-    else blk: {
+    } else blk: {
+        // 28. Else,
         // a. Set timeZone to ? ToString(timeZone).
         break :blk try (try time_zone_value.toString(agent)).toUtf8(agent.gc_allocator);
     };
@@ -320,9 +319,8 @@ pub fn createDateTimeFormat(
                 3,
                 null,
             );
-        }
-        // c. Else,
-        else blk: {
+        } else blk: {
+            // c. Else,
             // i. Let values be a List whose elements are the strings given in the Values column of
             //    the current row.
             // ii. Let value be ? GetOption(options, prop, string, values, undefined).
@@ -440,18 +438,16 @@ pub fn createDateTimeFormat(
 
         // TODO: d. Let styles be resolvedLocaleData.[[styles]].[[<resolvedCalendar>]].
         // TODO: e. Let bestFormat be DateTimeStyleFormat(dateStyle, timeStyle, styles).
-    }
-    // 42. Else,
-    else {
+    } else {
+        // 42. Else,
         // TODO: a-f.
         _ = defaults;
 
         // g. If formatMatcher is "basic", then
         if (format_matcher.eql(String.fromLiteral("basic"))) {
             // TODO: i. Let bestFormat be BasicFormatMatcher(formatOptions, formats).
-        }
-        // h. Else,
-        else {
+        } else {
+            // h. Else,
             // TODO: i. Let bestFormat be BestFitFormatMatcher(formatOptions, formats).
         }
     }
@@ -583,9 +579,8 @@ pub const prototype = struct {
                     const x = if (date.isUndefined()) blk: {
                         // a. Let x be ! Call(%Date.now%, undefined).
                         break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
-                    }
-                    // 4. Else,
-                    else blk: {
+                    } else blk: {
+                        // 4. Else,
                         // a. Let x be ? ToNumber(date).
                         break :blk (try date.toNumber(agent_)).asFloat();
                     };

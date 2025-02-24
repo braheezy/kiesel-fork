@@ -158,9 +158,8 @@ pub fn arrayBufferCopyAndDetach(
     const new_byte_length = if (new_length.isUndefined()) blk: {
         // a. Let newByteLength be arrayBuffer.[[ArrayBufferByteLength]].
         break :blk array_buffer_byte_length;
-    }
-    // 4. Else,
-    else blk: {
+    } else blk: {
+        // 4. Else,
         // a. Let newByteLength be ? ToIndex(newLength).
         break :blk try new_length.toIndex(agent);
     };
@@ -177,9 +176,8 @@ pub fn arrayBufferCopyAndDetach(
     blk: {
         // a. Let newMaxByteLength be arrayBuffer.[[ArrayBufferMaxByteLength]].
         break :blk array_buffer.fields.array_buffer_max_byte_length;
-    }
-    // 7. Else,
-    else blk: {
+    } else blk: {
+        // 7. Else,
         // a. Let newMaxByteLength be empty.
         break :blk null;
     };
@@ -398,9 +396,8 @@ pub fn getValueFromBuffer(
         // b. Let rawValue be GetRawBytesFromSharedBlock(block, byteIndex, type, isTypedArray,
         //    order).
         break :blk &getRawBytesFromSharedBlock(block, byte_index, @"type", is_typed_array, order);
-    }
-    // 6. Else,
-    else blk: {
+    } else blk: {
+        // 6. Else,
         // a. Let rawValue be a List whose elements are bytes from block at indices in the interval
         //    from byteIndex (inclusive) to byteIndex + elementSize (exclusive).
         break :blk block.items[@intCast(byte_index)..@intCast(byte_index + element_size)];
@@ -539,9 +536,8 @@ pub fn setValueInBuffer(
         // [...]
         _ = order;
         _ = is_typed_array;
-    }
-    // 9. Else,
-    else {
+    } else {
+        // 9. Else,
         // a. Store the individual bytes of rawBytes into block, starting at block[byteIndex].
         @memcpy(block.items[@intCast(byte_index)..@intCast(byte_index + element_size)], &raw_bytes);
     }
@@ -588,9 +584,8 @@ pub fn getModifySetValueInBuffer(
     // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (false) {
         // a-g.
-    }
-    // 9. Else,
-    else {
+    } else {
+        // 9. Else,
         // a. Let rawBytesRead be a List of length elementSize whose elements are the sequence of
         //    elementSize bytes starting with block[byteIndex].
         // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
@@ -773,9 +768,8 @@ pub const prototype = struct {
         const length = if (isFixedLengthArrayBuffer(object)) blk: {
             // a. Let length be O.[[ArrayBufferByteLength]].
             break :blk object.fields.array_buffer_data.?.items.len;
-        }
-        // 6. Else,
-        else blk: {
+        } else blk: {
+            // 6. Else,
             // a. Let length be O.[[ArrayBufferMaxByteLength]].
             break :blk object.fields.array_buffer_max_byte_length.?;
         };
@@ -881,13 +875,11 @@ pub const prototype = struct {
         // 7. If relativeStart = -∞, let first be 0.
         const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 8. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 8. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 9. Else, let first be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 9. Else, let first be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const first: u53 = @intFromFloat(first_f64);
@@ -902,13 +894,11 @@ pub const prototype = struct {
         // 11. If relativeEnd = -∞, let final be 0.
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 12. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 12. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 13. Else, let final be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 13. Else, let final be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
 

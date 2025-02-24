@@ -337,9 +337,8 @@ pub fn localTime(t: f64) f64 {
     const offset_ns = if (false) {
         // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
         unreachable;
-    }
-    // 3. Else,
-    else blk: {
+    } else blk: {
+        // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(t) × 10**6)).
         break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, t * 10e6);
     };
@@ -641,9 +640,8 @@ pub fn timeZoneString(
     const offset_ns = if (false) {
         // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
         unreachable;
-    }
-    // 3. Else,
-    else blk: {
+    } else blk: {
+        // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(tv) × 10**6)).
         break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, time_value * 10e6);
     };
@@ -746,9 +744,8 @@ pub const constructor = struct {
         const date_value = if (number_of_args == 0) blk: {
             // a. Let dv be the time value (UTC) identifying the current time.
             break :blk @as(f64, @floatFromInt(agent.platform.currentTime()));
-        }
-        // 4. Else if numberOfArgs = 1, then
-        else if (number_of_args == 1) blk: {
+        } else if (number_of_args == 1) blk: {
+            // 4. Else if numberOfArgs = 1, then
             // a. Let value be values[0].
             const value = arguments.get(0);
 
@@ -756,9 +753,8 @@ pub const constructor = struct {
             const time_value = if (value.isObject() and value.asObject().is(Date)) blk_tv: {
                 // i. Let tv be value.[[DateValue]].
                 break :blk_tv value.asObject().as(Date).fields.date_value;
-            }
-            // c. Else,
-            else blk_tv: {
+            } else blk_tv: {
+                // c. Else,
                 // i. Let v be ? ToPrimitive(value).
                 const primitive_value = try value.toPrimitive(agent, null);
 
@@ -769,9 +765,8 @@ pub const constructor = struct {
                     // 2. Let tv be the result of parsing v as a date, in exactly the same manner
                     //    as for the parse method (21.4.3.2).
                     break :blk_tv parseDateTimeString(primitive_value.asString());
-                }
-                // iii. Else,
-                else {
+                } else {
+                    // iii. Else,
                     // 1. Let tv be ? ToNumber(v).
                     break :blk_tv (try primitive_value.toNumber(agent)).asFloat();
                 }
@@ -779,9 +774,8 @@ pub const constructor = struct {
 
             // d. Let dv be TimeClip(tv).
             break :blk timeClip(time_value);
-        }
-        // 5. Else,
-        else blk: {
+        } else blk: {
+            // 5. Else,
             // a. Assert: numberOfArgs ≥ 2.
             std.debug.assert(number_of_args >= 2);
 
@@ -2195,14 +2189,12 @@ pub const prototype = struct {
         const try_first: PreferredType = if (hint.eql(String.fromLiteral("string")) or hint.eql(String.fromLiteral("default"))) blk: {
             // a. Let tryFirst be string.
             break :blk .string;
-        }
-        // 4. Else if hint is "number", then
-        else if (hint.eql(String.fromLiteral("number"))) blk: {
+        } else if (hint.eql(String.fromLiteral("number"))) blk: {
+            // 4. Else if hint is "number", then
             // a. Let tryFirst be number.
             break :blk .number;
-        }
-        // 5. Else,
-        else {
+        } else {
+            // 5. Else,
             // a. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,

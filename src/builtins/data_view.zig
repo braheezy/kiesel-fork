@@ -58,9 +58,8 @@ fn makeDataViewWithBufferWitnessRecord(
     const byte_length: DataViewWithBufferWitness.CachedBufferByteLength = if (isDetachedBuffer(buffer)) blk: {
         // a. Let byteLength be detached.
         break :blk .detached;
-    }
-    // 3. Else,
-    else blk: {
+    } else blk: {
+        // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
         break :blk .{ .value = arrayBufferByteLength(buffer, order) };
     };
@@ -124,9 +123,8 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     const byte_offset_end = if (data_view.fields.byte_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
         break :blk buffer_byte_length.value;
-    }
-    // 7. Else,
-    else blk: {
+    } else blk: {
+        // 7. Else,
         // a. Let byteOffsetEnd be byteOffsetStart + view.[[ByteLength]].
         break :blk std.math.add(
             u53,
@@ -366,15 +364,13 @@ pub const constructor = struct {
             if (buffer_is_fixed_length) {
                 // i. Let viewByteLength be bufferByteLength - offset.
                 break :blk .{ .value = buffer_byte_length - offset };
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. Let viewByteLength be auto.
                 break :blk .auto;
             }
-        }
-        // 9. Else,
-        else blk: {
+        } else blk: {
+            // 9. Else,
             // a. Let viewByteLength be ? ToIndex(byteLength).
             const view_byte_length = try byte_length.toIndex(agent);
 

@@ -177,9 +177,8 @@ pub fn generatorStart(
                     agent_,
                     &closure_generator.fields.evaluation_state.vm,
                 );
-            }
-            // TODO: d. Else,
-            else {
+            } else {
+                // TODO: d. Else,
                 // i. Assert: generatorBody is an Abstract Closure with no parameters.
                 // ii. Let result be generatorBody().
             };
@@ -216,9 +215,8 @@ pub fn generatorStart(
                 .@"return" => completion.value.?,
 
                 else => unreachable,
-            }
-            // k. Else,
-            else |err| {
+            } else |err| {
+                // k. Else,
                 // i. Assert: result is a throw completion.
                 // ii. Return ? result.
                 return err;

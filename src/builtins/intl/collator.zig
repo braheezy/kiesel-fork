@@ -192,9 +192,8 @@ pub const constructor = struct {
             if (usage.eql(String.fromLiteral("sort"))) {
                 // i. Set sensitivity to "variant".
                 maybe_sensitivity = String.fromLiteral("variant");
-            }
-            // b. Else,
-            else {
+            } else {
+                // b. Else,
                 // i. Set sensitivity to resolvedLocaleData.[[sensitivity]].
             }
         }

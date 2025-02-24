@@ -61,9 +61,8 @@ fn validateIntegerTypedArray(
                 .{@"type".typedArrayName()},
             );
         }
-    }
-    // 4. Else,
-    else {
+    } else {
+        // 4. Else,
         // a. Let type be TypedArrayElementType(typedArray).
         // b. If IsUnclampedIntegerElementType(type) is false and IsBigIntElementType(type) is
         //    false, throw a TypeError exception.
@@ -236,9 +235,8 @@ fn doWait(
     if (mode == .sync) {
         // a. Let promiseCapability be blocking.
         // b. Let resultObject be undefined.
-    }
-    // 16. Else,
-    else {
+    } else {
+        // 16. Else,
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         promise_capability = newPromiseCapability(
             agent,
@@ -496,9 +494,8 @@ pub const namespace = struct {
 
             // b. Let replacement be ? ToBigInt(replacementValue).
             Value.from(try replacement_value.toBigInt(agent)),
-        }
-        // 5. Else,
-        else .{
+        } else .{
+            // 5. Else,
             // a. Let expected be 𝔽(? ToIntegerOrInfinity(expectedValue)).
             Value.from(try expected_value.toIntegerOrInfinity(agent)),
 
@@ -556,9 +553,8 @@ pub const namespace = struct {
                         .seq_cst,
                         .seq_cst,
                     );
-                }
-                // 13. Else,
-                else {
+                } else {
+                    // 13. Else,
                     // a. Let rawBytesRead be a List of length elementSize whose elements are the
                     //    sequence of elementSize bytes starting with block[byteIndexInBuffer].
                     // b. If ByteListEqual(rawBytesRead, expectedBytes) is true, then
@@ -681,9 +677,8 @@ pub const namespace = struct {
         const count = if (count_value.isUndefined()) blk: {
             // a. Let c be +∞.
             break :blk std.math.inf(f64);
-        }
-        // 3. Else,
-        else blk: {
+        } else blk: {
+            // 3. Else,
             // a. Let intCount be ? ToIntegerOrInfinity(count).
             const int_count = try count_value.toIntegerOrInfinity(agent);
 

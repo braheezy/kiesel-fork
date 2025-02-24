@@ -260,9 +260,8 @@ fn validateAndApplyPropertyDescriptor(
                     .configurable = descriptor.configurable orelse false,
                 },
             };
-        }
-        // d. Else,
-        else blk: {
+        } else blk: {
+            // d. Else,
             // i. Create an own data property named P of object O whose [[Value]], [[Writable]],
             //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
@@ -372,9 +371,8 @@ fn validateAndApplyPropertyDescriptor(
                     .configurable = configurable,
                 },
             };
-        }
-        // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true, then
-        else if (current.isAccessorDescriptor() and descriptor.isDataDescriptor()) blk: {
+        } else if (current.isAccessorDescriptor() and descriptor.isDataDescriptor()) blk: {
+            // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true, then
             // i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
             //    else let configurable be current.[[Configurable]].
             const configurable = descriptor.configurable orelse current.configurable.?;
@@ -398,9 +396,8 @@ fn validateAndApplyPropertyDescriptor(
                     .configurable = configurable,
                 },
             };
-        }
-        // c. Else,
-        else blk: {
+        } else blk: {
+            // c. Else,
             // i. For each field of Desc, set the corresponding attribute of the property named P
             //    of object O to the value of the field.
             if (current.isDataDescriptor()) {
@@ -523,15 +520,13 @@ pub fn ordinaryGet(
     }
 
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try object.internal_methods.getOwnProperty(agent, object, property_key)
-
-    // 2. If desc is undefined, then
-    orelse {
+    const descriptor = try object.internal_methods.getOwnProperty(agent, object, property_key) orelse {
+        // 2. If desc is undefined, then
         // a. Let parent be ? O.[[GetPrototypeOf]]().
-        const parent = try object.internal_methods.getPrototypeOf(agent, object)
-
-        // b. If parent is null, return undefined.
-        orelse return .undefined;
+        const parent = try object.internal_methods.getPrototypeOf(agent, object) orelse {
+            // b. If parent is null, return undefined.
+            return .undefined;
+        };
 
         // c. Return ? parent.[[Get]](P, Receiver).
         return parent.internal_methods.get(agent, parent, property_key, receiver);
@@ -651,9 +646,8 @@ pub fn ordinarySetWithOwnDescriptor(
                 value,
                 receiver_value,
             );
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Set ownDesc to the PropertyDescriptor {
             //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
             //    }.
@@ -700,9 +694,8 @@ pub fn ordinarySetWithOwnDescriptor(
                 property_key,
                 value_descriptor,
             );
-        }
-        // e. Else,
-        else {
+        } else {
+            // e. Else,
             // i. Assert: Receiver does not currently have a property P.
             std.debug.assert(!receiver.property_storage.contains(property_key));
 

@@ -202,9 +202,8 @@ pub fn evaluateCallGetThisValue(reference: Reference) Value {
     if (reference.isPropertyReference()) {
         // i. Let thisValue be GetThisValue(ref).
         return reference.getThisValue();
-    }
-    // b. Else,
-    else {
+    } else {
+        // b. Else,
         // i. Let refEnv be ref.[[Base]].
         // ii. Assert: refEnv is an Environment Record.
         const reference_environment = reference.base.environment;
@@ -609,9 +608,8 @@ pub fn blockDeclarationInstantiation(
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).
                 env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Perform ! env.CreateMutableBinding(dn, false). NOTE: This step is replaced in section B.3.2.6.
                 env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
             }
@@ -1764,9 +1762,8 @@ fn classFieldDefinitionEvaluation(
         initializer_function.as(builtins.ECMAScriptFunction).fields.class_field_initializer_name = name;
 
         break :blk initializer_function;
-    }
-    // 3. Else,
-    else blk: {
+    } else blk: {
+        // 3. Else,
         // a. Let initializer be empty.
         break :blk null;
     };
@@ -1948,9 +1945,8 @@ pub fn classDefinitionEvaluation(
             // i. If classPrivateEnvironment.[[Names]] contains a Private Name pn such that pn.[[Description]] is dn, then
             if (class_private_environment.names.contains(declared_name)) {
                 // 1. Assert: This is only possible for getter/setter pairs.
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 const description = try String.fromUtf8(agent.gc_allocator, declared_name);
                 const symbol = try Symbol.init(agent.gc_allocator, description);
                 symbol.is_private = true;
@@ -1974,9 +1970,8 @@ pub fn classDefinitionEvaluation(
 
         // b. Let constructorParent be %Function.prototype%.
         constructor_parent = try realm.intrinsics.@"%Function.prototype%"();
-    }
-    // 8. Else,
-    else {
+    } else {
+        // 8. Else,
         // a. Set the running execution context's LexicalEnvironment to classEnv.
         agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
 
@@ -2009,9 +2004,8 @@ pub fn classDefinitionEvaluation(
         else if (!superclass.isConstructor()) {
             // i. Throw a TypeError exception.
             return agent.throwException(.type_error, "{} is not a constructor", .{superclass});
-        }
-        // h. Else,
-        else {
+        } else {
+            // h. Else,
             // i. Let protoParent be ? Get(superclass, "prototype").
             const prototype_parent_value = try superclass.asObject().get(PropertyKey.from("prototype"));
 
@@ -2096,9 +2090,8 @@ pub fn classDefinitionEvaluation(
 
                     // 4. Let result be ? Construct(func, args, NewTarget).
                     break :blk try prototype_function.?.construct(args, new_target.?);
-                }
-                // v. Else,
-                else blk: {
+                } else blk: {
+                    // v. Else,
                     // 1. NOTE: This branch behaves similarly to constructor() {}.
                     // 2. Let result be ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
                     break :blk try ordinaryCreateFromConstructor(
@@ -2128,9 +2121,8 @@ pub fn classDefinitionEvaluation(
             .prototype = constructor_parent,
             .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
         });
-    }
-    // 15. Else,
-    else blk: {
+    } else blk: {
+        // 15. Else,
         // a. Let constructorInfo be ! DefineMethod of constructor with arguments proto and
         //    constructorParent.
         const constructor_info = defineMethod(
@@ -2208,9 +2200,8 @@ pub fn classDefinitionEvaluation(
         const element_or_error = if (!class_element.isStatic()) blk: {
             // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
             break :blk classElementEvaluation(agent, class_element, prototype);
-        }
-        // b. Else,
-        else blk: {
+        } else blk: {
+            // b. Else,
             // i. Let element be Completion(ClassElementEvaluation of e with argument F).
             break :blk classElementEvaluation(agent, class_element, function);
         };
@@ -2264,9 +2255,8 @@ pub fn classDefinitionEvaluation(
                         //      [[Key]]: element.[[Key]], [[Kind]]: accessor, [[Get]]: pe.[[Get]], [[Set]]: element.[[Set]]
                         //    }.
                         combined.private_element.accessor.get = found.private_element.accessor.get;
-                    }
-                    // 3. Else,
-                    else {
+                    } else {
+                        // 3. Else,
                         // a. Let combined be PrivateElement {
                         //      [[Key]]: element.[[Key]], [[Kind]]: accessor, [[Get]]: element.[[Get]], [[Set]]: pe.[[Set]]
                         //    }.
@@ -2275,9 +2265,8 @@ pub fn classDefinitionEvaluation(
 
                     // 4. Replace pe in container with combined.
                     container.items[found.index] = combined;
-                }
-                // v. Else,
-                else {
+                } else {
+                    // v. Else,
                     // 1. Append element to container.
                     try container.append(agent.gc_allocator, private_method_definition);
                 }

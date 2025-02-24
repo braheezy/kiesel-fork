@@ -203,9 +203,8 @@ pub const namespace = struct {
         else if (key.eql(String.fromLiteral("unit"))) {
             // a. Let list be AvailableCanonicalUnits( ).
             list = availableCanonicalUnits();
-        }
-        // 8. Else,
-        else {
+        } else {
+            // 8. Else,
             // a. Throw a RangeError exception.
             return agent.throwException(.range_error, "Invalid key '{}'", .{key});
         }

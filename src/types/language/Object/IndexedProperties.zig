@@ -51,12 +51,9 @@ fn migrateStorageIfNeeded(
     const new_storage_type: Storage.Type = blk: {
         // Property set or addition
         if (maybe_property_descriptor) |property_descriptor| {
-            if (old_storage_type == .sparse // No downgrades
-                or
-                index > self.count() // Created an array hole
-                or
-                property_descriptor.value_or_accessor == .accessor // Accessor property
-                or
+            if (old_storage_type == .sparse or // No downgrades
+                index > self.count() or // Created an array hole
+                property_descriptor.value_or_accessor == .accessor or // Accessor property
                 !property_descriptor.attributes.eql(.all) // Non-default properties
             ) {
                 break :blk .sparse;

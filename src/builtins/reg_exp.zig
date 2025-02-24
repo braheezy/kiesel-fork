@@ -410,9 +410,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         break :blk Value.from(try ordinaryObjectCreate(agent, null));
 
         // b. Let hasGroups be true.
-    }
-    // 31. Else,
-    else blk: {
+    } else blk: {
+        // 31. Else,
         // a. Let groups be undefined.
         break :blk .undefined;
 
@@ -444,9 +443,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
             // ii. Append undefined to indices.
             try indices.append(agent.gc_allocator, null);
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Let captureStart be captureI.[[StartIndex]].
             // ii. Let captureEnd be captureI.[[EndIndex]].
             // iii. If fullUnicode is true, then
@@ -481,9 +479,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
                 // 2. Append undefined to groupNames.
                 try group_names.append(agent.gc_allocator, null);
-            }
-            // iii. Else,
-            else {
+            } else {
+                // iii. Else,
                 // 1. If capturedValue is not undefined, append s to matchedGroupNames.
                 if (!captured_value.isUndefined()) {
                     try matched_group_names.put(agent.gc_allocator, group_name, {});
@@ -506,9 +503,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 // 4. Append s to groupNames.
                 try group_names.append(agent.gc_allocator, group_name);
             }
-        }
-        // f. Else,
-        else {
+        } else {
+            // f. Else,
             // i. Append undefined to groupNames.
             try group_names.append(agent.gc_allocator, null);
         }
@@ -622,9 +618,8 @@ fn makeMatchIndicesIndexPairArray(
     const groups: Value = if (has_groups) blk: {
         // a. Let groups be OrdinaryObjectCreate(null).
         break :blk Value.from(try ordinaryObjectCreate(agent, null));
-    }
-    // 7. Else,
-    else blk: {
+    } else blk: {
+        // 7. Else,
         // a. Let groups be undefined.
         break :blk .undefined;
     };
@@ -645,9 +640,8 @@ fn makeMatchIndicesIndexPairArray(
         const match_index_pair: Value = if (match_indices != null) blk: {
             // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
             break :blk Value.from(try getMatchIndexPair(agent, string, match_indices.?));
-        }
-        // c. Else,
-        else blk: {
+        } else blk: {
+            // c. Else,
             // i. Let matchIndexPair be undefined.
             break :blk .undefined;
         };
@@ -739,9 +733,8 @@ pub const constructor = struct {
                 // ii. If SameValue(newTarget, patternConstructor) is true, return pattern.
                 if (sameValue(Value.from(constructor_), pattern_constructor)) return pattern;
             }
-        }
-        // 3. Else,
-        else {
+        } else {
+            // 3. Else,
             // a. Let newTarget be NewTarget.
             constructor_ = new_target.?;
         }
@@ -772,15 +765,13 @@ pub const constructor = struct {
             if (flags.isUndefined()) {
                 // i. Let F be ? Get(pattern, "flags").
                 f = try pattern.asObject().get(PropertyKey.from("flags"));
-            }
-            // c. Else,
-            else {
+            } else {
+                // c. Else,
                 // i. Let F be flags.
                 f = flags;
             }
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. Let P be pattern.
             p = pattern;
 
@@ -1025,9 +1016,8 @@ pub const prototype = struct {
                 Value.from(object)
             else
                 .null;
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. If flags contains "u" or flags contains "v", let fullUnicode be true. Otherwise,
             //    let fullUnicode be false.
             const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
@@ -1054,9 +1044,8 @@ pub const prototype = struct {
 
                     // 2. Return A.
                     return Value.from(array);
-                }
-                // iii. Else,
-                else {
+                } else {
+                    // iii. Else,
                     // 1. Let matchStr be ? ToString(? Get(result, "0")).
                     const match_str = try (try result.?.get(PropertyKey.from(0))).toString(agent);
 
@@ -1325,9 +1314,8 @@ pub const prototype = struct {
 
                 // iv. Let replacementString be ? ToString(replacementValue).
                 break :blk try replacement_value.toString(agent);
-            }
-            // l. Else,
-            else blk: {
+            } else blk: {
+                // l. Else,
                 // i. If namedCaptures is not undefined, then
                 const named_captures_object: ?*Object = if (!named_captures.isUndefined()) blk_obj: {
                     // 1. Set namedCaptures to ? ToObject(namedCaptures).
@@ -1576,9 +1564,8 @@ pub const prototype = struct {
             if (z == null) {
                 // i. Set q to AdvanceStringIndex(S, q, unicodeMatching).
                 q = advanceStringIndex(string, q, unicode_matching);
-            }
-            // d. Else,
-            else {
+            } else {
+                // d. Else,
                 // i. Let e be ℝ(? ToLength(? Get(splitter, "lastIndex"))).
                 var e = try (try splitter.get(PropertyKey.from("lastIndex"))).toLength(agent);
 
@@ -1589,9 +1576,8 @@ pub const prototype = struct {
                 if (e == p) {
                     // 1. Set q to AdvanceStringIndex(S, q, unicodeMatching).
                     q = advanceStringIndex(string, q, unicode_matching);
-                }
-                // iv. Else,
-                else {
+                } else {
+                    // iv. Else,
                     // 1. Let T be the substring of S from p to q.
                     const tail = try string.substring(
                         agent.gc_allocator,
@@ -1766,9 +1752,8 @@ pub const prototype = struct {
 
             // c. Let F be pattern.[[OriginalFlags]].
             f = Value.from(pattern.asObject().as(RegExp).fields.original_flags);
-        }
-        // 4. Else,
-        else {
+        } else {
+            // 4. Else,
             // a. Let P be pattern.
             p = pattern;
 

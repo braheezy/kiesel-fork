@@ -215,9 +215,8 @@ pub const constructor = struct {
                 agent.gc_allocator,
                 try tag_value.asObject().as(Locale).fields.locale.toString(agent.gc_allocator),
             );
-        }
-        // 9. Else,
-        else blk: {
+        } else blk: {
+            // 9. Else,
             // a. Let tag be ? ToString(tag).
             break :blk try tag_value.toString(agent);
         };

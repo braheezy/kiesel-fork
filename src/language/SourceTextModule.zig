@@ -244,9 +244,8 @@ fn innerModuleLoading(
             else if (module.source_text_module.loaded_modules.get(request)) |loaded_module| {
                 // 1. Perform InnerModuleLoading(state, record.[[Module]]).
                 try innerModuleLoading(agent, state, loaded_module);
-            }
-            // iii. Else,
-            else {
+            } else {
+                // iii. Else,
                 // 1. Perform HostLoadImportedModule(module, request, state.[[HostDefined]], state).
                 // 2. NOTE: HostLoadImportedModule will call FinishLoadingImportedModule, which
                 //    re-enters the graph loading process through ContinueModuleLoading.
@@ -545,9 +544,8 @@ pub fn parse(
             if (import_entry_with_bound_name == null) {
                 // 1. Append ee to localExportEntries.
                 try local_export_entries.append(agent.gc_allocator, export_entry);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
                 const import_entry = import_entry_with_bound_name.?;
 
@@ -556,9 +554,8 @@ pub fn parse(
                     // a. NOTE: This is a re-export of an imported module namespace object.
                     // b. Append ee to localExportEntries.
                     try local_export_entries.append(agent.gc_allocator, export_entry);
-                }
-                // 3. Else,
-                else {
+                } else {
+                    // 3. Else,
                     // a. NOTE: This is a re-export of a single name.
                     // b. Append the ExportEntry Record {
                     //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
@@ -586,9 +583,8 @@ pub fn parse(
 
             // ii. Append ee to starExportEntries.
             try star_export_entries.append(agent.gc_allocator, export_entry);
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Append ee to indirectExportEntries.
             try indirect_export_entries.append(agent.gc_allocator, export_entry);
         }
@@ -714,9 +710,8 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
                 &.{exception.value},
             ) catch |err_| try noexcept(err_);
         },
-    }
-    // 10. Else,
-    else {
+    } else {
+        // 10. Else,
         // a. Assert: module.[[Status]] is either evaluating-async or evaluated.
         std.debug.assert(switch (module.status) {
             .evaluating_async, .evaluated => true,
@@ -851,9 +846,8 @@ fn innerModuleEvaluation(
                     module.dfs_ancestor_index.?,
                     required_module.dfs_ancestor_index.?,
                 );
-            }
-            // iv. Else,
-            else {
+            } else {
+                // iv. Else,
                 // 1. Set requiredModule to requiredModule.[[CycleRoot]].
                 required_module = required_module.cycle_root.?;
 
@@ -896,9 +890,8 @@ fn innerModuleEvaluation(
         if (module.pending_async_dependencies.? == 0) {
             try executeAsyncModule(agent, module);
         }
-    }
-    // 13. Else,
-    else {
+    } else {
+        // 13. Else,
         // a. Perform ? module.ExecuteModule().
         try module.executeModule(null);
     }
@@ -1138,9 +1131,8 @@ fn asyncModuleExecutionFulfilled(
         else if (m.has_tla) {
             // i. Perform ExecuteAsyncModule(m).
             try executeAsyncModule(agent, m);
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Let result be m.ExecuteModule().
             const result = m.executeModule(null);
 
@@ -1387,9 +1379,8 @@ pub fn resolveExport(
                         .binding_name = .namespace,
                     },
                 };
-            }
-            // iv. Else,
-            else {
+            } else {
+                // iv. Else,
                 // 1. Assert: module imports a specific binding for this export.
                 // 2. Assert: e.[[ImportName]] is a String.
                 // 3. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
@@ -1550,9 +1541,8 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 local_name,
                 Value.from(namespace),
             ) catch |err| try noexcept(err);
-        }
-        // c. Else,
-        else {
+        } else {
+            // c. Else,
             // i. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
             const maybe_resolution = try imported_module.resolveExport(
                 agent,
@@ -1594,9 +1584,8 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                     local_name,
                     Value.from(namespace),
                 ) catch |err| try noexcept(err);
-            }
-            // iv. Else,
-            else {
+            } else {
+                // iv. Else,
                 // 1. Perform CreateImportBinding(env, in.[[LocalName]], resolution.[[Module]],
                 //    resolution.[[BindingName]]).
                 try env.module_environment.createImportBinding(
@@ -1705,9 +1694,8 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).
                 env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
-            }
-            // ii. Else,
-            else {
+            } else {
+                // ii. Else,
                 // 1. Perform ! env.CreateMutableBinding(dn, false).
                 env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
             }
@@ -1794,9 +1782,8 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         // f. If result is an abrupt completion, then
         //     i. Return ? result.
         _ = try result;
-    }
-    // 10. Else,
-    else {
+    } else {
+        // 10. Else,
         // 1. Assert: capability is a PromiseCapability Record.
         std.debug.assert(capability != null);
 

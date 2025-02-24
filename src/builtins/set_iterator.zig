@@ -111,9 +111,8 @@ pub const prototype = struct {
                 index += 1;
                 break value;
             }
-        }
-        // e. Return undefined.
-        else {
+        } else {
+            // e. Return undefined.
             set_iterator.fields = .completed;
             set.fields.unregisterIterator(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));

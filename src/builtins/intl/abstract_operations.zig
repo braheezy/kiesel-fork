@@ -166,9 +166,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     blk: {
         // a. Let O be CreateArrayFromList(« locales »).
         break :blk try createArrayFromList(agent, &.{locales});
-    }
-    // 4. Else,
-    else blk: {
+    } else blk: {
+        // 4. Else,
         // a. Let O be ? ToObject(locales).
         break :blk try locales.toObject(agent);
     };
@@ -210,9 +209,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                     agent.gc_allocator,
                     try k_value.asObject().as(builtins.intl.Locale).fields.locale.toString(agent.gc_allocator),
                 );
-            }
-            // iv. Else,
-            else blk: {
+            } else blk: {
+                // iv. Else,
                 // 1. Let tag be ? ToString(kValue).
                 break :blk try k_value.toString(agent);
             };

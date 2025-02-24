@@ -97,9 +97,8 @@ pub const prototype = struct {
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(IteratorNext(syncIteratorRecord, value)).
             break :blk sync_iterator.next(value);
-        }
-        // 6. Else,
-        else blk: {
+        } else blk: {
+            // 6. Else,
             // a. Let result be Completion(IteratorNext(syncIteratorRecord)).
             break :blk sync_iterator.next(null);
         }) catch |err| {
@@ -136,9 +135,8 @@ pub const prototype = struct {
         const return_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("return")) catch |err| {
             // 6. IfAbruptRejectPromise(return, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
-        }
-        // 7. If return is undefined, then
-        orelse {
+        } orelse {
+            // 7. If return is undefined, then
             // a. Let iteratorResult be CreateIteratorResultObject(value, true).
             const iterator_result = try createIteratorResultObject(
                 agent,
@@ -163,9 +161,8 @@ pub const prototype = struct {
                 Value.from(sync_iterator),
                 &.{value},
             );
-        }
-        // 9. Else,
-        else blk: {
+        } else blk: {
+            // 9. Else,
             // a. Let result be Completion(Call(return, syncIterator)).
             break :blk Value.from(return_).callAssumeCallableNoArgs(Value.from(sync_iterator));
         }) catch |err| {
@@ -221,9 +218,8 @@ pub const prototype = struct {
         const throw_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("throw")) catch |err| {
             // 6. IfAbruptRejectPromise(throw, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
-        }
-        // 7. If throw is undefined, then
-        orelse {
+        } orelse {
+            // 7. If throw is undefined, then
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
@@ -241,9 +237,8 @@ pub const prototype = struct {
                 Value.from(sync_iterator),
                 &.{value},
             );
-        }
-        // 9. Else,
-        else blk: {
+        } else blk: {
+            // 9. Else,
             // a. Let result be Completion(Call(throw, syncIterator)).
             break :blk Value.from(throw_).callAssumeCallableNoArgs(Value.from(sync_iterator));
         }) catch |err| {

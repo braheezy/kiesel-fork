@@ -429,9 +429,8 @@ pub fn finishLoadingImportedModule(
                 if (get_or_put_result.found_existing) {
                     // i. Assert: record.[[Module]] and result.[[Value]] are the same Module Record.
                     std.debug.assert(std.meta.eql(get_or_put_result.value_ptr.*, module));
-                }
-                // b. Else,
-                else {
+                } else {
+                    // b. Else,
                     // i. Append the LoadedModuleRequest Record {
                     //      [[Specifier]]: moduleRequest.[[Specifier]],
                     //      [[Attributes]]: moduleRequest.[[Attributes]],

@@ -152,9 +152,8 @@ pub const constructor = struct {
 
                 // c. Otherwise, let n be prim.
                 break :blk primitive.number;
-            }
-            // 2. Else,
-            else {
+            } else {
+                // 2. Else,
                 // a. Let n be +0𝔽.
                 break :blk types.Number.from(0);
             }
@@ -499,9 +498,8 @@ pub const prototype = struct {
 
             // b. Let e be 0.
             exponent = 0;
-        }
-        // 10. Else,
-        else {
+        } else {
+            // 10. Else,
             // a. Let e and n be integers such that 10**(p - 1) ≤ n < 10**p and for which
             //    n × 10**(e - p + 1) - x is as close to zero as possible. If there are two such
             //    sets of e and n, pick the e and n for which n × 10**(e - p + 1) is larger.
@@ -545,9 +543,8 @@ pub const prototype = struct {
                 if (exponent > 0) {
                     // 1. Let c be the code unit 0x002B (PLUS SIGN).
                     exponent_sign = '+';
-                }
-                // iv. Else,
-                else {
+                } else {
+                    // iv. Else,
                     // 1. Assert: e < 0.
                     std.debug.assert(exponent < 0);
 
@@ -594,9 +591,8 @@ pub const prototype = struct {
                 "{s}.{s}",
                 .{ number_string[0..@intCast(exponent + 1)], number_string[@intCast(exponent + 1)..] },
             );
-        }
-        // 13. Else,
-        else {
+        } else {
+            // 13. Else,
             // a. Set m to the string-concatenation of the code unit 0x0030 (DIGIT ZERO), the code
             //    unit 0x002E (FULL STOP), -(e + 1) occurrences of the code unit 0x0030 (DIGIT ZERO),
             //    and the String m.

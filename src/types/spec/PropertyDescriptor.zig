@@ -162,9 +162,8 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
 
         // b. If Desc does not have a [[Writable]] field, set Desc.[[Writable]] to like.[[Writable]].
         if (self.writable == null) self.writable = like.writable;
-    }
-    // 3. Else,
-    else {
+    } else {
+        // 3. Else,
         // a. If Desc does not have a [[Get]] field, set Desc.[[Get]] to like.[[Get]].
         // b. If Desc does not have a [[Set]] field, set Desc.[[Set]] to like.[[Set]].
         // NOTE: These are no-ops, the fields can't be missing.

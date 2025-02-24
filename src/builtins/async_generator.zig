@@ -114,9 +114,8 @@ pub const prototype = struct {
         if (state == .suspended_start or state == .suspended_yield) {
             // a. Perform AsyncGeneratorResume(generator, completion).
             try asyncGeneratorResume(agent, generator, completion);
-        }
-        // 10. Else,
-        else {
+        } else {
+            // 10. Else,
             // a. Assert: state is either executing or draining-queue.
             std.debug.assert(state == .executing or state == .draining_queue);
         }
@@ -169,9 +168,8 @@ pub const prototype = struct {
         else if (state == .suspended_yield) {
             // a. Perform AsyncGeneratorResume(generator, completion).
             try asyncGeneratorResume(agent, generator, completion);
-        }
-        // 10. Else,
-        else {
+        } else {
+            // 10. Else,
             // a. Assert: state is either executing or draining-queue.
             std.debug.assert(state == .executing or state == .draining_queue);
         }
@@ -237,9 +235,8 @@ pub const prototype = struct {
         if (state == .suspended_yield) {
             // a. Perform AsyncGeneratorResume(generator, completion).
             try asyncGeneratorResume(agent, generator, completion);
-        }
-        // 11. Else,
-        else {
+        } else {
+            // 11. Else,
             // a. Assert: state is either executing or draining-queue.
             std.debug.assert(state == .executing or state == .draining_queue);
         }
@@ -342,9 +339,8 @@ pub fn asyncGeneratorStart(
                     agent_,
                     &closure_generator.fields.evaluation_state.vm,
                 );
-            }
-            // d. Else,
-            else {
+            } else {
+                // d. Else,
                 // i. Assert: generatorBody is an Abstract Closure with no parameters.
                 // ii. Let result be Completion(generatorBody()).
             };
@@ -471,9 +467,8 @@ pub fn asyncGeneratorCompleteStep(
             .undefined,
             &.{value},
         ) catch |err| try noexcept(err);
-    }
-    // 7. Else,
-    else {
+    } else {
+        // 7. Else,
         // a. Assert: completion is a normal completion.
         std.debug.assert(completion.type == .normal);
 
@@ -490,9 +485,8 @@ pub fn asyncGeneratorCompleteStep(
             break :blk try createIteratorResultObject(agent, value, done);
 
             // iv. Set the running execution context's Realm to oldRealm.
-        }
-        // c. Else,
-        else blk: {
+        } else blk: {
+            // c. Else,
             // i. Let iteratorResult be CreateIteratorResultObject(value, done).
             break :blk try createIteratorResultObject(agent, value, done);
         };
@@ -613,9 +607,8 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
 
         // d. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
         return asyncGeneratorUnwrapYieldResumption(agent, resumption_value);
-    }
-    // 12. Else,
-    else {
+    } else {
+        // 12. Else,
         // a. Set generator.[[AsyncGeneratorState]] to suspended-yield.
         generator.fields.async_generator_state = .suspended_yield;
 
@@ -661,9 +654,8 @@ pub fn asyncGeneratorDrainQueue(
 
             // ii. Return unused.
             return;
-        }
-        // d. Else,
-        else {
+        } else {
+            // d. Else,
             // i. If completion is a normal completion, then
             if (completion.type == .normal) {
                 // 1. Set completion to NormalCompletion(undefined).

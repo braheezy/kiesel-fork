@@ -164,9 +164,8 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         }
 
         return value;
-    }
-    // 4. Else,
-    else {
+    } else {
+        // 4. Else,
         // a. Let base be V.[[Base]].
         // b. Assert: base is an Environment Record.
         const base = self.base.environment;

@@ -121,9 +121,8 @@ pub fn getSubstitution(
             const ref_replacement = types.String.fromLiteral("$");
 
             break :blk .{ ref, ref_replacement };
-        }
-        // c. Else if templateRemainder starts with "$`", then
-        else if (template_reminder.startsWith(types.String.fromLiteral("$`"))) blk: {
+        } else if (template_reminder.startsWith(types.String.fromLiteral("$`"))) blk: {
+            // c. Else if templateRemainder starts with "$`", then
             // i. Let ref be "$`".
             const ref = types.String.fromLiteral("$`");
 
@@ -131,9 +130,8 @@ pub fn getSubstitution(
             const ref_replacement = try str.substring(agent.gc_allocator, 0, position);
 
             break :blk .{ ref, ref_replacement };
-        }
-        // d. Else if templateRemainder starts with "$&", then
-        else if (template_reminder.startsWith(types.String.fromLiteral("$&"))) blk: {
+        } else if (template_reminder.startsWith(types.String.fromLiteral("$&"))) blk: {
+            // d. Else if templateRemainder starts with "$&", then
             // i. Let ref be "$&".
             const ref = types.String.fromLiteral("$&");
 
@@ -141,9 +139,8 @@ pub fn getSubstitution(
             const ref_replacement = matched;
 
             break :blk .{ ref, ref_replacement };
-        }
-        // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by 0x0027 (APOSTROPHE)), then
-        else if (template_reminder.startsWith(types.String.fromLiteral("$'"))) blk: {
+        } else if (template_reminder.startsWith(types.String.fromLiteral("$'"))) blk: {
+            // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by 0x0027 (APOSTROPHE)), then
             // i. Let ref be "$'".
             const ref = types.String.fromLiteral("$'");
 
@@ -164,12 +161,11 @@ pub fn getSubstitution(
             );
 
             break :blk .{ ref, ref_replacement };
-        }
-        // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
-        else if (template_reminder.length() >= 2 and
+        } else if (template_reminder.length() >= 2 and
             template_reminder.codeUnitAt(0) == '$' and
             std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))))
         blk: {
+            // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
             //    digitCount be 2. Otherwise, let digitCount be 1.
             var digit_count: usize = if (template_reminder.length() >= 3 and
@@ -220,23 +216,20 @@ pub fn getSubstitution(
                 if (capture == null) {
                     // a. Let refReplacement be the empty String.
                     break :blk_ref_replacement .empty;
-                }
-                // 3. Else,
-                else {
+                } else {
+                    // 3. Else,
                     // a. Let refReplacement be capture.
                     break :blk_ref_replacement capture.?;
                 }
-            }
-            // ix. Else,
-            else blk_ref_replacement: {
+            } else blk_ref_replacement: {
+                // ix. Else,
                 // 1. Let refReplacement be ref.
                 break :blk_ref_replacement ref;
             };
 
             break :blk .{ ref, ref_replacement };
-        }
-        // g. Else if templateRemainder starts with "$<", then
-        else if (template_reminder.startsWith(types.String.fromLiteral("$<"))) blk: {
+        } else if (template_reminder.startsWith(types.String.fromLiteral("$<"))) blk: {
+            // g. Else if templateRemainder starts with "$<", then
             // i. Let gtPos be StringIndexOf(templateRemainder, ">", 0).
             const gt_pos = template_reminder.indexOf(types.String.fromLiteral(">"), 0);
 
@@ -249,9 +242,8 @@ pub fn getSubstitution(
                 const ref_replacement = ref;
 
                 break :blk .{ ref, ref_replacement };
-            }
-            // iii. Else,
-            else {
+            } else {
+                // iii. Else,
                 // 1. Let ref be the substring of templateRemainder from 0 to gtPos + 1.
                 const ref = try template_reminder.substring(agent.gc_allocator, 0, gt_pos.? + 1);
 
@@ -279,9 +271,8 @@ pub fn getSubstitution(
 
                 break :blk .{ ref, ref_replacement };
             }
-        }
-        // h. Else,
-        else blk: {
+        } else blk: {
+            // h. Else,
             // i. Let ref be the substring of templateRemainder from 0 to 1.
             const ref = try template_reminder.substring(agent.gc_allocator, 0, 1);
 
@@ -553,9 +544,8 @@ pub const constructor = struct {
             if (arguments.count() == 0) {
                 // a. Let s be the empty String.
                 break :blk .empty;
-            }
-            // 2. Else,
-            else {
+            } else {
+                // 2. Else,
                 // a. If NewTarget is undefined and value is a Symbol, return SymbolDescriptiveString(value).
                 if (new_target == null and value.isSymbol()) {
                     return Value.from(try value.asSymbol().descriptiveString(agent));
@@ -1444,9 +1434,8 @@ pub const prototype = struct {
                     Value.from(string),
                 },
             )).toString(agent);
-        }
-        // 13. Else,
-        else blk: {
+        } else blk: {
+            // 13. Else,
             // a. Assert: replaceValue is a String.
             std.debug.assert(replace_value.isString());
 
@@ -1578,9 +1567,8 @@ pub const prototype = struct {
                         Value.from(string),
                     },
                 )).toString(agent);
-            }
-            // c. Else,
-            else blk: {
+            } else blk: {
+                // c. Else,
                 // i. Assert: replaceValue is a String.
                 std.debug.assert(replace_value.isString());
 
@@ -1685,13 +1673,11 @@ pub const prototype = struct {
         // 5. If intStart = -∞, let from be 0.
         const from_f64 = if (std.math.isNegativeInf(int_start)) blk: {
             break :blk 0;
-        }
-        // 6. Else if intStart < 0, let from be max(len + intStart, 0).
-        else if (int_start < 0) blk: {
+        } else if (int_start < 0) blk: {
+            // 6. Else if intStart < 0, let from be max(len + intStart, 0).
             break :blk @max(len_f64 + int_start, 0);
-        }
-        // 7. Else, let from be min(intStart, len).
-        else blk: {
+        } else blk: {
+            // 7. Else, let from be min(intStart, len).
             break :blk @min(int_start, len_f64);
         };
         const from: u53 = @intFromFloat(from_f64);
@@ -1705,13 +1691,11 @@ pub const prototype = struct {
         // 9. If intEnd = -∞, let to be 0.
         const to_f64 = if (std.math.isNegativeInf(int_end)) blk: {
             break :blk 0;
-        }
-        // 10. Else if intEnd < 0, let to be max(len + intEnd, 0).
-        else if (int_end < 0) blk: {
+        } else if (int_end < 0) blk: {
+            // 10. Else if intEnd < 0, let to be max(len + intEnd, 0).
             break :blk @max(len_f64 + int_end, 0);
-        }
-        // 11. Else, let to be min(intEnd, len).
-        else blk: {
+        } else blk: {
+            // 11. Else, let to be min(intEnd, len).
             break :blk @min(int_end, len_f64);
         };
         const to: u53 = @intFromFloat(to_f64);
@@ -2069,9 +2053,8 @@ pub const prototype = struct {
                 // i. Set result to the string-concatenation of result and 0xFFFD
                 //    (REPLACEMENT CHARACTER).
                 result.appendCodePointAssumeCapacity(std.unicode.replacement_character);
-            }
-            // c. Else,
-            else {
+            } else {
+                // c. Else,
                 // i. Set result to the string-concatenation of result and
                 //    UTF16EncodeCodePoint(cp.[[CodePoint]]).
                 result.appendCodePointAssumeCapacity(code_point.code_point);

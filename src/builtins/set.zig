@@ -412,9 +412,8 @@ pub const prototype = struct {
 
             std.mem.reverse(usize, indexes_to_remove.items);
             for (indexes_to_remove.items) |i| result_set_data.orderedRemoveAt(i);
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
@@ -586,9 +585,8 @@ pub const prototype = struct {
                 // 4. Set thisSize to the number of elements in O.[[SetData]].
                 this_size = object.fields.set_data.count();
             }
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
@@ -680,9 +678,8 @@ pub const prototype = struct {
                 // 4. Set thisSize to the number of elements in O.[[SetData]].
                 this_size = object.fields.set_data.count();
             }
-        }
-        // 5. Else,
-        else {
+        } else {
+            // 5. Else,
             // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
@@ -858,9 +855,8 @@ pub const prototype = struct {
                 if (maybe_result_index) |result_index| {
                     result_set_data.orderedRemoveAt(result_index);
                 }
-            }
-            // v. Else,
-            else {
+            } else {
+                // v. Else,
                 // 1. If resultIndex is not-found, append next to resultSetData.
                 if (maybe_result_index == null) {
                     try result_set_data.put(agent.gc_allocator, next, {});

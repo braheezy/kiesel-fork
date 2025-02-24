@@ -279,9 +279,8 @@ pub fn arraySetLength(
     if (new_len_desc.writable == null or new_len_desc.writable == true) {
         // a. Let newWritable be true.
         new_writable = true;
-    }
-    // 14. Else,
-    else {
+    } else {
+        // 14. Else,
         // a. NOTE: Setting the [[Writable]] attribute to false is deferred in case any elements
         //          cannot be deleted.
         // b. Let newWritable be false.
@@ -441,9 +440,8 @@ pub const constructor = struct {
 
                 // ii. Let intLen be 1𝔽.
                 int_len = 1;
-            }
-            // d. Else,
-            else {
+            } else {
+                // d. Else,
                 // i. Let intLen be ! ToUint32(len).
                 int_len = len.toUint32(agent) catch unreachable;
 
@@ -462,9 +460,8 @@ pub const constructor = struct {
 
             // f. Return array.
             return Value.from(array);
-        }
-        // 6. Else,
-        else {
+        } else {
+            // 6. Else,
             // a. Assert: numberOfArgs ≥ 2.
             std.debug.assert(number_of_args >= 2);
 
@@ -506,9 +503,8 @@ pub const constructor = struct {
         const mapping = if (mapper.isUndefined()) blk: {
             // a. Let mapping be false.
             break :blk false;
-        }
-        // 3. Else,
-        else blk: {
+        } else blk: {
+            // 3. Else,
             // a. If IsCallable(mapper) is false, throw a TypeError exception.
             if (!mapper.isCallable()) {
                 return agent.throwException(.type_error, "{} is not callable", .{mapper});
@@ -530,9 +526,8 @@ pub const constructor = struct {
             const array = if (constructor_.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
                 break :blk try constructor_.asObject().constructNoArgs();
-            }
-            // b. Else,
-            else blk: {
+            } else blk: {
+                // b. Else,
                 // i. Let A be ! ArrayCreate(0).
                 break :blk try arrayCreate(agent, 0, null);
             };
@@ -581,9 +576,8 @@ pub const constructor = struct {
                         // 2. IfAbruptCloseIterator(mappedValue, iteratorRecord).
                         return iterator.close(@as(Agent.Error!Value, err));
                     };
-                }
-                // vi. Else,
-                else blk: {
+                } else blk: {
+                    // vi. Else,
                     // 1. Let mappedValue be next.
                     break :blk next;
                 };
@@ -609,9 +603,8 @@ pub const constructor = struct {
         const array = if (constructor_.isConstructor()) blk: {
             // a. Let A be ? Construct(C, « 𝔽(len) »).
             break :blk try constructor_.asObject().construct(&.{Value.from(len)}, null);
-        }
-        // 10. Else,
-        else blk: {
+        } else blk: {
+            // 10. Else,
             // a. Let A be ? ArrayCreate(len).
             break :blk try arrayCreate(agent, len, null);
         };
@@ -631,9 +624,8 @@ pub const constructor = struct {
             const mapped_value = if (mapping) blk: {
                 // i. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                 break :blk try mapper.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
-            }
-            // d. Else,
-            else blk: {
+            } else blk: {
+                // d. Else,
                 // i. Let mappedValue be kValue.
                 break :blk k_value;
             };
@@ -677,9 +669,8 @@ pub const constructor = struct {
             if (constructor_.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
                 break :blk try constructor_.asObject().construct(&.{len_number}, null);
-            }
-            // 5. Else,
-            else {
+            } else {
+                // 5. Else,
                 // a. Let A be ? ArrayCreate(len).
                 break :blk try arrayCreate(agent, len, null);
             }
@@ -918,9 +909,8 @@ pub const prototype = struct {
                     // 4. Set n to n + 1.
                     // 5. Set k to k + 1.
                 }
-            }
-            // c. Else,
-            else {
+            } else {
+                // c. Else,
                 // i. NOTE: E is added as a single item rather than spread.
 
                 // ii. If n ≥ 2**53 - 1, throw a TypeError exception.
@@ -981,13 +971,11 @@ pub const prototype = struct {
         // 4. If relativeTarget = -∞, let to be 0.
         const to_f64 = if (std.math.isNegativeInf(relative_target)) blk: {
             break :blk 0;
-        }
-        // 5. Else if relativeTarget < 0, let to be max(len + relativeTarget, 0).
-        else if (relative_target < 0) blk: {
+        } else if (relative_target < 0) blk: {
+            // 5. Else if relativeTarget < 0, let to be max(len + relativeTarget, 0).
             break :blk @max(len_f64 + relative_target, 0);
-        }
-        // 6. Else, let to be min(relativeTarget, len).
-        else blk: {
+        } else blk: {
+            // 6. Else, let to be min(relativeTarget, len).
             break :blk @min(relative_target, len_f64);
         };
         var to: u53 = @intFromFloat(to_f64);
@@ -998,13 +986,11 @@ pub const prototype = struct {
         // 8. If relativeStart = -∞, let from be 0.
         const from_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 9. Else if relativeStart < 0, let from be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 9. Else if relativeStart < 0, let from be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 10. Else, let from be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 10. Else, let from be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         var from: u53 = @intFromFloat(from_f64);
@@ -1019,13 +1005,11 @@ pub const prototype = struct {
         // 12. If relativeEnd = -∞, let final be 0.
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 13. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 13. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 14. Else, let final be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 14. Else, let final be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
         const final: u53 = @intFromFloat(final_f64);
@@ -1043,9 +1027,8 @@ pub const prototype = struct {
 
             // a. Let direction be -1.
             break :blk -1;
-        }
-        // 17. Else,
-        else blk: {
+        } else blk: {
+            // 17. Else,
             // a. Let direction be 1.
             break :blk 1;
         };
@@ -1072,9 +1055,8 @@ pub const prototype = struct {
 
                 // ii. Perform ? Set(O, toKey, fromValue, true).
                 try object.set(to_key, from_value, .throw);
-            }
-            // e. Else,
-            else {
+            } else {
+                // e. Else,
                 // i. Assert: fromPresent is false.
                 std.debug.assert(!from_present);
 
@@ -1171,13 +1153,11 @@ pub const prototype = struct {
         // 4. If relativeStart = -∞, let k be 0.
         const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 6. Else, let k be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 6. Else, let k be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         var k: u53 = @intFromFloat(k_f64);
@@ -1192,13 +1172,11 @@ pub const prototype = struct {
         // 8. If relativeEnd = -∞, let final be 0.
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 10. Else, let final be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 10. Else, let final be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
         const final: u53 = @intFromFloat(final_f64);
@@ -1469,9 +1447,8 @@ pub const prototype = struct {
                         null,
                         null,
                     );
-                }
-                // vi. Else,
-                else {
+                } else {
+                    // vi. Else,
                     // 1. If targetIndex ≥ 2**53 - 1, throw a TypeError exception.
                     if (target_index >= std.math.maxInt(u53)) {
                         return agent.throwException(.type_error, "Maximum array length exceeded", .{});
@@ -1882,9 +1859,8 @@ pub const prototype = struct {
 
             // b. Return undefined.
             return .undefined;
-        }
-        // 4. Else,
-        else {
+        } else {
+            // 4. Else,
             // a. Assert: len > 0.
             std.debug.assert(len > 0);
 
@@ -1977,9 +1953,8 @@ pub const prototype = struct {
         if (initial_value != null) {
             // a. Set accumulator to initialValue.
             accumulator = initial_value.?;
-        }
-        // 8. Else,
-        else {
+        } else {
+            // 8. Else,
             // a. Let kPresent be false.
             var k_present = false;
 
@@ -2073,9 +2048,8 @@ pub const prototype = struct {
         if (initial_value != null) {
             // a. Set accumulator to initialValue.
             accumulator = initial_value.?;
-        }
-        // 8. Else,
-        else {
+        } else {
+            // 8. Else,
             // a. Let kPresent be false.
             var k_present = false;
 
@@ -2200,9 +2174,8 @@ pub const prototype = struct {
 
                 // ii. Perform ? Set(O, upperP, lowerValue, true).
                 try object.set(upper_property_key, lower_value, .throw);
-            }
-            // k. Else,
-            else {
+            } else {
+                // k. Else,
                 // i. Assert: lowerExists and upperExists are both false.
                 std.debug.assert(!lower_exists and !upper_exists);
 
@@ -2258,9 +2231,8 @@ pub const prototype = struct {
 
                 // ii. Perform ? Set(O, to, fromValue, true).
                 try object.set(to, from_value, .throw);
-            }
-            // e. Else,
-            else {
+            } else {
+                // e. Else,
                 // i. Assert: fromPresent is false.
                 std.debug.assert(!from_present);
 
@@ -2300,13 +2272,11 @@ pub const prototype = struct {
         // 4. If relativeStart = -∞, let k be 0.
         const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 6. Else, let k be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 6. Else, let k be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         var k: u53 = @intFromFloat(k_f64);
@@ -2321,13 +2291,11 @@ pub const prototype = struct {
         // 8. If relativeEnd = -∞, let final be 0.
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
-        }
-        // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-        else if (relative_end < 0) blk: {
+        } else if (relative_end < 0) blk: {
+            // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
             break :blk @max(len_f64 + relative_end, 0);
-        }
-        // 10. Else, let final be min(relativeEnd, len).
-        else blk: {
+        } else blk: {
+            // 10. Else, let final be min(relativeEnd, len).
             break :blk @min(relative_end, len_f64);
         };
         const final: u53 = @intFromFloat(final_f64);
@@ -2510,13 +2478,11 @@ pub const prototype = struct {
         // 4. If relativeStart = -∞, let actualStart be 0.
         const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 6. Else, let actualStart be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 6. Else, let actualStart be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const actual_start: u53 = @intFromFloat(actual_start_f64);
@@ -2528,14 +2494,12 @@ pub const prototype = struct {
         const actual_delete_count = if (start == null) blk: {
             // a. Let actualDeleteCount be 0.
             break :blk 0;
-        }
-        // 9. Else if deleteCount is not present, then
-        else if (delete_count == null) blk: {
+        } else if (delete_count == null) blk: {
+            // 9. Else if deleteCount is not present, then
             // a. Let actualDeleteCount be len - actualStart.
             break :blk len - actual_start;
-        }
-        // 10. Else,
-        else blk: {
+        } else blk: {
+            // 10. Else,
             // a. Let dc be ? ToIntegerOrInfinity(deleteCount).
             const delete_count_f64 = try delete_count.?.toIntegerOrInfinity(agent);
 
@@ -2596,9 +2560,8 @@ pub const prototype = struct {
 
                     // 2. Perform ? Set(O, to, fromValue, true).
                     try object.set(to, from_value, .throw);
-                }
-                // iv. Else,
-                else {
+                } else {
+                    // iv. Else,
                     // 1. Perform ? DeletePropertyOrThrow(O, to).
                     try object.deletePropertyOrThrow(to);
                 }
@@ -2637,9 +2600,8 @@ pub const prototype = struct {
 
                     // 2. Perform ? Set(O, to, fromValue, true).
                     try object.set(to, from_value, .throw);
-                }
-                // iv. Else,
-                else {
+                } else {
+                    // iv. Else,
                     // 1. Perform ? DeletePropertyOrThrow(O, to).
                     try object.deletePropertyOrThrow(to);
                 }
@@ -2835,13 +2797,11 @@ pub const prototype = struct {
         // 4. If relativeStart = -∞, let actualStart be 0.
         const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
-        }
-        // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
-        else if (relative_start < 0) blk: {
+        } else if (relative_start < 0) blk: {
+            // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
             break :blk @max(len_f64 + relative_start, 0);
-        }
-        // 6. Else, let actualStart be min(relativeStart, len).
-        else blk: {
+        } else blk: {
+            // 6. Else, let actualStart be min(relativeStart, len).
             break :blk @min(relative_start, len_f64);
         };
         const actual_start: u53 = @intFromFloat(actual_start_f64);
@@ -2853,14 +2813,12 @@ pub const prototype = struct {
         const actual_skip_count = if (start == null) blk: {
             // a. Let actualSkipCount be 0.
             break :blk 0;
-        }
-        // 9. Else if skipCount is not present, then
-        else if (skip_count == null) blk: {
+        } else if (skip_count == null) blk: {
+            // 9. Else if skipCount is not present, then
             // a. Let actualSkipCount be len - actualStart.
             break :blk len - actual_start;
-        }
-        // 10. Else,
-        else blk: {
+        } else blk: {
+            // 10. Else,
             // a. Let sc be ? ToIntegerOrInfinity(skipCount).
             const skip_count_f64 = try skip_count.?.toIntegerOrInfinity(agent);
 
@@ -2996,9 +2954,8 @@ pub const prototype = struct {
 
                     // 2. Perform ? Set(O, to, fromValue, true).
                     try object.set(to, from_value, .throw);
-                }
-                // v. Else,
-                else {
+                } else {
+                    // v. Else,
                     // 1. Assert: fromPresent is false.
                     std.debug.assert(!from_present);
 
