@@ -273,7 +273,6 @@ pub fn newFunctionEnvironment(
 ) std.mem.Allocator.Error!*FunctionEnvironment {
     // 1. Let env be a new Function Environment Record containing no bindings.
     const env = try allocator.create(FunctionEnvironment);
-
     env.* = .{
         // 2. Set env.[[FunctionObject]] to F.
         .function_object = function,
@@ -289,7 +288,10 @@ pub fn newFunctionEnvironment(
         .new_target = new_target,
 
         // 6. Set env.[[OuterEnv]] to F.[[Environment]].
-        .declarative_environment = try newDeclarativeEnvironment(allocator, function.fields.environment),
+        .declarative_environment = .{
+            .outer_env = function.fields.environment,
+            .bindings = .empty,
+        },
 
         .this_value = .undefined,
     };
@@ -313,7 +315,6 @@ pub fn newGlobalEnvironment(
 
     // 3. Let env be a new Global Environment Record.
     const env = try allocator.create(GlobalEnvironment);
-
     env.* = .{
         // 4. Set env.[[ObjectRecord]] to objRec.
         .object_record = object_record,
@@ -340,10 +341,12 @@ pub fn newModuleEnvironment(
 ) std.mem.Allocator.Error!*ModuleEnvironment {
     // 1. Let env be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
-
     env.* = .{
         // 2. Set env.[[OuterEnv]] to E.
-        .declarative_environment = try newDeclarativeEnvironment(allocator, outer_env),
+        .declarative_environment = .{
+            .outer_env = outer_env,
+            .bindings = .empty,
+        },
 
         .indirect_bindings = .empty,
     };
@@ -365,6 +368,9 @@ pub fn newPrivateEnvironment(
     //      [[OuterPrivateEnvironment]]: outerPrivateEnv, [[Names]]: names
     //    }.
     const env = try allocator.create(PrivateEnvironment);
-    env.* = .{ .outer_private_environment = outer_private_env, .names = names };
+    env.* = .{
+        .outer_private_environment = outer_private_env,
+        .names = names,
+    };
     return env;
 }

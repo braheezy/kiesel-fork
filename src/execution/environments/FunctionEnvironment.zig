@@ -35,7 +35,7 @@ function_object: *ECMAScriptFunction,
 new_target: ?*Object,
 
 // NOTE: This is how we implement the spec's inheritance of function environments.
-declarative_environment: *DeclarativeEnvironment,
+declarative_environment: DeclarativeEnvironment,
 
 /// 9.1.1.3.1 BindThisValue ( envRec, V )
 /// https://tc39.es/ecma262/#sec-bindthisvalue

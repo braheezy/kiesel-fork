@@ -19,7 +19,7 @@ const ModuleEnvironment = @This();
 indirect_bindings: String.HashMapUnmanaged(IndirectBinding),
 
 // NOTE: This is how we implement the spec's inheritance of module environments.
-declarative_environment: *DeclarativeEnvironment,
+declarative_environment: DeclarativeEnvironment,
 
 pub const IndirectBinding = struct {
     module: Module,
