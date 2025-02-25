@@ -70,15 +70,20 @@ pub fn getBindingValue(
         return target_env.?.getBindingValue(agent, binding_name, true);
     }
 
+    const binding = self.declarative_environment.bindings.get(name).?;
+
     // 4. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError
     //    exception.
+    if (!binding.initialized) {
+        return agent.throwException(
+            .reference_error,
+            "Binding for '{}' is not initialized",
+            .{name},
+        );
+    }
+
     // 5. Return the value currently bound to N in envRec.
-    const binding = self.declarative_environment.bindings.get(name).?;
-    return binding.value orelse agent.throwException(
-        .reference_error,
-        "Binding for '{}' is not initialized",
-        .{name},
-    );
+    return binding.value;
 }
 
 /// 9.1.1.5.2 DeleteBinding ( N )

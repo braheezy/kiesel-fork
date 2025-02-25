@@ -1,6 +1,7 @@
 //! 9.1.1.1 Declarative Environment Records
 //! https://tc39.es/ecma262/#sec-declarative-environment-records
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const environments = @import("../environments.zig");
@@ -21,11 +22,21 @@ outer_env: ?Environment,
 bindings: String.HashMapUnmanaged(Binding),
 
 pub const Binding = struct {
-    value: ?Value,
+    value: Value,
+    initialized: bool,
     strict: bool,
     mutable: bool,
     deletable: bool,
 };
+
+comptime {
+    switch (builtin.target.ptrBitWidth()) {
+        // Only some 32-bit platforms have certain bitpacking optimizations applied
+        32 => std.debug.assert(@sizeOf(Binding) == @sizeOf(Value) + 4 or @sizeOf(Binding) == @sizeOf(Value) + 8),
+        64 => std.debug.assert(@sizeOf(Binding) == @sizeOf(Value) + 8),
+        else => unreachable,
+    }
+}
 
 /// 9.1.1.1.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
@@ -48,7 +59,8 @@ pub fn createMutableBinding(
     //    true, record that the newly created binding may be deleted by a subsequent DeleteBinding
     //    call.
     try self.bindings.putNoClobber(agent.gc_allocator, name, .{
-        .value = null,
+        .value = undefined,
+        .initialized = false,
         .strict = false,
         .mutable = true,
         .deletable = deletable,
@@ -69,7 +81,8 @@ pub fn createImmutableBinding(
     // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
     //    true, record that the newly created binding is a strict binding.
     try self.bindings.putNoClobber(agent.gc_allocator, name, .{
-        .value = null,
+        .value = undefined,
+        .initialized = false,
         .strict = strict,
         .mutable = false,
         .deletable = false,
@@ -89,11 +102,13 @@ pub fn initializeBinding(
     var binding = self.bindings.getPtr(name).?;
 
     // 1. Assert: envRec must have an uninitialized binding for N.
-    std.debug.assert(binding.value == null);
+    std.debug.assert(binding.initialized == false);
 
     // 2. Set the bound value for N in envRec to V.
-    // 3. Record that the binding for N in envRec has been initialized.
     binding.value = value;
+
+    // 3. Record that the binding for N in envRec has been initialized.
+    binding.initialized = true;
 
     // 4. Return unused.
 }
@@ -110,7 +125,7 @@ pub fn setMutableBinding(
     const maybe_binding = self.bindings.getPtr(name);
 
     // 1. If envRec does not have a binding for N, then
-    if (maybe_binding == null) {
+    const binding = maybe_binding orelse {
         // a. If S is true, throw a ReferenceError exception.
         if (strict) {
             return agent.throwException(.reference_error, "'{}' is not defined", .{name});
@@ -124,15 +139,13 @@ pub fn setMutableBinding(
 
         // d. Return unused.
         return;
-    }
-
-    const binding = maybe_binding.?;
+    };
 
     // 2. If the binding for N in envRec is a strict binding, set S to true.
     const final_strict = if (binding.strict) true else strict;
 
     // 3. If the binding for N in envRec has not yet been initialized, then
-    if (binding.value == null) {
+    if (!binding.initialized) {
         // a. Throw a ReferenceError exception.
         return agent.throwException(
             .reference_error,
@@ -173,12 +186,16 @@ pub fn getBindingValue(
     const binding = self.bindings.get(name).?;
 
     // 2. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError exception.
+    if (!binding.initialized) {
+        return agent.throwException(
+            .reference_error,
+            "Binding for '{}' is not initialized",
+            .{name},
+        );
+    }
+
     // 3. Return the value currently bound to N in envRec.
-    return binding.value orelse agent.throwException(
-        .reference_error,
-        "Binding for '{}' is not initialized",
-        .{name},
-    );
+    return binding.value;
 }
 
 /// 9.1.1.1.7 DeleteBinding ( N )
