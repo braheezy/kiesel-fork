@@ -118,6 +118,8 @@ pub fn builtinCallOrConstruct(
 
         // 7. Set the ScriptOrModule of calleeContext to null.
         .script_or_module = null,
+
+        .ecmascript_code = undefined,
     };
 
     // 8. Perform any necessary implementation-defined initialization of calleeContext.

@@ -316,7 +316,7 @@ pub fn asyncGeneratorStart(
             const closure_generator_context = agent_.runningExecutionContext();
 
             // b. Let acGenerator be the Generator component of acGenContext.
-            const closure_generator = closure_generator_context.generator.?.async_generator;
+            const closure_generator = closure_generator_context.generator.async_generator;
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
@@ -576,7 +576,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     // 2. Assert: genContext is the execution context of a generator.
     // 3. Let generator be the value of the Generator component of genContext.
     // 4. Assert: GetGeneratorKind() is async.
-    const generator = generator_context.generator.?.async_generator;
+    const generator = generator_context.generator.async_generator;
 
     // 5. Let completion be NormalCompletion(value).
     const completion = Completion.normal(value);

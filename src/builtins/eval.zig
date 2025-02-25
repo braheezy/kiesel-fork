@@ -90,15 +90,15 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         lexical_environment = .{
             .declarative_environment = try newDeclarativeEnvironment(
                 agent.gc_allocator,
-                running_context.ecmascript_code.?.lexical_environment,
+                running_context.ecmascript_code.lexical_environment,
             ),
         };
 
         // b. Let varEnv be runningContext's VariableEnvironment.
-        variable_environment = running_context.ecmascript_code.?.variable_environment;
+        variable_environment = running_context.ecmascript_code.variable_environment;
 
         // c. Let privateEnv be runningContext's PrivateEnvironment.
-        private_environment = running_context.ecmascript_code.?.private_environment;
+        private_environment = running_context.ecmascript_code.private_environment;
     } else {
         // 17. Else,
         // a. Let lexEnv be NewDeclarativeEnvironment(evalRealm.[[GlobalEnv]]).

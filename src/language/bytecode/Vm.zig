@@ -403,7 +403,7 @@ fn executeBlockDeclarationInstantiation(
     executable: Executable,
 ) Agent.Error!void {
     const block = executable.getAstNode(block_index);
-    const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const old_env = self.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
     try blockDeclarationInstantiation(
         self.agent,
@@ -414,7 +414,7 @@ fn executeBlockDeclarationInstantiation(
         },
         .{ .declarative_environment = block_env },
     );
-    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+    self.agent.runningExecutionContext().ecmascript_code.lexical_environment = .{
         .declarative_environment = block_env,
     };
 }
@@ -502,7 +502,7 @@ fn executeCreateCatchBindings(
     }
 
     // 4. Set the running execution context's LexicalEnvironment to catchEnv.
-    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+    self.agent.runningExecutionContext().ecmascript_code.lexical_environment = .{
         .declarative_environment = catch_env,
     };
 }
@@ -540,7 +540,7 @@ fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
             old_env,
         ),
     };
-    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = new_env;
+    self.agent.runningExecutionContext().ecmascript_code.lexical_environment = new_env;
 }
 
 fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
@@ -946,7 +946,7 @@ fn executeForDeclarationBindingInstantiation(
     }
 
     // v. Set the running execution context's LexicalEnvironment to iterationEnv.
-    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+    self.agent.runningExecutionContext().ecmascript_code.lexical_environment = .{
         .declarative_environment = environment,
     };
 }
@@ -1084,7 +1084,7 @@ fn executeHasPrivateElement(
 
     // 5. Let privateEnv be the running execution context's PrivateEnvironment.
     // 6. Assert: privateEnv is not null.
-    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    const private_environment = self.agent.runningExecutionContext().ecmascript_code.private_environment.?;
 
     // 7. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
     const private_name = private_environment.resolvePrivateIdentifier(
@@ -1140,7 +1140,7 @@ fn executeInitializeBoundName(
 ) Agent.Error!void {
     const name = executable.getIdentifier(name_index);
     const value = self.stack.pop().?;
-    const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const environment = self.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     try initializeBoundName(
         self.agent,
         name,
@@ -1398,7 +1398,7 @@ fn executeMakePrivateReference(
 
     // 1. Let privateEnv be the running execution context's PrivateEnvironment.
     // 2. Assert: privateEnv is not null.
-    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    const private_env = self.agent.runningExecutionContext().ecmascript_code.private_environment.?;
 
     // 3. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
     const private_name = private_env.resolvePrivateIdentifier(
@@ -1426,7 +1426,7 @@ fn executeMakePrivateReferenceDirect(
     // creation of a reference.
     const private_identifier = executable.getIdentifier(private_identifier_index);
     const base_value = self.stack.pop().?;
-    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    const private_env = self.agent.runningExecutionContext().ecmascript_code.private_environment.?;
     const private_name = private_env.resolvePrivateIdentifier(
         try private_identifier.toUtf8(self.agent.gc_allocator),
     );
@@ -1559,7 +1559,7 @@ fn executePopReference(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
-    const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     try self.lexical_environment_stack.append(self.agent.gc_allocator, lexical_environment);
 }
 
@@ -1607,7 +1607,7 @@ fn executeResolveBindingDirect(
     // a reference.
     const name = executable.getIdentifier(name_index);
     const lookup_cache_entry = executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
-    var env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    var env = self.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     if (lookup_cache_entry.*) |cache| {
         for (0..cache.distance) |_| {
             env = env.outerEnv() orelse {
@@ -1638,7 +1638,7 @@ fn executeResolvePrivateIdentifier(
     const private_identifier = executable.getIdentifier(private_identifier_index);
 
     // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
-    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    const private_environment = self.agent.runningExecutionContext().ecmascript_code.private_environment.?;
 
     // 3. Let names be privateEnvRec.[[Names]].
     // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
@@ -1662,7 +1662,7 @@ fn executeResolveThisBinding(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeRestoreLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     const lexical_environment = self.lexical_environment_stack.getLast();
-    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = lexical_environment;
+    self.agent.runningExecutionContext().ecmascript_code.lexical_environment = lexical_environment;
 }
 
 fn executeRethrowExceptionIfAny(self: *Vm, _: Executable) Agent.Error!void {

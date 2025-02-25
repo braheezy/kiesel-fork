@@ -37,7 +37,11 @@ script_or_module: ?ScriptOrModule,
 
 /// Table 26: Additional State Components for ECMAScript Code Execution Contexts
 /// https://tc39.es/ecma262/#table-additional-state-components-for-ecmascript-code-execution-contexts
-ecmascript_code: ?struct {
+///
+/// NOTE: This is set everywhere except for the realm and builtin function execution contexts and
+///       never conditionally accessed, so we set it to `undefined` instead of making the field
+///       nullable to save 8 bytes and a bunch of null-unwrapping.
+ecmascript_code: struct {
     /// LexicalEnvironment
     lexical_environment: Environment,
 
@@ -46,11 +50,12 @@ ecmascript_code: ?struct {
 
     /// PrivateEnvironment
     private_environment: ?*PrivateEnvironment,
-} = null,
+},
 
 /// Table 27: Additional State Components for Generator Execution Contexts
 /// https://tc39.es/ecma262/#table-additional-state-components-for-generator-execution-contexts
-generator: ?union(enum) {
+generator: union(enum) {
+    unset,
     generator: *builtins.Generator,
     async_generator: *builtins.AsyncGenerator,
-} = null,
+} = .unset,

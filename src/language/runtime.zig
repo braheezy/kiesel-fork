@@ -590,7 +590,7 @@ pub fn blockDeclarationInstantiation(
     }
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
@@ -738,7 +738,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
-        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
@@ -747,7 +747,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by FunctionExpression.
         const source_text = function_expression.source_text;
@@ -786,10 +786,10 @@ pub fn instantiateOrdinaryFunctionExpression(
             .empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by FunctionExpression.
         const source_text = function_expression.source_text;
@@ -834,10 +834,10 @@ pub fn instantiateArrowFunctionExpression(
         .empty;
 
     // 2. Let env be the LexicalEnvironment of the running execution context.
-    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. Let sourceText be the source text matched by ArrowFunction.
     const source_text = arrow_function.source_text;
@@ -882,10 +882,10 @@ fn defineMethod(
         return err;
 
     // 2. Let env be the running execution context's LexicalEnvironment.
-    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. If functionPrototype is present, then
     //     a. Let prototype be functionPrototype.
@@ -959,10 +959,10 @@ pub fn methodDefinitionEvaluation(
                 return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
-            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
             // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+            const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
             const source_text = function_expression.source_text;
@@ -1032,10 +1032,10 @@ pub fn methodDefinitionEvaluation(
                 return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
-            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
             // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+            const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
             const source_text = function_expression.source_text;
@@ -1099,10 +1099,10 @@ pub fn methodDefinitionEvaluation(
                 return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
-            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
             // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+            const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by GeneratorMethod.
             const source_text = generator_expression.source_text;
@@ -1157,10 +1157,10 @@ pub fn methodDefinitionEvaluation(
                 return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
-            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
             // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+            const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by AsyncGeneratorMethod.
             const source_text = async_generator_expression.source_text;
@@ -1215,10 +1215,10 @@ pub fn methodDefinitionEvaluation(
                 return err;
 
             // 2. Let env be the LexicalEnvironment of the running execution context.
-            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
             // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+            const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by AsyncMethod.
             const source_text = async_function_expression.source_text;
@@ -1363,7 +1363,7 @@ pub fn instantiateGeneratorFunctionExpression(
         const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
-        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
@@ -1372,7 +1372,7 @@ pub fn instantiateGeneratorFunctionExpression(
         func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by GeneratorExpression.
         const source_text = generator_expression.source_text;
@@ -1424,10 +1424,10 @@ pub fn instantiateGeneratorFunctionExpression(
             .empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by GeneratorExpression.
         const source_text = generator_expression.source_text;
@@ -1583,7 +1583,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
-        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
@@ -1592,7 +1592,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by AsyncGeneratorExpression.
         const source_text = async_generator_expression.source_text;
@@ -1644,10 +1644,10 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
             .empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by AsyncGeneratorExpression.
         const source_text = async_generator_expression.source_text;
@@ -1721,10 +1721,10 @@ fn classFieldDefinitionEvaluation(
         };
 
         // b. Let env be the LexicalEnvironment of the running execution context.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // c. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // d. Let sourceText be the empty sequence of Unicode code points.
         const source_text = "";
@@ -1785,10 +1785,10 @@ fn classStaticBlockDefinitionEvaluation(
     const realm = agent.currentRealm();
 
     // 1. Let lex be the running execution context's LexicalEnvironment.
-    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 3. Let sourceText be the empty sequence of Unicode code points.
     const source_text = "";
@@ -1911,7 +1911,7 @@ pub fn classDefinitionEvaluation(
     const realm = agent.currentRealm();
 
     // 1. Let env be the LexicalEnvironment of the running execution context.
-    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 2. Let classEnv be NewDeclarativeEnvironment(env).
     const class_env = try newDeclarativeEnvironment(agent.gc_allocator, env);
@@ -1927,7 +1927,7 @@ pub fn classDefinitionEvaluation(
     }
 
     // 4. Let outerPrivateEnvironment be the running execution context's PrivateEnvironment.
-    const outer_private_environment = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const outer_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 5. Let classPrivateEnvironment be NewPrivateEnvironment(outerPrivateEnvironment).
     const class_private_environment = try newPrivateEnvironment(
@@ -1973,7 +1973,7 @@ pub fn classDefinitionEvaluation(
     } else {
         // 8. Else,
         // a. Set the running execution context's LexicalEnvironment to classEnv.
-        agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
+        agent.runningExecutionContext().ecmascript_code.lexical_environment = .{ .declarative_environment = class_env };
 
         // b. NOTE: The running execution context's PrivateEnvironment is outerPrivateEnvironment
         //    when evaluating ClassHeritage.
@@ -1985,7 +1985,7 @@ pub fn classDefinitionEvaluation(
         );
 
         // d. Set the running execution context's LexicalEnvironment to env.
-        agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+        agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
         // e. Let superclass be ? GetValue(? superclassRef).
         // NOTE: Wrapping the Expression node in a ExpressionStatement above ensures a get_value
@@ -2037,10 +2037,10 @@ pub fn classDefinitionEvaluation(
     const constructor = class_tail.class_body.constructorMethod();
 
     // 12. Set the running execution context's LexicalEnvironment to classEnv.
-    agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
+    agent.runningExecutionContext().ecmascript_code.lexical_environment = .{ .declarative_environment = class_env };
 
     // 13. Set the running execution context's PrivateEnvironment to classPrivateEnvironment.
-    agent.runningExecutionContext().ecmascript_code.?.private_environment = class_private_environment;
+    agent.runningExecutionContext().ecmascript_code.private_environment = class_private_environment;
 
     // 14. If constructor is empty, then
     var function = if (constructor == null) blk: {
@@ -2210,10 +2210,10 @@ pub fn classDefinitionEvaluation(
         // d. Set element to ! element.
         const element = element_or_error catch |err| {
             // i. Set the running execution context's LexicalEnvironment to env.
-            agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+            agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
             // ii. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+            agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
 
             // iii. Return ? element.
             return err;
@@ -2297,7 +2297,7 @@ pub fn classDefinitionEvaluation(
     }
 
     // 26. Set the running execution context's LexicalEnvironment to env.
-    agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+    agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
     // 27. If classBinding is not undefined, then
     if (class_binding != null) {
@@ -2352,7 +2352,7 @@ pub fn classDefinitionEvaluation(
         // c. If result is an abrupt completion, then
         _ = result catch |err| {
             // i. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+            agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
 
             // ii. Return ? result.
             return err;
@@ -2360,7 +2360,7 @@ pub fn classDefinitionEvaluation(
     }
 
     // 32. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-    agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+    agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
 
     // 33. Return F.
     return function;
@@ -2394,7 +2394,7 @@ pub fn bindingClassDeclarationEvaluation(
         } else unreachable;
 
         // 4. Let env be the running execution context's LexicalEnvironment.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 5. Perform ? InitializeBoundName(className, value, env).
         try initializeBoundName(agent, class_name, Value.from(value), .{ .environment = env });
@@ -2507,7 +2507,7 @@ pub fn instantiateAsyncFunctionExpression(
         const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
-        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
@@ -2516,7 +2516,7 @@ pub fn instantiateAsyncFunctionExpression(
         func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by AsyncFunctionExpression.
         const source_text = async_function_expression.source_text;
@@ -2552,10 +2552,10 @@ pub fn instantiateAsyncFunctionExpression(
             .empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
-        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+        const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by AsyncFunctionExpression.
         const source_text = async_function_expression.source_text;
@@ -2597,10 +2597,10 @@ pub fn instantiateAsyncArrowFunctionExpression(
         .empty;
 
     // 2. Let env be the LexicalEnvironment of the running execution context.
-    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 3. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. Let sourceText be the source text matched by AsyncArrowFunction.
     const source_text = async_arrow_function.source_text;

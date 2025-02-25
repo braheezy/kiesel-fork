@@ -96,6 +96,8 @@ pub fn initializeHostDefinedRealm(
 
         // 8. Set the ScriptOrModule of newContext to null.
         .script_or_module = null,
+
+        .ecmascript_code = undefined,
     };
 
     // 9. Push newContext onto the execution context stack; newContext is now the running

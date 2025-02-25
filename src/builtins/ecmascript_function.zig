@@ -193,7 +193,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             };
 
             if (use_fast_path) {
-                const environment = maybe_environment orelse agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+                const environment = maybe_environment orelse agent.runningExecutionContext().ecmascript_code.lexical_environment;
                 for (self.formal_parameters.items, 0..) |item, i| {
                     const name, const value = switch (item) {
                         .formal_parameter => |formal_parameter| blk: {
@@ -459,7 +459,7 @@ pub fn ordinaryCallBindThis(
     const callee_realm = function.fields.realm;
 
     // 4. Let localEnv be the LexicalEnvironment of calleeContext.
-    const local_env = callee_context.ecmascript_code.?.lexical_environment;
+    const local_env = callee_context.ecmascript_code.lexical_environment;
 
     const this_value = blk: {
         // 5. If thisMode is strict, then
@@ -720,7 +720,7 @@ fn construct(
     }
 
     // 7. Let constructorEnv be the LexicalEnvironment of calleeContext.
-    const constructor_env = callee_context.ecmascript_code.?.lexical_environment;
+    const constructor_env = callee_context.ecmascript_code.lexical_environment;
 
     // 8. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
     const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
@@ -1250,7 +1250,7 @@ fn functionDeclarationInstantiation(
         //    of the eval.
 
         // b. Let env be the LexicalEnvironment of calleeContext.
-        break :blk callee_context.ecmascript_code.?.lexical_environment;
+        break :blk callee_context.ecmascript_code.lexical_environment;
     } else blk: {
         // 20. Else,
         // a. NOTE: A separate Environment Record is needed to ensure that bindings created by
@@ -1258,7 +1258,7 @@ fn functionDeclarationInstantiation(
         //    parameters are declared.
 
         // b. Let calleeEnv be the LexicalEnvironment of calleeContext.
-        const callee_env = callee_context.ecmascript_code.?.lexical_environment;
+        const callee_env = callee_context.ecmascript_code.lexical_environment;
 
         // c. Let env be NewDeclarativeEnvironment(calleeEnv).
         const env: Environment = .{
@@ -1270,11 +1270,11 @@ fn functionDeclarationInstantiation(
 
         // d. Assert: The VariableEnvironment of calleeContext and calleeEnv are the same Environment Record.
         std.debug.assert(
-            std.meta.eql(callee_context.ecmascript_code.?.variable_environment, callee_env),
+            std.meta.eql(callee_context.ecmascript_code.variable_environment, callee_env),
         );
 
         // e. Set the LexicalEnvironment of calleeContext to env.
-        callee_context.ecmascript_code.?.lexical_environment = env;
+        callee_context.ecmascript_code.lexical_environment = env;
 
         break :blk env;
     };
@@ -1422,7 +1422,7 @@ fn functionDeclarationInstantiation(
         };
 
         // c. Set the VariableEnvironment of calleeContext to varEnv.
-        callee_context.ecmascript_code.?.variable_environment = var_env;
+        callee_context.ecmascript_code.variable_environment = var_env;
 
         // d. Let instantiatedVarNames be a new empty List.
         var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
@@ -1484,7 +1484,7 @@ fn functionDeclarationInstantiation(
     };
 
     // 32. Set the LexicalEnvironment of calleeContext to lexEnv.
-    callee_context.ecmascript_code.?.lexical_environment = lex_env;
+    callee_context.ecmascript_code.lexical_environment = lex_env;
 
     // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
     const lex_declarations = cached_ast_values.lexically_scoped_declarations;
@@ -1514,7 +1514,7 @@ fn functionDeclarationInstantiation(
     }
 
     // 35. Let privateEnv be the PrivateEnvironment of calleeContext.
-    const private_env = callee_context.ecmascript_code.?.private_environment;
+    const private_env = callee_context.ecmascript_code.private_environment;
 
     // 36. For each Parse Node f of functionsToInitialize, do
     for (functions_to_initialize.items) |hoistable_declaration| {

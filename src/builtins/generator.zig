@@ -154,7 +154,7 @@ pub fn generatorStart(
             const closure_generator_context = agent_.runningExecutionContext();
 
             // b. Let acGenerator be the Generator component of acGenContext.
-            const closure_generator = closure_generator_context.generator.?.generator;
+            const closure_generator = closure_generator_context.generator.generator;
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
@@ -404,15 +404,15 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
 
     // 2. If genContext does not have a Generator component, return non-generator.
     // 3. Let generator be the Generator component of genContext.
-    const generator = generator_context.generator orelse return .non_generator;
+    return switch (generator_context.generator) {
+        .unset => .non_generator,
 
-    switch (generator) {
         // 4. If generator has an [[AsyncGeneratorState]] internal slot, return async.
-        .async_generator => return .@"async",
+        .async_generator => .@"async",
 
         // 5. Else, return sync.
-        .generator => return .sync,
-    }
+        .generator => .sync,
+    };
 }
 
 /// 27.5.3.6 GeneratorYield ( iteratorResult )
@@ -422,11 +422,11 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
     const generator_context = agent.runningExecutionContext();
 
     // 2. Assert: genContext is the execution context of a generator.
-    std.debug.assert(generator_context.generator != null);
+    std.debug.assert(generator_context.generator != .unset);
 
     // 3. Let generator be the value of the Generator component of genContext.
     // 4. Assert: GetGeneratorKind() is sync.
-    const generator = generator_context.generator.?.generator;
+    const generator = generator_context.generator.generator;
 
     // 5. Set generator.[[GeneratorState]] to suspended-yield.
     generator.fields.generator_state = .suspended_yield;
