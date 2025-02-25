@@ -256,11 +256,12 @@ pub fn toString(
     allocator: std.mem.Allocator,
     radix: u8,
 ) std.mem.Allocator.Error!*const String {
+    std.debug.assert(radix >= 2);
+    std.debug.assert(radix <= 36);
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
     return String.fromAscii(allocator, self.managed.toString(allocator, radix, .lower) catch |err| switch (err) {
-        // This is an internal API, the base should always be valid.
-        error.InvalidBase => @panic("BigInt.toString() called with invalid base"),
+        error.InvalidBase => unreachable,
         error.OutOfMemory => return error.OutOfMemory,
     });
 }
