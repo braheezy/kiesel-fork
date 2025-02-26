@@ -101,6 +101,7 @@ hostMakeJobCallback: *const fn (
     callback: *Object,
 ) JobCallback = default_host_hooks.hostMakeJobCallback,
 hostPromiseRejectionTracker: *const fn (
+    agent: *Agent,
     promise: *builtins.Promise,
     operation: PromiseRejectionTrackerOperation,
 ) void = default_host_hooks.hostPromiseRejectionTracker,

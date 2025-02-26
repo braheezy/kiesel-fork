@@ -360,7 +360,7 @@ pub fn createDynamicFunction(
     };
 
     // 25. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
-    const proto = try getPrototypeFromConstructor(new_target, fallback_prototype);
+    const proto = try getPrototypeFromConstructor(agent, new_target, fallback_prototype);
 
     // 26. Let env be currentRealm.[[GlobalEnv]].
     const env = current_realm.global_env;
@@ -425,7 +425,7 @@ pub fn createDynamicFunction(
         // 32. Else if kind is normal, then
         .normal => {
             // a. Perform MakeConstructor(F).
-            try makeConstructor(function, .{});
+            try makeConstructor(agent, function, .{});
         },
 
         // 33. NOTE: Functions whose kind is async are not constructable and do not have a
@@ -642,13 +642,13 @@ pub const prototype = struct {
 
     /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( V )
     /// https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%
-    fn @"%Symbol.hasInstance%"(_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"%Symbol.hasInstance%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let F be the this value.
         const func = this_value;
 
         // 2. Return ? OrdinaryHasInstance(F, V).
-        return Value.from(try func.ordinaryHasInstance(value));
+        return Value.from(try func.ordinaryHasInstance(agent, value));
     }
 };

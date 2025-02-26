@@ -688,7 +688,7 @@ pub fn instantiateOrdinaryFunctionObject(
         );
 
         // 5. Perform MakeConstructor(F).
-        try makeConstructor(function, .{});
+        try makeConstructor(agent, function, .{});
 
         // 6. Return F.
         return function;
@@ -717,7 +717,7 @@ pub fn instantiateOrdinaryFunctionObject(
         try setFunctionName(function, PropertyKey.from("default"), null);
 
         // 4. Perform MakeConstructor(F).
-        try makeConstructor(function, .{});
+        try makeConstructor(agent, function, .{});
 
         // 5. Return F.
         return function;
@@ -773,7 +773,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 10. Perform MakeConstructor(closure).
-        try makeConstructor(closure, .{});
+        try makeConstructor(agent, closure, .{});
 
         // 11. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(agent, name, Value.from(closure));
@@ -815,7 +815,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 7. Perform MakeConstructor(closure).
-        try makeConstructor(closure, .{});
+        try makeConstructor(agent, closure, .{});
 
         // 8. Return closure.
         return closure;
@@ -2154,7 +2154,7 @@ pub fn classDefinitionEvaluation(
     };
 
     // 16. Perform MakeConstructor(F, false, proto).
-    try makeConstructor(function, .{ .writable_prototype = false, .prototype = prototype });
+    try makeConstructor(agent, function, .{ .writable_prototype = false, .prototype = prototype });
 
     // 17. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {

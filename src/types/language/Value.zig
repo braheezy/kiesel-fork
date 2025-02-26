@@ -1192,16 +1192,18 @@ pub fn isArray(self: Value) error{ExceptionThrown}!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
+    const object = self.asObject();
+
     // 2. If argument is an Array exotic object, return true.
-    if (self.asObject().is(builtins.Array)) return true;
+    if (object.is(builtins.Array)) return true;
 
     // 3. If argument is a Proxy exotic object, then
-    if (self.asObject().is(builtins.Proxy)) {
+    if (object.is(builtins.Proxy)) {
         // a. Perform ? ValidateNonRevokedProxy(argument).
-        try validateNonRevokedProxy(self.asObject().as(builtins.Proxy));
+        try validateNonRevokedProxy(object.agent, object.as(builtins.Proxy));
 
         // b. Let proxyTarget be argument.[[ProxyTarget]].
-        const proxy_target = self.asObject().as(builtins.Proxy).fields.proxy_target.?;
+        const proxy_target = object.as(builtins.Proxy).fields.proxy_target.?;
 
         // c. Return ? IsArray(proxyTarget).
         return from(proxy_target).isArray();
@@ -1409,11 +1411,9 @@ pub fn invoke(
 
 /// 7.3.21 OrdinaryHasInstance ( C, O )
 /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
-pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
+pub fn ordinaryHasInstance(self: Value, agent: *Agent, object_value: Value) Agent.Error!bool {
     // 1. If IsCallable(C) is false, return false.
     if (!self.isCallable()) return false;
-
-    const agent = self.asObject().agent;
 
     // 2. If C has a [[BoundTargetFunction]] internal slot, then
     if (self.asObject().is(builtins.BoundFunction)) {
@@ -1694,7 +1694,7 @@ pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error
     }
 
     // 5. Return ? OrdinaryHasInstance(target, V).
-    return target.ordinaryHasInstance(self);
+    return target.ordinaryHasInstance(agent, self);
 }
 
 /// 24.5.1 CanonicalizeKeyedCollectionKey ( key )

@@ -167,7 +167,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
         const this_realm = agent.currentRealm();
 
         // b. Let realmC be ? GetFunctionRealm(C).
-        const constructor_realm = try constructor_.asObject().getFunctionRealm();
+        const constructor_realm = try constructor_.asObject().getFunctionRealm(agent);
 
         // c. If thisRealm and realmC are not the same Realm Record, then
         if (this_realm != constructor_realm) {
@@ -410,7 +410,11 @@ pub const constructor = struct {
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let proto be ? GetPrototypeFromConstructor(newTarget, "%Array.prototype%").
-        const prototype_ = try getPrototypeFromConstructor(new_target_, "%Array.prototype%");
+        const prototype_ = try getPrototypeFromConstructor(
+            agent,
+            new_target_,
+            "%Array.prototype%",
+        );
 
         // 3. Let numberOfArgs be the number of elements in values.
         const number_of_args = arguments.count();
@@ -1278,7 +1282,14 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike();
 
         // 3. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .ascending,
+            predicate,
+            this_arg,
+        );
 
         // 4. Return findRec.[[Value]].
         return find_record.value;
@@ -1297,7 +1308,14 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike();
 
         // 3. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .ascending,
+            predicate,
+            this_arg,
+        );
 
         // 4. Return findRec.[[Index]].
         return find_record.index;
@@ -1316,7 +1334,14 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike();
 
         // 3. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .descending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .descending,
+            predicate,
+            this_arg,
+        );
 
         // 4. Return findRec.[[Value]].
         return find_record.value;
@@ -1335,7 +1360,14 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike();
 
         // 3. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .descending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .descending,
+            predicate,
+            this_arg,
+        );
 
         // 4. Return findRec.[[Index]].
         return find_record.index;
@@ -3072,14 +3104,13 @@ pub const prototype = struct {
 /// 23.1.3.12.1 FindViaPredicate ( O, len, direction, predicate, thisArg )
 /// https://tc39.es/ecma262/#sec-findviapredicate
 pub fn findViaPredicate(
+    agent: *Agent,
     object: *Object,
     len: u53,
     comptime direction: enum { ascending, descending },
     predicate: Value,
     this_arg: Value,
 ) Agent.Error!struct { index: Value, value: Value } {
-    const agent = object.agent;
-
     // 1. If IsCallable(predicate) is false, throw a TypeError exception.
     if (!predicate.isCallable()) {
         return agent.throwException(.type_error, "{} is not callable", .{predicate});

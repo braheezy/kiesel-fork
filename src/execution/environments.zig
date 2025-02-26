@@ -149,13 +149,12 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getThisBinding(self: Environment) error{ExceptionThrown}!Value {
+    pub fn getThisBinding(self: Environment, agent: *Agent) error{ExceptionThrown}!Value {
         return switch (self) {
             .declarative_environment,
             .object_environment,
             => unreachable,
-            .global_environment => |env| Value.from(env.getThisBinding()),
-            inline else => |env| env.getThisBinding(),
+            inline else => |env| env.getThisBinding(agent),
         };
     }
 };

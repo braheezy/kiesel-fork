@@ -87,7 +87,7 @@ pub const constructor = struct {
         // 2. Let hasInstance be ? OrdinaryHasInstance(%Iterator%, iteratorRecord.[[Iterator]]).
         const has_instance = try Value.from(
             try realm.intrinsics.@"%Iterator%"(),
-        ).ordinaryHasInstance(Value.from(iterator.iterator));
+        ).ordinaryHasInstance(agent, Value.from(iterator.iterator));
 
         // 3. If hasInstance is true, then
         if (has_instance) {

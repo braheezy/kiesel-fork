@@ -26,7 +26,6 @@ const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const getOption = types.getOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;

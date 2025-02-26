@@ -600,7 +600,7 @@ pub fn enumerableOwnProperties(
 
 /// 7.3.24 GetFunctionRealm ( obj )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
-pub fn getFunctionRealm(self: *const Object) error{ExceptionThrown}!*Realm {
+pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrown}!*Realm {
     // 1. If obj has a [[Realm]] internal slot, then
     if (self.internal_methods.call != null) {
         // a. Return obj.[[Realm]].
@@ -619,13 +619,13 @@ pub fn getFunctionRealm(self: *const Object) error{ExceptionThrown}!*Realm {
         const bound_target_function = self.as(builtins.BoundFunction).fields.bound_target_function;
 
         // b. Return ? GetFunctionRealm(boundTargetFunction).
-        return bound_target_function.getFunctionRealm();
+        return bound_target_function.getFunctionRealm(agent);
     }
 
     // 3. If obj is a Proxy exotic object, then
     if (self.is(builtins.Proxy)) {
         // a. Perform ? ValidateNonRevokedProxy(obj).
-        try validateNonRevokedProxy(self.as(builtins.Proxy));
+        try validateNonRevokedProxy(agent, self.as(builtins.Proxy));
 
         // b. Let proxyTarget be obj.[[ProxyTarget]].
         const proxy_target = self.as(builtins.Proxy).fields.proxy_target.?;
@@ -634,11 +634,11 @@ pub fn getFunctionRealm(self: *const Object) error{ExceptionThrown}!*Realm {
         std.debug.assert(proxy_target.internal_methods.call != null);
 
         // d. Return ? GetFunctionRealm(proxyTarget).
-        return proxy_target.getFunctionRealm();
+        return proxy_target.getFunctionRealm(agent);
     }
 
     // 4. Return the current Realm Record.
-    return self.agent.currentRealm();
+    return agent.currentRealm();
 }
 
 /// 7.3.25 CopyDataProperties ( target, source, excludedItems )

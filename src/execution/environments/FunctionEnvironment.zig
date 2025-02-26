@@ -4,11 +4,12 @@
 const std = @import("std");
 
 const builtins = @import("../../builtins.zig");
-const environments = @import("../environments.zig");
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
-const DeclarativeEnvironment = environments.DeclarativeEnvironment;
+const Agent = execution.Agent;
+const DeclarativeEnvironment = execution.DeclarativeEnvironment;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Value = types.Value;
@@ -39,9 +40,11 @@ declarative_environment: DeclarativeEnvironment,
 
 /// 9.1.1.3.1 BindThisValue ( envRec, V )
 /// https://tc39.es/ecma262/#sec-bindthisvalue
-pub fn bindThisValue(self: *FunctionEnvironment, value: Value) error{ExceptionThrown}!void {
-    const agent = self.function_object.object.agent;
-
+pub fn bindThisValue(
+    self: *FunctionEnvironment,
+    agent: *Agent,
+    value: Value,
+) error{ExceptionThrown}!void {
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
     std.debug.assert(self.this_binding_status != .lexical);
 
@@ -82,9 +85,7 @@ pub fn hasSuperBinding(self: FunctionEnvironment) bool {
 
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
-pub fn getThisBinding(self: FunctionEnvironment) error{ExceptionThrown}!Value {
-    const agent = self.function_object.object.agent;
-
+pub fn getThisBinding(self: FunctionEnvironment, agent: *Agent) error{ExceptionThrown}!Value {
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
     std.debug.assert(self.this_binding_status != .lexical);
 

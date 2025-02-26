@@ -887,7 +887,7 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
 
     // 8. Assert: thisER is a Function Environment Record.
     // 9. Perform ? BindThisValue(thisER, result).
-    try this_environment.function_environment.bindThisValue(Value.from(result));
+    try this_environment.function_environment.bindThisValue(self.agent, Value.from(result));
 
     // 10. Let F be thisER.[[FunctionObject]].
     // 11. Assert: F is an ECMAScript function object.
@@ -1376,7 +1376,7 @@ fn executeLoadThisValueForMakeSuperPropertyReference(self: *Vm, _: Executable) A
     const env = self.agent.getThisEnvironment();
 
     // 2. Let actualThis be ? env.GetThisBinding().
-    const actual_this = try env.getThisBinding();
+    const actual_this = try env.getThisBinding(self.agent);
 
     try self.stack.append(self.agent.gc_allocator, actual_this);
 }

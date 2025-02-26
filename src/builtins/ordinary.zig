@@ -864,7 +864,7 @@ pub fn ordinaryCreateFromConstructor(
     comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? GetPrototypeFromConstructor(constructor, intrinsicDefaultProto).
-    const prototype = try getPrototypeFromConstructor(constructor, intrinsic_default_proto);
+    const prototype = try getPrototypeFromConstructor(agent, constructor, intrinsic_default_proto);
 
     // 3. If internalSlotsList is present, let slotsList be internalSlotsList.
     // 4. Else, let slotsList be a new empty List.
@@ -875,6 +875,7 @@ pub fn ordinaryCreateFromConstructor(
 /// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )
 /// https://tc39.es/ecma262/#sec-getprototypefromconstructor
 pub fn getPrototypeFromConstructor(
+    agent: *Agent,
     constructor: *Object,
     comptime intrinsic_default_proto: []const u8,
 ) Agent.Error!*Object {
@@ -892,7 +893,7 @@ pub fn getPrototypeFromConstructor(
         // 3. If proto is not an Object, then
         else => blk: {
             // a. Let realm be ? GetFunctionRealm(constructor).
-            const realm = try constructor.getFunctionRealm();
+            const realm = try constructor.getFunctionRealm(agent);
 
             // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
             break :blk try @field(Realm.Intrinsics, intrinsic_default_proto)(&realm.intrinsics);

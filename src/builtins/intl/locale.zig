@@ -23,7 +23,6 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const getOption = types.getOption;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;

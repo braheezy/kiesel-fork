@@ -1506,7 +1506,14 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .ascending,
+            predicate,
+            this_arg,
+        );
 
         // 5. Return findRec.[[Value]].
         return find_record.value;
@@ -1527,7 +1534,14 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .ascending,
+            predicate,
+            this_arg,
+        );
 
         // 5. Return findRec.[[Index]].
         return find_record.index;
@@ -1548,7 +1562,14 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .descending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .descending,
+            predicate,
+            this_arg,
+        );
 
         // 5. Return findRec.[[Value]].
         return find_record.value;
@@ -1569,7 +1590,14 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
-        const find_record = try findViaPredicate(object, len, .descending, predicate, this_arg);
+        const find_record = try findViaPredicate(
+            agent,
+            object,
+            len,
+            .descending,
+            predicate,
+            this_arg,
+        );
 
         // 5. Return findRec.[[Index]].
         return find_record.index;
@@ -3292,7 +3320,7 @@ pub fn allocateTypedArray(
     length: ?u53,
 ) Agent.Error!*Object {
     // 1. Let proto be ? GetPrototypeFromConstructor(newTarget, defaultProto).
-    const prototype_ = try getPrototypeFromConstructor(new_target, default_prototype);
+    const prototype_ = try getPrototypeFromConstructor(agent, new_target, default_prototype);
 
     // 2. Let obj be TypedArrayCreate(proto).
     // 3. Assert: obj.[[ViewedArrayBuffer]] is undefined.

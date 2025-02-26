@@ -433,7 +433,7 @@ pub fn rejectPromise(
 
     // 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
     if (!promise.fields.promise_is_handled) {
-        agent.host_hooks.hostPromiseRejectionTracker(promise, .reject);
+        agent.host_hooks.hostPromiseRejectionTracker(agent, promise, .reject);
     }
 
     // 8. Perform TriggerPromiseReactions(reactions, reason).
@@ -586,7 +586,7 @@ pub fn newPromiseReactionJob(
     // 3. If reaction.[[Handler]] is not empty, then
     if (reaction.handler) |handler| {
         // a. Let getHandlerRealmResult be Completion(GetFunctionRealm(reaction.[[Handler]].[[Callback]])).
-        const get_handler_realm_result = handler.callback.getFunctionRealm();
+        const get_handler_realm_result = handler.callback.getFunctionRealm(agent);
 
         // b. If getHandlerRealmResult is a normal completion, set handlerRealm to
         //    getHandlerRealmResult.[[Value]].
@@ -674,7 +674,7 @@ pub fn newPromiseResolveThenableJob(
     const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
 
     // 2. Let getThenRealmResult be Completion(GetFunctionRealm(then.[[Callback]])).
-    const get_handler_realm_result = then.callback.getFunctionRealm();
+    const get_handler_realm_result = then.callback.getFunctionRealm(agent);
 
     // 3. If getThenRealmResult is a normal completion, let thenRealm be
     //    getThenRealmResult.[[Value]].
@@ -1512,7 +1512,7 @@ pub fn performPromiseThen(
 
             // c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
             if (!promise.fields.promise_is_handled) {
-                agent.host_hooks.hostPromiseRejectionTracker(promise, .handle);
+                agent.host_hooks.hostPromiseRejectionTracker(agent, promise, .handle);
             }
 
             // d. Let rejectJob be NewPromiseReactionJob(rejectReaction, reason).

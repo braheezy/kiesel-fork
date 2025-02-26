@@ -563,7 +563,7 @@ pub const constructor = struct {
         return Value.from(try stringCreate(
             agent,
             s,
-            try getPrototypeFromConstructor(new_target.?, "%String.prototype%"),
+            try getPrototypeFromConstructor(agent, new_target.?, "%String.prototype%"),
         ));
     }
 

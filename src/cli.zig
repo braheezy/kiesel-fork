@@ -30,7 +30,6 @@ const defineBuiltinPropertyLazy = kiesel.utils.defineBuiltinPropertyLazy;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
-const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 const parseJSONModule = kiesel.language.parseJSONModule;
 const regExpCreate = kiesel.builtins.regExpCreate;
@@ -915,10 +914,10 @@ pub fn main() !u8 {
 
     agent.host_hooks.hostPromiseRejectionTracker = struct {
         fn func(
+            agent_: *Agent,
             promise: *kiesel.builtins.Promise,
             operation: HostHooks.PromiseRejectionTrackerOperation,
         ) void {
-            const agent_ = promise.object.agent;
             if (tracked_promise_rejections.get(promise)) |previous_operation| {
                 // Don't report `Promise.reject().catch(handler)` evaluated in a single script
                 if (previous_operation == .reject and operation == .handle) {

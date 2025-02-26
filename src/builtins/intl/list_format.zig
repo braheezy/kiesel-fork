@@ -25,7 +25,6 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
-const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;

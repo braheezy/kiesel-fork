@@ -460,7 +460,7 @@ fn innerModuleLinking(
     }
 
     // 10. Perform ? module.InitializeEnvironment().
-    try module.initializeEnvironment();
+    try module.initializeEnvironment(agent);
 
     // 11. Assert: module occurs exactly once in stack.
 
@@ -897,7 +897,7 @@ fn innerModuleEvaluation(
     } else {
         // 13. Else,
         // a. Perform ? module.ExecuteModule().
-        try module.executeModule(null);
+        try module.executeModule(agent, null);
     }
 
     // 14. Assert: module occurs exactly once in stack.
@@ -1014,7 +1014,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     );
 
     // 9. Perform ! module.ExecuteModule(capability).
-    module.executeModule(capability) catch |err| try noexcept(err);
+    module.executeModule(agent, capability) catch |err| try noexcept(err);
 
     // 10. Return unused.
 }
@@ -1139,7 +1139,7 @@ fn asyncModuleExecutionFulfilled(
         } else {
             // c. Else,
             // i. Let result be m.ExecuteModule().
-            const result = m.executeModule(null);
+            const result = m.executeModule(agent, null);
 
             // ii. If result is an abrupt completion, then
             _ = result catch |err| switch (err) {
@@ -1479,9 +1479,7 @@ pub fn resolveExport(
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
-pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
-    const agent = self.realm.agent;
-
+fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
     for (self.indirect_export_entries.items) |export_entry| {
         // a. Assert: e.[[ExportName]] is not null.
@@ -1739,9 +1737,11 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
 
 /// 16.2.1.6.5 ExecuteModule ( [ capability ] )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-execute-module
-pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Agent.Error!void {
-    const agent = self.realm.agent;
-
+fn executeModule(
+    self: *SourceTextModule,
+    agent: *Agent,
+    capability: ?PromiseCapability,
+) Agent.Error!void {
     // 1. Let moduleContext be a new ECMAScript code execution context.
     const module_context = try agent.gc_allocator.create(ExecutionContext);
     module_context.* = .{

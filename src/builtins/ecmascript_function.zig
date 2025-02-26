@@ -489,7 +489,7 @@ pub fn ordinaryCallBindThis(
     // 8. Assert: The next step never returns an abrupt completion because
     //    localEnv.[[ThisBindingStatus]] is not initialized.
     // 9. Perform ! BindThisValue(localEnv, thisValue).
-    local_env.function_environment.bindThisValue(this_value) catch unreachable;
+    local_env.function_environment.bindThisValue(agent, this_value) catch unreachable;
 
     // 10. Return unused.
 }
@@ -751,7 +751,7 @@ fn construct(
     }
 
     // 15. Let thisBinding be ? constructorEnv.GetThisBinding().
-    const this_binding = try constructor_env.getThisBinding();
+    const this_binding = try constructor_env.getThisBinding(agent);
 
     // 16. Assert: thisBinding is an Object.
     std.debug.assert(this_binding.isObject());
@@ -885,13 +885,13 @@ pub fn addRestrictedFunctionProperties(
 /// 10.2.5 MakeConstructor ( F [ , writablePrototype [ , prototype ] ] )
 /// https://tc39.es/ecma262/#sec-makeconstructor
 pub fn makeConstructor(
+    agent: *Agent,
     function: *Object,
     args: struct {
         writable_prototype: bool = true,
         prototype: ?*Object = null,
     },
 ) std.mem.Allocator.Error!void {
-    const agent = function.agent;
     const realm = agent.currentRealm();
 
     // 1. If F is an ECMAScript function object, then

@@ -103,7 +103,7 @@ pub fn hasThisBinding(_: ModuleEnvironment) bool {
 
 /// 9.1.1.5.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getthisbinding
-pub fn getThisBinding(_: ModuleEnvironment) Value {
+pub fn getThisBinding(_: ModuleEnvironment, _: *Agent) Value {
     // 1. Return undefined.
     return .undefined;
 }

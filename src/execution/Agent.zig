@@ -316,7 +316,7 @@ pub fn resolveThisBinding(self: *Agent) Error!Value {
     const env = self.getThisEnvironment();
 
     // 2. Return ? envRec.GetThisBinding().
-    return env.getThisBinding();
+    return env.getThisBinding(self);
 }
 
 /// 9.4.5 GetNewTarget ( )

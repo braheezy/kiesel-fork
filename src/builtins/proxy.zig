@@ -30,7 +30,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -95,7 +95,7 @@ fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Err
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -149,7 +149,7 @@ fn isExtensible(agent: *Agent, object: *Object) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -194,7 +194,7 @@ fn preventExtensions(agent: *Agent, object: *Object) Agent.Error!bool {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -246,7 +246,7 @@ fn getOwnProperty(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -386,7 +386,7 @@ fn defineOwnProperty(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -508,7 +508,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -580,7 +580,7 @@ fn get(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -653,7 +653,7 @@ fn set(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -723,7 +723,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -793,7 +793,7 @@ fn ownPropertyKeys(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -947,7 +947,7 @@ fn call(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -985,7 +985,7 @@ fn construct(
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
-    try validateNonRevokedProxy(proxy);
+    try validateNonRevokedProxy(agent, proxy);
 
     // 2. Let target be O.[[ProxyTarget]].
     const target = proxy.fields.proxy_target.?;
@@ -1029,9 +1029,7 @@ fn construct(
 
 /// 10.5.14 ValidateNonRevokedProxy ( proxy )
 /// https://tc39.es/ecma262/#sec-validatenonrevokedproxy
-pub fn validateNonRevokedProxy(proxy: *Proxy) error{ExceptionThrown}!void {
-    const agent = proxy.object.agent;
-
+pub fn validateNonRevokedProxy(agent: *Agent, proxy: *Proxy) error{ExceptionThrown}!void {
     // 1. If proxy.[[ProxyTarget]] is null, throw a TypeError exception.
     if (proxy.fields.proxy_target == null) {
         return agent.throwException(.type_error, "Proxy has been revoked", .{});

@@ -172,6 +172,7 @@ pub fn hostGrowSharedArrayBuffer(
 /// 27.2.1.9 HostPromiseRejectionTracker ( promise, operation )
 /// https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 pub fn hostPromiseRejectionTracker(
+    _: *Agent,
     _: *builtins.Promise,
     _: HostHooks.PromiseRejectionTrackerOperation,
 ) void {

@@ -189,9 +189,9 @@ pub fn withBaseObject(_: GlobalEnvironment) ?*Object {
 
 /// 9.1.1.4.11 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
-pub fn getThisBinding(self: GlobalEnvironment) *Object {
+pub fn getThisBinding(self: GlobalEnvironment, _: *Agent) Value {
     // 1. Return envRec.[[GlobalThisValue]].
-    return self.global_this_value;
+    return Value.from(self.global_this_value);
 }
 
 /// 9.1.1.4.12 HasLexicalDeclaration ( envRec, N )
