@@ -325,6 +325,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
@@ -389,6 +390,7 @@ pub const prototype = struct {
                 while (try iterated_.stepValue(agent_)) |value| {
                     // iii. Let selected be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
                     const selected = predicate_.callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{ value, Value.from(counter.*) },
                     ) catch |err| {
@@ -458,6 +460,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
@@ -530,6 +533,7 @@ pub const prototype = struct {
 
                         // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
                         const mapped = mapper_.callAssumeCallable(
+                            agent_,
                             .undefined,
                             &.{ value, Value.from(counter_.*) },
                         ) catch |err| {
@@ -631,6 +635,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(procedure, undefined, « value, 𝔽(counter) »)).
             _ = procedure.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
@@ -690,6 +695,7 @@ pub const prototype = struct {
 
                 // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
                 const mapped = mapper_.callAssumeCallable(
+                    agent_,
                     .undefined,
                     &.{ value, Value.from(counter.*) },
                 ) catch |err| {
@@ -778,6 +784,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(reducer, undefined, « accumulator, value, 𝔽(counter) »)).
             const result = reducer.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ accumulator, value, Value.from(counter) },
             ) catch |err| {
@@ -823,6 +830,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {

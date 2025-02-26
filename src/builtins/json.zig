@@ -156,6 +156,7 @@ fn internalizeJSONProperty(
 
     // 3. Return ? Call(reviver, holder, « name, val »).
     return Value.from(reviver).callAssumeCallable(
+        agent,
         Value.from(holder),
         &.{ name.toValue(agent) catch unreachable, value },
     );
@@ -201,7 +202,7 @@ fn serializeJSONProperty(
         // b. If IsCallable(toJSON) is true, then
         if (to_json.isCallable()) {
             // i. Set value to ? Call(toJSON, value, « key »).
-            value = try to_json.callAssumeCallable(value, &.{try key.toValue(agent)});
+            value = try to_json.callAssumeCallable(agent, value, &.{try key.toValue(agent)});
         }
     }
 
@@ -209,6 +210,7 @@ fn serializeJSONProperty(
     if (state.replacer_function) |replacer_function| {
         // a. Set value to ? Call(state.[[ReplacerFunction]], holder, « key, value »).
         value = try Value.from(replacer_function).callAssumeCallable(
+            agent,
             Value.from(holder),
             &.{ try key.toValue(agent), value },
         );

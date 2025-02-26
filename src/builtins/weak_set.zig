@@ -98,7 +98,7 @@ pub const constructor = struct {
         //     b. If next is done, return set.
         while (try iterator.stepValue(agent)) |next| {
             // c. Let status be Completion(Call(adder, set, « next »)).
-            _ = adder.callAssumeCallable(Value.from(set), &.{next}) catch |err| {
+            _ = adder.callAssumeCallable(agent, Value.from(set), &.{next}) catch |err| {
                 // d. IfAbruptCloseIterator(status, iteratorRecord).
                 return iterator.close(agent, @as(Agent.Error!Value, err));
             };

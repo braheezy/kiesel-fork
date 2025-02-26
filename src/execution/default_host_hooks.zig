@@ -39,6 +39,7 @@ pub fn hostMakeJobCallback(callback: *Object) JobCallback {
 /// 9.5.3 HostCallJobCallback ( jobCallback, V, argumentsList )
 /// https://tc39.es/ecma262/#sec-hostcalljobcallback
 pub fn hostCallJobCallback(
+    agent: *Agent,
     job_callback: JobCallback,
     this_value: Value,
     arguments_list: []const Value,
@@ -47,7 +48,7 @@ pub fn hostCallJobCallback(
     std.debug.assert(Value.from(job_callback.callback).isCallable());
 
     // 2. Return ? Call(jobCallback.[[Callback]], V, argumentsList).
-    return Value.from(job_callback.callback).callAssumeCallable(this_value, arguments_list);
+    return Value.from(job_callback.callback).callAssumeCallable(agent, this_value, arguments_list);
 }
 
 /// 9.5.4 HostEnqueueGenericJob ( job, realm )

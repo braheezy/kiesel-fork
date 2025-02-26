@@ -693,6 +693,7 @@ pub fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
 
             // iv. Let result be ? Call(exoticToPrim, input, « hint »).
             const result = try from(exotic_to_primitive).callAssumeCallable(
+                agent,
                 self,
                 &.{from(hint)},
             );
@@ -1305,17 +1306,22 @@ pub fn call(
     // 3. Return ? F.[[Call]](V, argumentsList).
     const object = self.asObject();
     return object.internal_methods.call.?(
-        object.agent,
+        agent,
         object,
         this_value,
         Arguments.from(arguments_list),
     );
 }
 
-pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
+pub fn callAssumeCallable(
+    self: Value,
+    agent: *Agent,
+    this_value: Value,
+    arguments_list: []const Value,
+) Agent.Error!Value {
     const object = self.asObject();
     return object.internal_methods.call.?(
-        object.agent,
+        agent,
         object,
         this_value,
         Arguments.from(arguments_list),
@@ -1530,6 +1536,7 @@ pub fn groupBy(
 
         // e. Let key be Completion(Call(callback, undefined, « value, 𝔽(k) »)).
         const key = callback.callAssumeCallable(
+            agent,
             @"undefined",
             &.{ value, from(k) },
         ) catch |err| {

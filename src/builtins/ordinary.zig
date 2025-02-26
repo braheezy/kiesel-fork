@@ -514,7 +514,7 @@ pub fn ordinaryGet(
             .value => |value| return value,
             .accessor => |accessor| {
                 const getter = accessor.get orelse return .undefined;
-                return Value.from(getter).callAssumeCallable(receiver, &.{});
+                return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
             },
         }
     }
@@ -546,7 +546,7 @@ pub fn ordinaryGet(
     const getter = descriptor.get.? orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
-    return Value.from(getter).callAssumeCallable(receiver, &.{});
+    return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
 }
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )
@@ -601,7 +601,7 @@ pub fn ordinarySet(
             .accessor => |index| {
                 const accessor = object.property_storage.accessors.items[@intFromEnum(index)];
                 const setter = accessor.set orelse return false;
-                _ = try Value.from(setter).callAssumeCallable(receiver, &.{value});
+                _ = try Value.from(setter).callAssumeCallable(agent, receiver, &.{value});
             },
         }
         return true;
@@ -712,7 +712,7 @@ pub fn ordinarySetWithOwnDescriptor(
     const setter = own_descriptor.set.? orelse return false;
 
     // 6. Perform ? Call(setter, Receiver, « V »).
-    _ = try Value.from(setter).callAssumeCallable(receiver_value, &.{value});
+    _ = try Value.from(setter).callAssumeCallable(agent, receiver_value, &.{value});
 
     // 7. Return true.
     return true;

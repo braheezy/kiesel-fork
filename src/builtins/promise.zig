@@ -56,7 +56,11 @@ pub const PromiseCapability = struct {
                 const exception = agent.clearException();
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
-                _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception.value});
+                _ = try Value.from(self.reject).callAssumeCallable(
+                    agent,
+                    .undefined,
+                    &.{exception.value},
+                );
 
                 // b. Return capability.[[Promise]].
                 return self.promise;
@@ -473,7 +477,7 @@ pub fn promiseResolve(agent: *Agent, constructor_: *Object, x: Value) Agent.Erro
     const promise_capability = try newPromiseCapability(agent, Value.from(constructor_));
 
     // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
-    _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, &.{x});
+    _ = try Value.from(promise_capability.resolve).callAssumeCallable(agent, .undefined, &.{x});
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
@@ -529,7 +533,12 @@ pub fn newPromiseReactionJob(
             } else blk: {
                 // e. Else,
                 // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined, « argument »)).
-                if (agent_.host_hooks.hostCallJobCallback(handler.?, .undefined, &.{argument_})) |value|
+                if (agent_.host_hooks.hostCallJobCallback(
+                    agent_,
+                    handler.?,
+                    .undefined,
+                    &.{argument_},
+                )) |value|
                     break :blk Completion.normal(value)
                 else |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
@@ -554,6 +563,7 @@ pub fn newPromiseReactionJob(
             if (handler_result.type != .normal) {
                 // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.reject).callAssumeCallable(
+                    agent_,
                     .undefined,
                     &.{handler_result.value.?},
                 );
@@ -561,6 +571,7 @@ pub fn newPromiseReactionJob(
                 // i. Else,
                 // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.resolve).callAssumeCallable(
+                    agent_,
                     .undefined,
                     &.{handler_result.value.?},
                 );
@@ -632,6 +643,7 @@ pub fn newPromiseResolveThenableJob(
             // b. Let thenCallResult be Completion(HostCallJobCallback(then, thenable,
             //    « resolvingFunctions.[[Resolve]], resolvingFunctions.[[Reject]] »)).
             const then_call_result = agent_.host_hooks.hostCallJobCallback(
+                agent_,
                 then_,
                 Value.from(thenable_),
                 &.{
@@ -648,6 +660,7 @@ pub fn newPromiseResolveThenableJob(
                     // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
                     return Value.from(resolving_functions.reject).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{exception.value},
                     );
@@ -732,6 +745,7 @@ fn performPromiseAll(
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{Value.from(values_array)},
                 );
@@ -746,6 +760,7 @@ fn performPromiseAll(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            agent,
             Value.from(constructor_),
             &.{next},
         );
@@ -810,6 +825,7 @@ fn performPromiseAll(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{Value.from(values_array)},
                     );
@@ -900,6 +916,7 @@ fn performPromiseAllSettled(
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{Value.from(values_array)},
                 );
@@ -914,6 +931,7 @@ fn performPromiseAllSettled(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            agent,
             Value.from(constructor_),
             &.{next},
         );
@@ -1002,6 +1020,7 @@ fn performPromiseAllSettled(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{Value.from(values_array)},
                     );
@@ -1112,6 +1131,7 @@ fn performPromiseAllSettled(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{Value.from(values_array)},
                     );
@@ -1232,6 +1252,7 @@ fn performPromiseAny(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            agent,
             Value.from(constructor_),
             &.{next},
         );
@@ -1312,6 +1333,7 @@ fn performPromiseAny(
 
                     // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{Value.from(error_)},
                     );
@@ -1387,6 +1409,7 @@ fn performPromiseRace(
 
         // c. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            agent,
             Value.from(constructor_),
             &.{next},
         );
@@ -1598,6 +1621,7 @@ pub const constructor = struct {
         // 10. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
         //     resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
+            agent,
             .undefined,
             &.{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
         ) catch |err| switch (err) {
@@ -1609,6 +1633,7 @@ pub const constructor = struct {
 
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
                 _ = try Value.from(resolving_functions.reject).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{exception.value},
                 );
@@ -1868,6 +1893,7 @@ pub const constructor = struct {
         //     a. Perform ? Call(promiseCapability.[[Resolve]], undefined, « status.[[Value]] »).
         if (status) |value| {
             _ = try Value.from(promise_capability.resolve).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{value},
             );
@@ -1876,6 +1902,7 @@ pub const constructor = struct {
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 _ = try Value.from(promise_capability.reject).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{exception.value},
                 );
@@ -2027,7 +2054,7 @@ pub const prototype = struct {
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallable(.undefined, &.{});
+                    const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor__, result);
@@ -2085,7 +2112,7 @@ pub const prototype = struct {
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallable(.undefined, &.{});
+                    const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor__, result);

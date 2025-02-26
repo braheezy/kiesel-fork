@@ -230,6 +230,7 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{exception.value},
             ) catch |err_| try noexcept(err_);
@@ -259,6 +260,7 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
             _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                agent_,
                 .undefined,
                 &.{reason},
             ) catch |err| try noexcept(err);
@@ -309,6 +311,7 @@ fn continueDynamicImport(
 
                     // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                        agent_,
                         .undefined,
                         &.{exception.value},
                     ) catch |err_| try noexcept(err_);
@@ -344,6 +347,7 @@ fn continueDynamicImport(
 
                     // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
                     _ = Value.from(promise_capability__.resolve).callAssumeCallable(
+                        agent__,
                         .undefined,
                         &.{Value.from(namespace)},
                     ) catch |err| try noexcept(err);

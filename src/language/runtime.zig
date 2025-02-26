@@ -242,7 +242,7 @@ pub fn evaluateCall(
 
     // 6. If tailPosition is true, perform PrepareForTailCall().
     // 7. Return ? Call(func, thisValue, argList).
-    return function.callAssumeCallable(this_value, arguments);
+    return function.callAssumeCallable(agent, this_value, arguments);
 }
 
 /// 13.3.7.2 GetSuperConstructor ( )
@@ -323,6 +323,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{Value.from(@"error")},
             ) catch |err| try noexcept(err);
@@ -350,6 +351,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                 // 1. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
                 //    TypeError object »).
                 _ = Value.from(promise_capability.reject).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{Value.from(@"error")},
                 ) catch |err| try noexcept(err);
@@ -387,6 +389,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                         // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly
                         //    created TypeError object »).
                         _ = Value.from(promise_capability.reject).callAssumeCallable(
+                            agent,
                             .undefined,
                             &.{Value.from(@"error")},
                         ) catch |err| try noexcept(err);
@@ -416,6 +419,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{Value.from(@"error")},
             ) catch |err| try noexcept(err);
@@ -2344,6 +2348,7 @@ pub fn classDefinitionEvaluation(
                 // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
                 const body_function = &class_static_block_definition.body_function.object;
                 _ = Value.from(body_function).callAssumeCallable(
+                    agent,
                     Value.from(function),
                     &.{},
                 ) catch |err| break :blk err;

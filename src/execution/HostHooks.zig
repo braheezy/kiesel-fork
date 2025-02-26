@@ -46,6 +46,7 @@ hostGetSupportedImportAttributes: *const fn (
     agent: *Agent,
 ) std.mem.Allocator.Error!SupportedImportAttributes = default_host_hooks.hostGetSupportedImportAttributes,
 hostCallJobCallback: *const fn (
+    agent: *Agent,
     job_callback: JobCallback,
     this_value: Value,
     arguments_list: []const Value,

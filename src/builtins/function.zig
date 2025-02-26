@@ -491,7 +491,7 @@ pub const prototype = struct {
         if (arg_array.isUndefined() or arg_array.isNull()) {
             // a. Perform PrepareForTailCall().
             // b. Return ? Call(func, thisArg).
-            return func.callAssumeCallable(this_arg, &.{});
+            return func.callAssumeCallable(agent, this_arg, &.{});
         }
 
         // 4. Let argList be ? CreateListFromArrayLike(argArray).
@@ -499,7 +499,7 @@ pub const prototype = struct {
 
         // 5. Perform PrepareForTailCall().
         // 6. Return ? Call(func, thisArg, argList).
-        return func.callAssumeCallable(this_arg, arg_list);
+        return func.callAssumeCallable(agent, this_arg, arg_list);
     }
 
     /// 20.2.3.2 Function.prototype.bind ( thisArg, ...args )
@@ -590,7 +590,7 @@ pub const prototype = struct {
 
         // 3. Perform PrepareForTailCall().
         // 4. Return ? Call(func, thisArg, args).
-        return func.callAssumeCallable(this_arg, args);
+        return func.callAssumeCallable(agent, this_arg, args);
     }
 
     /// 20.2.3.5 Function.prototype.toString ( )

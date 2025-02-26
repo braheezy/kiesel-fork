@@ -48,6 +48,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
 
     // 7. Let handlerProto be ? Call(trap, handler, « target »).
     const handler_prototype = try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{Value.from(target)},
     );
@@ -112,6 +113,7 @@ fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Err
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else .null },
     )).toBoolean();
@@ -165,6 +167,7 @@ fn isExtensible(agent: *Agent, object: *Object) Agent.Error!bool {
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{Value.from(target)},
     )).toBoolean();
@@ -209,6 +212,7 @@ fn preventExtensions(agent: *Agent, object: *Object) Agent.Error!bool {
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{Value.from(target)},
     )).toBoolean();
@@ -263,6 +267,7 @@ fn getOwnProperty(
 
     // 7. Let trapResultObj be ? Call(trap, handler, « target, P »).
     const trap_result_obj = try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), try property_key.toValue(agent) },
     );
@@ -407,6 +412,7 @@ fn defineOwnProperty(
 
     // 8. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, descObj »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{
             Value.from(target),
@@ -520,6 +526,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), try property_key.toValue(agent) },
     )).toBoolean();
@@ -591,6 +598,7 @@ fn get(
 
     // 7. Let trapResult be ? Call(trap, handler, « target, P, Receiver »).
     const trap_result = try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), try property_key.toValue(agent), receiver },
     );
@@ -663,6 +671,7 @@ fn set(
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, V, Receiver »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), try property_key.toValue(agent), value, receiver },
     )).toBoolean();
@@ -732,6 +741,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
     const boolean_trap_result = (try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), try property_key.toValue(agent) },
     )).toBoolean();
@@ -801,6 +811,7 @@ fn ownPropertyKeys(
 
     // 7. Let trapResultArray be ? Call(trap, handler, « target »).
     const trap_result_array = try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{Value.from(target)},
     );
@@ -949,7 +960,7 @@ fn call(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("apply")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? Call(target, thisArgument, argumentsList).
-        return Value.from(target).callAssumeCallable(this_argument, arguments_list.values);
+        return Value.from(target).callAssumeCallable(agent, this_argument, arguments_list.values);
     };
 
     // 7. Let argArray be CreateArrayFromList(argumentsList).
@@ -957,6 +968,7 @@ fn call(
 
     // 8. Return ? Call(trap, handler, « target, thisArgument, argArray »).
     return Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), this_argument, Value.from(arg_array) },
     );
@@ -997,6 +1009,7 @@ fn construct(
 
     // 9. Let newObj be ? Call(trap, handler, « target, argArray, newTarget »).
     const new_obj = try Value.from(trap).callAssumeCallable(
+        agent,
         Value.from(handler),
         &.{ Value.from(target), Value.from(arg_array), Value.from(new_target) },
     );

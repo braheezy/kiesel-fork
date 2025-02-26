@@ -35,7 +35,7 @@ fn call(agent: *Agent, object: *Object, _: Value, arguments_list: Arguments) Age
     defer agent.gc_allocator.free(args);
 
     // 5. Return ? Call(target, boundThis, args).
-    return Value.from(target).callAssumeCallable(bound_this, args);
+    return Value.from(target).callAssumeCallable(agent, bound_this, args);
 }
 
 /// 10.4.1.2 [[Construct]] ( argumentsList, newTarget )

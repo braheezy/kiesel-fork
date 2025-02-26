@@ -287,7 +287,12 @@ pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
 
     if (!cell.is_unregistered) {
         // c. Perform ? HostCallJobCallback(callback, undefined, « cell.[[HeldValue]] »).
-        _ = try agent.host_hooks.hostCallJobCallback(callback, .undefined, &.{cell.held_value});
+        _ = try agent.host_hooks.hostCallJobCallback(
+            agent,
+            callback,
+            .undefined,
+            &.{cell.held_value},
+        );
     }
 
     // 4. Return unused.

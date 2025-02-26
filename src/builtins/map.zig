@@ -68,7 +68,7 @@ pub fn addEntriesFromIterable(
         };
 
         // h. Let status be Completion(Call(adder, target, « k, v »)).
-        _ = Value.from(adder).callAssumeCallable(Value.from(target), &.{ k, v }) catch |err| {
+        _ = Value.from(adder).callAssumeCallable(agent, Value.from(target), &.{ k, v }) catch |err| {
             // i. IfAbruptCloseIterator(status, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
@@ -315,6 +315,7 @@ pub const prototype = struct {
 
                 // i. Perform ? Call(callback, thisArg, « e.[[Value]], e.[[Key]], M »).
                 _ = try callback.callAssumeCallable(
+                    agent,
                     this_arg,
                     &.{ value, key, Value.from(&map.object) },
                 );

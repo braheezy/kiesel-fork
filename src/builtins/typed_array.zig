@@ -823,7 +823,7 @@ pub const constructor = struct {
                 // iv. If mapping is true, then
                 const mapped_value = if (mapping) blk: {
                     // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
-                    break :blk try mapper.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
+                    break :blk try mapper.callAssumeCallable(agent, this_arg, &.{ k_value, Value.from(k) });
                 } else blk: {
                     // v. Else,
                     // 1. Let mappedValue be kValue.
@@ -871,6 +871,7 @@ pub const constructor = struct {
             const mapped_value = if (mapping) blk: {
                 // i. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                 break :blk try mapper.callAssumeCallable(
+                    agent,
                     this_arg,
                     &.{ k_value, Value.from(k) },
                 );
@@ -1305,6 +1306,7 @@ pub const prototype = struct {
 
             // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback.callAssumeCallable(
+                agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -1448,6 +1450,7 @@ pub const prototype = struct {
 
             // c. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const selected = (try callback.callAssumeCallable(
+                agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -1604,6 +1607,7 @@ pub const prototype = struct {
 
             // c. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
             _ = try callback.callAssumeCallable(
+                agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             );
@@ -1921,6 +1925,7 @@ pub const prototype = struct {
 
             // c. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
             const mapped_value = try callback.callAssumeCallable(
+                agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             );
@@ -1995,6 +2000,7 @@ pub const prototype = struct {
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ accumulator, k_value, Value.from(k), Value.from(object) },
             );
@@ -2066,6 +2072,7 @@ pub const prototype = struct {
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
+                agent,
                 .undefined,
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
             );
@@ -2642,6 +2649,7 @@ pub const prototype = struct {
 
             // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback.callAssumeCallable(
+                agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -3231,6 +3239,7 @@ pub fn compareTypedArrayElements(
     if (maybe_comparator) |comparator| {
         // a. Let v be ? ToNumber(? Call(comparator, undefined, « x, y »)).
         const value = try (try Value.from(comparator).callAssumeCallable(
+            agent,
             .undefined,
             &.{ x, y },
         )).toNumber(agent);

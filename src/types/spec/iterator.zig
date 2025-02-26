@@ -153,7 +153,11 @@ pub const Iterator = struct {
             if (@"return" == null) return try completion;
 
             // c. Set innerResult to Completion(Call(return, iterator)).
-            break :blk Value.from(@"return".?).callAssumeCallable(Value.from(iterator), &.{});
+            break :blk Value.from(@"return".?).callAssumeCallable(
+                agent,
+                Value.from(iterator),
+                &.{},
+            );
         } else |err| err;
 
         // 5. If completion is a throw completion, return ? completion.
@@ -323,7 +327,7 @@ pub fn getIteratorFlattenable(
     } else blk: {
         // 4. Else,
         // a. Let iterator be ? Call(method, obj).
-        break :blk try Value.from(method.?).callAssumeCallable(object, &.{});
+        break :blk try Value.from(method.?).callAssumeCallable(agent, object, &.{});
     };
 
     // 5. If iterator is not an Object, throw a TypeError exception.

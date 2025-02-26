@@ -96,6 +96,7 @@ pub const prototype = struct {
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{Value.from(iterator_result)},
             ) catch |err| try noexcept(err);
@@ -217,6 +218,7 @@ pub const prototype = struct {
         if (state == .completed) {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « exception »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{exception},
             ) catch |err| try noexcept(err);
@@ -464,6 +466,7 @@ pub fn asyncGeneratorCompleteStep(
     if (completion.type == .throw) {
         // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
         _ = Value.from(promise_capability.reject).callAssumeCallable(
+            agent,
             .undefined,
             &.{value},
         ) catch |err| try noexcept(err);
@@ -493,6 +496,7 @@ pub fn asyncGeneratorCompleteStep(
 
         // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
         _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            agent,
             .undefined,
             &.{Value.from(iterator_result)},
         ) catch |err| try noexcept(err);

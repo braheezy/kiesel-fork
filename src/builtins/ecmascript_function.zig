@@ -648,6 +648,7 @@ fn evaluateAsyncFunctionBody(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{exception.value},
             ) catch |err_| try noexcept(err_);

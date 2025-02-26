@@ -237,7 +237,11 @@ pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.
     // 2. If IsCallable(exec) is true, then
     if (exec.isCallable()) {
         // a. Let result be ? Call(exec, R, « S »).
-        const result = try exec.callAssumeCallable(Value.from(reg_exp), &.{Value.from(string)});
+        const result = try exec.callAssumeCallable(
+            agent,
+            Value.from(reg_exp),
+            &.{Value.from(string)},
+        );
 
         // b. If result is not an Object and result is not null, throw a TypeError exception.
         if (!result.isObject() and !result.isNull()) {
@@ -1308,6 +1312,7 @@ pub const prototype = struct {
 
                 // iii. Let replacementValue be ? Call(replaceValue, undefined, replacerArgs).
                 const replacement_value = try replace_value.callAssumeCallable(
+                    agent,
                     .undefined,
                     replacer_args.items,
                 );

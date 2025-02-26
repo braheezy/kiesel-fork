@@ -200,7 +200,7 @@ pub fn ordinaryToPrimitive(self: *Object, hint: PreferredType) Agent.Error!Value
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
             // i. Let result be ? Call(method, O).
-            const result = try method.callAssumeCallable(Value.from(self), &.{});
+            const result = try method.callAssumeCallable(self.agent, Value.from(self), &.{});
 
             // ii. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -791,7 +791,7 @@ pub fn privateGet(self: *Object, private_name: PrivateName) Agent.Error!Value {
             };
 
             // 7. Return ? Call(getter, O).
-            return Value.from(getter).callAssumeCallable(Value.from(self), &.{});
+            return Value.from(getter).callAssumeCallable(self.agent, Value.from(self), &.{});
         },
     }
 }
@@ -840,7 +840,11 @@ pub fn privateSet(self: *Object, private_name: PrivateName, value: Value) Agent.
             };
 
             // d. Perform ? Call(setter, O, « value »).
-            _ = try Value.from(setter).callAssumeCallable(Value.from(self), &.{value});
+            _ = try Value.from(setter).callAssumeCallable(
+                self.agent,
+                Value.from(self),
+                &.{value},
+            );
         },
     }
 
@@ -856,7 +860,11 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
     // 3. If initializer is not empty, then
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
-        break :blk try Value.from(&initializer.object).callAssumeCallable(Value.from(self), &.{});
+        break :blk try Value.from(&initializer.object).callAssumeCallable(
+            self.agent,
+            Value.from(self),
+            &.{},
+        );
     } else blk: {
         // 4. Else,
         // a. Let initValue be undefined.

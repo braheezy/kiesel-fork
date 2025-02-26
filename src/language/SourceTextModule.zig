@@ -285,6 +285,7 @@ fn innerModuleLoading(
 
         // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
         _ = Value.from(state.promise_capability.resolve).callAssumeCallable(
+            agent,
             .undefined,
             &.{.undefined},
         ) catch |err| try noexcept(err);
@@ -320,6 +321,7 @@ pub fn continueModuleLoading(
 
             // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(state.promise_capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{exception.value},
             ) catch |err_| try noexcept(err_);
@@ -706,6 +708,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 
             // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
             _ = Value.from(capability.reject).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{exception.value},
             ) catch |err_| try noexcept(err_);
@@ -728,6 +731,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 
             // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
+                agent,
                 .undefined,
                 &.{.undefined},
             ) catch |err| try noexcept(err);
@@ -983,7 +987,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             const @"error" = arguments.get(0);
 
             // a. Perform AsyncModuleExecutionRejected(module, error).
-            try asyncModuleExecutionRejected(module_, .{
+            try asyncModuleExecutionRejected(agent_, module_, .{
                 .value = @"error",
                 .stack_trace = try agent_.captureStackTrace(),
             });
@@ -1096,6 +1100,7 @@ fn asyncModuleExecutionFulfilled(
 
         // b. Perform ! Call(module.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
         _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+            agent,
             .undefined,
             &.{.undefined},
         ) catch |err| try noexcept(err);
@@ -1144,7 +1149,7 @@ fn asyncModuleExecutionFulfilled(
                     const exception = agent.clearException();
 
                     // 1. Perform AsyncModuleExecutionRejected(m, result.[[Value]]).
-                    try asyncModuleExecutionRejected(m, exception);
+                    try asyncModuleExecutionRejected(agent, m, exception);
                 },
             };
             // iii. Else,
@@ -1162,6 +1167,7 @@ fn asyncModuleExecutionFulfilled(
 
                 // b. Perform ! Call(m.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
                 _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+                    agent,
                     .undefined,
                     &.{.undefined},
                 ) catch |err| try noexcept(err);
@@ -1175,6 +1181,7 @@ fn asyncModuleExecutionFulfilled(
 /// 16.2.1.6.3.5 AsyncModuleExecutionRejected ( module, error )
 /// https://tc39.es/ecma262/#sec-async-module-execution-rejected
 fn asyncModuleExecutionRejected(
+    agent: *Agent,
     module: *SourceTextModule,
     @"error": Agent.Exception,
 ) std.mem.Allocator.Error!void {
@@ -1212,7 +1219,7 @@ fn asyncModuleExecutionRejected(
     // 9. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
     for (module.async_parent_modules.items) |m| {
         // a. Perform AsyncModuleExecutionRejected(m, error).
-        try asyncModuleExecutionRejected(m, @"error");
+        try asyncModuleExecutionRejected(agent, m, @"error");
     }
 
     // 10. If module.[[TopLevelCapability]] is not empty, then
@@ -1222,6 +1229,7 @@ fn asyncModuleExecutionRejected(
 
         // b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]], undefined, « error »).
         _ = Value.from(top_level_capability.reject).callAssumeCallable(
+            agent,
             .undefined,
             &.{@"error".value},
         ) catch |err| try noexcept(err);

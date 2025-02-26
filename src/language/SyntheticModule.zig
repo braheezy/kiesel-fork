@@ -106,6 +106,7 @@ pub fn parseJSONModule(agent: *Agent, source: *const String) Agent.Error!*Synthe
 
     // 1. Let json be ? Call(%JSON.parse%, undefined, « source »).
     const json = try Value.from(try realm.intrinsics.@"%JSON.parse%"()).callAssumeCallable(
+        agent,
         .undefined,
         &.{Value.from(source)},
     );
@@ -276,6 +277,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
 
     // 15. Perform ! Call(pc.[[Resolve]], undefined, « undefined »).
     _ = Value.from(promise_capability.resolve).callAssumeCallable(
+        agent,
         .undefined,
         &.{.undefined},
     ) catch |err| try noexcept(err);
