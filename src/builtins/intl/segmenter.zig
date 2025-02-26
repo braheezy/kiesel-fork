@@ -88,8 +88,8 @@ pub const constructor = struct {
         // 6. Let opt be a new Record.
 
         // 7. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" », "best fit").
-        const matcher = try getOption(
-            options,
+        const matcher = try options.getOption(
+            agent,
             "localeMatcher",
             .string,
             &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -110,8 +110,8 @@ pub const constructor = struct {
 
         // 11. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
         //     "sentence" », "grapheme").
-        const granularity = try getOption(
-            options,
+        const granularity = try options.getOption(
+            agent,
             "granularity",
             .string,
             &.{

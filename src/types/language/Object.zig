@@ -13,14 +13,17 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
+const Number = types.Number;
 const PreferredType = Value.PreferredType;
 const PrivateElement = types.PrivateElement;
 const PrivateName = types.PrivateName;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
+const sameValue = types.sameValue;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const IndexedProperties = @import("Object/IndexedProperties.zig");
@@ -920,6 +923,99 @@ pub fn initializeInstanceElements(self: *Object, constructor: *Object) Agent.Err
     }
 
     // 5. Return unused.
+}
+
+/// 9.2.13 GetOption ( options, property, type, values, default )
+/// https://tc39.es/ecma402/#sec-getoption
+pub fn getOption(
+    self: *Object,
+    agent: *Agent,
+    comptime property: []const u8,
+    comptime type_: enum {
+        boolean,
+        number,
+        string,
+
+        fn T(t: @This()) type {
+            return switch (t) {
+                .boolean => bool,
+                .number => Number,
+                .string => *const String,
+            };
+        }
+    },
+    comptime values: ?[]const type_.T(),
+    comptime default: anytype,
+) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?type_.T() else type_.T() {
+    if (@TypeOf(default) != @TypeOf(null) and @TypeOf(default) != type_.T() and default != .required) {
+        @compileError("Invalid value for default parameter");
+    }
+
+    // 1. Let value be ? Get(options, property).
+    const value = try self.get(PropertyKey.from(property));
+
+    // 2. If value is undefined, then
+    if (value.isUndefined()) {
+        // a. If default is required, throw a RangeError exception.
+        if (@TypeOf(default) == @TypeOf(.required)) {
+            return agent.throwException(
+                .range_error,
+                "Required option '{s}' must not be undefined",
+                .{property},
+            );
+        }
+
+        // b. Return default.
+        return default;
+    }
+
+    const coerced_value = switch (type_) {
+        // 3. If type is boolean, then
+        .boolean => blk: {
+            // a. Set value to ToBoolean(value).
+            break :blk value.toBoolean();
+        },
+
+        // 4. Else if type is number, then
+        .number => blk: {
+            // a. Set value to ? ToNumber(value).
+            const number = try value.toNumber(agent);
+
+            // b. If value is NaN, throw a RangeError exception.
+            if (number.isNan()) {
+                return agent.throwException(
+                    .range_error,
+                    "Number option '{s}' must not be NaN",
+                    .{property},
+                );
+            }
+
+            break :blk number;
+        },
+
+        // 5. Else,
+        //     a. Assert: type is string.
+        .string => blk: {
+            // b. Set value to ? ToString(value).
+            break :blk try value.toString(agent);
+        },
+    };
+
+    // 6. If values is not empty and values does not contain value, throw a RangeError exception.
+    if (values != null) {
+        for (values.?) |permitted_value| {
+            if (sameValue(Value.from(coerced_value), Value.from(permitted_value))) break;
+        } else {
+            return agent.throwException(
+                .range_error,
+                "Invalid value for option '{s}'",
+                .{property},
+            );
+        }
+    }
+
+    // 7. Return value.
+    return coerced_value;
 }
 
 test "format" {

@@ -102,8 +102,8 @@ pub const constructor = struct {
 
         // 7. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
         //    "best fit").
-        const matcher = try getOption(
-            options,
+        const matcher = try options.getOption(
+            agent,
             "localeMatcher",
             .string,
             &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -121,8 +121,8 @@ pub const constructor = struct {
 
         // 10. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
         //     "long").
-        const style = try getOption(
-            options,
+        const style = try options.getOption(
+            agent,
             "style",
             .string,
             &.{
@@ -145,8 +145,8 @@ pub const constructor = struct {
 
         // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
         //     "currency", "calendar", "dateTimeField" », undefined).
-        const @"type" = try getOption(
-            options,
+        const @"type" = try options.getOption(
+            agent,
             "type",
             .string,
             &.{
@@ -179,8 +179,8 @@ pub const constructor = struct {
         display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.slice.ascii).?;
 
         // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
-        const fallback = try getOption(
-            options,
+        const fallback = try options.getOption(
+            agent,
             "fallback",
             .string,
             &.{
@@ -208,8 +208,8 @@ pub const constructor = struct {
 
         // 21. Let languageDisplay be ? GetOption(options, "languageDisplay", string, « "dialect",
         //     "standard" », "dialect").
-        const language_display = try getOption(
-            options,
+        const language_display = try options.getOption(
+            agent,
             "languageDisplay",
             .string,
             &.{

@@ -96,8 +96,8 @@ pub const constructor = struct {
 
         // 6. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup",
         //    "best fit" », "best fit").
-        const matcher = try getOption(
-            options,
+        const matcher = try options.getOption(
+            agent,
             "localeMatcher",
             .string,
             &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -118,8 +118,8 @@ pub const constructor = struct {
         plural_rules.as(PluralRules).fields.locale = resolved_locale;
 
         // 10. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
-        const type_ = try getOption(
-            options,
+        const type_ = try options.getOption(
+            agent,
             "type",
             .string,
             &.{ String.fromLiteral("cardinal"), String.fromLiteral("ordinal") },

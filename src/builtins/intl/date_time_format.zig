@@ -27,7 +27,6 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
-const getOption = types.getOption;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const noexcept = utils.noexcept;
@@ -77,8 +76,8 @@ pub fn createDateTimeFormat(
 
     // 5. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
     //    "best fit").
-    const matcher = try getOption(
-        options,
+    const matcher = try options.getOption(
+        agent,
         "localeMatcher",
         .string,
         &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -90,7 +89,7 @@ pub fn createDateTimeFormat(
 
     // 7. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
     //    "best fit").
-    const calendar = try getOption(options, "calendar", .string, null, null);
+    const calendar = try options.getOption(agent, "calendar", .string, null, null);
 
     // 8. If calendar is not undefined, then
     if (calendar != null) {
@@ -108,7 +107,7 @@ pub fn createDateTimeFormat(
     // TODO: 9. Set opt.[[ca]] to calendar.
 
     // 10. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty, undefined).
-    const numbering_system = try getOption(options, "numberingSystem", .string, null, null);
+    const numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
 
     // 11. If numberingSystem is not undefined, then
     if (numbering_system != null) {
@@ -126,11 +125,11 @@ pub fn createDateTimeFormat(
     // TODO: 12. Set opt.[[nu]] to numberingSystem.
 
     // 13. Let hour12 be ? GetOption(options, "hour12", boolean, empty, undefined).
-    const hour12 = try getOption(options, "hour12", .boolean, null, null);
+    const hour12 = try options.getOption(agent, "hour12", .boolean, null, null);
 
     // 14. Let hourCycle be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" », undefined).
-    var hour_cycle = try getOption(
-        options,
+    var hour_cycle = try options.getOption(
+        agent,
         "hourCycle",
         .string,
         &.{
@@ -324,7 +323,7 @@ pub fn createDateTimeFormat(
             // i. Let values be a List whose elements are the strings given in the Values column of
             //    the current row.
             // ii. Let value be ? GetOption(options, prop, string, values, undefined).
-            break :blk try getOption(options, property, .string, values, null);
+            break :blk try options.getOption(agent, property, .string, values, null);
         };
 
         // TODO: d. Set formatOptions.[[<prop>]] to value.
@@ -338,8 +337,8 @@ pub fn createDateTimeFormat(
 
     // 36. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
     //     "best fit").
-    const format_matcher = try getOption(
-        options,
+    const format_matcher = try options.getOption(
+        agent,
         "formatMatcher",
         .string,
         &.{ String.fromLiteral("basic"), String.fromLiteral("best fit") },
@@ -348,8 +347,8 @@ pub fn createDateTimeFormat(
 
     // 37. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
-    const date_style = try getOption(
-        options,
+    const date_style = try options.getOption(
+        agent,
         "dateStyle",
         .string,
         &.{
@@ -377,8 +376,8 @@ pub fn createDateTimeFormat(
 
     // 39. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
-    const time_style = try getOption(
-        options,
+    const time_style = try options.getOption(
+        agent,
         "timeStyle",
         .string,
         &.{

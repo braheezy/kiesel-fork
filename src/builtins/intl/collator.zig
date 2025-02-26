@@ -91,8 +91,8 @@ pub const constructor = struct {
         const options = try options_value.coerceOptionsToObject(agent);
 
         // 8. Let usage be ? GetOption(options, "usage", string, « "sort", "search" », "sort").
-        const usage = try getOption(
-            options,
+        const usage = try options.getOption(
+            agent,
             "usage",
             .string,
             &.{ String.fromLiteral("sort"), String.fromLiteral("search") },
@@ -112,8 +112,8 @@ pub const constructor = struct {
 
         // 13. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
         //     "best fit").
-        const matcher = try getOption(
-            options,
+        const matcher = try options.getOption(
+            agent,
             "localeMatcher",
             .string,
             &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -124,7 +124,7 @@ pub const constructor = struct {
         _ = matcher;
 
         // 15. Let collation be ? GetOption(options, "collation", string, empty, undefined).
-        const maybe_collation = try getOption(options, "collation", .string, null, null);
+        const maybe_collation = try options.getOption(agent, "collation", .string, null, null);
 
         // 16. If collation is not undefined, then
         if (maybe_collation) |_| {
@@ -134,7 +134,7 @@ pub const constructor = struct {
         // TODO: 17. Set opt.[[co]] to collation.
 
         // 18. Let numeric be ? GetOption(options, "numeric", boolean, empty, undefined).
-        const maybe_numeric = try getOption(options, "numeric", .boolean, null, null);
+        const maybe_numeric = try options.getOption(agent, "numeric", .boolean, null, null);
 
         // 19. If numeric is not undefined, then
         //     a. Set numeric to ! ToString(numeric).
@@ -142,8 +142,8 @@ pub const constructor = struct {
         _ = maybe_numeric;
 
         // 21. Let caseFirst be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" », undefined).
-        const maybe_case_first = try getOption(
-            options,
+        const maybe_case_first = try options.getOption(
+            agent,
             "caseFirst",
             .string,
             &.{
@@ -173,8 +173,8 @@ pub const constructor = struct {
 
         // 32. Let sensitivity be ? GetOption(options, "sensitivity", string, « "base", "accent",
         //     "case", "variant" », undefined).
-        var maybe_sensitivity = try getOption(
-            options,
+        var maybe_sensitivity = try options.getOption(
+            agent,
             "sensitivity",
             .string,
             &.{
@@ -218,8 +218,8 @@ pub const constructor = struct {
         // 35. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
         // 36. Let ignorePunctuation be ? GetOption(options, "ignorePunctuation", boolean, empty,
         //     defaultIgnorePunctuation).
-        const maybe_ignore_punctuation = try getOption(
-            options,
+        const maybe_ignore_punctuation = try options.getOption(
+            agent,
             "ignorePunctuation",
             .boolean,
             null,

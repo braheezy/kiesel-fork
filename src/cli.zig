@@ -238,8 +238,8 @@ const Kiesel = struct {
         const stdout = agent.platform.stdout;
         const value = arguments.get(0);
         const options = try arguments.get(1).coerceOptionsToObject(agent);
-        const newline = try getOption(options, "newline", .boolean, null, true);
-        const pretty = try getOption(options, "pretty", .boolean, null, false);
+        const newline = try options.getOption(agent, "newline", .boolean, null, true);
+        const pretty = try options.getOption(agent, "pretty", .boolean, null, false);
         const end = if (newline) "\n" else "";
         if (pretty)
             stdout.print("{pretty}{s}", .{ value, end }) catch {}

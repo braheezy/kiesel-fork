@@ -48,7 +48,7 @@ fn updateLanguageId(
 
     // 1. Let baseName be GetLocaleBaseName(tag).
     // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(baseName)).
-    const maybe_language = try getOption(options, "language", .string, null, null);
+    const maybe_language = try options.getOption(agent, "language", .string, null, null);
 
     // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
     //    throw a RangeError exception.
@@ -59,7 +59,7 @@ fn updateLanguageId(
     }
 
     // 4. Let script be ? GetOption(options, "script", string, empty, GetLocaleScript(baseName)).
-    const maybe_script = try getOption(options, "script", .string, null, null);
+    const maybe_script = try options.getOption(agent, "script", .string, null, null);
 
     // 5. If script is not undefined, then
     if (maybe_script) |script| {
@@ -71,7 +71,7 @@ fn updateLanguageId(
     }
 
     // 6. Let region be ? GetOption(options, "region", string, empty, GetLocaleRegion(baseName)).
-    const maybe_region = try getOption(options, "region", .string, null, null);
+    const maybe_region = try options.getOption(agent, "region", .string, null, null);
 
     // 7. If region is not undefined, then
     if (maybe_region) |region| {
@@ -241,7 +241,7 @@ pub const constructor = struct {
         var opt: UnicodeExtensions = .{};
 
         // 15. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
-        const calendar = try getOption(options, "calendar", .string, null, null);
+        const calendar = try options.getOption(agent, "calendar", .string, null, null);
 
         // 16. If calendar is not undefined, then
         if (calendar != null) {
@@ -260,7 +260,7 @@ pub const constructor = struct {
         opt.ca = calendar;
 
         // 18. Let collation be ? GetOption(options, "collation", string, empty, undefined).
-        const collation = try getOption(options, "collation", .string, null, null);
+        const collation = try options.getOption(agent, "collation", .string, null, null);
 
         // 19. If collation is not undefined, then
         if (collation != null) {
@@ -280,8 +280,8 @@ pub const constructor = struct {
 
         // 21. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
         //     undefined).
-        const hc = try getOption(
-            options,
+        const hc = try options.getOption(
+            agent,
             "hourCycle",
             .string,
             &.{ String.fromLiteral("h11"), String.fromLiteral("h12"), String.fromLiteral("h23"), String.fromLiteral("h24") },
@@ -293,8 +293,8 @@ pub const constructor = struct {
 
         // 23. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
         //     undefined).
-        const kf = try getOption(
-            options,
+        const kf = try options.getOption(
+            agent,
             "caseFirst",
             .string,
             &.{ String.fromLiteral("upper"), String.fromLiteral("lower"), String.fromLiteral("false") },
@@ -305,7 +305,7 @@ pub const constructor = struct {
         opt.kf = kf;
 
         // 25. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
-        const kn_value = try getOption(options, "numeric", .boolean, null, null);
+        const kn_value = try options.getOption(agent, "numeric", .boolean, null, null);
 
         // 26. If kn is not undefined, set kn to ! ToString(kn).
         const kn = if (kn_value == true) String.fromLiteral("true") else if (kn_value == false) String.fromLiteral("false") else null;
@@ -315,7 +315,7 @@ pub const constructor = struct {
 
         // 28. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
         //     undefined).
-        const numbering_system = try getOption(options, "numberingSystem", .string, null, null);
+        const numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
 
         // 29. If numberingSystem is not undefined, then
         if (numbering_system != null) {

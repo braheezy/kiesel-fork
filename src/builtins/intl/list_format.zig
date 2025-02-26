@@ -93,8 +93,8 @@ pub const constructor = struct {
         // 5. Let opt be a new Record.
 
         // 6. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" », "best fit").
-        const matcher = try getOption(
-            options,
+        const matcher = try options.getOption(
+            agent,
             "localeMatcher",
             .string,
             &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
@@ -115,8 +115,8 @@ pub const constructor = struct {
 
         // 10. Let type be ? GetOption(options, "type", string, « "conjunction", "disjunction",
         //     "unit" », "conjunction").
-        const type_ = try getOption(
-            options,
+        const type_ = try options.getOption(
+            agent,
             "type",
             .string,
             &.{
@@ -139,8 +139,8 @@ pub const constructor = struct {
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
-        const style = try getOption(
-            options,
+        const style = try options.getOption(
+            agent,
             "style",
             .string,
             &.{
