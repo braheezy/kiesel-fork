@@ -30,9 +30,7 @@ pub const Iterator = struct {
 
     /// 7.4.6 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
-    pub fn next(self: *Iterator, value_: ?Value) Agent.Error!*Object {
-        const agent = self.iterator.agent;
-
+    pub fn next(self: *Iterator, agent: *Agent, value_: ?Value) Agent.Error!*Object {
         // 1. If value is not present, then
         const result_completion = if (value_ == null) blk: {
             // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]])).
@@ -82,9 +80,9 @@ pub const Iterator = struct {
 
     /// 7.4.9 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
-    pub fn step(self: *Iterator) Agent.Error!?*Object {
+    pub fn step(self: *Iterator, agent: *Agent) Agent.Error!?*Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
-        const result = try next(self, null);
+        const result = try self.next(agent, null);
 
         // 2. Let done be Completion(IteratorComplete(result)).
         // 3. If done is a throw completion, then
@@ -112,9 +110,9 @@ pub const Iterator = struct {
 
     /// 7.4.10 IteratorStepValue ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstepvalue
-    pub fn stepValue(self: *Iterator) Agent.Error!?Value {
+    pub fn stepValue(self: *Iterator, agent: *Agent) Agent.Error!?Value {
         // 1. Let result be ? IteratorStep(iteratorRecord).
-        const result = try self.step() orelse {
+        const result = try self.step(agent) orelse {
             // 2. If result is done, then
             //     a. Return done.
             return null;
@@ -135,9 +133,7 @@ pub const Iterator = struct {
 
     /// 7.4.11 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
-    pub fn close(self: Iterator, completion: anytype) @TypeOf(completion) {
-        const agent = self.iterator.agent;
-
+    pub fn close(self: Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
         const completion_exception = agent.exception;
 
         // 1. Assert: iteratorRecord.[[Iterator]] is an Object.
@@ -180,9 +176,7 @@ pub const Iterator = struct {
 
     /// 7.4.16 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
-    pub fn toList(self: *Iterator) Agent.Error![]const Value {
-        const agent = self.iterator.agent;
-
+    pub fn toList(self: *Iterator, agent: *Agent) Agent.Error![]const Value {
         // 1. Let values be a new empty List.
         var values: std.ArrayListUnmanaged(Value) = .empty;
         errdefer values.deinit(agent.gc_allocator);
@@ -191,7 +185,7 @@ pub const Iterator = struct {
         //     a. Let next be ? IteratorStepValue(iteratorRecord).
         //     b. If next is done, then
         //         i. Return values.
-        while (try self.stepValue()) |next_| {
+        while (try self.stepValue(agent)) |next_| {
             // c. Append next to values.
             try values.append(agent.gc_allocator, next_);
         }

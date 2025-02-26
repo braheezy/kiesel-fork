@@ -215,11 +215,11 @@ pub const constructor = struct {
         // 8. Repeat,
         //     a. Let next be ? IteratorStepValue(iteratorRecord).
         //     b. If next is done, return set.
-        while (try iterator.stepValue()) |next| {
+        while (try iterator.stepValue(agent)) |next| {
             // c. Let status be Completion(Call(adder, set, « next »)).
             _ = adder.callAssumeCallable(Value.from(set), &.{next}) catch |err| {
                 // d. IfAbruptCloseIterator(status, iteratorRecord).
-                return iterator.close(@as(Agent.Error!Value, err));
+                return iterator.close(agent, @as(Agent.Error!Value, err));
             };
         }
 
@@ -425,7 +425,7 @@ pub const prototype = struct {
             // c. Repeat, while next is not done,
             //     i. Set next to ? IteratorStepValue(keysIter).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue()) |next_| {
+            while (try keys_iter.stepValue(agent)) |next_| {
                 // 1. Set next to CanonicalizeKeyedCollectionKey(next).
                 const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -598,7 +598,7 @@ pub const prototype = struct {
             // c. Repeat, while next is not done,
             //     i. Set next to ? IteratorStepValue(keysIter).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue()) |next_| {
+            while (try keys_iter.stepValue(agent)) |next_| {
                 // 1. Set next to CanonicalizeKeyedCollectionKey(next).
                 const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -691,11 +691,11 @@ pub const prototype = struct {
             // c. Repeat, while next is not done,
             //     i. Set next to ? IteratorStepValue(keysIter).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue()) |next| {
+            while (try keys_iter.stepValue(agent)) |next| {
                 // 1. If SetDataHas(O.[[SetData]], next) is true, then
                 if (setDataHas(object.fields.set_data, next)) {
                     // a. Perform ? IteratorClose(keysIter, NormalCompletion(unused)).
-                    try keys_iter.close(@as(Agent.Error!void, {}));
+                    try keys_iter.close(agent, @as(Agent.Error!void, {}));
 
                     // b. Return false.
                     return Value.from(false);
@@ -787,11 +787,11 @@ pub const prototype = struct {
         // 7. Repeat, while next is not done,
         //     a. Set next to ? IteratorStepValue(keysIter).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue()) |next| {
+        while (try keys_iter.stepValue(agent)) |next| {
             // i. If SetDataHas(O.[[SetData]], next) is false, then
             if (!setDataHas(object.fields.set_data, next)) {
                 // 1. Perform ? IteratorClose(keysIter, NormalCompletion(unused)).
-                try keys_iter.close(@as(Agent.Error!void, {}));
+                try keys_iter.close(agent, @as(Agent.Error!void, {}));
 
                 // 2. Return false.
                 return Value.from(false);
@@ -842,7 +842,7 @@ pub const prototype = struct {
         // 7. Repeat, while next is not done,
         //     a. Set next to ? IteratorStepValue(keysIter).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue()) |next_| {
+        while (try keys_iter.stepValue(agent)) |next_| {
             // i. Set next to CanonicalizeKeyedCollectionKey(next).
             const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -905,7 +905,7 @@ pub const prototype = struct {
         // 7. Repeat, while next is not done,
         //     a. Set next to ? IteratorStepValue(keysIter).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue()) |next_| {
+        while (try keys_iter.stepValue(agent)) |next_| {
             // i. Set next to CanonicalizeKeyedCollectionKey(next).
             const next = next_.canonicalizeKeyedCollectionKey();
 

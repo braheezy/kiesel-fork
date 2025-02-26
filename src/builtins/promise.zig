@@ -721,7 +721,7 @@ fn performPromiseAll(
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
-        const next = try iterator.stepValue() orelse {
+        const next = try iterator.stepValue(agent) orelse {
             // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
@@ -889,7 +889,7 @@ fn performPromiseAllSettled(
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
-        const next = try iterator.stepValue() orelse {
+        const next = try iterator.stepValue(agent) orelse {
             // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
@@ -1191,7 +1191,7 @@ fn performPromiseAny(
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
-        const next = try iterator.stepValue() orelse {
+        const next = try iterator.stepValue(agent) orelse {
             // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
@@ -1380,7 +1380,7 @@ fn performPromiseRace(
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
-        const next = try iterator.stepValue() orelse {
+        const next = try iterator.stepValue(agent) orelse {
             // i. Return resultCapability.[[Promise]].
             return Value.from(result_capability.promise);
         };
@@ -1654,7 +1654,7 @@ pub const constructor = struct {
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
             // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
-            if (!iterator.done) result = iterator.close(result);
+            if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
             if (result) |_| {} else |err| {
@@ -1701,7 +1701,7 @@ pub const constructor = struct {
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
             // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
-            if (!iterator.done) result = iterator.close(result);
+            if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
             if (result) |_| {} else |err| {
@@ -1748,7 +1748,7 @@ pub const constructor = struct {
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
             // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
-            if (!iterator.done) result = iterator.close(result);
+            if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
             if (result) |_| {} else |err| {
@@ -1795,7 +1795,7 @@ pub const constructor = struct {
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
             // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
-            if (!iterator.done) result = iterator.close(result);
+            if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
             if (result) |_| {} else |err| {

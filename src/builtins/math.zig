@@ -833,7 +833,7 @@ pub const namespace = struct {
         // 7. Repeat, while next is not DONE,
         //    a. Set next to ? IteratorStepValue(iteratorRecord).
         //    b. If next is not DONE, then
-        while (try iterator.stepValue()) |next| {
+        while (try iterator.stepValue(agent)) |next| {
             // i. Set count to count + 1.
             // ii. If count ≥ 2**53, then
             count = std.math.add(u53, count, 1) catch {
@@ -845,7 +845,7 @@ pub const namespace = struct {
                 );
 
                 // 2. Return ? IteratorClose(iteratorRecord, error).
-                return iterator.close(@as(Agent.Error!Value, @"error"));
+                return iterator.close(agent, @as(Agent.Error!Value, @"error"));
             };
 
             // iii. NOTE: The above case is not expected to be reached in practice and is included
@@ -862,7 +862,7 @@ pub const namespace = struct {
                 );
 
                 // 2. Return ? IteratorClose(iteratorRecord, error).
-                return iterator.close(@as(Agent.Error!Value, @"error"));
+                return iterator.close(agent, @as(Agent.Error!Value, @"error"));
             }
 
             // v. Let n be next.

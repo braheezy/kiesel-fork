@@ -97,7 +97,7 @@ pub const constructor = struct {
 
         // 5. Let errorsList be ? IteratorToList(? GetIterator(errors, sync)).
         var iterator = try getIterator(agent, errors, .sync);
-        const errors_list = try iterator.toList();
+        const errors_list = try iterator.toList(agent);
         defer agent.gc_allocator.free(errors_list);
 
         // 6. Perform ! DefinePropertyOrThrow(O, "errors", PropertyDescriptor {

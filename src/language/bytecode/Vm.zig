@@ -126,7 +126,7 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
         } else {
             var iterator = try getIterator(self.agent, argument, .sync);
             var n: usize = 0;
-            while (try iterator.stepValue()) |value| : (n += 1) {
+            while (try iterator.stepValue(self.agent)) |value| : (n += 1) {
                 try self.function_arguments.insert(self.agent.gc_allocator, n, value);
             }
         }
@@ -182,7 +182,7 @@ fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
     //     b. If next is done, return nextIndex.
-    while (try iterator.stepValue()) |next| : (next_index += 1) {
+    while (try iterator.stepValue(self.agent)) |next| : (next_index += 1) {
         // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
         array.createDataPropertyOrThrow(
             PropertyKey.from(next_index),

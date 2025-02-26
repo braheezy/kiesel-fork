@@ -244,7 +244,7 @@ pub const prototype = struct {
         // 8. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    integerLimit and performs the following steps when called:
         const closure = struct {
-            fn func(_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const iterated_ = &iterator_helper.fields.state.underlying_iterator;
 
                 // a. Let remaining be integerLimit.
@@ -259,7 +259,7 @@ pub const prototype = struct {
                     }
 
                     // ii. Let next be ? IteratorStep(iterated).
-                    _ = try iterated_.step() orelse {
+                    _ = try iterated_.step(agent_) orelse {
                         // iii. If next is done, return ReturnCompletion(undefined).
                         return null;
                     };
@@ -269,7 +269,7 @@ pub const prototype = struct {
 
                 // i. Let value be ? IteratorStepValue(iterated).
                 // ii. If value is done, return ReturnCompletion(undefined).
-                const value = (try iterated_.stepValue()) orelse return null;
+                const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                 // iii. Let completion be Completion(Yield(value)).
                 // iv. IfAbruptCloseIterator(completion, iterated).
@@ -322,19 +322,19 @@ pub const prototype = struct {
         // 6. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return true.
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
-                return iterated.close(@as(Agent.Error!Value, err));
+                return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
             // e. If ToBoolean(result) is false, return ? IteratorClose(iterated, NormalCompletion(false)).
             if (!result.toBoolean()) {
-                return try iterated.close(@as(Agent.Error!Value, Value.from(false)));
+                return try iterated.close(agent, @as(Agent.Error!Value, Value.from(false)));
             }
 
             // f. Set counter to counter + 1.
@@ -374,7 +374,7 @@ pub const prototype = struct {
         // 5. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    predicate and performs the following steps when called:
         const closure = struct {
-            fn func(_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const iterated_ = &iterator_helper.fields.state.underlying_iterator;
 
                 // a. Let remaining be integerLimit.
@@ -386,14 +386,14 @@ pub const prototype = struct {
                 // b. Repeat,
                 //     i. Let value be ? IteratorStepValue(iterated).
                 //     ii. If value is done, return ReturnCompletion(undefined).
-                while (try iterated_.stepValue()) |value| {
+                while (try iterated_.stepValue(agent_)) |value| {
                     // iii. Let selected be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
                     const selected = predicate_.callAssumeCallable(
                         .undefined,
                         &.{ value, Value.from(counter.*) },
                     ) catch |err| {
                         // iv. IfAbruptCloseIterator(selected, iterated).
-                        return iterated_.close(@as(Agent.Error!?Value, err));
+                        return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                     };
 
                     // vi. Set counter to counter + 1.
@@ -455,19 +455,19 @@ pub const prototype = struct {
         // 6. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return undefined.
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
-                return iterated.close(@as(Agent.Error!Value, err));
+                return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
             // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(value)).
             if (result.toBoolean()) {
-                return iterated.close(@as(Agent.Error!Value, value));
+                return iterated.close(agent, @as(Agent.Error!Value, value));
             }
 
             // f. Set counter to counter + 1.
@@ -526,7 +526,7 @@ pub const prototype = struct {
                     .outer => {
                         // i. Let value be ? IteratorStepValue(iterated).
                         // ii. If value is done, return ReturnCompletion(undefined).
-                        const value = (try iterated_.stepValue()) orelse return null;
+                        const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                         // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
                         const mapped = mapper_.callAssumeCallable(
@@ -534,7 +534,7 @@ pub const prototype = struct {
                             &.{ value, Value.from(counter_.*) },
                         ) catch |err| {
                             // iv. IfAbruptCloseIterator(mapped, iterated).
-                            return iterated_.close(@as(Agent.Error!?Value, err));
+                            return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
                         // v. Let innerIterator be Completion(GetIteratorFlattenable(mapped, reject-primitives)).
@@ -544,7 +544,7 @@ pub const prototype = struct {
                             .reject_primitives,
                         ) catch |err| {
                             // vi. IfAbruptCloseIterator(innerIterator, iterated).
-                            return iterated_.close(@as(Agent.Error!?Value, err));
+                            return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
                         iterator_helper.fields.state.captures.cast(*Captures).inner_iterator = inner_iterator;
@@ -560,9 +560,9 @@ pub const prototype = struct {
                         // viii. Repeat, while innerAlive is true,
 
                         // 1. Let innerValue be Completion(IteratorStepValue(innerIterator)).
-                        const inner_value = inner_iterator.stepValue() catch |err| {
+                        const inner_value = inner_iterator.stepValue(agent_) catch |err| {
                             // 2. IfAbruptCloseIterator(innerValue, iterated).
-                            return iterated_.close(@as(Agent.Error!?Value, err));
+                            return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
                         // 3. If innerValue is done, then
@@ -628,14 +628,14 @@ pub const prototype = struct {
         // 6. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return undefined.
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(procedure, undefined, « value, 𝔽(counter) »)).
             _ = procedure.callAssumeCallable(
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
-                return iterated.close(@as(Agent.Error!Value, err));
+                return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
             // e. Set counter to counter + 1.
@@ -675,7 +675,7 @@ pub const prototype = struct {
         // 5. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    mapper and performs the following steps when called:
         const closure = struct {
-            fn func(_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const iterated_ = &iterator_helper.fields.state.underlying_iterator;
                 const mapper_ = &iterator_helper.fields.state.captures.cast(*Captures).mapper;
 
@@ -686,7 +686,7 @@ pub const prototype = struct {
 
                 // i. Let value be ? IteratorStepValue(iterated).
                 // ii. If value is done, return ReturnCompletion(undefined).
-                const value = (try iterated_.stepValue()) orelse return null;
+                const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                 // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
                 const mapped = mapper_.callAssumeCallable(
@@ -694,7 +694,7 @@ pub const prototype = struct {
                     &.{ value, Value.from(counter.*) },
                 ) catch |err| {
                     // iv. IfAbruptCloseIterator(mapped, iterated).
-                    return iterated_.close(@as(Agent.Error!?Value, err));
+                    return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                 };
 
                 // vii. Set counter to counter + 1.
@@ -752,7 +752,7 @@ pub const prototype = struct {
         // 5. If initialValue is not present, then
         if (initial_value == null) {
             // a. Let accumulator be ? IteratorStepValue(iterated).
-            accumulator = (try iterated.stepValue()) orelse {
+            accumulator = (try iterated.stepValue(agent)) orelse {
                 // b. If accumulator is done, throw a TypeError exception.
                 return agent.throwException(
                     .type_error,
@@ -775,14 +775,14 @@ pub const prototype = struct {
         // 7. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return accumulator.
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(reducer, undefined, « accumulator, value, 𝔽(counter) »)).
             const result = reducer.callAssumeCallable(
                 .undefined,
                 &.{ accumulator, value, Value.from(counter) },
             ) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
-                return iterated.close(@as(Agent.Error!Value, err));
+                return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
             // e. Set accumulator to result.
@@ -820,19 +820,19 @@ pub const prototype = struct {
         // 6. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return false.
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
             const result = predicate.callAssumeCallable(
                 .undefined,
                 &.{ value, Value.from(counter) },
             ) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
-                return iterated.close(@as(Agent.Error!Value, err));
+                return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
             // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(false)).
             if (result.toBoolean()) {
-                return try iterated.close(@as(Agent.Error!Value, Value.from(true)));
+                return try iterated.close(agent, @as(Agent.Error!Value, Value.from(true)));
             }
 
             // f. Set counter to counter + 1.
@@ -882,7 +882,7 @@ pub const prototype = struct {
         // 8. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    integerLimit and performs the following steps when called:
         const closure = struct {
-            fn func(_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const iterated_ = &iterator_helper.fields.state.underlying_iterator;
 
                 // a. Let remaining be integerLimit.
@@ -893,7 +893,7 @@ pub const prototype = struct {
                     // i. If remaining = 0, then
                     if (remaining.* == 0) {
                         // 1. Return ? IteratorClose(iterated, ReturnCompletion(undefined)).
-                        return iterated_.close(@as(Agent.Error!?Value, null));
+                        return iterated_.close(agent_, @as(Agent.Error!?Value, null));
                     }
 
                     // ii. If remaining ≠ +∞, then
@@ -904,7 +904,7 @@ pub const prototype = struct {
 
                     // iii. Let value be ? IteratorStepValue(iterated).
                     // iv. If value is done, return ReturnCompletion(undefined).
-                    const value = (try iterated_.stepValue()) orelse return null;
+                    const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                     // v. Let completion be Completion(Yield(value)).
                     // vi. IfAbruptCloseIterator(completion, iterated).
@@ -952,7 +952,7 @@ pub const prototype = struct {
         // 5. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return CreateArrayFromList(items).
-        while (try iterated.stepValue()) |value| {
+        while (try iterated.stepValue(agent)) |value| {
             // c. Append value to items.
             try items.append(agent.gc_allocator, value);
         }

@@ -96,11 +96,11 @@ pub const prototype = struct {
         // 5. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(IteratorNext(syncIteratorRecord, value)).
-            break :blk sync_iterator.next(value);
+            break :blk sync_iterator.next(agent, value);
         } else blk: {
             // 6. Else,
             // a. Let result be Completion(IteratorNext(syncIteratorRecord)).
-            break :blk sync_iterator.next(null);
+            break :blk sync_iterator.next(agent, null);
         }) catch |err| {
             // 7. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));

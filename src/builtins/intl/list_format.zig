@@ -355,7 +355,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
     //     b. If next is done, then
     //         i. Return list.
-    while (try iterator.stepValue()) |next| {
+    while (try iterator.stepValue(agent)) |next| {
         // c. If next is not a String, then
         if (!next.isString()) {
             // i. Let error be ThrowCompletion(a newly created TypeError object).
@@ -366,7 +366,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
             );
 
             // ii. Return ? IteratorClose(iteratorRecord, error).
-            return iterator.close(@as(Agent.Error![]const []const u8, @"error"));
+            return iterator.close(agent, @as(Agent.Error![]const []const u8, @"error"));
         }
 
         // d. Append next to list.

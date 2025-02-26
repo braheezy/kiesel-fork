@@ -1535,11 +1535,11 @@ pub fn groupBy(
             );
 
             // ii. Return ? IteratorClose(iteratorRecord, error).
-            return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), @"error"));
+            return iterator.close(agent, @as(Agent.Error!GroupByContainer(key_coercion), @"error"));
         }
 
         // b. Let next be ? IteratorStepValue(iteratorRecord).
-        const next = try iterator.stepValue();
+        const next = try iterator.stepValue(agent);
 
         // c. If next is done, then
         //     i. Return groups.
@@ -1552,7 +1552,7 @@ pub fn groupBy(
             &.{ value, from(k) },
         ) catch |err| {
             // f. IfAbruptCloseIterator(key, iteratorRecord).
-            return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), err));
+            return iterator.close(agent, @as(Agent.Error!GroupByContainer(key_coercion), err));
         };
 
         // g. If keyCoercion is property, then
@@ -1560,7 +1560,7 @@ pub fn groupBy(
             // i. Set key to Completion(ToPropertyKey(key)).
             break :blk key.toPropertyKey(agent) catch |err| {
                 // ii. IfAbruptCloseIterator(key, iteratorRecord).
-                return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), err));
+                return iterator.close(agent, @as(Agent.Error!GroupByContainer(key_coercion), err));
             };
         } else blk: {
             // h. Else,

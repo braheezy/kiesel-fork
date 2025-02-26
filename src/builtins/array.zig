@@ -550,7 +550,7 @@ pub const constructor = struct {
                     );
 
                     // 2. Return ? IteratorClose(iteratorRecord, error).
-                    return iterator.close(@as(Agent.Error!Value, @"error"));
+                    return iterator.close(agent, @as(Agent.Error!Value, @"error"));
                 }
 
                 // ii. Let Pk be ! ToString(𝔽(k)).
@@ -558,7 +558,7 @@ pub const constructor = struct {
 
                 // iii. Let next be ? IteratorStepValue(iteratorRecord).
                 // iv. If next is done, then
-                const next = try iterator.stepValue() orelse {
+                const next = try iterator.stepValue(agent) orelse {
                     // 1. Perform ? Set(A, "length", 𝔽(k), true).
                     try array.set(PropertyKey.from("length"), Value.from(k), .throw);
 
@@ -574,7 +574,7 @@ pub const constructor = struct {
                         &.{ next, Value.from(k) },
                     ) catch |err| {
                         // 2. IfAbruptCloseIterator(mappedValue, iteratorRecord).
-                        return iterator.close(@as(Agent.Error!Value, err));
+                        return iterator.close(agent, @as(Agent.Error!Value, err));
                     };
                 } else blk: {
                     // vi. Else,
@@ -585,7 +585,7 @@ pub const constructor = struct {
                 // vii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
                 _ = array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| {
                     // viii. IfAbruptCloseIterator(defineStatus, iteratorRecord).
-                    return iterator.close(@as(Agent.Error!Value, err));
+                    return iterator.close(agent, @as(Agent.Error!Value, err));
                 };
 
                 // ix. Set k to k + 1.

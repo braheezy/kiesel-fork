@@ -41,7 +41,7 @@ pub fn addEntriesFromIterable(
     // 2. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
     //     b. If next is done, return target.
-    while (try iterator.stepValue()) |next| {
+    while (try iterator.stepValue(agent)) |next| {
         // c. If next is not an Object, then
         if (!next.isObject()) {
             // i. Let error be ThrowCompletion(a newly created TypeError object).
@@ -52,25 +52,25 @@ pub fn addEntriesFromIterable(
             );
 
             // ii. Return ? IteratorClose(iteratorRecord, error).
-            return iterator.close(@as(Agent.Error!*Object, @"error"));
+            return iterator.close(agent, @as(Agent.Error!*Object, @"error"));
         }
 
         // d. Let k be Completion(Get(next, "0")).
         const k = next.asObject().get(PropertyKey.from(0)) catch |err| {
             // e. IfAbruptCloseIterator(k, iteratorRecord).
-            return iterator.close(@as(Agent.Error!*Object, err));
+            return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 
         // f. Let v be Completion(Get(next, "1")).
         const v = next.asObject().get(PropertyKey.from(1)) catch |err| {
             // h. IfAbruptCloseIterator(v, iteratorRecord).
-            return iterator.close(@as(Agent.Error!*Object, err));
+            return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 
         // h. Let status be Completion(Call(adder, target, « k, v »)).
         _ = Value.from(adder).callAssumeCallable(Value.from(target), &.{ k, v }) catch |err| {
             // i. IfAbruptCloseIterator(status, iteratorRecord).
-            return iterator.close(@as(Agent.Error!*Object, err));
+            return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
     }
 
