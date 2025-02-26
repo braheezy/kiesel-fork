@@ -514,7 +514,7 @@ pub fn ordinaryGet(
             .value => |value| return value,
             .accessor => |accessor| {
                 const getter = accessor.get orelse return .undefined;
-                return Value.from(getter).callAssumeCallableNoArgs(receiver);
+                return Value.from(getter).callAssumeCallable(receiver, &.{});
             },
         }
     }
@@ -546,7 +546,7 @@ pub fn ordinaryGet(
     const getter = descriptor.get.? orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
-    return Value.from(getter).callAssumeCallableNoArgs(receiver);
+    return Value.from(getter).callAssumeCallable(receiver, &.{});
 }
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )

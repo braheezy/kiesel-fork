@@ -1296,7 +1296,6 @@ pub fn call(
     arguments_list: []const Value,
 ) Agent.Error!Value {
     // 1. If argumentsList is not present, set argumentsList to a new empty List.
-    // NOTE: This is done via the NoArgs variant of the function.
 
     // 2. If IsCallable(F) is false, throw a TypeError exception.
     if (!self.isCallable()) {
@@ -1313,10 +1312,6 @@ pub fn call(
     );
 }
 
-pub fn callNoArgs(self: Value, agent: *Agent, this_value: Value) Agent.Error!Value {
-    return self.call(agent, this_value, &.{});
-}
-
 pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
     const object = self.asObject();
     return object.internal_methods.call.?(
@@ -1325,10 +1320,6 @@ pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []cons
         this_value,
         Arguments.from(arguments_list),
     );
-}
-
-pub fn callAssumeCallableNoArgs(self: Value, this_value: Value) Agent.Error!Value {
-    return self.callAssumeCallable(this_value, &.{});
 }
 
 const ValidElementTypes = enum {
@@ -1402,21 +1393,12 @@ pub fn invoke(
     arguments_list: []const Value,
 ) Agent.Error!Value {
     // 1. If argumentsList is not present, set argumentsList to a new empty List.
-    // NOTE: This is done via the NoArgs variant of the function.
 
     // 2. Let func be ? GetV(V, P).
     const function = try self.get(agent, property_key);
 
     // 3. Return ? Call(func, V, argumentsList).
     return function.call(agent, self, arguments_list);
-}
-
-pub fn invokeNoArgs(
-    self: Value,
-    agent: *Agent,
-    property_key: PropertyKey,
-) Agent.Error!Value {
-    return self.invoke(agent, property_key, &.{});
 }
 
 /// 7.3.21 OrdinaryHasInstance ( C, O )

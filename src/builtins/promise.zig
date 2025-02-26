@@ -2027,7 +2027,7 @@ pub const prototype = struct {
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
+                    const result = try on_finally_.callAssumeCallable(.undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor__, result);
@@ -2085,7 +2085,7 @@ pub const prototype = struct {
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
+                    const result = try on_finally_.callAssumeCallable(.undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor__, result);

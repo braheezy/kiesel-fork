@@ -2343,8 +2343,9 @@ pub fn classDefinitionEvaluation(
                 // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
                 // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
                 const body_function = &class_static_block_definition.body_function.object;
-                _ = Value.from(body_function).callAssumeCallableNoArgs(
+                _ = Value.from(body_function).callAssumeCallable(
                     Value.from(function),
+                    &.{},
                 ) catch |err| break :blk err;
             },
         };

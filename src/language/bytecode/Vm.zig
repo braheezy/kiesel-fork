@@ -828,7 +828,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
                     const accessor = base_object.property_storage.accessors.items[@intFromEnum(index)];
                     // Excerpt from ordinaryGet()
                     if (accessor.get) |getter| {
-                        self.result = try Value.from(getter).callAssumeCallableNoArgs(base_value);
+                        self.result = try Value.from(getter).callAssumeCallable(base_value, &.{});
                     } else {
                         self.result = .undefined;
                     }

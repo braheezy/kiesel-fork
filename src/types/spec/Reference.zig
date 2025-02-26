@@ -123,7 +123,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
                             // Excerpt from ordinaryGet()
                             const getter = accessor.get orelse return .undefined;
                             const receiver = self.getThisValue();
-                            return Value.from(getter).callAssumeCallableNoArgs(receiver);
+                            return Value.from(getter).callAssumeCallable(receiver, &.{});
                         },
                     }
                 } else {

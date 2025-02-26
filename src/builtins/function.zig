@@ -491,7 +491,7 @@ pub const prototype = struct {
         if (arg_array.isUndefined() or arg_array.isNull()) {
             // a. Perform PrepareForTailCall().
             // b. Return ? Call(func, thisArg).
-            return func.callAssumeCallableNoArgs(this_arg);
+            return func.callAssumeCallable(this_arg, &.{});
         }
 
         // 4. Let argList be ? CreateListFromArrayLike(argArray).

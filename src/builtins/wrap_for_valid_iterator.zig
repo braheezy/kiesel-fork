@@ -41,7 +41,7 @@ pub const prototype = struct {
         const iterator = object.fields.iterated;
 
         // 4. Return ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
-        return iterator.next_method.callNoArgs(agent, Value.from(iterator.iterator));
+        return iterator.next_method.call(agent, Value.from(iterator.iterator), &.{});
     }
 
     /// 27.1.3.2.1.1.2 %WrapForValidIteratorPrototype%.return ( )
@@ -66,7 +66,7 @@ pub const prototype = struct {
         };
 
         // 7. Return ? Call(returnMethod, iterator).
-        return Value.from(return_method).callAssumeCallableNoArgs(Value.from(iterator));
+        return Value.from(return_method).callAssumeCallable(Value.from(iterator), &.{});
     }
 };
 

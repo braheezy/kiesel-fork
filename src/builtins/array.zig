@@ -525,7 +525,7 @@ pub const constructor = struct {
             // a. If IsConstructor(C) is true, then
             const array = if (constructor_.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
-                break :blk try constructor_.asObject().constructNoArgs();
+                break :blk try constructor_.asObject().construct(&.{}, null);
             } else blk: {
                 // b. Else,
                 // i. Let A be ! ArrayCreate(0).
@@ -2669,9 +2669,10 @@ pub const prototype = struct {
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
                 // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
-                const string = try (try element.invokeNoArgs(
+                const string = try (try element.invoke(
                     agent,
                     PropertyKey.from("toLocaleString"),
+                    &.{},
                 )).toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.
@@ -2909,7 +2910,7 @@ pub const prototype = struct {
         if (!func.isCallable()) func = Value.from(try realm.intrinsics.@"%Object.prototype.toString%"());
 
         // 4. Return ? Call(func, array).
-        return func.callAssumeCallableNoArgs(Value.from(array));
+        return func.callAssumeCallable(Value.from(array), &.{});
     }
 
     /// 23.1.3.37 Array.prototype.unshift ( ...items )

@@ -2844,9 +2844,10 @@ pub const prototype = struct {
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
                 // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
-                const string = try (try element.invokeNoArgs(
+                const string = try (try element.invoke(
                     agent,
                     PropertyKey.from("toLocaleString"),
+                    &.{},
                 )).toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.

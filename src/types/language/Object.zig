@@ -200,7 +200,7 @@ pub fn ordinaryToPrimitive(self: *Object, hint: PreferredType) Agent.Error!Value
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
             // i. Let result be ? Call(method, O).
-            const result = try method.callAssumeCallableNoArgs(Value.from(self));
+            const result = try method.callAssumeCallable(Value.from(self), &.{});
 
             // ii. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -383,20 +383,15 @@ pub fn hasOwnProperty(self: *Object, property_key: PropertyKey) Agent.Error!bool
 pub fn construct(
     self: *Object,
     arguments_list: []const Value,
-    new_target: ?*Object,
+    maybe_new_target: ?*Object,
 ) Agent.Error!*Object {
     // 1. If newTarget is not present, set newTarget to F.
-    const new_target_ = new_target orelse self;
+    const new_target = maybe_new_target orelse self;
 
     // 2. If argumentsList is not present, set argumentsList to a new empty List.
-    // NOTE: This is done via the NoArgs variant of the function.
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internal_methods.construct.?(self.agent, self, Arguments.from(arguments_list), new_target_);
-}
-
-pub fn constructNoArgs(self: *Object) Agent.Error!*Object {
-    return self.construct(&.{}, null);
+    return self.internal_methods.construct.?(self.agent, self, Arguments.from(arguments_list), new_target);
 }
 
 /// 7.3.15 SetIntegrityLevel ( O, level )
@@ -796,7 +791,7 @@ pub fn privateGet(self: *Object, private_name: PrivateName) Agent.Error!Value {
             };
 
             // 7. Return ? Call(getter, O).
-            return Value.from(getter).callAssumeCallableNoArgs(Value.from(self));
+            return Value.from(getter).callAssumeCallable(Value.from(self), &.{});
         },
     }
 }
@@ -861,7 +856,7 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
     // 3. If initializer is not empty, then
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
-        break :blk try Value.from(&initializer.object).callAssumeCallableNoArgs(Value.from(self));
+        break :blk try Value.from(&initializer.object).callAssumeCallable(Value.from(self), &.{});
     } else blk: {
         // 4. Else,
         // a. Let initValue be undefined.

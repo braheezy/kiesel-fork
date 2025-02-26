@@ -151,7 +151,7 @@ pub const constructor = struct {
         const groups = try items.groupBy(agent, callback, .collection);
 
         // 2. Let map be ! Construct(%Map%).
-        const map = (try realm.intrinsics.@"%Map%"()).constructNoArgs() catch |err| try noexcept(err);
+        const map = (try realm.intrinsics.@"%Map%"()).construct(&.{}, null) catch |err| try noexcept(err);
 
         // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
         var it = groups.iterator();

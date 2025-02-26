@@ -34,7 +34,7 @@ pub const Iterator = struct {
         // 1. If value is not present, then
         const result_completion = if (value_ == null) blk: {
             // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]])).
-            break :blk self.next_method.callNoArgs(agent, Value.from(self.iterator));
+            break :blk self.next_method.call(agent, Value.from(self.iterator), &.{});
         } else blk: {
             // 2. Else,
             // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »)).
@@ -153,7 +153,7 @@ pub const Iterator = struct {
             if (@"return" == null) return try completion;
 
             // c. Set innerResult to Completion(Call(return, iterator)).
-            break :blk Value.from(@"return".?).callAssumeCallableNoArgs(Value.from(iterator));
+            break :blk Value.from(@"return".?).callAssumeCallable(Value.from(iterator), &.{});
         } else |err| err;
 
         // 5. If completion is a throw completion, return ? completion.
@@ -215,7 +215,7 @@ pub fn getIteratorDirect(object: *Object) Agent.Error!Iterator {
 /// https://tc39.es/ecma262/#sec-getiteratorfrommethod
 pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agent.Error!Iterator {
     // 1. Let iterator be ? Call(method, obj).
-    const iterator = try Value.from(method).callNoArgs(agent, object);
+    const iterator = try Value.from(method).call(agent, object, &.{});
 
     // 2. If iterator is not an Object, throw a TypeError exception.
     if (!iterator.isObject()) {

@@ -164,7 +164,7 @@ pub const prototype = struct {
         } else blk: {
             // 9. Else,
             // a. Let result be Completion(Call(return, syncIterator)).
-            break :blk Value.from(return_).callAssumeCallableNoArgs(Value.from(sync_iterator));
+            break :blk Value.from(return_).callAssumeCallable(Value.from(sync_iterator), &.{});
         }) catch |err| {
             // 10. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
@@ -240,7 +240,7 @@ pub const prototype = struct {
         } else blk: {
             // 9. Else,
             // a. Let result be Completion(Call(throw, syncIterator)).
-            break :blk Value.from(throw_).callAssumeCallableNoArgs(Value.from(sync_iterator));
+            break :blk Value.from(throw_).callAssumeCallable(Value.from(sync_iterator), &.{});
         }) catch |err| {
             // 10. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
