@@ -414,8 +414,8 @@ pub fn getValueFromBuffer(
     return rawBytesToNumeric(@"type", raw_value, is_little_endian);
 }
 
-/// 6 NumericToRawBytes ( type, value, isLittleEndian )
-/// https://tc39.es/proposal-float16array/#sec-numerictorawbytes
+/// 25.1.3.17 NumericToRawBytes ( type, value, isLittleEndian )
+/// https://tc39.es/ecma262/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
     comptime element_type: ElementType,

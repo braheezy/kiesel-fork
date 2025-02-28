@@ -414,27 +414,6 @@ pub const namespace = struct {
         return Value.from(@exp(n.asFloat()) - 1);
     }
 
-    /// 3.1 Math.f16round ( x )
-    /// https://tc39.es/proposal-float16array/#sec-math.f16round
-    fn f16round(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const x = arguments.get(0);
-
-        // 1. Let n be ? ToNumber(x).
-        const n = try x.toNumber(agent);
-
-        // 2. If n is NaN, return NaN.
-        // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
-        // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format using
-        //    roundTiesToEven mode.
-        const n_16 = n.toFloat16();
-
-        // 5. Let n64 be the result of converting n16 to IEEE 754-2019 binary64 format.
-        const n_64: f64 = @floatCast(n_16);
-
-        // 6. Return the ECMAScript Number value corresponding to n64.
-        return Value.from(n_64);
-    }
-
     /// 21.3.2.16 Math.floor ( x )
     /// https://tc39.es/ecma262/#sec-math.floor
     fn floor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -472,7 +451,28 @@ pub const namespace = struct {
         return Value.from(n64);
     }
 
-    /// 21.3.2.18 Math.hypot ( ...args )
+    /// 21.3.2.18 Math.f16round ( x )
+    /// https://tc39.es/ecma262/#sec-math.f16round
+    fn f16round(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is NaN, return NaN.
+        // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
+        // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format using
+        //    roundTiesToEven mode.
+        const n_16 = n.toFloat16();
+
+        // 5. Let n64 be the result of converting n16 to IEEE 754-2019 binary64 format.
+        const n_64: f64 = @floatCast(n_16);
+
+        // 6. Return the ECMAScript Number value corresponding to n64.
+        return Value.from(n_64);
+    }
+
+    /// 21.3.2.19 Math.hypot ( ...args )
     /// https://tc39.es/ecma262/#sec-math.hypot
     fn hypot(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
@@ -518,7 +518,7 @@ pub const namespace = struct {
         return Value.from(@sqrt(sum_of_squares));
     }
 
-    /// 21.3.2.19 Math.imul ( x, y )
+    /// 21.3.2.20 Math.imul ( x, y )
     /// https://tc39.es/ecma262/#sec-math.imul
     fn imul(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -537,7 +537,7 @@ pub const namespace = struct {
         return Value.from(@as(i32, @bitCast(product)));
     }
 
-    /// 21.3.2.20 Math.log ( x )
+    /// 21.3.2.21 Math.log ( x )
     /// https://tc39.es/ecma262/#sec-math.log
     fn log(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -554,7 +554,7 @@ pub const namespace = struct {
         return Value.from(@log(n.asFloat()));
     }
 
-    /// 21.3.2.21 Math.log1p ( x )
+    /// 21.3.2.22 Math.log1p ( x )
     /// https://tc39.es/ecma262/#sec-math.log1p
     fn log1p(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -571,7 +571,7 @@ pub const namespace = struct {
         return Value.from(@log(1 + n.asFloat()));
     }
 
-    /// 21.3.2.22 Math.log10 ( x )
+    /// 21.3.2.23 Math.log10 ( x )
     /// https://tc39.es/ecma262/#sec-math.log10
     fn log10(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -588,7 +588,7 @@ pub const namespace = struct {
         return Value.from(@log10(n.asFloat()));
     }
 
-    /// 21.3.2.23 Math.log2 ( x )
+    /// 21.3.2.24 Math.log2 ( x )
     /// https://tc39.es/ecma262/#sec-math.log2
     fn log2(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -604,7 +604,7 @@ pub const namespace = struct {
         return Value.from(@log2(n.asFloat()));
     }
 
-    /// 21.3.2.24 Math.max ( ...args )
+    /// 21.3.2.25 Math.max ( ...args )
     /// https://tc39.es/ecma262/#sec-math.max
     fn max(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
@@ -642,7 +642,7 @@ pub const namespace = struct {
         return Value.from(highest);
     }
 
-    /// 21.3.2.25 Math.min ( ...args )
+    /// 21.3.2.26 Math.min ( ...args )
     /// https://tc39.es/ecma262/#sec-math.min
     fn min(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
@@ -680,7 +680,7 @@ pub const namespace = struct {
         return Value.from(lowest);
     }
 
-    /// 21.3.2.26 Math.pow ( base, exponent )
+    /// 21.3.2.27 Math.pow ( base, exponent )
     /// https://tc39.es/ecma262/#sec-math.pow
     fn pow(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const base_value = arguments.get(0);
@@ -696,7 +696,7 @@ pub const namespace = struct {
         return Value.from(base.exponentiate(exponent));
     }
 
-    /// 21.3.2.27 Math.random ( )
+    /// 21.3.2.28 Math.random ( )
     /// https://tc39.es/ecma262/#sec-math.random
     fn random(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -704,7 +704,7 @@ pub const namespace = struct {
         return Value.from(value);
     }
 
-    /// 21.3.2.28 Math.round ( x )
+    /// 21.3.2.29 Math.round ( x )
     /// https://tc39.es/ecma262/#sec-math.round
     fn round(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -723,7 +723,7 @@ pub const namespace = struct {
         return Value.from(rounded);
     }
 
-    /// 21.3.2.29 Math.sign ( x )
+    /// 21.3.2.30 Math.sign ( x )
     /// https://tc39.es/ecma262/#sec-math.sign
     fn sign(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -739,7 +739,7 @@ pub const namespace = struct {
         return Value.from(std.math.sign(n.asFloat()));
     }
 
-    /// 21.3.2.30 Math.sin ( x )
+    /// 21.3.2.31 Math.sin ( x )
     /// https://tc39.es/ecma262/#sec-math.sin
     fn sin(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -753,7 +753,7 @@ pub const namespace = struct {
         return Value.from(@sin(n.asFloat()));
     }
 
-    /// 21.3.2.31 Math.sinh ( x )
+    /// 21.3.2.32 Math.sinh ( x )
     /// https://tc39.es/ecma262/#sec-math.sinh
     fn sinh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -767,7 +767,7 @@ pub const namespace = struct {
         return Value.from(std.math.sinh(n.asFloat()));
     }
 
-    /// 21.3.2.32 Math.sqrt ( x )
+    /// 21.3.2.33 Math.sqrt ( x )
     /// https://tc39.es/ecma262/#sec-math.sqrt
     fn sqrt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -1002,7 +1002,7 @@ pub const namespace = struct {
         }
     }
 
-    /// 21.3.2.33 Math.tan ( x )
+    /// 21.3.2.34 Math.tan ( x )
     /// https://tc39.es/ecma262/#sec-math.tan
     fn tan(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -1016,7 +1016,7 @@ pub const namespace = struct {
         return Value.from(@tan(n.asFloat()));
     }
 
-    /// 21.3.2.34 Math.tanh ( x )
+    /// 21.3.2.35 Math.tanh ( x )
     /// https://tc39.es/ecma262/#sec-math.tanh
     fn tanh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -1032,7 +1032,7 @@ pub const namespace = struct {
         return Value.from(std.math.tanh(n.asFloat()));
     }
 
-    /// 21.3.2.35 Math.trunc ( x )
+    /// 21.3.2.36 Math.trunc ( x )
     /// https://tc39.es/ecma262/#sec-math.trunc
     fn trunc(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);

@@ -588,8 +588,8 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .biguint64);
     }
 
-    /// 7.1 DataView.prototype.getFloat16 ( byteOffset [ , littleEndian ] )
-    /// https://tc39.es/proposal-float16array/#sec-dataview.prototype.getfloat16
+    /// 25.3.4.7 DataView.prototype.getFloat16 ( byteOffset [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.getfloat16
     fn getFloat16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.get(1);
@@ -600,7 +600,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .float16);
     }
 
-    /// 25.3.4.7 DataView.prototype.getFloat32 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.8 DataView.prototype.getFloat32 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getfloat32
     fn getFloat32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -612,7 +612,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .float32);
     }
 
-    /// 25.3.4.8 DataView.prototype.getFloat64 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.9 DataView.prototype.getFloat64 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getfloat64
     fn getFloat64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -624,7 +624,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .float64);
     }
 
-    /// 25.3.4.9 DataView.prototype.getInt8 ( byteOffset )
+    /// 25.3.4.10 DataView.prototype.getInt8 ( byteOffset )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getint8
     fn getInt8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -634,7 +634,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, Value.from(true), .int8);
     }
 
-    /// 25.3.4.10 DataView.prototype.getInt16 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.11 DataView.prototype.getInt16 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getint16
     fn getInt16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -646,7 +646,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .int16);
     }
 
-    /// 25.3.4.11 DataView.prototype.getInt32 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.12 DataView.prototype.getInt32 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getint32
     fn getInt32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -658,7 +658,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .int32);
     }
 
-    /// 25.3.4.12 DataView.prototype.getUint8 ( byteOffset )
+    /// 25.3.4.13 DataView.prototype.getUint8 ( byteOffset )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getuint8
     fn getUint8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -668,7 +668,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, Value.from(true), .uint8);
     }
 
-    /// 25.3.4.13 DataView.prototype.getUint16 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.14 DataView.prototype.getUint16 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getuint16
     fn getUint16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -680,7 +680,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .uint16);
     }
 
-    /// 25.3.4.14 DataView.prototype.getUint32 ( byteOffset [ , littleEndian ] )
+    /// 25.3.4.15 DataView.prototype.getUint32 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getuint32
     fn getUint32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -692,7 +692,7 @@ pub const prototype = struct {
         return getViewValue(agent, this_value, byte_offset, little_endian, .uint32);
     }
 
-    /// 25.3.4.15 DataView.prototype.setBigInt64 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.16 DataView.prototype.setBigInt64 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setbigint64
     fn setBigInt64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -704,7 +704,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .bigint64, value);
     }
 
-    /// 25.3.4.16 DataView.prototype.setBigUint64 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.17 DataView.prototype.setBigUint64 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setbiguint64
     fn setBigUint64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -716,8 +716,8 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .biguint64, value);
     }
 
-    /// 7.2 DataView.prototype.setFloat16 ( byteOffset, value [ , littleEndian ] )
-    /// https://tc39.es/proposal-float16array/#sec-dataview.prototype.setfloat16
+    /// 25.3.4.18 DataView.prototype.setFloat16 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setfloat16
     fn setFloat16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
@@ -729,7 +729,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .float16, value);
     }
 
-    /// 25.3.4.17 DataView.prototype.setFloat32 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.19 DataView.prototype.setFloat32 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setfloat32
     fn setFloat32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -742,7 +742,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .float32, value);
     }
 
-    /// 25.3.4.18 DataView.prototype.setFloat64 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.20 DataView.prototype.setFloat64 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setfloat64
     fn setFloat64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -755,7 +755,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .float64, value);
     }
 
-    /// 25.3.4.19 DataView.prototype.setInt8 ( byteOffset, value )
+    /// 25.3.4.21 DataView.prototype.setInt8 ( byteOffset, value )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setint8
     fn setInt8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -766,7 +766,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, Value.from(true), .int8, value);
     }
 
-    /// 25.3.4.20 DataView.prototype.setInt16 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.22 DataView.prototype.setInt16 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setint16
     fn setInt16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -779,7 +779,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .int16, value);
     }
 
-    /// 25.3.4.21 DataView.prototype.setInt32 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.23 DataView.prototype.setInt32 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setint32
     fn setInt32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -792,7 +792,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .int32, value);
     }
 
-    /// 25.3.4.22 DataView.prototype.setUint8 ( byteOffset, value )
+    /// 25.3.4.24 DataView.prototype.setUint8 ( byteOffset, value )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint8
     fn setUint8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -803,7 +803,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, Value.from(true), .uint8, value);
     }
 
-    /// 25.3.4.23 DataView.prototype.setUint16 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.25 DataView.prototype.setUint16 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint16
     fn setUint16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
@@ -816,7 +816,7 @@ pub const prototype = struct {
         return setViewValue(agent, this_value, byte_offset, little_endian, .uint16, value);
     }
 
-    /// 25.3.4.24 DataView.prototype.setUint32 ( byteOffset, value [ , littleEndian ] )
+    /// 25.3.4.26 DataView.prototype.setUint32 ( byteOffset, value [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint32
     fn setUint32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
