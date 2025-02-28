@@ -16,11 +16,6 @@ pub fn printPrivateIdentifier(node: ast.PrivateIdentifier, writer: anytype, inde
     try print(node, writer, indentation + 1);
 }
 
-pub fn printParenthesizedExpression(node: ast.ParenthesizedExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-    try print("ParenthesizedExpression", writer, indentation);
-    try printExpression(node.expression.*, writer, indentation + 1);
-}
-
 pub fn printIdentifierReference(node: ast.IdentifierReference, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("IdentifierReference", writer, indentation);
     try print(node, writer, indentation + 1);
@@ -43,7 +38,6 @@ pub fn printPrimaryExpression(node: ast.PrimaryExpression, writer: anytype, inde
         .template_literal => |x| try printTemplateLiteral(x, writer, indentation),
         .arrow_function => |x| try printArrowFunction(x, writer, indentation),
         .async_arrow_function => |x| try printAsyncArrowFunction(x, writer, indentation),
-        .parenthesized_expression => |x| try printParenthesizedExpression(x, writer, indentation),
     }
 }
 

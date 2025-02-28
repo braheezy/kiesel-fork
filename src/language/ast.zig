@@ -72,22 +72,6 @@ pub const LexicallyScopedDeclaration = union(enum) {
     }
 };
 
-/// https://tc39.es/ecma262/#prod-ParenthesizedExpression
-pub const ParenthesizedExpression = struct {
-    expression: *Expression,
-
-    pub fn analyze(self: ParenthesizedExpression, query: AnalyzeQuery) bool {
-        return switch (query) {
-            .is_await_expression,
-            .is_identifier_reference,
-            .is_member_expression,
-            .is_reference,
-            => self.expression.analyze(query),
-            .is_string_literal => false,
-        };
-    }
-};
-
 /// https://tc39.es/ecma262/#prod-IdentifierReference
 pub const IdentifierReference = []const u8;
 
@@ -113,21 +97,16 @@ pub const PrimaryExpression = union(enum) {
     template_literal: TemplateLiteral,
     arrow_function: ArrowFunction,
     async_arrow_function: AsyncArrowFunction,
-    parenthesized_expression: ParenthesizedExpression,
 
     pub fn analyze(self: PrimaryExpression, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_await_expression,
             .is_member_expression,
-            => switch (self) {
-                .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
-                else => false,
-            },
+            => false,
             .is_identifier_reference,
             .is_reference,
             => switch (self) {
                 .identifier_reference => true,
-                .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
                 else => false,
             },
             .is_string_literal => switch (self) {
@@ -780,23 +759,28 @@ pub const Expression = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype
     pub fn assignmentTargetType(self: Expression) enum { simple, invalid } {
         switch (self) {
-            .primary_expression => |primary_expression| switch (primary_expression) {
-                .identifier_reference => {
-                    // 1. If IsStrict(this IdentifierReference) is true and the StringValue of
-                    //    Identifier is either "eval" or "arguments", return invalid.
-                    // NOTE: This is handled separately in the parser to get a better error message.
+            // IdentifierReference : Identifier
+            // IdentifierReference :
+            //     yield
+            //     await
+            .primary_expression => |primary_expression| if (primary_expression == .identifier_reference) {
+                // 1. If IsStrict(this IdentifierReference) is true and the StringValue of
+                //    Identifier is either "eval" or "arguments", return invalid.
+                // NOTE: This is handled separately in the parser to get a better error message.
 
-                    // 2. Return simple.
-                    return .simple;
-                },
-                .parenthesized_expression => |parenthesized_expression| {
-                    // 1. Let expr be the ParenthesizedExpression that is covered by
-                    //    CoverParenthesizedExpressionAndArrowParameterList.
-                    // 2. Return the AssignmentTargetType of expr.
-                    return parenthesized_expression.expression.assignmentTargetType();
-                },
-                else => {},
+                // 2. Return simple.
+                return .simple;
             },
+
+            // CallExpression :
+            //     CallExpression [ Expression ]
+            //     CallExpression . IdentifierName
+            //     CallExpression . PrivateIdentifier
+            // MemberExpression :
+            //     MemberExpression [ Expression ]
+            //     MemberExpression . IdentifierName
+            //     SuperProperty
+            //     MemberExpression . PrivateIdentifier
             .member_expression,
             .super_property,
             => {
@@ -863,7 +847,7 @@ pub const Statement = union(enum) {
             .is_reference,
             .is_string_literal,
             => switch (self) {
-                .expression_statement => |expression_statement| expression_statement.analyze(query),
+                .expression_statement => |expression_statement| expression_statement.expression.analyze(query),
                 else => false,
             },
         };
@@ -1806,10 +1790,6 @@ pub const BindingRestElement = union(enum) {
 /// https://tc39.es/ecma262/#prod-ExpressionStatement
 pub const ExpressionStatement = struct {
     expression: Expression,
-
-    pub fn analyze(self: ExpressionStatement, query: AnalyzeQuery) bool {
-        return self.expression.analyze(query);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IfStatement

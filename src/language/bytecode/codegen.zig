@@ -118,15 +118,6 @@ fn interceptContinueAndBreakJumps(
     skip_jump.getPtr().* = try executable.nextInstructionIndex();
 }
 
-pub fn codegenParenthesizedExpression(
-    node: ast.ParenthesizedExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // Use codegenExpressionImpl() instead of codegenExpression() to not disable `fuse_get_value`
-    try codegenExpressionImpl(node.expression.*, executable, ctx);
-}
-
 /// 13.1.3 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-identifiers-runtime-semantics-evaluation
 pub fn codegenIdentifierReference(
@@ -177,7 +168,6 @@ pub fn codegenPrimaryExpression(
         .template_literal => |x| try codegenTemplateLiteral(x, executable, ctx),
         .arrow_function => |x| try codegenArrowFunction(x, executable, ctx),
         .async_arrow_function => |x| try codegenAsyncArrowFunction(x, executable, ctx),
-        .parenthesized_expression => |x| try codegenParenthesizedExpression(x, executable, ctx),
     }
 }
 
@@ -1468,12 +1458,10 @@ pub fn codegenUnaryExpression(
         // UnaryExpression : typeof UnaryExpression
         .typeof => {
             if (node.expression.analyze(.is_identifier_reference)) {
-                var primary_expression = node.expression.primary_expression;
-                while (primary_expression == .parenthesized_expression) {
-                    primary_expression = primary_expression.parenthesized_expression.expression.primary_expression;
-                }
                 try executable.addInstruction(.typeof_identifier, .{
-                    .identifier = try executable.addIdentifier(primary_expression.identifier_reference),
+                    .identifier = try executable.addIdentifier(
+                        node.expression.primary_expression.identifier_reference,
+                    ),
                     .strict = ctx.contained_in_strict_mode_code,
                 });
             } else {

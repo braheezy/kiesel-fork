@@ -638,18 +638,6 @@ pub fn acceptKeyword(self: *Parser, value: []const u8) AcceptError!Tokenizer.Tok
     return token;
 }
 
-pub fn acceptParenthesizedExpression(self: *Parser) AcceptError!ast.ParenthesizedExpression {
-    const state = self.core.saveState();
-    errdefer self.core.restoreState(state);
-
-    _ = try self.core.accept(RuleSet.is(.@"("));
-    const expression = try self.allocator.create(ast.Expression);
-    errdefer self.allocator.destroy(expression);
-    expression.* = try self.acceptExpression(.{});
-    _ = try self.core.accept(RuleSet.is(.@")"));
-    return .{ .expression = expression };
-}
-
 pub fn acceptIdentifierName(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -918,10 +906,7 @@ pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression 
             // If parsing the arrow function failed we may have emitted an 'invalid binding
             // identifier' error, e.g. for `"use strict"; (eval)` - get rid of those
             while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
-            break :blk if (self.acceptParenthesizedExpression()) |parenthesized_expression|
-                .{ .parenthesized_expression = parenthesized_expression }
-            else |_|
-                error.UnexpectedToken;
+            break :blk error.UnexpectedToken;
         },
         .function => if (self.acceptFunctionExpression()) |function_expression|
             .{ .function_expression = function_expression }
@@ -1824,6 +1809,16 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
             while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
             const primary_expression = try self.acceptPrimaryExpression();
             break :blk .{ .primary_expression = primary_expression };
+        },
+        .@"(" => if (self.acceptPrimaryExpression()) |primary_expression|
+            // Arrow function
+            .{ .primary_expression = primary_expression }
+        else |_| blk: {
+            // Parenthesized expression
+            _ = try self.core.accept(RuleSet.is(.@"("));
+            const e = try self.acceptExpression(.{});
+            _ = try self.core.accept(RuleSet.is(.@")"));
+            break :blk e;
         },
         else => if (self.acceptAwaitExpression()) |await_expression|
             .{ .await_expression = await_expression }
