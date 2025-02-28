@@ -97,7 +97,9 @@ fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!voi
 const Kiesel = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
-        try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
+        if (kiesel.build_options.enable_annex_b) {
+            try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
+        }
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
         try defineBuiltinFunction(kiesel_object, "detachArrayBuffer", detachArrayBuffer, 1, realm);
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
@@ -122,40 +124,32 @@ const Kiesel = struct {
     }
 
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        if (@FieldType(Object.Shape, "is_htmldda") == void) {
-            return agent.throwException(
-                .internal_error,
-                "[[IsHTMLDDA]] is not supported in this build",
-                .{},
-            );
-        } else {
-            const realm = agent.currentRealm();
-            const is_htmldda = try kiesel.builtins.Object.create(agent, .{
-                .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-                .is_htmldda = true,
-                .internal_methods = &.{
-                    .call = struct {
-                        /// This is required by [test262](https://github.com/tc39/test262/blob/main/INTERPRETING.md#host-defined-functions).
-                        ///
-                        /// What should happen when the function is being called with something
-                        /// other than no arguments or an empty string is unclear and different
-                        /// test262 runtimes disagree on this:
-                        ///
-                        /// - JSC: [Returns null unconditionally](https://github.com/WebKit/WebKit/blob/b571ec5131dcca906981b9a477d7b71e9605b6a6/Source/JavaScriptCore/jsc.cpp#L2818-L2827)
-                        /// - V8: [Returns null unconditionally](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/runtime/runtime-test.cc;l=1038-1055;drc=ca3478a884cd4d1c5d7897ded9838773ca1c4fd3)
-                        /// - QuickJS: [Returns null unconditionally](https://github.com/quickjs-ng/quickjs/blob/6868fb9e2516fde4a7a3fcef113a6bb1e5ecc957/run-test262.c#L753-L757)
-                        /// - LibJS: [Returns undefined](https://github.com/SerenityOS/serenity/blob/9a207da36845e18dc4f747d8ecc98fbc0e11545c/Userland/Libraries/LibJS/Contrib/Test262/IsHTMLDDA.cpp#L20-L32)
-                        /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
-                        ///
-                        /// We pick the most common one :^)
-                        fn call(_: *Agent, _: *Object, _: Value, _: Arguments) Agent.Error!Value {
-                            return .null;
-                        }
-                    }.call,
-                },
-            });
-            return Value.from(is_htmldda);
-        }
+        const realm = agent.currentRealm();
+        const is_htmldda = try kiesel.builtins.Object.create(agent, .{
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+            .is_htmldda = true,
+            .internal_methods = &.{
+                .call = struct {
+                    /// This is required by [test262](https://github.com/tc39/test262/blob/main/INTERPRETING.md#host-defined-functions).
+                    ///
+                    /// What should happen when the function is being called with something
+                    /// other than no arguments or an empty string is unclear and different
+                    /// test262 runtimes disagree on this:
+                    ///
+                    /// - JSC: [Returns null unconditionally](https://github.com/WebKit/WebKit/blob/b571ec5131dcca906981b9a477d7b71e9605b6a6/Source/JavaScriptCore/jsc.cpp#L2818-L2827)
+                    /// - V8: [Returns null unconditionally](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/runtime/runtime-test.cc;l=1038-1055;drc=ca3478a884cd4d1c5d7897ded9838773ca1c4fd3)
+                    /// - QuickJS: [Returns null unconditionally](https://github.com/quickjs-ng/quickjs/blob/6868fb9e2516fde4a7a3fcef113a6bb1e5ecc957/run-test262.c#L753-L757)
+                    /// - LibJS: [Returns undefined](https://github.com/SerenityOS/serenity/blob/9a207da36845e18dc4f747d8ecc98fbc0e11545c/Userland/Libraries/LibJS/Contrib/Test262/IsHTMLDDA.cpp#L20-L32)
+                    /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
+                    ///
+                    /// We pick the most common one :^)
+                    fn call(_: *Agent, _: *Object, _: Value, _: Arguments) Agent.Error!Value {
+                        return .null;
+                    }
+                }.call,
+            },
+        });
+        return Value.from(is_htmldda);
     }
 
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
