@@ -106,9 +106,16 @@ pub const prototype = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 8. Return AsyncFromSyncIteratorContinuation(result, promiseCapability).
+        // 8. Return AsyncFromSyncIteratorContinuation(result, promiseCapability,
+        //    syncIteratorRecord, true).
         return Value.from(
-            try asyncFromSyncIteratorContinuation(agent, result, promise_capability),
+            try asyncFromSyncIteratorContinuation(
+                agent,
+                result,
+                promise_capability,
+                sync_iterator,
+                true,
+            ),
         );
     }
 
@@ -128,15 +135,16 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 4. Let syncIterator be O.[[SyncIteratorRecord]].[[Iterator]].
-        const sync_iterator = async_from_sync_iterator.fields.sync_iterator.iterator;
+        // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+        const sync_iterator = &async_from_sync_iterator.fields.sync_iterator;
 
-        // 5. Let return be Completion(GetMethod(syncIterator, "return")).
-        const return_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("return")) catch |err| {
-            // 6. IfAbruptRejectPromise(return, promiseCapability).
+        // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].
+        // 6. Let return be Completion(GetMethod(syncIterator, "return")).
+        const return_ = Value.from(sync_iterator.iterator).getMethod(agent, PropertyKey.from("return")) catch |err| {
+            // 7. IfAbruptRejectPromise(return, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         } orelse {
-            // 7. If return is undefined, then
+            // 8. If return is undefined, then
             // a. Let iteratorResult be CreateIteratorResultObject(value, true).
             const iterator_result = try createIteratorResultObject(
                 agent,
@@ -155,28 +163,28 @@ pub const prototype = struct {
             return Value.from(promise_capability.promise);
         };
 
-        // 8. If value is present, then
+        // 9. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(return, syncIterator, « value »)).
             break :blk Value.from(return_).callAssumeCallable(
                 agent,
-                Value.from(sync_iterator),
+                Value.from(sync_iterator.iterator),
                 &.{value},
             );
         } else blk: {
-            // 9. Else,
+            // 10. Else,
             // a. Let result be Completion(Call(return, syncIterator)).
             break :blk Value.from(return_).callAssumeCallable(
                 agent,
-                Value.from(sync_iterator),
+                Value.from(sync_iterator.iterator),
                 &.{},
             );
         }) catch |err| {
-            // 10. IfAbruptRejectPromise(result, promiseCapability).
+            // 11. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 11. If result is not an Object, then
+        // 12. If result is not an Object, then
         if (!result.isObject()) {
             const type_error = try agent.createErrorObject(
                 .type_error,
@@ -196,9 +204,16 @@ pub const prototype = struct {
             return Value.from(promise_capability.promise);
         }
 
-        // 12. Return AsyncFromSyncIteratorContinuation(result, promiseCapability).
+        // 13. Return AsyncFromSyncIteratorContinuation(result, promiseCapability,
+        //     syncIteratorRecord, false).
         return Value.from(
-            try asyncFromSyncIteratorContinuation(agent, result.asObject(), promise_capability),
+            try asyncFromSyncIteratorContinuation(
+                agent,
+                result.asObject(),
+                promise_capability,
+                sync_iterator,
+                false,
+            ),
         );
     }
 
@@ -218,48 +233,71 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 4. Let syncIterator be O.[[SyncIteratorRecord]].[[Iterator]].
-        const sync_iterator = async_from_sync_iterator.fields.sync_iterator.iterator;
+        // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+        const sync_iterator = &async_from_sync_iterator.fields.sync_iterator;
 
-        // 5. Let throw be Completion(GetMethod(syncIterator, "throw")).
-        const throw_ = Value.from(sync_iterator).getMethod(agent, PropertyKey.from("throw")) catch |err| {
-            // 6. IfAbruptRejectPromise(throw, promiseCapability).
+        // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].
+        // 6. Let throw be Completion(GetMethod(syncIterator, "throw")).
+        const throw_ = Value.from(sync_iterator.iterator).getMethod(agent, PropertyKey.from("throw")) catch |err| {
+            // 7. IfAbruptRejectPromise(throw, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         } orelse {
-            // 7. If throw is undefined, then
-            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
+            // 8. If throw is undefined, then
+
+            // a. NOTE: If syncIterator does not have a throw method, close it to give it a chance
+            //    to clean up before we reject the capability.
+
+            // b. Let closeCompletion be NormalCompletion(empty).
+            // c. Let result be Completion(IteratorClose(syncIteratorRecord, closeCompletion)).
+            sync_iterator.close(agent, @as(Agent.Error!void, {})) catch |err| {
+                // d. IfAbruptRejectPromise(result, promiseCapability).
+                return Value.from(try promise_capability.rejectPromise(agent, err));
+            };
+
+            // e. NOTE: The next step throws a TypeError to indicate that there was a protocol
+            //    violation: syncIterator does not have a throw method.
+            // f. NOTE: If closing syncIterator does not throw then the result of that operation is
+            //    ignored, even if it yields a rejected promise.
+
+            const type_error = try agent.createErrorObject(
+                .type_error,
+                "Iterator does not have a 'throw' function",
+                .{},
+            );
+
+            // g. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{maybe_value orelse .undefined},
+                &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
-            // b. Return promiseCapability.[[Promise]].
+            // h. Return promiseCapability.[[Promise]].
             return Value.from(promise_capability.promise);
         };
 
-        // 8. If value is present, then
+        // 9. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(throw, syncIterator, « value »)).
             break :blk Value.from(throw_).callAssumeCallable(
                 agent,
-                Value.from(sync_iterator),
+                Value.from(sync_iterator.iterator),
                 &.{value},
             );
         } else blk: {
-            // 9. Else,
+            // 10. Else,
             // a. Let result be Completion(Call(throw, syncIterator)).
             break :blk Value.from(throw_).callAssumeCallable(
                 agent,
-                Value.from(sync_iterator),
+                Value.from(sync_iterator.iterator),
                 &.{},
             );
         }) catch |err| {
-            // 10. IfAbruptRejectPromise(result, promiseCapability).
+            // 11. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 11. If result is not an Object, then
+        // 12. If result is not an Object, then
         if (!result.isObject()) {
             const type_error = try agent.createErrorObject(
                 .type_error,
@@ -279,9 +317,15 @@ pub const prototype = struct {
             return Value.from(promise_capability.promise);
         }
 
-        // 12. Return AsyncFromSyncIteratorContinuation(result, promiseCapability).
+        // 13. Return AsyncFromSyncIteratorContinuation(result, promiseCapability, syncIteratorRecord, true).
         return Value.from(
-            try asyncFromSyncIteratorContinuation(agent, result.asObject(), promise_capability),
+            try asyncFromSyncIteratorContinuation(
+                agent,
+                result.asObject(),
+                promise_capability,
+                sync_iterator,
+                true,
+            ),
         );
     }
 };
@@ -296,12 +340,14 @@ pub const AsyncFromSyncIterator = MakeObject(.{
     .tag = .async_from_sync_iterator,
 });
 
-/// 27.1.6.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability )
+/// 27.1.6.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability, syncIteratorRecord, closeOnRejection )
 /// https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
 fn asyncFromSyncIteratorContinuation(
     agent: *Agent,
     result: *Object,
     promise_capability: PromiseCapability,
+    sync_iterator: *Iterator,
+    close_on_rejection: bool,
 ) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
@@ -323,23 +369,32 @@ fn asyncFromSyncIteratorContinuation(
 
     // 6. Let valueWrapper be Completion(PromiseResolve(%Promise%, value)).
     const value_wrapper = promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value) catch |err| {
-        // 7. IfAbruptRejectPromise(valueWrapper, promiseCapability).
+        // 7. If valueWrapper is an abrupt completion, done is false, and closeOnRejection is true, then
+        if (!done and close_on_rejection) {
+            // a. Set valueWrapper to Completion(IteratorClose(syncIteratorRecord, valueWrapper)).
+            _ = sync_iterator.close(agent, @as(Agent.Error!Value, err)) catch |err_| {
+                return promise_capability.rejectPromise(agent, err_) catch |err__| try noexcept(err__);
+            };
+            unreachable;
+        }
+
+        // 8. IfAbruptRejectPromise(valueWrapper, promiseCapability).
         return promise_capability.rejectPromise(agent, err) catch |err_| try noexcept(err_);
     };
 
-    const Captures = struct {
+    const UnwrapClosureCaptures = struct {
         done: bool,
     };
-    const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .done = done };
+    const unwrap_closure_captures = try agent.gc_allocator.create(UnwrapClosureCaptures);
+    unwrap_closure_captures.* = .{ .done = done };
 
-    // 8. Let unwrap be a new Abstract Closure with parameters (v) that captures done and performs
+    // 9. Let unwrap be a new Abstract Closure with parameters (v) that captures done and performs
     //    the following steps when called:
     const unwrap = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-            const done_ = captures_.done;
+            const captures = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*UnwrapClosureCaptures);
+            const done_ = captures.done;
             const value_ = arguments_.get(0);
 
             // a. Return CreateIteratorResultObject(v, done).
@@ -347,28 +402,72 @@ fn asyncFromSyncIteratorContinuation(
         }
     }.func;
 
-    // 9. Let onFulfilled be CreateBuiltinFunction(unwrap, 1, "", « »).
+    // 10. Let onFulfilled be CreateBuiltinFunction(unwrap, 1, "", « »).
     const on_fulfilled = Value.from(
         try createBuiltinFunction(agent, .{ .function = unwrap }, .{
             .length = 1,
             .name = "",
-            .additional_fields = .make(*Captures, captures),
+            .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures),
         }),
     );
 
-    // 10. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
+    // 11. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
     //     object in order to wait for its value if it is a promise and re-package the result in a
     //     new "unwrapped" IteratorResult object.
 
-    // 11. Perform PerformPromiseThen(valueWrapper, onFulfilled, undefined, promiseCapability).
+    // 12. If done is true, or if closeOnRejection is false, then
+    const on_rejected: Value = if (done or !close_on_rejection) blk: {
+        // a. Let onRejected be undefined.
+        break :blk .undefined;
+    } else blk: {
+        // 13. Else,
+
+        const CloseIteratorClosureCaptures = struct {
+            sync_iterator: *Iterator,
+        };
+        const close_iterator_closure_captures = try agent.gc_allocator.create(CloseIteratorClosureCaptures);
+        close_iterator_closure_captures.* = .{ .sync_iterator = sync_iterator };
+
+        // a. Let closeIterator be a new Abstract Closure with parameters (error) that captures
+        //    syncIteratorRecord and performs the following steps when called:
+        const close_iterator = struct {
+            fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
+                const function = agent_.activeFunctionObject();
+                const captures = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*CloseIteratorClosureCaptures);
+                const sync_iterator_ = captures.sync_iterator;
+                const @"error" = arguments_.get(0);
+
+                agent_.exception = .{
+                    .value = @"error",
+                    .stack_trace = try agent_.captureStackTrace(),
+                };
+
+                // i. Return ? IteratorClose(syncIteratorRecord, ThrowCompletion(error)).
+                return sync_iterator_.close(agent_, @as(Agent.Error!Value, error.ExceptionThrown));
+            }
+        }.func;
+
+        // b. Let onRejected be CreateBuiltinFunction(closeIterator, 1, "", « »).
+        // c. NOTE: onRejected is used to close the Iterator when the "value" property of an
+        //    IteratorResult object it yields is a rejected promise.
+        break :blk Value.from(
+            try createBuiltinFunction(agent, .{ .function = close_iterator }, .{
+                .length = 1,
+                .name = "",
+                .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures),
+            }),
+        );
+    };
+
+    // 14. Perform PerformPromiseThen(valueWrapper, onFulfilled, onRejected, promiseCapability).
     _ = try performPromiseThen(
         agent,
         value_wrapper.as(builtins.Promise),
         on_fulfilled,
-        .undefined,
+        on_rejected,
         promise_capability,
     );
 
-    // 12. Return promiseCapability.[[Promise]].
+    // 15. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
 }
