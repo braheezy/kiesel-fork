@@ -245,8 +245,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "compare", compare, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinAccessor(object, "compare", compare, null, realm);
 
         // 10.3.1 Intl.Collator.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.collator.prototype.constructor
@@ -256,7 +256,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
         );
 
-        // 10.3.2 Intl.Collator.prototype [ %Symbol.toStringTag% ]
+        // 10.3.4 Intl.Collator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.collator.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Collator"),
@@ -266,64 +266,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 10.3.3 get Intl.Collator.prototype.compare
-    /// https://tc39.es/ecma402/#sec-intl.collator.prototype.compare
-    fn compare(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let collator be the this value.
-        // 2. Perform ? RequireInternalSlot(collator, [[InitializedCollator]]).
-        const collator = try this_value.requireInternalSlot(agent, Collator);
-
-        // 3. If collator.[[BoundCompare]] is undefined, then
-        if (collator.fields.bound_compare == null) {
-            // a. Let F be a new built-in function object as defined in 10.3.3.1.
-            // b. Set F.[[Collator]] to collator.
-            const Captures = struct {
-                collator: *Collator,
-            };
-            const captures = try agent.gc_allocator.create(Captures);
-            captures.* = .{ .collator = collator };
-
-            const collator_compare_function = struct {
-                /// 10.3.3.1 Collator Compare Functions
-                /// https://tc39.es/ecma402/#sec-collator-compare-functions
-                fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-                    const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-
-                    // 1. Let collator be F.[[Collator]].
-                    // 2. Assert: collator is an Object and collator has an [[InitializedCollator]]
-                    //    internal slot.
-                    const collator_ = captures_.collator;
-
-                    // 3. If x is not provided, let x be undefined.
-                    // 4. If y is not provided, let y be undefined.
-                    // 5. Let X be ? ToString(x).
-                    // 6. Let Y be ? ToString(y).
-                    const x = try arguments.get(0).toString(agent_);
-                    const y = try arguments.get(1).toString(agent_);
-
-                    // 7. Return CompareStrings(collator, X, Y).
-                    return compareStrings(agent_.gc_allocator, collator_, x, y);
-                }
-            }.func;
-
-            const bound_compare = try createBuiltinFunction(agent, .{
-                .function = collator_compare_function,
-            }, .{
-                .length = 2,
-                .name = "",
-                .additional_fields = .make(*Captures, captures),
-            });
-
-            // c. Set collator.[[BoundCompare]] to F.
-            collator.fields.bound_compare = bound_compare;
-        }
-
-        // 4. Return collator.[[BoundCompare]].
-        return Value.from(collator.fields.bound_compare.?);
-    }
-
-    /// 10.3.4 Intl.Collator.prototype.resolvedOptions ( )
+    /// 10.3.2 Intl.Collator.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.collator.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -384,6 +327,63 @@ pub const prototype = struct {
 
         // 5. Return options.
         return Value.from(options);
+    }
+
+    /// 10.3.3 get Intl.Collator.prototype.compare
+    /// https://tc39.es/ecma402/#sec-intl.collator.prototype.compare
+    fn compare(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let collator be the this value.
+        // 2. Perform ? RequireInternalSlot(collator, [[InitializedCollator]]).
+        const collator = try this_value.requireInternalSlot(agent, Collator);
+
+        // 3. If collator.[[BoundCompare]] is undefined, then
+        if (collator.fields.bound_compare == null) {
+            // a. Let F be a new built-in function object as defined in 10.3.3.1.
+            // b. Set F.[[Collator]] to collator.
+            const Captures = struct {
+                collator: *Collator,
+            };
+            const captures = try agent.gc_allocator.create(Captures);
+            captures.* = .{ .collator = collator };
+
+            const collator_compare_function = struct {
+                /// 10.3.3.1 Collator Compare Functions
+                /// https://tc39.es/ecma402/#sec-collator-compare-functions
+                fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+                    const function = agent_.activeFunctionObject();
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+
+                    // 1. Let collator be F.[[Collator]].
+                    // 2. Assert: collator is an Object and collator has an [[InitializedCollator]]
+                    //    internal slot.
+                    const collator_ = captures_.collator;
+
+                    // 3. If x is not provided, let x be undefined.
+                    // 4. If y is not provided, let y be undefined.
+                    // 5. Let X be ? ToString(x).
+                    // 6. Let Y be ? ToString(y).
+                    const x = try arguments.get(0).toString(agent_);
+                    const y = try arguments.get(1).toString(agent_);
+
+                    // 7. Return CompareStrings(collator, X, Y).
+                    return compareStrings(agent_.gc_allocator, collator_, x, y);
+                }
+            }.func;
+
+            const bound_compare = try createBuiltinFunction(agent, .{
+                .function = collator_compare_function,
+            }, .{
+                .length = 2,
+                .name = "",
+                .additional_fields = .make(*Captures, captures),
+            });
+
+            // c. Set collator.[[BoundCompare]] to F.
+            collator.fields.bound_compare = bound_compare;
+        }
+
+        // 4. Return collator.[[BoundCompare]].
+        return Value.from(collator.fields.bound_compare.?);
     }
 };
 

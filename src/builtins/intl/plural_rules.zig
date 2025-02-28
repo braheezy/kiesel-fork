@@ -151,8 +151,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "select", select, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinFunction(object, "select", select, 1, realm);
 
         // 16.3.1 Intl.PluralRules.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
@@ -162,7 +162,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
         );
 
-        // 16.3.2 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
+        // 16.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.PluralRules"),
@@ -172,28 +172,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 16.3.3 Intl.PluralRules.prototype.select ( value )
-    /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.select
-    fn select(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const value = arguments.get(0);
-
-        // 1. Let pr be the this value.
-        // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
-        const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
-
-        // 3. Let n be ? ToNumber(value).
-        const n = try value.toNumber(agent);
-
-        // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                @tagName(resolvePlural(plural_rules, n).plural_category),
-            ),
-        );
-    }
-
-    /// 16.3.5 Intl.PluralRules.prototype.resolvedOptions ( )
+    /// 16.3.2 Intl.PluralRules.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -268,6 +247,27 @@ pub const prototype = struct {
 
         // 6. Return options.
         return Value.from(options);
+    }
+
+    /// 16.3.3 Intl.PluralRules.prototype.select ( value )
+    /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.select
+    fn select(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let pr be the this value.
+        // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
+        const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
+
+        // 3. Let n be ? ToNumber(value).
+        const n = try value.toNumber(agent);
+
+        // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                @tagName(resolvePlural(plural_rules, n).plural_category),
+            ),
+        );
     }
 };
 

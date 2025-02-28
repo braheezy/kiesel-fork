@@ -367,19 +367,19 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
-        try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinAccessor(object, "baseName", baseName, null, realm);
         try defineBuiltinAccessor(object, "calendar", calendar, null, realm);
         try defineBuiltinAccessor(object, "caseFirst", caseFirst, null, realm);
         try defineBuiltinAccessor(object, "collation", collation, null, realm);
         try defineBuiltinAccessor(object, "hourCycle", hourCycle, null, realm);
-        try defineBuiltinAccessor(object, "numeric", numeric, null, realm);
-        try defineBuiltinAccessor(object, "numberingSystem", numberingSystem, null, realm);
         try defineBuiltinAccessor(object, "language", language, null, realm);
-        try defineBuiltinAccessor(object, "script", script, null, realm);
+        try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
+        try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
+        try defineBuiltinAccessor(object, "numberingSystem", numberingSystem, null, realm);
+        try defineBuiltinAccessor(object, "numeric", numeric, null, realm);
         try defineBuiltinAccessor(object, "region", region, null, realm);
+        try defineBuiltinAccessor(object, "script", script, null, realm);
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
         // 14.3.1 Intl.Locale.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
@@ -389,7 +389,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
         );
 
-        // 14.3.2 Intl.Locale.prototype [ %Symbol.toStringTag% ]
+        // 14.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Locale"),
@@ -399,7 +399,123 @@ pub const prototype = struct {
         });
     }
 
-    /// 14.3.3 Intl.Locale.prototype.maximize ( )
+    /// 14.3.2 get Intl.Locale.prototype.baseName
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.baseName
+    fn baseName(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return GetLocaleBaseName(loc.[[Locale]]).
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                try locale.fields.locale.basename(agent.gc_allocator),
+            ),
+        );
+    }
+
+    /// 14.3.3 get Intl.Locale.prototype.calendar
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.calendar
+    fn calendar(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[Calendar]].
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "ca",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                } orelse return .undefined,
+            ),
+        );
+    }
+
+    /// 14.3.4 get Intl.Locale.prototype.caseFirst
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.caseFirst
+    fn caseFirst(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[CaseFirst]].
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "kf",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                } orelse return .undefined,
+            ),
+        );
+    }
+
+    /// 14.3.5 get Intl.Locale.prototype.collation
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.collation
+    fn collation(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[Collation]].
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "co",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                } orelse return .undefined,
+            ),
+        );
+    }
+
+    /// 14.3.6 get Intl.Locale.prototype.hourCycle
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.hourCycle
+    fn hourCycle(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[HourCycle]].
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "hc",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                } orelse return .undefined,
+            ),
+        );
+    }
+
+    /// 14.3.7 get Intl.Locale.prototype.language
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
+    fn language(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return GetLocaleLanguage(loc.[[Locale]]).
+        return Value.from(
+            try String.fromAscii(
+                agent.gc_allocator,
+                try locale.fields.locale.language(agent.gc_allocator),
+            ),
+        );
+    }
+
+    /// 14.3.8 Intl.Locale.prototype.maximize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
     fn maximize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -426,7 +542,7 @@ pub const prototype = struct {
         return Value.from(object);
     }
 
-    /// 14.3.4 Intl.Locale.prototype.minimize ( )
+    /// 14.3.9 Intl.Locale.prototype.minimize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
     fn minimize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -453,115 +569,20 @@ pub const prototype = struct {
         return Value.from(object);
     }
 
-    /// 14.3.5 Intl.Locale.prototype.toString ( )
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
-    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 14.3.10 get Intl.Locale.prototype.numberingSystem
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
+    fn numberingSystem(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
-        // 3. Return loc.[[Locale]].
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                try locale.fields.locale.toString(agent.gc_allocator),
-            ),
-        );
-    }
-
-    /// 14.3.6 get Intl.Locale.prototype.baseName
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.baseName
-    fn baseName(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return GetLocaleBaseName(loc.[[Locale]]).
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                try locale.fields.locale.basename(agent.gc_allocator),
-            ),
-        );
-    }
-
-    /// 14.3.7 get Intl.Locale.prototype.calendar
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.calendar
-    fn calendar(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return loc.[[Calendar]].
+        // 3. Return loc.[[NumberingSystem]].
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
-                    "ca",
-                ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
-            ),
-        );
-    }
-
-    /// 14.3.8 get Intl.Locale.prototype.caseFirst
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.caseFirst
-    fn caseFirst(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return loc.[[CaseFirst]].
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                locale.fields.locale.getUnicodeExtension(
-                    agent.gc_allocator,
-                    "kf",
-                ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
-            ),
-        );
-    }
-
-    /// 14.3.9 get Intl.Locale.prototype.collation
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.collation
-    fn collation(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return loc.[[Collation]].
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                locale.fields.locale.getUnicodeExtension(
-                    agent.gc_allocator,
-                    "co",
-                ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
-            ),
-        );
-    }
-
-    /// 14.3.10 get Intl.Locale.prototype.hourCycle
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.hourCycle
-    fn hourCycle(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return loc.[[HourCycle]].
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                locale.fields.locale.getUnicodeExtension(
-                    agent.gc_allocator,
-                    "hc",
+                    "nu",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
                 } orelse return .undefined,
@@ -586,44 +607,23 @@ pub const prototype = struct {
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }
 
-    /// 14.3.12 get Intl.Locale.prototype.numberingSystem
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
-    fn numberingSystem(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 14.3.12 get Intl.Locale.prototype.region
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.region
+    fn region(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
-        // 3. Return loc.[[NumberingSystem]].
+        // 3. Return GetLocaleRegion(loc.[[Locale]]).
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
-                locale.fields.locale.getUnicodeExtension(
-                    agent.gc_allocator,
-                    "nu",
-                ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
             ),
         );
     }
 
-    /// 14.3.13 get Intl.Locale.prototype.language
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
-    fn language(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
-        const locale = try this_value.requireInternalSlot(agent, Locale);
-
-        // 3. Return GetLocaleLanguage(loc.[[Locale]]).
-        return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                try locale.fields.locale.language(agent.gc_allocator),
-            ),
-        );
-    }
-
-    /// 14.3.14 get Intl.Locale.prototype.script
+    /// 14.3.13 get Intl.Locale.prototype.script
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.script
     fn script(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -639,18 +639,18 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.15 get Intl.Locale.prototype.region
-    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.region
-    fn region(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 14.3.14 Intl.Locale.prototype.toString ( )
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
-        // 3. Return GetLocaleRegion(loc.[[Locale]]).
+        // 3. Return loc.[[Locale]].
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
-                try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
+                try locale.fields.locale.toString(agent.gc_allocator),
             ),
         );
     }

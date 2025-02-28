@@ -521,8 +521,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "format", format, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinAccessor(object, "format", format, null, realm);
 
         // 11.3.1 Intl.DateTimeFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.constructor
@@ -532,7 +532,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
         );
 
-        // 11.3.2 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
+        // 11.3.7 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.DateTimeFormat"),
@@ -542,70 +542,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 11.3.3 get Intl.DateTimeFormat.prototype.format
-    /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.format
-    fn format(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dtf be the this value.
-        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
-        //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
-        // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
-        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
-
-        // 4. If dtf.[[BoundFormat]] is undefined, then
-        if (date_time_format.fields.bound_format == null) {
-            // a. Let F be a new built-in function object as defined in DateTime Format Functions (11.5.4).
-            // b. Set F.[[DateTimeFormat]] to dtf.
-            const Captures = struct {
-                date_time_format: *DateTimeFormat,
-            };
-            const captures = try agent.gc_allocator.create(Captures);
-            captures.* = .{ .date_time_format = date_time_format };
-
-            const dateTimeFormatFunction = struct {
-                /// 11.5.4 DateTime Format Functions
-                /// https://tc39.es/ecma402/#sec-datetime-format-functions
-                fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-                    const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-                    const date = arguments.get(0);
-
-                    // 1. Let dtf be F.[[DateTimeFormat]].
-                    // 2. Assert: dtf is an Object and dtf has an [[InitializedDateTimeFormat]]
-                    //    internal slot.
-                    const date_time_format_ = captures_.date_time_format;
-
-                    // 3. If date is not provided or is undefined, then
-                    const x = if (date.isUndefined()) blk: {
-                        // a. Let x be ! Call(%Date.now%, undefined).
-                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
-                    } else blk: {
-                        // 4. Else,
-                        // a. Let x be ? ToNumber(date).
-                        break :blk (try date.toNumber(agent_)).asFloat();
-                    };
-
-                    // 5. Return ? FormatDateTime(dtf, x).
-                    return formatDateTime(agent_, date_time_format_, x);
-                }
-            }.func;
-
-            const bound_format = try createBuiltinFunction(agent, .{
-                .function = dateTimeFormatFunction,
-            }, .{
-                .length = 1,
-                .name = "",
-                .additional_fields = .make(*Captures, captures),
-            });
-
-            // c. Set dtf.[[BoundFormat]] to F.
-            date_time_format.fields.bound_format = bound_format;
-        }
-
-        // 5. Return dtf.[[BoundFormat]].
-        return Value.from(date_time_format.fields.bound_format.?);
-    }
-
-    /// 11.3.7 Intl.DateTimeFormat.prototype.resolvedOptions ( )
+    /// 11.3.2 Intl.DateTimeFormat.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -680,6 +617,69 @@ pub const prototype = struct {
 
         // 6. Return options.
         return Value.from(options);
+    }
+
+    /// 11.3.3 get Intl.DateTimeFormat.prototype.format
+    /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.format
+    fn format(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let dtf be the this value.
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
+        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+
+        // 4. If dtf.[[BoundFormat]] is undefined, then
+        if (date_time_format.fields.bound_format == null) {
+            // a. Let F be a new built-in function object as defined in DateTime Format Functions (11.5.4).
+            // b. Set F.[[DateTimeFormat]] to dtf.
+            const Captures = struct {
+                date_time_format: *DateTimeFormat,
+            };
+            const captures = try agent.gc_allocator.create(Captures);
+            captures.* = .{ .date_time_format = date_time_format };
+
+            const dateTimeFormatFunction = struct {
+                /// 11.5.4 DateTime Format Functions
+                /// https://tc39.es/ecma402/#sec-datetime-format-functions
+                fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+                    const function = agent_.activeFunctionObject();
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const date = arguments.get(0);
+
+                    // 1. Let dtf be F.[[DateTimeFormat]].
+                    // 2. Assert: dtf is an Object and dtf has an [[InitializedDateTimeFormat]]
+                    //    internal slot.
+                    const date_time_format_ = captures_.date_time_format;
+
+                    // 3. If date is not provided or is undefined, then
+                    const x = if (date.isUndefined()) blk: {
+                        // a. Let x be ! Call(%Date.now%, undefined).
+                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
+                    } else blk: {
+                        // 4. Else,
+                        // a. Let x be ? ToNumber(date).
+                        break :blk (try date.toNumber(agent_)).asFloat();
+                    };
+
+                    // 5. Return ? FormatDateTime(dtf, x).
+                    return formatDateTime(agent_, date_time_format_, x);
+                }
+            }.func;
+
+            const bound_format = try createBuiltinFunction(agent, .{
+                .function = dateTimeFormatFunction,
+            }, .{
+                .length = 1,
+                .name = "",
+                .additional_fields = .make(*Captures, captures),
+            });
+
+            // c. Set dtf.[[BoundFormat]] to F.
+            date_time_format.fields.bound_format = bound_format;
+        }
+
+        // 5. Return dtf.[[BoundFormat]].
+        return Value.from(date_time_format.fields.bound_format.?);
     }
 };
 

@@ -146,8 +146,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "segment", segment, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinFunction(object, "segment", segment, 1, realm);
 
         // 18.3.1 Intl.Segmenter.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype.constructor
@@ -157,7 +157,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
         );
 
-        // 18.3.2 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
+        // 18.3.4 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Segmenter"),
@@ -167,23 +167,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 18.3.3 Intl.Segmenter.prototype.segment ( string )
-    /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.segment
-    fn segment(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const string_value = arguments.get(0);
-
-        // 1. Let segmenter be the this value.
-        // 2. Perform ? RequireInternalSlot(segmenter, [[InitializedSegmenter]]).
-        const segmenter = try this_value.requireInternalSlot(agent, Segmenter);
-
-        // 3. Let string be ? ToString(string).
-        const string = try string_value.toString(agent);
-
-        // 4. Return CreateSegmentsObject(segmenter, string).
-        return Value.from(try createSegmentsObject(agent, segmenter, string));
-    }
-
-    /// 18.3.4 Intl.Segmenter.prototype.resolvedOptions ( )
+    /// 18.3.2 Intl.Segmenter.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -220,6 +204,22 @@ pub const prototype = struct {
 
         // 5. Return options.
         return Value.from(options);
+    }
+
+    /// 18.3.3 Intl.Segmenter.prototype.segment ( string )
+    /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.segment
+    fn segment(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const string_value = arguments.get(0);
+
+        // 1. Let segmenter be the this value.
+        // 2. Perform ? RequireInternalSlot(segmenter, [[InitializedSegmenter]]).
+        const segmenter = try this_value.requireInternalSlot(agent, Segmenter);
+
+        // 3. Let string be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Return CreateSegmentsObject(segmenter, string).
+        return Value.from(try createSegmentsObject(agent, segmenter, string));
     }
 };
 

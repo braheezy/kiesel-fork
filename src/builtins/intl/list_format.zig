@@ -179,8 +179,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "format", format, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinFunction(object, "format", format, 1, realm);
 
         // 13.3.1 Intl.ListFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.constructor
@@ -190,7 +190,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
         );
 
-        // 13.3.2 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
+        // 13.3.5 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.ListFormat"),
@@ -200,27 +200,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 13.3.3 Intl.ListFormat.prototype.format ( list )
-    /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.format
-    fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const list = arguments.get(0);
-
-        // 1. Let lf be the this value.
-        // 2. Perform ? RequireInternalSlot(lf, [[InitializedListFormat]]).
-        const list_format = try this_value.requireInternalSlot(agent, ListFormat);
-
-        // 3. Let stringList be ? StringListFromIterable(list).
-        const string_list = try stringListFromIterable(agent, list);
-        defer {
-            for (string_list) |string| agent.gc_allocator.free(string);
-            agent.gc_allocator.free(string_list);
-        }
-
-        // 4. Return FormatList(lf, stringList).
-        return Value.from(try formatList(agent.gc_allocator, list_format, string_list));
-    }
-
-    /// 13.3.5 Intl.ListFormat.prototype.resolvedOptions ( )
+    /// 13.3.2 Intl.ListFormat.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -256,6 +236,26 @@ pub const prototype = struct {
 
         // 5. Return options.
         return Value.from(options);
+    }
+
+    /// 13.3.3 Intl.ListFormat.prototype.format ( list )
+    /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.format
+    fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const list = arguments.get(0);
+
+        // 1. Let lf be the this value.
+        // 2. Perform ? RequireInternalSlot(lf, [[InitializedListFormat]]).
+        const list_format = try this_value.requireInternalSlot(agent, ListFormat);
+
+        // 3. Let stringList be ? StringListFromIterable(list).
+        const string_list = try stringListFromIterable(agent, list);
+        defer {
+            for (string_list) |string| agent.gc_allocator.free(string);
+            agent.gc_allocator.free(string_list);
+        }
+
+        // 4. Return FormatList(lf, stringList).
+        return Value.from(try formatList(agent.gc_allocator, list_format, string_list));
     }
 };
 
