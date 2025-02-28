@@ -248,9 +248,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     fuzzilli.sanitize_coverage_trace_pc_guard = true;
-    fuzzilli.root_module.addCSourceFile(.{
-        .file = b.path("tools/fuzzilli/coverage.c"),
-    });
 
     const fuzzilli_step = b.step("fuzzilli", "Build and install fuzzilli shell");
     fuzzilli_step.dependOn(&b.addInstallArtifact(fuzzilli, .{}).step);

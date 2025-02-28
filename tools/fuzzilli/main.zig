@@ -9,13 +9,13 @@ const String = kiesel.types.String;
 const Value = kiesel.types.Value;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 
-const REPRL_CRFD = 100;
-const REPRL_CWFD = 101;
-const REPRL_DRFD = 102;
-const REPRL_DWFD = 103;
-const REPRL_MAX_DATA_SIZE = 16 << 20;
-
-extern fn __sanitizer_cov_reset_edgeguards() void;
+const coverage = @import("./coverage.zig");
+const REPRL_CRFD = coverage.REPRL_CRFD;
+const REPRL_CWFD = coverage.REPRL_CWFD;
+const REPRL_DRFD = coverage.REPRL_DRFD;
+const REPRL_DWFD = coverage.REPRL_DWFD;
+const REPRL_MAX_DATA_SIZE = coverage.REPRL_MAX_DATA_SIZE;
+const __sanitizer_cov_reset_edgeguards = coverage.__sanitizer_cov_reset_edgeguards;
 
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#adding-custom-fuzzilli-javascript-builtin
 fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
