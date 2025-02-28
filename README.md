@@ -77,6 +77,7 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | `enable-libgc`      | `true`                                      | Enables building with `libgc`                                                                                                           |
 | `enable-libregexp`  | `true`                                      | Enables building with `libregexp`                                                                                                       |
 | `enable-nan-boxing` | `true` on x86_64/aarch64, `false` otherwise | Enables NaN-boxing which requires a maximum of 48 bits of addressable memory                                                            |
+| `enable-runtime`    | `true`                                      | Enables the [web-compatible runtime](https://codeberg.org/kiesel-js/runtime)                                                            |
 
 ## Usage
 

@@ -47,6 +47,11 @@ pub fn build(b: *std.Build) void {
         .x86_64, .aarch64 => true,
         else => false,
     };
+    const enable_runtime = b.option(
+        bool,
+        "enable-runtime",
+        "Enable the web-compatible runtime",
+    ) orelse true;
 
     var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
     var code: u8 = undefined;
@@ -65,6 +70,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_libgc", enable_libgc);
     options.addOption(bool, "enable_libregexp", enable_libregexp);
     options.addOption(bool, "enable_nan_boxing", enable_nan_boxing);
+    options.addOption(bool, "enable_runtime", enable_runtime);
     options.addOption(std.SemanticVersion, "version", version);
 
     const libgc_cflags_extra: []const u8 = blk: {

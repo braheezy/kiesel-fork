@@ -89,7 +89,9 @@ fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!voi
         realm,
         .builtin_default,
     );
-    try kiesel_runtime.addBindings(realm, global_object);
+    if (kiesel.build_options.enable_runtime) {
+        try kiesel_runtime.addBindings(realm, global_object);
+    }
 }
 
 const Kiesel = struct {
