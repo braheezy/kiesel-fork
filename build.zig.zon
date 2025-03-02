@@ -1,57 +1,58 @@
 .{
-    .name = "kiesel",
+    .name = .kiesel,
     .version = "0.1.0",
+    .fingerprint = 0x411228af4a775b43,
     .dependencies = .{
         .any_pointer = .{
             .url = "https://github.com/ikskuh/any-pointer/archive/d068b14cd30577783de018e280428953d098b3d2.tar.gz",
-            .hash = "1220af067ee5d1d79203dd80957917b522c0ed2f367fd812b5234ce6f682efc13a58",
+            .hash = "N-V-__8AAMBAAACvBn7l0deSA92AlXkXtSLA7S82f9gStSNM",
         },
         .args = .{
-            .url = "https://github.com/ikskuh/zig-args/archive/968258dc1b1230493d8f1677097c832a3d7e0bd8.tar.gz",
-            .hash = "1220bdedf1a993d852d8aebcd63922a8fb163fac37b9c6ff72d187b2847a4a3a4248",
+            .url = "https://github.com/ikskuh/zig-args/archive/9425b94c103a031777fdd272c555ce93a7dea581.tar.gz",
+            .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/521ceab7b720872994305d0140f3cc15a93cf575.tar.gz",
-            .hash = "12203d62f54c325769df7f978f5c608fde4c4567ebf0f1f681486f0476200bbf04a0",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/353548ecdfbf2a2c18f632d9a744a46e89ec17ee.tar.gz",
+            .hash = "icu4zig-0.1.0-IT7GrBUPAgAtH3VHHKNOJ6Z-nVbOX8ukBgM7OBg4_Pih",
             .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/1a0b5c5b9ce9ce3b39021a19801c6be3d033abb0.tar.gz",
-            .hash = "1220a379d0bc5201d505276ee17150311624b12e3eb07845fdd51e74bc7e72160b88",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/1460e6a884e532244d7fdd1ac5ed0a56e887b7b9.tar.gz",
+            .hash = "kiesel_runtime-0.1.0-goZjAcMbAQArmVfy0MAQgRjWU8OfKglb_6CbfEPhJ6oa",
             .lazy = true,
         },
         .libgc = .{
-            // FIXME: This points to https://github.com/ivmai/bdwgc/pull/706, update once merged
-            .url = "https://github.com/ivmai/bdwgc/archive/1574d38e92009f850b5145fa994879ca7e3a8cd5.tar.gz",
-            .hash = "1220a1391ef5c780e43d5f85a5ea8eda32c3bd06be04f5667adb3dfe9f276c37b385",
+            .url = "https://github.com/ivmai/bdwgc/archive/f6707d6ca5ad1b22559727389f55a11c1120aa26.tar.gz",
+            .hash = "N-V-__8AACt8LgDZgzHCZ_Y4YSRDRafeKGZQAdbgl7iXFUV7",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/43ffb2ad0886d9684663274026495b67ecd8a753.tar.gz",
-            .hash = "1220d91aad40f1c5bbc1a7959e77614d12c0c30452924174a431560c8a8659dbce8a",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/4a202d6a0698ad23384b7193bd8cc3e972d82294.tar.gz",
+            .hash = "libregexp-0.1.0-HanscSYNAACoMYYf4jJYwLHWTkndCMqKtJMYIkovxsSA",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
             .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/a4ea24f105902111633c6ae9f888b676ac5e36df.tar.gz",
-            .hash = "12209cc9ee372456eda52b71cf9ae77dcc707fa42c9f9d68996b5bf7495b53229c2e",
+            .hash = "N-V-__8AAG0-dAOcye43JFbtpStxz5rnfcxwf6Qsn51omWtb",
             .lazy = true,
         },
         .parser_toolkit = .{
             .url = "https://github.com/ikskuh/parser-toolkit/archive/6aafc4cd8f82e053b35a4b96dd7255164a487f77.tar.gz",
-            .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
+            .hash = "N-V-__8AAA1AEwAg3OpokIgsir6QuePs8a9UuKYM4SlcTpLU",
         },
         .stackinfo = .{
-            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/d48774270e354d3b89576b23294a8cd001a9d50b.tar.gz",
-            .hash = "122069482f7c57b8eccbe6f4666f16cd8225e57251c235c788fa022eb7f99df8fb23",
+            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/72edb4301313aabe2593d62814fccc8c39f6dbd1.tar.gz",
+            .hash = "stackinfo-0.1.0-NZ2qTskbAAAefz3d7vjalblduNIyOzuwKg9Yx6CnUtee",
         },
         .unicode_id = .{
-            .url = "https://codeberg.org/injuly/unicode-id/archive/10e8dfae849b3e550529de663f71ae8e49e5bde8.tar.gz",
-            .hash = "1220d21683f2d62b7488ca640c79cd3004cef4b7a369c8193882aec78ddb196410de",
+            // FIXME: This points to https://codeberg.org/injuly/unicode-id/pulls/2, update once merged
+            .url = "https://codeberg.org/injuly/unicode-id/archive/68dc513288e26ff5e28c8555949d59b4447d319c.tar.gz",
+            .hash = "unicode_id-0.0.1-MsAuU0yBAQA-Wqv13y7g9rSLkmVWJSwy2Ke9BxsOmq0c",
         },
         .zigline = .{
             .url = "https://github.com/alimpfard/zigline/archive/8b4d0fec9f4ed50bef6e94826548f087af68bf66.tar.gz",
-            .hash = "1220ad280d071280e247e5f8c7dea6c16523cb69be1db62f8fd1860cff32d5ebed64",
+            .hash = "N-V-__8AAK0TAgCtKA0HEoDiR-X4x96mwWUjy2m-HbYvj9GG",
         },
     },
     .paths = .{
