@@ -20,7 +20,14 @@ const String = @This();
 pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
-pub const whitespace = language.tokenizer.whitespace ++ language.tokenizer.line_terminators;
+pub const whitespace_code_units = blk: {
+    const whitespace = language.tokenizer.whitespace ++ language.tokenizer.line_terminators;
+    var code_units: [whitespace.len]u21 = undefined;
+    for (whitespace, 0..) |utf8, i| {
+        code_units[i] = std.unicode.utf8Decode(utf8) catch unreachable;
+    }
+    break :blk code_units;
+};
 
 pub const empty = fromLiteral("");
 
@@ -327,7 +334,7 @@ pub fn isWellFormedUnicode(self: *const String) bool {
     return true;
 }
 
-const CodePoint = struct {
+pub const CodePoint = struct {
     code_point: u21,
     code_unit_count: u2,
     is_unpaired_surrogate: bool,
@@ -461,13 +468,6 @@ pub fn trim(
     allocator: std.mem.Allocator,
     where: enum { start, end, @"start+end" },
 ) std.mem.Allocator.Error!*const String {
-    const whitespace_code_units = comptime blk: {
-        var code_units: [whitespace.len]u21 = undefined;
-        for (whitespace, 0..) |utf8, i| {
-            code_units[i] = std.unicode.utf8Decode(utf8) catch unreachable;
-        }
-        break :blk code_units;
-    };
     if (self.isEmpty()) return empty;
     switch (where) {
         .start => {

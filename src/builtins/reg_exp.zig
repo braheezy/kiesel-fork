@@ -701,9 +701,10 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try defineBuiltinFunction(object, "escape", escape, 1, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
-        // 22.2.5.1 RegExp.prototype
+        // 22.2.5.2 RegExp.prototype
         // https://tc39.es/ecma262/#sec-regexp.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%RegExp.prototype%"()),
@@ -790,7 +791,142 @@ pub const constructor = struct {
         return Value.from(try regExpInitialize(agent, object, p, f));
     }
 
-    /// 22.2.5.2 get RegExp [ %Symbol.species% ]
+    /// 22.2.5.1 RegExp.escape ( S )
+    /// https://tc39.es/ecma262/#sec-regexp.escape
+    fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const string_value = arguments.get(0);
+
+        // 1. If S is not a String, throw a TypeError exception.
+        if (!string_value.isString()) {
+            return agent.throwException(.type_error, "{} is not a string", .{string_value});
+        }
+        const string = string_value.asString();
+
+        // 2. Let escaped be the empty String.
+        var escaped: String.Builder = .empty;
+        defer escaped.deinit(agent.gc_allocator);
+
+        // 3. Let cpList be StringToCodePoints(S).
+        // 4. For each code point cp of cpList, do
+        var position: usize = 0;
+        while (position < string.length()) {
+            const cp = string.codePointAt(position);
+            defer position += cp.code_unit_count;
+
+            // a. If escaped is the empty String and cp is matched by either DecimalDigit or
+            //    AsciiLetter, then
+            if (position == 0 and std.ascii.isAlphanumeric(std.math.cast(u8, cp.code_point) orelse 0)) {
+                // i. NOTE: Escaping a leading digit ensures that output corresponds with pattern
+                //    text which may be used after a \0 character escape or a DecimalEscape such as
+                //    \1 and still match S rather than be interpreted as an extension of the
+                //    preceding escape sequence. Escaping a leading ASCII letter does the same for
+                //    the context after \c.
+                // ii. Let numericValue be the numeric value of cp.
+                // iii. Let hex be Number::toString(𝔽(numericValue), 16).
+                // iv. Assert: The length of hex is 2.
+                // v. Set escaped to the string-concatenation of the code unit 0x005C (REVERSE
+                //    SOLIDUS), "x", and hex.
+                try escaped.appendString(
+                    agent.gc_allocator,
+                    try String.fromAscii(
+                        agent.gc_allocator,
+                        try std.fmt.allocPrint(agent.gc_allocator, "\\x{x}", .{cp.code_point}),
+                    ),
+                );
+            } else {
+                // b. Else,
+                // i. Set escaped to the string-concatenation of escaped and EncodeForRegExpEscape(cp).
+                try encodeForRegExpEscape(agent.gc_allocator, &escaped, cp);
+            }
+        }
+
+        // 5. Return escaped.
+        return Value.from(try escaped.build(agent.gc_allocator));
+    }
+
+    /// 22.2.5.1.1 EncodeForRegExpEscape ( cp )
+    /// https://tc39.es/ecma262/#sec-encodeforregexpescape
+    fn encodeForRegExpEscape(
+        allocator: std.mem.Allocator,
+        escaped: *String.Builder,
+        cp: String.CodePoint,
+    ) std.mem.Allocator.Error!void {
+        var hex_escape = false;
+        switch (cp.code_point) {
+            // 1. If cp is matched by SyntaxCharacter or cp is U+002F (SOLIDUS), then
+            '^', '$', '\\', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '/' => {
+                // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and
+                //    UTF16EncodeCodePoint(cp).
+                try escaped.appendChar(allocator, '\\');
+                try escaped.appendChar(allocator, @intCast(cp.code_point));
+                return;
+            },
+
+            // 2. Else if cp is a code point listed in the “Code Point” column of Table 67, then
+            '\t'...'\r' => {
+                // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the
+                //    string in the “ControlEscape” column of the row whose “Code Point” column
+                //    contains cp.
+                try escaped.appendChar(allocator, '\\');
+                try escaped.appendChar(
+                    allocator,
+                    ([5]u8{ 't', 'n', 'v', 'f', 'r' })[cp.code_point - 0x09],
+                );
+                return;
+            },
+
+            // 3. Let otherPunctuators be the string-concatenation of ",-=<>#&!%:;@~'`" and the
+            //    code unit 0x0022 (QUOTATION MARK).
+            // 4. Let toEscape be StringToCodePoints(otherPunctuators).
+            ',', '-', '=', '<', '>', '#', '&', '!', '%', ':', ';', '@', '~', '\'', '`', '"' => {
+                hex_escape = true;
+            },
+
+            else => {},
+        }
+
+        // 5. If toEscape contains cp, cp is matched by either WhiteSpace or LineTerminator, or cp
+        //    has the same numeric value as a leading surrogate or trailing surrogate, then
+        if (hex_escape or
+            std.mem.indexOfScalar(u21, &String.whitespace_code_units, cp.code_point) != null or
+            cp.is_unpaired_surrogate)
+        {
+            // a. Let cpNum be the numeric value of cp.
+            // b. If cpNum ≤ 0xFF, then
+            if (cp.code_point <= 0xff) {
+                // i. Let hex be Number::toString(𝔽(cpNum), 16).
+                // ii. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS),
+                //     "x", and StringPad(hex, 2, "0", start).
+                try escaped.appendString(
+                    allocator,
+                    try String.fromAscii(
+                        allocator,
+                        try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{cp.code_point}),
+                    ),
+                );
+                return;
+            }
+
+            // c. Let escaped be the empty String.
+            // d. Let codeUnits be UTF16EncodeCodePoint(cp).
+            // e. For each code unit cu of codeUnits, do
+            // i. Set escaped to the string-concatenation of escaped and UnicodeEscape(cu).
+            // f. Return escaped.
+            try escaped.appendString(
+                allocator,
+                try String.fromAscii(
+                    allocator,
+                    try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{cp.code_point}),
+                ),
+            );
+            return;
+        }
+
+        // 6. Return UTF16EncodeCodePoint(cp).
+        try escaped.appendCodePoint(allocator, cp.code_point);
+    }
+
+    /// 22.2.5.3 get RegExp [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-regexp-%symbol.species%
     fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
