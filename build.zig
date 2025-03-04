@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) void {
 
     const any_pointer = b.dependency("any_pointer", .{});
     const args = b.dependency("args", .{});
+    const kiesel_runtime = b.dependency("kiesel_runtime", .{});
     const libgc = b.dependency("libgc", .{
         .target = target,
         .optimize = optimize,
@@ -142,6 +143,9 @@ pub fn build(b: *std.Build) void {
         kiesel.linkLibrary(libregexp.artifact("regexp"));
     }
 
+    // Ensure the runtime uses the kiesel module defined above.
+    kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
+
     const exe = switch (target.result.os.tag) {
         .uefi => b.addExecutable(.{
             .name = "bootx64",
@@ -149,6 +153,7 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("src/uefi.zig"),
                 .imports = &.{
                     .{ .name = "kiesel", .module = kiesel },
+                    .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
                     .{ .name = "zigline", .module = zigline.module("zigline") },
                 },
                 .target = target,
@@ -163,6 +168,7 @@ pub fn build(b: *std.Build) void {
                     .imports = &.{
                         .{ .name = "args", .module = args.module("args") },
                         .{ .name = "kiesel", .module = kiesel },
+                        .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
                         .{ .name = "zigline", .module = zigline.module("zigline") },
                     },
                     .target = target,
@@ -175,11 +181,6 @@ pub fn build(b: *std.Build) void {
                     })) |icu4zig| {
                         module.addImport("icu4zig", icu4zig.module("icu4zig"));
                     }
-                }
-                if (b.lazyDependency("kiesel_runtime", .{})) |kiesel_runtime| {
-                    // Ensure the runtime uses the kiesel module defined above.
-                    kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
-                    module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
                 }
                 break :blk module;
             },

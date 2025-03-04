@@ -2,6 +2,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const kiesel = @import("kiesel");
+const kiesel_runtime = @import("kiesel-runtime");
 
 const Agent = kiesel.execution.Agent;
 const Diagnostics = kiesel.language.Diagnostics;
@@ -24,6 +25,24 @@ pub const std_options: std.Options = .{
             _: anytype,
         ) void {}
     }.logFn,
+
+    // No std.posix.getrandom() on UEFI
+    .cryptoRandomSeed = struct {
+        fn cryptoRandomSeed(buffer: []u8) void {
+            var rng: *std.os.uefi.protocol.Rng = undefined;
+            const status = std.os.uefi.system_table.boot_services.?.locateProtocol(
+                &std.os.uefi.protocol.Rng.guid,
+                null,
+                @ptrCast(&rng),
+            );
+            // Might return .not_found, e.g. in QEMU without virtio-rng
+            if (status != .success) return;
+            _ = rng.getRNG(null, buffer.len, buffer.ptr);
+        }
+    }.cryptoRandomSeed,
+
+    // tlsCsprngFill() needs this to work on UEFI due to lack of TLS
+    .crypto_always_getrandom = true,
 };
 
 const WriterContext = struct {
@@ -85,6 +104,10 @@ pub fn main() std.os.uefi.Status {
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
+
+    kiesel_runtime.addBindings(realm, realm.global_object) catch |err| switch (err) {
+        error.OutOfMemory => return .out_of_resources,
+    };
 
     stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\n", .{
         .kiesel = kiesel.version,
