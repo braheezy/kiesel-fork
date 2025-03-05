@@ -10,13 +10,6 @@ const PropertyType = Object.PropertyStorage.PropertyType;
 
 const Shape = @This();
 
-// This value is made up, here's what some other engines use:
-// - V8:   1536 - https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/transitions.h;l=153;drc=0afc9ac9afcaab79fc54299039f4d27abf3a086d
-// - SM: 32-100 - https://searchfox.org/mozilla-central/rev/5f2c1701846a54c484d7dd46a291b796f5a67cac/js/src/vm/PropMap.h#625-626
-// - JSC:    64 - https://github.com/WebKit/WebKit/blob/55a405ffb60198aee3fa68ee8af63e352c9bcdda/Source/JavaScriptCore/runtime/Structure.h#L214
-// - LibJS:  64 - https://github.com/SerenityOS/serenity/blob/7c710805ec4ef80a1dcc8f5b60fa9964fa010aa9/Userland/Libraries/LibJS/Runtime/Object.cpp#L1218
-const max_transition_count = 64;
-
 pub const Transition = union(enum) {
     set_prototype: ?*Object,
     set_non_extensible,
@@ -87,13 +80,25 @@ const PropertyMetadata = struct {
     attributes: Attributes,
 };
 
-const State = enum {
-    default,
-    unique,
+const TransitionCount = enum(u8) {
+    /// This shape is no longer transitioning.
+    unique = std.math.maxInt(u8),
+
+    /// This shape has reached the maximum number of transitions and will be made unique the next
+    /// time a transition is requested.
+    ///
+    /// The value is made up, here is what some other engines use:
+    /// - V8:   1536 - https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/transitions.h;l=153;drc=0afc9ac9afcaab79fc54299039f4d27abf3a086d
+    /// - SM: 32-100 - https://searchfox.org/mozilla-central/rev/5f2c1701846a54c484d7dd46a291b796f5a67cac/js/src/vm/PropMap.h#625-626
+    /// - JSC:    64 - https://github.com/WebKit/WebKit/blob/55a405ffb60198aee3fa68ee8af63e352c9bcdda/Source/JavaScriptCore/runtime/Structure.h#L214
+    /// - LibJS:  64 - https://github.com/SerenityOS/serenity/blob/7c710805ec4ef80a1dcc8f5b60fa9964fa010aa9/Userland/Libraries/LibJS/Runtime/Object.cpp#L1218
+    max = 64,
+
+    /// Number of transitions that led to this shape.
+    _,
 };
 
-state: State,
-transition_count: u8,
+transition_count: TransitionCount,
 next_value_index: PropertyIndex.Value,
 next_accessor_index: PropertyIndex.Accessor,
 transitions: Transition.HashMapUnmanaged(*Shape),
@@ -111,8 +116,7 @@ is_htmldda: if (build_options.enable_annex_b) bool else void,
 pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
-        .state = .default,
-        .transition_count = 0,
+        .transition_count = @enumFromInt(0),
         .next_value_index = @enumFromInt(0),
         .next_accessor_index = @enumFromInt(0),
         .transitions = .empty,
@@ -131,9 +135,9 @@ pub fn deinit(self: *Shape, allocator: std.mem.Allocator) void {
 }
 
 pub fn makeUnique(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
-    std.debug.assert(self.state == .default);
+    std.debug.assert(self.transition_count != .unique);
     const shape = try self.clone(allocator);
-    shape.state = .unique;
+    shape.transition_count = .unique;
     return shape;
 }
 
@@ -141,7 +145,6 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
     const shape = try allocator.create(Shape);
     errdefer allocator.destroy(shape);
     shape.* = .{
-        .state = self.state,
         .transition_count = self.transition_count,
         .next_value_index = self.next_value_index,
         .next_accessor_index = self.next_accessor_index,
@@ -157,25 +160,15 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
 fn getOrCreateShape(
     self: *Shape,
     allocator: std.mem.Allocator,
-    transition: ?Transition,
+    transition: Transition,
 ) std.mem.Allocator.Error!*Shape {
-    switch (self.state) {
-        .default => {
-            if (self.transition_count == max_transition_count or transition == null) {
-                return self.makeUnique(allocator);
-            }
-            const shape_gop = try self.transitions.getOrPut(allocator, transition.?);
-            if (shape_gop.found_existing) return shape_gop.value_ptr.*;
-            const shape = try self.clone(allocator);
-            shape.transition_count += 1;
-            shape_gop.value_ptr.* = shape;
-            return shape;
-        },
-        .unique => {
-            std.debug.assert(self.transitions.count() == 0);
-            return self;
-        },
-    }
+    std.debug.assert(@intFromEnum(self.transition_count) < @intFromEnum(TransitionCount.max));
+    const shape_gop = try self.transitions.getOrPut(allocator, transition);
+    if (shape_gop.found_existing) return shape_gop.value_ptr.*;
+    const shape = try self.clone(allocator);
+    shape.transition_count = @enumFromInt(@intFromEnum(self.transition_count) + 1);
+    shape_gop.value_ptr.* = shape;
+    return shape;
 }
 
 pub fn setPrototype(
@@ -183,8 +176,11 @@ pub fn setPrototype(
     allocator: std.mem.Allocator,
     prototype: ?*Object,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .{ .set_prototype = prototype };
-    const shape = try self.getOrCreateShape(allocator, transition);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .{ .set_prototype = prototype }),
+    };
     shape.prototype = prototype;
     return shape;
 }
@@ -194,7 +190,10 @@ pub fn setPrototypeWithoutTransition(
     allocator: std.mem.Allocator,
     prototype: ?*Object,
 ) std.mem.Allocator.Error!*Shape {
-    const shape = try self.getOrCreateShape(allocator, null);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        else => try self.makeUnique(allocator),
+    };
     shape.prototype = prototype;
     return shape;
 }
@@ -203,8 +202,11 @@ pub fn setNonExtensible(
     self: *Shape,
     allocator: std.mem.Allocator,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .set_non_extensible;
-    const shape = try self.getOrCreateShape(allocator, transition);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .set_non_extensible),
+    };
     shape.extensible = false;
     return shape;
 }
@@ -213,7 +215,10 @@ pub fn setNonExtensibleWithoutTransition(
     self: *Shape,
     allocator: std.mem.Allocator,
 ) std.mem.Allocator.Error!*Shape {
-    const shape = try self.getOrCreateShape(allocator, null);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        else => try self.makeUnique(allocator),
+    };
     shape.extensible = false;
     return shape;
 }
@@ -222,8 +227,11 @@ pub fn setIsHTMLDDA(
     self: *Shape,
     allocator: std.mem.Allocator,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .set_is_htmldda;
-    const shape = try self.getOrCreateShape(allocator, transition);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .set_is_htmldda),
+    };
     shape.is_htmldda = true;
     return shape;
 }
@@ -232,7 +240,10 @@ pub fn setIsHTMLDDAWithoutTransition(
     self: *Shape,
     allocator: std.mem.Allocator,
 ) std.mem.Allocator.Error!*Shape {
-    const shape = try self.getOrCreateShape(allocator, null);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        else => try self.makeUnique(allocator),
+    };
     shape.is_htmldda = true;
     return shape;
 }
@@ -244,10 +255,13 @@ pub fn setProperty(
     attributes: Attributes,
     property_type: PropertyType,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .{
-        .set_property = .{ property_key, attributes, property_type },
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .{
+            .set_property = .{ property_key, attributes, property_type },
+        }),
     };
-    const shape = try self.getOrCreateShape(allocator, transition);
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
@@ -276,7 +290,10 @@ pub fn setPropertyWithoutTransition(
     attributes: Attributes,
     property_type: PropertyType,
 ) std.mem.Allocator.Error!*Shape {
-    const shape = try self.getOrCreateShape(allocator, null);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        else => try self.makeUnique(allocator),
+    };
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
@@ -303,8 +320,11 @@ pub fn deleteProperty(
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!*Shape {
-    const transition: Transition = .{ .delete_property = property_key };
-    const shape = try self.getOrCreateShape(allocator, transition);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .{ .delete_property = property_key }),
+    };
     // No-op if we got the shape from a previous transition
     _ = shape.properties.orderedRemove(property_key);
     return shape;
@@ -315,7 +335,10 @@ pub fn deletePropertyWithoutTransition(
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!*Shape {
-    const shape = try self.getOrCreateShape(allocator, null);
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        else => try self.makeUnique(allocator),
+    };
     const removed = shape.properties.orderedRemove(property_key);
     std.debug.assert(removed);
     return shape;
