@@ -511,12 +511,13 @@ fn stringGetOwnProperty(
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 1,
-            .name = "String",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            1,
+            "String",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

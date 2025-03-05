@@ -28,12 +28,13 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 0,
-            .name = "WeakSet",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "WeakSet",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

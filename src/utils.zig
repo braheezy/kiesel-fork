@@ -147,8 +147,8 @@ fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
 pub fn defineBuiltinAccessor(
     object: *Object,
     comptime name: []const u8,
-    getter: ?*const Behaviour.Function,
-    setter: ?*const Behaviour.Function,
+    comptime getter: ?Behaviour.Function,
+    comptime setter: ?Behaviour.Function,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
     return defineBuiltinAccessorWithAttributes(
@@ -164,8 +164,8 @@ pub fn defineBuiltinAccessor(
 pub fn defineBuiltinAccessorWithAttributes(
     object: *Object,
     comptime name: []const u8,
-    getter: ?*const Behaviour.Function,
-    setter: ?*const Behaviour.Function,
+    comptime getter: ?Behaviour.Function,
+    comptime setter: ?Behaviour.Function,
     realm: *Realm,
     attributes: struct {
         enumerable: bool,
@@ -173,22 +173,26 @@ pub fn defineBuiltinAccessorWithAttributes(
     },
 ) std.mem.Allocator.Error!void {
     const agent = object.agent;
-    std.debug.assert(getter != null or setter != null);
+    comptime std.debug.assert(getter != null or setter != null);
     const getter_function = if (getter) |function| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(agent, .{ .function = function }, .{
-            .length = 0,
-            .name = function_name,
-            .realm = realm,
-        });
+        break :blk try createBuiltinFunction(
+            agent,
+            .{ .function = function },
+            0,
+            function_name,
+            .{ .realm = realm },
+        );
     } else null;
     const setter_function = if (setter) |function| blk: {
         const function_name = std.fmt.comptimePrint("set {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(agent, .{ .function = function }, .{
-            .length = 0,
-            .name = function_name,
-            .realm = realm,
-        });
+        break :blk try createBuiltinFunction(
+            agent,
+            .{ .function = function },
+            0,
+            function_name,
+            .{ .realm = realm },
+        );
     } else null;
     const property_key = getPropertyKey(name, agent);
     const attributes_: Object.PropertyStorage.Attributes = .{
@@ -211,24 +215,26 @@ pub fn defineBuiltinAccessorWithAttributes(
 pub fn defineBuiltinFunction(
     object: *Object,
     comptime name: []const u8,
-    function: *const Behaviour.Function,
-    length: u32,
+    comptime function: Behaviour.Function,
+    comptime length: u32,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
-    const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
-        .length = length,
-        .name = function_name,
-        .realm = realm,
-    });
+    const builtin_function = try createBuiltinFunction(
+        realm.agent,
+        .{ .function = function },
+        length,
+        function_name,
+        .{ .realm = realm },
+    );
     try defineBuiltinProperty(object, name, Value.from(builtin_function));
 }
 
 pub fn defineBuiltinFunctionWithAttributes(
     object: *Object,
     comptime name: []const u8,
-    function: *const Behaviour.Function,
-    length: u32,
+    comptime function: Behaviour.Function,
+    comptime length: u32,
     realm: *Realm,
     attributes: struct {
         writable: bool,
@@ -237,11 +243,13 @@ pub fn defineBuiltinFunctionWithAttributes(
     },
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
-    const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
-        .length = length,
-        .name = function_name,
-        .realm = realm,
-    });
+    const builtin_function = try createBuiltinFunction(
+        realm.agent,
+        .{ .function = function },
+        length,
+        function_name,
+        .{ .realm = realm },
+    );
     try defineBuiltinProperty(object, name, PropertyDescriptor{
         .value = Value.from(builtin_function),
         .writable = attributes.writable,
@@ -253,7 +261,7 @@ pub fn defineBuiltinFunctionWithAttributes(
 pub fn defineBuiltinFunctionLazy(
     object: *Object,
     comptime name: []const u8,
-    comptime function: *const Behaviour.Function,
+    comptime function: Behaviour.Function,
     comptime length: u32,
     realm: *Realm,
     attributes: Object.PropertyStorage.Attributes,
@@ -264,11 +272,13 @@ pub fn defineBuiltinFunctionLazy(
         name,
         struct {
             fn initializer(realm_: *Realm) std.mem.Allocator.Error!Value {
-                const builtin_function = try createBuiltinFunction(realm_.agent, .{ .function = function }, .{
-                    .length = length,
-                    .name = function_name,
-                    .realm = realm_,
-                });
+                const builtin_function = try createBuiltinFunction(
+                    realm_.agent,
+                    .{ .function = function },
+                    length,
+                    function_name,
+                    .{ .realm = realm_ },
+                );
                 return Value.from(builtin_function);
             }
         }.initializer,
@@ -308,7 +318,7 @@ pub fn defineBuiltinProperty(
 pub fn defineBuiltinPropertyLazy(
     object: *Object,
     comptime name: []const u8,
-    initializer: *const fn (*Realm) std.mem.Allocator.Error!Value,
+    comptime initializer: fn (*Realm) std.mem.Allocator.Error!Value,
     realm: *Realm,
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {

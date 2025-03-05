@@ -19,11 +19,13 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const function = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .function = impl }, .{
-            .length = 0,
-            .name = "",
-            .realm = realm,
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .function = impl },
+            0,
+            "",
+            .{ .realm = realm },
+        );
     }
 
     pub fn init(_: *Realm, object: *Object) std.mem.Allocator.Error!void {

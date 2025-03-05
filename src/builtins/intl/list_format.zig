@@ -34,12 +34,13 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 0,
-            .name = "ListFormat",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "ListFormat",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

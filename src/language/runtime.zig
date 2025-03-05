@@ -2118,13 +2118,19 @@ pub fn classDefinitionEvaluation(
         // b. Let F be CreateBuiltinFunction(defaultConstructor, 0, className, « [[ConstructorKind]],
         //    [[SourceText]] », the current Realm Record, constructorParent).
         const class_constructor_fields = try agent.gc_allocator.create(ClassConstructorFields);
-        break :blk try createBuiltinFunction(agent, .{ .constructor = default_constructor }, .{
-            .length = 0,
-            .name = try class_name.toUtf8(agent.gc_allocator),
-            .realm = agent.currentRealm(),
-            .prototype = constructor_parent,
-            .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
-        });
+        const function = try createBuiltinFunction(
+            agent,
+            .{ .constructor = default_constructor },
+            0,
+            null,
+            .{
+                .realm = agent.currentRealm(),
+                .prototype = constructor_parent,
+                .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
+            },
+        );
+        try setFunctionName(function, PropertyKey.from(class_name), null);
+        break :blk function;
     } else blk: {
         // 15. Else,
         // a. Let constructorInfo be ! DefineMethod of constructor with arguments proto and

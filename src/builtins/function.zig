@@ -48,12 +48,13 @@ fn GrammarSymbol(comptime T: type) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 1,
-            .name = "Function",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            1,
+            "Function",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -441,12 +442,13 @@ pub fn createDynamicFunction(
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .function = function }, .{
-            .length = 0,
-            .name = "",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .function = function },
+            0,
+            "",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Object.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

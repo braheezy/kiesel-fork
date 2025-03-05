@@ -971,11 +971,13 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     }.func;
 
     // 5. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
-    const on_fulfilled = try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
-        .length = 0,
-        .name = "",
-        .additional_fields = .make(*Captures, captures),
-    });
+    const on_fulfilled = try createBuiltinFunction(
+        agent,
+        .{ .function = fulfilled_closure },
+        0,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
+    );
 
     // 6. Let rejectedClosure be a new Abstract Closure with parameters (error) that captures
     //    module and performs the following steps when called:
@@ -998,11 +1000,13 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     }.func;
 
     // 7. Let onRejected be CreateBuiltinFunction(rejectedClosure, 0, "", « »).
-    const on_rejected = try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
-        .length = 0,
-        .name = "",
-        .additional_fields = .make(*Captures, captures),
-    });
+    const on_rejected = try createBuiltinFunction(
+        agent,
+        .{ .function = rejected_closure },
+        0,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
+    );
 
     // 8. Perform PerformPromiseThen(capability.[[Promise]], onFulfilled, onRejected).
     _ = try performPromiseThen(

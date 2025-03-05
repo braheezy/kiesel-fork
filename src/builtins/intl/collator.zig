@@ -33,12 +33,13 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 0,
-            .name = "Collator",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "Collator",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -370,13 +371,13 @@ pub const prototype = struct {
                 }
             }.func;
 
-            const bound_compare = try createBuiltinFunction(agent, .{
-                .function = collator_compare_function,
-            }, .{
-                .length = 2,
-                .name = "",
-                .additional_fields = .make(*Captures, captures),
-            });
+            const bound_compare = try createBuiltinFunction(
+                agent,
+                .{ .function = collator_compare_function },
+                2,
+                "",
+                .{ .additional_fields = .make(*Captures, captures) },
+            );
 
             // c. Set collator.[[BoundCompare]] to F.
             collator.fields.bound_compare = bound_compare;

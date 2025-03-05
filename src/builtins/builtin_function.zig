@@ -151,10 +151,10 @@ pub fn builtinCallOrConstruct(
 /// https://tc39.es/ecma262/#sec-createbuiltinfunction
 pub fn createBuiltinFunction(
     agent: *Agent,
-    behaviour: Behaviour,
+    comptime behaviour: Behaviour,
+    comptime length: u32,
+    comptime maybe_name: ?[]const u8,
     args: struct {
-        length: u32,
-        name: []const u8,
         realm: ?*Realm = null,
         // NOTE: I don't think any builtin functions are created with a null prototype,
         //       so the null state can serve as 'not present'.
@@ -203,17 +203,19 @@ pub fn createBuiltinFunction(
     });
 
     // 10. Perform SetFunctionLength(func, length).
-    try setFunctionLength(function, @floatFromInt(args.length));
+    try setFunctionLength(function, @floatFromInt(length));
 
     // 11. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
     // 12. Else,
     //     a. Perform SetFunctionName(func, name, prefix).
-    try setFunctionName(
-        function,
-        PropertyKey.from(try String.fromAscii(agent.gc_allocator, args.name)),
-        args.prefix,
-    );
+    // NOTE: We make the name optional because classDefinitionEvaluation() calls createBuiltinFunction()
+    //       with a runtime-known name and we want to keep the assertion in setFunctionName() to
+    //       ensure it only gets called once. It's the caller's responsibility to install the
+    //       function name after the fact.
+    if (maybe_name) |name| {
+        try setFunctionName(function, PropertyKey.from(name), args.prefix);
+    }
 
     // 13. Return func.
     return function;

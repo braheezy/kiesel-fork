@@ -271,11 +271,13 @@ fn continueDynamicImport(
     }.func;
 
     // 5. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
-    const on_rejected = try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
-        .length = 1,
-        .name = "",
-        .additional_fields = .make(*RejectedClosureCaptures, rejected_closure_captures),
-    });
+    const on_rejected = try createBuiltinFunction(
+        agent,
+        .{ .function = rejected_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*RejectedClosureCaptures, rejected_closure_captures) },
+    );
 
     const LinkAndEvaluateClosureCaptures = struct {
         module: Module,
@@ -358,11 +360,13 @@ fn continueDynamicImport(
             }.func;
 
             // e. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
-            const on_fulfilled = try createBuiltinFunction(agent_, .{ .function = fulfilled_closure }, .{
-                .length = 0,
-                .name = "",
-                .additional_fields = .make(*FulfilledClosureCaptures, fulfilled_closure_captures),
-            });
+            const on_fulfilled = try createBuiltinFunction(
+                agent_,
+                .{ .function = fulfilled_closure },
+                0,
+                "",
+                .{ .additional_fields = .make(*FulfilledClosureCaptures, fulfilled_closure_captures) },
+            );
 
             // f. Perform PerformPromiseThen(evaluatePromise, onFulfilled, onRejected).
             _ = try performPromiseThen(
@@ -379,14 +383,13 @@ fn continueDynamicImport(
     }.func;
 
     // 7. Let linkAndEvaluate be CreateBuiltinFunction(linkAndEvaluateClosure, 0, "", « »).
-    const link_and_evaluate = try createBuiltinFunction(agent, .{ .function = link_and_evaluate_closure }, .{
-        .length = 0,
-        .name = "",
-        .additional_fields = .make(
-            *LinkAndEvaluateClosureCaptures,
-            link_and_evaluate_closure_captures,
-        ),
-    });
+    const link_and_evaluate = try createBuiltinFunction(
+        agent,
+        .{ .function = link_and_evaluate_closure },
+        0,
+        "",
+        .{ .additional_fields = .make(*LinkAndEvaluateClosureCaptures, link_and_evaluate_closure_captures) },
+    );
 
     // 8. Perform PerformPromiseThen(loadPromise, linkAndEvaluate, onRejected).
     _ = try performPromiseThen(

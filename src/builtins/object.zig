@@ -33,12 +33,13 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*types.Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 1,
-            .name = "Object",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            1,
+            "Object",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
@@ -357,11 +358,13 @@ pub const constructor = struct {
         }.func;
 
         // 5. Let adder be CreateBuiltinFunction(closure, 2, "", « »).
-        const adder = try createBuiltinFunction(agent, .{ .function = closure }, .{
-            .length = 2,
-            .name = "",
-            .additional_fields = .make(*Captures, captures),
-        });
+        const adder = try createBuiltinFunction(
+            agent,
+            .{ .function = closure },
+            2,
+            "",
+            .{ .additional_fields = .make(*Captures, captures) },
+        );
 
         // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).
         return Value.from(try addEntriesFromIterable(agent, object, iterable, adder));

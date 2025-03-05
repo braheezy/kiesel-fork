@@ -22,12 +22,13 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-generatorfunction-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 1,
-            .name = "GeneratorFunction",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            1,
+            "GeneratorFunction",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

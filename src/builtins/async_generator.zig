@@ -768,11 +768,13 @@ pub fn asyncGeneratorAwaitReturn(
 
     // 12. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
     const on_fulfilled = Value.from(
-        try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
-            .length = 1,
-            .name = "",
-            .additional_fields = .make(*Captures, captures),
-        }),
+        try createBuiltinFunction(
+            agent,
+            .{ .function = fulfilled_closure },
+            1,
+            "",
+            .{ .additional_fields = .make(*Captures, captures) },
+        ),
     );
 
     // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
@@ -803,11 +805,13 @@ pub fn asyncGeneratorAwaitReturn(
 
     // 14. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
     const on_rejected = Value.from(
-        try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
-            .length = 1,
-            .name = "",
-            .additional_fields = .make(*Captures, captures),
-        }),
+        try createBuiltinFunction(
+            agent,
+            .{ .function = rejected_closure },
+            1,
+            "",
+            .{ .additional_fields = .make(*Captures, captures) },
+        ),
     );
 
     // 15. Perform PerformPromiseThen(promise, onFulfilled, onRejected).

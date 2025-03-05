@@ -29,12 +29,13 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 2,
-            .name = "AggregateError",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Error%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            2,
+            "AggregateError",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Error%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

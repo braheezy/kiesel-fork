@@ -719,12 +719,13 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 0,
-            .name = "TypedArray",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "TypedArray",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -3790,12 +3791,13 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
     const name = element_type.typedArrayName();
     return struct {
         pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-            return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-                .length = 3,
-                .name = name,
-                .realm = realm,
-                .prototype = try realm.intrinsics.@"%TypedArray%"(),
-            });
+            return createBuiltinFunction(
+                realm.agent,
+                .{ .constructor = impl },
+                3,
+                name,
+                .{ .realm = realm, .prototype = try realm.intrinsics.@"%TypedArray%"() },
+            );
         }
 
         pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

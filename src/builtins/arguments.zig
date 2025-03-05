@@ -463,11 +463,13 @@ fn makeArgGetter(
 
     // 2. Let getter be CreateBuiltinFunction(getterClosure, 0, "", « »).
     // 3. NOTE: getter is never directly accessible to ECMAScript code.
-    const getter = try createBuiltinFunction(agent, .{ .function = getter_closure }, .{
-        .length = 1,
-        .name = "",
-        .additional_fields = .make(*Captures, captures),
-    });
+    const getter = try createBuiltinFunction(
+        agent,
+        .{ .function = getter_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
+    );
 
     // 4. Return getter.
     return getter;
@@ -505,11 +507,13 @@ fn makeArgSetter(
 
     // 2. Let setter be CreateBuiltinFunction(setterClosure, 1, "", « »).
     // 3. NOTE: setter is never directly accessible to ECMAScript code.
-    const setter = try createBuiltinFunction(agent, .{ .function = setter_closure }, .{
-        .length = 1,
-        .name = "",
-        .additional_fields = .make(*Captures, captures),
-    });
+    const setter = try createBuiltinFunction(
+        agent,
+        .{ .function = setter_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
+    );
 
     // 4. Return setter.
     return setter;

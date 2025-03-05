@@ -463,12 +463,13 @@ pub fn createDateTimeFormat(
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 0,
-            .name = "DateTimeFormat",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "DateTimeFormat",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -666,13 +667,13 @@ pub const prototype = struct {
                 }
             }.func;
 
-            const bound_format = try createBuiltinFunction(agent, .{
-                .function = dateTimeFormatFunction,
-            }, .{
-                .length = 1,
-                .name = "",
-                .additional_fields = .make(*Captures, captures),
-            });
+            const bound_format = try createBuiltinFunction(
+                agent,
+                .{ .function = dateTimeFormatFunction },
+                1,
+                "",
+                .{ .additional_fields = .make(*Captures, captures) },
+            );
 
             // c. Set dtf.[[BoundFormat]] to F.
             date_time_format.fields.bound_format = bound_format;

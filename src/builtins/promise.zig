@@ -209,11 +209,13 @@ pub fn createResolvingFunctions(
 
     // 4. Let resolve be CreateBuiltinFunction(stepsResolve, lengthResolve, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const resolve = try createBuiltinFunction(agent, .{ .function = steps_resolve }, .{
-        .length = length_resolve,
-        .name = "",
-        .additional_fields = .make(*AdditionalFields, additional_fields),
-    });
+    const resolve = try createBuiltinFunction(
+        agent,
+        .{ .function = steps_resolve },
+        length_resolve,
+        "",
+        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+    );
 
     additional_fields.* = .{
         // 5. Set resolve.[[Promise]] to promise.
@@ -262,11 +264,13 @@ pub fn createResolvingFunctions(
 
     // 9. Let reject be CreateBuiltinFunction(stepsReject, lengthReject, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const reject = try createBuiltinFunction(agent, .{ .function = steps_reject }, .{
-        .length = length_reject,
-        .name = "",
-        .additional_fields = .make(*AdditionalFields, additional_fields),
-    });
+    const reject = try createBuiltinFunction(
+        agent,
+        .{ .function = steps_reject },
+        length_reject,
+        "",
+        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+    );
 
     // 10. Set reject.[[Promise]] to promise.
     // 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
@@ -368,11 +372,13 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
 
     // 5. Let executor be CreateBuiltinFunction(executorClosure, 2, "", « »).
     const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-    const executor = try createBuiltinFunction(agent, .{ .function = executor_closure }, .{
-        .length = 2,
-        .name = "",
-        .additional_fields = .make(*AdditionalFields, additional_fields),
-    });
+    const executor = try createBuiltinFunction(
+        agent,
+        .{ .function = executor_closure },
+        2,
+        "",
+        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+    );
 
     // NOTE: This struct can outlive the function scope if anything holds on to the callback above.
     additional_fields.* = .{
@@ -838,16 +844,16 @@ fn performPromiseAll(
 
         // f. Let length be the number of non-optional parameters of the function definition in
         //    Promise.all Resolve Element Functions.
-        const length = 1;
-
         // g. Let onFulfilled be CreateBuiltinFunction(steps, length, "", « [[AlreadyCalled]],
         //    [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps }, .{
-            .length = length,
-            .name = "",
-            .additional_fields = .make(*AdditionalFields, additional_fields),
-        });
+        const on_fulfilled = try createBuiltinFunction(
+            agent,
+            .{ .function = steps },
+            1,
+            "",
+            .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+        );
 
         additional_fields.* = .{
             // h. Set onFulfilled.[[AlreadyCalled]] to false.
@@ -1033,16 +1039,16 @@ fn performPromiseAllSettled(
 
         // f. Let lengthFulfilled be the number of non-optional parameters of the function
         //    definition in Promise.allSettled Resolve Element Functions.
-        const length_fulfilled = 1;
-
         // g. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps_fulfilled }, .{
-            .length = length_fulfilled,
-            .name = "",
-            .additional_fields = .make(*AdditionalFields, on_fulfilled_additional_fields),
-        });
+        const on_fulfilled = try createBuiltinFunction(
+            agent,
+            .{ .function = steps_fulfilled },
+            1,
+            "",
+            .{ .additional_fields = .make(*AdditionalFields, on_fulfilled_additional_fields) },
+        );
 
         // h. Let alreadyCalled be the Record { [[Value]]: false }.
         const already_called = try agent.gc_allocator.create(AlreadyCalled);
@@ -1144,16 +1150,16 @@ fn performPromiseAllSettled(
 
         // o. Let lengthRejected be the number of non-optional parameters of the function
         //    definition in Promise.allSettled Reject Element Functions.
-        const length_rejected = 1;
-
         // p. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
-            .length = length_rejected,
-            .name = "",
-            .additional_fields = .make(*AdditionalFields, on_rejected_additional_fields),
-        });
+        const on_rejected = try createBuiltinFunction(
+            agent,
+            .{ .function = steps_rejected },
+            1,
+            "",
+            .{ .additional_fields = .make(*AdditionalFields, on_rejected_additional_fields) },
+        );
 
         on_rejected_additional_fields.* = .{
             // q. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
@@ -1346,16 +1352,16 @@ fn performPromiseAny(
 
         // f. Let lengthRejected be the number of non-optional parameters of the function
         //    definition in Promise.any Reject Element Functions.
-        const length_rejected = 1;
-
         // g. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Errors]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
-            .length = length_rejected,
-            .name = "",
-            .additional_fields = .make(*AdditionalFields, additional_fields),
-        });
+        const on_rejected = try createBuiltinFunction(
+            agent,
+            .{ .function = steps_rejected },
+            1,
+            "",
+            .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+        );
 
         additional_fields.* = .{
             // h. Set onRejected.[[AlreadyCalled]] to false.
@@ -1541,12 +1547,13 @@ pub fn performPromiseThen(
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
-            .length = 1,
-            .name = "Promise",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            1,
+            "Promise",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -2075,13 +2082,13 @@ pub const prototype = struct {
                     }.func;
 
                     // iv. Let valueThunk be CreateBuiltinFunction(returnValue, 0, "", « »).
-                    const value_thunk = try createBuiltinFunction(agent_, .{
-                        .function = return_value,
-                    }, .{
-                        .length = 0,
-                        .name = "",
-                        .additional_fields = .make(*Value, value_capture),
-                    });
+                    const value_thunk = try createBuiltinFunction(
+                        agent_,
+                        .{ .function = return_value },
+                        0,
+                        "",
+                        .{ .additional_fields = .make(*Value, value_capture) },
+                    );
 
                     // v. Return ? Invoke(p, "then", « valueThunk »).
                     return Value.from(new_promise).invoke(
@@ -2094,11 +2101,13 @@ pub const prototype = struct {
 
             // b. Let thenFinally be CreateBuiltinFunction(thenFinallyClosure, 1, "", « »).
             then_finally = Value.from(
-                try createBuiltinFunction(agent, .{ .function = then_finally_closure }, .{
-                    .length = 1,
-                    .name = "",
-                    .additional_fields = .make(*Captures, captures),
-                }),
+                try createBuiltinFunction(
+                    agent,
+                    .{ .function = then_finally_closure },
+                    1,
+                    "",
+                    .{ .additional_fields = .make(*Captures, captures) },
+                ),
             );
 
             // c. Let catchFinallyClosure be a new Abstract Closure with parameters (reason) that
@@ -2137,13 +2146,13 @@ pub const prototype = struct {
                     }.func;
 
                     // iv. Let thrower be CreateBuiltinFunction(throwReason, 0, "", « »).
-                    const thrower = try createBuiltinFunction(agent_, .{
-                        .function = throw_reason,
-                    }, .{
-                        .length = 0,
-                        .name = "",
-                        .additional_fields = .make(*Value, reason_capture),
-                    });
+                    const thrower = try createBuiltinFunction(
+                        agent_,
+                        .{ .function = throw_reason },
+                        0,
+                        "",
+                        .{ .additional_fields = .make(*Value, reason_capture) },
+                    );
 
                     // v. Return ? Invoke(p, "then", « thrower »).
                     return Value.from(new_promise).invoke(
@@ -2156,11 +2165,13 @@ pub const prototype = struct {
 
             // d. Let catchFinally be CreateBuiltinFunction(catchFinallyClosure, 1, "", « »).
             catch_finally = Value.from(
-                try createBuiltinFunction(agent, .{ .function = catch_finally_closure }, .{
-                    .length = 1,
-                    .name = "",
-                    .additional_fields = .make(*Captures, captures),
-                }),
+                try createBuiltinFunction(
+                    agent,
+                    .{ .function = catch_finally_closure },
+                    1,
+                    "",
+                    .{ .additional_fields = .make(*Captures, captures) },
+                ),
             );
         }
 

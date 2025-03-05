@@ -404,11 +404,13 @@ fn asyncFromSyncIteratorContinuation(
 
     // 10. Let onFulfilled be CreateBuiltinFunction(unwrap, 1, "", « »).
     const on_fulfilled = Value.from(
-        try createBuiltinFunction(agent, .{ .function = unwrap }, .{
-            .length = 1,
-            .name = "",
-            .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures),
-        }),
+        try createBuiltinFunction(
+            agent,
+            .{ .function = unwrap },
+            1,
+            "",
+            .{ .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures) },
+        ),
     );
 
     // 11. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
@@ -451,11 +453,13 @@ fn asyncFromSyncIteratorContinuation(
         // c. NOTE: onRejected is used to close the Iterator when the "value" property of an
         //    IteratorResult object it yields is a rejected promise.
         break :blk Value.from(
-            try createBuiltinFunction(agent, .{ .function = close_iterator }, .{
-                .length = 1,
-                .name = "",
-                .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures),
-            }),
+            try createBuiltinFunction(
+                agent,
+                .{ .function = close_iterator },
+                1,
+                "",
+                .{ .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures) },
+            ),
         );
     };
 
