@@ -1,4 +1,4 @@
-//! 18.6 Segment Iterator Objects
+//! 19.6 Segment Iterator Objects
 //! https://tc39.es/ecma402/#sec-segment-iterator-objects
 
 const std = @import("std");
@@ -24,7 +24,7 @@ const findBoundary = builtins.intl.findBoundary;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 18.6.1 CreateSegmentIterator ( segmenter, string )
+/// 19.6.1 CreateSegmentIterator ( segmenter, string )
 /// https://tc39.es/ecma402/#sec-createsegmentiterator
 pub fn createSegmentIterator(
     agent: *Agent,
@@ -53,7 +53,7 @@ pub fn createSegmentIterator(
     return iterator;
 }
 
-/// 18.6.2 The %IntlSegmentIteratorPrototype% Object
+/// 19.6.2 The %IntlSegmentIteratorPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -65,7 +65,7 @@ pub const prototype = struct {
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 18.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
+        // 19.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%Symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Segmenter String Iterator"),
@@ -75,7 +75,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 18.6.2.1 %IntlSegmentIteratorPrototype%.next ( )
+    /// 19.6.2.1 %IntlSegmentIteratorPrototype%.next ( )
     /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. let iterator be the this value.
@@ -123,6 +123,8 @@ pub const prototype = struct {
     }
 };
 
+/// 19.6.3 Properties of Segment Iterator Instances
+/// https://tc39.es/ecma402/#sec-properties-of-segment-iterator-instances
 pub const SegmentIterator = MakeObject(.{
     .Fields = struct {
         iterating_segmenter: *builtins.intl.Segmenter,
@@ -132,7 +134,7 @@ pub const SegmentIterator = MakeObject(.{
     .tag = .intl_segment_iterator,
 });
 
-/// 18.7.1 CreateSegmentDataObject ( segmenter, string, startIndex, endIndex )
+/// 19.7.1 CreateSegmentDataObject ( segmenter, string, startIndex, endIndex )
 /// https://tc39.es/ecma402/#sec-createsegmentdataobject
 pub fn createSegmentDataObject(
     agent: *Agent,

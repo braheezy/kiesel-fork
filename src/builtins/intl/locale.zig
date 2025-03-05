@@ -1,4 +1,4 @@
-//! 14 Locale Objects
+//! 15 Locale Objects
 //! https://tc39.es/ecma402/#locale-objects
 
 const std = @import("std");
@@ -36,7 +36,7 @@ const UnicodeExtensions = struct {
     nu: ?*const String = null,
 };
 
-/// 14.1.2 UpdateLanguageId ( tag, options )
+/// 15.1.2 UpdateLanguageId ( tag, options )
 /// https://tc39.es/ecma402/#sec-updatelanguageid
 fn updateLanguageId(
     agent: *Agent,
@@ -88,7 +88,7 @@ fn updateLanguageId(
     return new_tag;
 }
 
-/// 14.1.3 MakeLocaleRecord ( tag, options, localeExtensionKeys )
+/// 15.1.3 MakeLocaleRecord ( tag, options, localeExtensionKeys )
 /// https://tc39.es/ecma402/#sec-makelocalerecord
 fn makeLocaleRecord(
     agent: *Agent,
@@ -147,7 +147,7 @@ fn makeLocaleRecord(
     return icu4zig.Locale.fromString(new_str) catch unreachable;
 }
 
-/// 14.2 Properties of the Intl.Locale Constructor
+/// 15.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -161,7 +161,7 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 14.2.1 Intl.Locale.prototype
+        // 15.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Locale.prototype%"()),
@@ -171,7 +171,7 @@ pub const constructor = struct {
         });
     }
 
-    /// 14.1.1 Intl.Locale ( tag [ , options ] )
+    /// 15.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
@@ -358,7 +358,7 @@ pub const constructor = struct {
     }
 };
 
-/// 14.3 Properties of the Intl.Locale Prototype Object
+/// 15.3 Properties of the Intl.Locale Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -382,7 +382,7 @@ pub const prototype = struct {
         try defineBuiltinAccessor(object, "script", script, null, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
-        // 14.3.1 Intl.Locale.prototype.constructor
+        // 15.3.1 Intl.Locale.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
         try defineBuiltinProperty(
             object,
@@ -390,7 +390,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
         );
 
-        // 14.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
+        // 15.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Locale"),
@@ -400,7 +400,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 14.3.2 get Intl.Locale.prototype.baseName
+    /// 15.3.2 get Intl.Locale.prototype.baseName
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.baseName
     fn baseName(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -416,7 +416,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.3 get Intl.Locale.prototype.calendar
+    /// 15.3.3 get Intl.Locale.prototype.calendar
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.calendar
     fn calendar(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -437,7 +437,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.4 get Intl.Locale.prototype.caseFirst
+    /// 15.3.4 get Intl.Locale.prototype.caseFirst
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.caseFirst
     fn caseFirst(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -458,7 +458,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.5 get Intl.Locale.prototype.collation
+    /// 15.3.5 get Intl.Locale.prototype.collation
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.collation
     fn collation(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -479,7 +479,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.6 get Intl.Locale.prototype.hourCycle
+    /// 15.3.6 get Intl.Locale.prototype.hourCycle
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.hourCycle
     fn hourCycle(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -500,7 +500,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.7 get Intl.Locale.prototype.language
+    /// 15.3.7 get Intl.Locale.prototype.language
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
     fn language(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -516,7 +516,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.8 Intl.Locale.prototype.maximize ( )
+    /// 15.3.8 Intl.Locale.prototype.maximize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
     fn maximize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -543,7 +543,7 @@ pub const prototype = struct {
         return Value.from(object);
     }
 
-    /// 14.3.9 Intl.Locale.prototype.minimize ( )
+    /// 15.3.9 Intl.Locale.prototype.minimize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
     fn minimize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -570,7 +570,7 @@ pub const prototype = struct {
         return Value.from(object);
     }
 
-    /// 14.3.10 get Intl.Locale.prototype.numberingSystem
+    /// 15.3.10 get Intl.Locale.prototype.numberingSystem
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
     fn numberingSystem(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -591,7 +591,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.11 get Intl.Locale.prototype.numeric
+    /// 15.3.11 get Intl.Locale.prototype.numeric
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numeric
     fn numeric(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -608,7 +608,7 @@ pub const prototype = struct {
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }
 
-    /// 14.3.12 get Intl.Locale.prototype.region
+    /// 15.3.12 get Intl.Locale.prototype.region
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.region
     fn region(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -624,7 +624,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.13 get Intl.Locale.prototype.script
+    /// 15.3.13 get Intl.Locale.prototype.script
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.script
     fn script(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -640,7 +640,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 14.3.14 Intl.Locale.prototype.toString ( )
+    /// 15.3.14 Intl.Locale.prototype.toString ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -657,7 +657,7 @@ pub const prototype = struct {
     }
 };
 
-/// 14.4 Properties of Intl.Locale Instances
+/// 15.4 Properties of Intl.Locale Instances
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-instances
 pub const Locale = MakeObject(.{
     .Fields = struct {

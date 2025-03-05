@@ -34,6 +34,7 @@ comptime {
 pub const collator = @import("./intl/collator.zig");
 pub const date_time_format = @import("./intl/date_time_format.zig");
 pub const display_names = @import("./intl/display_names.zig");
+pub const duration_format = @import("./intl/duration_format.zig");
 pub const list_format = @import("./intl/list_format.zig");
 pub const locale = @import("./intl/locale.zig");
 pub const plural_rules = @import("./intl/plural_rules.zig");
@@ -44,6 +45,7 @@ pub const segments = @import("./intl/segments.zig");
 pub const Collator = collator.Collator;
 pub const DateTimeFormat = date_time_format.DateTimeFormat;
 pub const DisplayNames = display_names.DisplayNames;
+pub const DurationFormat = duration_format.DurationFormat;
 pub const ListFormat = list_format.ListFormat;
 pub const Locale = locale.Locale;
 pub const PluralRules = plural_rules.PluralRules;
@@ -103,7 +105,16 @@ pub const namespace = struct {
             .configurable = true,
         });
 
-        // 8.2.4 Intl.ListFormat ( . . . )
+        // 8.2.4 Intl.DurationFormat ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.durationformat-intro
+        try defineBuiltinProperty(object, "DurationFormat", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.5 Intl.ListFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.listformat-intro
         try defineBuiltinProperty(object, "ListFormat", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
@@ -112,7 +123,7 @@ pub const namespace = struct {
             .configurable = true,
         });
 
-        // 8.2.5 Intl.Locale ( . . . )
+        // 8.2.6 Intl.Locale ( . . . )
         // https://tc39.es/ecma402/#sec-intl.locale-intro
         try defineBuiltinProperty(object, "Locale", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
@@ -121,7 +132,7 @@ pub const namespace = struct {
             .configurable = true,
         });
 
-        // 8.2.7 Intl.PluralRules ( . . . )
+        // 8.2.8 Intl.PluralRules ( . . . )
         // https://tc39.es/ecma402/#sec-intl.pluralrules-intro
         try defineBuiltinProperty(object, "PluralRules", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
@@ -130,7 +141,7 @@ pub const namespace = struct {
             .configurable = true,
         });
 
-        // 8.2.9 Intl.Segmenter ( . . . )
+        // 8.2.10 Intl.Segmenter ( . . . )
         // https://tc39.es/ecma402/#sec-intl.segmenter-intro
         try defineBuiltinProperty(object, "Segmenter", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),

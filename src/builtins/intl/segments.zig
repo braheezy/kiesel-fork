@@ -1,4 +1,4 @@
-//! 18.5 Segments Objects
+//! 19.5 Segments Objects
 //! https://tc39.es/ecma402/#sec-segments-objects
 
 const std = @import("std");
@@ -21,7 +21,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const findBoundary = builtins.intl.findBoundary;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
 
-/// 18.5.1 CreateSegmentsObject ( segmenter, string )
+/// 19.5.1 CreateSegmentsObject ( segmenter, string )
 /// https://tc39.es/ecma402/#sec-createsegmentsobject
 pub fn createSegmentsObject(
     agent: *Agent,
@@ -49,7 +49,7 @@ pub fn createSegmentsObject(
     return segments;
 }
 
-/// 18.5.2 The %IntlSegmentsPrototype% Object
+/// 19.5.2 The %IntlSegmentsPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -63,7 +63,7 @@ pub const prototype = struct {
         try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
     }
 
-    /// 18.5.2.1 %IntlSegmentsPrototype%.containing ( index )
+    /// 19.5.2.1 %IntlSegmentsPrototype%.containing ( index )
     /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%.containing
     fn containing(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
@@ -109,7 +109,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 18.5.2.2 %IntlSegmentsPrototype% [ %Symbol.iterator% ] ( )
+    /// 19.5.2.2 %IntlSegmentsPrototype% [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-%symbol.iterator%
     fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let segments be the this value.
@@ -127,7 +127,7 @@ pub const prototype = struct {
     }
 };
 
-/// 18.5.3 Properties of Segments Instances
+/// 19.5.3 Properties of Segments Instances
 /// https://tc39.es/ecma402/#sec-properties-of-segments-instances
 pub const Segments = MakeObject(.{
     .Fields = struct {

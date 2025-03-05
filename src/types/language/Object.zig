@@ -81,6 +81,7 @@ pub const Tag = enum(u32) {
     intl_collator,
     intl_date_time_format,
     intl_display_names,
+    intl_duration_format,
     intl_list_format,
     intl_locale,
     intl_plural_rules,
@@ -944,8 +945,8 @@ pub fn getOption(
             };
         }
     },
-    comptime values: ?[]const type_.T(),
-    comptime default: anytype,
+    values: ?[]const type_.T(),
+    default: anytype,
 ) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?type_.T() else type_.T() {
     if (@TypeOf(default) != @TypeOf(null) and @TypeOf(default) != type_.T() and default != .required) {
         @compileError("Invalid value for default parameter");

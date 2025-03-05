@@ -1,0 +1,1194 @@
+//! 13 DurationFormat Objects
+//! https://tc39.es/ecma402/#durationformat-objects
+
+const std = @import("std");
+
+const icu4zig = @import("icu4zig");
+
+const abstract_operations = @import("abstract_operations.zig");
+const builtins = @import("../../builtins.zig");
+const execution = @import("../../execution.zig");
+const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
+
+const Agent = execution.Agent;
+const Arguments = types.Arguments;
+const MakeObject = types.MakeObject;
+const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
+const Realm = execution.Realm;
+const String = types.String;
+const Value = types.Value;
+const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
+const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getNumberOption = abstract_operations.getNumberOption;
+const getOptionsObject = abstract_operations.getOptionsObject;
+const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
+const noexcept = utils.noexcept;
+const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+
+/// 13.2 Properties of the Intl.DurationFormat Constructor
+/// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-constructor
+pub const constructor = struct {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+        return createBuiltinFunction(
+            realm.agent,
+            .{ .constructor = impl },
+            0,
+            "DurationFormat",
+            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+        );
+    }
+
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        // 13.2.1 Intl.DurationFormat.prototype
+        // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype
+        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat.prototype%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+    }
+
+    /// 13.1.1 Intl.DurationFormat ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sec-intl-durationformat-constructor
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
+        const locales = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. If NewTarget is undefined, throw a TypeError exception.
+        const new_target = maybe_new_target orelse {
+            return agent.throwException(
+                .type_error,
+                "Intl.DurationFormat must be constructed with 'new'",
+                .{},
+            );
+        };
+
+        // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
+        //    "%Intl.DurationFormatPrototype%", « [[InitializedDurationFormat]], [[Locale]],
+        //    [[NumberingSystem]], [[Style]], [[YearsStyle]], [[YearsDisplay]], [[MonthsStyle]],
+        //    [[MonthsDisplay]], [[WeeksStyle]], [[WeeksDisplay]], [[DaysStyle]], [[DaysDisplay]],
+        //    [[HoursStyle]], [[HoursDisplay]], [[MinutesStyle]], [[MinutesDisplay]],
+        //    [[SecondsStyle]], [[SecondsDisplay]], [[MillisecondsStyle]], [[MillisecondsDisplay]],
+        //    [[MicrosecondsStyle]], [[MicrosecondsDisplay]], [[NanosecondsStyle]],
+        //    [[NanosecondsDisplay]], [[HourMinuteSeparator]], [[MinuteSecondSeparator]],
+        //    [[FractionalDigits]] »).
+        const duration_format = try ordinaryCreateFromConstructor(
+            DurationFormat,
+            agent,
+            new_target,
+            "%Intl.DurationFormat.prototype%",
+            .{
+                .locale = undefined,
+                .numbering_system = undefined,
+                .style = undefined,
+                .years_style = undefined,
+                .years_display = undefined,
+                .months_style = undefined,
+                .months_display = undefined,
+                .weeks_style = undefined,
+                .weeks_display = undefined,
+                .days_style = undefined,
+                .days_display = undefined,
+                .hours_style = undefined,
+                .hours_display = undefined,
+                .minutes_style = undefined,
+                .minutes_display = undefined,
+                .seconds_style = undefined,
+                .seconds_display = undefined,
+                .milliseconds_style = undefined,
+                .milliseconds_display = undefined,
+                .microseconds_style = undefined,
+                .microseconds_display = undefined,
+                .nanoseconds_style = undefined,
+                .nanoseconds_display = undefined,
+                .hour_minute_separator = undefined,
+                .minute_second_separator = undefined,
+                .fractional_digits = undefined,
+            },
+        );
+
+        // 3. Let requestedLocales be ? CanonicalizeLocaleList(locales).
+        const requested_locales = try canonicalizeLocaleList(agent, locales);
+
+        // 4. Let options be ? GetOptionsObject(options).
+        const options = try getOptionsObject(agent, options_value);
+
+        // 5. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
+        //    "best fit").
+        const matcher = try options.getOption(
+            agent,
+            "localeMatcher",
+            .string,
+            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
+            String.fromLiteral("best fit"),
+        );
+
+        // 6. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
+        //    undefined).
+        const numbering_system = try options.getOption(
+            agent,
+            "numberingSystem",
+            .string,
+            null,
+            null,
+        );
+
+        // 7. If numberingSystem is not undefined, then
+        if (numbering_system != null) {
+            // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw a
+            //    RangeError exception.
+            if (!matchUnicodeLocaleIdentifierType(try numbering_system.?.toUtf8(agent.gc_allocator))) {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid locale identifier type '{}'",
+                    .{numbering_system.?},
+                );
+            }
+        }
+
+        // 8. Let opt be the Record { [[localeMatcher]]: matcher, [[nu]]: numberingSystem }.
+        // TODO: 9. Let r be ResolveLocale(%Intl.DurationFormat%.[[AvailableLocales]], requestedLocales,
+        //          opt, %Intl.DurationFormat%.[[RelevantExtensionKeys]], %Intl.DurationFormat%.[[LocaleData]]).
+        _ = matcher;
+        const resolved_locale = if (requested_locales.items.len != 0)
+            requested_locales.items[0]
+        else
+            agent.platform.default_locale;
+        const resolved = .{
+            .locale = resolved_locale,
+            .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
+                try String.fromAscii(agent.gc_allocator, nu)
+            else
+                numbering_system orelse String.fromLiteral("latn"),
+        };
+
+        // 10. Set durationFormat.[[Locale]] to r.[[Locale]].
+        duration_format.as(DurationFormat).fields.locale = resolved.locale;
+
+        // TODO: 11. Let resolvedLocaleData be r.[[LocaleData]].
+        // 12. Let digitalFormat be resolvedLocaleData.[[DigitalFormat]].
+        const digital_format = .{
+            .hour_minute_separator = ':',
+            .minute_second_separator = ':',
+            .two_digit_hours = false,
+        };
+
+        // 13. Set durationFormat.[[HourMinuteSeparator]] to digitalFormat.[[HourMinuteSeparator]].
+        duration_format.as(DurationFormat).fields.hour_minute_separator = digital_format.hour_minute_separator;
+
+        // 14. Set durationFormat.[[MinuteSecondSeparator]] to digitalFormat.[[MinuteSecondSeparator]].
+        duration_format.as(DurationFormat).fields.minute_second_separator = digital_format.minute_second_separator;
+
+        // 15. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
+        duration_format.as(DurationFormat).fields.numbering_system = resolved.numbering_system;
+
+        // 16. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow",
+        //     "digital" », "short").
+        const style = try options.getOption(
+            agent,
+            "style",
+            .string,
+            &.{
+                String.fromLiteral("long"),
+                String.fromLiteral("short"),
+                String.fromLiteral("narrow"),
+                String.fromLiteral("digital"),
+            },
+            String.fromLiteral("short"),
+        );
+
+        // 17. Set durationFormat.[[Style]] to style.
+        const style_map = std.StaticStringMap(
+            DurationFormat.Fields.Style,
+        ).initComptime(&.{
+            .{ "long", .long },
+            .{ "short", .short },
+            .{ "narrow", .narrow },
+            .{ "digital", .digital },
+        });
+        duration_format.as(DurationFormat).fields.style = style_map.get(style.slice.ascii).?;
+
+        // 18. Let prevStyle be the empty String.
+        var prev_style = String.empty;
+
+        // 19. For each row of Table 20, except the header row, in table order, do
+        inline for (comptime .{
+            .{
+                .years,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                },
+                String.fromLiteral("short"),
+            },
+            .{
+                .months,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                },
+                String.fromLiteral("short"),
+            },
+            .{
+                .weeks,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                },
+                String.fromLiteral("short"),
+            },
+            .{
+                .days,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                },
+                String.fromLiteral("short"),
+            },
+            .{
+                .hours,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                    String.fromLiteral("2-digit"),
+                },
+                String.fromLiteral("numeric"),
+            },
+            .{
+                .minutes,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                    String.fromLiteral("2-digit"),
+                },
+                String.fromLiteral("numeric"),
+            },
+            .{
+                .seconds,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                    String.fromLiteral("2-digit"),
+                },
+                String.fromLiteral("numeric"),
+            },
+            .{
+                .milliseconds,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                },
+                String.fromLiteral("numeric"),
+            },
+            .{
+                .microseconds,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                },
+                String.fromLiteral("numeric"),
+            },
+            .{
+                .nanoseconds,
+                &.{
+                    String.fromLiteral("long"),
+                    String.fromLiteral("short"),
+                    String.fromLiteral("narrow"),
+                    String.fromLiteral("numeric"),
+                },
+                String.fromLiteral("numeric"),
+            },
+        }) |row| {
+            // a. Let styleSlot be the Style Slot value of the current row.
+            // b. Let displaySlot be the Display Slot value of the current row.
+            // c. Let unit be the Unit value of the current row.
+            // d. Let valueList be the Values value of the current row.
+            // e. Let digitalBase be the Digital Default value of the current row.
+            const unit, const value_list, const digital_base = row;
+            const style_slot = std.fmt.comptimePrint("{s}_style", .{@tagName(unit)});
+            const display_slot = std.fmt.comptimePrint("{s}_display", .{@tagName(unit)});
+
+            // f. Let unitOptions be ? GetDurationUnitOptions(unit, options, style, valueList,
+            //    digitalBase, prevStyle, digitalFormat.[[TwoDigitHours]]).
+            const unit_options = try getDurationUnitOptions(
+                agent,
+                unit,
+                options,
+                style,
+                value_list,
+                digital_base,
+                prev_style,
+                digital_format.two_digit_hours,
+            );
+
+            // g. Set the value of the styleSlot slot of durationFormat to unitOptions.[[Style]].
+            const unit_style_map = std.StaticStringMap(
+                @FieldType(DurationFormat.Fields, style_slot),
+            ).initComptime(switch (unit) {
+                .years, .months, .weeks, .days => &.{
+                    .{ "long", .long },
+                    .{ "short", .short },
+                    .{ "narrow", .narrow },
+                },
+                .hours, .minutes, .seconds => &.{
+                    .{ "long", .long },
+                    .{ "short", .short },
+                    .{ "narrow", .narrow },
+                    .{ "numeric", .numeric },
+                    .{ "2-digit", .@"2-digit" },
+                },
+                .milliseconds, .microseconds, .nanoseconds => &.{
+                    .{ "long", .long },
+                    .{ "short", .short },
+                    .{ "narrow", .narrow },
+                    .{ "fractional", .fractional },
+                },
+                else => unreachable,
+            });
+            @field(duration_format.as(DurationFormat).fields, style_slot) = unit_style_map.get(
+                unit_options.style.slice.ascii,
+            ).?;
+
+            // h. Set the value of the displaySlot slot of durationFormat to unitOptions.[[Display]].
+            const unit_display_map = std.StaticStringMap(
+                @FieldType(DurationFormat.Fields, display_slot),
+            ).initComptime(&.{
+                .{ "auto", .auto },
+                .{ "always", .always },
+            });
+            @field(duration_format.as(DurationFormat).fields, display_slot) = unit_display_map.get(
+                unit_options.display.slice.ascii,
+            ).?;
+
+            switch (unit) {
+                // i. If unit is one of "hours", "minutes", "seconds", "milliseconds", or
+                //    "microseconds", then
+                .hours, .minutes, .seconds, .milliseconds, .microseconds => {
+                    // i. Set prevStyle to unitOptions.[[Style]].
+                    prev_style = unit_options.style;
+                },
+                else => {},
+            }
+        }
+
+        // 20. Set durationFormat.[[FractionalDigits]] to ? GetNumberOption(options,
+        //     "fractionalDigits", 0, 9, undefined).
+        duration_format.as(DurationFormat).fields.fractional_digits = if (try getNumberOption(
+            agent,
+            options,
+            "fractionalDigits",
+            0,
+            9,
+            null,
+        )) |fractional_digits|
+            @enumFromInt(fractional_digits)
+        else
+            null;
+
+        // 21. Return durationFormat.
+        return Value.from(duration_format);
+    }
+};
+
+/// 13.3 Properties of the Intl.DurationFormat Prototype Object
+/// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-prototype-object
+pub const prototype = struct {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(realm.agent, .{
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+        });
+    }
+
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+        try defineBuiltinFunction(object, "format", format, 1, realm);
+
+        // 13.3.1 Intl.DurationFormat.prototype.constructor
+        // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
+        );
+
+        // 13.3.5 Intl.DurationFormat.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+            .value = Value.from("Intl.DurationFormat"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+    }
+
+    /// 13.3.2 Intl.DurationFormat.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype.resolvedOptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let df be the this value.
+        // 2. Perform ? RequireInternalSlot(df, [[InitializedDurationFormat]]).
+        const duration_format = try this_value.requireInternalSlot(agent, DurationFormat);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each row of Table 21, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. Let v be the value of df's internal slot whose name is the Internal Slot value of the current row.
+        //     c. If p is "fractionalDigits", then
+        //         i. If v is not undefined, perform ! CreateDataPropertyOrThrow(options, p, 𝔽(v)).
+        //     d. Else,
+        //         i. Assert: v is not undefined.
+        //         ii. If v is "fractional", then
+        //             1. Assert: The Internal Slot value of the current row is
+        //                [[MillisecondsStyle]], [[MicrosecondsStyle]], or [[NanosecondsStyle]] .
+        //             2. Set v to "numeric".
+        //         iii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = duration_format.fields.resolvedOptions();
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try duration_format.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("numberingSystem"),
+            Value.from(resolved_options.numbering_system),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("style"),
+            Value.from(resolved_options.style),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("years"),
+            Value.from(resolved_options.years),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("yearsDisplay"),
+            Value.from(resolved_options.years_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("months"),
+            Value.from(resolved_options.months),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("monthsDisplay"),
+            Value.from(resolved_options.months_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("weeks"),
+            Value.from(resolved_options.weeks),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("weeksDisplay"),
+            Value.from(resolved_options.weeks_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("days"),
+            Value.from(resolved_options.days),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("daysDisplay"),
+            Value.from(resolved_options.days_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("hours"),
+            Value.from(resolved_options.hours),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("hoursDisplay"),
+            Value.from(resolved_options.hours_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("minutes"),
+            Value.from(resolved_options.minutes),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("minutesDisplay"),
+            Value.from(resolved_options.minutes_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("minutes"),
+            Value.from(resolved_options.minutes),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("minutesDisplay"),
+            Value.from(resolved_options.minutes_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("seconds"),
+            Value.from(resolved_options.seconds),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("secondsDisplay"),
+            Value.from(resolved_options.seconds_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("milliseconds"),
+            Value.from(resolved_options.milliseconds),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("millisecondsDisplay"),
+            Value.from(resolved_options.milliseconds_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("microseconds"),
+            Value.from(resolved_options.microseconds),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("microsecondsDisplay"),
+            Value.from(resolved_options.microseconds_display),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("nanoseconds"),
+            Value.from(resolved_options.nanoseconds),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("nanosecondsDisplay"),
+            Value.from(resolved_options.nanoseconds_display),
+        ) catch |err| try noexcept(err);
+        if (resolved_options.fractional_digits) |fractional_digits| {
+            options.createDataPropertyOrThrow(
+                PropertyKey.from("fractionalDigits"),
+                Value.from(fractional_digits),
+            ) catch |err| try noexcept(err);
+        }
+
+        // 5. Return options.
+        return Value.from(options);
+    }
+
+    /// 13.3.3 Intl.DurationFormat.prototype.format ( duration )
+    /// https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype.format
+    fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const duration_value = arguments.get(0);
+
+        // 1. Let df be the this value.
+        // 2. Perform ? RequireInternalSlot(df, [[InitializedDurationFormat]]).
+        const duration_format = try this_value.requireInternalSlot(agent, DurationFormat);
+
+        // 3. Let record be ? ToDurationRecord(duration).
+        const duration = try Duration.from(agent, duration_value);
+
+        // 4. Let parts be PartitionDurationFormatPattern(df, record).
+        // 5. Let result be the empty String.
+        // 6. For each Record { [[Type]], [[Value]], [[Unit]] } part in parts, do
+        //    a. Set result to the string-concatenation of result and part.[[Value]].
+        // 7. Return result.
+        // TODO: This is blocked on missing C APIs in ICU4X. https://github.com/unicode-org/icu4x/issues/801
+        _ = duration_format;
+        _ = duration;
+        return agent.throwException(.internal_error, "Duration formatting not implemented", .{});
+    }
+};
+
+/// 13.4 Properties of Intl.DurationFormat Instances
+/// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-instances
+pub const DurationFormat = MakeObject(.{
+    .Fields = struct {
+        pub const Style = enum { long, short, narrow, digital };
+        pub const YearsStyle = enum { long, short, narrow };
+        pub const YearsDisplay = enum { auto, always };
+        pub const MonthsStyle = enum { long, short, narrow };
+        pub const MonthsDisplay = enum { auto, always };
+        pub const WeeksStyle = enum { long, short, narrow };
+        pub const WeeksDisplay = enum { auto, always };
+        pub const DaysStyle = enum { long, short, narrow };
+        pub const DaysDisplay = enum { auto, always };
+        pub const HoursStyle = enum { long, short, narrow, @"2-digit", numeric };
+        pub const HoursDisplay = enum { auto, always };
+        pub const MinutesStyle = enum { long, short, narrow, @"2-digit", numeric };
+        pub const MinutesDisplay = enum { auto, always };
+        pub const SecondsStyle = enum { long, short, narrow, @"2-digit", numeric };
+        pub const SecondsDisplay = enum { auto, always };
+        pub const MillisecondsStyle = enum { long, short, narrow, fractional };
+        pub const MillisecondsDisplay = enum { auto, always };
+        pub const MicrosecondsStyle = enum { long, short, narrow, fractional };
+        pub const MicrosecondsDisplay = enum { auto, always };
+        pub const NanosecondsStyle = enum { long, short, narrow, fractional };
+        pub const NanosecondsDisplay = enum { auto, always };
+        pub const FractionalDigits = enum(u4) { @"0", @"1", @"2", @"3", @"4", @"5", @"6", @"7", @"8", @"9" };
+
+        /// [[Locale]]
+        locale: icu4zig.Locale,
+
+        /// [[NumberingSystem]]
+        numbering_system: *const String,
+
+        /// [[Style]]
+        style: Style,
+
+        /// [[YearsStyle]]
+        years_style: YearsStyle,
+
+        /// [[YearsDisplay]]
+        years_display: YearsDisplay,
+
+        /// [[MonthsStyle]]
+        months_style: MonthsStyle,
+
+        /// [[MonthsDisplay]]
+        months_display: MonthsDisplay,
+
+        /// [[WeeksStyle]]
+        weeks_style: WeeksStyle,
+
+        /// [[WeeksDisplay]]
+        weeks_display: WeeksDisplay,
+
+        /// [[DaysStyle]]
+        days_style: DaysStyle,
+
+        /// [[DaysDisplay]]
+        days_display: DaysDisplay,
+
+        /// [[HoursStyle]]
+        hours_style: HoursStyle,
+
+        /// [[HoursDisplay]]
+        hours_display: HoursDisplay,
+
+        /// [[MinutesStyle]]
+        minutes_style: MinutesStyle,
+
+        /// [[MinutesDisplay]]
+        minutes_display: MinutesDisplay,
+
+        /// [[SecondsStyle]]
+        seconds_style: SecondsStyle,
+
+        /// [[SecondsDisplay]]
+        seconds_display: SecondsDisplay,
+
+        /// [[MillisecondsStyle]]
+        milliseconds_style: MillisecondsStyle,
+
+        /// [[MillisecondsDisplay]]
+        milliseconds_display: MillisecondsDisplay,
+
+        /// [[MicrosecondsStyle]]
+        microseconds_style: MicrosecondsStyle,
+
+        /// [[MicrosecondsDisplay]]
+        microseconds_display: MicrosecondsDisplay,
+
+        /// [[NanosecondsStyle]]
+        nanoseconds_style: NanosecondsStyle,
+
+        /// [[NanosecondsDisplay]]
+        nanoseconds_display: NanosecondsDisplay,
+
+        /// [[HourMinuteSeparator]]
+        hour_minute_separator: u8,
+
+        /// [[MinuteSecondSeparator]]
+        minute_second_separator: u8,
+
+        /// [[FractionalDigits]]
+        fractional_digits: ?FractionalDigits,
+
+        pub const ResolvedOptions = struct {
+            numbering_system: *const String,
+            style: *const String,
+            years: *const String,
+            years_display: *const String,
+            months: *const String,
+            months_display: *const String,
+            weeks: *const String,
+            weeks_display: *const String,
+            days: *const String,
+            days_display: *const String,
+            hours: *const String,
+            hours_display: *const String,
+            minutes: *const String,
+            minutes_display: *const String,
+            seconds: *const String,
+            seconds_display: *const String,
+            milliseconds: *const String,
+            milliseconds_display: *const String,
+            microseconds: *const String,
+            microseconds_display: *const String,
+            nanoseconds: *const String,
+            nanoseconds_display: *const String,
+            fractional_digits: ?u4,
+        };
+
+        pub fn resolvedOptions(self: @This()) ResolvedOptions {
+            return .{
+                .numbering_system = self.numbering_system,
+                .style = switch (self.style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .digital => String.fromLiteral("digital"),
+                },
+                .years = switch (self.years_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                },
+                .years_display = switch (self.years_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .months = switch (self.months_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                },
+                .months_display = switch (self.months_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .weeks = switch (self.weeks_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                },
+                .weeks_display = switch (self.weeks_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .days = switch (self.days_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                },
+                .days_display = switch (self.days_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .hours = switch (self.hours_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .@"2-digit" => String.fromLiteral("2-digit"),
+                    .numeric => String.fromLiteral("numeric"),
+                },
+                .hours_display = switch (self.hours_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .minutes = switch (self.minutes_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .@"2-digit" => String.fromLiteral("2-digit"),
+                    .numeric => String.fromLiteral("numeric"),
+                },
+                .minutes_display = switch (self.minutes_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .seconds = switch (self.seconds_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .@"2-digit" => String.fromLiteral("2-digit"),
+                    .numeric => String.fromLiteral("numeric"),
+                },
+                .seconds_display = switch (self.seconds_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .milliseconds = switch (self.milliseconds_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .fractional => String.fromLiteral("numeric"),
+                },
+                .milliseconds_display = switch (self.milliseconds_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .microseconds = switch (self.microseconds_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .fractional => String.fromLiteral("numeric"),
+                },
+                .microseconds_display = switch (self.microseconds_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .nanoseconds = switch (self.nanoseconds_style) {
+                    .long => String.fromLiteral("long"),
+                    .short => String.fromLiteral("short"),
+                    .narrow => String.fromLiteral("narrow"),
+                    .fractional => String.fromLiteral("numeric"),
+                },
+                .nanoseconds_display = switch (self.nanoseconds_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .always => String.fromLiteral("always"),
+                },
+                .fractional_digits = if (self.fractional_digits) |fractional_digits|
+                    @intFromEnum(fractional_digits)
+                else
+                    null,
+            };
+        }
+    },
+    .tag = .intl_duration_format,
+});
+
+/// 13.5.1 Duration Records
+/// https://tc39.es/ecma402/#sec-duration-records
+const Duration = struct {
+    /// [[Years]]
+    years: f64,
+
+    /// [[Months]]
+    months: f64,
+
+    /// [[Weeks]]
+    weeks: f64,
+
+    /// [[Days]]
+    days: f64,
+
+    /// [[Hours]]
+    hours: f64,
+
+    /// [[Minutes]]
+    minutes: f64,
+
+    /// [[Seconds]]
+    seconds: f64,
+
+    /// [[Milliseconds]]
+    milliseconds: f64,
+
+    /// [[Microseconds]]
+    microseconds: f64,
+
+    /// [[Nanoseconds]]
+    nanoseconds: f64,
+
+    /// 13.5.3 ToDurationRecord ( input )
+    /// https://tc39.es/ecma402/#sec-todurationrecord
+    pub fn from(agent: *Agent, input_value: Value) Agent.Error!Duration {
+        // 1. If input is not an Object, then
+        if (!input_value.isObject()) {
+            // a. If input is a String, throw a RangeError exception.
+            // Note: This is for a future Temporal integration.
+            if (input_value.isString()) {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid duration string {}",
+                    .{input_value},
+                );
+            }
+
+            // b. Throw a TypeError exception.
+            return agent.throwException(.type_error, "{} is not an Object", .{input_value});
+        }
+        const input = input_value.asObject();
+
+        // 2. Let result be a new Duration Record with each field set to 0.
+        var result: Duration = .{
+            .years = 0,
+            .months = 0,
+            .weeks = 0,
+            .days = 0,
+            .hours = 0,
+            .minutes = 0,
+            .seconds = 0,
+            .milliseconds = 0,
+            .microseconds = 0,
+            .nanoseconds = 0,
+        };
+
+        // 3. Let days be ? Get(input, "days").
+        const days = try input.get(PropertyKey.from("days"));
+
+        // 4. If days is not undefined, set result.[[Days]] to ? ToIntegerIfIntegral(days).
+        if (!days.isUndefined()) {
+            result.days = try toIntegerIfIntegral(agent, days);
+        }
+
+        // 5. Let hours be ? Get(input, "hours").
+        const hours = try input.get(PropertyKey.from("hours"));
+
+        // 6. If hours is not undefined, set result.[[Hours]] to ? ToIntegerIfIntegral(hours).
+        if (!hours.isUndefined()) {
+            result.hours = try toIntegerIfIntegral(agent, hours);
+        }
+
+        // 7. Let microseconds be ? Get(input, "microseconds").
+        const microseconds = try input.get(PropertyKey.from("microseconds"));
+
+        // 8. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
+        if (!microseconds.isUndefined()) {
+            result.microseconds = try toIntegerIfIntegral(agent, microseconds);
+        }
+
+        // 9. Let milliseconds be ? Get(input, "milliseconds").
+        const milliseconds = try input.get(PropertyKey.from("milliseconds"));
+
+        // 10. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
+        if (!milliseconds.isUndefined()) {
+            result.milliseconds = try toIntegerIfIntegral(agent, milliseconds);
+        }
+
+        // 11. Let minutes be ? Get(input, "minutes").
+        const minutes = try input.get(PropertyKey.from("minutes"));
+
+        // 12. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(minutes).
+        if (!minutes.isUndefined()) {
+            result.minutes = try toIntegerIfIntegral(agent, minutes);
+        }
+
+        // 13. Let months be ? Get(input, "months").
+        const months = try input.get(PropertyKey.from("months"));
+
+        // 14. If months is not undefined, set result.[[Months]] to ? ToIntegerIfIntegral(months).
+        if (!months.isUndefined()) {
+            result.months = try toIntegerIfIntegral(agent, months);
+        }
+
+        // 15. Let nanoseconds be ? Get(input, "nanoseconds").
+        const nanoseconds = try input.get(PropertyKey.from("nanoseconds"));
+
+        // 16. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
+        if (!nanoseconds.isUndefined()) {
+            result.nanoseconds = try toIntegerIfIntegral(agent, nanoseconds);
+        }
+
+        // 17. Let seconds be ? Get(input, "seconds").
+        const seconds = try input.get(PropertyKey.from("seconds"));
+
+        // 18. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(seconds).
+        if (!seconds.isUndefined()) {
+            result.seconds = try toIntegerIfIntegral(agent, seconds);
+        }
+
+        // 19. Let weeks be ? Get(input, "weeks").
+        const weeks = try input.get(PropertyKey.from("weeks"));
+
+        // 20. If weeks is not undefined, set result.[[Weeks]] to ? ToIntegerIfIntegral(weeks).
+        if (!weeks.isUndefined()) {
+            result.weeks = try toIntegerIfIntegral(agent, weeks);
+        }
+
+        // 21. Let years be ? Get(input, "years").
+        const years = try input.get(PropertyKey.from("years"));
+
+        // 22. If years is not undefined, set result.[[Years]] to ? ToIntegerIfIntegral(years).
+        if (!years.isUndefined()) {
+            result.years = try toIntegerIfIntegral(agent, years);
+        }
+
+        // 23. If years, months, weeks, days, hours, minutes, seconds, milliseconds, microseconds,
+        //     and nanoseconds are all undefined, throw a TypeError exception.
+
+        // TODO: 24. If IsValidDuration( result.[[Years]], result.[[Months]], result.[[Weeks]],
+        //            result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
+        //            result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]) is false,
+        //            then
+        //     a. Throw a RangeError exception.
+
+        // 25. Return result.
+        return result;
+    }
+};
+
+/// 13.5.2 ToIntegerIfIntegral ( argument )
+/// https://tc39.es/ecma402/#sec-tointegerifintegral
+fn toIntegerIfIntegral(agent: *Agent, argument: Value) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(argument).
+    const number = try argument.toNumber(agent);
+
+    // 2. If number is not an integral Number, throw a RangeError exception.
+    if (!number.isIntegral()) {
+        return agent.throwException(.range_error, "{} is not an integral number", .{argument});
+    }
+
+    // 3. Return ℝ(number).
+    return number.asFloat();
+}
+
+const DurationUnitOptions = struct {
+    style: *const String,
+    display: *const String,
+};
+
+const Unit = enum {
+    years,
+    months,
+    weeks,
+    days,
+    hours,
+    minutes,
+    seconds,
+    milliseconds,
+    microseconds,
+    nanoseconds,
+};
+
+/// 13.5.6 GetDurationUnitOptions ( unit, options, baseStyle, stylesList, digitalBase, prevStyle, twoDigitHours )
+/// https://tc39.es/ecma402/#sec-getdurationunitoptions
+fn getDurationUnitOptions(
+    agent: *Agent,
+    comptime unit: Unit,
+    options: *Object,
+    base_style: *const String,
+    comptime styles_list: []const *const String,
+    digital_base: *const String,
+    prev_style: *const String,
+    two_digit_hours: bool,
+) Agent.Error!DurationUnitOptions {
+    // 1. Let style be ? GetOption(options, unit, string, stylesList, undefined).
+    var style = try options.getOption(agent, @tagName(unit), .string, styles_list, null);
+
+    // 2. Let displayDefault be "always".
+    var display_default = String.fromLiteral("always");
+
+    // 3. If style is undefined, then
+    if (style == null) {
+        // a. If baseStyle is "digital", then
+        if (base_style.eql(String.fromLiteral("digital"))) {
+            // i. Set style to digitalBase.
+            style = digital_base;
+
+            // ii. If unit is not one of "hours", "minutes", or "seconds", set displayDefault to "auto".
+            if (!(unit == .hours or unit == .minutes or unit == .seconds)) {
+                display_default = String.fromLiteral("auto");
+            }
+        }
+        // b. Else if prevStyle is one of "fractional", "numeric" or "2-digit", then
+        else if (prev_style.eql(String.fromLiteral("fractional")) or
+            prev_style.eql(String.fromLiteral("numeric")) or
+            prev_style.eql(String.fromLiteral("2-digit")))
+        {
+            // i. Set style to "numeric".
+            style = String.fromLiteral("numeric");
+
+            // ii. If unit is not "minutes" or "seconds", set displayDefault to "auto".
+            if (!(unit == .minutes or unit == .seconds)) {
+                display_default = String.fromLiteral("auto");
+            }
+        }
+        // c. Else,
+        else {
+            // i. Set style to baseStyle.
+            style = base_style;
+
+            // ii. Set displayDefault to "auto".
+            display_default = String.fromLiteral("auto");
+        }
+    }
+
+    // 4. If style is "numeric" and unit is one of "milliseconds", "microseconds", or "nanoseconds", then
+    if (style.?.eql(String.fromLiteral("numeric")) and
+        (unit == .milliseconds or unit == .microseconds or unit == .nanoseconds))
+    {
+        // a. Set style to "fractional".
+        style = String.fromLiteral("fractional");
+
+        // b. Set displayDefault to "auto".
+        display_default = String.fromLiteral("auto");
+    }
+
+    // 5. Let displayField be the string-concatenation of unit and "Display".
+    const display_field = std.fmt.comptimePrint("{s}Display", .{@tagName(unit)});
+
+    // 6. Let display be ? GetOption(options, displayField, string, « "auto", "always" », displayDefault).
+    const display = try options.getOption(
+        agent,
+        display_field,
+        .string,
+        &.{ String.fromLiteral("auto"), String.fromLiteral("always") },
+        display_default,
+    );
+
+    // 7. Perform ? ValidateDurationUnitStyle(unit, style, display, prevStyle).
+    try validateDurationUnitStyle(agent, unit, style.?, display, prev_style);
+
+    // 8. If unit is "hours" and twoDigitHours is true, set style to "2-digit".
+    if (unit == .hours and two_digit_hours) {
+        style = String.fromLiteral("2-digit");
+    }
+
+    // 9. If unit is "minutes" or "seconds" and prevStyle is "numeric" or "2-digit", set style to "2-digit".
+    if ((unit == .minutes or unit == .seconds) and
+        (prev_style.eql(String.fromLiteral("numeric")) or prev_style.eql(String.fromLiteral("2-digit"))))
+    {
+        style = String.fromLiteral("2-digit");
+    }
+
+    // 10. Return the Record { [[Style]]: style, [[Display]]: display  }.
+    return .{ .style = style.?, .display = display };
+}
+
+/// 13.5.6.1 ValidateDurationUnitStyle ( unit, style, display, prevStyle )
+/// https://tc39.es/ecma402/#sec-validatedurationunitstyle
+fn validateDurationUnitStyle(
+    agent: *Agent,
+    unit: Unit,
+    style: *const String,
+    display: *const String,
+    prev_style: *const String,
+) Agent.Error!void {
+    // 1. If display is "always" and style is "fractional", throw a RangeError exception.
+    if (display.eql(String.fromLiteral("always")) and style.eql(String.fromLiteral("fractional"))) {
+        return agent.throwException(
+            .range_error,
+            "Option '{[0]s}' with value 'numeric' and '{[0]s}Display' with value 'always' are incompatible",
+            .{@tagName(unit)},
+        );
+    }
+
+    // 2. If prevStyle is "fractional" and style is not "fractional", throw a RangeError exception.
+    if (prev_style.eql(String.fromLiteral("fractional")) and !style.eql(String.fromLiteral("fractional"))) {
+        return agent.throwException(
+            .range_error,
+            "Option '{s}' following 'numeric' option must be 'numeric'",
+            .{@tagName(unit)},
+        );
+    }
+
+    // 3. If prevStyle is "numeric" or "2-digit" and style is not one of "fractional", "numeric" or
+    //    "2-digit", throw a RangeError exception.
+    if ((prev_style.eql(String.fromLiteral("numeric")) or
+        prev_style.eql(String.fromLiteral("2-digit"))) and
+        !(style.eql(String.fromLiteral("fractional")) or
+            style.eql(String.fromLiteral("numeric")) or
+            style.eql(String.fromLiteral("2-digit"))))
+    {
+        return agent.throwException(
+            .range_error,
+            "Option '{s}' following 'numeric' or '2-digit' option must be 'fractional', 'numeric', or '2-digit'",
+            .{@tagName(unit)},
+        );
+    }
+
+    // 4. Return unused.
+}

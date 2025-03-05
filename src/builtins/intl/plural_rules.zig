@@ -1,4 +1,4 @@
-//! 16 PluralRules Objects
+//! 17 PluralRules Objects
 //! hthttps://tc39.es/ecma402/#pluralrules-objects
 
 const std = @import("std");
@@ -30,7 +30,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 16.2 Properties of the Intl.PluralRules Constructor
+/// 17.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -44,7 +44,7 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 16.2.1 Intl.PluralRules.prototype
+        // 17.2.1 Intl.PluralRules.prototype
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules.prototype%"()),
@@ -54,7 +54,7 @@ pub const constructor = struct {
         });
     }
 
-    /// 16.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
+    /// 17.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
@@ -142,7 +142,7 @@ pub const constructor = struct {
     }
 };
 
-/// 16.3 Properties of the Intl.PluralRules Prototype Object
+/// 17.3 Properties of the Intl.PluralRules Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -155,7 +155,7 @@ pub const prototype = struct {
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
         try defineBuiltinFunction(object, "select", select, 1, realm);
 
-        // 16.3.1 Intl.PluralRules.prototype.constructor
+        // 17.3.1 Intl.PluralRules.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
         try defineBuiltinProperty(
             object,
@@ -163,7 +163,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
         );
 
-        // 16.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
+        // 17.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.PluralRules"),
@@ -173,7 +173,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 16.3.2 Intl.PluralRules.prototype.resolvedOptions ( )
+    /// 17.3.2 Intl.PluralRules.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -250,7 +250,7 @@ pub const prototype = struct {
         return Value.from(options);
     }
 
-    /// 16.3.3 Intl.PluralRules.prototype.select ( value )
+    /// 17.3.3 Intl.PluralRules.prototype.select ( value )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.select
     fn select(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
@@ -272,7 +272,7 @@ pub const prototype = struct {
     }
 };
 
-/// 16.4 Properties of Intl.PluralRules Instances
+/// 17.4 Properties of Intl.PluralRules Instances
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-instances
 pub const PluralRules = MakeObject(.{
     .Fields = struct {
@@ -302,7 +302,7 @@ pub const PluralRules = MakeObject(.{
     .tag = .intl_plural_rules,
 });
 
-/// 16.5.4 ResolvePlural ( pluralRules, n )
+/// 17.5.4 ResolvePlural ( pluralRules, n )
 /// https://tc39.es/ecma402/#sec-resolveplural
 pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct {
     /// [[PluralCategory]]

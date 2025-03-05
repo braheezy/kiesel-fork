@@ -83,6 +83,8 @@ lazy_intrinsics: struct {
     @"%Intl.DateTimeFormat.prototype%": ?*Object = null,
     @"%Intl.DisplayNames%": ?*Object = null,
     @"%Intl.DisplayNames.prototype%": ?*Object = null,
+    @"%Intl.DurationFormat%": ?*Object = null,
+    @"%Intl.DurationFormat.prototype%": ?*Object = null,
     @"%Intl.ListFormat%": ?*Object = null,
     @"%Intl.ListFormat.prototype%": ?*Object = null,
     @"%Intl.Locale%": ?*Object = null,
@@ -385,6 +387,12 @@ pub fn @"%Intl.DisplayNames%"(self: *Intrinsics) std.mem.Allocator.Error!*Object
 }
 pub fn @"%Intl.DisplayNames.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.DisplayNames.prototype%", builtins.intl.display_names.prototype);
+}
+pub fn @"%Intl.DurationFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.DurationFormat%", builtins.intl.duration_format.constructor);
+}
+pub fn @"%Intl.DurationFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.DurationFormat.prototype%", builtins.intl.duration_format.prototype);
 }
 pub fn @"%Intl.ListFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.ListFormat%", builtins.intl.list_format.constructor);

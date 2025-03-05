@@ -732,6 +732,7 @@ fn prettyPrintIntlCollator(
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
+
 fn prettyPrintIntlDateTimeFormat(
     intl_date_time_format: *const builtins.intl.DateTimeFormat,
     writer: anytype,
@@ -790,6 +791,58 @@ fn prettyPrintIntlDisplayNames(
             Value.from(resolved_options.type),
             Value.from(resolved_options.fallback),
         });
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintIntlDurationFormat(
+    intl_duration_format: *const builtins.intl.DurationFormat,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_duration_format.object.agent;
+    const locale = intl_duration_format.fields.locale;
+    const tty_config = state.tty_config;
+
+    const resolved_options = intl_duration_format.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.DurationFormat(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, numberingSystem: {pretty}, style: {pretty}, years: {pretty}, " ++
+        "yearsDisplay: {pretty}, months: {pretty}, monthsDisplay: {pretty}, weeks: {pretty}, " ++
+        "weeksDisplay: {pretty}, days: {pretty}, daysDisplay: {pretty}, hours: {pretty}, " ++
+        "hoursDisplay: {pretty}, minutes: {pretty}, minutesDisplay: {pretty}, seconds: {pretty}, " ++
+        "secondsDisplay: {pretty}, milliseconds: {pretty}, millisecondsDisplay: {pretty}, " ++
+        "microseconds: {pretty}, microsecondsDisplay: {pretty}, nanoseconds: {pretty}, " ++
+        "nanosecondsDisplay: {pretty}", .{
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.numbering_system),
+        Value.from(resolved_options.style),
+        Value.from(resolved_options.years),
+        Value.from(resolved_options.years_display),
+        Value.from(resolved_options.months),
+        Value.from(resolved_options.months_display),
+        Value.from(resolved_options.weeks),
+        Value.from(resolved_options.weeks_display),
+        Value.from(resolved_options.days),
+        Value.from(resolved_options.days_display),
+        Value.from(resolved_options.hours),
+        Value.from(resolved_options.hours_display),
+        Value.from(resolved_options.minutes),
+        Value.from(resolved_options.minutes_display),
+        Value.from(resolved_options.seconds),
+        Value.from(resolved_options.seconds_display),
+        Value.from(resolved_options.milliseconds),
+        Value.from(resolved_options.milliseconds_display),
+        Value.from(resolved_options.microseconds),
+        Value.from(resolved_options.microseconds_display),
+        Value.from(resolved_options.nanoseconds),
+        Value.from(resolved_options.nanoseconds_display),
+    });
+    if (resolved_options.fractional_digits) |fractional_digits| {
+        try writer.print(", fractionalDigits: {pretty}", .{Value.from(fractional_digits)});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1052,6 +1105,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.intl.Collator, prettyPrintIntlCollator },
             .{ builtins.intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
             .{ builtins.intl.DisplayNames, prettyPrintIntlDisplayNames },
+            .{ builtins.intl.DurationFormat, prettyPrintIntlDurationFormat },
             .{ builtins.intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.intl.Locale, prettyPrintIntlLocale },
             .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },

@@ -1,4 +1,4 @@
-//! 18 Segmenter Objects
+//! 19 Segmenter Objects
 //! https://tc39.es/ecma402/#segmenter-objects
 
 const std = @import("std");
@@ -30,7 +30,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 18.2 Properties of the Intl.Segmenter Constructor
+/// 19.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -44,7 +44,7 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 18.2.1 Intl.Segmenter.prototype
+        // 19.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter.prototype%"()),
@@ -54,7 +54,7 @@ pub const constructor = struct {
         });
     }
 
-    /// 18.1.1 Intl.Segmenter ( [ locales [ , options ] ] )
+    /// 19.1.1 Intl.Segmenter ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.segmenter
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
@@ -137,7 +137,7 @@ pub const constructor = struct {
     }
 };
 
-/// 18.3 Properties of the Intl.Segmenter Prototype Object
+/// 19.3 Properties of the Intl.Segmenter Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -150,7 +150,7 @@ pub const prototype = struct {
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
         try defineBuiltinFunction(object, "segment", segment, 1, realm);
 
-        // 18.3.1 Intl.Segmenter.prototype.constructor
+        // 19.3.1 Intl.Segmenter.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype.constructor
         try defineBuiltinProperty(
             object,
@@ -158,7 +158,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
         );
 
-        // 18.3.4 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
+        // 19.3.4 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Segmenter"),
@@ -168,7 +168,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 18.3.2 Intl.Segmenter.prototype.resolvedOptions ( )
+    /// 19.3.2 Intl.Segmenter.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -207,7 +207,7 @@ pub const prototype = struct {
         return Value.from(options);
     }
 
-    /// 18.3.3 Intl.Segmenter.prototype.segment ( string )
+    /// 19.3.3 Intl.Segmenter.prototype.segment ( string )
     /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.segment
     fn segment(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
@@ -224,7 +224,7 @@ pub const prototype = struct {
     }
 };
 
-/// 18.4 Properties of Intl.Segmenter Instances
+/// 19.4 Properties of Intl.Segmenter Instances
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-instances
 pub const Segmenter = MakeObject(.{
     .Fields = struct {
@@ -312,7 +312,7 @@ const Boundary = struct {
     is_word_like: ?bool = null,
 };
 
-/// 18.8.1 FindBoundary ( segmenter, string, startIndex, direction )
+/// 19.8.1 FindBoundary ( segmenter, string, startIndex, direction )
 /// https://tc39.es/ecma402/#sec-findboundary
 pub fn findBoundary(
     segmenter: *builtins.intl.Segmenter,

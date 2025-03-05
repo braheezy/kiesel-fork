@@ -1,4 +1,4 @@
-//! 13 ListFormat Objects
+//! 14 ListFormat Objects
 //! https://tc39.es/ecma402/#listformat-objects
 
 const std = @import("std");
@@ -30,7 +30,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 13.2 Properties of the Intl.ListFormat Constructor
+/// 14.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -44,7 +44,7 @@ pub const constructor = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 13.2.1 Intl.ListFormat.prototype
+        // 14.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat.prototype%"()),
@@ -54,7 +54,7 @@ pub const constructor = struct {
         });
     }
 
-    /// 13.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
+    /// 14.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
@@ -170,7 +170,7 @@ pub const constructor = struct {
     }
 };
 
-/// 13.3 Properties of the Intl.ListFormat Prototype Object
+/// 14.3 Properties of the Intl.ListFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -183,7 +183,7 @@ pub const prototype = struct {
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
         try defineBuiltinFunction(object, "format", format, 1, realm);
 
-        // 13.3.1 Intl.ListFormat.prototype.constructor
+        // 14.3.1 Intl.ListFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.constructor
         try defineBuiltinProperty(
             object,
@@ -191,7 +191,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
         );
 
-        // 13.3.5 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
+        // 14.3.5 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.ListFormat"),
@@ -201,7 +201,7 @@ pub const prototype = struct {
         });
     }
 
-    /// 13.3.2 Intl.ListFormat.prototype.resolvedOptions ( )
+    /// 14.3.2 Intl.ListFormat.prototype.resolvedOptions ( )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.resolvedoptions
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -239,7 +239,7 @@ pub const prototype = struct {
         return Value.from(options);
     }
 
-    /// 13.3.3 Intl.ListFormat.prototype.format ( list )
+    /// 14.3.3 Intl.ListFormat.prototype.format ( list )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.format
     fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const list = arguments.get(0);
@@ -260,7 +260,7 @@ pub const prototype = struct {
     }
 };
 
-/// 13.4 Properties of Intl.ListFormat Instances
+/// 14.4 Properties of Intl.ListFormat Instances
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-instances
 pub const ListFormat = MakeObject(.{
     .Fields = struct {
@@ -310,7 +310,7 @@ pub const ListFormat = MakeObject(.{
     .tag = .intl_list_format,
 });
 
-/// 13.5.3 FormatList ( listFormat, list )
+/// 14.5.3 FormatList ( listFormat, list )
 /// https://tc39.es/ecma402/#sec-formatlist
 fn formatList(
     allocator: std.mem.Allocator,
@@ -336,7 +336,7 @@ fn formatList(
     return String.fromUtf8(allocator, try list_formatter.format(allocator, .{ .utf8 = list }));
 }
 
-/// 13.5.5 StringListFromIterable ( iterable )
+/// 14.5.5 StringListFromIterable ( iterable )
 /// https://tc39.es/ecma402/#sec-createstringlistfromiterable
 fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []const u8 {
     // 1. If iterable is undefined, then
