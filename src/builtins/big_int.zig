@@ -118,9 +118,10 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.BigInt
     }
 
     // 2. Return ℤ(ℝ(number)).
-    const string = try number.toString(agent.gc_allocator, 10);
+    const string = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{number.asFloat()});
+    defer agent.gc_allocator.free(string);
     const big_int = try types.BigInt.from(agent.gc_allocator, 0);
-    big_int.managed.setString(10, string.slice.ascii) catch |err| switch (err) {
+    big_int.managed.setString(10, string) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
