@@ -204,7 +204,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         object.agent.gc_allocator,
         property_key,
         attributes_,
-        .accessor,
+        .{ .accessor = @enumFromInt(object.property_storage.accessors.items.len) },
     );
     try object.property_storage.accessors.append(agent.gc_allocator, .{
         .get = getter_function,
@@ -310,7 +310,7 @@ pub fn defineBuiltinProperty(
         object.agent.gc_allocator,
         property_key,
         attributes,
-        .value,
+        .{ .value = @enumFromInt(object.property_storage.values.items.len) },
     );
     try object.property_storage.values.append(agent.gc_allocator, value);
 }
@@ -328,7 +328,7 @@ pub fn defineBuiltinPropertyLazy(
         object.agent.gc_allocator,
         property_key,
         attributes,
-        .value,
+        .{ .value = @enumFromInt(object.property_storage.values.items.len) },
     );
     try object.property_storage.values.append(agent.gc_allocator, undefined);
     try object.property_storage.lazy_properties.putNoClobber(

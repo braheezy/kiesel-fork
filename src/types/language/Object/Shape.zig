@@ -99,8 +99,6 @@ const TransitionCount = enum(u8) {
 };
 
 transition_count: TransitionCount,
-next_value_index: PropertyIndex.Value,
-next_accessor_index: PropertyIndex.Accessor,
 transitions: Transition.HashMapUnmanaged(*Shape),
 properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
 
@@ -117,8 +115,6 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
         .transition_count = @enumFromInt(0),
-        .next_value_index = @enumFromInt(0),
-        .next_accessor_index = @enumFromInt(0),
         .transitions = .empty,
         .properties = .empty,
         .prototype = null,
@@ -146,8 +142,6 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
     errdefer allocator.destroy(shape);
     shape.* = .{
         .transition_count = self.transition_count,
-        .next_value_index = self.next_value_index,
-        .next_accessor_index = self.next_accessor_index,
         .transitions = .empty,
         .properties = try self.properties.clone(allocator),
         .prototype = self.prototype,
@@ -253,8 +247,9 @@ pub fn setProperty(
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
     attributes: Attributes,
-    property_type: PropertyType,
+    next_index: PropertyIndex,
 ) std.mem.Allocator.Error!*Shape {
+    const property_type = std.meta.activeTag(next_index);
     const shape = switch (self.transition_count) {
         .unique => self,
         .max => try self.makeUnique(allocator),
@@ -268,16 +263,7 @@ pub fn setProperty(
         if (property_type == property_gop.value_ptr.index) return shape;
     }
     property_gop.value_ptr.* = .{
-        .index = switch (property_type) {
-            .value => blk: {
-                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
-                break :blk .{ .value = shape.next_value_index };
-            },
-            .accessor => blk: {
-                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
-                break :blk .{ .accessor = shape.next_accessor_index };
-            },
-        },
+        .index = next_index,
         .attributes = attributes,
     };
     return shape;
@@ -288,8 +274,9 @@ pub fn setPropertyWithoutTransition(
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
     attributes: Attributes,
-    property_type: PropertyType,
+    next_index: PropertyIndex,
 ) std.mem.Allocator.Error!*Shape {
+    const property_type = std.meta.activeTag(next_index);
     const shape = switch (self.transition_count) {
         .unique => self,
         else => try self.makeUnique(allocator),
@@ -300,16 +287,7 @@ pub fn setPropertyWithoutTransition(
         if (property_type == property_gop.value_ptr.index) return shape;
     }
     property_gop.value_ptr.* = .{
-        .index = switch (property_type) {
-            .value => blk: {
-                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
-                break :blk .{ .value = shape.next_value_index };
-            },
-            .accessor => blk: {
-                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
-                break :blk .{ .accessor = shape.next_accessor_index };
-            },
-        },
+        .index = next_index,
         .attributes = attributes,
     };
     return shape;
