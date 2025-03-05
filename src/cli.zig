@@ -309,7 +309,7 @@ const Kiesel = struct {
             );
         }
         const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
-        std.time.sleep(nanoseconds);
+        std.Thread.sleep(nanoseconds);
         return .undefined;
     }
 

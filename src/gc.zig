@@ -35,13 +35,13 @@ pub fn collect() void {
 
 pub fn disableWarnings() void {
     libgc.GC_set_warn_proc(struct {
-        fn func(_: [*c]const u8, _: libgc.GC_word) callconv(.C) void {}
+        fn func(_: [*c]const u8, _: libgc.GC_word) callconv(.c) void {}
     }.func);
 }
 
 pub fn FinalizerData(comptime T: type) type {
     return struct {
-        nextFinalizerFunc: ?*const fn (?*anyopaque, ?*anyopaque) callconv(.C) void = null,
+        nextFinalizerFunc: ?*const fn (?*anyopaque, ?*anyopaque) callconv(.c) void = null,
         next_finalizer_data: ?*anyopaque = null,
         data: T,
 
@@ -55,7 +55,7 @@ pub fn registerFinalizer(
     comptime finalizer: *const fn (data: *@TypeOf(data.*).Data) void,
 ) void {
     libgc.GC_register_finalizer(target, struct {
-        fn func(func_target: ?*anyopaque, func_data: ?*anyopaque) callconv(.C) void {
+        fn func(func_target: ?*anyopaque, func_data: ?*anyopaque) callconv(.c) void {
             const finalizer_data: @TypeOf(data) = @alignCast(@ptrCast(func_data));
             finalizer(&finalizer_data.data);
             if (finalizer_data.nextFinalizerFunc) |nextFinalizerFunc| {

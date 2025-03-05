@@ -182,8 +182,11 @@ pub fn DeferredPayload(comptime T: type) type {
             return @ptrCast(self.executable.instructions.items[self.index..][0..@sizeOf(T)]);
         }
 
-        pub fn getFieldDeferred(self: @This(), comptime field_name: std.meta.FieldEnum(T)) DeferredPayload(std.meta.FieldType(T, field_name)) {
-            const index = self.index + @offsetOf(T, @tagName(field_name));
+        pub fn getFieldDeferred(
+            self: @This(),
+            comptime field_name: []const u8,
+        ) DeferredPayload(@FieldType(T, field_name)) {
+            const index = self.index + @offsetOf(T, field_name);
             return .{
                 .executable = self.executable,
                 .index = index,

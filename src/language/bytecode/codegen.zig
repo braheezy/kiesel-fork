@@ -2706,7 +2706,7 @@ pub fn codegenForStatement(
 
         // iii. If ToBoolean(testValue) is false, return V.
         const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
-        end_jump = jump_conditional.getFieldDeferred(.alternate);
+        end_jump = jump_conditional.getFieldDeferred("alternate");
         jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
     }
 
@@ -2833,7 +2833,7 @@ fn forInOfHeadEvaluation(
         try executable.addInstruction(.store, {});
         try executable.addInstruction(.create_object_property_iterator, {});
 
-        return jump_conditional.getFieldDeferred(.consequent);
+        return jump_conditional.getFieldDeferred("consequent");
     } else {
         // 7. Else,
         // a. Assert: iterationKind is either iterate or async-iterate.
@@ -3276,7 +3276,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
             try caseClauseIsSelected(executable, ctx, case_clause);
             const jump_conditional = try executable.addInstructionDeferred(.jump_conditional);
             jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
-            try consequent_jumps.append(executable.allocator, jump_conditional.getFieldDeferred(.consequent));
+            try consequent_jumps.append(executable.allocator, jump_conditional.getFieldDeferred("consequent"));
         },
         .default_clause => {
             std.debug.assert(!has_default_clause);

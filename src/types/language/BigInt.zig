@@ -172,7 +172,7 @@ pub fn leftShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.shiftLeft(
         &x.managed,
-        y.managed.to(usize) catch return agent.throwException(
+        y.managed.toInt(usize) catch return agent.throwException(
             .internal_error,
             "Cannot left-shift BigInt by more than {} bits",
             .{std.math.maxInt(usize)},
@@ -188,7 +188,7 @@ pub fn signedRightShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.shiftRight(
         &x.managed,
-        y.managed.to(usize) catch return agent.throwException(
+        y.managed.toInt(usize) catch return agent.throwException(
             .internal_error,
             "Cannot right-shift BigInt by more than {} bits",
             .{std.math.maxInt(usize)},

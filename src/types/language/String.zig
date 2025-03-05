@@ -10,7 +10,7 @@ const language = @import("../../language.zig");
 
 fn utf8IsAscii(utf8: []const u8) bool {
     return for (utf8) |c| {
-        if (!std.ascii.isASCII(c)) break false;
+        if (!std.ascii.isAscii(c)) break false;
     } else true;
 }
 

@@ -12,8 +12,8 @@
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/353548ecdfbf2a2c18f632d9a744a46e89ec17ee.tar.gz",
-            .hash = "icu4zig-0.1.0-IT7GrBUPAgAtH3VHHKNOJ6Z-nVbOX8ukBgM7OBg4_Pih",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/c791d54c12eca45307b404c578c5d3f7f135f19f.tar.gz",
+            .hash = "icu4zig-0.1.0-IT7GrBUPAgCxLwmeCxrSWd-RSJtBYI1vMrrBufTTiXCQ",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -45,13 +45,13 @@
             .hash = "stackinfo-0.1.0-NZ2qTskbAAAefz3d7vjalblduNIyOzuwKg9Yx6CnUtee",
         },
         .unicode_id = .{
-            // FIXME: This points to https://codeberg.org/injuly/unicode-id/pulls/2, update once merged
-            .url = "https://codeberg.org/injuly/unicode-id/archive/68dc513288e26ff5e28c8555949d59b4447d319c.tar.gz",
+            .url = "https://codeberg.org/injuly/unicode-id/archive/d56c5ed310058463cf6587a62a9febc595efc5e7.tar.gz",
             .hash = "unicode_id-0.0.1-MsAuU0yBAQA-Wqv13y7g9rSLkmVWJSwy2Ke9BxsOmq0c",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/8b4d0fec9f4ed50bef6e94826548f087af68bf66.tar.gz",
-            .hash = "N-V-__8AAK0TAgCtKA0HEoDiR-X4x96mwWUjy2m-HbYvj9GG",
+            // FIXME: This points to https://github.com/alimpfard/zigline/pull/25, update once merged
+            .url = "https://github.com/alimpfard/zigline/archive/401011405e75d0e5f01017dc20216cfb9e46562a.tar.gz",
+            .hash = "N-V-__8AAK0TAgD4BBVEDr_a3ghcBGr44WChlcyNMPC-NUSY",
         },
     },
     .paths = .{

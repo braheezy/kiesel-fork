@@ -1024,7 +1024,7 @@ pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
     // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
     try int64bit.truncate(&n.managed, .signed, 64);
-    return int64bit.to(i64) catch unreachable;
+    return int64bit.toInt(i64) catch unreachable;
 }
 
 /// 7.1.16 ToBigUint64 ( argument )
@@ -1037,7 +1037,7 @@ pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
     // 3. Return ℤ(int64bit).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
     try int64bit.truncate(&n.managed, .unsigned, 64);
-    return int64bit.to(u64) catch unreachable;
+    return int64bit.toInt(u64) catch unreachable;
 }
 
 /// 7.1.17 ToString ( argument )
