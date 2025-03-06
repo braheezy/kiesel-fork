@@ -1802,7 +1802,11 @@ pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
             const Payload = Instruction.Payload(tag);
             const payload_ptr: *align(1) const Payload = @ptrCast(executable.instructions.items[self.ip..][0..@sizeOf(Payload)]);
             self.ip += @sizeOf(Payload);
-            try self.executeInstruction(tag, payload_ptr.*, executable);
+            try @call(
+                .always_inline,
+                Vm.executeInstruction,
+                .{ self, tag, payload_ptr.*, executable },
+            );
             continue :main self.fetchInstructionTag(executable);
         },
     }
