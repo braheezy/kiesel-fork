@@ -53,6 +53,9 @@ pub fn build(b: *std.Build) void {
         "Enable the web-compatible runtime",
     ) orelse true;
 
+    const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
+    const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend");
+
     var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
     var code: u8 = undefined;
     if (b.runAllowFail(
@@ -158,7 +161,10 @@ pub fn build(b: *std.Build) void {
                 },
                 .target = target,
                 .optimize = optimize,
+                .strip = strip,
             }),
+            .use_llvm = use_llvm,
+            .use_lld = use_llvm,
         }),
         else => b.addExecutable(.{
             .name = "kiesel",
@@ -173,6 +179,7 @@ pub fn build(b: *std.Build) void {
                     },
                     .target = target,
                     .optimize = optimize,
+                    .strip = strip,
                 });
                 if (enable_intl) {
                     if (b.lazyDependency("icu4zig", .{
@@ -184,9 +191,10 @@ pub fn build(b: *std.Build) void {
                 }
                 break :blk module;
             },
+            .use_llvm = use_llvm,
+            .use_lld = use_llvm,
         }),
     };
-    if (optimize != .Debug) exe.root_module.strip = true;
 
     const install_exe = b.addInstallArtifact(exe, .{
         .dest_dir = switch (target.result.os.tag) {
@@ -246,7 +254,10 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
             .target = target,
             .optimize = optimize,
+            .strip = strip,
         }),
+        .use_llvm = use_llvm,
+        .use_lld = use_llvm,
     });
     fuzzilli.sanitize_coverage_trace_pc_guard = true;
 
