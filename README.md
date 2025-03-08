@@ -4,6 +4,7 @@
 
 [![test262](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ff.sakamoto.pl%2Flinus%2Fkiesel%2Fpercentage.txt&query=%24&suffix=%25&label=test262&color=%23e9d44d)](https://test262.fyi/#|kiesel)
 [![justforfunnoreally.dev badge](https://img.shields.io/badge/justforfunnoreally-dev-9ff)](https://justforfunnoreally.dev)
+[![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d)](https://ziglang.org/download/)
 [![License](https://img.shields.io/badge/License-MIT-d63e97)](https://codeberg.org/kiesel-js/kiesel/src/branch/main/LICENSE)
 [![Build](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcodeberg.org%2Fapi%2Fv1%2Frepos%2Fkiesel-js%2Fkiesel%2Fcommits%2Fmain%2Fstatus&query=statuses%5B0%5D.status&label=Build&labelColor=gray&color=blue)](https://codeberg.org/kiesel-js/kiesel/actions?workflow=build.yml)
 
@@ -53,17 +54,11 @@ Further reading:
 
 ## Build
 
-Dependencies managed through [`build.zig.zon`](./build.zig.zon) will be
-installed automatically when building for the first time.
-
-To build and run the Kiesel CLI:
+Zig 0.14 is required. To build and run the Kiesel CLI:
 
 ```console
 zig build run
 ```
-
-NOTE: Kiesel targets the master branch of Zig. This means that the build breaks
-semi-regularly, which I will usually fix as soon as I notice.
 
 ### Build Options
 

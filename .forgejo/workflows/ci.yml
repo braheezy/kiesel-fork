@@ -16,7 +16,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.14.0
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
@@ -128,7 +128,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.14.0
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
@@ -172,7 +172,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.14.0
       - name: Check formatting
         run: |
           zig fmt --check .
@@ -192,7 +192,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.14.0
       - name: Run tests
         run: |
           zig build -Denable-intl=false test
@@ -220,7 +220,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.14.0
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
