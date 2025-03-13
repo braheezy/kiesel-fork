@@ -427,8 +427,8 @@ pub fn numericToRawBytes(
         .float16 => blk: {
             // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
             //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
-            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to any
-            //    implementation chosen IEEE 754-2019 binary16 format Not-a-Number encoding. An
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set
+            //    to any implementation chosen IEEE 754-2019 binary16 format NaN encoding. An
             //    implementation must always choose the same encoding for each implementation
             //    distinguishable NaN value.
             break :blk std.mem.toBytes(
@@ -442,8 +442,8 @@ pub fn numericToRawBytes(
         .float32 => blk: {
             // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
             //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
-            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
-            //    any implementation chosen IEEE 754-2019 binary32 format Not-a-Number encoding. An
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set
+            //    to any implementation chosen IEEE 754-2019 binary32 format NaN encoding. An
             //    implementation must always choose the same encoding for each implementation
             //    distinguishable NaN value.
             break :blk std.mem.toBytes(
@@ -456,10 +456,10 @@ pub fn numericToRawBytes(
         // 3. Else if type is float64, then
         .float64 => blk: {
             // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
-            //    binary64 format encoding of value. The bytes are arranged in little endian order. If
-            //    value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019 binary64
-            //    format Not-a-Number encoding. An implementation must always choose the same encoding
-            //    for each implementation distinguishable NaN value.
+            //    binary64 format encoding of value. The bytes are arranged in little endian order.
+            //    If value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019
+            //    binary64 format NaN encoding. An implementation must always choose the same
+            //    encoding for each implementation distinguishable NaN value.
             break :blk std.mem.toBytes(
                 if (value.asNumber().isNan())
                     std.math.nan(f64)
