@@ -103,8 +103,12 @@ cycle_root: ?*SourceTextModule,
 /// [[HasTLA]]
 has_tla: bool,
 
-/// [[AsyncEvaluation]]
-async_evaluation: bool,
+/// [[AsyncEvaluationOrder]]
+async_evaluation_order: union(enum) {
+    unset,
+    done,
+    integer: u32,
+},
 
 /// [[TopLevelCapability]]
 top_level_capability: ?PromiseCapability,
@@ -597,7 +601,7 @@ pub fn parse(
 
     // 12. Return Source Text Module Record {
     //       [[Realm]]: realm, [[Environment]]: empty, [[Namespace]]: empty, [[CycleRoot]]: empty,
-    //       [[HasTLA]]: async, [[AsyncEvaluation]]: false, [[TopLevelCapability]]: empty,
+    //       [[HasTLA]]: async, [[AsyncEvaluationOrder]]: unset, [[TopLevelCapability]]: empty,
     //       [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: empty, [[Status]]: new,
     //       [[EvaluationError]]: empty, [[HostDefined]]: hostDefined, [[ECMAScriptCode]]: body,
     //       [[Context]]: empty, [[ImportMeta]]: empty, [[RequestedModules]]: requestedModules,
@@ -612,7 +616,7 @@ pub fn parse(
         .namespace = null,
         .cycle_root = null,
         .has_tla = @"async",
-        .async_evaluation = false,
+        .async_evaluation_order = .unset,
         .top_level_capability = null,
         .async_parent_modules = .empty,
         .pending_async_dependencies = null,
@@ -694,10 +698,13 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
                 // i. Assert: m.[[Status]] is evaluating.
                 std.debug.assert(m.status == .evaluating);
 
-                // ii. Set m.[[Status]] to evaluated.
+                // ii. Assert: m.[[AsyncEvaluationOrder]] is unset.
+                std.debug.assert(m.async_evaluation_order == .unset);
+
+                // iii. Set m.[[Status]] to evaluated.
                 m.status = .evaluated;
 
-                // iii. Set m.[[EvaluationError]] to result.
+                // iv. Set m.[[EvaluationError]] to result.
                 m.evaluation_error = exception;
             }
 
@@ -724,12 +731,14 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
         // b. Assert: module.[[EvaluationError]] is empty.
         std.debug.assert(module.evaluation_error == null);
 
-        // c. If module.[[AsyncEvaluation]] is false, then
-        if (!module.async_evaluation) {
-            // i. Assert: module.[[Status]] is evaluated.
-            std.debug.assert(module.status == .evaluated);
+        // c. If module.[[Status]] is evaluated, then
+        if (module.status == .evaluated) {
+            // i. NOTE: This implies that evaluation of module completed synchronously.
 
-            // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
+            // ii. Assert: module.[[AsyncEvaluationOrder]] is unset.
+            std.debug.assert(module.async_evaluation_order == .unset);
+
+            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
                 agent,
                 .undefined,
@@ -869,8 +878,8 @@ fn innerModuleEvaluation(
                 }
             }
 
-            // v. If requiredModule.[[AsyncEvaluation]] is true, then
-            if (required_module.async_evaluation) {
+            // v. If requiredModule.[[AsyncEvaluationOrder]] is an integer, then
+            if (required_module.async_evaluation_order == .integer) {
                 // 1. Set module.[[PendingAsyncDependencies]] to module.[[PendingAsyncDependencies]] + 1.
                 module.pending_async_dependencies.? += 1;
 
@@ -882,15 +891,13 @@ fn innerModuleEvaluation(
 
     // 12. If module.[[PendingAsyncDependencies]] > 0 or module.[[HasTLA]] is true, then
     if (module.pending_async_dependencies.? > 0 or module.has_tla) {
-        // a. Assert: module.[[AsyncEvaluation]] is false and was never previously set to true.
-        std.debug.assert(!module.async_evaluation);
+        // a. Assert: module.[[AsyncEvaluationOrder]] is unset.
+        std.debug.assert(module.async_evaluation_order == .unset);
 
-        // b. Set module.[[AsyncEvaluation]] to true.
-        // c. NOTE: The order in which module records have their [[AsyncEvaluation]] fields
-        //    transition to true is significant. (See 16.2.1.6.3.4.)
-        module.async_evaluation = true;
+        // b. Set module.[[AsyncEvaluationOrder]] to IncrementModuleAsyncEvaluationCount().
+        module.async_evaluation_order = .{ .integer = agent.incrementModuleAsyncEvaluationCount() };
 
-        // d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
+        // c. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
         if (module.pending_async_dependencies.? == 0) {
             try executeAsyncModule(agent, module);
         }
@@ -915,14 +922,18 @@ fn innerModuleEvaluation(
             // iii. Assert: requiredModule is a Cyclic Module Record.
             const required_module = stack.pop().?;
 
-            // iv. If requiredModule.[[AsyncEvaluation]] is false, set requiredModule.[[Status]] to evaluated.
-            // v. Otherwise, set requiredModule.[[Status]] to evaluating-async.
-            required_module.status = if (!required_module.async_evaluation) .evaluated else .evaluating_async;
+            // iv. Assert: requiredModule.[[AsyncEvaluationOrder]] is either an integer or unset.
+            std.debug.assert(required_module.async_evaluation_order == .integer or
+                required_module.async_evaluation_order == .unset);
 
-            // vii. Set requiredModule.[[CycleRoot]] to module.
+            // v. If requiredModule.[[AsyncEvaluationOrder]] is unset, set requiredModule.[[Status]] to evaluated.
+            // vi. Otherwise, set requiredModule.[[Status]] to evaluating-async.
+            required_module.status = if (required_module.async_evaluation_order == .unset) .evaluated else .evaluating_async;
+
+            // viii. Set requiredModule.[[CycleRoot]] to module.
             required_module.cycle_root = module;
 
-            // vi. If requiredModule and module are the same Module Record, set done to true.
+            // vii. If requiredModule and module are the same Module Record, set done to true.
             if (required_module == module) break;
         }
     }
@@ -1042,8 +1053,8 @@ fn gatherAvailableAncestors(
             // ii. Assert: m.[[EvaluationError]] is empty.
             std.debug.assert(m.evaluation_error == null);
 
-            // iii. Assert: m.[[AsyncEvaluation]] is true.
-            std.debug.assert(m.async_evaluation == true);
+            // iii. Assert: m.[[AsyncEvaluationOrder]] is an integer.
+            std.debug.assert(m.async_evaluation_order == .integer);
 
             // iv. Assert: m.[[PendingAsyncDependencies]] > 0.
             std.debug.assert(m.pending_async_dependencies.? > 0);
@@ -1085,14 +1096,14 @@ fn asyncModuleExecutionFulfilled(
     // 2. Assert: module.[[Status]] is evaluating-async.
     std.debug.assert(module.status == .evaluating_async);
 
-    // 3. Assert: module.[[AsyncEvaluation]] is true.
-    std.debug.assert(module.async_evaluation == true);
+    // 3. Assert: module.[[AsyncEvaluationOrder]] is an integer.
+    std.debug.assert(module.async_evaluation_order == .integer);
 
     // 4. Assert: module.[[EvaluationError]] is empty.
     std.debug.assert(module.evaluation_error == null);
 
-    // 5. Set module.[[AsyncEvaluation]] to false.
-    module.async_evaluation = false;
+    // 5. Set module.[[AsyncEvaluationOrder]] to done.
+    module.async_evaluation_order = .done;
 
     // 6. Set module.[[Status]] to evaluated.
     module.status = .evaluated;
@@ -1117,17 +1128,22 @@ fn asyncModuleExecutionFulfilled(
     // 9. Perform GatherAvailableAncestors(module, execList).
     try gatherAvailableAncestors(agent, module, &exec_list);
 
-    // 10. Let sortedExecList be a List whose elements are the elements of execList, in the order
-    //     in which they had their [[AsyncEvaluation]] fields set to true in InnerModuleEvaluation.
-    // TODO: Implement https://github.com/tc39/ecma262/pull/3353 which does this in a nicer way.
-
-    // 11. Assert: All elements of sortedExecList have their [[AsyncEvaluation]] field set to true,
-    //     [[PendingAsyncDependencies]] field set to 0, and [[EvaluationError]] field set to empty.
+    // 10. Assert: All elements of execList have their [[AsyncEvaluationOrder]] field set to an
+    //     integer, [[PendingAsyncDependencies]] field set to 0, and [[EvaluationError]] field set
+    //     to empty.
     for (exec_list.items) |m| {
-        std.debug.assert(m.async_evaluation == true);
+        std.debug.assert(m.async_evaluation_order == .integer);
         std.debug.assert(m.pending_async_dependencies == 0);
         std.debug.assert(m.evaluation_error == null);
     }
+
+    // 11. Let sortedExecList be a List whose elements are the elements of execList, sorted by
+    //     their [[AsyncEvaluationOrder]] field in ascending order.
+    std.mem.sort(*SourceTextModule, exec_list.items, {}, struct {
+        fn lessThanFn(_: void, lhs: *SourceTextModule, rhs: *SourceTextModule) bool {
+            return lhs.async_evaluation_order.integer < rhs.async_evaluation_order.integer;
+        }
+    }.lessThanFn);
 
     // 12. For each Cyclic Module Record m of sortedExecList, do
     for (exec_list.items) |m| {
@@ -1158,8 +1174,8 @@ fn asyncModuleExecutionFulfilled(
             };
             // iii. Else,
 
-            // 1. Set m.[[AsyncEvaluation]] to false.
-            m.async_evaluation = false;
+            // 1. Set m.[[AsyncEvaluationOrder]] to done.
+            m.async_evaluation_order = .done;
 
             // 2. Set m.[[Status]] to evaluated.
             m.status = .evaluated;
@@ -1201,8 +1217,8 @@ fn asyncModuleExecutionRejected(
     // 2. Assert: module.[[Status]] is evaluating-async.
     std.debug.assert(module.status == .evaluating_async);
 
-    // 3. Assert: module.[[AsyncEvaluation]] is true.
-    std.debug.assert(module.async_evaluation == true);
+    // 3. Assert: module.[[AsyncEvaluationOrder]] is an integer.
+    std.debug.assert(module.async_evaluation_order == .integer);
 
     // 4. Assert: module.[[EvaluationError]] is empty.
     std.debug.assert(module.evaluation_error == null);
@@ -1213,12 +1229,12 @@ fn asyncModuleExecutionRejected(
     // 6. Set module.[[Status]] to evaluated.
     module.status = .evaluated;
 
-    // 7. Set module.[[AsyncEvaluation]] to false.
-    // 8. NOTE: module.[[AsyncEvaluation]] is set to false for symmetry with
+    // 7. Set module.[[AsyncEvaluationOrder]] to done.
+    // 8. NOTE: module.[[AsyncEvaluationOrder]] is set to done for symmetry with
     //    AsyncModuleExecutionFulfilled. In InnerModuleEvaluation, the value of a module's
-    //    [[AsyncEvaluation]] internal slot is unused when its [[EvaluationError]] internal slot is
-    //    not empty.
-    module.async_evaluation = false;
+    //    [[AsyncEvaluationOrder]] internal slot is unused when its [[EvaluationError]] internal
+    //    slot is not empty.
+    module.async_evaluation_order = .done;
 
     // 9. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
     for (module.async_parent_modules.items) |m| {

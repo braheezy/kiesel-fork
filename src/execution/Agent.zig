@@ -45,6 +45,9 @@ platform: Platform,
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
 
+/// [[ModuleAsyncEvaluationCount]]
+module_async_evaluation_count: u32 = 0,
+
 pub const Exception = @import("Agent/Exception.zig");
 pub const Platform = @import("Agent/Platform.zig");
 
@@ -340,6 +343,18 @@ pub fn getGlobalObject(self: Agent) *Object {
 
     // 2. Return currentRealm.[[GlobalObject]].
     return current_realm.global_object;
+}
+
+/// 9.6.3 IncrementModuleAsyncEvaluationCount ( )
+/// https://tc39.es/ecma262/#sec-IncrementModuleAsyncEvaluationCount
+pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
+    // 1. Let AR be the Agent Record of the surrounding agent.
+    // 2. Let count be AR.[[ModuleAsyncEvaluationCount]].
+    // 3. Set AR.[[ModuleAsyncEvaluationCount]] to count + 1.
+    defer self.module_async_evaluation_count += 1;
+
+    // 4. Return count.
+    return self.module_async_evaluation_count;
 }
 
 test init {
