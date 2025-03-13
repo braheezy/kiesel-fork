@@ -101,7 +101,6 @@ lazy_intrinsics: struct {
     @"%IteratorHelperPrototype%": ?*Object = null,
     @"%Iterator.prototype%": ?*Object = null,
     @"%JSON%": ?*Object = null,
-    @"%JSON.parse%": ?*Object = null,
     @"%Map%": ?*Object = null,
     @"%Map.prototype%": ?*Object = null,
     @"%MapIteratorPrototype%": ?*Object = null,
@@ -441,14 +440,6 @@ pub fn @"%Iterator.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Objec
 }
 pub fn @"%JSON%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%JSON%", builtins.json.namespace);
-}
-pub fn @"%JSON.parse%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    const intrinsic = &self.lazy_intrinsics.@"%JSON.parse%";
-    if (intrinsic.* == null) {
-        const json = try @"%JSON%"(self);
-        intrinsic.* = json.getPropertyValueDirect(PropertyKey.from("parse")).asObject();
-    }
-    return intrinsic.*.?;
 }
 pub fn @"%Map%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Map%", builtins.map.constructor);

@@ -66,7 +66,36 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
     };
 }
 
-/// 25.5.1.1 InternalizeJSONProperty ( holder, name, reviver )
+/// 25.5.1.1 ParseJSON ( text )
+/// https://tc39.es/ecma262/#sec-ParseJSON
+pub fn parseJSON(agent: *Agent, text: *const String) Agent.Error!Value {
+    // 1. If StringToCodePoints(text) is not a valid JSON text as specified in ECMA-404, throw a
+    //    SyntaxError exception.
+    // 2. Let scriptString be the string-concatenation of "(", text, and ");".
+    // 3. Let script be ParseText(scriptString, Script).
+    // 4. NOTE: The early error rules defined in 13.2.5.1 have special handling for the above
+    //    invocation of ParseText.
+    // 5. Assert: script is a Parse Node.
+    // 6. Let result be ! Evaluation of script.
+    // 7. NOTE: The PropertyDefinitionEvaluation semantics defined in 13.2.5.5 have special
+    //    handling for the above evaluation.
+    // 8. Assert: result is either a String, a Number, a Boolean, an Object that is defined by
+    //    either an ArrayLiteral or an ObjectLiteral, or null.
+    // 9. Return result.
+    const parsed = std.json.parseFromSlice(
+        std.json.Value,
+        agent.gc_allocator,
+        try text.toUtf8(agent.gc_allocator),
+        .{},
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return agent.throwException(.syntax_error, "Invalid JSON document", .{}),
+    };
+    defer parsed.deinit();
+    return convertJsonValue(agent, parsed.value);
+}
+
+/// 25.5.1.2 InternalizeJSONProperty ( holder, name, reviver )
 /// https://tc39.es/ecma262/#sec-internalizejsonproperty
 fn internalizeJSONProperty(
     agent: *Agent,
@@ -610,9 +639,6 @@ pub const namespace = struct {
 
         try defineBuiltinFunction(object, "parse", parse, 2, realm);
         try defineBuiltinFunction(object, "stringify", stringify, 3, realm);
-
-        // Ensure function intrinsics are set right after the object is created
-        _ = try realm.intrinsics.@"%JSON.parse%"();
     }
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )
@@ -625,32 +651,10 @@ pub const namespace = struct {
         // 1. Let jsonString be ? ToString(text).
         const json_string = try text.toString(agent);
 
-        // 2. Parse StringToCodePoints(jsonString) as a JSON text as specified in ECMA-404. Throw
-        //    a SyntaxError exception if it is not a valid JSON text as defined in that specification.
-        // 3. Let scriptString be the string-concatenation of "(", jsonString, and ");".
-        // 4. Let script be ParseText(scriptString, Script).
-        // 5. NOTE: The early error rules defined in 13.2.5.1 have special handling for the above
-        //    invocation of ParseText.
-        // 6. Assert: script is a Parse Node.
-        // 7. Let unfiltered be ! Evaluation of script.
-        // 8. NOTE: The PropertyDefinitionEvaluation semantics defined in 13.2.5.5 have special
-        //    handling for the above evaluation.
-        const parsed = std.json.parseFromSlice(
-            std.json.Value,
-            agent.gc_allocator,
-            try json_string.toUtf8(agent.gc_allocator),
-            .{},
-        ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            else => return agent.throwException(.syntax_error, "Invalid JSON document", .{}),
-        };
-        defer parsed.deinit();
-        const unfiltered = parsed.value;
+        // 2. Let unfiltered be ? ParseJSON(jsonString).
+        const unfiltered = try parseJSON(agent, json_string);
 
-        // 10. Assert: unfiltered is either a String, a Number, a Boolean, an Object that is
-        //     defined by either an ArrayLiteral or an ObjectLiteral, or null.
-
-        // 11. If IsCallable(reviver) is true, then
+        // 3. If IsCallable(reviver) is true, then
         if (reviver.isCallable()) {
             // a. Let root be OrdinaryObjectCreate(%Object.prototype%).
             const root = try ordinaryObjectCreate(
@@ -662,17 +666,14 @@ pub const namespace = struct {
             const root_name = PropertyKey.from("");
 
             // c. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
-            root.createDataPropertyOrThrow(
-                root_name,
-                try convertJsonValue(agent, unfiltered),
-            ) catch |err| try noexcept(err);
+            root.createDataPropertyOrThrow(root_name, unfiltered) catch |err| try noexcept(err);
 
             // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
             return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
         } else {
-            // 12. Else,
+            // 4. Else,
             // a. Return unfiltered.
-            return convertJsonValue(agent, unfiltered);
+            return unfiltered;
         }
     }
 

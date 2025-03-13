@@ -183,6 +183,7 @@ pub const ordinaryPreventExtensions = ordinary.ordinaryPreventExtensions;
 pub const ordinarySet = ordinary.ordinarySet;
 pub const ordinarySetPrototypeOf = ordinary.ordinarySetPrototypeOf;
 pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
+pub const parseJSON = json.parseJSON;
 pub const performEval = eval.performEval;
 pub const performPromiseThen = promise.performPromiseThen;
 pub const promiseResolve = promise.promiseResolve;

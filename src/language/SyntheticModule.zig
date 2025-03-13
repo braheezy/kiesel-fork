@@ -22,6 +22,7 @@ const containsSlice = utils.containsSlice;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const parseJSON = builtins.parseJSON;
 const promiseResolve = builtins.promiseResolve;
 
 const SyntheticModule = @This();
@@ -102,14 +103,8 @@ pub fn createDefaultExportSyntheticModule(
 /// 16.2.1.8.2 ParseJSONModule ( source )
 /// https://tc39.es/ecma262/#sec-parse-json-module
 pub fn parseJSONModule(agent: *Agent, source: *const String) Agent.Error!*SyntheticModule {
-    const realm = agent.currentRealm();
-
-    // 1. Let json be ? Call(%JSON.parse%, undefined, « source »).
-    const json = try Value.from(try realm.intrinsics.@"%JSON.parse%"()).callAssumeCallable(
-        agent,
-        .undefined,
-        &.{Value.from(source)},
-    );
+    // 1. Let json be ? ParseJSON(source).
+    const json = try parseJSON(agent, source);
 
     // 2. Return CreateDefaultExportSyntheticModule(json).
     return createDefaultExportSyntheticModule(agent, json);

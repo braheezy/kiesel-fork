@@ -680,7 +680,7 @@ pub fn codegenPropertyDefinition(
 
         // PropertyDefinition : PropertyName : AssignmentExpression
         .property_name_and_expression => |property_name_and_expression| {
-            // 2. If this PropertyDefinition is contained within a Script that is being evaluated for JSON.parse (see step 7 of JSON.parse), then
+            // 2. If this PropertyDefinition is contained within a Script that is being evaluated for ParseJSON (see step 6 of ParseJSON), then
             //     a. Let isProtoSetter be false.
             // NOTE: JSON parsing is handled by `std.json` so this never applies.
             // 3. Else if propKey is "__proto__" and IsComputedPropertyKey of PropertyName is false, then
