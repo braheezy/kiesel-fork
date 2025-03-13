@@ -573,8 +573,8 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.get(1);
 
-        // 1. Let v be the this value.
-        // 2. Return ? GetViewValue(v, byteOffset, littleEndian, bigint64).
+        // 1. Let view be the this value.
+        // 2. Return ? GetViewValue(view, byteOffset, littleEndian, bigint64).
         return getViewValue(agent, this_value, byte_offset, little_endian, .bigint64);
     }
 
@@ -584,8 +584,8 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.get(1);
 
-        // 1. Let v be the this value.
-        // 2. Return ? GetViewValue(v, byteOffset, littleEndian, biguint64).
+        // 1. Let view be the this value.
+        // 2. Return ? GetViewValue(view, byteOffset, littleEndian, biguint64).
         return getViewValue(agent, this_value, byte_offset, little_endian, .biguint64);
     }
 
@@ -595,9 +595,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.get(1);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, Float16).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, Float16).
         return getViewValue(agent, this_value, byte_offset, little_endian, .float16);
     }
 
@@ -607,9 +607,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, float32).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, float32).
         return getViewValue(agent, this_value, byte_offset, little_endian, .float32);
     }
 
@@ -619,9 +619,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, float64).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, float64).
         return getViewValue(agent, this_value, byte_offset, little_endian, .float64);
     }
 
@@ -630,8 +630,8 @@ pub const prototype = struct {
     fn getInt8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
 
-        // 1. Let v be the this value.
-        // 2. Return ? GetViewValue(v, byteOffset, true, int8).
+        // 1. Let view be the this value.
+        // 2. Return ? GetViewValue(view, byteOffset, true, int8).
         return getViewValue(agent, this_value, byte_offset, Value.from(true), .int8);
     }
 
@@ -641,9 +641,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, int16).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, int16).
         return getViewValue(agent, this_value, byte_offset, little_endian, .int16);
     }
 
@@ -653,9 +653,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, int32).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, int32).
         return getViewValue(agent, this_value, byte_offset, little_endian, .int32);
     }
 
@@ -664,8 +664,8 @@ pub const prototype = struct {
     fn getUint8(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
 
-        // 1. Let v be the this value.
-        // 2. Return ? GetViewValue(v, byteOffset, true, uint8).
+        // 1. Let view be the this value.
+        // 2. Return ? GetViewValue(view, byteOffset, true, uint8).
         return getViewValue(agent, this_value, byte_offset, Value.from(true), .uint8);
     }
 
@@ -675,9 +675,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, uint16).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, uint16).
         return getViewValue(agent, this_value, byte_offset, little_endian, .uint16);
     }
 
@@ -687,9 +687,9 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const little_endian = arguments.getOrNull(1) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, uint32).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, uint32).
         return getViewValue(agent, this_value, byte_offset, little_endian, .uint32);
     }
 
@@ -700,8 +700,8 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.get(2);
 
-        // 1. Let v be the this value.
-        // 2. Return ? SetViewValue(v, byteOffset, littleEndian, bigint64, value).
+        // 1. Let view be the this value.
+        // 2. Return ? SetViewValue(view, byteOffset, littleEndian, bigint64, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .bigint64, value);
     }
 
@@ -712,8 +712,8 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.get(2);
 
-        // 1. Let v be the this value.
-        // 2. Return ? SetViewValue(v, byteOffset, littleEndian, biguint64, value).
+        // 1. Let view be the this value.
+        // 2. Return ? SetViewValue(view, byteOffset, littleEndian, biguint64, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .biguint64, value);
     }
 
@@ -724,9 +724,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, Float16, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, Float16, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .float16, value);
     }
 
@@ -737,9 +737,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, float32, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float32, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .float32, value);
     }
 
@@ -750,9 +750,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, float64, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float64, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .float64, value);
     }
 
@@ -762,8 +762,8 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let v be the this value.
-        // 2. Return ? SetViewValue(v, byteOffset, true, int8, value).
+        // 1. Let view be the this value.
+        // 2. Return ? SetViewValue(view, byteOffset, true, int8, value).
         return setViewValue(agent, this_value, byte_offset, Value.from(true), .int8, value);
     }
 
@@ -774,9 +774,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, int16, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, int16, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .int16, value);
     }
 
@@ -787,9 +787,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, int32, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, int32, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .int32, value);
     }
 
@@ -799,8 +799,8 @@ pub const prototype = struct {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let v be the this value.
-        // 2. Return ? SetViewValue(v, byteOffset, true, uint8, value).
+        // 1. Let view be the this value.
+        // 2. Return ? SetViewValue(view, byteOffset, true, uint8, value).
         return setViewValue(agent, this_value, byte_offset, Value.from(true), .uint8, value);
     }
 
@@ -811,9 +811,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, uint16, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, uint16, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .uint16, value);
     }
 
@@ -824,9 +824,9 @@ pub const prototype = struct {
         const value = arguments.get(1);
         const little_endian = arguments.getOrNull(2) orelse Value.from(false);
 
-        // 1. Let v be the this value.
+        // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, uint32, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, uint32, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .uint32, value);
     }
 };
