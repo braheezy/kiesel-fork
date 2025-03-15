@@ -489,49 +489,45 @@ pub fn timeClip(time: f64) f64 {
 
 /// 21.4.1.32 Date Time String Format
 /// https://tc39.es/ecma262/#sec-date-time-string-format
-pub fn parseDateTimeString(string: *const String) f64 {
-    const invalid = std.math.nan(f64);
-    var parser = StringParser.init(switch (string.slice) {
-        .ascii => |ascii| ascii,
-        .utf16 => return invalid,
-    });
+pub fn parseDateTimeString(string: []const u8) error{InvalidFormat}!f64 {
+    var parser = StringParser.init(string);
     var date_only = true;
     const year, const month, const date = blk: {
-        const year = switch (parser.peek() orelse return invalid) {
+        const year = switch (parser.peek() orelse return error.InvalidFormat) {
             '+', '-' => |sign| year: {
                 _ = parser.consume() orelse unreachable;
-                var value = parser.consumeDigits(Year, 6) orelse return invalid;
+                var value = parser.consumeDigits(Year, 6) orelse return error.InvalidFormat;
                 if (sign == '-') {
-                    if (value == 0) return invalid;
+                    if (value == 0) return error.InvalidFormat;
                     value *= -1;
                 }
                 break :year value;
             },
-            else => parser.consumeDigits(Year, 4) orelse return invalid,
+            else => parser.consumeDigits(Year, 4) orelse return error.InvalidFormat,
         };
         if (parser.peek() != '-') break :blk .{ year, 1, 1 };
         _ = parser.consume() orelse unreachable;
-        const month = parser.consumeDigits(Month, 2) orelse return invalid;
-        if (month < 1 or month > 12) return invalid;
+        const month = parser.consumeDigits(Month, 2) orelse return error.InvalidFormat;
+        if (month < 1 or month > 12) return error.InvalidFormat;
         if (parser.peek() != '-') break :blk .{ year, month, 1 };
         _ = parser.consume() orelse unreachable;
-        const date = parser.consumeDigits(Date_, 2) orelse return invalid;
-        if (date < 1 or date > 31) return invalid;
+        const date = parser.consumeDigits(Date_, 2) orelse return error.InvalidFormat;
+        if (date < 1 or date > 31) return error.InvalidFormat;
         break :blk .{ year, month, date };
     };
     const hour, const minute, const second, const millisecond = blk: {
-        if ((parser.consume() orelse break :blk .{ 0, 0, 0, 0 }) != 'T') return invalid;
+        if ((parser.consume() orelse break :blk .{ 0, 0, 0, 0 }) != 'T') return error.InvalidFormat;
         date_only = false;
-        const hour = parser.consumeDigits(Hour, 2) orelse return invalid;
-        if (hour > 24) return invalid;
-        if (parser.consume() != ':') return invalid;
-        const minute = parser.consumeDigits(Minute, 2) orelse return invalid;
-        if (minute > 59) return invalid;
+        const hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
+        if (hour > 24) return error.InvalidFormat;
+        if (parser.consume() != ':') return error.InvalidFormat;
+        const minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
+        if (minute > 59) return error.InvalidFormat;
         if (parser.consume() != ':') break :blk .{ hour, minute, 0, 0 };
-        const second = parser.consumeDigits(Second, 2) orelse return invalid;
-        if (second > 59) return invalid;
+        const second = parser.consumeDigits(Second, 2) orelse return error.InvalidFormat;
+        if (second > 59) return error.InvalidFormat;
         if (parser.consume() != '.') break :blk .{ hour, minute, second, 0 };
-        const millisecond = parser.consumeDigits(Millisecond, 3) orelse return invalid;
+        const millisecond = parser.consumeDigits(Millisecond, 3) orelse return error.InvalidFormat;
         break :blk .{ hour, minute, second, millisecond };
     };
     const offset_ms = blk: {
@@ -541,11 +537,11 @@ pub fn parseDateTimeString(string: *const String) f64 {
             break :blk 0;
         }) {
             '+', '-' => |sign| {
-                const offset_hour = parser.consumeDigits(Hour, 2) orelse return invalid;
-                if (hour > 23) return invalid;
-                if (parser.consume() != ':') return invalid;
-                const offset_minute = parser.consumeDigits(Minute, 2) orelse return invalid;
-                if (minute > 59) return invalid;
+                const offset_hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
+                if (hour > 23) return error.InvalidFormat;
+                if (parser.consume() != ':') return error.InvalidFormat;
+                const offset_minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
+                if (minute > 59) return error.InvalidFormat;
                 var value =
                     @as(f64, @floatFromInt(offset_hour)) * std.time.ms_per_hour +
                     @as(f64, @floatFromInt(offset_minute)) * std.time.ms_per_min;
@@ -554,11 +550,11 @@ pub fn parseDateTimeString(string: *const String) f64 {
                 break :blk value;
             },
             'Z' => break :blk 0,
-            else => return invalid,
+            else => return error.InvalidFormat,
         }
     };
     // Did we reach the end of the string?
-    if (parser.peek() != null) return invalid;
+    if (parser.peek() != null) return error.InvalidFormat;
     const time_value = makeDate(
         makeDay(
             @floatFromInt(year),
@@ -570,6 +566,109 @@ pub fn parseDateTimeString(string: *const String) f64 {
             @floatFromInt(minute),
             @floatFromInt(second),
             @floatFromInt(millisecond),
+        ),
+    );
+    return timeClip(time_value + offset_ms);
+}
+
+/// Supports the `toString()` and `toUTCString()` formats:
+///
+/// - `Thu Jan 01 1970 01:00:00 GMT+0100 (Greenwich Mean Time)`
+/// - `Thu, 01 Jan 1970 00:00:00 GMT`
+pub fn parseOtherString(string: []const u8) error{InvalidFormat}!f64 {
+    var parser = StringParser.init(string);
+    const weekday = parser.consumeSlice(3) orelse return error.InvalidFormat;
+    for (week_day_names) |w| {
+        if (std.mem.eql(u8, weekday, w)) break;
+    } else return error.InvalidFormat;
+    const is_utc_string = parser.peek() == ',';
+    if (is_utc_string) _ = parser.consume() orelse unreachable;
+    if (parser.consume() != ' ') return error.InvalidFormat;
+    const date, const month = if (is_utc_string) blk: {
+        const date = parser.consumeDigits(Date_, 2) orelse return error.InvalidFormat;
+        if (parser.consume() != ' ') return error.InvalidFormat;
+        const month_string = parser.consumeSlice(3) orelse return error.InvalidFormat;
+        const month: Month = for (month_names, 1..) |m, i| {
+            if (std.mem.eql(u8, month_string, m)) break @intCast(i);
+        } else return error.InvalidFormat;
+        break :blk .{ date, month };
+    } else blk: {
+        const month_string = parser.consumeSlice(3) orelse return error.InvalidFormat;
+        const month: Month = for (month_names, 1..) |m, i| {
+            if (std.mem.eql(u8, month_string, m)) break @intCast(i);
+        } else return error.InvalidFormat;
+        if (parser.consume() != ' ') return error.InvalidFormat;
+        const date = parser.consumeDigits(Date_, 2) orelse return error.InvalidFormat;
+        break :blk .{ date, month };
+    };
+    if (parser.consume() != ' ') return error.InvalidFormat;
+    const year = blk: {
+        const sign = if (parser.peek() == '-')
+            parser.consume() orelse unreachable
+        else
+            '+';
+        var value = parser.consumeDigits(Year, 6) orelse
+            parser.consumeDigits(Year, 5) orelse
+            parser.consumeDigits(Year, 4) orelse
+            return error.InvalidFormat;
+        if (sign == '-') {
+            if (value == 0) return error.InvalidFormat;
+            value *= -1;
+        }
+        break :blk value;
+    };
+    if (parser.consume() != ' ') return error.InvalidFormat;
+    const hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
+    if (hour > 24) return error.InvalidFormat;
+    if (parser.consume() != ':') return error.InvalidFormat;
+    const minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
+    if (minute > 59) return error.InvalidFormat;
+    if (parser.consume() != ':') return error.InvalidFormat;
+    const second = parser.consumeDigits(Second, 2) orelse return error.InvalidFormat;
+    if (second > 59) return error.InvalidFormat;
+    if (parser.consume() != ' ') return error.InvalidFormat;
+    const gmt = parser.consumeSlice(3) orelse return error.InvalidFormat;
+    if (!std.mem.eql(u8, gmt, "GMT")) return error.InvalidFormat;
+    const offset_ms = blk: {
+        if (is_utc_string) break :blk 0;
+        switch (parser.consume() orelse return error.InvalidFormat) {
+            '+', '-' => |sign| {
+                const offset_hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
+                if (hour > 23) return error.InvalidFormat;
+                const offset_minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
+                if (minute > 59) return error.InvalidFormat;
+                var value =
+                    @as(f64, @floatFromInt(offset_hour)) * std.time.ms_per_hour +
+                    @as(f64, @floatFromInt(offset_minute)) * std.time.ms_per_min;
+                // Offset sign is negated
+                if (sign == '+') value *= -1;
+                break :blk value;
+            },
+            else => return error.InvalidFormat,
+        }
+    };
+    // Time zone in parenthesis is optional
+    if (!is_utc_string and parser.peek() == ' ') {
+        _ = parser.consume() orelse unreachable;
+        if (parser.consume() != '(') return error.InvalidFormat;
+        if (parser.consume() == ')') return error.InvalidFormat;
+        while (parser.consume()) |c| {
+            if (c == ')') break;
+        }
+    }
+    // Did we reach the end of the string?
+    if (parser.peek() != null) return error.InvalidFormat;
+    const time_value = makeDate(
+        makeDay(
+            @floatFromInt(year),
+            @floatFromInt(month - 1),
+            @floatFromInt(date),
+        ),
+        makeTime(
+            @floatFromInt(hour),
+            @floatFromInt(minute),
+            @floatFromInt(second),
+            0,
         ),
     );
     return timeClip(time_value + offset_ms);
@@ -765,7 +864,7 @@ pub const constructor = struct {
                     //    String.
                     // 2. Let tv be the result of parsing v as a date, in exactly the same manner
                     //    as for the parse method (21.4.3.2).
-                    break :blk_tv parseDateTimeString(primitive_value.asString());
+                    break :blk_tv parseImpl(primitive_value.asString());
                 } else {
                     // iii. Else,
                     // 1. Let tv be ? ToNumber(v).
@@ -843,7 +942,17 @@ pub const constructor = struct {
     /// https://tc39.es/ecma262/#sec-date.now
     fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const string = try arguments.get(0).toString(agent);
-        return Value.from(parseDateTimeString(string));
+        return Value.from(parseImpl(string));
+    }
+
+    fn parseImpl(string: *const String) f64 {
+        const ascii = switch (string.slice) {
+            .ascii => |ascii| ascii,
+            .utf16 => return std.math.nan(f64),
+        };
+        return parseDateTimeString(ascii) catch
+            parseOtherString(ascii) catch
+            std.math.nan(f64);
     }
 
     /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
@@ -2276,3 +2385,34 @@ pub const Date = MakeObject(.{
     },
     .tag = .date,
 });
+
+test parseOtherString {
+    const test_cases = [_]struct { []const u8, f64 }{
+        // toString()
+        .{ "Thu Jan 01 1970 00:00:00 GMT+0000", 0 },
+        .{ "Thu Jan 01 1970 00:00:00 GMT+0100", -3_600_000 },
+        .{ "Thu Jan 01 1970 00:00:00 GMT-0100", 3_600_000 },
+        .{ "Sat Mar 15 2025 12:34:56 GMT+0000 (Greenwich Mean Time)", 1742042096000 },
+
+        // toUTCString()
+        .{ "Thu, 01 Jan 1970 00:00:00 GMT", 0 },
+        .{ "Sat, 15 Mar 2025 12:34:56 GMT", 1742042096000 },
+    };
+    for (test_cases) |test_case| {
+        const value, const expected = test_case;
+        try std.testing.expectEqual(expected, parseOtherString(value));
+    }
+    inline for (.{
+        "",
+        "abc",
+        "Abc Jan 01 1970 00:00:00 GMT+0000",
+        "Thu Abc 01 1970 00:00:00 GMT+0000",
+        "Thu Jan 99 1970 00:00:00 GMT+0000",
+        "Thu Jan 01 1970 99:99:99 GMT+0000",
+        "Thu Jan 01 1970 00:00:00 GMT+0000 ()",
+        "Thu Jan 01 1970 00:00:00 GMT+9999",
+        "Thu 01 Jan 1970 00:00:00 GMT",
+    }) |value| {
+        try std.testing.expectError(error.InvalidFormat, parseOtherString(value));
+    }
+}
