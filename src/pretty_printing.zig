@@ -15,6 +15,7 @@ const Value = types.Value;
 const getArrayLength = builtins.array.getArrayLength;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
+const toDateString = builtins.date.toDateString;
 const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = builtins.weakRefDeref;
 
@@ -216,12 +217,22 @@ fn prettyPrintDate(
     date: *const builtins.Date,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = date.object.agent;
     const date_value = date.fields.date_value;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Date(");
-    try writer.print("{pretty}", .{Value.from(date_value)});
+    if (!std.math.isNan(date_value)) {
+        try writer.print(
+            "{pretty}",
+            .{Value.from(asciiString(toDateString(agent.gc_allocator, date_value) catch return))},
+        );
+    } else {
+        try tty_config.setColor(writer, .dim);
+        try writer.writeAll("<invalid>");
+        try tty_config.setColor(writer, .reset);
+    }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
