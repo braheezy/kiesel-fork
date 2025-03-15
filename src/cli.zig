@@ -348,7 +348,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     },
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) !?Value {
+}) !Value {
     const agent = realm.agent;
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
@@ -396,7 +396,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .stack_trace = &.{},
             };
             try stderr.print("{pretty}\n", .{exception});
-            return null;
+            return error.AlreadyReported;
         },
         error.OutOfMemory => return error.OutOfMemory,
     };
@@ -483,12 +483,12 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     } catch |err| switch (err) {
         error.OutOfMemory => {
             try stderr.writeAll("Out of memory\n");
-            return null;
+            return error.AlreadyReported;
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
             try stderr.print("{pretty}\n", .{exception});
-            return null;
+            return error.AlreadyReported;
         },
     };
 }
@@ -672,21 +672,22 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
 
         try editor.addToHistory(source_text);
 
-        if (try run(allocator, realm, source_text, .{
+        const result = run(allocator, realm, source_text, .{
             .base_dir = options.base_dir,
             .origin = .repl,
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
-        })) |result| {
-            try stdout.print("{pretty}", .{result});
-            if (options.debug) {
-                const tty_config = realm.agent.platform.tty_config;
-                try printValueDebugInfo(stdout, tty_config, result);
-            }
-            try stdout.writeAll("\n");
+        }) catch |err| switch (err) {
+            // Handled exception & printed something, carry on
+            error.AlreadyReported => continue,
+            else => return err,
+        };
+        try stdout.print("{pretty}", .{result});
+        if (options.debug) {
+            const tty_config = realm.agent.platform.tty_config;
+            try printValueDebugInfo(stdout, tty_config, result);
         }
-        // Handled exception & printed something, carry on
-        else continue;
+        try stdout.writeAll("\n");
     }
 }
 
@@ -939,25 +940,29 @@ pub fn main() !u8 {
         const resolved_path = try std.fs.path.resolve(allocator, &.{ cwd, path });
         defer allocator.free(resolved_path);
         std.debug.assert(std.fs.path.isAbsolute(resolved_path));
-        if (try run(allocator, realm, source_text, .{
+        const result = run(allocator, realm, source_text, .{
             .base_dir = std.fs.path.dirname(resolved_path).?,
             .origin = .{ .path = path },
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
-        })) |result| {
-            if (parsed_args.options.@"print-result")
-                try stdout.print("{pretty}\n", .{result});
-        } else return 1;
+        }) catch |err| switch (err) {
+            error.AlreadyReported => return 1,
+            else => return err,
+        };
+        if (parsed_args.options.@"print-result")
+            try stdout.print("{pretty}\n", .{result});
     } else if (parsed_args.options.command) |source_text| {
-        if (try run(allocator, realm, source_text, .{
+        const result = run(allocator, realm, source_text, .{
             .base_dir = cwd,
             .origin = .command,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
-        })) |result| {
-            if (parsed_args.options.@"print-result")
-                try stdout.print("{pretty}\n", .{result});
-        } else return 1;
+        }) catch |err| switch (err) {
+            error.AlreadyReported => return 1,
+            else => return err,
+        };
+        if (parsed_args.options.@"print-result")
+            try stdout.print("{pretty}\n", .{result});
     } else {
         try repl(allocator, realm, .{
             .base_dir = cwd,
