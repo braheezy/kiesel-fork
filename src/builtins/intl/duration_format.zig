@@ -70,15 +70,13 @@ pub const constructor = struct {
             );
         };
 
-        // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
+        // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.DurationFormatPrototype%", « [[InitializedDurationFormat]], [[Locale]],
-        //    [[NumberingSystem]], [[Style]], [[YearsStyle]], [[YearsDisplay]], [[MonthsStyle]],
-        //    [[MonthsDisplay]], [[WeeksStyle]], [[WeeksDisplay]], [[DaysStyle]], [[DaysDisplay]],
-        //    [[HoursStyle]], [[HoursDisplay]], [[MinutesStyle]], [[MinutesDisplay]],
-        //    [[SecondsStyle]], [[SecondsDisplay]], [[MillisecondsStyle]], [[MillisecondsDisplay]],
-        //    [[MicrosecondsStyle]], [[MicrosecondsDisplay]], [[NanosecondsStyle]],
-        //    [[NanosecondsDisplay]], [[HourMinuteSeparator]], [[MinuteSecondSeparator]],
-        //    [[FractionalDigits]] »).
+        //    [[NumberingSystem]], [[Style]], [[YearsOptions]], [[MonthsOptions]],
+        //    [[WeeksOptions]], [[DaysOptions]], [[HoursOptions]], [[MinutesOptions]],
+        //    [[SecondsOptions]], [[MillisecondsOptions]], [[MicrosecondsOptions]],
+        //    [[NanosecondsOptions]], [[HourMinuteSeparator]], [[MinuteSecondSeparator]],
+        //    [[FractionalDigits]] »).
         const duration_format = try ordinaryCreateFromConstructor(
             DurationFormat,
             agent,
@@ -88,26 +86,16 @@ pub const constructor = struct {
                 .locale = undefined,
                 .numbering_system = undefined,
                 .style = undefined,
-                .years_style = undefined,
-                .years_display = undefined,
-                .months_style = undefined,
-                .months_display = undefined,
-                .weeks_style = undefined,
-                .weeks_display = undefined,
-                .days_style = undefined,
-                .days_display = undefined,
-                .hours_style = undefined,
-                .hours_display = undefined,
-                .minutes_style = undefined,
-                .minutes_display = undefined,
-                .seconds_style = undefined,
-                .seconds_display = undefined,
-                .milliseconds_style = undefined,
-                .milliseconds_display = undefined,
-                .microseconds_style = undefined,
-                .microseconds_display = undefined,
-                .nanoseconds_style = undefined,
-                .nanoseconds_display = undefined,
+                .years_options = undefined,
+                .months_options = undefined,
+                .weeks_options = undefined,
+                .days_options = undefined,
+                .hours_options = undefined,
+                .minutes_options = undefined,
+                .seconds_options = undefined,
+                .milliseconds_options = undefined,
+                .microseconds_options = undefined,
+                .nanoseconds_options = undefined,
                 .hour_minute_separator = undefined,
                 .minute_second_separator = undefined,
                 .fractional_digits = undefined,
@@ -320,31 +308,28 @@ pub const constructor = struct {
                 String.fromLiteral("numeric"),
             },
         }) |row| {
-            // a. Let styleSlot be the Style Slot value of the current row.
-            // b. Let displaySlot be the Display Slot value of the current row.
-            // c. Let unit be the Unit value of the current row.
-            // d. Let valueList be the Values value of the current row.
-            // e. Let digitalBase be the Digital Default value of the current row.
-            const unit, const value_list, const digital_base = row;
-            const style_slot = std.fmt.comptimePrint("{s}_style", .{@tagName(unit)});
-            const display_slot = std.fmt.comptimePrint("{s}_display", .{@tagName(unit)});
+            // a. Let slot be the Internal Slot value of the current row.
+            // b. Let unit be the Unit value of the current row.
+            // c. Let styles be the Styles value of the current row.
+            // d. Let digitalBase be the Digital Default value of the current row.
+            const unit, const styles, const digital_base = row;
+            const slot = std.fmt.comptimePrint("{s}_options", .{@tagName(unit)});
 
-            // f. Let unitOptions be ? GetDurationUnitOptions(unit, options, style, valueList,
+            // e. Let unitOptions be ? GetDurationUnitOptions(unit, options, style, styles,
             //    digitalBase, prevStyle, digitalFormat.[[TwoDigitHours]]).
             const unit_options = try getDurationUnitOptions(
                 agent,
                 unit,
                 options,
                 style,
-                value_list,
+                styles,
                 digital_base,
                 prev_style,
                 digital_format.two_digit_hours,
             );
 
-            // g. Set the value of the styleSlot slot of durationFormat to unitOptions.[[Style]].
             const unit_style_map = std.StaticStringMap(
-                @FieldType(DurationFormat.Fields, style_slot),
+                @FieldType(@FieldType(DurationFormat.Fields, slot), "style"),
             ).initComptime(switch (unit) {
                 .years, .months, .weeks, .days => &.{
                     .{ "long", .long },
@@ -366,23 +351,21 @@ pub const constructor = struct {
                 },
                 else => unreachable,
             });
-            @field(duration_format.as(DurationFormat).fields, style_slot) = unit_style_map.get(
-                unit_options.style.slice.ascii,
-            ).?;
-
-            // h. Set the value of the displaySlot slot of durationFormat to unitOptions.[[Display]].
             const unit_display_map = std.StaticStringMap(
-                @FieldType(DurationFormat.Fields, display_slot),
+                @FieldType(@FieldType(DurationFormat.Fields, slot), "display"),
             ).initComptime(&.{
                 .{ "auto", .auto },
                 .{ "always", .always },
             });
-            @field(duration_format.as(DurationFormat).fields, display_slot) = unit_display_map.get(
-                unit_options.display.slice.ascii,
-            ).?;
+
+            // f. Set the value of durationFormat's internal slot whose name is slot to unitOptions.
+            @field(duration_format.as(DurationFormat).fields, slot) = .{
+                .style = unit_style_map.get(unit_options.style.slice.ascii).?,
+                .display = unit_display_map.get(unit_options.display.slice.ascii).?,
+            };
 
             switch (unit) {
-                // i. If unit is one of "hours", "minutes", "seconds", "milliseconds", or
+                // g. If unit is one of "hours", "minutes", "seconds", "milliseconds", or
                 //    "microseconds", then
                 .hours, .minutes, .seconds, .milliseconds, .microseconds => {
                     // i. Set prevStyle to unitOptions.[[Style]].
@@ -459,16 +442,27 @@ pub const prototype = struct {
 
         // 4. For each row of Table 21, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of df's internal slot whose name is the Internal Slot value of the current row.
-        //     c. If p is "fractionalDigits", then
-        //         i. If v is not undefined, perform ! CreateDataPropertyOrThrow(options, p, 𝔽(v)).
-        //     d. Else,
-        //         i. Assert: v is not undefined.
-        //         ii. If v is "fractional", then
-        //             1. Assert: The Internal Slot value of the current row is
-        //                [[MillisecondsStyle]], [[MicrosecondsStyle]], or [[NanosecondsStyle]] .
-        //             2. Set v to "numeric".
-        //         iii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //     b. Let v be the value of df's internal slot whose name is the Internal Slot value of
+        //        the current row.
+        //     c. If v is not undefined, then
+        //         i. If there is a Conversion value in the current row, let conversion be that
+        //            value; else let conversion be empty.
+        //         ii. If conversion is number, then
+        //             1. Set v to 𝔽(v).
+        //         iii. Else if conversion is not empty, then
+        //             1. Assert: conversion is style+display and v is a Duration Unit Options
+        //                Record.
+        //             2. NOTE: v.[[Style]] will be represented with a property named p (a plural
+        //                Temporal unit), then v.[[Display]] will be represented with a property
+        //                whose name suffixes p with "Display".
+        //             3. Let style be v.[[Style]].
+        //             4. If style is "fractional", then
+        //                 a. Assert: IsFractionalSecondUnitName(p) is true.
+        //                 b. Set style to "numeric".
+        //             5. Perform ! CreateDataPropertyOrThrow(options, p, style).
+        //             6. Set p to the string-concatenation of p and "Display".
+        //             7. Set v to v.[[Display]].
+        //         iv. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = duration_format.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
@@ -526,14 +520,6 @@ pub const prototype = struct {
         options.createDataPropertyOrThrow(
             PropertyKey.from("hoursDisplay"),
             Value.from(resolved_options.hours_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
-            PropertyKey.from("minutes"),
-            Value.from(resolved_options.minutes),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
-            PropertyKey.from("minutesDisplay"),
-            Value.from(resolved_options.minutes_display),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("minutes"),
@@ -615,26 +601,46 @@ pub const prototype = struct {
 pub const DurationFormat = MakeObject(.{
     .Fields = struct {
         pub const Style = enum { long, short, narrow, digital };
-        pub const YearsStyle = enum { long, short, narrow };
-        pub const YearsDisplay = enum { auto, always };
-        pub const MonthsStyle = enum { long, short, narrow };
-        pub const MonthsDisplay = enum { auto, always };
-        pub const WeeksStyle = enum { long, short, narrow };
-        pub const WeeksDisplay = enum { auto, always };
-        pub const DaysStyle = enum { long, short, narrow };
-        pub const DaysDisplay = enum { auto, always };
-        pub const HoursStyle = enum { long, short, narrow, @"2-digit", numeric };
-        pub const HoursDisplay = enum { auto, always };
-        pub const MinutesStyle = enum { long, short, narrow, @"2-digit", numeric };
-        pub const MinutesDisplay = enum { auto, always };
-        pub const SecondsStyle = enum { long, short, narrow, @"2-digit", numeric };
-        pub const SecondsDisplay = enum { auto, always };
-        pub const MillisecondsStyle = enum { long, short, narrow, fractional };
-        pub const MillisecondsDisplay = enum { auto, always };
-        pub const MicrosecondsStyle = enum { long, short, narrow, fractional };
-        pub const MicrosecondsDisplay = enum { auto, always };
-        pub const NanosecondsStyle = enum { long, short, narrow, fractional };
-        pub const NanosecondsDisplay = enum { auto, always };
+        pub const YearsOptions = struct {
+            style: enum { long, short, narrow },
+            display: enum { auto, always },
+        };
+        pub const MonthsOptions = struct {
+            style: enum { long, short, narrow },
+            display: enum { auto, always },
+        };
+        pub const WeeksOptions = struct {
+            style: enum { long, short, narrow },
+            display: enum { auto, always },
+        };
+        pub const DaysOptions = struct {
+            style: enum { long, short, narrow },
+            display: enum { auto, always },
+        };
+        pub const HoursOptions = struct {
+            style: enum { long, short, narrow, @"2-digit", numeric },
+            display: enum { auto, always },
+        };
+        pub const MinutesOptions = struct {
+            style: enum { long, short, narrow, @"2-digit", numeric },
+            display: enum { auto, always },
+        };
+        pub const SecondsOptions = struct {
+            style: enum { long, short, narrow, @"2-digit", numeric },
+            display: enum { auto, always },
+        };
+        pub const MillisecondsOptions = struct {
+            style: enum { long, short, narrow, fractional },
+            display: enum { auto, always },
+        };
+        pub const MicrosecondsOptions = struct {
+            style: enum { long, short, narrow, fractional },
+            display: enum { auto, always },
+        };
+        pub const NanosecondsOptions = struct {
+            style: enum { long, short, narrow, fractional },
+            display: enum { auto, always },
+        };
         pub const FractionalDigits = enum(u4) { @"0", @"1", @"2", @"3", @"4", @"5", @"6", @"7", @"8", @"9" };
 
         /// [[Locale]]
@@ -646,65 +652,35 @@ pub const DurationFormat = MakeObject(.{
         /// [[Style]]
         style: Style,
 
-        /// [[YearsStyle]]
-        years_style: YearsStyle,
+        /// [[YearsOptions]]
+        years_options: YearsOptions,
 
-        /// [[YearsDisplay]]
-        years_display: YearsDisplay,
+        /// [[MonthsOptions]]
+        months_options: MonthsOptions,
 
-        /// [[MonthsStyle]]
-        months_style: MonthsStyle,
+        /// [[WeeksOptions]]
+        weeks_options: WeeksOptions,
 
-        /// [[MonthsDisplay]]
-        months_display: MonthsDisplay,
+        /// [[DaysOptions]]
+        days_options: DaysOptions,
 
-        /// [[WeeksStyle]]
-        weeks_style: WeeksStyle,
+        /// [[HoursOptions]]
+        hours_options: HoursOptions,
 
-        /// [[WeeksDisplay]]
-        weeks_display: WeeksDisplay,
+        /// [[MinutesOptions]]
+        minutes_options: MinutesOptions,
 
-        /// [[DaysStyle]]
-        days_style: DaysStyle,
+        /// [[SecondsOptions]]
+        seconds_options: SecondsOptions,
 
-        /// [[DaysDisplay]]
-        days_display: DaysDisplay,
+        /// [[MillisecondsOptions]]
+        milliseconds_options: MillisecondsOptions,
 
-        /// [[HoursStyle]]
-        hours_style: HoursStyle,
+        /// [[MicrosecondsOptions]]
+        microseconds_options: MicrosecondsOptions,
 
-        /// [[HoursDisplay]]
-        hours_display: HoursDisplay,
-
-        /// [[MinutesStyle]]
-        minutes_style: MinutesStyle,
-
-        /// [[MinutesDisplay]]
-        minutes_display: MinutesDisplay,
-
-        /// [[SecondsStyle]]
-        seconds_style: SecondsStyle,
-
-        /// [[SecondsDisplay]]
-        seconds_display: SecondsDisplay,
-
-        /// [[MillisecondsStyle]]
-        milliseconds_style: MillisecondsStyle,
-
-        /// [[MillisecondsDisplay]]
-        milliseconds_display: MillisecondsDisplay,
-
-        /// [[MicrosecondsStyle]]
-        microseconds_style: MicrosecondsStyle,
-
-        /// [[MicrosecondsDisplay]]
-        microseconds_display: MicrosecondsDisplay,
-
-        /// [[NanosecondsStyle]]
-        nanoseconds_style: NanosecondsStyle,
-
-        /// [[NanosecondsDisplay]]
-        nanoseconds_display: NanosecondsDisplay,
+        /// [[NanosecondsOptions]]
+        nanoseconds_options: NanosecondsOptions,
 
         /// [[HourMinuteSeparator]]
         hour_minute_separator: u8,
@@ -750,102 +726,102 @@ pub const DurationFormat = MakeObject(.{
                     .narrow => String.fromLiteral("narrow"),
                     .digital => String.fromLiteral("digital"),
                 },
-                .years = switch (self.years_style) {
+                .years = switch (self.years_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                 },
-                .years_display = switch (self.years_display) {
+                .years_display = switch (self.years_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .months = switch (self.months_style) {
+                .months = switch (self.months_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                 },
-                .months_display = switch (self.months_display) {
+                .months_display = switch (self.months_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .weeks = switch (self.weeks_style) {
+                .weeks = switch (self.weeks_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                 },
-                .weeks_display = switch (self.weeks_display) {
+                .weeks_display = switch (self.weeks_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .days = switch (self.days_style) {
+                .days = switch (self.days_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                 },
-                .days_display = switch (self.days_display) {
+                .days_display = switch (self.days_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .hours = switch (self.hours_style) {
+                .hours = switch (self.hours_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .@"2-digit" => String.fromLiteral("2-digit"),
                     .numeric => String.fromLiteral("numeric"),
                 },
-                .hours_display = switch (self.hours_display) {
+                .hours_display = switch (self.hours_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .minutes = switch (self.minutes_style) {
+                .minutes = switch (self.minutes_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .@"2-digit" => String.fromLiteral("2-digit"),
                     .numeric => String.fromLiteral("numeric"),
                 },
-                .minutes_display = switch (self.minutes_display) {
+                .minutes_display = switch (self.minutes_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .seconds = switch (self.seconds_style) {
+                .seconds = switch (self.seconds_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .@"2-digit" => String.fromLiteral("2-digit"),
                     .numeric => String.fromLiteral("numeric"),
                 },
-                .seconds_display = switch (self.seconds_display) {
+                .seconds_display = switch (self.seconds_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .milliseconds = switch (self.milliseconds_style) {
+                .milliseconds = switch (self.milliseconds_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .fractional => String.fromLiteral("numeric"),
                 },
-                .milliseconds_display = switch (self.milliseconds_display) {
+                .milliseconds_display = switch (self.milliseconds_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .microseconds = switch (self.microseconds_style) {
+                .microseconds = switch (self.microseconds_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .fractional => String.fromLiteral("numeric"),
                 },
-                .microseconds_display = switch (self.microseconds_display) {
+                .microseconds_display = switch (self.microseconds_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
-                .nanoseconds = switch (self.nanoseconds_style) {
+                .nanoseconds = switch (self.nanoseconds_options.style) {
                     .long => String.fromLiteral("long"),
                     .short => String.fromLiteral("short"),
                     .narrow => String.fromLiteral("narrow"),
                     .fractional => String.fromLiteral("numeric"),
                 },
-                .nanoseconds_display = switch (self.nanoseconds_display) {
+                .nanoseconds_display = switch (self.nanoseconds_options.display) {
                     .auto => String.fromLiteral("auto"),
                     .always => String.fromLiteral("always"),
                 },
@@ -1035,8 +1011,12 @@ fn toIntegerIfIntegral(agent: *Agent, argument: Value) Agent.Error!f64 {
     return number.asFloat();
 }
 
+/// https://tc39.es/ecma402/#durationformat-unit-options-record
 const DurationUnitOptions = struct {
+    /// [[Style]]
     style: *const String,
+
+    /// [[Display]]
     display: *const String,
 };
 
@@ -1051,6 +1031,14 @@ const Unit = enum {
     milliseconds,
     microseconds,
     nanoseconds,
+
+    /// 13.5.13 IsFractionalSecondUnitName ( unit )
+    /// https://tc39.es/ecma402/#sec-isfractionalsecondunitname
+    fn isFractionalSecondUnitName(unit: Unit) bool {
+        // 1. If unit is one of "milliseconds", "microseconds", or "nanoseconds", return true.
+        // 2. Return false.
+        return unit == .milliseconds or unit == .microseconds or unit == .nanoseconds;
+    }
 };
 
 /// 13.5.6 GetDurationUnitOptions ( unit, options, baseStyle, stylesList, digitalBase, prevStyle, twoDigitHours )
@@ -1106,10 +1094,8 @@ fn getDurationUnitOptions(
         }
     }
 
-    // 4. If style is "numeric" and unit is one of "milliseconds", "microseconds", or "nanoseconds", then
-    if (style.?.eql(String.fromLiteral("numeric")) and
-        (unit == .milliseconds or unit == .microseconds or unit == .nanoseconds))
-    {
+    // 4. If style is "numeric" and IsFractionalSecondUnitName(unit) is true, then
+    if (style.?.eql(String.fromLiteral("numeric")) and unit.isFractionalSecondUnitName()) {
         // a. Set style to "fractional".
         style = String.fromLiteral("fractional");
 
@@ -1144,7 +1130,7 @@ fn getDurationUnitOptions(
         style = String.fromLiteral("2-digit");
     }
 
-    // 10. Return the Record { [[Style]]: style, [[Display]]: display  }.
+    // 10. Return the Duration Unit Options Record { [[Style]]: style, [[Display]]: display }.
     return .{ .style = style.?, .display = display };
 }
 
