@@ -674,30 +674,42 @@ pub fn parseOtherString(string: []const u8) error{InvalidFormat}!f64 {
     return timeClip(time_value + offset_ms);
 }
 
+pub fn fmtTimeString(time_value: f64) std.fmt.Formatter(formatTimeString) {
+    return .{ .data = time_value };
+}
+
 /// 21.4.4.41.1 TimeString ( tv )
 /// https://tc39.es/ecma262/#sec-timestring
-pub fn timeString(
-    allocator: std.mem.Allocator,
+fn formatTimeString(
     time_value: f64,
-) std.mem.Allocator.Error![]const u8 {
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
     // 1. Let hour be ToZeroPaddedDecimalString(ℝ(HourFromTime(tv)), 2).
     // 2. Let minute be ToZeroPaddedDecimalString(ℝ(MinFromTime(tv)), 2).
     // 3. Let second be ToZeroPaddedDecimalString(ℝ(SecFromTime(tv)), 2).
     // 4. Return the string-concatenation of hour, ":", minute, ":", second, the code unit 0x0020
     //    (SPACE), and "GMT".
-    return std.fmt.allocPrint(
-        allocator,
-        "{:0>2}:{:0>2}:{:0>2} GMT",
-        .{ hourFromTime(time_value), minFromTime(time_value), secFromTime(time_value) },
-    );
+    try writer.print("{:0>2}:{:0>2}:{:0>2} GMT", .{
+        hourFromTime(time_value),
+        minFromTime(time_value),
+        secFromTime(time_value),
+    });
+}
+
+pub fn fmtDateString(time_value: f64) std.fmt.Formatter(formatDateString) {
+    return .{ .data = time_value };
 }
 
 /// 21.4.4.41.2 DateString ( tv )
 /// https://tc39.es/ecma262/#sec-datestring
-pub fn dateString(
-    allocator: std.mem.Allocator,
+fn formatDateString(
     time_value: f64,
-) std.mem.Allocator.Error![]const u8 {
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
     // 1. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
     const weekday = week_day_names[weekDay(time_value)];
 
@@ -719,19 +731,21 @@ pub fn dateString(
 
     // 7. Return the string-concatenation of weekday, the code unit 0x0020 (SPACE), month, the code
     //    unit 0x0020 (SPACE), day, the code unit 0x0020 (SPACE), yearSign, and paddedYear.
-    return std.fmt.allocPrint(
-        allocator,
-        "{s} {s} {:0>2} {s}{s}",
-        .{ weekday, month, day_, year_sign, padded_year },
-    );
+    try writer.print("{s} {s} {:0>2} {s}{s}", .{ weekday, month, day_, year_sign, padded_year });
+}
+
+pub fn fmtTimeZoneString(time_value: f64) std.fmt.Formatter(formatTimeZoneString) {
+    return .{ .data = time_value };
 }
 
 /// 21.4.4.41.3 TimeZoneString ( tv )
 /// https://tc39.es/ecma262/#sec-timezoneestring
-pub fn timeZoneString(
-    allocator: std.mem.Allocator,
+pub fn formatTimeZoneString(
     time_value: f64,
-) std.mem.Allocator.Error![]const u8 {
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
     // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
     const system_time_zone_identifier = systemTimeZoneIdentifier();
 
@@ -754,7 +768,7 @@ pub fn timeZoneString(
     // 6. Else,
     //     a. Let offsetSign be "-".
     //     b. Let absOffset be -offset.
-    const offset_sign = if (offset >= 0) "+" else "-";
+    const offset_sign: u8 = if (offset >= 0) '+' else '-';
     const abs_offset = @abs(offset);
 
     // 7. Let offsetMin be ToZeroPaddedDecimalString(ℝ(MinFromTime(absOffset)), 2).
@@ -770,30 +784,36 @@ pub fn timeZoneString(
     const tz_name = " (UTC)";
 
     // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMin, and tzName.
-    return std.fmt.allocPrint(
-        allocator,
-        "{s}{:0>2}{:0>2}{s}",
-        .{ offset_sign, offset_hour, offset_min, tz_name },
-    );
+    try writer.print("{c}{:0>2}{:0>2}{s}", .{ offset_sign, offset_hour, offset_min, tz_name });
+}
+
+pub fn fmtToDateString(time_value: f64) std.fmt.Formatter(formatToDateString) {
+    return .{ .data = time_value };
 }
 
 /// 21.4.4.41.4 ToDateString ( tv )
 /// https://tc39.es/ecma262/#sec-todatestring
-pub fn toDateString(
-    allocator: std.mem.Allocator,
+fn formatToDateString(
     time_value: f64,
-) std.mem.Allocator.Error![]const u8 {
+    comptime _: []const u8,
+    _: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
     // 1. If tv is NaN, return "Invalid Date".
-    if (std.math.isNan(time_value)) return "Invalid Date";
+    if (std.math.isNan(time_value)) {
+        try writer.writeAll("Invalid Date");
+        return;
+    }
 
     // 2. Let t be LocalTime(tv).
     const t = localTime(time_value);
 
-    // 3. Return the string-concatenation of DateString(t), the code unit 0x0020 (SPACE), TimeString(t), and TimeZoneString(tv).
-    return std.fmt.allocPrint(allocator, "{s} {s}{s}", .{
-        try dateString(allocator, t),
-        try timeString(allocator, t),
-        try timeZoneString(allocator, time_value),
+    // 3. Return the string-concatenation of DateString(t), the code unit 0x0020 (SPACE),
+    //    TimeString(t), and TimeZoneString(tv).
+    try writer.print("{s} {s}{s}", .{
+        fmtDateString(t),
+        fmtTimeString(t),
+        fmtTimeZoneString(time_value),
     });
 }
 
@@ -834,7 +854,11 @@ pub const constructor = struct {
             const now_: f64 = @floatFromInt(agent.platform.currentTime());
 
             // b. Return ToDateString(now).
-            return Value.from(try String.fromAscii(agent.gc_allocator, try toDateString(agent.gc_allocator, now_)));
+            return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{}",
+                .{fmtToDateString(now_)},
+            )));
         }
 
         // 2. Let numberOfArgs be the number of elements in values.
@@ -2083,7 +2107,11 @@ pub const prototype = struct {
         const t = localTime(time_value);
 
         // 6. Return DateString(t).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try dateString(agent.gc_allocator, t)));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{}",
+            .{fmtDateString(t)},
+        )));
     }
 
     /// 21.4.4.36 Date.prototype.toISOString ( )
@@ -2191,7 +2219,11 @@ pub const prototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try toDateString(agent.gc_allocator, time_value)));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{}",
+            .{fmtToDateString(time_value)},
+        )));
     }
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )
@@ -2211,10 +2243,14 @@ pub const prototype = struct {
         const t = localTime(time_value);
 
         // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.mem.concat(agent.gc_allocator, u8, &.{
-            try timeString(agent.gc_allocator, t),
-            try timeZoneString(agent.gc_allocator, time_value),
-        })));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{}{}",
+            .{
+                fmtTimeString(t),
+                fmtTimeZoneString(time_value),
+            },
+        )));
     }
 
     /// 21.4.4.43 Date.prototype.toUTCString ( )
@@ -2262,7 +2298,7 @@ pub const prototype = struct {
                 month,
                 year_sign,
                 padded_year,
-                try timeString(agent.gc_allocator, time_value),
+                fmtTimeString(time_value),
             },
         )));
     }

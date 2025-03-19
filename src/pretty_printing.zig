@@ -12,10 +12,10 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
+const fmtToDateString = builtins.date.fmtToDateString;
 const getArrayLength = builtins.array.getArrayLength;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
-const toDateString = builtins.date.toDateString;
 const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = builtins.weakRefDeref;
 
@@ -224,10 +224,13 @@ fn prettyPrintDate(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Date(");
     if (!std.math.isNan(date_value)) {
-        try writer.print(
-            "{pretty}",
-            .{Value.from(asciiString(toDateString(agent.gc_allocator, date_value) catch return))},
-        );
+        try writer.print("{pretty}", .{
+            Value.from(asciiString(std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{}",
+                .{fmtToDateString(date_value)},
+            ) catch return)),
+        });
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<invalid>");
