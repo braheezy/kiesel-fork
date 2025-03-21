@@ -271,8 +271,7 @@ pub const Instruction = union(enum(u8)) {
     pub const Tag = std.meta.Tag(Instruction);
 
     pub fn Payload(comptime tag: Instruction.Tag) type {
-        @setEvalBranchQuota(100_000);
-        return std.meta.TagPayload(Instruction, tag);
+        return @FieldType(Instruction, @tagName(tag));
     }
 };
 
