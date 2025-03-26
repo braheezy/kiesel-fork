@@ -43,8 +43,8 @@ pub fn createDateTimeFormat(
     required: enum { date, time, any },
     defaults: enum { date, time, all },
 ) Agent.Error!*Object {
-    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init();
-    defer time_zone_id_mapper.deinit();
+    const iana_parser = icu4zig.IanaParser.init();
+    defer iana_parser.deinit();
 
     // 1. Let dateTimeFormat be ? OrdinaryCreateFromConstructor(newTarget,
     //    "%Intl.DateTimeFormat.prototype%", « [[InitializedDateTimeFormat]], [[Locale]],
@@ -184,10 +184,10 @@ pub fn createDateTimeFormat(
         .{ "gregory", .gregorian },
         .{ "hebrew", .hebrew },
         .{ "indian", .indian },
-        .{ "islamic-civil", .islamic_civil },
-        .{ "islamic-tbla", .islamic_tabular },
-        .{ "islamic-umalqura", .islamic_umm_al_qura },
-        .{ "islamic", .islamic_observational },
+        .{ "islamic-civil", .hijri_civil },
+        .{ "islamic-tbla", .hijri_tabular },
+        .{ "islamic-umalqura", .hijri_umm_al_qura },
+        .{ "islamic", .hijri_observational_mecca },
         .{ "iso8601", .iso },
         .{ "japanese", .japanese },
         .{ "persian", .persian },
@@ -204,7 +204,7 @@ pub fn createDateTimeFormat(
     const time_zone_value = try options.get(PropertyKey.from("timeZone"));
 
     // 27. If timeZone is undefined, then
-    var time_zone_string = if (time_zone_value.isUndefined()) blk: {
+    const time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
         break :blk systemTimeZoneIdentifier();
     } else blk: {
@@ -225,18 +225,7 @@ pub fn createDateTimeFormat(
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
-    var time_zone_info = icu4zig.TimeZoneInfo.unknown();
-    defer time_zone_info.deinit();
-    if (time_zone_info.setOffsetStr(time_zone_string)) |_| {
-        // TODO: Normalize time zone offset string
-    } else |_| if (try time_zone_id_mapper.normalizeIana(
-        agent.gc_allocator,
-        time_zone_string,
-    )) |normalized| {
-        time_zone_string = normalized;
-    } else {
-        return agent.throwException(.range_error, "Invalid time zone '{s}'", .{time_zone_string});
-    }
+    // TODO: Detect invalid time zone
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
     date_time_format.as(DateTimeFormat).fields.time_zone = try String.fromAscii(agent.gc_allocator, time_zone_string);
@@ -781,24 +770,17 @@ const FormatDateTimeError =
     icu4zig.CalendarError ||
     icu4zig.CalendarParseError ||
     icu4zig.DateTimeFormatterLoadError ||
-    icu4zig.DateTimeFormatError;
+    icu4zig.DateTimeWriteError;
 
 fn formatDateTimeImpl(
     allocator: std.mem.Allocator,
     date_time_format: *const DateTimeFormat,
     x: f64,
 ) FormatDateTimeError![]const u8 {
-    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init();
-    defer time_zone_id_mapper.deinit();
-
-    const calendar = icu4zig.Calendar.init(date_time_format.fields.calendar);
-    defer calendar.deinit();
-
-    const date = try icu4zig.Date.init(
+    const date = try icu4zig.IsoDate.init(
         builtins.date.yearFromTime(x),
         builtins.date.monthFromTime(x) + 1,
         builtins.date.dateFromTime(x),
-        calendar,
     );
     defer date.deinit();
 
@@ -810,37 +792,41 @@ fn formatDateTimeImpl(
     );
     defer time.deinit();
 
-    var time_zone_info = icu4zig.TimeZoneInfo.unknown();
+    const iana_parser = icu4zig.IanaParser.init();
+    defer iana_parser.deinit();
+    const time_zone = iana_parser.parse(date_time_format.fields.time_zone.slice.ascii);
+    time_zone.deinit();
+    const offset = icu4zig.UtcOffset.fromString(date_time_format.fields.time_zone.slice.ascii) catch
+        icu4zig.UtcOffset.fromSeconds(0) catch
+        unreachable;
+    defer offset.deinit();
+    const time_zone_info = time_zone.withOffset(offset);
     defer time_zone_info.deinit();
-    // TODO: We should probably set this according to the actual date, omitting it results in
-    //       DateTimeZoneInfoMissingFieldsError so we hardcode standard time for now.
-    time_zone_info.setStandardTime();
-    time_zone_info.setOffsetStr(
-        date_time_format.fields.time_zone.slice.ascii,
-    ) catch time_zone_info.setIanaTimeZoneId(
-        time_zone_id_mapper,
-        date_time_format.fields.time_zone.slice.ascii,
-    );
 
-    // Approximation, ICU4X API doesn't match ECMA-402
-    const date_style = date_time_format.fields.date_style orelse .short;
-    const time_style = date_time_format.fields.time_style orelse .short;
-    const date_time_length: icu4zig.ZonedDateTimeFormatter.DateTimeLength = if (@intFromEnum(date_style) >= @intFromEnum(time_style))
-        switch (date_style) {
+    // TODO: Implement DateTimeFormatter in a way where the underlying format is selectable, currently hardcoded to ymdt
+    const date_time_formatter = try icu4zig.DateTimeFormatter.init(
+        date_time_format.fields.locale,
+        switch (date_time_format.fields.date_style orelse .short) {
             .full, .long => .long,
             .medium => .medium,
             .short => .short,
-        }
-    else switch (time_style) {
-        .full, .long => .long,
-        .medium => .medium,
-        .short => .short,
-    };
+        },
+        switch (date_time_format.fields.time_style orelse .short) {
+            .full => .subsecond9,
+            .long => .second,
+            .medium => .minute,
+            .short => .hour,
+        },
+        .auto,
+        .auto,
+    );
+    defer date_time_formatter.deinit();
     const zoned_date_time_formatter = try icu4zig.ZonedDateTimeFormatter.init(
         date_time_format.fields.locale,
-        date_time_length,
+        date_time_formatter,
     );
-    const result = try zoned_date_time_formatter.format(
+    defer zoned_date_time_formatter.deinit();
+    const result = try zoned_date_time_formatter.formatIso(
         allocator,
         date,
         time,
