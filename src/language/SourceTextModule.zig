@@ -167,7 +167,7 @@ pub fn print(self: SourceTextModule, writer: anytype) @TypeOf(writer).Error!void
     try ast_printing.printModule(self.ecmascript_code, writer, 0);
 }
 
-/// 16.2.1.6.1 LoadRequestedModules ( [ hostDefined ] )
+/// 16.2.1.6.1.1 LoadRequestedModules ( [ hostDefined ] )
 /// https://tc39.es/ecma262/#sec-LoadRequestedModules
 pub fn loadRequestedModules(
     self: *SourceTextModule,
@@ -204,7 +204,8 @@ pub fn loadRequestedModules(
     return promise_capability.promise.as(builtins.Promise);
 }
 
-/// 16.2.1.6.1.1 InnerModuleLoading ( state, module )
+/// 16.2.1.6.1.1.1 InnerModuleLoading ( state, module )
+/// https://tc39.es/ecma262/#sec-InnerModuleLoading
 fn innerModuleLoading(
     agent: *Agent,
     state: *GraphLoadingState,
@@ -298,7 +299,7 @@ fn innerModuleLoading(
     // 6. Return unused.
 }
 
-/// 16.2.1.6.1.2 ContinueModuleLoading ( state, moduleCompletion )
+/// 16.2.1.6.1.1.2 ContinueModuleLoading ( state, moduleCompletion )
 /// https://tc39.es/ecma262/#sec-ContinueModuleLoading
 pub fn continueModuleLoading(
     agent: *Agent,
@@ -335,7 +336,7 @@ pub fn continueModuleLoading(
     // 4. Return unused.
 }
 
-/// 16.2.1.6.2 Link ( )
+/// 16.2.1.6.1.2 Link ( )
 /// https://tc39.es/ecma262/#sec-moduledeclarationlinking
 pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 1. Assert: module.[[Status]] is one of unlinked, linked, evaluating-async, or evaluated.
@@ -381,7 +382,7 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 7. Return unused.
 }
 
-/// 16.2.1.6.2.1 InnerModuleLinking ( module, stack, index )
+/// 16.2.1.6.1.2.1 InnerModuleLinking ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-InnerModuleLinking
 fn innerModuleLinking(
     agent: *Agent,
@@ -638,7 +639,7 @@ pub fn parse(
     return self;
 }
 
-/// 16.2.1.6.3 Evaluate ( )
+/// 16.2.1.6.1.3 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-moduleevaluation
 pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
@@ -757,7 +758,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
     return capability.promise.as(builtins.Promise);
 }
 
-/// 16.2.1.6.3.1 InnerModuleEvaluation ( module, stack, index )
+/// 16.2.1.6.1.3.1 InnerModuleEvaluation ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-innermoduleevaluation
 fn innerModuleEvaluation(
     agent: *Agent,
@@ -942,7 +943,7 @@ fn innerModuleEvaluation(
     return new_index;
 }
 
-/// 16.2.1.6.3.2 ExecuteAsyncModule ( module )
+/// 16.2.1.6.1.3.2 ExecuteAsyncModule ( module )
 /// https://tc39.es/ecma262/#sec-execute-async-module
 fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
@@ -1034,7 +1035,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     // 10. Return unused.
 }
 
-/// 16.2.1.6.3.3 GatherAvailableAncestors ( module, execList )
+/// 16.2.1.6.1.3.3 GatherAvailableAncestors ( module, execList )
 /// https://tc39.es/ecma262/#sec-gather-available-ancestors
 fn gatherAvailableAncestors(
     agent: *Agent,
@@ -1078,7 +1079,7 @@ fn gatherAvailableAncestors(
     // 2. Return unused.
 }
 
-/// 16.2.1.6.3.4 AsyncModuleExecutionFulfilled ( module )
+/// 16.2.1.6.1.3.4 AsyncModuleExecutionFulfilled ( module )
 /// https://tc39.es/ecma262/#sec-async-module-execution-fulfilled
 fn asyncModuleExecutionFulfilled(
     agent: *Agent,
@@ -1198,7 +1199,7 @@ fn asyncModuleExecutionFulfilled(
     // 13. Return unused.
 }
 
-/// 16.2.1.6.3.5 AsyncModuleExecutionRejected ( module, error )
+/// 16.2.1.6.1.3.5 AsyncModuleExecutionRejected ( module, error )
 /// https://tc39.es/ecma262/#sec-async-module-execution-rejected
 fn asyncModuleExecutionRejected(
     agent: *Agent,
@@ -1258,7 +1259,7 @@ fn asyncModuleExecutionRejected(
     // 11. Return unused.
 }
 
-/// 16.2.1.7.2 GetExportedNames ( [ exportStarSet ] )
+/// 16.2.1.7.2.1 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-getexportednames
 pub fn getExportedNames(
     self: *const SourceTextModule,
@@ -1335,7 +1336,7 @@ pub fn getExportedNames(
     return exported_names.toOwnedSlice(agent.gc_allocator);
 }
 
-/// 16.2.1.6.3 ResolveExport ( exportName [ , resolveSet ] )
+/// 16.2.1.7.2.2 ResolveExport ( exportName [ , resolveSet ] )
 /// https://tc39.es/ecma262/#sec-resolveexport
 pub fn resolveExport(
     self: *SourceTextModule,
@@ -1497,7 +1498,7 @@ pub fn resolveExport(
         null;
 }
 
-/// 16.2.1.6.4 InitializeEnvironment ( )
+/// 16.2.1.7.3.1 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
 fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
@@ -1755,7 +1756,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     // 26. Return unused.
 }
 
-/// 16.2.1.6.5 ExecuteModule ( [ capability ] )
+/// 16.2.1.7.3.2 ExecuteModule ( [ capability ] )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-execute-module
 fn executeModule(
     self: *SourceTextModule,
