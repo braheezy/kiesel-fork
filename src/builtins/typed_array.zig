@@ -4052,6 +4052,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             if (element_type == .uint8) {
                 try defineBuiltinFunction(object, "toBase64", toBase64, 0, realm);
+                try defineBuiltinFunction(object, "toHex", toHex, 0, realm);
             }
         }
 
@@ -4111,6 +4112,29 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 11. Return CodePointsToString(outAscii).
             return Value.from(try String.fromAscii(agent.gc_allocator, out_ascii));
+        }
+
+        // 2 Uint8Array.prototype.toHex ( )
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tohex
+        fn toHex(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+            // 1. Let O be the this value.
+            // 2. Perform ? ValidateUint8Array(O).
+            const typed_array = try validateUint8Array(agent, this_value);
+
+            // 3. Let toEncode be ? GetUint8ArrayBytes(O).
+            const to_encode = try getUint8ArrayBytes(agent, typed_array);
+
+            // 4. Let out be the empty String.
+            // 5. For each byte byte of toEncode, do
+            //     a. Let hex be Number::toString(𝔽(byte), 16).
+            //     b. Set hex to StringPad(hex, 2, "0", start).
+            //     c. Set out to the string-concatenation of out and hex.
+            // 6. Return out.
+            return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{}",
+                .{std.fmt.fmtSliceHexLower(to_encode)},
+            )));
         }
     };
 }
