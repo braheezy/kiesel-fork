@@ -30,6 +30,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const findViaPredicate = builtins.findViaPredicate;
 const getIteratorFromMethod = types.getIteratorFromMethod;
+const getOptionsObject = @import("intl/abstract_operations.zig").getOptionsObject;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isDetachedBuffer = builtins.isDetachedBuffer;
@@ -3785,6 +3786,54 @@ fn allocateTypedArrayBuffer(
     // 9. Return unused.
 }
 
+/// 7 ValidateUint8Array ( ta )
+/// https://tc39.es/ecma262/#sec-validatetypedarray
+pub fn validateUint8Array(agent: *Agent, value: Value) error{ExceptionThrown}!*TypedArray {
+    // 1. Perform ? RequireInternalSlot(ta, [[TypedArrayName]]).
+    const typed_array = try value.requireInternalSlot(agent, TypedArray);
+
+    // 2. If ta.[[TypedArrayName]] is not "Uint8Array", throw a TypeError exception.
+    if (typed_array.fields.element_type != .uint8) {
+        return agent.throwException(.type_error, "Typed array is not a Uint8Array", .{});
+    }
+
+    // 3. Return unused.
+    return typed_array;
+}
+
+/// 8 GetUint8ArrayBytes ( ta )
+/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-getuint8arraybytes
+pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.Error![]const u8 {
+    std.debug.assert(typed_array.fields.element_type == .uint8);
+
+    // 1. Let buffer be ta.[[ViewedArrayBuffer]].
+    const buffer = typed_array.fields.viewed_array_buffer;
+
+    // 2. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(ta, seq-cst).
+    const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+    // 3. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+    if (isTypedArrayOutOfBounds(ta)) {
+        return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+    }
+
+    // 4. Let len be TypedArrayLength(taRecord).
+    const len = typedArrayLength(ta);
+
+    // 5. Let byteOffset be ta.[[ByteOffset]].
+    const byte_offset = typed_array.fields.byte_offset;
+
+    // 6. Let bytes be a new empty List.
+    // 7. Let index be 0.
+    // 8. Repeat, while index < len,
+    //     a. Let byteIndex be byteOffset + index.
+    //     b. Let byte be ℝ(GetValueFromBuffer(buffer, byteIndex, uint8, true, unordered)).
+    //     c. Append byte to bytes.
+    //     d. Set index to index + 1.
+    // 9. Return bytes.
+    return buffer.arrayBufferData().?.items[@intCast(byte_offset)..@intCast(byte_offset + len)];
+}
+
 /// 23.2.6 Properties of the TypedArray Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
@@ -4000,6 +4049,68 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 "constructor",
                 Value.from(try constructorFn(&realm.intrinsics)),
             );
+
+            if (element_type == .uint8) {
+                try defineBuiltinFunction(object, "toBase64", toBase64, 0, realm);
+            }
+        }
+
+        // 1 Uint8Array.prototype.toBase64 ( [ options ] )
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
+        fn toBase64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+            const options_value = arguments.get(0);
+
+            // 1. Let O be the this value.
+            // 2. Perform ? ValidateUint8Array(O).
+            const typed_array = try validateUint8Array(agent, this_value);
+
+            // 3. Let opts be ? GetOptionsObject(options).
+            const options = try getOptionsObject(agent, options_value);
+
+            // 4. Let alphabet be ? Get(opts, "alphabet").
+            var alphabet = try options.get(PropertyKey.from("alphabet"));
+
+            // 5. If alphabet is undefined, set alphabet to "base64".
+            if (alphabet.isUndefined()) {
+                alphabet = Value.from("base64");
+            }
+
+            // 6. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
+            if (!alphabet.isString() or
+                !(alphabet.asString().eql(String.fromLiteral("base64")) or
+                    alphabet.asString().eql(String.fromLiteral("base64url"))))
+            {
+                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet});
+            }
+
+            // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
+            const omit_padding = (try options.get(PropertyKey.from("omitPadding"))).toBoolean();
+
+            // 8. Let toEncode be ? GetUint8ArrayBytes(O).
+            const to_encode = try getUint8ArrayBytes(agent, typed_array);
+
+            // 9. If alphabet is "base64", then
+            const codecs = if (alphabet.asString().eql(String.fromLiteral("base64"))) blk: {
+                // a. Let outAscii be the sequence of code points which results from encoding
+                //    toEncode according to the base64 encoding specified in section 4 of RFC 4648.
+                //    Padding is included if and only if omitPadding is false.
+                break :blk if (omit_padding) std.base64.standard_no_pad else std.base64.standard;
+            } else blk: {
+                // 10. Else,
+                // a. Assert: alphabet is "base64url".
+                std.debug.assert(alphabet.asString().eql(String.fromLiteral("base64url")));
+
+                // b. Let outAscii be the sequence of code points which results from encoding
+                //    toEncode according to the base64url encoding specified in section 5 of RFC
+                //    4648. Padding is included if and only if omitPadding is false.
+                break :blk if (omit_padding) std.base64.url_safe_no_pad else std.base64.url_safe;
+            };
+            const out_ascii = try agent.gc_allocator.alloc(u8, codecs.Encoder.calcSize(to_encode.len));
+            const encoded = codecs.Encoder.encode(out_ascii, to_encode);
+            std.debug.assert(encoded.len == out_ascii.len);
+
+            // 11. Return CodePointsToString(outAscii).
+            return Value.from(try String.fromAscii(agent.gc_allocator, out_ascii));
         }
     };
 }
