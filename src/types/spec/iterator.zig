@@ -12,6 +12,7 @@ const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const @"await" = builtins.@"await";
 const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -158,6 +159,57 @@ pub const Iterator = struct {
                 Value.from(iterator),
                 &.{},
             );
+        } else |err| err;
+
+        // 5. If completion is a throw completion, return ? completion.
+        _ = completion catch |err| {
+            agent.exception = completion_exception;
+            return err;
+        };
+
+        // 6. If innerResult is a throw completion, return ? innerResult.
+        const inner_result_value = inner_result catch |err| return err;
+
+        // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
+        if (!inner_result_value.isObject()) {
+            return agent.throwException(.type_error, "{} is not an Object", .{inner_result_value});
+        }
+
+        // 8. Return ? completion.
+        return completion;
+    }
+
+    /// 7.4.13 AsyncIteratorClose ( iteratorRecord, completion )
+    /// https://tc39.es/ecma262/#sec-asynciteratorclose
+    pub fn closeAsync(self: Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
+        const completion_exception = agent.exception;
+
+        // 1. Assert: iteratorRecord.[[Iterator]] is an Object.
+        // 2. Let iterator be iteratorRecord.[[Iterator]].
+        const iterator = self.iterator;
+
+        // 3. Let innerResult be Completion(GetMethod(iterator, "return")).
+        const inner_result_object = Value.from(iterator).getMethod(
+            agent,
+            PropertyKey.from("return"),
+        );
+
+        // 4. If innerResult is a normal completion, then
+        const inner_result = if (inner_result_object) |@"return"| blk: {
+            // a. Let return be innerResult.[[Value]].
+            // b. If return is undefined, return ? completion.
+            if (@"return" == null) return try completion;
+
+            // c. Set innerResult to Completion(Call(return, iterator)).
+            const inner_result = Value.from(@"return".?).callAssumeCallable(
+                agent,
+                Value.from(iterator),
+                &.{},
+            );
+
+            // d. If innerResult is a normal completion, set innerResult to
+            //    Completion(Await(innerResult.[[Value]])).
+            break :blk if (inner_result) |value_| @"await"(agent, value_) else |err| err;
         } else |err| err;
 
         // 5. If completion is a throw completion, return ? completion.

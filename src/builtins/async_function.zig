@@ -12,11 +12,13 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
+const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
@@ -113,7 +115,7 @@ pub const prototype = struct {
 pub fn asyncFunctionStart(
     agent: *Agent,
     promise_capability: PromiseCapability,
-    async_function: *builtins.ECMAScriptFunction,
+    async_body: AsyncBody,
 ) std.mem.Allocator.Error!void {
     // 1. Let runningContext be the running execution context.
     const running_context = agent.runningExecutionContext();
@@ -128,15 +130,19 @@ pub fn asyncFunctionStart(
     try asyncBlockStart(
         agent,
         promise_capability,
-        .{ .ecmascript_function = async_function },
+        async_body,
         async_context,
     );
 
     // 5. Return unused.
 }
 
-const ECMAScriptFunctionOrModule = union(enum) {
+const AsyncBody = union(enum) {
     ecmascript_function: *builtins.ECMAScriptFunction,
+    abstract_closure: struct {
+        func: *const fn (*Agent, SafePointer) Agent.Error!Completion,
+        captures: SafePointer,
+    },
     module: ast.Module,
 };
 
@@ -145,7 +151,7 @@ const ECMAScriptFunctionOrModule = union(enum) {
 pub fn asyncBlockStart(
     agent: *Agent,
     promise_capability: PromiseCapability,
-    async_body: ECMAScriptFunctionOrModule,
+    async_body: AsyncBody,
     async_context: *ExecutionContext,
 ) std.mem.Allocator.Error!void {
     // 1. Let runningContext be the running execution context.
@@ -157,7 +163,7 @@ pub fn asyncBlockStart(
         fn func(
             agent_: *Agent,
             promise_capability_: PromiseCapability,
-            async_body_: ECMAScriptFunctionOrModule,
+            async_body_: AsyncBody,
         ) std.mem.Allocator.Error!void {
             // a. Let acAsyncContext be the running execution context.
 
@@ -166,9 +172,9 @@ pub fn asyncBlockStart(
             // c. Else,
             //     i. Assert: asyncBody is an Abstract Closure with no parameters.
             //     ii. Let result be asyncBody().
-            //     NOTE: This is in the spec for Wasm JS Promise integration but we don't support it.
             const result = switch (async_body_) {
                 .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_),
+                .abstract_closure => |abstract_closure| abstract_closure.func(agent_, abstract_closure.captures),
                 .module => |module| generateAndRunBytecode(agent_, module, .{}),
             };
 

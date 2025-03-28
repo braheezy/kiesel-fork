@@ -11,14 +11,20 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
+const Completion = types.Completion;
+const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
+const asyncFunctionStart = builtins.asyncFunctionStart;
+const @"await" = builtins.@"await";
 const createArrayIterator = builtins.createArrayIterator;
+const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -27,6 +33,7 @@ const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const isLessThan = types.isLessThan;
 const isStrictlyEqual = types.isStrictlyEqual;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
@@ -390,6 +397,7 @@ pub const constructor = struct {
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
+        try defineBuiltinFunction(object, "fromAsync", fromAsync, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
@@ -651,6 +659,278 @@ pub const constructor = struct {
 
         // 14. Return A.
         return Value.from(array);
+    }
+
+    /// 2.1.1.1 Array.fromAsync ( asyncItems [ , mapfn [ , thisArg ] ] )
+    /// https://tc39.es/proposal-array-from-async/#sec-array.fromAsync
+    fn fromAsync(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let C be the this value.
+
+        // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        const promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        const Captures = struct {
+            constructor: Value,
+            async_items: Value,
+            mapper: Value,
+            this_arg: Value,
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .constructor = this_value,
+            .async_items = arguments.get(0),
+            .mapper = arguments.get(1),
+            .this_arg = arguments.get(2),
+        };
+
+        // 3. Let fromAsyncClosure be a new Abstract Closure with no parameters that captures C,
+        //    mapfn, and thisArg and performs the following steps when called:
+        const fromAsyncClosure = struct {
+            fn func(agent_: *Agent, captures_: SafePointer) Agent.Error!Completion {
+                const constructor_ = captures_.cast(*Captures).constructor;
+                const async_items = captures_.cast(*Captures).async_items;
+                const mapper = captures_.cast(*Captures).mapper;
+                const this_arg = captures_.cast(*Captures).this_arg;
+
+                // a. If mapfn is undefined, let mapping be false.
+                const mapping = if (mapper.isUndefined()) blk: {
+                    // a. Let mapping be false.
+                    break :blk false;
+                } else blk: {
+                    // b. Else,
+                    // i. If IsCallable(mapfn) is false, throw a TypeError exception.
+                    if (!mapper.isCallable()) {
+                        return agent_.throwException(.type_error, "{} is not callable", .{mapper});
+                    }
+
+                    // ii. Let mapping be true.
+                    break :blk true;
+                };
+
+                // c. Let usingAsyncIterator be ? GetMethod(asyncItems, @@asyncIterator).
+                const using_async_iterator = try async_items.getMethod(
+                    agent_,
+                    PropertyKey.from(agent_.well_known_symbols.@"%Symbol.asyncIterator%"),
+                );
+
+                var using_sync_iterator: ?*Object = undefined;
+
+                // d. If usingAsyncIterator is undefined, then
+                if (using_async_iterator == null) {
+                    // i. Let usingSyncIterator be ? GetMethod(asyncItems, @@iterator).
+                    using_sync_iterator = try async_items.getMethod(
+                        agent_,
+                        PropertyKey.from(agent_.well_known_symbols.@"%Symbol.iterator%"),
+                    );
+                }
+
+                // e. Let iteratorRecord be undefined.
+                var maybe_iterator: ?Iterator = null;
+
+                // f. If usingAsyncIterator is not undefined, then
+                if (using_async_iterator) |async_iterator| {
+                    // i. Set iteratorRecord to ? GetIterator(asyncItems, async, usingAsyncIterator).
+                    maybe_iterator = try getIteratorFromMethod(agent_, async_items, async_iterator);
+                } else if (using_sync_iterator) |sync_iterator| {
+                    // g. Else if usingSyncIterator is not undefined, then
+                    // i. Set iteratorRecord to ? CreateAsyncFromSyncIterator(GetIterator(asyncItems, sync, usingSyncIterator)).
+                    maybe_iterator = try createAsyncFromSyncIterator(
+                        agent_,
+                        try getIteratorFromMethod(agent_, async_items, sync_iterator),
+                    );
+                }
+
+                // h. If iteratorRecord is not undefined, then
+                if (maybe_iterator) |iterator| {
+                    // i. If IsConstructor(C) is true, then
+                    const array = if (constructor_.isConstructor()) blk: {
+                        // 1. Let A be ? Construct(C).
+                        break :blk try constructor_.asObject().construct(&.{}, null);
+                    } else blk: {
+                        // ii. Else,
+                        // 1. Let A be ! ArrayCreate(0).
+                        break :blk arrayCreate(agent_, 0, null) catch |err| try noexcept(err);
+                    };
+
+                    // iii. Let k be 0.
+                    var k: u53 = 0;
+
+                    // iv. Repeat,
+                    while (true) : (k += 1) {
+                        // 1. If k ≥ 2**53 - 1, then
+                        if (k == std.math.maxInt(u53)) {
+                            // a. Let error be ThrowCompletion(a newly created TypeError object).
+                            const @"error" = agent_.throwException(
+                                .type_error,
+                                "Maximum array length exceeded",
+                                .{},
+                            );
+
+                            // b. Return ? AsyncIteratorClose(iteratorRecord, error).
+                            return iterator.closeAsync(agent_, @as(Agent.Error!Completion, @"error"));
+                        }
+
+                        // 2. Let Pk be ! ToString(𝔽(k)).
+                        const property_key = PropertyKey.from(k);
+
+                        // 3. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+                        var next_result_value = try iterator.next_method.callAssumeCallable(
+                            agent_,
+                            Value.from(iterator.iterator),
+                            &.{},
+                        );
+
+                        // 4. Set nextResult to ? Await(nextResult).
+                        next_result_value = try @"await"(agent_, next_result_value);
+
+                        // 5. If nextResult is not an Object, throw a TypeError exception.
+                        if (!next_result_value.isObject()) {
+                            return agent_.throwException(.type_error, "{} is not an object", .{next_result_value});
+                        }
+                        const next_result = next_result_value.asObject();
+
+                        // 6. Let done be ? IteratorComplete(nextResult).
+                        const done = try Iterator.complete(next_result);
+
+                        // 7. If done is true,
+                        if (done) {
+                            // a. Perform ? Set(A, "length", 𝔽(k), true).
+                            try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+
+                            // b. Return Completion Record { [[Type]]: return, [[Value]]: A, [[Target]]: empty }.
+                            return .@"return"(Value.from(array));
+                        }
+
+                        // a. Perform ? Set(A, "length", 𝔽(k), true).
+                        try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+
+                        // 8. Let nextValue be ? IteratorValue(nextResult).
+                        const next_value = try Iterator.value(next_result);
+
+                        // 9. If mapping is true, then
+                        const mapped_value = if (mapping) blk: {
+                            // a. Let mappedValue be Call(mapfn, thisArg, « nextValue, 𝔽(k) »).
+                            var mapped_value = mapper.callAssumeCallable(
+                                agent_,
+                                this_arg,
+                                &.{ next_value, Value.from(k) },
+                            ) catch |err| switch (err) {
+                                error.OutOfMemory => return error.OutOfMemory,
+                                error.ExceptionThrown => {
+                                    // b. IfAbruptCloseAsyncIterator(mappedValue, iteratorRecord).
+                                    return iterator.closeAsync(agent_, @as(Agent.Error!Completion, err));
+                                },
+                            };
+
+                            // c. Set mappedValue to Await(mappedValue).
+                            mapped_value = @"await"(agent_, mapped_value) catch |err| switch (err) {
+                                error.OutOfMemory => return error.OutOfMemory,
+                                error.ExceptionThrown => {
+                                    // d. IfAbruptCloseAsyncIterator(mappedValue, iteratorRecord).
+                                    return iterator.closeAsync(agent_, @as(Agent.Error!Completion, err));
+                                },
+                            };
+
+                            break :blk mapped_value;
+                        } else blk: {
+                            // 10. Else, let mappedValue be nextValue.
+                            break :blk next_value;
+                        };
+
+                        // 11. Let defineStatus be CreateDataPropertyOrThrow(A, Pk, mappedValue).
+                        array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| switch (err) {
+                            error.OutOfMemory => return error.OutOfMemory,
+                            error.ExceptionThrown => {
+                                // 12. If defineStatus is an abrupt completion, return ? AsyncIteratorClose(iteratorRecord, defineStatus).
+                                return iterator.closeAsync(agent_, @as(Agent.Error!Completion, err));
+                            },
+                        };
+
+                        // 13. Set k to k + 1.
+                    }
+                } else {
+                    // i. Else,
+                    // i. NOTE: asyncItems is neither an AsyncIterable nor an Iterable so assume it
+                    //    is an array-like object.
+
+                    // ii. Let arrayLike be ! ToObject(asyncItems).
+                    const array_like = async_items.toObject(agent_) catch |err| try noexcept(err);
+
+                    // iii. Let len be ? LengthOfArrayLike(arrayLike).
+                    const len = try array_like.lengthOfArrayLike();
+
+                    // iv. If IsConstructor(C) is true, then
+                    const array = if (constructor_.isConstructor()) blk: {
+                        // 1. Let A be ? Construct(C, « 𝔽(len) »).
+                        break :blk try constructor_.asObject().construct(&.{Value.from(len)}, null);
+                    } else blk: {
+                        // v. Else,
+                        // 1. Let A be ? ArrayCreate(len).
+                        break :blk try arrayCreate(agent_, len, null);
+                    };
+
+                    // vi. Let k be 0.
+                    var k: u53 = 0;
+
+                    // vii. Repeat, while k < len,
+                    while (k < len) : (k += 1) {
+                        // 1. Let Pk be ! ToString(𝔽(k)).
+                        const property_key = PropertyKey.from(k);
+
+                        // 2. Let kValue be ? Get(arrayLike, Pk).
+                        var k_value = try array_like.get(property_key);
+
+                        // 3. Set kValue to ? Await(kValue).
+                        k_value = try @"await"(agent_, k_value);
+
+                        // 4. If mapping is true, then
+                        const mapped_value = if (mapping) blk: {
+                            // a. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
+                            var mapped_value = try mapper.callAssumeCallable(
+                                agent_,
+                                this_arg,
+                                &.{ k_value, Value.from(k) },
+                            );
+
+                            // b. Set mappedValue to ? Await(mappedValue).
+                            mapped_value = try @"await"(agent_, mapped_value);
+
+                            break :blk mapped_value;
+                        } else blk: {
+                            // 5. Else, let mappedValue be kValue.
+                            break :blk k_value;
+                        };
+
+                        // 6. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
+                        try array.createDataPropertyOrThrow(property_key, mapped_value);
+
+                        // 7. Set k to k + 1.
+                    }
+
+                    // viii. Perform ? Set(A, "length", 𝔽(len), true).
+                    try array.set(PropertyKey.from("length"), Value.from(len), .throw);
+
+                    // ix. Return Completion Record { [[Type]]: return, [[Value]]: A, [[Target]]: empty }.
+                    return .@"return"(Value.from(array));
+                }
+            }
+        }.func;
+
+        // 4. Perform AsyncFunctionStart(promiseCapability, fromAsyncClosure).
+        try asyncFunctionStart(agent, promise_capability, .{
+            .abstract_closure = .{
+                .func = fromAsyncClosure,
+                .captures = .make(*Captures, captures),
+            },
+        });
+
+        // 5. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
     }
 
     /// 23.1.2.2 Array.isArray ( arg )

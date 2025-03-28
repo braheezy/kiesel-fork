@@ -657,7 +657,7 @@ fn evaluateAsyncFunctionBody(
 
     // 4. Else,
     //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
-    try asyncFunctionStart(agent, promise_capability, function);
+    try asyncFunctionStart(agent, promise_capability, .{ .ecmascript_function = function });
 
     // 5. Return ReturnCompletion(promiseCapability.[[Promise]]).
     return Value.from(promise_capability.promise);
