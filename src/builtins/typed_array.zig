@@ -3889,6 +3889,27 @@ fn fromBase64Impl(
     return .{ .read = bytes.len, .bytes = buf[0..buf_len] };
 }
 
+/// 10.4 FromHex ( string [ , maxLength ] )
+/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-fromhex
+fn fromHexImpl(agent: *Agent, string: *const String) Agent.Error!struct {
+    read: usize,
+    bytes: []const u8,
+} {
+    // 1-7.
+    const bytes = switch (string.slice) {
+        .ascii => |ascii| ascii,
+        .utf16 => return agent.throwException(.syntax_error, "Invalid hex string", .{}),
+    };
+    const buf = try agent.gc_allocator.alloc(u8, bytes.len / 2);
+    _ = std.fmt.hexToBytes(buf, bytes) catch |err| switch (err) {
+        error.InvalidLength, error.InvalidCharacter => {
+            return agent.throwException(.syntax_error, "Invalid hex string", .{});
+        },
+        error.NoSpaceLeft => unreachable,
+    };
+    return .{ .read = bytes.len, .bytes = buf };
+}
+
 /// 23.2.6 Properties of the TypedArray Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
@@ -3927,6 +3948,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             if (element_type == .uint8) {
                 try defineBuiltinFunction(object, "fromBase64", fromBase64, 1, realm);
+                try defineBuiltinFunction(object, "fromHex", fromHex, 1, realm);
             }
         }
 
@@ -4150,6 +4172,45 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             @memcpy(block.items, result.bytes);
 
             // 14. Return ta.
+            return Value.from(typed_array);
+        }
+
+        /// 5 Uint8Array.fromHex ( string )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.fromhex
+        fn fromHex(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+            const realm = agent.currentRealm();
+            const string_value = arguments.get(0);
+
+            // 1. If string is not a String, throw a TypeError exception.
+            if (!string_value.isString()) {
+                return agent.throwException(.type_error, "{} is not a string", .{string_value});
+            }
+            const string = string_value.asString();
+
+            // 2. Let result be FromHex(string).
+            // 3. If result.[[Error]] is not none, then
+            //     a. Throw result.[[Error]].
+            const result = try fromHexImpl(agent, string);
+
+            // 4. Let resultLength be the length of result.[[Bytes]].
+            const result_length: u53 = @intCast(result.bytes.len);
+
+            // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            //    "%Uint8Array.prototype%", resultLength).
+            const typed_array = try allocateTypedArray(
+                agent,
+                .uint8,
+                try realm.intrinsics.@"%Uint8Array%"(),
+                "%Uint8Array.prototype%",
+                result_length,
+            );
+
+            // 6. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
+            //    the value at the corresponding index of result.[[Bytes]].
+            const block = typed_array.as(TypedArray).fields.viewed_array_buffer.arrayBufferData().?;
+            @memcpy(block.items, result.bytes);
+
+            // 7. Return ta.
             return Value.from(typed_array);
         }
     };
