@@ -661,7 +661,7 @@ pub const constructor = struct {
         return Value.from(array);
     }
 
-    /// 2.1.1.1 Array.fromAsync ( asyncItems [ , mapfn [ , thisArg ] ] )
+    /// 2.1.1.1 Array.fromAsync ( asyncItems [ , mapper [ , thisArg ] ] )
     /// https://tc39.es/proposal-array-from-async/#sec-array.fromAsync
     fn fromAsync(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -689,7 +689,7 @@ pub const constructor = struct {
         };
 
         // 3. Let fromAsyncClosure be a new Abstract Closure with no parameters that captures C,
-        //    mapfn, and thisArg and performs the following steps when called:
+        //    asyncItems, mapper, and thisArg and performs the following steps when called:
         const fromAsyncClosure = struct {
             fn func(agent_: *Agent, captures_: SafePointer) Agent.Error!Completion {
                 const constructor_ = captures_.cast(*Captures).constructor;
@@ -697,13 +697,13 @@ pub const constructor = struct {
                 const mapper = captures_.cast(*Captures).mapper;
                 const this_arg = captures_.cast(*Captures).this_arg;
 
-                // a. If mapfn is undefined, let mapping be false.
+                // a. If mapper is undefined, let mapping be false.
                 const mapping = if (mapper.isUndefined()) blk: {
                     // a. Let mapping be false.
                     break :blk false;
                 } else blk: {
                     // b. Else,
-                    // i. If IsCallable(mapfn) is false, throw a TypeError exception.
+                    // i. If IsCallable(mapper) is false, throw a TypeError exception.
                     if (!mapper.isCallable()) {
                         return agent_.throwException(.type_error, "{} is not callable", .{mapper});
                     }
@@ -734,11 +734,12 @@ pub const constructor = struct {
 
                 // f. If usingAsyncIterator is not undefined, then
                 if (using_async_iterator) |async_iterator| {
-                    // i. Set iteratorRecord to ? GetIterator(asyncItems, async, usingAsyncIterator).
+                    // i. Set iteratorRecord to ? GetIteratorFromMethod(asyncItems, usingAsyncIterator).
                     maybe_iterator = try getIteratorFromMethod(agent_, async_items, async_iterator);
                 } else if (using_sync_iterator) |sync_iterator| {
                     // g. Else if usingSyncIterator is not undefined, then
-                    // i. Set iteratorRecord to ? CreateAsyncFromSyncIterator(GetIterator(asyncItems, sync, usingSyncIterator)).
+                    // i. Set iteratorRecord to ? CreateAsyncFromSyncIterator(
+                    //    ? GetIteratorFromMethod(asyncItems, usingSyncIterator)).
                     maybe_iterator = try createAsyncFromSyncIterator(
                         agent_,
                         try getIteratorFromMethod(agent_, async_items, sync_iterator),
@@ -814,7 +815,7 @@ pub const constructor = struct {
 
                         // 9. If mapping is true, then
                         const mapped_value = if (mapping) blk: {
-                            // a. Let mappedValue be Call(mapfn, thisArg, « nextValue, 𝔽(k) »).
+                            // a. Let mappedValue be Call(mapper, thisArg, « nextValue, 𝔽(k) »).
                             var mapped_value = mapper.callAssumeCallable(
                                 agent_,
                                 this_arg,
@@ -890,7 +891,7 @@ pub const constructor = struct {
 
                         // 4. If mapping is true, then
                         const mapped_value = if (mapping) blk: {
-                            // a. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
+                            // a. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                             var mapped_value = try mapper.callAssumeCallable(
                                 agent_,
                                 this_arg,
