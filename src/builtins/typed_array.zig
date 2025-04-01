@@ -3834,6 +3834,61 @@ pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.E
     return buffer.arrayBufferData().?.items[@intCast(byte_offset)..@intCast(byte_offset + len)];
 }
 
+const Alphabet = enum {
+    base64,
+    base64url,
+};
+
+const LastChunkHandling = enum {
+    loose,
+    strict,
+    stop_before_partial,
+};
+
+/// 10.3 FromBase64 ( string, alphabet, lastChunkHandling [ , maxLength ] )
+/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-frombase64
+fn fromBase64Impl(
+    agent: *Agent,
+    string: *const String,
+    alphabet: Alphabet,
+    last_chunk_handling: LastChunkHandling,
+) Agent.Error!struct {
+    read: usize,
+    bytes: []const u8,
+} {
+    // 1-10.
+    // NOTE: This doesn't pass all tests. std.base64 has an awful API so I didn't bother.
+    const bytes = switch (string.slice) {
+        .ascii => |ascii| switch (last_chunk_handling) {
+            .loose => if (std.mem.indexOfScalar(u8, ascii, '=')) |end| blk: {
+                for (ascii[end..]) |c| {
+                    if (c != '=') {
+                        return agent.throwException(.syntax_error, "Invalid base64 string", .{});
+                    }
+                }
+                break :blk ascii[0..end];
+            } else ascii,
+            .strict => ascii,
+            .stop_before_partial => ascii[0 .. ascii.len - (ascii.len % 4)],
+        },
+        .utf16 => return agent.throwException(.syntax_error, "Invalid base64 string", .{}),
+    };
+    // NOTE: For some reason urlSafeBase64DecoderWithIgnore() doesn't set the pad char so we do this manually.
+    const decoder = std.base64.Base64DecoderWithIgnore.init(
+        switch (alphabet) {
+            .base64 => std.base64.standard_alphabet_chars,
+            .base64url => std.base64.url_safe_alphabet_chars,
+        },
+        if (last_chunk_handling == .loose) null else '=',
+        "\t\n\u{c}\r ",
+    );
+    const buf = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(bytes.len) catch unreachable);
+    const buf_len = decoder.decode(buf, bytes) catch {
+        return agent.throwException(.syntax_error, "Invalid base64 string", .{});
+    };
+    return .{ .read = bytes.len, .bytes = buf[0..buf_len] };
+}
+
 /// 23.2.6 Properties of the TypedArray Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
@@ -3869,6 +3924,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 .enumerable = false,
                 .configurable = false,
             });
+
+            if (element_type == .uint8) {
+                try defineBuiltinFunction(object, "fromBase64", fromBase64, 1, realm);
+            }
         }
 
         /// 23.2.5.1 TypedArray ( ...args )
@@ -4016,6 +4075,83 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 }
             }
         }
+
+        /// 3 Uint8Array.fromBase64 ( string [ , options ] )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
+        fn fromBase64(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+            const realm = agent.currentRealm();
+            const string_value = arguments.get(0);
+            const options_value = arguments.get(1);
+
+            // 1. If string is not a String, throw a TypeError exception.
+            if (!string_value.isString()) {
+                return agent.throwException(.type_error, "{} is not a string", .{string_value});
+            }
+            const string = string_value.asString();
+
+            // 2. Let opts be ? GetOptionsObject(options).
+            const options = try getOptionsObject(agent, options_value);
+
+            // 3. Let alphabet be ? Get(opts, "alphabet").
+            var alphabet_value = try options.get(PropertyKey.from("alphabet"));
+
+            // 4. If alphabet is undefined, set alphabet to "base64".
+            // 5. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
+            const alphabet: Alphabet = blk: {
+                if (alphabet_value.isUndefined()) break :blk .base64;
+                if (alphabet_value.isString()) {
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64"))) break :blk .base64;
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64url"))) break :blk .base64url;
+                }
+                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet_value});
+            };
+
+            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            var last_chunk_handling_value = try options.get(PropertyKey.from("lastChunkHandling"));
+
+            // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
+            // 8. If lastChunkHandling is not one of "loose", "strict", or "stop-before-partial",
+            //    throw a TypeError exception.
+            const last_chunk_handling: LastChunkHandling = blk: {
+                if (last_chunk_handling_value.isUndefined()) break :blk .loose;
+                if (last_chunk_handling_value.isString()) {
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("loose"))) break :blk .loose;
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("strict"))) break :blk .strict;
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("stop-before-partial"))) break :blk .stop_before_partial;
+                }
+                return agent.throwException(
+                    .type_error,
+                    "Invalid lastChunkHandling {}",
+                    .{last_chunk_handling_value},
+                );
+            };
+
+            // 9. Let result be FromBase64(string, alphabet, lastChunkHandling).
+            // 10. If result.[[Error]] is not none, then
+            //     a. Throw result.[[Error]].
+            const result = try fromBase64Impl(agent, string, alphabet, last_chunk_handling);
+
+            // 11. Let resultLength be the length of result.[[Bytes]].
+            const result_length: u53 = @intCast(result.bytes.len);
+
+            // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            //     "%Uint8Array.prototype%", resultLength).
+            const typed_array = try allocateTypedArray(
+                agent,
+                .uint8,
+                try realm.intrinsics.@"%Uint8Array%"(),
+                "%Uint8Array.prototype%",
+                result_length,
+            );
+
+            // 13. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
+            //     the value at the corresponding index of result.[[Bytes]].
+            const block = typed_array.as(TypedArray).fields.viewed_array_buffer.arrayBufferData().?;
+            @memcpy(block.items, result.bytes);
+
+            // 14. Return ta.
+            return Value.from(typed_array);
+        }
     };
 }
 
@@ -4069,20 +4205,17 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const options = try getOptionsObject(agent, options_value);
 
             // 4. Let alphabet be ? Get(opts, "alphabet").
-            var alphabet = try options.get(PropertyKey.from("alphabet"));
+            const alphabet_value = try options.get(PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
-            if (alphabet.isUndefined()) {
-                alphabet = Value.from("base64");
-            }
-
-            // 6. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
-            if (!alphabet.isString() or
-                !(alphabet.asString().eql(String.fromLiteral("base64")) or
-                    alphabet.asString().eql(String.fromLiteral("base64url"))))
-            {
-                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet});
-            }
+            const alphabet: Alphabet = blk: {
+                if (alphabet_value.isUndefined()) break :blk .base64;
+                if (alphabet_value.isString()) {
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64"))) break :blk .base64;
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64url"))) break :blk .base64url;
+                }
+                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet_value});
+            };
 
             // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
             const omit_padding = (try options.get(PropertyKey.from("omitPadding"))).toBoolean();
@@ -4091,20 +4224,21 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const to_encode = try getUint8ArrayBytes(agent, typed_array);
 
             // 9. If alphabet is "base64", then
-            const codecs = if (alphabet.asString().eql(String.fromLiteral("base64"))) blk: {
-                // a. Let outAscii be the sequence of code points which results from encoding
-                //    toEncode according to the base64 encoding specified in section 4 of RFC 4648.
-                //    Padding is included if and only if omitPadding is false.
-                break :blk if (omit_padding) std.base64.standard_no_pad else std.base64.standard;
-            } else blk: {
+            const codecs = switch (alphabet) {
+                .base64 => blk: {
+                    // a. Let outAscii be the sequence of code points which results from encoding
+                    //    toEncode according to the base64 encoding specified in section 4 of RFC
+                    //    4648. Padding is included if and only if omitPadding is false.
+                    break :blk if (omit_padding) std.base64.standard_no_pad else std.base64.standard;
+                },
                 // 10. Else,
                 // a. Assert: alphabet is "base64url".
-                std.debug.assert(alphabet.asString().eql(String.fromLiteral("base64url")));
-
-                // b. Let outAscii be the sequence of code points which results from encoding
-                //    toEncode according to the base64url encoding specified in section 5 of RFC
-                //    4648. Padding is included if and only if omitPadding is false.
-                break :blk if (omit_padding) std.base64.url_safe_no_pad else std.base64.url_safe;
+                .base64url => blk: {
+                    // b. Let outAscii be the sequence of code points which results from encoding
+                    //    toEncode according to the base64url encoding specified in section 5 of
+                    //    RFC 4648. Padding is included if and only if omitPadding is false.
+                    break :blk if (omit_padding) std.base64.url_safe_no_pad else std.base64.url_safe;
+                },
             };
             const out_ascii = try agent.gc_allocator.alloc(u8, codecs.Encoder.calcSize(to_encode.len));
             const encoded = codecs.Encoder.encode(out_ascii, to_encode);
