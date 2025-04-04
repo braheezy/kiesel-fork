@@ -9,6 +9,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
+const BlockDeclarationInstantiationType = runtime.BlockDeclarationInstantiationType;
 const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const Completion = types.Completion;
 const Environment = execution.Environment;
@@ -400,6 +401,7 @@ fn executeBitwiseNot(self: *Vm, _: Executable) Agent.Error!void {
 fn executeBlockDeclarationInstantiation(
     self: *Vm,
     block_index: Executable.AstNodeIndex,
+    block_type: BlockDeclarationInstantiationType,
     executable: Executable,
 ) Agent.Error!void {
     const block = executable.getAstNode(block_index);
@@ -407,10 +409,9 @@ fn executeBlockDeclarationInstantiation(
     const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
     try blockDeclarationInstantiation(
         self.agent,
-        switch (block.*) {
-            .statement_list => |statement_list| .{ .statement_list = statement_list },
-            .case_block => |case_block| .{ .case_block = case_block },
-            else => unreachable,
+        switch (block_type) {
+            .statement_list => .{ .statement_list = block.statement_list },
+            .case_block => .{ .case_block = block.case_block },
         },
         .{ .declarative_environment = block_env },
     );
@@ -1839,7 +1840,7 @@ fn executeInstruction(
         .binary_operator_bitwise_xor => self.executeBinaryOperatorBitwiseXor(executable),
         .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(payload, executable),
         .bitwise_not => self.executeBitwiseNot(executable),
-        .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(payload, executable),
+        .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(payload.ast_node, payload.type, executable),
         .class_definition_evaluation => self.executeClassDefinitionEvaluation(payload, executable),
         .create_catch_bindings => self.executeCreateCatchBindings(payload, executable),
         .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),

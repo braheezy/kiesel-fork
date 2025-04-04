@@ -23,7 +23,9 @@ ast_nodes: std.ArrayListUnmanaged(AstNode),
 environment_lookup_cache: std.ArrayListUnmanaged(?Environment.LookupCacheEntry),
 property_lookup_cache: std.ArrayListUnmanaged(?Object.Shape.PropertyLookupCacheEntry),
 
-pub const AstNode = union(enum) {
+// NOTE: In most cases instructions know which AST node they refer to, so this can be an untagged
+// enum. If there can be more than one type we store that information separately.
+pub const AstNode = union {
     arrow_function: ast.ArrowFunction,
     async_arrow_function: ast.AsyncArrowFunction,
     async_function_expression: ast.AsyncFunctionExpression,

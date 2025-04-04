@@ -572,11 +572,16 @@ pub fn applyStringOrNumericBinaryOperator(
     // 8. Return operation(lNum, rNum).
 }
 
+pub const BlockDeclarationInstantiationType = enum {
+    statement_list,
+    case_block,
+};
+
 /// 14.2.3 BlockDeclarationInstantiation ( code, env )
 /// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
 pub fn blockDeclarationInstantiation(
     agent: *Agent,
-    code: union(enum) {
+    code: union(BlockDeclarationInstantiationType) {
         statement_list: ast.StatementList,
         case_block: ast.CaseBlock,
     },

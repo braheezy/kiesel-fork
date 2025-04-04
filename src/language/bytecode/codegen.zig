@@ -2163,10 +2163,10 @@ pub fn codegenBlock(
         // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
         // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
         // 4. Set the running execution context's LexicalEnvironment to blockEnv.
-        try executable.addInstructionWithAstNode(
-            .block_declaration_instantiation,
-            .{ .statement_list = node.statement_list },
-        );
+        try executable.addInstruction(.block_declaration_instantiation, .{
+            .ast_node = try executable.addAstNode(.{ .statement_list = node.statement_list }),
+            .type = .statement_list,
+        });
     }
 
     // 5. Let blockValue be Completion(Evaluation of StatementList).
@@ -3351,10 +3351,10 @@ pub fn codegenSwitchStatement(
     // 4. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
     // 5. Perform BlockDeclarationInstantiation(CaseBlock, blockEnv).
     // 6. Set the running execution context's LexicalEnvironment to blockEnv.
-    try executable.addInstructionWithAstNode(
-        .block_declaration_instantiation,
-        .{ .case_block = node.case_block },
-    );
+    try executable.addInstruction(.block_declaration_instantiation, .{
+        .ast_node = try executable.addAstNode(.{ .case_block = node.case_block }),
+        .type = .case_block,
+    });
 
     // 7. Let R be Completion(CaseBlockEvaluation of CaseBlock with argument switchValue).
     try caseBlockEvaluation(executable, ctx, node.case_block);

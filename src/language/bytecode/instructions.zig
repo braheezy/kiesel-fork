@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const BlockDeclarationInstantiationType = @import("../runtime.zig").BlockDeclarationInstantiationType;
 const Executable = @import("Executable.zig");
 const IteratorKind = @import("../../types.zig").IteratorKind;
 const MethodDefinition = @import("../../language/ast.zig").MethodDefinition;
@@ -49,7 +50,10 @@ pub const Instruction = union(enum(u8)) {
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
     /// Perform BlockDeclarationInstantiation().
-    block_declaration_instantiation: AstNodeIndex,
+    block_declaration_instantiation: struct {
+        ast_node: AstNodeIndex,
+        type: BlockDeclarationInstantiationType,
+    },
     /// Store ClassDefinitionEvaluation() as the result value.
     class_definition_evaluation: AstNodeIndex,
     /// Create bindings for the given catch parameter.
