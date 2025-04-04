@@ -152,11 +152,11 @@ fn revalidateAtomicAccess(
     std.debug.assert(byte_index_in_buffer >= typed_array.fields.byte_offset);
 
     // 5. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
-    if (byte_index_in_buffer >= ta.cached_buffer_byte_length.value) {
+    if (byte_index_in_buffer >= @intFromEnum(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {} for buffer with byte length {}",
-            .{ byte_index_in_buffer, ta.cached_buffer_byte_length.value },
+            .{ byte_index_in_buffer, @intFromEnum(ta.cached_buffer_byte_length) },
         );
     }
 

@@ -203,7 +203,7 @@ fn prettyPrintDataView(
     try tty_config.setColor(writer, .reset);
     try writer.print("arrayBuffer: {pretty}", .{Value.from(viewed_array_buffer.object())});
     if (byte_length != .auto) {
-        try writer.print(", byteLength: {pretty}", .{Value.from(byte_length.value)});
+        try writer.print(", byteLength: {pretty}", .{Value.from(@intFromEnum(byte_length))});
     }
     if (byte_offset != 0) {
         try writer.print(", byteOffset: {pretty}", .{Value.from(byte_offset)});

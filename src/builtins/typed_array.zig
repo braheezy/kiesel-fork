@@ -442,9 +442,10 @@ fn ownPropertyKeys(
 /// 10.4.5.9 TypedArray With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-typedarray-with-buffer-witness-records
 pub const TypedArrayWithBufferWitness = struct {
-    pub const CachedBufferByteLength = union(enum) {
-        detached,
-        value: u53,
+    pub const CachedBufferByteLength = enum(u53) {
+        // It is reasonable to assume no buffer will ever be this large.
+        detached = std.math.maxInt(u53),
+        _,
     };
 
     /// [[Object]]
@@ -470,7 +471,7 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
     } else blk: {
         // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
-        break :blk .{ .value = arrayBufferByteLength(buffer, order) };
+        break :blk @enumFromInt(arrayBufferByteLength(buffer, order));
     };
 
     // 4. Return the TypedArray With Buffer Witness Record {
@@ -495,7 +496,7 @@ pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
     const typed_array = ta.object;
 
     // 5. If O.[[ByteLength]] is not auto, return O.[[ByteLength]].
-    if (typed_array.fields.byte_length != .auto) return typed_array.fields.byte_length.value;
+    if (typed_array.fields.byte_length != .auto) return @intFromEnum(typed_array.fields.byte_length);
 
     // 6. Let elementSize be TypedArrayElementSize(O).
     const element_size = typedArrayElementSize(typed_array);
@@ -514,7 +515,7 @@ pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     const typed_array = ta.object;
 
     // 3. If O.[[ArrayLength]] is not auto, return O.[[ArrayLength]].
-    if (typed_array.fields.array_length != .auto) return typed_array.fields.array_length.value;
+    if (typed_array.fields.array_length != .auto) return @intFromEnum(typed_array.fields.array_length);
 
     // 4. Assert: IsFixedLengthArrayBuffer(O.[[ViewedArrayBuffer]]) is false.
     std.debug.assert(!isFixedLengthArrayBuffer(typed_array.fields.viewed_array_buffer));
@@ -532,7 +533,7 @@ pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     std.debug.assert(byte_length != .detached);
 
     // 9. Return floor((byteLength - byteOffset) / elementSize).
-    return @divFloor(byte_length.value - byte_offset, element_size);
+    return @divFloor(@intFromEnum(byte_length) - byte_offset, element_size);
 }
 
 /// 10.4.5.14 IsTypedArrayOutOfBounds ( taRecord )
@@ -559,7 +560,7 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     // 6. If O.[[ArrayLength]] is auto, then
     const byte_offset_end = if (typed_array.fields.array_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk buffer_byte_length.value;
+        break :blk @intFromEnum(buffer_byte_length);
     } else blk: {
         // 7. Else,
         // a. Let elementSize be TypedArrayElementSize(O).
@@ -571,15 +572,15 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
             byte_offset_start,
             std.math.mul(
                 u53,
-                typed_array.fields.array_length.value,
+                @intFromEnum(typed_array.fields.array_length),
                 element_size,
             ) catch return true,
         ) catch return true;
     };
 
     // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (byte_offset_start > buffer_byte_length.value or
-        byte_offset_end > buffer_byte_length.value) return true;
+    if (byte_offset_start > @intFromEnum(buffer_byte_length) or
+        byte_offset_end > @intFromEnum(buffer_byte_length)) return true;
 
     // 9. NOTE: 0-length TypedArrays are not considered out-of-bounds.
     // 10. Return false.
@@ -3380,13 +3381,13 @@ pub fn allocateTypedArray(
             // NOTE: We do this unconditionally here and skip the branch below instead.
 
             // a. Set obj.[[ByteLength]] to 0.
-            .byte_length = .{ .value = 0 },
+            .byte_length = @enumFromInt(0),
 
             // b. Set obj.[[ByteOffset]] to 0.
             .byte_offset = 0,
 
             // c. Set obj.[[ArrayLength]] to 0.
-            .array_length = .{ .value = 0 },
+            .array_length = @enumFromInt(0),
         },
     });
 
@@ -3538,13 +3539,13 @@ fn initializeTypedArrayFromTypedArray(
     typed_array.fields.viewed_array_buffer = .{ .array_buffer = data.as(builtins.ArrayBuffer) };
 
     // 14. Set O.[[ByteLength]] to byteLength.
-    typed_array.fields.byte_length = .{ .value = byte_length };
+    typed_array.fields.byte_length = @enumFromInt(byte_length);
 
     // 15. Set O.[[ByteOffset]] to 0.
     typed_array.fields.byte_offset = 0;
 
     // 16. Set O.[[ArrayLength]] to elementLength.
-    typed_array.fields.array_length = .{ .value = element_length };
+    typed_array.fields.array_length = @enumFromInt(element_length);
 
     // 17. Return unused.
 }
@@ -3654,10 +3655,10 @@ fn initializeTypedArrayFromArrayBuffer(
         };
 
         // c. Set O.[[ByteLength]] to newByteLength.
-        typed_array.fields.byte_length = .{ .value = new_byte_length };
+        typed_array.fields.byte_length = @enumFromInt(new_byte_length);
 
         // d. Set O.[[ArrayLength]] to newByteLength / elementSize.
-        typed_array.fields.array_length = .{ .value = @divExact(new_byte_length, element_size) };
+        typed_array.fields.array_length = @enumFromInt(@divExact(new_byte_length, element_size));
     }
 
     // 10. Set O.[[ViewedArrayBuffer]] to buffer.
@@ -3775,13 +3776,13 @@ fn allocateTypedArrayBuffer(
     typed_array.fields.viewed_array_buffer = .{ .array_buffer = data.as(builtins.ArrayBuffer) };
 
     // 6. Set O.[[ByteLength]] to byteLength.
-    typed_array.fields.byte_length = .{ .value = byte_length };
+    typed_array.fields.byte_length = @enumFromInt(byte_length);
 
     // 7. Set O.[[ByteOffset]] to 0.
     typed_array.fields.byte_offset = 0;
 
     // 8. Set O.[[ArrayLength]] to length.
-    typed_array.fields.array_length = .{ .value = length };
+    typed_array.fields.array_length = @enumFromInt(length);
 
     // 9. Return unused.
 }
@@ -4338,9 +4339,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-instances
 pub const TypedArray = MakeObject(.{
     .Fields = struct {
-        pub const ByteLength = union(enum) {
-            auto,
-            value: u53,
+        pub const ByteLength = enum(u53) {
+            // It is reasonable to assume no buffer will ever be this large.
+            auto = std.math.maxInt(u53),
+            _,
         };
 
         /// [[TypedArrayName]]

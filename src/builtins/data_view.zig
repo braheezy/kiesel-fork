@@ -33,9 +33,10 @@ const setValueInBuffer = builtins.setValueInBuffer;
 /// 25.3.1.1 DataView With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-dataview-with-buffer-witness-records
 const DataViewWithBufferWitness = struct {
-    pub const CachedBufferByteLength = union(enum) {
-        detached,
-        value: u53,
+    pub const CachedBufferByteLength = enum(u53) {
+        // It is reasonable to assume no buffer will ever be this large.
+        detached = std.math.maxInt(u53),
+        _,
     };
 
     /// [[Object]]
@@ -61,7 +62,7 @@ fn makeDataViewWithBufferWitnessRecord(
     } else blk: {
         // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
-        break :blk .{ .value = arrayBufferByteLength(buffer, order) };
+        break :blk @enumFromInt(arrayBufferByteLength(buffer, order));
     };
 
     // 4. Return the DataView With Buffer Witness Record {
@@ -80,7 +81,7 @@ fn getViewByteLength(view: DataViewWithBufferWitness) u53 {
     const data_view = view.object;
 
     // 3. If view.[[ByteLength]] is not auto, return view.[[ByteLength]].
-    if (data_view.fields.byte_length != .auto) return data_view.fields.byte_length.value;
+    if (data_view.fields.byte_length != .auto) return @intFromEnum(data_view.fields.byte_length);
 
     // 4. Assert: IsFixedLengthArrayBuffer(view.[[ViewedArrayBuffer]]) is false.
     std.debug.assert(!isFixedLengthArrayBuffer(data_view.fields.viewed_array_buffer));
@@ -95,7 +96,7 @@ fn getViewByteLength(view: DataViewWithBufferWitness) u53 {
     std.debug.assert(byte_length != .detached);
 
     // 8. Return byteLength - byteOffset.
-    return byte_length.value - byte_offset;
+    return @intFromEnum(byte_length) - byte_offset;
 }
 
 /// 25.3.1.4 IsViewOutOfBounds ( viewRecord )
@@ -122,20 +123,20 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     // 6. If view.[[ByteLength]] is auto, then
     const byte_offset_end = if (data_view.fields.byte_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk buffer_byte_length.value;
+        break :blk @intFromEnum(buffer_byte_length);
     } else blk: {
         // 7. Else,
         // a. Let byteOffsetEnd be byteOffsetStart + view.[[ByteLength]].
         break :blk std.math.add(
             u53,
             byte_offset_start,
-            data_view.fields.byte_length.value,
+            @intFromEnum(data_view.fields.byte_length),
         ) catch return true;
     };
 
     // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (byte_offset_start > buffer_byte_length.value or
-        byte_offset_end > buffer_byte_length.value) return true;
+    if (byte_offset_start > @intFromEnum(buffer_byte_length) or
+        byte_offset_end > @intFromEnum(buffer_byte_length)) return true;
 
     // 9. NOTE: 0-length DataViews are not considered out-of-bounds.
     // 10. Return false.
@@ -364,7 +365,7 @@ pub const constructor = struct {
             // a. If bufferIsFixedLength is true, then
             if (buffer_is_fixed_length) {
                 // i. Let viewByteLength be bufferByteLength - offset.
-                break :blk .{ .value = buffer_byte_length - offset };
+                break :blk @enumFromInt(buffer_byte_length - offset);
             } else {
                 // b. Else,
                 // i. Let viewByteLength be auto.
@@ -388,7 +389,7 @@ pub const constructor = struct {
                 );
             }
 
-            break :blk .{ .value = view_byte_length };
+            break :blk @enumFromInt(view_byte_length);
         };
 
         // 10. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%DataView.prototype%",
@@ -425,7 +426,7 @@ pub const constructor = struct {
         // 14. If byteLength is not undefined, then
         if (!byte_length.isUndefined()) {
             // a. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, offset, view_byte_length.value)) |x|
+            if (if (std.math.add(u53, offset, @intFromEnum(view_byte_length))) |x|
                 x > buffer_byte_length
             else |_|
                 true)
@@ -835,9 +836,10 @@ pub const prototype = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-dataview-instances
 pub const DataView = MakeObject(.{
     .Fields = struct {
-        pub const ByteLength = union(enum) {
-            auto,
-            value: u53,
+        pub const ByteLength = enum(u53) {
+            // It is reasonable to assume no buffer will ever be this large.
+            auto = std.math.maxInt(u53),
+            _,
         };
 
         /// [[ViewedArrayBuffer]]
