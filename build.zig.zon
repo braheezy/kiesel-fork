@@ -5,16 +5,16 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .any_pointer = .{
-            .url = "https://github.com/ikskuh/any-pointer/archive/d068b14cd30577783de018e280428953d098b3d2.tar.gz",
-            .hash = "N-V-__8AAMBAAACvBn7l0deSA92AlXkXtSLA7S82f9gStSNM",
+            .url = "https://github.com/ikskuh/any-pointer/archive/68132fe118ec6b84b3a0d526d16b9b4610edf64f.tar.gz",
+            .hash = "N-V-__8AAJ9AAADMXRuM-8Tczp7EheJnSdxHaoAOCjyLJI0T",
         },
         .args = .{
             .url = "https://github.com/ikskuh/zig-args/archive/9425b94c103a031777fdd272c555ce93a7dea581.tar.gz",
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/4f1f3a29c4592d5ba9ba248202c4413cde9469ab.tar.gz",
-            .hash = "icu4zig-0.1.0-IT7GrIcPAgAIjWmyf9EHtTehvDWnIn35wfeLDxduNrHf",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/db3f951c91373480e0616c9e5b081edf096a9515.tar.gz",
+            .hash = "icu4zig-0.1.0-IT7GrFkMAgC_OKrZgePq3fH_sCoR84FX8TfjhRkBgTmO",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -24,12 +24,12 @@
             .hash = "kiesel_runtime-0.1.0-goZjAaIbAQA3BUTZ52kJcOh6LmeFTDsCjPZF5SVstgth",
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/f6707d6ca5ad1b22559727389f55a11c1120aa26.tar.gz",
-            .hash = "N-V-__8AACt8LgDZgzHCZ_Y4YSRDRafeKGZQAdbgl7iXFUV7",
+            .url = "https://github.com/ivmai/bdwgc/archive/cc0e47485ce23c7cdc5ca219f234facca73a514b.tar.gz",
+            .hash = "N-V-__8AAAWRLgDnxhKfTRC4E-50HbDs9-Q7jd_4T4AbE57S",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/4a202d6a0698ad23384b7193bd8cc3e972d82294.tar.gz",
-            .hash = "libregexp-0.1.0-HanscSYNAACoMYYf4jJYwLHWTkndCMqKtJMYIkovxsSA",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/fac416f34dcb6e59c257dd99f7da8e1dd65beb0e.tar.gz",
+            .hash = "libregexp-0.1.0-HanscXwNAAD6ChBeFGHxsZgalLURF6ATXfl0a9Yvz-3a",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
@@ -38,20 +38,19 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/6aafc4cd8f82e053b35a4b96dd7255164a487f77.tar.gz",
-            .hash = "N-V-__8AAA1AEwAg3OpokIgsir6QuePs8a9UuKYM4SlcTpLU",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/7817ed5d9096b40039c49498ddf7f11fa7a2fc4e.tar.gz",
+            .hash = "parser_toolkit-0.1.0-baYGPbJAEwB2mV9PHH9LFc5yZTx3Ox5rkcJp87Fh8ECO",
         },
         .stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/72edb4301313aabe2593d62814fccc8c39f6dbd1.tar.gz",
             .hash = "stackinfo-0.1.0-NZ2qTskbAAAefz3d7vjalblduNIyOzuwKg9Yx6CnUtee",
         },
         .unicode_id = .{
-            .url = "https://codeberg.org/injuly/unicode-id/archive/d56c5ed310058463cf6587a62a9febc595efc5e7.tar.gz",
-            .hash = "unicode_id-0.0.1-MsAuU0yBAQA-Wqv13y7g9rSLkmVWJSwy2Ke9BxsOmq0c",
+            .url = "https://codeberg.org/injuly/unicode-id/archive/ab463d6fe5dae906ac112c1361a7436bd1c9cda9.tar.gz",
+            .hash = "unicode_id-0.0.1-MsAuU1OBAQDvOQJbtbcLiuTJfsoWQTnC7NCTCG4wBY26",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/25, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/401011405e75d0e5f01017dc20216cfb9e46562a.tar.gz",
+            .url = "https://github.com/alimpfard/zigline/archive/51f4b56bfd969a7b093a072f52562746ff215647.tar.gz",
             .hash = "N-V-__8AAK0TAgD4BBVEDr_a3ghcBGr44WChlcyNMPC-NUSY",
         },
     },

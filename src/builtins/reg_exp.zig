@@ -48,6 +48,11 @@ export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
     return 0;
 }
 
+export fn lre_check_timeout(_: ?*anyopaque) c_int {
+    // This can be used to implement RegExp aborts e.g. on SIGINT.
+    return 0;
+}
+
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
     const lre_opaque = @as(*LreOpaque, @alignCast(@ptrCast(@"opaque".?)));
     const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
