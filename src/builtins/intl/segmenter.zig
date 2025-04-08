@@ -26,7 +26,6 @@ const createSegmentsObject = builtins.intl.createSegmentsObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOptionsObject = abstract_operations.getOptionsObject;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -189,7 +188,7 @@ pub const prototype = struct {
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = segmenter.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -197,11 +196,11 @@ pub const prototype = struct {
                     try segmenter.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("granularity"),
             Value.from(resolved_options.granularity),
-        ) catch |err| try noexcept(err);
+        );
 
         // 5. Return options.
         return Value.from(options);

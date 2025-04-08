@@ -29,7 +29,6 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
-const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 
@@ -569,7 +568,7 @@ pub const prototype = struct {
         //                 b. Set v to 𝔽(v).
         //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = date_time_format.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -577,30 +576,30 @@ pub const prototype = struct {
                     try date_time_format.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("calendar"),
             Value.from(resolved_options.calendar),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("numberingSystem"),
             Value.from(resolved_options.numbering_system),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("timeZone"),
             Value.from(resolved_options.time_zone),
-        ) catch |err| try noexcept(err);
+        );
         if (resolved_options.date_style) |date_style| {
-            options.createDataPropertyOrThrow(
+            try options.createDataPropertyDirect(
                 PropertyKey.from("dateStyle"),
                 Value.from(date_style),
-            ) catch |err| try noexcept(err);
+            );
         }
         if (resolved_options.time_style) |time_style| {
-            options.createDataPropertyOrThrow(
+            try options.createDataPropertyDirect(
                 PropertyKey.from("timeStyle"),
                 Value.from(time_style),
-            ) catch |err| try noexcept(err);
+            );
         }
         // TODO: hourCycle, hour12, weekday, era, year, month, day, dayPeriod, hour, minute,
         //       second, fractionalSecondDigits, timeZoneName

@@ -27,7 +27,6 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
@@ -1002,16 +1001,13 @@ fn performPromiseAllSettled(
                 );
 
                 // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
-                object.createDataPropertyOrThrow(
+                try object.createDataPropertyDirect(
                     PropertyKey.from("status"),
                     Value.from("fulfilled"),
-                ) catch |err| try noexcept(err);
+                );
 
                 // 11. Perform ! CreateDataPropertyOrThrow(obj, "value", x).
-                object.createDataPropertyOrThrow(
-                    PropertyKey.from("value"),
-                    x,
-                ) catch |err| try noexcept(err);
+                try object.createDataPropertyDirect(PropertyKey.from("value"), x);
 
                 // 12. Set values[index] to obj.
                 values_.items[index_] = Value.from(object);
@@ -1113,16 +1109,13 @@ fn performPromiseAllSettled(
                 );
 
                 // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
-                object.createDataPropertyOrThrow(
+                try object.createDataPropertyDirect(
                     PropertyKey.from("status"),
                     Value.from("rejected"),
-                ) catch |err| try noexcept(err);
+                );
 
                 // 11. Perform ! CreateDataPropertyOrThrow(obj, "reason", x).
-                object.createDataPropertyOrThrow(
-                    PropertyKey.from("reason"),
-                    x,
-                ) catch |err| try noexcept(err);
+                try object.createDataPropertyDirect(PropertyKey.from("reason"), x);
 
                 // 12. Set values[index] to obj.
                 values_.items[index_] = Value.from(object);
@@ -1234,12 +1227,12 @@ fn performPromiseAny(
                 //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                 //      [[Value]]: CreateArrayFromList(errors)
                 //    }).
-                error_.definePropertyOrThrow(PropertyKey.from("errors"), .{
+                try error_.definePropertyDirect(PropertyKey.from("errors"), .{
                     .configurable = true,
                     .enumerable = false,
                     .writable = true,
                     .value = Value.from(try createArrayFromList(agent, errors.items)),
-                }) catch |err| try noexcept(err);
+                });
 
                 // 3. Return ThrowCompletion(error).
                 agent.exception = .{
@@ -1330,12 +1323,12 @@ fn performPromiseAny(
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
-                    error_.definePropertyOrThrow(PropertyKey.from("errors"), .{
+                    try error_.definePropertyDirect(PropertyKey.from("errors"), .{
                         .configurable = true,
                         .enumerable = false,
                         .writable = true,
                         .value = Value.from(try createArrayFromList(agent_, errors_.items)),
-                    }) catch |err| try noexcept(err);
+                    });
 
                     // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
@@ -1938,22 +1931,22 @@ pub const constructor = struct {
         );
 
         // 4. Perform ! CreateDataPropertyOrThrow(obj, "promise", promiseCapability.[[Promise]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("promise"),
             Value.from(promise_capability.promise),
-        ) catch |err| try noexcept(err);
+        );
 
         // 5. Perform ! CreateDataPropertyOrThrow(obj, "resolve", promiseCapability.[[Resolve]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("resolve"),
             Value.from(promise_capability.resolve),
-        ) catch |err| try noexcept(err);
+        );
 
         // 6. Perform ! CreateDataPropertyOrThrow(obj, "reject", promiseCapability.[[Reject]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("reject"),
             Value.from(promise_capability.reject),
-        ) catch |err| try noexcept(err);
+        );
 
         // 7. Return obj.
         return Value.from(object);

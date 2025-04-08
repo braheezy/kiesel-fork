@@ -36,10 +36,10 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
         .array => |x| blk: {
             const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
             for (x.items, 0..) |value_i, i| {
-                array.createDataPropertyOrThrow(
+                try array.createDataPropertyDirect(
                     PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
                     try convertJsonValue(agent, value_i),
-                ) catch |err| try noexcept(err);
+                );
             }
             break :blk Value.from(array);
         },
@@ -51,7 +51,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
             );
             var it = x.iterator();
             while (it.next()) |entry| {
-                object.createDataPropertyOrThrow(
+                try object.createDataPropertyDirect(
                     PropertyKey.from(
                         try String.fromUtf8(
                             agent.gc_allocator,
@@ -59,7 +59,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
                         ),
                     ),
                     try convertJsonValue(agent, entry.value_ptr.*),
-                ) catch |err| try noexcept(err);
+                );
             }
             break :blk Value.from(object);
         },
@@ -666,7 +666,7 @@ pub const namespace = struct {
             const root_name = PropertyKey.from("");
 
             // c. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
-            root.createDataPropertyOrThrow(root_name, unfiltered) catch |err| try noexcept(err);
+            try root.createDataPropertyDirect(root_name, unfiltered);
 
             // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
             return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
@@ -815,10 +815,7 @@ pub const namespace = struct {
         );
 
         // 11. Perform ! CreateDataPropertyOrThrow(wrapper, the empty String, value).
-        wrapper.createDataPropertyOrThrow(
-            PropertyKey.from(""),
-            value,
-        ) catch |err| try noexcept(err);
+        try wrapper.createDataPropertyDirect(PropertyKey.from(""), value);
 
         // 12. Let state be the JSON Serialization Record {
         //       [[ReplacerFunction]]: ReplacerFunction, [[Stack]]: stack, [[Indent]]: indent,

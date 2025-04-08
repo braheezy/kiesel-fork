@@ -25,7 +25,6 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOptionsObject = abstract_operations.getOptionsObject;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -295,7 +294,7 @@ pub const prototype = struct {
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = display_names.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -303,24 +302,24 @@ pub const prototype = struct {
                     try display_names.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("fallback"),
             Value.from(resolved_options.fallback),
-        ) catch |err| try noexcept(err);
+        );
         if (display_names.fields.type == .language) {
-            options.createDataPropertyOrThrow(
+            try options.createDataPropertyDirect(
                 PropertyKey.from("languageDisplay"),
                 Value.from(resolved_options.language_display),
-            ) catch |err| try noexcept(err);
+            );
         }
 
         // 5. Return options.

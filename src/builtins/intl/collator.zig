@@ -25,7 +25,6 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -292,7 +291,7 @@ pub const prototype = struct {
         //     d. If v is not undefined, then
         //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = collator.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -300,31 +299,31 @@ pub const prototype = struct {
                     try collator.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("usage"),
             Value.from(resolved_options.usage),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("sensitivity"),
             Value.from(resolved_options.sensitivity),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("ignorePunctuation"),
             Value.from(resolved_options.ignore_punctuation),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("collation"),
             Value.from(resolved_options.collation),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("numeric"),
             Value.from(resolved_options.numeric),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("caseFirst"),
             Value.from(resolved_options.case_first),
-        ) catch |err| try noexcept(err);
+        );
 
         // 5. Return options.
         return Value.from(options);

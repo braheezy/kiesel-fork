@@ -128,12 +128,12 @@ pub fn getTemplateObject(
         // c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
         //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        template.definePropertyOrThrow(property_key, .{
+        try template.definePropertyDirect(property_key, .{
             .value = Value.from(cooked_value),
             .writable = false,
             .enumerable = true,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // d. Let rawValue be the String value rawStrings[index].
         const raw_value = raw_strings[@intCast(index)];
@@ -141,12 +141,12 @@ pub fn getTemplateObject(
         // e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
         //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        raw_obj.definePropertyOrThrow(property_key, .{
+        try raw_obj.definePropertyDirect(property_key, .{
             .value = Value.from(raw_value),
             .writable = false,
             .enumerable = true,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // f. Set index to index + 1.
     }
@@ -157,12 +157,12 @@ pub fn getTemplateObject(
     // 14. Perform ! DefinePropertyOrThrow(template, "raw", PropertyDescriptor {
     //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //     }).
-    template.definePropertyOrThrow(PropertyKey.from("raw"), .{
+    try template.definePropertyDirect(PropertyKey.from("raw"), .{
         .value = Value.from(raw_obj),
         .writable = false,
         .enumerable = false,
         .configurable = false,
-    }) catch |err| try noexcept(err);
+    });
 
     // 15. Perform ! SetIntegrityLevel(template, frozen).
     _ = template.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
@@ -1144,12 +1144,12 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
-            }) catch |err| try noexcept(err);
+            });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
@@ -1202,12 +1202,12 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
-            }) catch |err| try noexcept(err);
+            });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
@@ -1300,12 +1300,12 @@ pub fn instantiateGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 7. Return F.
         return function;
@@ -1342,12 +1342,12 @@ pub fn instantiateGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 6. Return F.
         return function;
@@ -1411,12 +1411,12 @@ pub fn instantiateGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(agent, name, Value.from(closure));
@@ -1466,12 +1466,12 @@ pub fn instantiateGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 9. Return closure.
         return closure;
@@ -1521,12 +1521,12 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 7. Return F.
         return function;
@@ -1562,12 +1562,12 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 6. Return F.
         return function;
@@ -1631,12 +1631,12 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(agent, name, Value.from(closure));
@@ -1686,12 +1686,12 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
             .configurable = false,
-        }) catch |err| try noexcept(err);
+        });
 
         // 9. Return closure.
         return closure;

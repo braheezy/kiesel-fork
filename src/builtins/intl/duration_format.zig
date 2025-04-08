@@ -27,7 +27,6 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -464,7 +463,7 @@ pub const prototype = struct {
         //             7. Set v to v.[[Display]].
         //         iv. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = duration_format.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -472,100 +471,100 @@ pub const prototype = struct {
                     try duration_format.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("numberingSystem"),
             Value.from(resolved_options.numbering_system),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("years"),
             Value.from(resolved_options.years),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("yearsDisplay"),
             Value.from(resolved_options.years_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("months"),
             Value.from(resolved_options.months),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("monthsDisplay"),
             Value.from(resolved_options.months_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("weeks"),
             Value.from(resolved_options.weeks),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("weeksDisplay"),
             Value.from(resolved_options.weeks_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("days"),
             Value.from(resolved_options.days),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("daysDisplay"),
             Value.from(resolved_options.days_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("hours"),
             Value.from(resolved_options.hours),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("hoursDisplay"),
             Value.from(resolved_options.hours_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("minutes"),
             Value.from(resolved_options.minutes),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("minutesDisplay"),
             Value.from(resolved_options.minutes_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("seconds"),
             Value.from(resolved_options.seconds),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("secondsDisplay"),
             Value.from(resolved_options.seconds_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("milliseconds"),
             Value.from(resolved_options.milliseconds),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("millisecondsDisplay"),
             Value.from(resolved_options.milliseconds_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("microseconds"),
             Value.from(resolved_options.microseconds),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("microsecondsDisplay"),
             Value.from(resolved_options.microseconds_display),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("nanoseconds"),
             Value.from(resolved_options.nanoseconds),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("nanosecondsDisplay"),
             Value.from(resolved_options.nanoseconds_display),
-        ) catch |err| try noexcept(err);
+        );
         if (resolved_options.fractional_digits) |fractional_digits| {
-            options.createDataPropertyOrThrow(
+            try options.createDataPropertyDirect(
                 PropertyKey.from("fractionalDigits"),
                 Value.from(fractional_digits),
-            ) catch |err| try noexcept(err);
+            );
         }
 
         // 5. Return options.

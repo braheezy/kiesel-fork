@@ -6,13 +6,11 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const language = @import("../language.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Object = language.Object;
 const PropertyKey = language.Object.PropertyKey;
 const Value = language.Value;
-const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 const PropertyDescriptor = @This();
@@ -82,55 +80,55 @@ pub fn fromPropertyDescriptor(
     // 4. If Desc has a [[Value]] field, then
     if (self.value) |value| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "value", Desc.[[Value]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("value"),
             value,
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 5. If Desc has a [[Writable]] field, then
     if (self.writable) |writable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "writable", Desc.[[Writable]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("writable"),
             Value.from(writable),
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 6. If Desc has a [[Get]] field, then
     if (self.get) |get| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("get"),
             if (get) |o| Value.from(o) else .undefined,
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 7. If Desc has a [[Set]] field, then
     if (self.set) |set| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("set"),
             if (set) |o| Value.from(o) else .undefined,
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 8. If Desc has an [[Enumerable]] field, then
     if (self.enumerable) |enumerable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "enumerable", Desc.[[Enumerable]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("enumerable"),
             Value.from(enumerable),
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 9. If Desc has a [[Configurable]] field, then
     if (self.configurable) |configurable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "configurable", Desc.[[Configurable]]).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from("configurable"),
             Value.from(configurable),
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 10. Return obj.

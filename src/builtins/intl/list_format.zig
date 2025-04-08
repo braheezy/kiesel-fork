@@ -26,7 +26,6 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const getOptionsObject = abstract_operations.getOptionsObject;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -222,18 +221,18 @@ pub const prototype = struct {
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = list_format.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(try String.fromAscii(agent.gc_allocator, try list_format.fields.locale.toString(agent.gc_allocator))),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
-        ) catch |err| try noexcept(err);
+        );
 
         // 5. Return options.
         return Value.from(options);

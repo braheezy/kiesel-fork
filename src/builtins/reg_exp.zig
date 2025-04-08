@@ -145,11 +145,11 @@ pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
     // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor {
     //      [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    object.definePropertyOrThrow(PropertyKey.from("lastIndex"), .{
+    try object.definePropertyDirect(PropertyKey.from("lastIndex"), .{
         .writable = true,
         .enumerable = false,
         .configurable = false,
-    }) catch |err| try noexcept(err);
+    });
 
     // 3. Return obj.
     return object;
@@ -376,16 +376,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const array = arrayCreate(agent, @intCast(n + 1), null) catch |err| try noexcept(err);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
-    array.createDataPropertyOrThrow(
+    try array.createDataPropertyDirect(
         PropertyKey.from("index"),
         Value.from(@as(u53, @intCast(last_index))),
-    ) catch |err| try noexcept(err);
+    );
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
-    array.createDataPropertyOrThrow(
-        PropertyKey.from("input"),
-        Value.from(string),
-    ) catch |err| try noexcept(err);
+    try array.createDataPropertyDirect(PropertyKey.from("input"), Value.from(string));
 
     // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
     match = .{ .start_index = last_index, .end_index = end_index };
@@ -405,10 +402,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const matched_substr = try getMatchString(agent, string, match);
 
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
-    array.createDataPropertyOrThrow(
-        PropertyKey.from(0),
-        Value.from(matched_substr),
-    ) catch |err| try noexcept(err);
+    try array.createDataPropertyDirect(PropertyKey.from(0), Value.from(matched_substr));
 
     var group_name_ptr = libregexp.lre_get_groupnames(@ptrCast(re_bytecode));
     const has_groups = group_name_ptr != null;
@@ -428,10 +422,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     };
 
     // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    array.createDataPropertyOrThrow(
-        PropertyKey.from("groups"),
-        groups,
-    ) catch |err| try noexcept(err);
+    try array.createDataPropertyDirect(PropertyKey.from("groups"), groups);
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
@@ -470,10 +461,10 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         }
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
-        array.createDataPropertyOrThrow(
+        try array.createDataPropertyDirect(
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
             captured_value,
-        ) catch |err| try noexcept(err);
+        );
 
         // e. If the ith capture of R was defined with a GroupName, then
         if (group_name_ptr != null and group_name_ptr.* != 0) {
@@ -504,10 +495,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 const property_key = PropertyKey.from(
                     try String.fromUtf8(agent.gc_allocator, group_name),
                 );
-                groups.asObject().createDataPropertyOrThrow(
-                    property_key,
-                    captured_value,
-                ) catch |err| try noexcept(err);
+                try groups.asObject().createDataPropertyDirect(property_key, captured_value);
 
                 // 4. Append s to groupNames.
                 try group_names.append(agent.gc_allocator, group_name);
@@ -531,10 +519,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         );
 
         // b. Perform ! CreateDataPropertyOrThrow(A, "indices", indicesArray).
-        array.createDataPropertyOrThrow(
-            PropertyKey.from("indices"),
-            Value.from(indices_array),
-        ) catch |err| try noexcept(err);
+        try array.createDataPropertyDirect(PropertyKey.from("indices"), Value.from(indices_array));
     }
 
     // 36. Return A.
@@ -634,10 +619,7 @@ fn makeMatchIndicesIndexPairArray(
     };
 
     // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    array.createDataPropertyOrThrow(
-        PropertyKey.from("groups"),
-        groups,
-    ) catch |err| try noexcept(err);
+    try array.createDataPropertyDirect(PropertyKey.from("groups"), groups);
 
     // 9. For each integer i such that 0 ≤ i < n, in ascending order, do
     var i: usize = 0;
@@ -656,10 +638,10 @@ fn makeMatchIndicesIndexPairArray(
         };
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
-        array.createDataPropertyOrThrow(
+        try array.createDataPropertyDirect(
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
             match_index_pair,
-        ) catch |err| try noexcept(err);
+        );
 
         // e. If i > 0, then
         if (i > 0) {
@@ -681,10 +663,10 @@ fn makeMatchIndicesIndexPairArray(
                         try agent.gc_allocator.dupe(u8, group_name),
                     ),
                 );
-                groups.asObject().createDataPropertyOrThrow(
+                try groups.asObject().createDataPropertyDirect(
                     property_key,
                     match_index_pair,
-                ) catch |err| try noexcept(err);
+                );
             }
         }
     }
@@ -1196,10 +1178,7 @@ pub const prototype = struct {
                     const match_str = try (try result.?.get(PropertyKey.from(0))).toString(agent);
 
                     // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
-                    array.createDataPropertyOrThrow(
-                        PropertyKey.from(n),
-                        Value.from(match_str),
-                    ) catch |err| try noexcept(err);
+                    try array.createDataPropertyDirect(PropertyKey.from(n), Value.from(match_str));
 
                     // 3. If matchStr is the empty String, then
                     if (match_str.isEmpty()) {
@@ -1681,10 +1660,7 @@ pub const prototype = struct {
             if (z != null) return Value.from(array);
 
             // c. Perform ! CreateDataPropertyOrThrow(A, "0", S).
-            array.createDataPropertyOrThrow(
-                PropertyKey.from(0),
-                Value.from(string),
-            ) catch |err| try noexcept(err);
+            try array.createDataPropertyDirect(PropertyKey.from(0), Value.from(string));
 
             // d. Return A.
             return Value.from(array);
@@ -1733,10 +1709,10 @@ pub const prototype = struct {
                     );
 
                     // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
-                    array.createDataPropertyOrThrow(
+                    try array.createDataPropertyDirect(
                         PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
                         Value.from(tail),
-                    ) catch |err| try noexcept(err);
+                    );
 
                     // 3. Set lengthA to lengthA + 1.
                     length_array += 1;
@@ -1762,10 +1738,10 @@ pub const prototype = struct {
                         const next_capture = try z.?.get(PropertyKey.from(i));
 
                         // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), nextCapture).
-                        array.createDataPropertyOrThrow(
+                        try array.createDataPropertyDirect(
                             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
                             next_capture,
-                        ) catch |err| try noexcept(err);
+                        );
 
                         // c. Set i to i + 1.
 
@@ -1786,10 +1762,10 @@ pub const prototype = struct {
         const tail = try string.substring(agent.gc_allocator, @intCast(p), size);
 
         // 21. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
-        array.createDataPropertyOrThrow(
+        try array.createDataPropertyDirect(
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
             Value.from(tail),
-        ) catch |err| try noexcept(err);
+        );
 
         // 22. Return A.
         return Value.from(array);

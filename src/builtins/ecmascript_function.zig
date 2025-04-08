@@ -909,18 +909,18 @@ pub fn addRestrictedFunctionProperties(
     // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor {
     //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(
+    try function.definePropertyDirect(
         PropertyKey.from("caller"),
         property_descriptor,
-    ) catch |err| try noexcept(err);
+    );
 
     // 4. Perform ! DefinePropertyOrThrow(F, "arguments", PropertyDescriptor {
     //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(
+    try function.definePropertyDirect(
         PropertyKey.from("arguments"),
         property_descriptor,
-    ) catch |err| try noexcept(err);
+    );
 
     // 5. Return unused.
 }
@@ -975,12 +975,12 @@ pub fn makeConstructor(
         // b. Perform ! DefinePropertyOrThrow(prototype, "constructor", PropertyDescriptor {
         //      [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: true
         //    }).
-        prototype.definePropertyOrThrow(PropertyKey.from("constructor"), .{
+        try prototype.definePropertyDirect(PropertyKey.from("constructor"), .{
             .value = Value.from(function),
             .writable = args.writable_prototype,
             .enumerable = false,
             .configurable = true,
-        }) catch |err| try noexcept(err);
+        });
 
         break :blk prototype;
     };
@@ -988,12 +988,12 @@ pub fn makeConstructor(
     // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
     //      [[Value]]: prototype, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+    try function.definePropertyDirect(PropertyKey.from("prototype"), .{
         .value = Value.from(prototype),
         .writable = args.writable_prototype,
         .enumerable = false,
         .configurable = false,
-    }) catch |err| try noexcept(err);
+    });
 
     // 7. Return unused.
 }
@@ -1133,12 +1133,12 @@ pub fn setFunctionName(
     // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
     //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.from("name"), .{
+    try function.definePropertyDirect(PropertyKey.from("name"), .{
         .value = Value.from(name),
         .writable = false,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 7. Return unused.
 }
@@ -1159,12 +1159,12 @@ pub fn setFunctionLength(function: *Object, length: f64) std.mem.Allocator.Error
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.from("length"), .{
+    try function.definePropertyDirect(PropertyKey.from("length"), .{
         .value = Value.from(length),
         .writable = false,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 3. Return unused.
 }

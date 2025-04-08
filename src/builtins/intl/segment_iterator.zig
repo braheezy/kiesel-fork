@@ -21,7 +21,6 @@ const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const findBoundary = builtins.intl.findBoundary;
-const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 19.6.1 CreateSegmentIterator ( segmenter, string )
@@ -162,22 +161,22 @@ pub fn createSegmentDataObject(
     const segment = try string.substring(agent.gc_allocator, start_index, end_index);
 
     // 6. Perform ! CreateDataPropertyOrThrow(result, "segment", segment).
-    result.createDataPropertyOrThrow(
+    try result.createDataPropertyDirect(
         PropertyKey.from("segment"),
         Value.from(segment),
-    ) catch |err| try noexcept(err);
+    );
 
     // 7. Perform ! CreateDataPropertyOrThrow(result, "index", 𝔽(startIndex)).
-    result.createDataPropertyOrThrow(
+    try result.createDataPropertyDirect(
         PropertyKey.from("index"),
         Value.from(@as(u53, @intCast(start_index))),
-    ) catch |err| try noexcept(err);
+    );
 
     // 8. Perform ! CreateDataPropertyOrThrow(result, "input", string).
-    result.createDataPropertyOrThrow(
+    try result.createDataPropertyDirect(
         PropertyKey.from("input"),
         Value.from(string),
-    ) catch |err| try noexcept(err);
+    );
 
     // 9. Let granularity be segmenter.[[SegmenterGranularity]].
     const granularity = segmenter.fields.segmenter_granularity;
@@ -188,10 +187,10 @@ pub fn createSegmentDataObject(
         //    "word-like" according to locale segmenter.[[Locale]].
 
         // b. Perform ! CreateDataPropertyOrThrow(result, "isWordLike", isWordLike).
-        result.createDataPropertyOrThrow(
+        try result.createDataPropertyDirect(
             PropertyKey.from("isWordLike"),
             Value.from(is_word_like),
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 11. Return result.

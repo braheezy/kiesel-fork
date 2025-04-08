@@ -2164,12 +2164,10 @@ pub fn createArrayFromList(
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
-            .value_or_accessor = .{
-                .value = element,
-            },
-            .attributes = .all,
-        });
+        try array.createDataPropertyDirect(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+            element,
+        );
 
         // b. Set n to n + 1.
     }
@@ -2194,12 +2192,10 @@ pub fn createArrayFromListMapToValue(
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
-            .value_or_accessor = .{
-                .value = try mapFn(agent, element),
-            },
-            .attributes = .all,
-        });
+        try array.createDataPropertyDirect(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+            try mapFn(agent, element),
+        );
 
         // b. Set n to n + 1.
     }

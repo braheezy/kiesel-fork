@@ -20,7 +20,6 @@ const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
-const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
@@ -1201,16 +1200,10 @@ pub const constructor = struct {
         const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
         // 6. Perform ! CreateDataPropertyOrThrow(result, "proxy", proxy).
-        result.createDataPropertyOrThrow(
-            PropertyKey.from("proxy"),
-            Value.from(proxy),
-        ) catch |err| try noexcept(err);
+        try result.createDataPropertyDirect(PropertyKey.from("proxy"), Value.from(proxy));
 
         // 7. Perform ! CreateDataPropertyOrThrow(result, "revoke", revoker).
-        result.createDataPropertyOrThrow(
-            PropertyKey.from("revoke"),
-            Value.from(revoker),
-        ) catch |err| try noexcept(err);
+        try result.createDataPropertyDirect(PropertyKey.from("revoke"), Value.from(revoker));
 
         // 8. Return result.
         return Value.from(result);

@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Object = types.Object;
@@ -14,7 +13,6 @@ const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const @"await" = builtins.@"await";
 const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
-const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 7.4.1 Iterator Records
@@ -404,16 +402,10 @@ pub fn createIteratorResultObject(
     const object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
     // 2. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
-    object.createDataPropertyOrThrow(
-        PropertyKey.from("value"),
-        value,
-    ) catch |err| try noexcept(err);
+    try object.createDataPropertyDirect(PropertyKey.from("value"), value);
 
     // 3. Perform ! CreateDataPropertyOrThrow(obj, "done", done).
-    object.createDataPropertyOrThrow(
-        PropertyKey.from("done"),
-        Value.from(done),
-    ) catch |err| try noexcept(err);
+    try object.createDataPropertyDirect(PropertyKey.from("done"), Value.from(done));
 
     // 4. Return obj.
     return object;

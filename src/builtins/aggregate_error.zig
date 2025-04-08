@@ -105,7 +105,7 @@ pub const constructor = struct {
         //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
         //      [[Value]]: CreateArrayFromList(errorsList)
         //    }).
-        object.definePropertyOrThrow(
+        try object.definePropertyDirect(
             PropertyKey.from("errors"),
             .{
                 .configurable = true,
@@ -113,7 +113,7 @@ pub const constructor = struct {
                 .writable = true,
                 .value = Value.from(try createArrayFromList(agent, errors_list)),
             },
-        ) catch |err| try noexcept(err);
+        );
 
         // 7. Return O.
         return Value.from(object);

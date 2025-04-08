@@ -281,16 +281,16 @@ fn doWait(
         if (mode == .sync) return Value.from("not-equal");
 
         // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
-        result_object.createDataPropertyOrThrow(
+        try result_object.createDataPropertyDirect(
             PropertyKey.from("async"),
             Value.from(false),
-        ) catch |err| try noexcept(err);
+        );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "not-equal").
-        result_object.createDataPropertyOrThrow(
+        try result_object.createDataPropertyDirect(
             PropertyKey.from("value"),
             Value.from("not-equal"),
-        ) catch |err| try noexcept(err);
+        );
 
         // e. Return resultObject.
         return Value.from(result_object);
@@ -305,16 +305,16 @@ fn doWait(
         // TODO: b. Perform LeaveCriticalSection(WL).
 
         // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
-        result_object.createDataPropertyOrThrow(
+        try result_object.createDataPropertyDirect(
             PropertyKey.from("async"),
             Value.from(false),
-        ) catch |err| try noexcept(err);
+        );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "timed-out").
-        result_object.createDataPropertyOrThrow(
+        try result_object.createDataPropertyDirect(
             PropertyKey.from("value"),
             Value.from("timed-out"),
-        ) catch |err| try noexcept(err);
+        );
 
         // e. Return resultObject.
         return Value.from(result_object);
@@ -327,16 +327,16 @@ fn doWait(
     if (mode == .sync) return Value.from(waiter.result);
 
     // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
-    result_object.createDataPropertyOrThrow(
+    try result_object.createDataPropertyDirect(
         PropertyKey.from("async"),
         Value.from(true),
-    ) catch |err| try noexcept(err);
+    );
 
     // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
-    result_object.createDataPropertyOrThrow(
+    try result_object.createDataPropertyDirect(
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
-    ) catch |err| try noexcept(err);
+    );
 
     // 35. Return resultObject.
     return Value.from(result_object);

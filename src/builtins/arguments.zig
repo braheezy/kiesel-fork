@@ -236,21 +236,22 @@ pub fn createUnmappedArgumentsObject(
     // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    object.definePropertyOrThrow(PropertyKey.from("length"), .{
+    try object.definePropertyDirect(PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(len))),
         .writable = true,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 5. Let index be 0.
     // 6. Repeat, while index < len,
     for (arguments_list, 0..) |value, index| {
         // a. Let val be argumentsList[index].
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
-
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
-        object.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
+        try object.createDataPropertyDirect(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
+            value,
+        );
 
         // c. Set index to index + 1.
     }
@@ -258,22 +259,22 @@ pub fn createUnmappedArgumentsObject(
     // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try object.definePropertyDirect(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    object.definePropertyOrThrow(PropertyKey.from("callee"), .{
+    try object.definePropertyDirect(PropertyKey.from("callee"), .{
         .get = try realm.intrinsics.@"%ThrowTypeError%"(),
         .set = try realm.intrinsics.@"%ThrowTypeError%"(),
         .enumerable = false,
         .configurable = false,
-    }) catch |err| try noexcept(err);
+    });
 
     // 9. Return obj.
     return object;
@@ -343,10 +344,10 @@ pub fn createMappedArgumentsObject(
     for (arguments_list, 0..) |value, index| {
         // a. Let val be argumentsList[index].
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
-        object.createDataPropertyOrThrow(
+        try object.createDataPropertyDirect(
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
             value,
-        ) catch |err| try noexcept(err);
+        );
 
         // c. Set index to index + 1.
     }
@@ -354,12 +355,12 @@ pub fn createMappedArgumentsObject(
     // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    object.definePropertyOrThrow(PropertyKey.from("length"), .{
+    try object.definePropertyDirect(PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(len))),
         .writable = true,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 17. Let mappedNames be a new empty List.
     var mapped_names: std.StringHashMapUnmanaged(void) = .empty;
@@ -412,22 +413,22 @@ pub fn createMappedArgumentsObject(
     // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try object.definePropertyDirect(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    object.definePropertyOrThrow(PropertyKey.from("callee"), .{
+    try object.definePropertyDirect(PropertyKey.from("callee"), .{
         .value = Value.from(function),
         .writable = true,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| try noexcept(err);
+    });
 
     // 22. Return obj.
     return object;

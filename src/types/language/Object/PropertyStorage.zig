@@ -86,6 +86,36 @@ pub const CompletePropertyDescriptor = struct {
     value_or_accessor: ValueOrAccessor,
     attributes: Attributes,
 
+    pub fn fromPropertyDescriptor(descriptor: PropertyDescriptor) CompletePropertyDescriptor {
+        if (descriptor.isAccessorDescriptor()) {
+            return .{
+                .value_or_accessor = .{
+                    .accessor = .{
+                        .get = descriptor.get orelse @as(?*Object, null),
+                        .set = descriptor.set orelse @as(?*Object, null),
+                    },
+                },
+                .attributes = .{
+                    .writable = false,
+                    .enumerable = descriptor.enumerable orelse false,
+                    .configurable = descriptor.configurable orelse false,
+                },
+            };
+        } else {
+            std.debug.assert(descriptor.isDataDescriptor());
+            return .{
+                .value_or_accessor = .{
+                    .value = descriptor.value orelse .undefined,
+                },
+                .attributes = .{
+                    .writable = descriptor.writable orelse false,
+                    .enumerable = descriptor.enumerable orelse false,
+                    .configurable = descriptor.configurable orelse false,
+                },
+            };
+        }
+    }
+
     pub fn toPropertyDescriptor(self: CompletePropertyDescriptor) PropertyDescriptor {
         return switch (self.value_or_accessor) {
             .value => |value| .{

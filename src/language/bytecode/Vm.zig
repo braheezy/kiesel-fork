@@ -146,10 +146,10 @@ fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
     const index = getArrayLength(array);
     // From ArrayAccumulation:
     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-    array.createDataPropertyOrThrow(
+    try array.createDataPropertyDirect(
         PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
         init_value,
-    ) catch |err| try noexcept(err);
+    );
     self.result = Value.from(array);
 }
 
@@ -185,10 +185,7 @@ fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     //     b. If next is done, return nextIndex.
     while (try iterator.stepValue(self.agent)) |next| : (next_index += 1) {
         // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
-        array.createDataPropertyOrThrow(
-            PropertyKey.from(next_index),
-            next,
-        ) catch |err| try noexcept(err);
+        try array.createDataPropertyDirect(PropertyKey.from(next_index), next);
 
         // d. Set nextIndex to nextIndex + 1.
     }
@@ -988,10 +985,7 @@ fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
         var it = import_meta_values.iterator();
         while (it.next()) |entry| {
             // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
-            import_meta.createDataPropertyOrThrow(
-                entry.key_ptr.*,
-                entry.value_ptr.*,
-            ) catch |err| try noexcept(err);
+            try import_meta.createDataPropertyDirect(entry.key_ptr.*, entry.value_ptr.*);
         }
 
         // d. Perform HostFinalizeImportMeta(importMeta, module).
@@ -1512,7 +1506,7 @@ fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
     const object = self.stack.pop().?.asObject();
     // From PropertyDefinitionEvaluation:
     // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
-    object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
+    try object.createDataPropertyDirect(property_name, property_value);
     self.result = Value.from(object);
 }
 

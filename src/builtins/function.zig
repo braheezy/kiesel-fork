@@ -31,7 +31,6 @@ const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttri
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const fmtParseError = language.fmtParseError;
 const makeConstructor = builtins.makeConstructor;
-const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setFunctionLength = builtins.setFunctionLength;
@@ -396,12 +395,12 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            try function.definePropertyDirect(PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
-            }) catch |err| try noexcept(err);
+            });
         },
 
         // 31. Else if kind is async-generator, then
@@ -415,12 +414,12 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            try function.definePropertyDirect(PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
-            }) catch |err| try noexcept(err);
+            });
         },
 
         // 32. Else if kind is normal, then

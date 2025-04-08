@@ -184,6 +184,67 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
     };
 }
 
+/// Fast version of `createDataPropertyOrThrow()` that assumes the property does not exist yet or
+/// looking it up is free of side effects. This allows us to bypass `[[DefineOwnProperty]]` and
+/// thus `[[GetOwnProperty]]` and `[[IsExtensible]]`.
+pub fn createDataPropertyDirect(
+    self: *Object,
+    property_key: PropertyKey,
+    value: Value,
+) std.mem.Allocator.Error!void {
+    const agent = self.agent;
+    if (self.internal_methods.defineOwnProperty == &builtins.ordinary.internal_methods.defineOwnProperty and
+        self.internal_methods.getOwnProperty == &builtins.ordinary.internal_methods.getOwnProperty and
+        self.internal_methods.isExtensible == &builtins.ordinary.internal_methods.isExtensible)
+    {
+        // Go directly to the property storage.
+        try self.property_storage.set(agent.gc_allocator, property_key, .{
+            .value_or_accessor = .{
+                .value = value,
+            },
+            .attributes = .all,
+        });
+    } else {
+        // Non-ordinary objects like arrays need to go through `[[DefineOwnProperty]]` to set the length.
+        const result = self.internal_methods.defineOwnProperty(agent, self, property_key, .{
+            .value = value,
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        }) catch |err| try noexcept(err);
+        std.debug.assert(result);
+    }
+}
+
+/// Fast version of `definePropertyOrThrow()` that assumes the property does not exist yet or
+/// looking it up is free of side effects. This allows us to bypass `[[DefineOwnProperty]]` and
+/// thus `[[GetOwnProperty]]` and `[[IsExtensible]]`.
+pub fn definePropertyDirect(
+    self: *Object,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) std.mem.Allocator.Error!void {
+    const agent = self.agent;
+    if (self.internal_methods.defineOwnProperty == &builtins.ordinary.internal_methods.defineOwnProperty and
+        self.internal_methods.getOwnProperty == &builtins.ordinary.internal_methods.getOwnProperty and
+        self.internal_methods.isExtensible == &builtins.ordinary.internal_methods.isExtensible)
+    {
+        try self.property_storage.set(
+            agent.gc_allocator,
+            property_key,
+            .fromPropertyDescriptor(property_descriptor),
+        );
+    } else {
+        const result = self.internal_methods.defineOwnProperty(
+            agent,
+            self,
+            property_key,
+            property_descriptor,
+        ) catch |err| try noexcept(err);
+        std.debug.assert(result);
+    }
+}
+
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
 /// https://tc39.es/ecma262/#sec-ordinarytoprimitive
 pub fn ordinaryToPrimitive(self: *Object, hint: PreferredType) Agent.Error!Value {
@@ -324,7 +385,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     };
 
     // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
-    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| try noexcept(err);
+    try self.definePropertyDirect(property_key, new_descriptor);
 
     // 4. Return unused.
 }
@@ -686,10 +747,7 @@ pub fn copyDataProperties(
                 const property_value = try from.get(next_key);
 
                 // 2. Perform ! CreateDataPropertyOrThrow(target, nextKey, propValue).
-                self.createDataPropertyOrThrow(
-                    next_key,
-                    property_value,
-                ) catch |err| try noexcept(err);
+                try self.createDataPropertyDirect(next_key, property_value);
             }
         }
     }

@@ -462,12 +462,12 @@ pub fn stringCreate(
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    string.definePropertyOrThrow(PropertyKey.from("length"), .{
+    try string.definePropertyDirect(PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(length))),
         .writable = false,
         .enumerable = false,
         .configurable = false,
-    }) catch |err| try noexcept(err);
+    });
 
     // 9. Return S.
     return string;

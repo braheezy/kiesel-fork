@@ -26,7 +26,6 @@ const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -224,7 +223,7 @@ pub const prototype = struct {
         //             2. Set v to 𝔽(v).
         //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = plural_rules.fields.resolvedOptions();
-        options.createDataPropertyOrThrow(
+        try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -232,15 +231,15 @@ pub const prototype = struct {
                     try plural_rules.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
-        ) catch |err| try noexcept(err);
-        options.createDataPropertyOrThrow(
+        );
+        try options.createDataPropertyDirect(
             PropertyKey.from("pluralCategories"),
             Value.from(try createArrayFromList(agent, plural_categories.items)),
-        ) catch |err| try noexcept(err);
+        );
 
         // TODO: minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
         //       minimumSignificantDigits, maximumSignificantDigits, roundingIncrement,

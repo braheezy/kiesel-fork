@@ -446,10 +446,7 @@ pub const constructor = struct {
             // c. If len is not a Number, then
             if (!len.isNumber()) {
                 // i. Perform ! CreateDataPropertyOrThrow(array, "0", len).
-                array.createDataPropertyOrThrow(
-                    PropertyKey.from(0),
-                    len,
-                ) catch |err| try noexcept(err);
+                try array.createDataPropertyDirect(PropertyKey.from(0), len);
 
                 // ii. Let intLen be 1𝔽.
                 int_len = 1;
@@ -489,7 +486,7 @@ pub const constructor = struct {
 
                 // ii. Let itemK be values[k].
                 // iii. Perform ! CreateDataPropertyOrThrow(array, Pk, itemK).
-                array.createDataPropertyOrThrow(property_key, item_k) catch |err| try noexcept(err);
+                try array.createDataPropertyDirect(property_key, item_k);
 
                 // iv. Set k to k + 1.
             }
@@ -1090,10 +1087,10 @@ pub const prototype = struct {
                     "findLast",   "findLastIndex", "flat",      "flatMap", "includes", "keys",
                     "toReversed", "toSorted",      "toSpliced", "values",
                 }) |name| {
-                    unscopable_list.createDataPropertyOrThrow(
+                    try unscopable_list.createDataPropertyDirect(
                         PropertyKey.from(name),
                         Value.from(true),
-                    ) catch |err| try noexcept(err);
+                    );
                 }
 
                 // 18. Return unscopableList.
@@ -3043,7 +3040,7 @@ pub const prototype = struct {
             const from_value = try object.get(from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            try array.createDataPropertyOrThrow(property_key, from_value);
+            try array.createDataPropertyDirect(property_key, from_value);
 
             // e. Set k to k + 1.
         }
@@ -3099,7 +3096,7 @@ pub const prototype = struct {
         // 8. Repeat, while j < len,
         while (j < len) : (j += 1) {
             // a. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(j)), sortedList[j]).
-            try array.createDataPropertyOrThrow(PropertyKey.from(j), sorted_list[@intCast(j)]);
+            try array.createDataPropertyDirect(PropertyKey.from(j), sorted_list[@intCast(j)]);
 
             // b. Set j to j + 1.
         }
@@ -3183,7 +3180,7 @@ pub const prototype = struct {
             const i_value = try object.get(property_key);
 
             // c. Perform ! CreateDataPropertyOrThrow(A, Pi, iValue).
-            array.createDataPropertyOrThrow(property_key, i_value) catch |err| try noexcept(err);
+            try array.createDataPropertyDirect(property_key, i_value);
 
             // d. Set i to i + 1.
         }
@@ -3194,7 +3191,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(i);
 
             // b. Perform ! CreateDataPropertyOrThrow(A, Pi, E).
-            array.createDataPropertyOrThrow(property_key, element) catch |err| try noexcept(err);
+            try array.createDataPropertyDirect(property_key, element);
 
             // c. Set i to i + 1.
             i += 1;
@@ -3215,7 +3212,7 @@ pub const prototype = struct {
             const from_value = try object.get(from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pi, fromValue).
-            array.createDataPropertyOrThrow(property_key, from_value) catch |err| try noexcept(err);
+            try array.createDataPropertyDirect(property_key, from_value);
 
             // e. Set i to i + 1.
             // f. Set r to r + 1.
@@ -3376,7 +3373,7 @@ pub const prototype = struct {
                 try object.get(property_key);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            array.createDataPropertyOrThrow(property_key, from_value) catch |err| try noexcept(err);
+            try array.createDataPropertyDirect(property_key, from_value);
 
             // e. Set k to k + 1.
         }

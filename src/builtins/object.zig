@@ -350,7 +350,7 @@ pub const constructor = struct {
                 const property_key = try key.toPropertyKey(agent_);
 
                 // b. Perform ! CreateDataPropertyOrThrow(obj, propertyKey, value).
-                object_.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
+                try object_.createDataPropertyDirect(property_key, value);
 
                 // c. Return undefined.
                 return .undefined;
@@ -419,10 +419,7 @@ pub const constructor = struct {
                 const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
 
                 // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(descriptors, key, descriptor).
-                descriptors.createDataPropertyOrThrow(
-                    key,
-                    Value.from(descriptor),
-                ) catch |err| try noexcept(err);
+                try descriptors.createDataPropertyDirect(key, Value.from(descriptor));
             }
         }
 
@@ -528,10 +525,7 @@ pub const constructor = struct {
             const elements = try createArrayFromList(agent, entry.value_ptr.items);
 
             // b. Perform ! CreateDataPropertyOrThrow(obj, g.[[Key]], elements).
-            object.createDataPropertyOrThrow(
-                entry.key_ptr.*,
-                Value.from(elements),
-            ) catch |err| try noexcept(err);
+            try object.createDataPropertyDirect(entry.key_ptr.*, Value.from(elements));
         }
 
         // 4. Return obj.
