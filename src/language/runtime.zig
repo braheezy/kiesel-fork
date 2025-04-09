@@ -477,7 +477,7 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
 pub fn applyStringOrNumericBinaryOperator(
     agent: *Agent,
     l_val: Value,
-    operator: ast.BinaryExpression.Operator,
+    comptime operator: ast.BinaryExpression.Operator,
     r_val: Value,
 ) Agent.Error!Value {
     var final_l_val = l_val;
