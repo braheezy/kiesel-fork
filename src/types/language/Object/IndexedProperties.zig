@@ -82,7 +82,9 @@ fn migrateStorageIfNeeded(
             break :blk .sparse;
         }
     };
-    try self.migrateStorage(allocator, new_storage_type);
+    if (old_storage_type != new_storage_type) {
+        try self.migrateStorage(allocator, new_storage_type);
+    }
 }
 
 pub fn migrateStorage(
@@ -91,7 +93,8 @@ pub fn migrateStorage(
     new_storage_type: Storage.Type,
 ) std.mem.Allocator.Error!void {
     const old_storage_type = std.meta.activeTag(self.storage);
-    if (old_storage_type == new_storage_type) return;
+    std.debug.assert(@intFromEnum(old_storage_type) < @intFromEnum(new_storage_type) or
+        new_storage_type == .none);
     self.storage = switch (new_storage_type) {
         .none => blk: {
             switch (self.storage) {

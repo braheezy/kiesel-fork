@@ -267,7 +267,7 @@ pub fn arraySetLength(
         ) catch |err| try noexcept(err);
 
         // Force sparse storage for array holes added to the end
-        if (new_len > old_len and succeeded) {
+        if (new_len > old_len and succeeded and array.property_storage.indexed_properties.storage != .sparse) {
             try array.property_storage.indexed_properties.migrateStorage(
                 agent.gc_allocator,
                 .sparse,
