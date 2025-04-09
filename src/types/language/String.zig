@@ -35,6 +35,7 @@ pub const whitespace_code_units = blk: {
 pub const empty = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
+pub const Cache = @import("String/cache.zig").Cache;
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
 
 pub const Slice = union(enum) {
@@ -80,6 +81,8 @@ pub fn fromLiteral(comptime utf8: []const u8) *const String {
 
 pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const String {
     if (utf8.len == 0) return empty;
+    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf8 = utf8 });
+    if (gop.found_existing) return gop.value_ptr.*;
     const slice: Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
     } else blk: {
@@ -91,6 +94,7 @@ pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const 
     };
     const string = try agent.gc_allocator.create(String);
     string.* = .{ .slice = slice, .hash = slice.hash() };
+    gop.value_ptr.* = string;
     return string;
 }
 
@@ -114,9 +118,12 @@ pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.All
 
 pub fn fromAscii(agent: *Agent, ascii: []const u8) std.mem.Allocator.Error!*const String {
     if (ascii.len == 0) return empty;
+    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf8 = ascii });
+    if (gop.found_existing) return gop.value_ptr.*;
     const slice: Slice = .{ .ascii = ascii };
     const string = try agent.gc_allocator.create(String);
     string.* = .{ .slice = slice, .hash = slice.hash() };
+    gop.value_ptr.* = string;
     return string;
 }
 
@@ -130,9 +137,12 @@ pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.A
 
 pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*const String {
     if (utf16.len == 0) return empty;
+    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf16 = utf16 });
+    if (gop.found_existing) return gop.value_ptr.*;
     const slice: Slice = .{ .utf16 = utf16 };
     const string = try agent.gc_allocator.create(String);
     string.* = .{ .slice = slice, .hash = slice.hash() };
+    gop.value_ptr.* = string;
     return string;
 }
 

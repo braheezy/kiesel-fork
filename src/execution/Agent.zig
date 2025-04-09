@@ -40,6 +40,7 @@ host_hooks: HostHooks,
 execution_context_stack: std.ArrayListUnmanaged(*ExecutionContext),
 queued_jobs: std.ArrayListUnmanaged(QueuedJob),
 empty_shape: *Object.Shape,
+string_cache: String.Cache,
 platform: Platform,
 
 /// [[LittleEndian]]
@@ -82,6 +83,7 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
         .execution_context_stack = .empty,
         .queued_jobs = .empty,
         .empty_shape = undefined,
+        .string_cache = .empty,
         .platform = platform,
     };
     self.pre_allocated = .{
@@ -101,6 +103,7 @@ pub fn deinit(self: *Agent) void {
     self.execution_context_stack.deinit(self.gc_allocator);
     self.queued_jobs.deinit(self.gc_allocator);
     self.empty_shape.deinit(self.gc_allocator);
+    self.string_cache.deinit(self.gc_allocator);
     self.platform.deinit();
 }
 
