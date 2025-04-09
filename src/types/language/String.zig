@@ -76,6 +76,7 @@ pub fn fromLiteral(comptime utf8: []const u8) *const String {
 }
 
 pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!*const String {
+    if (utf8.len == 0) return empty;
     const slice: Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
     } else blk: {
@@ -91,6 +92,7 @@ pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocato
 }
 
 pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
+    if (ascii.len == 0) return empty;
     const slice: Slice = .{ .ascii = ascii };
     const string = try allocator.create(String);
     string.* = .{ .slice = slice, .hash = slice.hash() };
@@ -98,6 +100,7 @@ pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Alloca
 }
 
 pub fn fromUtf16(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
+    if (utf16.len == 0) return empty;
     const slice: Slice = .{ .utf16 = utf16 };
     const string = try allocator.create(String);
     string.* = .{ .slice = slice, .hash = slice.hash() };
