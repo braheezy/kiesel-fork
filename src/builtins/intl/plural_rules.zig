@@ -227,7 +227,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try plural_rules.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
@@ -263,10 +263,7 @@ pub const prototype = struct {
 
         // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
         return Value.from(
-            try String.fromAscii(
-                agent.gc_allocator,
-                @tagName(resolvePlural(plural_rules, n).plural_category),
-            ),
+            try String.fromAscii(agent, @tagName(resolvePlural(plural_rules, n).plural_category)),
         );
     }
 };

@@ -205,7 +205,7 @@ fn get(
     };
 
     // 12. Return ? targetEnv.GetBindingValue(binding.[[BindingName]], true).
-    const binding_name = try String.fromUtf8(agent.gc_allocator, binding.binding_name.string);
+    const binding_name = try String.fromUtf8(agent, binding.binding_name.string);
     return target_env.getBindingValue(agent, binding_name, true);
 }
 
@@ -256,7 +256,7 @@ fn ownPropertyKeys(
     var keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
     try keys.ensureUnusedCapacity(agent.gc_allocator, exports.len + symbol_keys.items.len);
     for (exports) |name| {
-        const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+        const property_key = PropertyKey.from(try String.fromUtf8(agent, name));
         keys.appendAssumeCapacity(property_key);
     }
     keys.appendSliceAssumeCapacity(symbol_keys.items);

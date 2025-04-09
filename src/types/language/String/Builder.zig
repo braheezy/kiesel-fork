@@ -1,6 +1,10 @@
 const std = @import("std");
 
-const String = @import("../String.zig");
+const execution = @import("../../../execution.zig");
+const types = @import("../../../types.zig");
+
+const Agent = execution.Agent;
+const String = types.String;
 
 const Builder = @This();
 
@@ -79,7 +83,7 @@ pub fn appendCodePointAssumeCapacity(self: *Builder, code_point: u21) void {
     self.segments.appendAssumeCapacity(.{ .code_point = code_point });
 }
 
-pub fn build(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
+fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!String.Slice {
     const is_ascii = for (self.segments.items) |segment| {
         if (!segment.isAscii()) break false;
     } else true;
@@ -94,7 +98,7 @@ pub fn build(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
             .code_unit => |code_unit| try result.append(allocator, @intCast(code_unit)),
             .code_point => |code_point| try result.append(allocator, @intCast(code_point)),
         };
-        return String.fromAscii(allocator, try result.toOwnedSlice(allocator));
+        return .{ .ascii = try result.toOwnedSlice(allocator) };
     } else {
         var result: std.ArrayListUnmanaged(u16) = .empty;
         for (self.segments.items) |segment| switch (segment) {
@@ -113,6 +117,22 @@ pub fn build(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
                 }
             },
         };
-        return String.fromUtf16(allocator, try result.toOwnedSlice(allocator));
+        return .{ .utf16 = try result.toOwnedSlice(allocator) };
     }
+}
+
+pub fn build(self: Builder, agent: *Agent) std.mem.Allocator.Error!*const String {
+    const slice = try buildImpl(self, agent.gc_allocator);
+    return switch (slice) {
+        .ascii => |ascii| String.fromAscii(agent, ascii),
+        .utf16 => |utf16| String.fromUtf16(agent, utf16),
+    };
+}
+
+pub fn buildAlloc(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
+    const slice = try buildImpl(self, allocator);
+    return switch (slice) {
+        .ascii => |ascii| String.fromAsciiAlloc(allocator, ascii),
+        .utf16 => |utf16| String.fromUtf16Alloc(allocator, utf16),
+    };
 }

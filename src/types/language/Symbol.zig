@@ -56,10 +56,11 @@ pub fn descriptiveString(self: *const Symbol, agent: *Agent) std.mem.Allocator.E
     const description: *const String = self.description orelse .empty;
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
-    return String.concat(
-        agent.gc_allocator,
-        &.{ String.fromLiteral("Symbol("), description, String.fromLiteral(")") },
-    );
+    return String.concat(agent, &.{
+        String.fromLiteral("Symbol("),
+        description,
+        String.fromLiteral(")"),
+    });
 }
 
 test format {

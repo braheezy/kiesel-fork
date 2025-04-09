@@ -77,7 +77,7 @@ pub const prototype = struct {
             const next_index = position + code_point.code_unit_count;
 
             // iii. Let resultString be the substring of s from position to nextIndex.
-            const result_string = try string.substring(agent.gc_allocator, position, next_index);
+            const result_string = try string.substring(agent, position, next_index);
 
             // iv. Set position to nextIndex.
             string_iterator.fields.state.position = next_index;

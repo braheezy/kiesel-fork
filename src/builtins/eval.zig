@@ -208,7 +208,7 @@ fn evalDeclarationInstantiation(
         if (var_env == .global_environment) {
             // i. For each element name of varNames, do
             for (var_names.items) |name_utf8| {
-                const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+                const name = try String.fromUtf8(agent, name_utf8);
 
                 // 1. If HasLexicalDeclaration(varEnv, name) is true, throw a SyntaxError exception.
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
@@ -237,7 +237,7 @@ fn evalDeclarationInstantiation(
 
                 // 2. For each element name of varNames, do
                 for (var_names.items) |name_utf8| {
-                    const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+                    const name = try String.fromUtf8(agent, name_utf8);
 
                     // a. If ! thisEnv.HasBinding(name) is true, then
                     if (this_env.hasBinding(name) catch |err| try noexcept(err)) {
@@ -281,7 +281,7 @@ fn evalDeclarationInstantiation(
 
             // iii. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
             };
 
             // iv. If declaredFunctionNames does not contain fn, then
@@ -327,7 +327,7 @@ fn evalDeclarationInstantiation(
 
             // i. For each String vn of the BoundNames of d, do
             for (bound_names.items) |var_name_utf8| {
-                const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+                const var_name = try String.fromUtf8(agent, var_name_utf8);
 
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
@@ -374,7 +374,7 @@ fn evalDeclarationInstantiation(
 
         // b. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
-            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+            const name = try String.fromUtf8(agent, name_utf8);
 
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
@@ -392,7 +392,7 @@ fn evalDeclarationInstantiation(
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
         };
 
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.

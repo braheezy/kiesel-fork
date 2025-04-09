@@ -289,7 +289,7 @@ pub fn createDynamicFunction(
         }
     }
 
-    const parameters_string = try (try result.build(agent.gc_allocator)).toUtf8(agent.gc_allocator);
+    const parameters_string = try (try result.build(agent)).toUtf8(agent.gc_allocator);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
@@ -606,11 +606,11 @@ pub const prototype = struct {
         if (func.isObject()) {
             if (func.asObject().is(ECMAScriptFunction)) {
                 const ecmascript_function = func.asObject().as(ECMAScriptFunction);
-                return Value.from(try String.fromUtf8(agent.gc_allocator, ecmascript_function.fields.source_text));
+                return Value.from(try String.fromUtf8(agent, ecmascript_function.fields.source_text));
             } else if (func.asObject().is(BuiltinFunction)) {
                 const builtin_function = func.asObject().as(BuiltinFunction);
                 if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
-                    return Value.from(try String.fromUtf8(agent.gc_allocator, class_constructor_fields.source_text));
+                    return Value.from(try String.fromUtf8(agent, class_constructor_fields.source_text));
                 }
             }
         }
@@ -629,7 +629,7 @@ pub const prototype = struct {
                 "function {}() {{ [native code] }}",
                 .{name},
             );
-            return Value.from(try String.fromAscii(agent.gc_allocator, source_text));
+            return Value.from(try String.fromAscii(agent, source_text));
         }
 
         // 4. If func is an Object and IsCallable(func) is true, return an implementation-defined

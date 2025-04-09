@@ -35,7 +35,10 @@ pub var state: State = .{
 };
 
 fn asciiString(ascii: []const u8) *const String {
-    return String.fromAscii(arena.allocator(), ascii) catch String.fromLiteral("<OOM>");
+    const slice: String.Slice = .{ .ascii = ascii };
+    const string = arena.allocator().create(String) catch return String.fromLiteral("<OOM>");
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
 }
 
 fn PrettyPrintError(comptime Writer: type) type {

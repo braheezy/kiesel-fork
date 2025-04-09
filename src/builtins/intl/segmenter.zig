@@ -192,7 +192,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try segmenter.fields.locale.toString(agent.gc_allocator),
                 ),
             ),

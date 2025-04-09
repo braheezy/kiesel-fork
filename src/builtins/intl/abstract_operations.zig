@@ -206,7 +206,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             const tag = if (k_value.isObject() and k_value.asObject().is(builtins.intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
                 break :blk try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try k_value.asObject().as(builtins.intl.Locale).fields.locale.toString(agent.gc_allocator),
                 );
             } else blk: {

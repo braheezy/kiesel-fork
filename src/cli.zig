@@ -259,7 +259,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
+        return Value.from(try String.fromUtf8(agent, bytes));
     }
 
     fn readLine(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -278,7 +278,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
+        return Value.from(try String.fromUtf8(agent, bytes));
     }
 
     fn readStdin(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -296,7 +296,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
+        return Value.from(try String.fromUtf8(agent, bytes));
     }
 
     fn sleep(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -441,7 +441,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 options.origin.path,
             ) catch |err| break :blk err;
             const cache_key: ModuleRequest = .{
-                .specifier = try String.fromUtf8(agent.gc_allocator, module_path),
+                .specifier = try String.fromUtf8(agent, module_path),
                 .attributes = &.{},
             };
             try module_cache.putNoClobber(agent.gc_allocator, cache_key, module);
@@ -838,7 +838,7 @@ pub fn main() !u8 {
                 // - https://github.com/SerenityOS/serenity/blob/648b36f3c53bf3fd83a8dbf5fc788046abe10e29/Userland/Libraries/LibJS/Runtime/VM.cpp#L481-L487
                 // - https://github.com/bellard/quickjs/blob/36911f0d3ab1a4c190a4d5cbe7c2db225a455389/quickjs.c#L27590-L27596
                 const cache_key: ModuleRequest = .{
-                    .specifier = try String.fromUtf8(agent_.gc_allocator, module_path),
+                    .specifier = try String.fromUtf8(agent_, module_path),
                     .attributes = module_request.attributes,
                 };
                 if (module_cache.get(cache_key)) |module| break :blk module;
@@ -870,7 +870,7 @@ pub fn main() !u8 {
                     if (import_attribute.value.eql(String.fromLiteral("json"))) {
                         const synthetic_module = try parseJSONModule(
                             agent_,
-                            try String.fromUtf8(agent_.gc_allocator, source_text),
+                            try String.fromUtf8(agent_, source_text),
                         );
                         return .{ .synthetic_module = synthetic_module };
                     }

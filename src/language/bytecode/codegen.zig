@@ -291,7 +291,7 @@ fn bindingInitialization(
                             ctx,
                             .{
                                 .value = Value.from(
-                                    try String.fromUtf8(executable.allocator, single_name_binding.binding_identifier),
+                                    try String.fromUtf8Alloc(executable.allocator, single_name_binding.binding_identifier),
                                 ),
                             },
                             environment,
@@ -581,7 +581,7 @@ pub fn codegenPropertyName(
             // LiteralPropertyName : IdentifierName
             .identifier => |identifier| {
                 // 1. Return the StringValue of IdentifierName.
-                const value = Value.from(try String.fromUtf8(executable.allocator, identifier));
+                const value = Value.from(try String.fromUtf8Alloc(executable.allocator, identifier));
                 try executable.addInstructionWithConstant(.store_constant, value);
             },
 
@@ -658,7 +658,7 @@ pub fn codegenPropertyDefinition(
         .identifier_reference => |identifier_reference| {
             // 1. Let propName be the StringValue of IdentifierReference.
             const property_name = Value.from(
-                try String.fromUtf8(executable.allocator, identifier_reference),
+                try String.fromUtf8Alloc(executable.allocator, identifier_reference),
             );
             try executable.addInstructionWithConstant(.load_constant, property_name);
 
@@ -740,11 +740,11 @@ pub fn codegenRegularExpressionLiteral(
     _: *Context,
 ) Executable.Error!void {
     // 1. Let pattern be CodePointsToString(BodyText of RegularExpressionLiteral).
-    const pattern = Value.from(try String.fromUtf8(executable.allocator, node.pattern));
+    const pattern = Value.from(try String.fromUtf8Alloc(executable.allocator, node.pattern));
     try executable.addInstructionWithConstant(.load_constant, pattern);
 
     // 2. Let flags be CodePointsToString(FlagText of RegularExpressionLiteral).
-    const flags = Value.from(try String.fromUtf8(executable.allocator, node.flags));
+    const flags = Value.from(try String.fromUtf8Alloc(executable.allocator, node.flags));
     try executable.addInstructionWithConstant(.load_constant, flags);
 
     // 3. Return ! RegExpCreate(pattern, flags).
@@ -991,7 +991,7 @@ pub fn codegenSuperProperty(
 
             // 3. Let propertyKey be the StringValue of IdentifierName.
             const property_key = Value.from(
-                try String.fromUtf8(executable.allocator, identifier),
+                try String.fromUtf8Alloc(executable.allocator, identifier),
             );
             try executable.addInstructionWithConstant(.load_constant, property_key);
 

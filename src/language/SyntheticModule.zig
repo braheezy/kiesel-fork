@@ -128,7 +128,7 @@ fn setSyntheticModuleExport(
     // 4. Perform envRec.SetMutableBinding(exportName, exportValue, true).
     env.setMutableBinding(
         agent,
-        try String.fromUtf8(agent.gc_allocator, export_name),
+        try String.fromUtf8(agent, export_name),
         export_value,
         true,
     ) catch |err| try noexcept(err);
@@ -200,7 +200,7 @@ pub fn link(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!void 
 
     // 4. For each String exportName of module.[[ExportNames]], do
     for (self.export_names) |export_name| {
-        const name = try String.fromUtf8(agent.gc_allocator, export_name);
+        const name = try String.fromUtf8(agent, export_name);
 
         // a. Perform ! env.CreateMutableBinding(exportName, false).
         env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);

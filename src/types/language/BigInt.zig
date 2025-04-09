@@ -49,7 +49,7 @@ pub fn asFloat(self: *const BigInt, agent: *Agent) std.mem.Allocator.Error!f64 {
     //       works for now.
     return std.fmt.parseFloat(
         f64,
-        (try self.toString(agent.gc_allocator, 10)).slice.ascii,
+        (try self.toString(agent, 10)).slice.ascii,
     ) catch unreachable;
 }
 
@@ -253,14 +253,14 @@ pub fn bitwiseOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allo
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
 pub fn toString(
     self: *const BigInt,
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     radix: u8,
 ) std.mem.Allocator.Error!*const String {
     std.debug.assert(radix >= 2);
     std.debug.assert(radix <= 36);
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
-    return String.fromAscii(allocator, self.managed.toString(allocator, radix, .lower) catch |err| switch (err) {
+    return String.fromAscii(agent, self.managed.toString(agent.gc_allocator, radix, .lower) catch |err| switch (err) {
         error.InvalidBase => unreachable,
         error.OutOfMemory => return error.OutOfMemory,
     });

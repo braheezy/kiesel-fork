@@ -345,7 +345,7 @@ pub fn stringValueImpl(
             else => result.appendCodePointAssumeCapacity(code_point),
         }
     }
-    return result.build(allocator);
+    return result.buildAlloc(allocator);
 }
 
 /// https://tc39.es/ecma262/#prod-StringLiteral
@@ -527,13 +527,13 @@ pub const TemplateLiteral = struct {
         ) std.mem.Allocator.Error!*const String {
             const text = self.templateValueChars();
             if (std.mem.indexOf(u8, text, "\r") == null) {
-                return String.fromUtf8(allocator, text);
+                return String.fromUtf8Alloc(allocator, text);
             }
             const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
             _ = std.mem.replace(u8, cloned, "\r", "\n", cloned);
-            // FIXME: Not knowing whether fromUtf8() will take ownership of the string is awkward
+            // FIXME: Not knowing whether fromUtf8Alloc() will take ownership of the string is awkward
             //        and prevents us from freeing it
-            return String.fromUtf8(allocator, cloned);
+            return String.fromUtf8Alloc(allocator, cloned);
         }
 
         /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
@@ -4243,7 +4243,7 @@ pub const WithClause = struct {
         try attributes.ensureUnusedCapacity(allocator, self.items.len);
         for (self.items) |item| {
             const key = switch (item.key) {
-                .identifier => |identifier| try String.fromUtf8(allocator, identifier),
+                .identifier => |identifier| try String.fromUtf8Alloc(allocator, identifier),
                 .string_literal => |string_literal| try string_literal.stringValue(allocator),
             };
             const value = try item.value.stringValue(allocator);

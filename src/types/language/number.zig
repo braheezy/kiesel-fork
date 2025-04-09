@@ -4,9 +4,11 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
+const Agent = execution.Agent;
 const String = types.String;
 
 const pow_2_32 = std.math.pow(f64, 2, 32);
@@ -594,7 +596,7 @@ pub const Number = union(enum) {
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
     pub fn toString(
         self: Number,
-        allocator: std.mem.Allocator,
+        agent: *Agent,
         radix: u8,
     ) std.mem.Allocator.Error!*const String {
         // 1. If x is NaN, return "NaN".
@@ -605,32 +607,31 @@ pub const Number = union(enum) {
 
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
         if (self.asFloat() < 0) {
-            return String.fromAscii(
-                allocator,
-                try std.fmt.allocPrint(allocator, "-{}", .{
-                    try self.unaryMinus().toString(allocator, radix),
-                }),
-            );
+            return String.fromAscii(agent, try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "-{}",
+                .{try self.unaryMinus().toString(agent, radix)},
+            ));
         }
 
         // 4. If x is +∞𝔽, return "Infinity".
         if (self.isPositiveInf()) return String.fromLiteral("Infinity");
 
         // TODO: Implement steps 5-12 according to spec!
-        return String.fromAscii(allocator, switch (self) {
+        return String.fromAscii(agent, switch (self) {
             .f64 => |x| if (@abs(x) >= 1e-6 and @abs(x) < 1e21)
-                try std.fmt.allocPrint(allocator, "{d}", .{x})
+                try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{x})
             else if (@abs(x) < 1)
-                try std.fmt.allocPrint(allocator, "{e}", .{x})
+                try std.fmt.allocPrint(agent.gc_allocator, "{e}", .{x})
             else blk: {
-                const tmp = try std.fmt.allocPrint(allocator, "{e}", .{x});
-                defer allocator.free(tmp);
-                break :blk try std.mem.replaceOwned(u8, allocator, tmp, "e", "e+");
+                const tmp = try std.fmt.allocPrint(agent.gc_allocator, "{e}", .{x});
+                defer agent.gc_allocator.free(tmp);
+                break :blk try std.mem.replaceOwned(u8, agent.gc_allocator, tmp, "e", "e+");
             },
             .i32 => |x| blk: {
                 var array_list: std.ArrayListUnmanaged(u8) = .empty;
-                try std.fmt.formatInt(x, radix, .lower, .{}, array_list.writer(allocator));
-                break :blk try array_list.toOwnedSlice(allocator);
+                try std.fmt.formatInt(x, radix, .lower, .{}, array_list.writer(agent.gc_allocator));
+                break :blk try array_list.toOwnedSlice(agent.gc_allocator);
             },
         });
     }

@@ -1818,7 +1818,7 @@ pub const prototype = struct {
         }
 
         // 9. Return R.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
@@ -2897,7 +2897,7 @@ pub const prototype = struct {
         }
 
         // 7. Return R.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
@@ -3113,7 +3113,7 @@ pub const prototype = struct {
 
         // 5. Assert: name is a String.
         // 6. Return name.
-        return Value.from(try String.fromAscii(agent.gc_allocator, name));
+        return Value.from(try String.fromAscii(agent, name));
     }
 };
 
@@ -4307,7 +4307,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             std.debug.assert(encoded.len == out_ascii.len);
 
             // 11. Return CodePointsToString(outAscii).
-            return Value.from(try String.fromAscii(agent.gc_allocator, out_ascii));
+            return Value.from(try String.fromAscii(agent, out_ascii));
         }
 
         // 2 Uint8Array.prototype.toHex ( )
@@ -4326,7 +4326,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             //     b. Set hex to StringPad(hex, 2, "0", start).
             //     c. Set out to the string-concatenation of out and hex.
             // 6. Return out.
-            return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+            return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{}",
                 .{std.fmt.fmtSliceHexLower(to_encode)},

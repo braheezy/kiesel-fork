@@ -223,7 +223,7 @@ pub const prototype = struct {
         const resolved_options = list_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             PropertyKey.from("locale"),
-            Value.from(try String.fromAscii(agent.gc_allocator, try list_format.fields.locale.toString(agent.gc_allocator))),
+            Value.from(try String.fromAscii(agent, try list_format.fields.locale.toString(agent.gc_allocator))),
         );
         try options.createDataPropertyDirect(
             PropertyKey.from("type"),
@@ -255,7 +255,7 @@ pub const prototype = struct {
         }
 
         // 4. Return FormatList(lf, stringList).
-        return Value.from(try formatList(agent.gc_allocator, list_format, string_list));
+        return Value.from(try formatList(agent, list_format, string_list));
     }
 };
 
@@ -312,7 +312,7 @@ pub const ListFormat = MakeObject(.{
 /// 14.5.3 FormatList ( listFormat, list )
 /// https://tc39.es/ecma402/#sec-formatlist
 fn formatList(
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     list_format: *const ListFormat,
     list: []const []const u8,
 ) std.mem.Allocator.Error!*const String {
@@ -332,7 +332,7 @@ fn formatList(
         },
     );
     defer list_formatter.deinit();
-    return String.fromUtf8(allocator, try list_formatter.format(allocator, .{ .utf8 = list }));
+    return String.fromUtf8(agent, try list_formatter.format(agent.gc_allocator, .{ .utf8 = list }));
 }
 
 /// 14.5.5 StringListFromIterable ( iterable )

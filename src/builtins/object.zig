@@ -868,10 +868,11 @@ pub const prototype = struct {
 
         // 17. Return the string-concatenation of "[object ", tag, and "]".
         return Value.from(
-            try String.concat(
-                agent.gc_allocator,
-                &.{ String.fromLiteral("[object "), tag, String.fromLiteral("]") },
-            ),
+            try String.concat(agent, &.{
+                String.fromLiteral("[object "),
+                tag,
+                String.fromLiteral("]"),
+            }),
         );
     }
 

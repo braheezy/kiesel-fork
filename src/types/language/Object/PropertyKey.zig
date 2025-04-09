@@ -108,14 +108,11 @@ pub const PropertyKey = union(enum) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
             .integer_index => |integer_index| Value.from(
-                try String.fromAscii(
+                try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    try std.fmt.allocPrint(
-                        agent.gc_allocator,
-                        "{}",
-                        .{integer_index},
-                    ),
-                ),
+                    "{}",
+                    .{integer_index},
+                )),
             ),
         };
     }
@@ -130,10 +127,11 @@ pub const PropertyKey = union(enum) {
             .string => |string| .{ .string = string },
             .symbol => |symbol| .{ .symbol = symbol },
             .integer_index => |integer_index| .{
-                .string = try String.fromAscii(
+                .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    try std.fmt.allocPrint(agent.gc_allocator, "{}", .{integer_index}),
-                ),
+                    "{}",
+                    .{integer_index},
+                )),
             },
         };
     }

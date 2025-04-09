@@ -157,11 +157,11 @@ pub fn createDateTimeFormat(
     const resolved = .{
         .locale = resolved_locale,
         .calendar = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
-            try String.fromAscii(agent.gc_allocator, ca)
+            try String.fromAscii(agent, ca)
         else
             calendar orelse String.fromLiteral("gregory"),
         .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
-            try String.fromAscii(agent.gc_allocator, nu)
+            try String.fromAscii(agent, nu)
         else
             numbering_system orelse String.fromLiteral("latn"),
     };
@@ -227,7 +227,7 @@ pub fn createDateTimeFormat(
     // TODO: Detect invalid time zone
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
-    date_time_format.as(DateTimeFormat).fields.time_zone = try String.fromAscii(agent.gc_allocator, time_zone_string);
+    date_time_format.as(DateTimeFormat).fields.time_zone = try String.fromAscii(agent, time_zone_string);
 
     // TODO: 32. Let formatOptions be a new Record.
     // TODO: 33. Set formatOptions.[[hourCycle]] to hc.
@@ -572,7 +572,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try date_time_format.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
@@ -761,7 +761,7 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
             .{@errorName(err)},
         ),
     };
-    return Value.from(try String.fromUtf8(agent.gc_allocator, result));
+    return Value.from(try String.fromUtf8(agent, result));
 }
 
 const FormatDateTimeError =

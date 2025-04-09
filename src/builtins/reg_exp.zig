@@ -493,7 +493,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
                 // 3. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
                 const property_key = PropertyKey.from(
-                    try String.fromUtf8(agent.gc_allocator, group_name),
+                    try String.fromUtf8(agent, group_name),
                 );
                 try groups.asObject().createDataPropertyDirect(property_key, captured_value);
 
@@ -565,7 +565,7 @@ fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Al
     std.debug.assert(match.end_index <= string.length());
 
     // 2. Return the substring of S from match.[[StartIndex]] to match.[[EndIndex]].
-    return string.substring(agent.gc_allocator, match.start_index, match.end_index);
+    return string.substring(agent, match.start_index, match.end_index);
 }
 
 /// 22.2.7.7 GetMatchIndexPair ( S, match )
@@ -658,10 +658,7 @@ fn makeMatchIndicesIndexPairArray(
 
                 // 3. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
                 const property_key = PropertyKey.from(
-                    try String.fromUtf8(
-                        agent.gc_allocator,
-                        try agent.gc_allocator.dupe(u8, group_name),
-                    ),
+                    try String.fromUtf8(agent, try agent.gc_allocator.dupe(u8, group_name)),
                 );
                 try groups.asObject().createDataPropertyDirect(
                     property_key,
@@ -817,7 +814,7 @@ pub const constructor = struct {
                 try escaped.appendString(
                     agent.gc_allocator,
                     try String.fromAscii(
-                        agent.gc_allocator,
+                        agent,
                         try std.fmt.allocPrint(agent.gc_allocator, "\\x{x}", .{cp.code_point}),
                     ),
                 );
@@ -829,7 +826,7 @@ pub const constructor = struct {
         }
 
         // 5. Return escaped.
-        return Value.from(try escaped.build(agent.gc_allocator));
+        return Value.from(try escaped.build(agent));
     }
 
     /// 22.2.5.1.1 EncodeForRegExpEscape ( cp )
@@ -885,13 +882,11 @@ pub const constructor = struct {
                 // i. Let hex be Number::toString(𝔽(cpNum), 16).
                 // ii. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS),
                 //     "x", and StringPad(hex, 2, "0", start).
-                try escaped.appendString(
-                    allocator,
-                    try String.fromAscii(
-                        allocator,
-                        try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{cp.code_point}),
-                    ),
-                );
+                const str = try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{cp.code_point});
+                // TODO: Support appending an ASCII slice to String.Builder
+                for (str) |c| {
+                    try escaped.appendChar(allocator, c);
+                }
                 return;
             }
 
@@ -900,13 +895,11 @@ pub const constructor = struct {
             // e. For each code unit cu of codeUnits, do
             // i. Set escaped to the string-concatenation of escaped and UnicodeEscape(cu).
             // f. Return escaped.
-            try escaped.appendString(
-                allocator,
-                try String.fromAscii(
-                    allocator,
-                    try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{cp.code_point}),
-                ),
-            );
+            const str = try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{cp.code_point});
+            // TODO: Support appending an ASCII slice to String.Builder
+            for (str) |c| {
+                try escaped.appendChar(allocator, c);
+            }
             return;
         }
 
@@ -1055,7 +1048,7 @@ pub const prototype = struct {
         //     codeUnits has no elements, the empty String is returned.
         return Value.from(
             try String.fromAscii(
-                agent.gc_allocator,
+                agent,
                 try code_units.toOwnedSlice(agent.gc_allocator),
             ),
         );
@@ -1472,11 +1465,7 @@ pub const prototype = struct {
                 //     substring of S from nextSourcePosition to position, and replacementString.
                 try accumulated_result.appendString(
                     agent.gc_allocator,
-                    try string.substring(
-                        agent.gc_allocator,
-                        next_source_position,
-                        position,
-                    ),
+                    try string.substring(agent, next_source_position, position),
                 );
                 try accumulated_result.appendString(agent.gc_allocator, replacement_string);
 
@@ -1491,10 +1480,10 @@ pub const prototype = struct {
         if (next_source_position < string_length) {
             try accumulated_result.appendString(
                 agent.gc_allocator,
-                try string.substring(agent.gc_allocator, next_source_position, null),
+                try string.substring(agent, next_source_position, null),
             );
         }
-        return Value.from(try accumulated_result.build(agent.gc_allocator));
+        return Value.from(try accumulated_result.build(agent));
     }
 
     /// 22.2.6.12 RegExp.prototype [ %Symbol.search% ] ( string )
@@ -1572,13 +1561,13 @@ pub const prototype = struct {
         const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
 
         // 7. Return EscapeRegExpPattern(src, flags).
-        return Value.from(try escapeRegExpPattern(agent.gc_allocator, src, re_flags));
+        return Value.from(try escapeRegExpPattern(agent, src, re_flags));
     }
 
     /// 22.2.6.13.1 EscapeRegExpPattern ( P, F )
     /// https://tc39.es/ecma262/#sec-escaperegexppattern
     fn escapeRegExpPattern(
-        allocator: std.mem.Allocator,
+        agent: *Agent,
         pattern: *const String,
         _: c_int,
     ) std.mem.Allocator.Error!*const String {
@@ -1592,7 +1581,7 @@ pub const prototype = struct {
         //    If P is the empty String, this specification can be met by letting S be "(?:)".
         // 6. Return S.
         if (pattern.isEmpty()) return String.fromLiteral("(?:)");
-        return pattern.replace(allocator, "/", "\\/");
+        return pattern.replace(agent, "/", "\\/");
     }
 
     /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
@@ -1628,7 +1617,7 @@ pub const prototype = struct {
         const new_flags = if (flags_.indexOf(String.fromLiteral("y"), 0) != null)
             flags_
         else
-            try String.concat(agent.gc_allocator, &.{ flags_, String.fromLiteral("y") });
+            try String.concat(agent, &.{ flags_, String.fromLiteral("y") });
 
         // 10. Let splitter be ? Construct(C, « rx, newFlags »).
         const splitter = try constructor_.construct(
@@ -1702,11 +1691,7 @@ pub const prototype = struct {
                 } else {
                     // iv. Else,
                     // 1. Let T be the substring of S from p to q.
-                    const tail = try string.substring(
-                        agent.gc_allocator,
-                        @intCast(p),
-                        @intCast(q),
-                    );
+                    const tail = try string.substring(agent, @intCast(p), @intCast(q));
 
                     // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
                     try array.createDataPropertyDirect(
@@ -1759,7 +1744,7 @@ pub const prototype = struct {
         }
 
         // 20. Let T be the substring of S from p to size.
-        const tail = try string.substring(agent.gc_allocator, @intCast(p), size);
+        const tail = try string.substring(agent, @intCast(p), size);
 
         // 21. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
         try array.createDataPropertyDirect(
@@ -1817,7 +1802,7 @@ pub const prototype = struct {
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
-        const result = try String.concat(agent.gc_allocator, &.{
+        const result = try String.concat(agent, &.{
             String.fromLiteral("/"),
             pattern,
             String.fromLiteral("/"),

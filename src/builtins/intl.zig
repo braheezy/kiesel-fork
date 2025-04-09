@@ -165,10 +165,7 @@ pub const namespace = struct {
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
                 fn mapFn(agent_: *Agent, locale_: icu4zig.Locale) std.mem.Allocator.Error!Value {
                     return Value.from(
-                        try String.fromAscii(
-                            agent_.gc_allocator,
-                            try locale_.toString(agent_.gc_allocator),
-                        ),
+                        try String.fromAscii(agent_, try locale_.toString(agent_.gc_allocator)),
                     );
                 }
             }.mapFn),

@@ -151,7 +151,7 @@ pub const constructor = struct {
         const resolved = .{
             .locale = resolved_locale,
             .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
-                try String.fromAscii(agent.gc_allocator, nu)
+                try String.fromAscii(agent, nu)
             else
                 numbering_system orelse String.fromLiteral("latn"),
         };
@@ -467,7 +467,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try duration_format.fields.locale.toString(agent.gc_allocator),
                 ),
             ),

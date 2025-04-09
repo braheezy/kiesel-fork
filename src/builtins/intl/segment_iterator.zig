@@ -158,7 +158,7 @@ pub fn createSegmentDataObject(
     const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
     // 5. Let segment be the substring of string from startIndex to endIndex.
-    const segment = try string.substring(agent.gc_allocator, start_index, end_index);
+    const segment = try string.substring(agent, start_index, end_index);
 
     // 6. Perform ! CreateDataPropertyOrThrow(result, "segment", segment).
     try result.createDataPropertyDirect(

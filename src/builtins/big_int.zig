@@ -185,7 +185,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-bigint.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const x = try thisBigIntValue(agent, this_value);
-        return Value.from(try x.toString(agent.gc_allocator, 10));
+        return Value.from(try x.toString(agent, 10));
     }
 
     /// 21.2.3.3 BigInt.prototype.toString ( [ radix ] )
@@ -206,7 +206,7 @@ pub const prototype = struct {
         }
 
         // 5. Return BigInt::toString(x, radixMV).
-        return Value.from(try x.toString(agent.gc_allocator, @intFromFloat(radix_mv)));
+        return Value.from(try x.toString(agent, @intFromFloat(radix_mv)));
     }
 
     /// 21.2.3.4 BigInt.prototype.valueOf ( )

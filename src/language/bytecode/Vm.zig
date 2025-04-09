@@ -216,7 +216,7 @@ fn executeBinaryOperatorAdd(self: *Vm, _: Executable) Agent.Error!void {
     // OPTIMIZATION: Fast path for string values
     else if (l_val.isString() and r_val.isString()) {
         self.result = Value.from(
-            try String.concat(self.agent.gc_allocator, &.{ l_val.asString(), r_val.asString() }),
+            try String.concat(self.agent, &.{ l_val.asString(), r_val.asString() }),
         );
         return;
     }
@@ -429,7 +429,7 @@ fn executeClassDefinitionEvaluation(
     // ClassExpression : class BindingIdentifier ClassTail
     if (class_expression.identifier) |identifier| {
         // 1. Let className be the StringValue of BindingIdentifier.
-        const class_name = try String.fromUtf8(self.agent.gc_allocator, identifier);
+        const class_name = try String.fromUtf8(self.agent, identifier);
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
         const value = try classDefinitionEvaluation(
@@ -493,7 +493,7 @@ fn executeCreateCatchBindings(
 
     // 3. For each element argName of the BoundNames of CatchParameter, do
     for (bound_names.items) |arg_name_utf8| {
-        const arg_name = try String.fromUtf8(self.agent.gc_allocator, arg_name_utf8);
+        const arg_name = try String.fromUtf8(self.agent, arg_name_utf8);
 
         // a. Perform ! catchEnv.CreateMutableBinding(argName, false).
         catch_env.createMutableBinding(self.agent, arg_name, false) catch |err| try noexcept(err);
@@ -920,7 +920,7 @@ fn executeForDeclarationBindingInstantiation(
 
     // 1. For each element name of the BoundNames of ForBinding, do
     for (bound_names.items) |name_utf8| {
-        const name = try String.fromUtf8(self.agent.gc_allocator, name_utf8);
+        const name = try String.fromUtf8(self.agent, name_utf8);
 
         // a. If IsConstantDeclaration of LetOrConst is true, then
         if (lexical_declaration.isConstantDeclaration()) {

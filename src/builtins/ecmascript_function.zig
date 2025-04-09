@@ -129,59 +129,59 @@ pub const ECMAScriptFunction = MakeObject(.{
 
         pub fn ensureCachedAstValues(
             self: *@This(),
-            allocator: std.mem.Allocator,
+            agent: *Agent,
         ) std.mem.Allocator.Error!*const CachedAstValues {
             if (self.cached_ast_values) |*cached_ast_values| return cached_ast_values;
 
             var parameter_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-            defer parameter_names_utf8.deinit(allocator);
-            try self.formal_parameters.collectBoundNames(allocator, &parameter_names_utf8);
+            defer parameter_names_utf8.deinit(agent.gc_allocator);
+            try self.formal_parameters.collectBoundNames(agent.gc_allocator, &parameter_names_utf8);
             var parameter_names: std.ArrayListUnmanaged(*const String) = .empty;
-            try parameter_names.ensureTotalCapacity(allocator, parameter_names_utf8.items.len);
+            try parameter_names.ensureTotalCapacity(agent.gc_allocator, parameter_names_utf8.items.len);
             for (parameter_names_utf8.items) |name_utf8| {
-                const name = try String.fromUtf8(allocator, name_utf8);
+                const name = try String.fromUtf8(agent, name_utf8);
                 parameter_names.appendAssumeCapacity(name);
             }
 
             var var_declared_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-            defer var_declared_names_utf8.deinit(allocator);
-            try self.ecmascript_code.collectVarDeclaredNames(allocator, &var_declared_names_utf8);
+            defer var_declared_names_utf8.deinit(agent.gc_allocator);
+            try self.ecmascript_code.collectVarDeclaredNames(agent.gc_allocator, &var_declared_names_utf8);
             var var_declared_names: std.ArrayListUnmanaged(*const String) = .empty;
-            try var_declared_names.ensureTotalCapacity(allocator, var_declared_names_utf8.items.len);
+            try var_declared_names.ensureTotalCapacity(agent.gc_allocator, var_declared_names_utf8.items.len);
             for (var_declared_names_utf8.items) |name_utf8| {
-                const name = try String.fromUtf8(allocator, name_utf8);
+                const name = try String.fromUtf8(agent, name_utf8);
                 var_declared_names.appendAssumeCapacity(name);
             }
 
             var lexically_declared_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-            try self.ecmascript_code.collectLexicallyDeclaredNames(allocator, &lexically_declared_names);
+            try self.ecmascript_code.collectLexicallyDeclaredNames(agent.gc_allocator, &lexically_declared_names);
 
             var var_scoped_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
-            try self.ecmascript_code.collectVarScopedDeclarations(allocator, &var_scoped_declarations);
+            try self.ecmascript_code.collectVarScopedDeclarations(agent.gc_allocator, &var_scoped_declarations);
 
             var lexically_scoped_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
-            try self.ecmascript_code.collectLexicallyScopedDeclarations(allocator, &lexically_scoped_declarations);
+            try self.ecmascript_code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexically_scoped_declarations);
 
             var lexically_scoped_declarations_bound_names: std.ArrayListUnmanaged([]const *const String) = .empty;
             for (lexically_scoped_declarations.items) |declaration| {
                 var bound_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
-                defer bound_names_utf8.deinit(allocator);
-                try declaration.collectBoundNames(allocator, &bound_names_utf8);
+                defer bound_names_utf8.deinit(agent.gc_allocator);
+                try declaration.collectBoundNames(agent.gc_allocator, &bound_names_utf8);
                 var bound_names: std.ArrayListUnmanaged(*const String) = .empty;
-                try bound_names.ensureTotalCapacity(allocator, bound_names_utf8.items.len);
+                try bound_names.ensureTotalCapacity(agent.gc_allocator, bound_names_utf8.items.len);
                 for (bound_names_utf8.items) |name_utf8| {
-                    const name = try String.fromUtf8(allocator, name_utf8);
+                    const name = try String.fromUtf8(agent, name_utf8);
                     bound_names.appendAssumeCapacity(name);
                 }
-                try lexically_scoped_declarations_bound_names.append(allocator, try bound_names.toOwnedSlice(allocator));
+                try lexically_scoped_declarations_bound_names.append(agent.gc_allocator, try bound_names.toOwnedSlice(agent.gc_allocator));
             }
 
             var parameter_names_has_duplicates = false;
             var parameter_names_contains_arguments = false;
             var unique_names: String.HashMapUnmanaged(void) = .empty;
-            defer unique_names.deinit(allocator);
+            defer unique_names.deinit(agent.gc_allocator);
             if (parameter_names.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
-            try unique_names.ensureTotalCapacity(allocator, @intCast(parameter_names.items.len));
+            try unique_names.ensureTotalCapacity(agent.gc_allocator, @intCast(parameter_names.items.len));
             for (parameter_names.items) |parameter_name| {
                 if (parameter_name.eql(String.fromLiteral("arguments"))) {
                     parameter_names_contains_arguments = true;
@@ -197,11 +197,11 @@ pub const ECMAScriptFunction = MakeObject(.{
             const lexical_names_contains_arguments = containsSlice(lexically_declared_names.items, "arguments");
 
             self.cached_ast_values = .{
-                .parameter_names = try parameter_names.toOwnedSlice(allocator),
-                .var_declared_names = try var_declared_names.toOwnedSlice(allocator),
-                .var_scoped_declarations = try var_scoped_declarations.toOwnedSlice(allocator),
-                .lexically_scoped_declarations = try lexically_scoped_declarations.toOwnedSlice(allocator),
-                .lexically_scoped_declarations_bound_names = try lexically_scoped_declarations_bound_names.toOwnedSlice(allocator),
+                .parameter_names = try parameter_names.toOwnedSlice(agent.gc_allocator),
+                .var_declared_names = try var_declared_names.toOwnedSlice(agent.gc_allocator),
+                .var_scoped_declarations = try var_scoped_declarations.toOwnedSlice(agent.gc_allocator),
+                .lexically_scoped_declarations = try lexically_scoped_declarations.toOwnedSlice(agent.gc_allocator),
+                .lexically_scoped_declarations_bound_names = try lexically_scoped_declarations_bound_names.toOwnedSlice(agent.gc_allocator),
                 .parameter_names_has_duplicates = parameter_names_has_duplicates,
                 .parameter_names_contains_arguments = parameter_names_contains_arguments,
                 .lexical_names_contains_arguments = lexical_names_contains_arguments,
@@ -1091,10 +1091,11 @@ pub fn setFunctionName(
                 };
 
                 // c. Else, set name to the string-concatenation of "[", description, and "]".
-                break :blk try String.concat(
-                    agent.gc_allocator,
-                    &.{ String.fromLiteral("["), description, String.fromLiteral("]") },
-                );
+                break :blk try String.concat(agent, &.{
+                    String.fromLiteral("["),
+                    description,
+                    String.fromLiteral("]"),
+                });
             },
         },
         // 3. Else if name is a Private Name, then
@@ -1114,14 +1115,11 @@ pub fn setFunctionName(
     if (prefix != null) {
         // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
         //    name.
-        name = try String.concat(
-            agent.gc_allocator,
-            &.{
-                try String.fromAscii(agent.gc_allocator, prefix.?),
-                String.fromLiteral(" "),
-                name,
-            },
-        );
+        name = try String.concat(agent, &.{
+            try String.fromAscii(agent, prefix.?),
+            String.fromLiteral(" "),
+            name,
+        });
 
         // b. If F has an [[InitialName]] internal slot, then
         if (function.is(BuiltinFunction)) {
@@ -1190,7 +1188,7 @@ fn functionDeclarationInstantiation(
 
     // OPTIMIZATION: Instead of doing this every time the function is called, we collect all of
     //               them once and then cache them.
-    const cached_ast_values = try function.fields.ensureCachedAstValues(agent.gc_allocator);
+    const cached_ast_values = try function.fields.ensureCachedAstValues(agent);
 
     // 5. Let parameterNames be the BoundNames of formals.
     const parameter_names = cached_ast_values.parameter_names;
@@ -1233,7 +1231,7 @@ fn functionDeclarationInstantiation(
 
             // ii. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
             };
 
             // iii. If functionNames does not contain fn, then
@@ -1546,7 +1544,7 @@ fn functionDeclarationInstantiation(
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
         };
 
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.

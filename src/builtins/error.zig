@@ -198,10 +198,7 @@ pub const prototype = struct {
         // 9. Return the string-concatenation of name, the code unit 0x003A (COLON), the code unit
         //    0x0020 (SPACE), and msg.
         return Value.from(
-            try String.concat(
-                agent.gc_allocator,
-                &.{ name_string, String.fromLiteral(": "), msg_string },
-            ),
+            try String.concat(agent, &.{ name_string, String.fromLiteral(": "), msg_string }),
         );
     }
 };

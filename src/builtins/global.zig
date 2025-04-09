@@ -367,10 +367,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let trimmedString be ! TrimString(inputString, start).
-    var trimmed_string = try (try input_string.trim(
-        agent.gc_allocator,
-        .start,
-    )).toUtf8(agent.gc_allocator);
+    var trimmed_string = try (try input_string.trim(agent, .start)).toUtf8(agent.gc_allocator);
 
     // 3. Let trimmed be StringToCodePoints(trimmedString).
     // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
@@ -405,10 +402,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let S be ! TrimString(inputString, start).
-    var string = try (try input_string.trim(
-        agent.gc_allocator,
-        .start,
-    )).toUtf8(agent.gc_allocator);
+    var string = try (try input_string.trim(agent, .start)).toUtf8(agent.gc_allocator);
 
     // 3. Let sign be 1.
     var sign: f64 = 1;
@@ -564,7 +558,7 @@ fn encode(
                 return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
             }
         }.isValidChar);
-        return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice(agent.gc_allocator));
+        return String.fromAscii(agent, try buffer.toOwnedSlice(agent.gc_allocator));
     }
 
     // 1. Let len be the length of string.
@@ -616,17 +610,18 @@ fn encode(
                 // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0", start).
                 try result.appendString(
                     agent.gc_allocator,
-                    try String.fromAscii(
+                    try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        try std.fmt.allocPrint(agent.gc_allocator, "%{X:0>2}", .{byte}),
-                    ),
+                        "%{X:0>2}",
+                        .{byte},
+                    )),
                 );
             }
         }
     }
 
     // 7. Return R.
-    return result.build(agent.gc_allocator);
+    return result.build(agent);
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
@@ -684,7 +679,7 @@ fn decode(
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
                 //    asciiChar.
                 s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
-                    .{ .string = try String.fromUtf16(agent.gc_allocator, escape_) }
+                    .{ .string = try String.fromUtf16(agent, escape_) }
                 else
                     .{ .code_unit = byte };
             } else {
@@ -748,7 +743,7 @@ fn decode(
     }
 
     // 5. Return R.
-    return result.build(agent.gc_allocator);
+    return result.build(agent);
 }
 
 /// 19.2.6.7 ParseHexOctet ( string, position )
@@ -811,14 +806,11 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 //    hexadecimal number.
                 // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
                 break :blk .{
-                    .string = try String.fromAscii(
+                    .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        try std.fmt.allocPrint(
-                            agent.gc_allocator,
-                            "%{}",
-                            .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
-                        ),
-                    ),
+                        "%{}",
+                        .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
+                    )),
                 };
             } else {
                 // iii. Else,
@@ -828,14 +820,11 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 var bytes = std.mem.toBytes(c);
                 std.mem.reverse(u8, &bytes);
                 break :blk .{
-                    .string = try String.fromAscii(
+                    .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        try std.fmt.allocPrint(
-                            agent.gc_allocator,
-                            "%u{}",
-                            .{std.fmt.fmtSliceHexUpper(&bytes)},
-                        ),
-                    ),
+                        "%u{}",
+                        .{std.fmt.fmtSliceHexUpper(&bytes)},
+                    )),
                 };
             }
         };
@@ -847,7 +836,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     }
 
     // 7. Return R.
-    return Value.from(try result.build(agent.gc_allocator));
+    return Value.from(try result.build(agent));
 }
 
 /// B.2.1.2 unescape ( string )
@@ -926,5 +915,5 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     }
 
     // 6. Return R.
-    return Value.from(try result.build(agent.gc_allocator));
+    return Value.from(try result.build(agent));
 }

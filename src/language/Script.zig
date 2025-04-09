@@ -153,7 +153,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
     // 3. For each element name of lexNames, do
     for (lexical_names.items) |name_utf8| {
-        const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+        const name = try String.fromUtf8(agent, name_utf8);
 
         // a. If HasVarDeclaration(env, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
@@ -183,7 +183,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
     // 4. For each element name of varNames, do
     for (var_names.items) |name_utf8| {
-        const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+        const name = try String.fromUtf8(agent, name_utf8);
 
         // a. If HasLexicalDeclaration(env, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
@@ -222,7 +222,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
             // iii. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
             };
 
             // iv. If declaredFunctionNames does not contain fn, then
@@ -265,7 +265,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
             // i. For each String vn of the BoundNames of d, do
             for (bound_names.items) |var_name_utf8| {
-                const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+                const var_name = try String.fromUtf8(agent, var_name_utf8);
 
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
@@ -314,7 +314,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
         // b. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
-            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+            const name = try String.fromUtf8(agent, name_utf8);
 
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
@@ -332,7 +332,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
         };
 
         // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.

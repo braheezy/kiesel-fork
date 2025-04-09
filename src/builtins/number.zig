@@ -306,7 +306,7 @@ pub const prototype = struct {
 
         // 4. If x is not finite, return Number::toString(x, 10).
         if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent.gc_allocator, 10));
+            return Value.from(try x_number.toString(agent, 10));
         }
 
         // 5. If f < 0 or f > 100, throw a RangeError exception.
@@ -356,7 +356,7 @@ pub const prototype = struct {
                 .{ formatted[0..index], formatted[index + 1 ..] },
             );
         }
-        return Value.from(try String.fromAscii(agent.gc_allocator, formatted));
+        return Value.from(try String.fromAscii(agent, formatted));
     }
 
     /// 21.1.3.3 Number.prototype.toFixed ( fractionDigits )
@@ -384,7 +384,7 @@ pub const prototype = struct {
 
         // 6. If x is not finite, return Number::toString(x, 10).
         if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent.gc_allocator, 10));
+            return Value.from(try x_number.toString(agent, 10));
         }
 
         // 7. Set x to ℝ(x).
@@ -425,14 +425,11 @@ pub const prototype = struct {
         //         v. Set m to the string-concatenation of a, ".", and b.
         // 12. Return the string-concatenation of s and m.
         return Value.from(
-            try String.fromAscii(
+            try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{s}{d:.[2]}",
-                    .{ sign, x, fraction_digits },
-                ),
-            ),
+                "{s}{d:.[2]}",
+                .{ sign, x, fraction_digits },
+            )),
         );
     }
 
@@ -440,7 +437,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-number.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const x = try thisNumberValue(agent, this_value);
-        return Value.from(try x.toString(agent.gc_allocator, 10));
+        return Value.from(try x.toString(agent, 10));
     }
 
     /// 21.1.3.5 Number.prototype.toPrecision ( precision )
@@ -461,7 +458,7 @@ pub const prototype = struct {
 
         // 4. If x is not finite, return Number::toString(x, 10).
         if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent.gc_allocator, 10));
+            return Value.from(try x_number.toString(agent, 10));
         }
 
         // 5. If p < 1 or p > 100, throw a RangeError exception.
@@ -561,14 +558,11 @@ pub const prototype = struct {
                 // vi. Return the string-concatenation of s, m, the code unit 0x0065 (LATIN SMALL
                 //     LETTER E), c, and d.
                 return Value.from(
-                    try String.fromAscii(
+                    try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        try std.fmt.allocPrint(
-                            agent.gc_allocator,
-                            "{s}{s}e{c}{d}",
-                            .{ sign, number_string, exponent_sign, exponent },
-                        ),
-                    ),
+                        "{s}{s}e{c}{d}",
+                        .{ sign, number_string, exponent_sign, exponent },
+                    )),
                 );
             }
         }
@@ -576,10 +570,11 @@ pub const prototype = struct {
         // 11. If e = p - 1, return the string-concatenation of s and m.
         if (exponent == precision - 1) {
             return Value.from(
-                try String.fromAscii(
+                try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
-                ),
+                    "{s}{s}",
+                    .{ sign, number_string },
+                )),
             );
         }
 
@@ -606,10 +601,11 @@ pub const prototype = struct {
 
         // 14. Return the string-concatenation of s and m.
         return Value.from(
-            try String.fromAscii(
+            try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
-            ),
+                "{s}{s}",
+                .{ sign, number_string },
+            )),
         );
     }
 
@@ -631,7 +627,7 @@ pub const prototype = struct {
         }
 
         // 5. Return Number::toString(x, radixMV).
-        return Value.from(try x.toString(agent.gc_allocator, @intFromFloat(radix_mv)));
+        return Value.from(try x.toString(agent, @intFromFloat(radix_mv)));
     }
 
     /// 21.1.3.7 Number.prototype.valueOf ( )

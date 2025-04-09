@@ -500,7 +500,7 @@ pub fn applyStringOrNumericBinaryOperator(
             const r_str = try r_prim.toString(agent);
 
             // iii. Return the string-concatenation of lStr and rStr.
-            return Value.from(try String.concat(agent.gc_allocator, &.{ l_str, r_str }));
+            return Value.from(try String.concat(agent, &.{ l_str, r_str }));
         }
 
         // d. Set lVal to lPrim.
@@ -611,7 +611,7 @@ pub fn blockDeclarationInstantiation(
 
         // a. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
-            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+            const name = try String.fromUtf8(agent, name_utf8);
 
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
@@ -631,7 +631,7 @@ pub fn blockDeclarationInstantiation(
 
             // i. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
             };
 
             // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
@@ -688,7 +688,7 @@ pub fn instantiateOrdinaryFunctionObject(
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(
             function,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            PropertyKey.from(try String.fromUtf8(agent, name)),
             null,
         );
 
@@ -744,7 +744,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -790,7 +790,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     else {
         // 1. If name is not present, set name to "".
         const name: *const String = if (default_name) |name|
-            try String.fromUtf8(agent.gc_allocator, name)
+            try String.fromUtf8(agent, name)
         else
             .empty;
 
@@ -838,7 +838,7 @@ pub fn instantiateArrowFunctionExpression(
 
     // 1. If name is not present, set name to "".
     const name: *const String = if (default_name) |name|
-        try String.fromUtf8(agent.gc_allocator, name)
+        try String.fromUtf8(agent, name)
     else
         .empty;
 
@@ -1270,7 +1270,7 @@ pub fn instantiateGeneratorFunctionObject(
     // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
     if (generator_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by GeneratorDeclaration.
         const source_text = generator_declaration.source_text;
@@ -1369,7 +1369,7 @@ pub fn instantiateGeneratorFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -1428,7 +1428,7 @@ pub fn instantiateGeneratorFunctionExpression(
     else {
         // 1. If name is not present, set name to "".
         const name: *const String = if (default_name) |name|
-            try String.fromUtf8(agent.gc_allocator, name)
+            try String.fromUtf8(agent, name)
         else
             .empty;
 
@@ -1491,7 +1491,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
     if (async_generator_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
         const source_text = async_generator_declaration.source_text;
@@ -1589,7 +1589,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -1648,7 +1648,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     else {
         // 1. If name is not present, set name to "".
         const name: *const String = if (default_name) |name|
-            try String.fromUtf8(agent.gc_allocator, name)
+            try String.fromUtf8(agent, name)
         else
             .empty;
 
@@ -1956,7 +1956,7 @@ pub fn classDefinitionEvaluation(
                 // 1. Assert: This is only possible for getter/setter pairs.
             } else {
                 // ii. Else,
-                const description = try String.fromUtf8(agent.gc_allocator, declared_name);
+                const description = try String.fromUtf8(agent, declared_name);
                 const symbol = try Symbol.init(agent.gc_allocator, description);
                 symbol.is_private = true;
 
@@ -2392,7 +2392,7 @@ pub fn bindingClassDeclarationEvaluation(
     // ClassDeclaration : class BindingIdentifier ClassTail
     if (class_declaration.identifier) |identifier| {
         // 1. Let className be the StringValue of BindingIdentifier.
-        const class_name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const class_name = try String.fromUtf8(agent, identifier);
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
         const value = try classDefinitionEvaluation(
@@ -2456,7 +2456,7 @@ pub fn instantiateAsyncFunctionObject(
     // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
     if (async_function_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncFunctionDeclaration.
         const source_text = async_function_declaration.source_text;
@@ -2521,7 +2521,7 @@ pub fn instantiateAsyncFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = try String.fromUtf8(agent.gc_allocator, identifier);
+        const name = try String.fromUtf8(agent, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -2564,7 +2564,7 @@ pub fn instantiateAsyncFunctionExpression(
     else {
         // 1. If name is not present, set name to "".
         const name: *const String = if (default_name) |name|
-            try String.fromUtf8(agent.gc_allocator, name)
+            try String.fromUtf8(agent, name)
         else
             .empty;
 
@@ -2609,7 +2609,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
 
     // 1. If name is not present, set name to "".
     const name: *const String = if (default_name) |name|
-        try String.fromUtf8(agent.gc_allocator, name)
+        try String.fromUtf8(agent, name)
     else
         .empty;
 

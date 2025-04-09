@@ -2040,7 +2040,7 @@ pub const prototype = struct {
         }
 
         // 8. Return R.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 23.1.3.19 Array.prototype.keys ( )
@@ -3010,7 +3010,7 @@ pub const prototype = struct {
         }
 
         // 7. Return R.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 23.1.3.33 Array.prototype.toReversed ( )

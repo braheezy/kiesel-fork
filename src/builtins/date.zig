@@ -854,7 +854,7 @@ pub const constructor = struct {
             const now_: f64 = @floatFromInt(agent.platform.currentTime());
 
             // b. Return ToDateString(now).
-            return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+            return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{}",
                 .{fmtToDateString(now_)},
@@ -2107,7 +2107,7 @@ pub const prototype = struct {
         const t = localTime(time_value);
 
         // 6. Return DateString(t).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{}",
             .{fmtDateString(t)},
@@ -2144,7 +2144,7 @@ pub const prototype = struct {
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
             .{
@@ -2219,7 +2219,7 @@ pub const prototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{}",
             .{fmtToDateString(time_value)},
@@ -2243,7 +2243,7 @@ pub const prototype = struct {
         const t = localTime(time_value);
 
         // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{}{}",
             .{
@@ -2289,7 +2289,7 @@ pub const prototype = struct {
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
         //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
-        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}, {:0>2} {s} {s}{s} {s}",
             .{

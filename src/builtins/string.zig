@@ -67,17 +67,17 @@ pub fn stringPad(
             @memcpy(dest, fill_string_code_units[0..dest.len]);
         }
 
-        break :blk try types.String.fromUtf16(agent.gc_allocator, repeated_code_units);
+        break :blk try types.String.fromUtf16(agent, repeated_code_units);
     };
 
     switch (placement) {
         // 6. If placement is start, return the string-concatenation of truncatedStringFiller and S.
-        .start => return types.String.concat(agent.gc_allocator, &.{
+        .start => return types.String.concat(agent, &.{
             truncated_string_filler,
             string,
         }),
         // 7. Else, return the string-concatenation of S and truncatedStringFiller.
-        .end => return types.String.concat(agent.gc_allocator, &.{
+        .end => return types.String.concat(agent, &.{
             string,
             truncated_string_filler,
         }),
@@ -127,7 +127,7 @@ pub fn getSubstitution(
             const ref = types.String.fromLiteral("$`");
 
             // ii. Let refReplacement be the substring of str from 0 to position.
-            const ref_replacement = try str.substring(agent.gc_allocator, 0, position);
+            const ref_replacement = try str.substring(agent, 0, position);
 
             break :blk .{ ref, ref_replacement };
         } else if (template_reminder.startsWith(types.String.fromLiteral("$&"))) blk: {
@@ -155,7 +155,7 @@ pub fn getSubstitution(
             //    by a call to the intrinsic %Symbol.replace% method of %RegExp.prototype% on an
             //    object whose "exec" property is not the intrinsic %RegExp.prototype.exec%.
             const ref_replacement = try str.substring(
-                agent.gc_allocator,
+                agent,
                 @min(tail_pos, string_length),
                 null,
             );
@@ -174,7 +174,7 @@ pub fn getSubstitution(
 
             // ii. Let digits be the substring of templateRemainder from 1 to 1 + digitCount.
             var digits = (try template_reminder.substring(
-                agent.gc_allocator,
+                agent,
                 1,
                 1 + digit_count,
             )).slice.ascii;
@@ -205,7 +205,7 @@ pub fn getSubstitution(
             }
 
             // vii. Let ref be the substring of templateRemainder from 0 to 1 + digitCount.
-            const ref = try template_reminder.substring(agent.gc_allocator, 0, 1 + digit_count);
+            const ref = try template_reminder.substring(agent, 0, 1 + digit_count);
 
             // viii. If 1 ≤ index ≤ captureLen, then
             const ref_replacement: *const types.String = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
@@ -245,14 +245,10 @@ pub fn getSubstitution(
             } else {
                 // iii. Else,
                 // 1. Let ref be the substring of templateRemainder from 0 to gtPos + 1.
-                const ref = try template_reminder.substring(agent.gc_allocator, 0, gt_pos.? + 1);
+                const ref = try template_reminder.substring(agent, 0, gt_pos.? + 1);
 
                 // 2. Let groupName be the substring of templateRemainder from 2 to gtPos.
-                const group_name = try template_reminder.substring(
-                    agent.gc_allocator,
-                    2,
-                    gt_pos.?,
-                );
+                const group_name = try template_reminder.substring(agent, 2, gt_pos.?);
 
                 // 3. Assert: namedCaptures is an Object.
                 std.debug.assert(named_captures != null);
@@ -274,7 +270,7 @@ pub fn getSubstitution(
         } else blk: {
             // h. Else,
             // i. Let ref be the substring of templateRemainder from 0 to 1.
-            const ref = try template_reminder.substring(agent.gc_allocator, 0, 1);
+            const ref = try template_reminder.substring(agent, 0, 1);
 
             // ii. Let refReplacement be ref.
             const ref_replacement = ref;
@@ -286,18 +282,14 @@ pub fn getSubstitution(
         const ref_length = ref.length();
 
         // j. Set templateRemainder to the substring of templateRemainder from refLength.
-        template_reminder = try template_reminder.substring(
-            agent.gc_allocator,
-            ref_length,
-            null,
-        );
+        template_reminder = try template_reminder.substring(agent, ref_length, null);
 
         // k. Set result to the string-concatenation of result and refReplacement.
         try result.appendString(agent.gc_allocator, ref_replacement);
     }
 
     // 6. Return result.
-    return result.build(agent.gc_allocator);
+    return result.build(agent);
 }
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
@@ -499,7 +491,7 @@ fn stringGetOwnProperty(
     if (index >= len) return null;
 
     // 9. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
-    const result_str = try str.substring(agent.gc_allocator, index, index + 1);
+    const result_str = try str.substring(agent, index, index + 1);
 
     // 10. Return the PropertyDescriptor {
     //       [[Value]]: resultStr, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
@@ -586,7 +578,7 @@ pub const constructor = struct {
         }
 
         // 3. Return result.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
@@ -626,7 +618,7 @@ pub const constructor = struct {
 
         // 3. Assert: If codePoints is empty, then result is the empty String.
         // 4. Return result.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 22.1.2.4 String.raw ( template, ...substitutions )
@@ -669,7 +661,7 @@ pub const constructor = struct {
             try result.appendString(agent.gc_allocator, next_literal);
 
             // d. If nextIndex + 1 = literalCount, return R.
-            if (next_index + 1 == literal_count) return Value.from(try result.build(agent.gc_allocator));
+            if (next_index + 1 == literal_count) return Value.from(try result.build(agent));
 
             // e. If nextIndex < substitutionCount, then
             if (next_index < substitution_count) {
@@ -822,7 +814,7 @@ pub const prototype = struct {
         const k: usize = @intFromFloat(k_f64);
 
         // 8. Return the substring of S from k to k + 1.
-        return Value.from(try string.substring(agent.gc_allocator, k, k + 1));
+        return Value.from(try string.substring(agent, k, k + 1));
     }
 
     /// 22.1.3.2 String.prototype.charAt ( pos )
@@ -847,7 +839,7 @@ pub const prototype = struct {
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Return the substring of S from position to position + 1.
-        return Value.from(try string.substring(agent.gc_allocator, position, position + 1));
+        return Value.from(try string.substring(agent, position, position + 1));
     }
 
     /// 22.1.3.3 String.prototype.charCodeAt ( pos )
@@ -929,7 +921,7 @@ pub const prototype = struct {
         }
 
         // 5. Return R.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 22.1.3.7 String.prototype.endsWith ( searchString [ , endPosition ] )
@@ -982,7 +974,7 @@ pub const prototype = struct {
         const start = std.math.sub(usize, end, search_length) catch return Value.from(false);
 
         // 13. Let substring be the substring of S from start to end.
-        const substring_ = try string.substring(agent.gc_allocator, start, end);
+        const substring_ = try string.substring(agent, start, end);
 
         // 14. If substring is searchStr, return true.
         if (substring_.eql(search_str)) return Value.from(true);
@@ -1358,7 +1350,7 @@ pub const prototype = struct {
 
         // 6. Return the String value that is made from n copies of S appended together.
         const n_usize = std.math.lossyCast(usize, n);
-        return Value.from(try string.repeat(agent.gc_allocator, n_usize));
+        return Value.from(try string.repeat(agent, n_usize));
     }
 
     /// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
@@ -1414,14 +1406,10 @@ pub const prototype = struct {
         };
 
         // 10. Let preceding be the substring of string from 0 to position.
-        const preceding = try string.substring(agent.gc_allocator, 0, position);
+        const preceding = try string.substring(agent, 0, position);
 
         // 11. Let following be the substring of string from position + searchLength.
-        const following = try string.substring(
-            agent.gc_allocator,
-            position + search_length,
-            null,
-        );
+        const following = try string.substring(agent, position + search_length, null);
 
         // 12. If functionalReplace is true, then
         const replacement = if (functional_replace) blk: {
@@ -1457,7 +1445,7 @@ pub const prototype = struct {
 
         // 14. Return the string-concatenation of preceding, replacement, and following.
         return Value.from(
-            try types.String.concat(agent.gc_allocator, &.{ preceding, replacement, following }),
+            try types.String.concat(agent, &.{ preceding, replacement, following }),
         );
     }
 
@@ -1556,7 +1544,7 @@ pub const prototype = struct {
         // 14. For each element p of matchPositions, do
         for (match_positions.items) |position| {
             // a. Let preserved be the substring of string from endOfLastMatch to p.
-            const preserved = try string.substring(agent.gc_allocator, end_of_last_match, position);
+            const preserved = try string.substring(agent, end_of_last_match, position);
 
             // b. If functionalReplace is true, then
             const replacement = if (functional_replace) blk: {
@@ -1591,7 +1579,7 @@ pub const prototype = struct {
             };
 
             // d. Set result to the string-concatenation of result, preserved, and replacement.
-            result = try types.String.concat(agent.gc_allocator, &.{ result, preserved, replacement });
+            result = try types.String.concat(agent, &.{ result, preserved, replacement });
 
             // e. Set endOfLastMatch to p + searchLength.
             end_of_last_match = position + search_length;
@@ -1601,17 +1589,10 @@ pub const prototype = struct {
         if (end_of_last_match < string.length()) {
             // a. Set result to the string-concatenation of result and the substring of string from
             //    endOfLastMatch.
-            result = try types.String.concat(
-                agent.gc_allocator,
-                &.{
-                    result,
-                    try string.substring(
-                        agent.gc_allocator,
-                        end_of_last_match,
-                        null,
-                    ),
-                },
-            );
+            result = try types.String.concat(agent, &.{
+                result,
+                try string.substring(agent, end_of_last_match, null),
+            });
         }
 
         // 16. Return result.
@@ -1710,7 +1691,7 @@ pub const prototype = struct {
         // 13. Return the substring of S from from to to.
         return Value.from(
             try string.substring(
-                agent.gc_allocator,
+                agent,
                 std.math.lossyCast(usize, from),
                 std.math.lossyCast(usize, to),
             ),
@@ -1781,7 +1762,7 @@ pub const prototype = struct {
             const out_len = std.math.clamp(limit, 0, str_len);
 
             // c. Let head be the substring of S from 0 to outLen.
-            const head = try string.substring(agent.gc_allocator, 0, out_len);
+            const head = try string.substring(agent, 0, out_len);
 
             // d. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
             const code_units = try head.toUtf16(agent.gc_allocator);
@@ -1793,11 +1774,11 @@ pub const prototype = struct {
                         const code_unit_string = if (code_unit > 0x7F) blk: {
                             var utf16 = try agent_.gc_allocator.alloc(u16, 1);
                             utf16[0] = code_unit;
-                            break :blk try types.String.fromUtf16(agent_.gc_allocator, utf16);
+                            break :blk try types.String.fromUtf16(agent_, utf16);
                         } else blk: {
                             var ascii = try agent_.gc_allocator.alloc(u8, 1);
                             ascii[0] = @intCast(code_unit);
-                            break :blk try types.String.fromAscii(agent_.gc_allocator, ascii);
+                            break :blk try types.String.fromAscii(agent_, ascii);
                         };
                         return Value.from(code_unit_string);
                     }
@@ -1823,7 +1804,7 @@ pub const prototype = struct {
         // 14. Repeat, while j is not not-found,
         while (j != null) {
             // a. Let T be the substring of S from i to j.
-            const tail = try string.substring(agent.gc_allocator, i, j.?);
+            const tail = try string.substring(agent, i, j.?);
 
             // b. Append T to substrings.
             try substrings.append(agent.gc_allocator, tail);
@@ -1847,7 +1828,7 @@ pub const prototype = struct {
         }
 
         // 15. Let T be the substring of S from i.
-        const tail = try string.substring(agent.gc_allocator, i, null);
+        const tail = try string.substring(agent, i, null);
 
         // 16. Append T to substrings.
         try substrings.append(agent.gc_allocator, tail);
@@ -1911,7 +1892,7 @@ pub const prototype = struct {
         if (end > len) return Value.from(false);
 
         // 13. Let substring be the substring of S from start to end.
-        const substring_ = try string.substring(agent.gc_allocator, start, end);
+        const substring_ = try string.substring(agent, start, end);
 
         // 14. If substring is searchStr, return true.
         if (substring_.eql(search_str)) return Value.from(true);
@@ -1957,7 +1938,7 @@ pub const prototype = struct {
         const to = @max(final_start, final_end);
 
         // 10. Return the substring of S from from to to.
-        return Value.from(try string.substring(agent.gc_allocator, from, to));
+        return Value.from(try string.substring(agent, from, to));
     }
 
     /// 22.1.3.26 String.prototype.toLocaleLowerCase ( [ reserved1 [ , reserved2 ] ] )
@@ -1965,7 +1946,7 @@ pub const prototype = struct {
     fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
-        const lower = try string.toLowerCase(agent.gc_allocator);
+        const lower = try string.toLowerCase(agent);
         return Value.from(lower);
     }
 
@@ -1974,7 +1955,7 @@ pub const prototype = struct {
     fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
-        const lower = try string.toUpperCase(agent.gc_allocator);
+        const lower = try string.toUpperCase(agent);
         return Value.from(lower);
     }
 
@@ -1991,7 +1972,7 @@ pub const prototype = struct {
         // 4. Let lowerText be toLowercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let L be CodePointsToString(lowerText).
-        const lower = try string.toLowerCase(agent.gc_allocator);
+        const lower = try string.toLowerCase(agent);
 
         // 6. Return L.
         return Value.from(lower);
@@ -2019,7 +2000,7 @@ pub const prototype = struct {
         // 4. Let upperText be toUppercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let U be CodePointsToString(upperText).
-        const upper = try string.toUpperCase(agent.gc_allocator);
+        const upper = try string.toUpperCase(agent);
 
         // 6. Return U.
         return Value.from(upper);
@@ -2070,7 +2051,7 @@ pub const prototype = struct {
         }
 
         // 7. Return result.
-        return Value.from(try result.build(agent.gc_allocator));
+        return Value.from(try result.build(agent));
     }
 
     /// 22.1.3.32 String.prototype.trim ( )
@@ -2099,14 +2080,14 @@ pub const prototype = struct {
             .start => blk: {
                 // a. Let T be the String value that is a copy of S with leading white space
                 //    removed.
-                break :blk try string.trim(agent.gc_allocator, .start);
+                break :blk try string.trim(agent, .start);
             },
 
             // 4. Else if where is end, then
             .end => blk: {
                 // a. Let T be the String value that is a copy of S with trailing white space
                 //    removed.
-                break :blk try string.trim(agent.gc_allocator, .end);
+                break :blk try string.trim(agent, .end);
             },
 
             // 5. Else,
@@ -2114,7 +2095,7 @@ pub const prototype = struct {
             .@"start+end" => blk: {
                 // b. Let T be the String value that is a copy of S with both leading and trailing
                 //    white space removed.
-                break :blk try string.trim(agent.gc_allocator, .@"start+end");
+                break :blk try string.trim(agent, .@"start+end");
             },
         };
 
@@ -2214,7 +2195,7 @@ pub const prototype = struct {
         // 11. Return the substring of S from intStart to intEnd.
         return Value.from(
             try string.substring(
-                agent.gc_allocator,
+                agent,
                 @intFromFloat(int_start),
                 @intFromFloat(int_end),
             ),
@@ -2250,7 +2231,7 @@ pub const prototype = struct {
             //    occurrence of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with
             //    the six code unit sequence "&quot;".
             const value_string_escaped = try value_string.replace(
-                agent.gc_allocator,
+                agent,
                 "\"",
                 "&quot;",
             );
@@ -2263,29 +2244,23 @@ pub const prototype = struct {
             // - the code unit 0x0022 (QUOTATION MARK)
             // - escapedV
             // - the code unit 0x0022 (QUOTATION MARK)
-            return types.String.fromUtf8(
+            return types.String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]}</{[tag]s}>",
-                    .{
-                        .string = string,
-                        .tag = tag,
-                        .attribute = attr.name,
-                        .value = value_string_escaped,
-                    },
-                ),
-            );
+                "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]}</{[tag]s}>",
+                .{
+                    .string = string,
+                    .tag = tag,
+                    .attribute = attr.name,
+                    .value = value_string_escaped,
+                },
+            ));
         }
 
-        return types.String.fromUtf8(
+        return types.String.fromUtf8(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "<{[tag]s}>{[string]}</{[tag]s}>",
-                .{ .string = string, .tag = tag },
-            ),
-        );
+            "<{[tag]s}>{[string]}</{[tag]s}>",
+            .{ .string = string, .tag = tag },
+        ));
     }
 
     /// B.2.2.2 String.prototype.anchor ( name )

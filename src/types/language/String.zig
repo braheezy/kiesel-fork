@@ -6,7 +6,10 @@ const std = @import("std");
 const icu4zig = @import("icu4zig");
 
 const build_options = @import("build-options");
+const execution = @import("../../execution.zig");
 const language = @import("../../language.zig");
+
+const Agent = execution.Agent;
 
 fn utf8IsAscii(utf8: []const u8) bool {
     return for (utf8) |c| {
@@ -38,7 +41,7 @@ pub const Slice = union(enum) {
     ascii: []const u8,
     utf16: []const u16,
 
-    fn hash(self: @This()) u64 {
+    pub fn hash(self: @This()) u64 {
         return std.hash.Wyhash.hash(0, switch (self) {
             .ascii => |ascii| ascii,
             .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
@@ -75,7 +78,25 @@ pub fn fromLiteral(comptime utf8: []const u8) *const String {
     return string;
 }
 
-pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!*const String {
+pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const String {
+    if (utf8.len == 0) return empty;
+    const slice: Slice = if (utf8IsAscii(utf8)) blk: {
+        break :blk .{ .ascii = utf8 };
+    } else blk: {
+        const utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, utf8) catch |err| switch (err) {
+            error.InvalidUtf8 => @panic("Invalid UTF-8"),
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+        break :blk .{ .utf16 = utf16 };
+    };
+    const string = try agent.gc_allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
+}
+
+// The parser, AST, and parts of codegen need to create strings from UTF-8 slices but do not
+// currently have access to the agent, so we skip caching them. This can be revisited later.
+pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!*const String {
     if (utf8.len == 0) return empty;
     const slice: Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
@@ -91,7 +112,15 @@ pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocato
     return string;
 }
 
-pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
+pub fn fromAscii(agent: *Agent, ascii: []const u8) std.mem.Allocator.Error!*const String {
+    if (ascii.len == 0) return empty;
+    const slice: Slice = .{ .ascii = ascii };
+    const string = try agent.gc_allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
+}
+
+pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
     if (ascii.len == 0) return empty;
     const slice: Slice = .{ .ascii = ascii };
     const string = try allocator.create(String);
@@ -99,7 +128,15 @@ pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Alloca
     return string;
 }
 
-pub fn fromUtf16(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
+pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*const String {
+    if (utf16.len == 0) return empty;
+    const slice: Slice = .{ .utf16 = utf16 };
+    const string = try agent.gc_allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
+}
+
+pub fn fromUtf16Alloc(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
     if (utf16.len == 0) return empty;
     const slice: Slice = .{ .utf16 = utf16 };
     const string = try allocator.create(String);
@@ -185,7 +222,7 @@ pub fn startsWith(self: *const String, other: *const String) bool {
 /// https://tc39.es/ecma262/#substring
 pub fn substring(
     self: *const String,
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     inclusive_start: usize,
     exclusive_end: ?usize,
 ) std.mem.Allocator.Error!*const String {
@@ -196,7 +233,7 @@ pub fn substring(
     switch (self.slice) {
         .ascii => |ascii| {
             const ascii_substring = ascii[inclusive_start .. exclusive_end orelse self.length()];
-            return fromAscii(allocator, try allocator.dupe(u8, ascii_substring));
+            return fromAscii(agent, try agent.gc_allocator.dupe(u8, ascii_substring));
         },
         .utf16 => |utf16| {
             const utf16_substring = utf16[inclusive_start .. exclusive_end orelse self.length()];
@@ -204,13 +241,13 @@ pub fn substring(
                 if (code_unit > 0x7F) break false;
             } else true;
             if (is_ascii) {
-                const ascii = try allocator.alloc(u8, utf16_substring.len);
+                const ascii = try agent.gc_allocator.alloc(u8, utf16_substring.len);
                 for (utf16_substring, 0..) |code_unit, i| {
                     ascii[i] = @intCast(code_unit);
                 }
-                return fromAscii(allocator, ascii);
+                return fromAscii(agent, ascii);
             } else {
-                return fromUtf16(allocator, try allocator.dupe(u16, utf16_substring));
+                return fromUtf16(agent, try agent.gc_allocator.dupe(u16, utf16_substring));
             }
         },
     }
@@ -400,75 +437,73 @@ pub fn codeUnitAt(self: *const String, index: usize) u16 {
     };
 }
 
-pub fn toLowerCase(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
+pub fn toLowerCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
     switch (self.slice) {
         .ascii => |ascii| {
-            const output = try allocator.alloc(u8, ascii.len);
+            const output = try agent.gc_allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
                 output[i] = std.ascii.toLower(c);
             }
-            return fromAscii(allocator, output);
+            return fromAscii(agent, output);
         },
         .utf16 => |utf16| {
             if (build_options.enable_intl) {
                 // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
                 //       handled correctly here.
-                const utf8 = try self.toUtf8(allocator);
-                defer allocator.free(utf8);
+                const utf8 = try self.toUtf8(agent.gc_allocator);
+                defer agent.gc_allocator.free(utf8);
                 const case_mapper = icu4zig.CaseMapper.init();
                 defer case_mapper.deinit();
                 const locale = icu4zig.Locale.und();
                 defer locale.deinit();
-                const utf8_lowercase = try case_mapper.lowercase(allocator, utf8, locale);
-                defer allocator.free(utf8_lowercase);
-                return fromUtf8(allocator, utf8_lowercase);
+                const utf8_lowercase = try case_mapper.lowercase(agent.gc_allocator, utf8, locale);
+                return fromUtf8(agent, utf8_lowercase);
             }
-            const output = try allocator.alloc(u16, utf16.len);
+            const output = try agent.gc_allocator.alloc(u16, utf16.len);
             for (utf16, 0..) |c, i| {
                 output[i] = if (c < 128) std.ascii.toLower(@intCast(c)) else c;
             }
-            return fromUtf16(allocator, output);
+            return fromUtf16(agent, output);
         },
     }
 }
 
-pub fn toUpperCase(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
+pub fn toUpperCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
     switch (self.slice) {
         .ascii => |ascii| {
-            const output = try allocator.alloc(u8, ascii.len);
+            const output = try agent.gc_allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
                 output[i] = std.ascii.toUpper(c);
             }
-            return fromAscii(allocator, output);
+            return fromAscii(agent, output);
         },
         .utf16 => |utf16| {
             if (build_options.enable_intl) {
                 // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
                 //       handled correctly here.
-                const utf8 = try self.toUtf8(allocator);
-                defer allocator.free(utf8);
+                const utf8 = try self.toUtf8(agent.gc_allocator);
+                defer agent.gc_allocator.free(utf8);
                 const case_mapper = icu4zig.CaseMapper.init();
                 defer case_mapper.deinit();
                 const locale = icu4zig.Locale.und();
                 defer locale.deinit();
-                const utf8_uppercase = try case_mapper.uppercase(allocator, utf8, locale);
-                defer allocator.free(utf8_uppercase);
-                return fromUtf8(allocator, utf8_uppercase);
+                const utf8_uppercase = try case_mapper.uppercase(agent.gc_allocator, utf8, locale);
+                return fromUtf8(agent, utf8_uppercase);
             }
-            const output = try allocator.alloc(u16, utf16.len);
+            const output = try agent.gc_allocator.alloc(u16, utf16.len);
             for (utf16, 0..) |c, i| {
                 output[i] = if (c < 128) std.ascii.toUpper(@intCast(c)) else c;
             }
-            return fromUtf16(allocator, output);
+            return fromUtf16(agent, output);
         },
     }
 }
 
 pub fn trim(
     self: *const String,
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     where: enum { start, end, @"start+end" },
 ) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
@@ -485,7 +520,7 @@ pub fn trim(
                 }
                 break;
             }
-            return self.substring(allocator, start, null);
+            return self.substring(agent, start, null);
         },
         .end => {
             var end: usize = self.length();
@@ -500,7 +535,7 @@ pub fn trim(
                 }
                 break;
             }
-            return self.substring(allocator, 0, end);
+            return self.substring(agent, 0, end);
         },
         .@"start+end" => {
             var start: usize = 0;
@@ -525,14 +560,14 @@ pub fn trim(
                 }
                 break;
             }
-            return self.substring(allocator, start, end);
+            return self.substring(agent, start, end);
         },
     }
 }
 
 pub fn replace(
     self: *const String,
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     needle: []const u8,
     replacement: []const u8,
 ) std.mem.Allocator.Error!*const String {
@@ -541,55 +576,55 @@ pub fn replace(
         .ascii => |ascii| {
             const output = try std.mem.replaceOwned(
                 u8,
-                allocator,
+                agent.gc_allocator,
                 ascii,
                 needle,
                 replacement,
             );
-            return fromAscii(allocator, output);
+            return fromAscii(agent, output);
         },
         .utf16 => |utf16| {
-            const needle_utf16 = std.unicode.utf8ToUtf16LeAlloc(allocator, needle) catch |err| switch (err) {
+            const needle_utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, needle) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
                 error.OutOfMemory => return error.OutOfMemory,
             };
-            const replacement_utf16 = std.unicode.utf8ToUtf16LeAlloc(allocator, replacement) catch |err| switch (err) {
+            const replacement_utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, replacement) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
                 error.OutOfMemory => return error.OutOfMemory,
             };
             const output = try std.mem.replaceOwned(
                 u16,
-                allocator,
+                agent.gc_allocator,
                 utf16,
                 needle_utf16,
                 replacement_utf16,
             );
-            return fromUtf16(allocator, output);
+            return fromUtf16(agent, output);
         },
     }
 }
 
 pub fn repeat(
     self: *const String,
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     n: usize,
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
-    var builder = try Builder.initCapacity(allocator, n);
-    defer builder.deinit(allocator);
+    var builder = try Builder.initCapacity(agent.gc_allocator, n);
+    defer builder.deinit(agent.gc_allocator);
     for (0..n) |_| builder.appendStringAssumeCapacity(self);
-    return builder.build(allocator);
+    return builder.build(agent);
 }
 
 pub fn concat(
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     strings: []const *const String,
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
-    var builder = try Builder.initCapacity(allocator, strings.len);
-    defer builder.deinit(allocator);
+    var builder = try Builder.initCapacity(agent.gc_allocator, strings.len);
+    defer builder.deinit(agent.gc_allocator);
     for (strings) |string| builder.appendStringAssumeCapacity(string);
-    return builder.build(allocator);
+    return builder.build(agent);
 }
 
 pub fn HashMapUnmanaged(comptime V: type) type {

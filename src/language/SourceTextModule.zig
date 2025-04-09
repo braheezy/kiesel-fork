@@ -1548,7 +1548,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         const imported_module = getImportedModule(self, import_entry.module_request);
 
         const import_name = import_entry.import_name.?;
-        const local_name = try String.fromUtf8(agent.gc_allocator, import_entry.local_name);
+        const local_name = try String.fromUtf8(agent, import_entry.local_name);
 
         // b. If in.[[ImportName]] is namespace-object, then
         if (import_name == .namespace_object) {
@@ -1619,7 +1619,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                     agent,
                     local_name,
                     resolution.module,
-                    try String.fromUtf8(agent.gc_allocator, resolution.binding_name.string),
+                    try String.fromUtf8(agent, resolution.binding_name.string),
                 );
             }
         }
@@ -1684,7 +1684,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
 
         // a. For each element dn of the BoundNames of d, do
         for (bound_names.items) |var_name_utf8| {
-            const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+            const var_name = try String.fromUtf8(agent, var_name_utf8);
 
             // i. If declaredVarNames does not contain dn, then
             if (!declared_var_names.contains(var_name)) {
@@ -1715,7 +1715,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
 
         // a. For each element dn of the BoundNames of d, do
         for (bound_names.items) |name_utf8| {
-            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+            const name = try String.fromUtf8(agent, name_utf8);
 
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {

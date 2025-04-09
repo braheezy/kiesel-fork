@@ -4097,7 +4097,7 @@ pub fn acceptWithClauseItem(
     const location = (try self.peekToken()).location;
     const key = try self.acceptAttributeKey();
     const key_string = switch (key) {
-        .identifier => |identifier| try String.fromUtf8(self.allocator, identifier),
+        .identifier => |identifier| try String.fromUtf8Alloc(self.allocator, identifier),
         .string_literal => |string_literal| try string_literal.stringValue(self.allocator),
     };
     // It is a Syntax Error if WithClauseToAttributes of WithClause has two different entries a and

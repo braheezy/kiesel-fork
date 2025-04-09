@@ -118,7 +118,7 @@ pub fn getConstant(self: Executable, index: ConstantIndex) Value {
 }
 
 pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) Error!IdentifierIndex {
-    const string = try String.fromUtf8(self.allocator, identifier);
+    const string = try String.fromUtf8Alloc(self.allocator, identifier);
     const result = try self.identifiers.getOrPut(self.allocator, string);
     return IdentifierIndex.init(result.index);
 }

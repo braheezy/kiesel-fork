@@ -154,7 +154,7 @@ const ErrorType = enum {
 };
 
 pub fn createErrorObject(
-    self: Agent,
+    self: *Agent,
     comptime error_type: ErrorType,
     comptime fmt: []const u8,
     args: anytype,
@@ -166,7 +166,7 @@ pub fn createErrorObject(
     )(&realm.intrinsics);
     const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
     const error_object = constructor.construct(
-        &.{Value.from(try String.fromUtf8(self.gc_allocator, message))},
+        &.{Value.from(try String.fromUtf8(self, message))},
         null,
     ) catch |err| try noexcept(err);
     if (error_type == .internal_error) {

@@ -795,7 +795,7 @@ pub fn toNumber(self: Value, agent: *Agent) Agent.Error!Number {
         .boolean => return Number.from(@intFromBool(self.asBoolean())),
 
         // 6. If argument is a String, return StringToNumber(argument).
-        .string => return stringToNumber(agent.gc_allocator, self.asString()),
+        .string => return stringToNumber(agent, self.asString()),
 
         // 7. Assert: argument is an Object.
         .object => {
@@ -999,7 +999,7 @@ pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
 
         .string => {
             // 1. Let n be StringToBigInt(prim).
-            const n = try stringToBigInt(agent.gc_allocator, primitive.asString());
+            const n = try stringToBigInt(agent, primitive.asString());
 
             // 2. If n is undefined, throw a SyntaxError exception.
             // 3. Return n.
@@ -1068,10 +1068,10 @@ pub fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
             String.fromLiteral("false"),
 
         // 7. If argument is a Number, return Number::toString(argument, 10).
-        .number => self.asNumber().toString(agent.gc_allocator, 10),
+        .number => self.asNumber().toString(agent, 10),
 
         // 8. If argument is a BigInt, return BigInt::toString(argument, 10).
-        .big_int => self.asBigInt().toString(agent.gc_allocator, 10),
+        .big_int => self.asBigInt().toString(agent, 10),
 
         // 9. Assert: argument is an Object.
         .object => {
@@ -1744,13 +1744,14 @@ pub fn toPrivateName(self: Value) ?PrivateName {
 /// 7.1.4.1.1 StringToNumber ( str )
 /// https://tc39.es/ecma262/#sec-stringtonumber
 pub fn stringToNumber(
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     string: *const String,
 ) std.mem.Allocator.Error!Number {
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
-    const trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
+    const trimmed_string = try (try string.trim(agent, .@"start+end")).toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(trimmed_string);
     if (trimmed_string.len == 0) return Number.from(0);
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
@@ -1785,7 +1786,7 @@ pub fn stringToNumber(
 /// 7.1.14 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     string: *const String,
 ) std.mem.Allocator.Error!?*const BigInt {
     // 1. Let literal be ParseText(str, StringIntegerLiteral).
@@ -1794,30 +1795,28 @@ pub fn stringToBigInt(
     // 4. Assert: mv is an integer.
     // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
-    var trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
-    if (trimmed_string.len == 0) return try types.BigInt.from(allocator, 0);
+    const trimmed_string = try (try string.trim(agent, .@"start+end")).toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(trimmed_string);
+    if (trimmed_string.len == 0) return try types.BigInt.from(agent.gc_allocator, 0);
     // Unlike std.fmt.parseFloat() and std.fmt.parseInt() with base 0, std.math.big.int.Managed.setString()
     // doesn't like the prefix so we have to cut it off manually.
-    const base: u8 = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
-        trimmed_string = trimmed_string[2..];
-        if (trimmed_string.len == 0) return null;
-        break :blk 2;
+    const base: u8, const value = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
+        const value = trimmed_string[2..];
+        if (value.len == 0) return null;
+        break :blk .{ 2, value };
     } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0o")) blk: {
-        trimmed_string = trimmed_string[2..];
-        if (trimmed_string.len == 0) return null;
-        break :blk 8;
+        const value = trimmed_string[2..];
+        if (value.len == 0) return null;
+        break :blk .{ 8, value };
     } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) blk: {
-        trimmed_string = trimmed_string[2..];
-        if (trimmed_string.len == 0) return null;
-        break :blk 16;
+        const value = trimmed_string[2..];
+        if (value.len == 0) return null;
+        break :blk .{ 16, value };
     } else blk: {
-        break :blk 10;
+        break :blk .{ 10, trimmed_string };
     };
-    const big_int = try BigInt.from(allocator, 0);
-    big_int.managed.setString(
-        base,
-        trimmed_string,
-    ) catch |err| switch (err) {
+    const big_int = try BigInt.from(agent.gc_allocator, 0);
+    big_int.managed.setString(base, value) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
@@ -2073,7 +2072,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 7. If x is a BigInt and y is a String, then
     if (x.isBigInt() and y.isString()) {
         // a. Let n be StringToBigInt(y).
-        const n = try stringToBigInt(agent.gc_allocator, y.asString()) orelse {
+        const n = try stringToBigInt(agent, y.asString()) orelse {
             // b. If n is undefined, return false.
             return false;
         };

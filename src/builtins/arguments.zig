@@ -384,14 +384,14 @@ pub fn createMappedArgumentsObject(
                 // 1. Let g be MakeArgGetter(name, env).
                 const getter = try makeArgGetter(
                     agent,
-                    try String.fromUtf8(agent.gc_allocator, name),
+                    try String.fromUtf8(agent, name),
                     env,
                 );
 
                 // 2. Let p be MakeArgSetter(name, env).
                 const setter = try makeArgSetter(
                     agent,
-                    try String.fromUtf8(agent.gc_allocator, name),
+                    try String.fromUtf8(agent, name),
                     env,
                 );
 

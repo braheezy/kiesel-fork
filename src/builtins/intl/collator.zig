@@ -295,7 +295,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try collator.fields.locale.toString(agent.gc_allocator),
                 ),
             ),

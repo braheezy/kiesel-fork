@@ -298,7 +298,7 @@ pub const prototype = struct {
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
-                    agent.gc_allocator,
+                    agent,
                     try display_names.fields.locale.toString(agent.gc_allocator),
                 ),
             ),
@@ -393,7 +393,7 @@ pub const prototype = struct {
             ),
         };
         if (value.len == 0) return .undefined;
-        return Value.from(try String.fromUtf8(agent.gc_allocator, value));
+        return Value.from(try String.fromUtf8(agent, value));
     }
 };
 
