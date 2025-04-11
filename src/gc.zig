@@ -34,9 +34,9 @@ pub fn collect() void {
 }
 
 pub fn disableWarnings() void {
-    libgc.GC_set_warn_proc(struct {
-        fn func(_: [*c]const u8, _: libgc.GC_word) callconv(.c) void {}
-    }.func);
+    libgc.GC_set_warn_proc(@ptrCast(&struct {
+        fn func(_: [*:0]const u8, _: libgc.GC_word) callconv(.c) void {}
+    }.func));
 }
 
 pub fn FinalizerData(comptime T: type) type {

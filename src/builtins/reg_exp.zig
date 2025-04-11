@@ -270,14 +270,11 @@ pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.
     );
 }
 
-const CapturesList = [*c][*c]u8;
-
-fn getMatch(captures_list: CapturesList, string: []const u8, shift: bool, i: usize) ?Match {
-    if (captures_list[2 * i] == null or captures_list[2 * i + 1] == null) return null;
-    const start_index = (@intFromPtr(captures_list[2 * i]) -
-        @intFromPtr(string.ptr)) >> @intFromBool(shift);
-    const end_index = (@intFromPtr(captures_list[2 * i + 1]) -
-        @intFromPtr(string.ptr)) >> @intFromBool(shift);
+fn getMatch(captures_list: []?*u8, string: []const u8, shift: bool, i: usize) ?Match {
+    const match = captures_list[2 * i ..][0..2].*;
+    if (match[0] == null or match[1] == null) return null;
+    const start_index = (@intFromPtr(match[0]) - @intFromPtr(string.ptr)) >> @intFromBool(shift);
+    const end_index = (@intFromPtr(match[1]) - @intFromPtr(string.ptr)) >> @intFromBool(shift);
     return .{ .start_index = start_index, .end_index = end_index };
 }
 
@@ -299,9 +296,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // libregexp's capture count includes the matched string
     std.debug.assert(capture_count >= 1);
 
-    const captures_list: CapturesList = @ptrCast(
-        try agent.gc_allocator.alloc([*c]u8, capture_count * 2),
-    );
+    const captures_list = try agent.gc_allocator.alloc(?*u8, capture_count * 2);
 
     // 3. Let flags be R.[[OriginalFlags]].
     const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
@@ -323,7 +318,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const result = if (last_index > length) 0 else libregexp.lre_exec(
-        captures_list,
+        @ptrCast(captures_list),
         @ptrCast(re_bytecode),
         buf.ptr,
         @intCast(last_index),

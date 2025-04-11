@@ -16,30 +16,30 @@ const MAX_EDGES = (SHM_SIZE - 4) * 8;
 const shmem_data = extern struct {
     num_edges: u32,
 
-    pub fn edges(self: [*c]shmem_data) [*c]u8 {
-        return @alignCast(@ptrCast(self + 4));
+    pub fn edges(self: *shmem_data) [*]u8 {
+        return @ptrFromInt(@intFromPtr(self) + 4);
     }
 };
 
-var __shmem: [*c]shmem_data = null;
-var __edges_start: [*c]u32 = null;
-var __edges_stop: [*c]u32 = null;
+var __shmem: *shmem_data = undefined;
+var __edges_start: ?[*]u32 = null;
+var __edges_stop: ?[*]u32 = null;
 
 pub fn __sanitizer_cov_reset_edgeguards() void {
     var N: u32 = 0;
-    var x = __edges_start;
-    while (x < __edges_stop and N < MAX_EDGES) : (x += 1) {
+    var x = __edges_start.?;
+    while (@intFromPtr(x) < @intFromPtr(__edges_stop.?) and N < MAX_EDGES) : (x += 1) {
         N += 1;
-        x.* = N;
+        x[0] = N;
     }
 }
 
-export fn __sanitizer_cov_trace_pc_guard_init(start: [*c]u32, stop: [*c]u32) void {
+export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void {
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
 
     // Avoid duplicate initialization
-    if (start == stop or start.* != 0) return;
+    if (start == stop or start[0] != 0) return;
 
     if (__edges_start != null or __edges_stop != null) {
         stderr.writeAll("Coverage instrumentation is only supported for a single module\n") catch {};
@@ -85,14 +85,14 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*c]u32, stop: [*c]u32) voi
 
     __sanitizer_cov_reset_edgeguards();
 
-    __shmem.*.num_edges = @intCast(stop - start);
+    __shmem.num_edges = @intCast(stop - start);
     stdout.print(
         "[COV] edge counters initialized. Shared memory: {s} with {} edges\n",
-        .{ shm_key orelse "(null)", __shmem.*.num_edges },
+        .{ shm_key orelse "(null)", __shmem.num_edges },
     ) catch {};
 }
 
-export fn __sanitizer_cov_trace_pc_guard(guard: [*c]u32) void {
+export fn __sanitizer_cov_trace_pc_guard(guard: *u32) void {
     // There's a small race condition here: if this function executes in two threads for the same
     // edge at the same time, the first thread might disable the edge (by setting the guard to zero)
     // before the second thread fetches the guard value (and thus the index). However, our
@@ -100,6 +100,6 @@ export fn __sanitizer_cov_trace_pc_guard(guard: [*c]u32) void {
     const index = guard.*;
     // If this function is called before coverage instrumentation is properly initialized we want to return early.
     if (index == 0) return;
-    __shmem.*.edges()[index / 8] |= @as(u8, 1) << @intCast(index % 8);
+    __shmem.edges()[index / 8] |= @as(u8, 1) << @intCast(index % 8);
     guard.* = 0;
 }
