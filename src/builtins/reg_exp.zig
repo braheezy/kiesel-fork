@@ -300,7 +300,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     std.debug.assert(capture_count >= 1);
 
     const captures_list: CapturesList = @ptrCast(
-        try agent.gc_allocator.alloc([*c]u8, @intCast(@sizeOf([*c]u8) * capture_count * 2)),
+        try agent.gc_allocator.alloc([*c]u8, capture_count * 2),
     );
 
     // 3. Let flags be R.[[OriginalFlags]].
