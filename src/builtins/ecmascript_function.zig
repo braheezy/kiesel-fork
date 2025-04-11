@@ -111,10 +111,10 @@ pub const ECMAScriptFunction = MakeObject(.{
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
 
-        cached_arguments_executable: ?Executable = null,
-        cached_body_executable: ?Executable = null,
+        cached_arguments_executable: ?*Executable = null,
+        cached_body_executable: ?*Executable = null,
         cached_use_arguments_fast_path: ?bool = null,
-        cached_ast_values: ?CachedAstValues = null,
+        cached_ast_values: ?*const CachedAstValues = null,
 
         const CachedAstValues = struct {
             parameter_names: []const *const String,
@@ -131,7 +131,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             self: *@This(),
             agent: *Agent,
         ) std.mem.Allocator.Error!*const CachedAstValues {
-            if (self.cached_ast_values) |*cached_ast_values| return cached_ast_values;
+            if (self.cached_ast_values) |cached_ast_values| return cached_ast_values;
 
             var parameter_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
             defer parameter_names_utf8.deinit(agent.gc_allocator);
@@ -196,7 +196,8 @@ pub const ECMAScriptFunction = MakeObject(.{
 
             const lexical_names_contains_arguments = containsSlice(lexically_declared_names.items, "arguments");
 
-            self.cached_ast_values = .{
+            const cached_ast_values = try agent.gc_allocator.create(CachedAstValues);
+            cached_ast_values.* = .{
                 .parameter_names = try parameter_names.toOwnedSlice(agent.gc_allocator),
                 .var_declared_names = try var_declared_names.toOwnedSlice(agent.gc_allocator),
                 .var_scoped_declarations = try var_scoped_declarations.toOwnedSlice(agent.gc_allocator),
@@ -206,7 +207,8 @@ pub const ECMAScriptFunction = MakeObject(.{
                 .parameter_names_contains_arguments = parameter_names_contains_arguments,
                 .lexical_names_contains_arguments = lexical_names_contains_arguments,
             };
-            return &self.cached_ast_values.?;
+            self.cached_ast_values = cached_ast_values;
+            return cached_ast_values;
         }
 
         /// Maybe a hack, but kind of a neat one :^)
@@ -275,7 +277,7 @@ pub const ECMAScriptFunction = MakeObject(.{
                 return;
             }
 
-            if (self.cached_arguments_executable == null) {
+            const executable = self.cached_arguments_executable orelse blk: {
                 var elements = try std.ArrayListUnmanaged(ast.ArrayBindingPattern.Element).initCapacity(
                     agent.gc_allocator,
                     self.formal_parameters.items.len,
@@ -298,7 +300,8 @@ pub const ECMAScriptFunction = MakeObject(.{
                 const initializer: ast.Expression = .{
                     .primary_expression = .{ .literal = .null }, // Placeholder value
                 };
-                var executable = (if (maybe_environment != null)
+                const executable = try agent.gc_allocator.create(Executable);
+                executable.* = (if (maybe_environment != null)
                     // Uses InitializeReferencedBinding
                     generateBytecode(agent.gc_allocator, ast.LexicalBinding{
                         .binding_pattern = .{
@@ -333,13 +336,14 @@ pub const ECMAScriptFunction = MakeObject(.{
                 };
                 // 0 = load, 1 = store_constant, 2..3 = index
                 std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intFromEnum(index);
-                self.cached_arguments_executable = executable;
 
                 if (agent.options.debug.print_bytecode) {
                     executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
                 }
-            }
-            var executable = &self.cached_arguments_executable.?;
+
+                self.cached_arguments_executable = executable;
+                break :blk executable;
+            };
             const array = try createArrayFromList(agent, arguments.values);
             executable.constants.keys()[executable.constants.count() - 1] = Value.from(array);
             try executable.constants.reIndex(executable.allocator);
@@ -360,8 +364,9 @@ pub const ECMAScriptFunction = MakeObject(.{
                 return Completion.normal(null);
             }
 
-            if (self.cached_body_executable == null) {
-                const executable = generateBytecode(
+            const executable = self.cached_body_executable orelse blk: {
+                var executable = try agent.gc_allocator.create(Executable);
+                executable.* = generateBytecode(
                     agent.gc_allocator,
                     self.ecmascript_code,
                     .{},
@@ -373,13 +378,14 @@ pub const ECMAScriptFunction = MakeObject(.{
                     ),
                     error.OutOfMemory => return error.OutOfMemory,
                 };
-                self.cached_body_executable = executable;
 
                 if (agent.options.debug.print_bytecode) {
                     executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
                 }
-            }
-            const executable = &self.cached_body_executable.?;
+
+                self.cached_body_executable = executable;
+                break :blk executable;
+            };
             return vm.run(executable.*);
         }
     },
