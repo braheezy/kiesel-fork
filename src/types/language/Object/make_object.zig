@@ -54,7 +54,6 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .agent = agent,
-                    .private_elements = .empty,
                     .internal_methods = args.internal_methods,
                     .property_storage = .{
                         .shape = agent.empty_shape,
@@ -62,6 +61,7 @@ pub fn MakeObject(
                         .accessors = .empty,
                         .indexed_properties = .empty,
                         .lazy_properties = .empty,
+                        .private_elements = .empty,
                     },
                 },
             };

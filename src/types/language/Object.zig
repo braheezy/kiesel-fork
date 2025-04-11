@@ -105,10 +105,6 @@ pub const PropertyKind = enum {
 };
 
 tag: Object.Tag,
-
-/// [[PrivateElements]]
-private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
-
 agent: *Agent,
 internal_methods: *const InternalMethods,
 property_storage: PropertyStorage,
@@ -761,7 +757,7 @@ pub fn privateElementFind(self: *const Object, private_name: PrivateName) ?*Priv
     // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
     //     a. Return pe.
     // 2. Return empty.
-    return self.private_elements.getPtr(private_name);
+    return self.property_storage.private_elements.getPtr(private_name);
 }
 
 /// 7.3.27 PrivateFieldAdd ( O, P, value )
@@ -784,7 +780,7 @@ pub fn privateFieldAdd(self: *Object, private_name: PrivateName, value: Value) A
     }
 
     // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(self.agent.gc_allocator, private_name, .{ .field = value });
+    try self.property_storage.private_elements.putNoClobber(self.agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.
 }
@@ -816,7 +812,7 @@ pub fn privateMethodOrAccessorAdd(
     }
 
     // 5. Append method to O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(self.agent.gc_allocator, private_name, method);
+    try self.property_storage.private_elements.putNoClobber(self.agent.gc_allocator, private_name, method);
 
     // 6. Return unused.
 }
