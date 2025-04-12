@@ -2243,7 +2243,9 @@ pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value)
 
 test format {
     const gc = @import("../../gc.zig");
-    var agent = try Agent.init(gc.allocator(), .{});
+    var gc_allocator: gc.GcAllocator = .init(.normal);
+    var gc_allocator_atomic: gc.GcAllocator = .init(.atomic);
+    var agent = try Agent.init(gc_allocator.allocator(), gc_allocator_atomic.allocator(), .{});
     defer agent.deinit();
     const symbol_without_description: Symbol = .{ .description = null };
     const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };
@@ -2260,7 +2262,7 @@ test format {
         .{ from("foo"), "\"foo\"" },
         .{ from(&symbol_without_description), "Symbol()" },
         .{ from(&symbol_with_description), "Symbol(\"foo\")" },
-        .{ from(try BigInt.from(gc.allocator(), managed)), "123n" },
+        .{ from(try BigInt.from(gc_allocator.allocator(), managed)), "123n" },
         .{ from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {

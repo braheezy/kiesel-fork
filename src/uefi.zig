@@ -85,7 +85,7 @@ pub fn main() std.os.uefi.Status {
         .writeFn = writeFn,
     };
 
-    var agent = Agent.init(allocator, .{
+    var agent = Agent.init(allocator, allocator, .{
         .platform = .{
             .stdout = stdout,
             .stderr = stderr,

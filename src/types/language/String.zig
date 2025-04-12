@@ -35,7 +35,7 @@ pub const whitespace_code_units = blk: {
 pub const empty = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
-pub const Cache = @import("String/cache.zig").Cache;
+pub const Cache = @import("String/Cache.zig");
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
 
 pub const Slice = union(enum) {
@@ -81,21 +81,20 @@ pub fn fromLiteral(comptime utf8: []const u8) *const String {
 
 pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const String {
     if (utf8.len == 0) return empty;
-    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf8 = utf8 });
-    if (gop.found_existing) return gop.value_ptr.*;
-    const slice: Slice = if (utf8IsAscii(utf8)) blk: {
-        break :blk .{ .ascii = utf8 };
-    } else blk: {
-        const utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, utf8) catch |err| switch (err) {
-            error.InvalidUtf8 => @panic("Invalid UTF-8"),
-            error.OutOfMemory => return error.OutOfMemory,
+    const result = try agent.string_cache.getOrPut(agent, .{ .utf8 = utf8 });
+    if (!result.found_existing) {
+        const slice: Slice = if (utf8IsAscii(utf8)) blk: {
+            break :blk .{ .ascii = utf8 };
+        } else blk: {
+            const utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, utf8) catch |err| switch (err) {
+                error.InvalidUtf8 => @panic("Invalid UTF-8"),
+                error.OutOfMemory => return error.OutOfMemory,
+            };
+            break :blk .{ .utf16 = utf16 };
         };
-        break :blk .{ .utf16 = utf16 };
-    };
-    const string = try agent.gc_allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
-    gop.value_ptr.* = string;
-    return string;
+        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+    }
+    return result.string;
 }
 
 // The parser, AST, and parts of codegen need to create strings from UTF-8 slices but do not
@@ -118,13 +117,12 @@ pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.All
 
 pub fn fromAscii(agent: *Agent, ascii: []const u8) std.mem.Allocator.Error!*const String {
     if (ascii.len == 0) return empty;
-    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf8 = ascii });
-    if (gop.found_existing) return gop.value_ptr.*;
-    const slice: Slice = .{ .ascii = ascii };
-    const string = try agent.gc_allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
-    gop.value_ptr.* = string;
-    return string;
+    const result = try agent.string_cache.getOrPut(agent, .{ .utf8 = ascii });
+    if (!result.found_existing) {
+        const slice: Slice = .{ .ascii = ascii };
+        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+    }
+    return result.string;
 }
 
 pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
@@ -137,13 +135,12 @@ pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.A
 
 pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*const String {
     if (utf16.len == 0) return empty;
-    const gop = try agent.string_cache.getOrPut(agent.gc_allocator, .{ .utf16 = utf16 });
-    if (gop.found_existing) return gop.value_ptr.*;
-    const slice: Slice = .{ .utf16 = utf16 };
-    const string = try agent.gc_allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
-    gop.value_ptr.* = string;
-    return string;
+    const result = try agent.string_cache.getOrPut(agent, .{ .utf16 = utf16 });
+    if (!result.found_existing) {
+        const slice: String.Slice = .{ .utf16 = utf16 };
+        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+    }
+    return result.string;
 }
 
 pub fn fromUtf16Alloc(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
@@ -192,6 +189,7 @@ pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
 }
 
 pub fn eql(self: *const String, other: *const String) bool {
+    if (self == other) return true;
     if (self.slice == .ascii and other.slice == .ascii) {
         return self.hash == other.hash and std.mem.eql(u8, self.slice.ascii, other.slice.ascii);
     }

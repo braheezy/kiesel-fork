@@ -28,6 +28,7 @@ const noexcept = utils.noexcept;
 const Agent = @This();
 
 gc_allocator: std.mem.Allocator,
+gc_allocator_atomic: std.mem.Allocator,
 options: Options,
 pre_allocated: struct {
     zero: *const BigInt,
@@ -67,7 +68,11 @@ pub const QueuedJob = struct {
     realm: ?*Realm,
 };
 
-pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator.Error!Agent {
+pub fn init(
+    gc_allocator: std.mem.Allocator,
+    gc_allocator_atomic: std.mem.Allocator,
+    options: Options,
+) std.mem.Allocator.Error!Agent {
     const platform = options.platform orelse if (@TypeOf(Platform.default) != void)
         Platform.default()
     else
@@ -75,6 +80,7 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
     pretty_printing.state.tty_config = platform.tty_config;
     var self: Agent = .{
         .gc_allocator = gc_allocator,
+        .gc_allocator_atomic = gc_allocator_atomic,
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
@@ -103,7 +109,7 @@ pub fn deinit(self: *Agent) void {
     self.execution_context_stack.deinit(self.gc_allocator);
     self.queued_jobs.deinit(self.gc_allocator);
     self.empty_shape.deinit(self.gc_allocator);
-    self.string_cache.deinit(self.gc_allocator);
+    self.string_cache.entries.deinit(self.gc_allocator);
     self.platform.deinit();
 }
 
@@ -362,12 +368,12 @@ pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
 
 test init {
     // Ensure Agent teardown is leak-free
-    var agent = try init(std.testing.allocator, .{});
+    var agent = try init(std.testing.allocator, std.testing.allocator, .{});
     defer agent.deinit();
 }
 
 test "well_known_symbols" {
-    var agent = try init(std.testing.allocator, .{});
+    var agent = try init(std.testing.allocator, std.testing.allocator, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
     try std.testing.expectEqualStrings(unscopables.description.?.slice.ascii, "Symbol.unscopables");

@@ -1075,7 +1075,9 @@ pub fn getOption(
 
 test "format" {
     const gc = @import("../../gc.zig");
-    var agent_ = try Agent.init(gc.allocator(), .{});
+    var gc_allocator: gc.GcAllocator = .init(.normal);
+    var gc_allocator_atomic: gc.GcAllocator = .init(.atomic);
+    var agent_ = try Agent.init(gc_allocator.allocator(), gc_allocator_atomic.allocator(), .{});
     defer agent_.deinit();
 
     const test_cases = [_]struct { *Object, []const u8 }{

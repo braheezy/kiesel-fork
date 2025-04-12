@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const build_options = @import("build-options");
 const libgc = @import("./c/libgc.zig").libgc;
 
 pub const libgc_version: std.SemanticVersion = .{
@@ -10,20 +9,6 @@ pub const libgc_version: std.SemanticVersion = .{
 };
 
 pub const GcAllocator = @import("gc/GcAllocator.zig");
-
-pub fn allocator() std.mem.Allocator {
-    if (libgc.GC_is_init_called() == 0) {
-        libgc.GC_init();
-        if (build_options.enable_nan_boxing) {
-            libgc.GC_set_pointer_mask(std.math.maxInt(u48));
-        }
-        libgc.GC_start_mark_threads();
-    }
-    return .{
-        .ptr = undefined,
-        .vtable = &GcAllocator.vtable,
-    };
-}
 
 pub fn disable() void {
     libgc.GC_disable();
@@ -63,4 +48,15 @@ pub fn registerFinalizer(
             }
         }
     }.func, data, &data.nextFinalizerFunc, &data.next_finalizer_data);
+}
+
+/// Asserts that the link has not already been registered with an object.
+pub fn registerDisappearingLink(link: *?*const anyopaque, object: *const anyopaque) std.mem.Allocator.Error!void {
+    const status = libgc.GC_general_register_disappearing_link(@ptrCast(link), object);
+    switch (status) {
+        libgc.GC_SUCCESS, libgc.GC_UNIMPLEMENTED => {},
+        libgc.GC_DUPLICATE => unreachable,
+        libgc.GC_NO_MEMORY => return error.OutOfMemory,
+        else => unreachable,
+    }
 }

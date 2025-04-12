@@ -75,7 +75,9 @@ fn reprl() !u8 {
         @memcpy(data, @as([*]u8, @ptrCast(ptr))[0..data_size]);
 
         const result: u32 = blk: {
-            var agent = try Agent.init(kiesel.gc.allocator(), .{});
+            var gc_allocator: kiesel.gc.GcAllocator = .init(.normal);
+            var gc_atomic: kiesel.gc.GcAllocator = .init(.atomic);
+            var agent = try Agent.init(gc_allocator.allocator(), gc_atomic.allocator(), .{});
             defer agent.deinit();
 
             try Realm.initializeHostDefinedRealm(&agent, .{});
