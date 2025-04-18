@@ -1797,10 +1797,14 @@ pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
             const Payload = Instruction.Payload(tag);
             const payload_ptr: *align(1) const Payload = @ptrCast(executable.instructions.items[self.ip..][0..@sizeOf(Payload)]);
             self.ip += @sizeOf(Payload);
-            try @call(
+            @call(
                 .always_inline,
-                Vm.executeInstruction,
+                executeInstruction,
                 .{ self, tag, payload_ptr.*, executable },
+            ) catch |err| try @call(
+                .never_inline,
+                handleException,
+                .{ self, err },
             );
             continue :main self.fetchInstructionTag(executable);
         },
@@ -1813,7 +1817,7 @@ fn executeInstruction(
     payload: Instruction.Payload(tag),
     executable: Executable,
 ) Agent.Error!void {
-    (switch (tag) {
+    return switch (tag) {
         .array_create => self.executeArrayCreate(payload.length, executable),
         .array_push_value => self.executeArrayPushValue(executable),
         .array_set_length => self.executeArraySetLength(payload.length, executable),
@@ -1918,13 +1922,17 @@ fn executeInstruction(
         .typeof_identifier => self.executeTypeofIdentifier(payload.identifier, payload.strict, executable),
         .unary_minus => self.executeUnaryMinus(executable),
         .@"return", .yield, .end => unreachable,
-    }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.ExceptionThrown => {
-            if (self.exception_jump_target_stack.items.len != 0) {
-                self.exception = self.agent.clearException();
-                self.ip = self.exception_jump_target_stack.getLast();
-            } else return err;
-        },
     };
+}
+
+fn handleException(self: *Vm, err: Agent.Error) Agent.Error!void {
+    switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.ExceptionThrown => if (self.exception_jump_target_stack.items.len != 0) {
+            self.exception = self.agent.clearException();
+            self.ip = self.exception_jump_target_stack.getLast();
+        } else {
+            return error.ExceptionThrown;
+        },
+    }
 }
