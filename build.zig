@@ -59,11 +59,11 @@ pub fn build(b: *std.Build) void {
     var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
     var code: u8 = undefined;
     if (b.runAllowFail(
-        &.{ "git", "rev-parse", "HEAD" },
+        &.{ "git", "-C", b.build_root.path orelse ".", "rev-parse", "--short=9", "HEAD" },
         &code,
         .Ignore,
     )) |output| {
-        version.build = output[0..9];
+        version.build = std.mem.trimRight(u8, output, "\n");
     } else |_| {}
 
     const options = b.addOptions();
