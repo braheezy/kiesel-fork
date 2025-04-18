@@ -133,7 +133,7 @@ fn prettyPrintArrayIterator(
     try tty_config.setColor(writer, .reset);
     switch (array_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.array)});
+            try writer.print("{pretty}", .{Value.from(state_.iterated_array_like)});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -484,8 +484,8 @@ fn prettyPrintRegExpStringIterator(
     switch (reg_exp_string_iterator.fields) {
         .state => |state_| {
             try writer.print("{pretty}, {pretty}", .{
-                Value.from(state_.reg_exp),
-                Value.from(state_.string),
+                Value.from(state_.iterating_reg_exp),
+                Value.from(state_.iterated_string),
             });
         },
         .completed => {
