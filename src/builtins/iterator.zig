@@ -110,7 +110,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.1.4 The %Iterator.prototype% Object
+/// 27.1.4 Properties of the Iterator Prototype Object
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
