@@ -36,30 +36,27 @@ configurable: ?bool = null,
 /// 6.2.6.1 IsAccessorDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isaccessordescriptor
 pub fn isAccessorDescriptor(self: PropertyDescriptor) bool {
-    // 1. If Desc is undefined, return false.
-    // 2. If Desc has a [[Get]] field, return true.
-    // 3. If Desc has a [[Set]] field, return true.
-    // 4. Return false.
+    // 1. If Desc has a [[Get]] field, return true.
+    // 2. If Desc has a [[Set]] field, return true.
+    // 3. Return false.
     return self.get != null or self.set != null;
 }
 
 /// 6.2.6.2 IsDataDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isdatadescriptor
 pub fn isDataDescriptor(self: PropertyDescriptor) bool {
-    // 1. If Desc is undefined, return false.
-    // 2. If Desc has a [[Value]] field, return true.
-    // 3. If Desc has a [[Writable]] field, return true.
-    // 4. Return false.
+    // 1. If Desc has a [[Value]] field, return true.
+    // 2. If Desc has a [[Writable]] field, return true.
+    // 3. Return false.
     return self.value != null or self.writable != null;
 }
 
 /// 6.2.6.3 IsGenericDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isgenericdescriptor
 pub fn isGenericDescriptor(self: PropertyDescriptor) bool {
-    // 1. If Desc is undefined, return false.
-    // 2. If IsAccessorDescriptor(Desc) is true, return false.
-    // 3. If IsDataDescriptor(Desc) is true, return false.
-    // 4. Return true.
+    // 1. If IsAccessorDescriptor(Desc) is true, return false.
+    // 2. If IsDataDescriptor(Desc) is true, return false.
+    // 3. Return true.
     return !(self.isAccessorDescriptor() or self.isDataDescriptor());
 }
 

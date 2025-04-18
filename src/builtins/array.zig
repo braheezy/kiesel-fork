@@ -62,26 +62,27 @@ fn defineOwnProperty(
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
+        // b. Assert: lengthDesc is not undefined.
         var length_descriptor = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
 
-        // b. Assert: IsDataDescriptor(lengthDesc) is true.
+        // c. Assert: IsDataDescriptor(lengthDesc) is true.
         std.debug.assert(length_descriptor.isDataDescriptor());
 
-        // c. Assert: lengthDesc.[[Configurable]] is false.
+        // d. Assert: lengthDesc.[[Configurable]] is false.
         std.debug.assert(length_descriptor.configurable == false);
 
-        // d. Let length be lengthDesc.[[Value]].
-        // e. Assert: length is a non-negative integral Number.
+        // e. Let length be lengthDesc.[[Value]].
+        // f. Assert: length is a non-negative integral Number.
         const length = length_descriptor.value.?.asNumber().toUint32();
 
-        // f. Let index be ! ToUint32(P).
+        // g. Let index be ! ToUint32(P).
         const index: u32 = @intCast(property_key.integer_index);
 
-        // g. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
+        // h. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
         if (index >= length and length_descriptor.writable == false)
             return false;
 
-        // h. Let succeeded be ! OrdinaryDefineOwnProperty(A, P, Desc).
+        // i. Let succeeded be ! OrdinaryDefineOwnProperty(A, P, Desc).
         var succeeded = ordinaryDefineOwnProperty(
             agent,
             array,
@@ -89,11 +90,11 @@ fn defineOwnProperty(
             property_descriptor,
         ) catch |err| try noexcept(err);
 
-        // i. If succeeded is false, return false.
+        // j. If succeeded is false, return false.
         if (!succeeded)
             return false;
 
-        // j. If index ≥ length, then
+        // k. If index ≥ length, then
         if (index >= length) {
             // i. Set lengthDesc.[[Value]] to index + 1𝔽.
             length_descriptor.value = Value.from(index + 1);
@@ -110,7 +111,7 @@ fn defineOwnProperty(
             std.debug.assert(succeeded);
         }
 
-        // k. Return true.
+        // l. Return true.
         return true;
     }
 
@@ -245,18 +246,19 @@ pub fn arraySetLength(
     new_len_desc.value = Value.from(new_len);
 
     // 7. Let oldLenDesc be OrdinaryGetOwnProperty(A, "length").
+    // 8. Assert: oldLenDesc is not undefined.
     const old_len_desc = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
 
-    // 8. Assert: IsDataDescriptor(oldLenDesc) is true.
+    // 9. Assert: IsDataDescriptor(oldLenDesc) is true.
     std.debug.assert(old_len_desc.isDataDescriptor());
 
-    // 9. Assert: oldLenDesc.[[Configurable]] is false.
+    // 10. Assert: oldLenDesc.[[Configurable]] is false.
     std.debug.assert(old_len_desc.configurable == false);
 
-    // 10. Let oldLen be oldLenDesc.[[Value]].
+    // 11. Let oldLen be oldLenDesc.[[Value]].
     const old_len: u32 = @intFromFloat(old_len_desc.value.?.asNumber().asFloat());
 
-    // 11. If newLen ≥ oldLen, then
+    // 12. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
         // a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
         const succeeded = ordinaryDefineOwnProperty(
@@ -277,17 +279,17 @@ pub fn arraySetLength(
         return succeeded;
     }
 
-    // 12. If oldLenDesc.[[Writable]] is false, return false.
+    // 13. If oldLenDesc.[[Writable]] is false, return false.
     if (old_len_desc.writable == false) return false;
 
     var new_writable: bool = undefined;
 
-    // 13. If newLenDesc does not have a [[Writable]] field or newLenDesc.[[Writable]] is true, then
+    // 14. If newLenDesc does not have a [[Writable]] field or newLenDesc.[[Writable]] is true, then
     if (new_len_desc.writable == null or new_len_desc.writable == true) {
         // a. Let newWritable be true.
         new_writable = true;
     } else {
-        // 14. Else,
+        // 15. Else,
         // a. NOTE: Setting the [[Writable]] attribute to false is deferred in case any elements
         //          cannot be deleted.
         // b. Let newWritable be false.
@@ -297,7 +299,7 @@ pub fn arraySetLength(
         new_len_desc.writable = true;
     }
 
-    // 15. Let succeeded be ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
+    // 16. Let succeeded be ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
     var succeeded = ordinaryDefineOwnProperty(
         agent,
         array,
@@ -305,10 +307,10 @@ pub fn arraySetLength(
         new_len_desc,
     ) catch |err| try noexcept(err);
 
-    // 16. If succeeded is false, return false.
+    // 17. If succeeded is false, return false.
     if (!succeeded) return false;
 
-    // 17. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
+    // 18. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
     //     in descending numeric index order, do
     var sparse_indices = switch (array.property_storage.indexed_properties.storage) {
         .sparse => |sparse| blk: {
@@ -362,7 +364,7 @@ pub fn arraySetLength(
         }
     }
 
-    // 18. If newWritable is false, then
+    // 19. If newWritable is false, then
     if (!new_writable) {
         // a. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
         //      [[Writable]]: false
@@ -378,7 +380,7 @@ pub fn arraySetLength(
         std.debug.assert(succeeded);
     }
 
-    // 19. Return true.
+    // 20. Return true.
     return true;
 }
 
