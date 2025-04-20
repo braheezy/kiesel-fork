@@ -136,11 +136,6 @@ pub fn build(b: *std.Build) void {
             }
         }
         kiesel.linkLibrary(libgc.artifact("gc"));
-        if (optimize == .ReleaseSafe) {
-            // This started triggering a SIGILL in ReleaseSafe mode at some point, likely UB that
-            // needs to be fixed upstream. Revisit after next libgc dependency update.
-            libgc.artifact("gc").root_module.sanitize_c = false;
-        }
     }
     if (enable_libregexp) {
         kiesel.linkLibrary(libregexp.artifact("regexp"));
