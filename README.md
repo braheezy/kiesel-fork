@@ -54,7 +54,10 @@ Further reading:
 
 ## Build
 
-Zig 0.14 is required. To build and run the Kiesel CLI:
+The `main` branch targets Zig 0.14. The `zig-dev` branch targets Zig 0.15-dev
+and is kept up to date on a best effort basis.
+
+To build and run the Kiesel CLI:
 
 ```console
 zig build run
