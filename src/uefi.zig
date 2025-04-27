@@ -85,16 +85,18 @@ pub fn main() std.os.uefi.Status {
         .writeFn = writeFn,
     };
 
-    var agent = Agent.init(allocator, allocator, .{
-        .platform = .{
-            .stdout = stdout,
-            .stderr = stderr,
-            .tty_config = .no_color,
-            .stack_info = null,
-            .default_locale = {},
-            .currentTime = std.time.milliTimestamp,
-        },
-    }) catch |err| switch (err) {
+    const platform: Agent.Platform = .{
+        .gc_allocator = allocator,
+        .gc_allocator_atomic = allocator,
+        .stdout = stdout,
+        .stderr = stderr,
+        .tty_config = .no_color,
+        .stack_info = null,
+        .default_locale = {},
+        .currentTime = std.time.milliTimestamp,
+    };
+    defer platform.deinit();
+    var agent = Agent.init(&platform, .{}) catch |err| switch (err) {
         error.OutOfMemory => return .out_of_resources,
     };
     defer agent.deinit();

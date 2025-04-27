@@ -2242,15 +2242,15 @@ pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value)
 }
 
 test format {
-    const gc = @import("../../gc.zig");
-    var gc_allocator: gc.GcAllocator = .init(.normal);
-    var gc_allocator_atomic: gc.GcAllocator = .init(.atomic);
-    var agent = try Agent.init(gc_allocator.allocator(), gc_allocator_atomic.allocator(), .{});
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
     defer agent.deinit();
     const symbol_without_description: Symbol = .{ .description = null };
     const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };
     var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
     defer managed.deinit();
+    const big_int = try BigInt.from(agent.gc_allocator, managed);
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
@@ -2262,7 +2262,7 @@ test format {
         .{ from("foo"), "\"foo\"" },
         .{ from(&symbol_without_description), "Symbol()" },
         .{ from(&symbol_with_description), "Symbol(\"foo\")" },
-        .{ from(try BigInt.from(gc_allocator.allocator(), managed)), "123n" },
+        .{ from(big_int), "123n" },
         .{ from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {

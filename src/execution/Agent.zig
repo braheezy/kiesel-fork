@@ -42,7 +42,7 @@ execution_context_stack: std.ArrayListUnmanaged(*ExecutionContext),
 queued_jobs: std.ArrayListUnmanaged(QueuedJob),
 empty_shape: *Object.Shape,
 string_cache: String.Cache,
-platform: Platform,
+platform: *const Platform,
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
@@ -54,7 +54,6 @@ pub const Exception = @import("Agent/Exception.zig");
 pub const Platform = @import("Agent/Platform.zig");
 
 pub const Options = struct {
-    platform: ?Platform = null,
     debug: struct {
         print_ast: bool = false,
         print_bytecode: bool = false,
@@ -68,19 +67,14 @@ pub const QueuedJob = struct {
     realm: ?*Realm,
 };
 
-pub fn init(
-    gc_allocator: std.mem.Allocator,
-    gc_allocator_atomic: std.mem.Allocator,
-    options: Options,
-) std.mem.Allocator.Error!Agent {
-    const platform = options.platform orelse if (@TypeOf(Platform.default) != void)
-        Platform.default()
-    else
-        @panic("No default implementation exists for this platform");
+pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator.Error!Agent {
     pretty_printing.state.tty_config = platform.tty_config;
     var self: Agent = .{
-        .gc_allocator = gc_allocator,
-        .gc_allocator_atomic = gc_allocator_atomic,
+        // TODO: Do we want to remove these aliases? In that case you'd have to type out
+        //       `agent.platform.gc_allocator.alloc()` every time, or we remove both levels of
+        //       indirection and make it `agent.alloc()`.
+        .gc_allocator = platform.gc_allocator,
+        .gc_allocator_atomic = platform.gc_allocator_atomic,
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
@@ -110,7 +104,6 @@ pub fn deinit(self: *Agent) void {
     self.queued_jobs.deinit(self.gc_allocator);
     self.empty_shape.deinit(self.gc_allocator);
     self.string_cache.entries.deinit(self.gc_allocator);
-    self.platform.deinit();
 }
 
 pub fn drainJobQueue(self: *Agent) void {
@@ -367,13 +360,19 @@ pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
 }
 
 test init {
+    var platform = Platform.default();
+    defer platform.deinit();
     // Ensure Agent teardown is leak-free
-    var agent = try init(std.testing.allocator, std.testing.allocator, .{});
+    platform.gc_allocator = std.testing.allocator;
+    platform.gc_allocator_atomic = std.testing.allocator;
+    var agent = try init(&platform, .{});
     defer agent.deinit();
 }
 
 test "well_known_symbols" {
-    var agent = try init(std.testing.allocator, std.testing.allocator, .{});
+    var platform = Platform.default();
+    defer platform.deinit();
+    var agent = try init(&platform, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
     try std.testing.expectEqualStrings(unscopables.description.?.slice.ascii, "Symbol.unscopables");

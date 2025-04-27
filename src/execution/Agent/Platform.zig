@@ -5,9 +5,14 @@ const icu4zig = @import("icu4zig");
 const stackinfo = @import("stackinfo");
 
 const build_options = @import("build-options");
+const gc = @import("../../gc.zig");
+
+const GcAllocator = gc.GcAllocator;
 
 const Platform = @This();
 
+gc_allocator: std.mem.Allocator,
+gc_allocator_atomic: std.mem.Allocator,
 stdout: std.io.AnyWriter,
 stderr: std.io.AnyWriter,
 tty_config: std.io.tty.Config,
@@ -31,26 +36,38 @@ const has_std_time_nanotimestamp = switch (builtin.os.tag) {
     else => has_clockid_t,
 };
 
-// `any()` captures a pointer to the writer, so these have to stick around.
-var stdout_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
-var stderr_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
+const State = struct {
+    gc_allocator: if (build_options.enable_libgc) GcAllocator else void,
+    gc_allocator_atomic: if (build_options.enable_libgc) GcAllocator else void,
 
-pub const default = if (has_fd_t and has_std_time_nanotimestamp) defaultImpl else {};
+    // `any()` captures a pointer to the writer, so these have to stick around.
+    stdout_writer: if (has_fd_t) std.fs.File.Writer else void,
+    stderr_writer: if (has_fd_t) std.fs.File.Writer else void,
+};
 
-// Ensure the default implementation doesn't silently break on known supported platforms
-comptime {
-    switch (builtin.os.tag) {
-        .linux, .macos, .windows, .wasi => std.debug.assert(@TypeOf(default) != void),
-        else => {},
+var state: State = undefined;
+
+pub fn default() Platform {
+    if (comptime !(has_fd_t and has_std_time_nanotimestamp)) {
+        @compileError("Platform.default() is not supported on this platform");
     }
-}
-
-fn defaultImpl() Platform {
-    stdout_writer = std.io.getStdOut().writer();
-    stderr_writer = std.io.getStdErr().writer();
+    state = .{
+        .gc_allocator = if (@FieldType(State, "gc_allocator") != void) .init(.normal),
+        .gc_allocator_atomic = if (@FieldType(State, "gc_allocator_atomic") != void) .init(.atomic),
+        .stdout_writer = std.io.getStdOut().writer(),
+        .stderr_writer = std.io.getStdErr().writer(),
+    };
     return .{
-        .stdout = stdout_writer.any(),
-        .stderr = stderr_writer.any(),
+        .gc_allocator = if (@FieldType(State, "gc_allocator") != void)
+            state.gc_allocator.allocator()
+        else
+            std.heap.page_allocator,
+        .gc_allocator_atomic = if (@FieldType(State, "gc_allocator_atomic") != void)
+            state.gc_allocator_atomic.allocator()
+        else
+            std.heap.page_allocator,
+        .stdout = state.stdout_writer.any(),
+        .stderr = state.stderr_writer.any(),
         .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
         .stack_info = stackinfo.StackInfo.init() catch null,
         .default_locale = if (build_options.enable_intl)

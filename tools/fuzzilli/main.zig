@@ -44,6 +44,9 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 fn reprl() !u8 {
     const gpa = std.heap.page_allocator;
 
+    var platform = Agent.Platform.default();
+    defer platform.deinit();
+
     var helo: [4]u8 = "HELO".*;
     std.debug.assert(try std.posix.write(REPRL_CWFD, &helo) == 4);
     std.debug.assert(try std.posix.read(REPRL_CRFD, &helo) == 4);
@@ -75,9 +78,7 @@ fn reprl() !u8 {
         @memcpy(data, @as([*]u8, @ptrCast(ptr))[0..data_size]);
 
         const result: u32 = blk: {
-            var gc_allocator: kiesel.gc.GcAllocator = .init(.normal);
-            var gc_atomic: kiesel.gc.GcAllocator = .init(.atomic);
-            var agent = try Agent.init(gc_allocator.allocator(), gc_atomic.allocator(), .{});
+            var agent = try Agent.init(&platform, .{});
             defer agent.deinit();
 
             try Realm.initializeHostDefinedRealm(&agent, .{});

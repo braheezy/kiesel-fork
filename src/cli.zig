@@ -772,18 +772,14 @@ pub fn main() !u8 {
     if (kiesel.build_options.enable_libgc and !parsed_args.options.@"print-gc-warnings") {
         kiesel.gc.disableWarnings();
     }
-    var gc_allocator: kiesel.gc.GcAllocator = if (kiesel.build_options.enable_libgc) .init(.normal) else undefined;
-    var gc_allocator_atomic: kiesel.gc.GcAllocator = if (kiesel.build_options.enable_libgc) .init(.atomic) else undefined;
-    var agent = try Agent.init(
-        if (kiesel.build_options.enable_libgc) gc_allocator.allocator() else std.heap.page_allocator,
-        if (kiesel.build_options.enable_libgc) gc_allocator_atomic.allocator() else std.heap.page_allocator,
-        .{
-            .debug = .{
-                .print_ast = parsed_args.options.@"print-ast",
-                .print_bytecode = parsed_args.options.@"print-bytecode",
-            },
+    var platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{
+        .debug = .{
+            .print_ast = parsed_args.options.@"print-ast",
+            .print_bytecode = parsed_args.options.@"print-bytecode",
         },
-    );
+    });
     defer agent.deinit();
 
     if (kiesel.build_options.enable_intl) {
@@ -794,7 +790,7 @@ pub fn main() !u8 {
             else
                 lang;
             if (icu4zig.Locale.fromString(lang_trimmed)) |locale|
-                agent.platform.default_locale = locale
+                platform.default_locale = locale
             else |_| {}
         } else |_| {}
     }
