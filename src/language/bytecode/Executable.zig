@@ -66,7 +66,7 @@ pub const AstNodeIndex = Index("AstNodeIndex", u16);
 pub const ConstantIndex = Index("ConstantIndex", u16);
 pub const EnvironmentLookupCacheIndex = Index("EnvironmentLookupCacheIndex", u16);
 pub const IdentifierIndex = Index("IdentifierIndex", u16);
-pub const InstructionIndex = Index("InstructionIndex", u16);
+pub const InstructionIndex = Index("InstructionIndex", u32);
 pub const PropertyLookupCacheIndex = Index("PropertyLookupCacheIndex", u16);
 
 pub fn init(allocator: std.mem.Allocator) Executable {
