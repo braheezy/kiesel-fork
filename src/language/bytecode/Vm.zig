@@ -135,7 +135,7 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     return self.function_arguments.items;
 }
 
-fn executeArrayCreate(self: *Vm, length: u16, _: Executable) Agent.Error!void {
+fn executeArrayCreate(self: *Vm, length: u32, _: Executable) Agent.Error!void {
     const array = try arrayCreate(self.agent, length, null);
     self.result = Value.from(array);
 }
@@ -153,14 +153,14 @@ fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(array);
 }
 
-fn executeArraySetLength(self: *Vm, length: u16, _: Executable) Agent.Error!void {
+fn executeArraySetLength(self: *Vm, length: u32, _: Executable) Agent.Error!void {
     const array = self.result.?.asObject();
     // From ArrayAccumulation:
     // 2. Perform ? Set(array, "length", 𝔽(len), true).
     try array.set(PropertyKey.from("length"), Value.from(length), .throw);
 }
 
-fn executeArraySetValueDirect(self: *Vm, index: u16, _: Executable) Agent.Error!void {
+fn executeArraySetValueDirect(self: *Vm, index: u32, _: Executable) Agent.Error!void {
     const value = self.stack.pop().?;
     const array = self.stack.pop().?.asObject();
     try array.property_storage.indexed_properties.set(self.agent.gc_allocator, index, .{

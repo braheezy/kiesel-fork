@@ -15,17 +15,17 @@ const PropertyLookupCacheIndex = Executable.PropertyLookupCacheIndex;
 pub const Instruction = union(enum(u8)) {
     /// Store ArrayCreate(0) as the result value.
     array_create: struct {
-        length: u16,
+        length: u32,
     },
     /// Append value on the stack to an array.
     array_push_value,
     /// Set the length property of an array to the given index.
     array_set_length: struct {
-        length: u16,
+        length: u32,
     },
     /// Set an array value directly.
     array_set_value_direct: struct {
-        index: u16,
+        index: u32,
     },
     /// Spread value into an array.
     array_spread_value,

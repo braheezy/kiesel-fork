@@ -56,7 +56,7 @@ pub const Context = struct {
     }
 };
 
-fn castIndex(comptime T: type, index: usize) Executable.CastIndexError!u16 {
+fn castIndex(comptime T: type, index: usize) Executable.CastIndexError!T {
     return std.math.cast(T, index) orelse {
         @branchHint(.cold);
         return error.IndexOutOfRange;
@@ -487,7 +487,7 @@ pub fn codegenArrayLiteral(
         }
     } else true;
     try executable.addInstruction(.array_create, .{
-        .length = if (is_fixed_length) try castIndex(u16, node.element_list.len) else 0,
+        .length = if (is_fixed_length) try castIndex(u32, node.element_list.len) else 0,
     });
     try executable.addInstruction(.load, {});
     for (node.element_list, 0..) |element, i| {
@@ -497,7 +497,7 @@ pub fn codegenArrayLiteral(
                 if (is_fixed_length) continue;
                 try executable.addInstruction(.store, {});
                 try executable.addInstruction(.array_set_length, .{
-                    .length = try castIndex(u16, i + 1),
+                    .length = try castIndex(u32, i + 1),
                 });
                 try executable.addInstruction(.load, {});
             },
@@ -515,7 +515,7 @@ pub fn codegenArrayLiteral(
                 // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
                 if (is_fixed_length) {
                     try executable.addInstruction(.array_set_value_direct, .{
-                        .index = try castIndex(u16, i),
+                        .index = try castIndex(u32, i),
                     });
                 } else {
                     try executable.addInstruction(.array_push_value, {});
@@ -1074,7 +1074,7 @@ pub fn codegenArguments(
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     } else {
         try executable.addInstruction(.array_create, .{
-            .length = try castIndex(u16, spread_indices.items.len),
+            .length = try castIndex(u32, spread_indices.items.len),
         });
         try executable.addInstruction(.load, {});
         for (spread_indices.items, 0..) |spread_index, i| {
@@ -1083,7 +1083,7 @@ pub fn codegenArguments(
                 Value.from(@as(u53, @intCast(spread_index))),
             );
             try executable.addInstruction(.array_set_value_direct, .{
-                .index = try castIndex(u16, i),
+                .index = try castIndex(u32, i),
             });
             try executable.addInstruction(.load, {});
         }
