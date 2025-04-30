@@ -14,8 +14,8 @@ const DeferredInstructionIndex = Executable.DeferredPayload(Executable.Instructi
 
 pub const Context = struct {
     contained_in_strict_mode_code: bool,
-    environment_lookup_cache_index: Executable.IndexType,
-    property_lookup_cache_index: Executable.IndexType,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+    property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
     continue_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
     break_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
     labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
@@ -26,8 +26,8 @@ pub const Context = struct {
     pub fn init() Context {
         return .{
             .contained_in_strict_mode_code = false,
-            .environment_lookup_cache_index = 0,
-            .property_lookup_cache_index = 0,
+            .environment_lookup_cache_index = @enumFromInt(0),
+            .property_lookup_cache_index = @enumFromInt(0),
             .continue_jumps = .empty,
             .break_jumps = .empty,
             .labelled_continue_jumps = .empty,
@@ -37,13 +37,13 @@ pub const Context = struct {
     }
 
     pub fn addEnvironmentLookupCacheIndex(self: *Context) Executable.EnvironmentLookupCacheIndex {
-        defer self.environment_lookup_cache_index += 1;
-        return @enumFromInt(self.environment_lookup_cache_index);
+        defer self.environment_lookup_cache_index = @enumFromInt(@intFromEnum(self.environment_lookup_cache_index) + 1);
+        return self.environment_lookup_cache_index;
     }
 
     pub fn addPropertyLookupCacheIndex(self: *Context) Executable.PropertyLookupCacheIndex {
-        defer self.property_lookup_cache_index += 1;
-        return @enumFromInt(self.property_lookup_cache_index);
+        defer self.property_lookup_cache_index = @enumFromInt(@intFromEnum(self.property_lookup_cache_index) + 1);
+        return self.property_lookup_cache_index;
     }
 
     pub fn deinit(self: *Context, allocator: std.mem.Allocator) void {

@@ -44,8 +44,6 @@ pub const AstNode = union {
 pub const CastIndexError = error{IndexOutOfRange};
 pub const Error = CastIndexError || std.mem.Allocator.Error;
 
-pub const IndexType = u16;
-
 // The name is required to avoid very long names when dumping the bytecode.
 fn Index(comptime name: []const u8, comptime BackingType: type) type {
     return enum(BackingType) {

@@ -335,7 +335,7 @@ pub const ECMAScriptFunction = MakeObject(.{
                     error.OutOfMemory => return error.OutOfMemory,
                 };
                 // 0 = load, 1 = store_constant, 2..3 = index
-                std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intFromEnum(index);
+                std.mem.bytesAsValue(Executable.ConstantIndex, executable.instructions.items[2..]).* = index;
 
                 if (agent.options.debug.print_bytecode) {
                     executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
