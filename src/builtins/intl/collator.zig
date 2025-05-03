@@ -166,8 +166,10 @@ pub const constructor = struct {
 
         // TODO: 23-28.
 
-        // 29. Let sensitivity be ? GetOption(options, "sensitivity", string, « "base", "accent",
-        //     "case", "variant" », undefined).
+        // 29. If usage is "sort", let defaultSensitivity be "variant". Otherwise, let
+        //     defaultSensitivity be resolvedLocaleData.[[sensitivity]].
+        // 30. Set collator.[[Sensitivity]] to ? GetOption(options, "sensitivity", string, «
+        //     "base", "accent", "case", "variant" », defaultSensitivity).
         var maybe_sensitivity = try options.getOption(
             agent,
             "sensitivity",
@@ -180,20 +182,9 @@ pub const constructor = struct {
             },
             null,
         );
-
-        // 30. If sensitivity is undefined, then
-        if (maybe_sensitivity == null) {
-            // a. If usage is "sort", then
-            if (usage.eql(String.fromLiteral("sort"))) {
-                // i. Set sensitivity to "variant".
-                maybe_sensitivity = String.fromLiteral("variant");
-            } else {
-                // b. Else,
-                // i. Set sensitivity to resolvedLocaleData.[[sensitivity]].
-            }
+        if (maybe_sensitivity == null and usage.eql(String.fromLiteral("sort"))) {
+            maybe_sensitivity = String.fromLiteral("variant");
         }
-
-        // 31. Set collator.[[Sensitivity]] to sensitivity.
         const sensitivity_map = std.StaticStringMap(
             struct { icu4zig.Collator.Options.Strength, ?icu4zig.Collator.Options.CaseLevel },
         ).initComptime(&.{
@@ -210,9 +201,9 @@ pub const constructor = struct {
             collator.as(Collator).fields.options.case_level = case_level;
         }
 
-        // 32. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
-        // 33. Let ignorePunctuation be ? GetOption(options, "ignorePunctuation", boolean, empty,
-        //     defaultIgnorePunctuation).
+        // 31. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
+        // 32. Set collator.[[IgnorePunctuation]] to ? GetOption(options, "ignorePunctuation",
+        //     boolean, empty, defaultIgnorePunctuation).
         const maybe_ignore_punctuation = try options.getOption(
             agent,
             "ignorePunctuation",
@@ -220,13 +211,11 @@ pub const constructor = struct {
             null,
             null,
         );
-
-        // 34. Set collator.[[IgnorePunctuation]] to ignorePunctuation.
         if (maybe_ignore_punctuation) |ignore_punctuation| {
             collator.as(Collator).fields.options.max_variable = if (ignore_punctuation) .space else .punctuation;
         }
 
-        // 35. Return collator.
+        // 33. Return collator.
         return Value.from(collator);
     }
 };
