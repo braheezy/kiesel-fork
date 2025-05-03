@@ -768,8 +768,8 @@ fn innerModuleEvaluation(
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
     if (abstract_module != .source_text_module) {
-        // a. Let promise be ! module.Evaluate().
-        const promise = abstract_module.evaluate(agent) catch |err| try noexcept(err);
+        // a. Let promise be module.Evaluate().
+        const promise = try abstract_module.evaluate(agent);
 
         // b. Assert: promise.[[PromiseState]] is not pending.
         std.debug.assert(promise.fields.promise_state != .pending);
