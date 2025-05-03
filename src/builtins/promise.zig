@@ -672,7 +672,7 @@ pub fn newPromiseResolveThenableJob(
                 },
             };
 
-            // d. Return ? thenCallResult.
+            // d. Return ! thenCallResult.
             return then_call_result;
         }
     }.func;
@@ -1687,7 +1687,7 @@ pub const constructor = struct {
             }
         }
 
-        // 9. Return ? result.
+        // 9. Return ! result.
         return result;
     }
 
@@ -1734,7 +1734,7 @@ pub const constructor = struct {
             }
         }
 
-        // 9. Return ? result.
+        // 9. Return ! result.
         return result;
     }
 
@@ -1781,7 +1781,7 @@ pub const constructor = struct {
             }
         }
 
-        // 9. Return ? result.
+        // 9. Return ! result.
         return result;
     }
 
@@ -1828,7 +1828,7 @@ pub const constructor = struct {
             }
         }
 
-        // 9. Return ? result.
+        // 9. Return ! result.
         return result;
     }
 
