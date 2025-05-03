@@ -63,12 +63,9 @@ pub const constructor = struct {
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let internalSlotsList be « [[InitializedCollator]], [[Locale]], [[Usage]],
-        //    [[Sensitivity]], [[IgnorePunctuation]], [[Collation]], [[BoundCompare]] ».
-        // 3. If %Intl.Collator%.[[RelevantExtensionKeys]] contains "kn", then
-        //     a. Append [[Numeric]] to internalSlotsList.
-        // 4. If %Intl.Collator%.[[RelevantExtensionKeys]] contains "kf", then
-        //     a. Append [[CaseFirst]] to internalSlotsList.
-        // 5. Let collator be ? OrdinaryCreateFromConstructor(newTarget,
+        //    [[Collation]], [[Numeric]], [[CaseFirst]], [[Sensitivity]], [[IgnorePunctuation]],
+        //    [[BoundCompare]] ».
+        // 3. Let collator be ? OrdinaryCreateFromConstructor(newTarget,
         //    "%Intl.Collator.prototype%", internalSlotsList).
         const collator = try ordinaryCreateFromConstructor(
             Collator,
@@ -83,13 +80,13 @@ pub const constructor = struct {
             },
         );
 
-        // 6. Let requestedLocales be ? CanonicalizeLocaleList(locales).
+        // 4. Let requestedLocales be ? CanonicalizeLocaleList(locales).
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
-        // 7. Set options to ? CoerceOptionsToObject(options).
+        // 5. Set options to ? CoerceOptionsToObject(options).
         const options = try options_value.coerceOptionsToObject(agent);
 
-        // 8. Let usage be ? GetOption(options, "usage", string, « "sort", "search" », "sort").
+        // 6. Let usage be ? GetOption(options, "usage", string, « "sort", "search" », "sort").
         const usage = try options.getOption(
             agent,
             "usage",
@@ -98,18 +95,18 @@ pub const constructor = struct {
             String.fromLiteral("sort"),
         );
 
-        // 9. Set collator.[[Usage]] to usage.
+        // 7. Set collator.[[Usage]] to usage.
         const usage_map = std.StaticStringMap(Collator.Fields.Usage).initComptime(&.{
             .{ "sort", .sort },
             .{ "search", .search },
         });
         collator.as(Collator).fields.usage = usage_map.get(usage.slice.ascii).?;
 
-        // TODO: 10-11.
+        // TODO: 8-9.
 
-        // 12. Let opt be a new Record.
+        // 10. Let opt be a new Record.
 
-        // 13. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
+        // 11. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
         //     "best fit").
         const matcher = try options.getOption(
             agent,
@@ -119,28 +116,28 @@ pub const constructor = struct {
             String.fromLiteral("best fit"),
         );
 
-        // TODO: 14. Set opt.[[localeMatcher]] to matcher.
+        // TODO: 12. Set opt.[[localeMatcher]] to matcher.
         _ = matcher;
 
-        // 15. Let collation be ? GetOption(options, "collation", string, empty, undefined).
+        // 13. Let collation be ? GetOption(options, "collation", string, empty, undefined).
         const maybe_collation = try options.getOption(agent, "collation", .string, null, null);
 
-        // 16. If collation is not undefined, then
+        // 14. If collation is not undefined, then
         if (maybe_collation) |_| {
             // TODO: a. If collation cannot be matched by the type Unicode locale nonterminal,
             //          throw a RangeError exception.
         }
-        // TODO: 17. Set opt.[[co]] to collation.
+        // TODO: 15. Set opt.[[co]] to collation.
 
-        // 18. Let numeric be ? GetOption(options, "numeric", boolean, empty, undefined).
+        // 16. Let numeric be ? GetOption(options, "numeric", boolean, empty, undefined).
         const maybe_numeric = try options.getOption(agent, "numeric", .boolean, null, null);
 
-        // 19. If numeric is not undefined, then
+        // 17. If numeric is not undefined, then
         //     a. Set numeric to ! ToString(numeric).
-        // TODO: 20. Set opt.[[kn]] to numeric.
+        // TODO: 18. Set opt.[[kn]] to numeric.
         _ = maybe_numeric;
 
-        // 21. Let caseFirst be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" », undefined).
+        // 19. Let caseFirst be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" », undefined).
         const maybe_case_first = try options.getOption(
             agent,
             "caseFirst",
@@ -153,24 +150,23 @@ pub const constructor = struct {
             null,
         );
 
-        // TODO: 22. Set opt.[[kf]] to caseFirst.
+        // TODO: 20. Set opt.[[kf]] to caseFirst.
         _ = maybe_case_first;
 
-        // 23. Let relevantExtensionKeys be %Intl.Collator%.[[RelevantExtensionKeys]].
-        // TODO: 24. Let r be ResolveLocale(%Intl.Collator%.[[AvailableLocales]], requestedLocales,
-        //           opt, relevantExtensionKeys, localeData).
+        // 21. Let r be ResolveLocale(%Intl.Collator%.[[AvailableLocales]], requestedLocales,
+        //           opt, %Intl.Collator%.[[RelevantExtensionKeys]], localeData).
         const resolved_locale = if (requested_locales.items.len != 0) blk: {
             const resolved_locale_string = try requested_locales.items[0].toString(agent.gc_allocator);
             var it = std.mem.splitSequence(u8, resolved_locale_string, "-x-");
             break :blk icu4zig.Locale.fromString(it.next().?) catch unreachable;
         } else agent.platform.default_locale;
 
-        // 25. Set collator.[[Locale]] to r.[[Locale]].
+        // 22. Set collator.[[Locale]] to r.[[Locale]].
         collator.as(Collator).fields.locale = resolved_locale;
 
-        // TODO: 26-31.
+        // TODO: 23-28.
 
-        // 32. Let sensitivity be ? GetOption(options, "sensitivity", string, « "base", "accent",
+        // 29. Let sensitivity be ? GetOption(options, "sensitivity", string, « "base", "accent",
         //     "case", "variant" », undefined).
         var maybe_sensitivity = try options.getOption(
             agent,
@@ -185,7 +181,7 @@ pub const constructor = struct {
             null,
         );
 
-        // 33. If sensitivity is undefined, then
+        // 30. If sensitivity is undefined, then
         if (maybe_sensitivity == null) {
             // a. If usage is "sort", then
             if (usage.eql(String.fromLiteral("sort"))) {
@@ -197,7 +193,7 @@ pub const constructor = struct {
             }
         }
 
-        // 34. Set collator.[[Sensitivity]] to sensitivity.
+        // 31. Set collator.[[Sensitivity]] to sensitivity.
         const sensitivity_map = std.StaticStringMap(
             struct { icu4zig.Collator.Options.Strength, ?icu4zig.Collator.Options.CaseLevel },
         ).initComptime(&.{
@@ -214,8 +210,8 @@ pub const constructor = struct {
             collator.as(Collator).fields.options.case_level = case_level;
         }
 
-        // 35. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
-        // 36. Let ignorePunctuation be ? GetOption(options, "ignorePunctuation", boolean, empty,
+        // 32. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
+        // 33. Let ignorePunctuation be ? GetOption(options, "ignorePunctuation", boolean, empty,
         //     defaultIgnorePunctuation).
         const maybe_ignore_punctuation = try options.getOption(
             agent,
@@ -225,12 +221,12 @@ pub const constructor = struct {
             null,
         );
 
-        // 37. Set collator.[[IgnorePunctuation]] to ignorePunctuation.
+        // 34. Set collator.[[IgnorePunctuation]] to ignorePunctuation.
         if (maybe_ignore_punctuation) |ignore_punctuation| {
             collator.as(Collator).fields.options.max_variable = if (ignore_punctuation) .space else .punctuation;
         }
 
-        // 38. Return collator.
+        // 35. Return collator.
         return Value.from(collator);
     }
 };
