@@ -42,15 +42,8 @@ pub fn deinit(self: *BigInt, allocator: std.mem.Allocator) void {
     allocator.destroy(self);
 }
 
-pub fn asFloat(self: *const BigInt, agent: *Agent) std.mem.Allocator.Error!f64 {
-    // NOTE: We could also use to(i1024) here, which should cover the largest possible int for
-    //       an f64, but that fails to codegen on the Zig side for at least aarch64-macos and
-    //       wasm32-wasi. Going via toString() and parsing that into a float isn't great but
-    //       works for now.
-    return std.fmt.parseFloat(
-        f64,
-        (try self.toString(agent, 10)).slice.ascii,
-    ) catch unreachable;
+pub fn asFloat(self: *const BigInt) f64 {
+    return self.managed.toFloat(f64);
 }
 
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )

@@ -147,9 +147,9 @@ pub const constructor = struct {
                 const primitive = try value.toNumeric(agent);
 
                 // b. If prim is a BigInt, let n be 𝔽(ℝ(prim)).
-                if (primitive == .big_int) break :blk types.Number.from(
-                    try primitive.big_int.asFloat(agent),
-                );
+                if (primitive == .big_int) {
+                    break :blk types.Number.from(primitive.big_int.asFloat());
+                }
 
                 // c. Otherwise, let n be prim.
                 break :blk primitive.number;

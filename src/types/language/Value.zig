@@ -2015,8 +2015,8 @@ pub fn isLessThan(
 
         // k. If ℝ(nx) < ℝ(ny), return true; otherwise return false.
         return switch (nx) {
-            .number => nx.number.asFloat() < try ny.big_int.asFloat(agent),
-            .big_int => try nx.big_int.asFloat(agent) < ny.number.asFloat(),
+            .number => nx.number.asFloat() < ny.big_int.asFloat(),
+            .big_int => nx.big_int.asFloat() < ny.number.asFloat(),
         };
     }
 }
