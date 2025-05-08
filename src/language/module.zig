@@ -163,6 +163,42 @@ pub const Module = union(enum) {
             .synthetic_module => |module| module.evaluate(agent),
         };
     }
+
+    /// 16.2.1.5.1 EvaluateModuleSync ( module )
+    /// https://tc39.es/ecma262/#sec-EvaluateModuleSync
+    pub fn evaluateSync(self: Module, agent: *Agent) Agent.Error!void {
+        // 1. Assert: module is not a Cyclic Module Record.
+        std.debug.assert(self != .source_text_module);
+
+        // 2. Let promise be module.Evaluate().
+        const promise = try self.evaluate(agent);
+
+        // 3. Assert: promise.[[PromiseState]] is either fulfilled or rejected.
+        std.debug.assert(promise.fields.promise_state == .fulfilled or
+            promise.fields.promise_state == .rejected);
+
+        // 4. If promise.[[PromiseState]] is rejected, then
+        if (promise.fields.promise_state == .rejected) {
+            // a. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(
+            //    promise, "handle").
+            if (promise.fields.promise_is_handled == false) {
+                agent.host_hooks.hostPromiseRejectionTracker(agent, promise, .handle);
+            }
+
+            // b. Set promise.[[PromiseIsHandled]] to true.
+            promise.fields.promise_is_handled = true;
+
+            // c. Return ThrowCompletion(promise.[[PromiseResult]]).
+            agent.exception = .{
+                .value = promise.fields.promise_result,
+                // TODO: Capture stack when rejecting a promise
+                .stack_trace = &.{},
+            };
+            return error.ExceptionThrown;
+        }
+
+        // 5. Return unused.
+    }
 };
 
 /// https://tc39.es/ecma262/#graphloadingstate-record

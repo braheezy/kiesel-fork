@@ -768,24 +768,10 @@ fn innerModuleEvaluation(
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
     if (abstract_module != .source_text_module) {
-        // a. Let promise be module.Evaluate().
-        const promise = try abstract_module.evaluate(agent);
+        // a. Perform ? EvaluateModuleSync(module).
+        try abstract_module.evaluateSync(agent);
 
-        // b. Assert: promise.[[PromiseState]] is not pending.
-        std.debug.assert(promise.fields.promise_state != .pending);
-
-        // c. If promise.[[PromiseState]] is rejected, then
-        if (promise.fields.promise_state == .rejected) {
-            // i. Return ThrowCompletion(promise.[[PromiseResult]]).
-            agent.exception = .{
-                .value = promise.fields.promise_result,
-                // TODO: Capture stack when rejecting a promise
-                .stack_trace = &.{},
-            };
-            return error.ExceptionThrown;
-        }
-
-        // d. Return index.
+        // b. Return index.
         return index;
     }
 
