@@ -163,6 +163,10 @@ pub fn regExpInitialize(
     pattern: Value,
     flags: Value,
 ) Agent.Error!*Object {
+    if (!build_options.enable_libregexp) {
+        return agent.throwException(.internal_error, "RegExp support is disabled", .{});
+    }
+
     // 1. If pattern is undefined, let P be the empty String.
     // 2. Else, let P be ? ToString(pattern).
     const p: *const String = if (pattern.isUndefined()) .empty else try pattern.toString(agent);
@@ -281,6 +285,10 @@ fn getMatch(captures_list: []?*u8, string: []const u8, shift: bool, i: usize) ?M
 /// 22.2.7.2 RegExpBuiltinExec ( R, S )
 /// https://tc39.es/ecma262/#sec-regexpbuiltinexec
 pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String) Agent.Error!?*Object {
+    if (!build_options.enable_libregexp) {
+        return agent.throwException(.internal_error, "RegExp support is disabled", .{});
+    }
+
     // 1. Let length be the length of S.
     const length = string.length();
 
@@ -920,6 +928,8 @@ pub const prototype = struct {
     }
 
     pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        if (!build_options.enable_libregexp) return;
+
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinFunction(object, "exec", exec, 1, realm);
         try defineBuiltinAccessor(object, "flags", flags, null, realm);

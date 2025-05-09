@@ -2,6 +2,7 @@ const std = @import("std");
 
 const libregexp = @import("../c/libregexp.zig").libregexp;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
@@ -446,6 +447,11 @@ pub const RegularExpressionLiteral = struct {
         self: RegularExpressionLiteral,
         allocator: std.mem.Allocator,
     ) std.mem.Allocator.Error!ValidationResult {
+        if (!build_options.enable_libregexp) {
+            // Skip validation, throws unconditionally when evaluated
+            return .valid;
+        }
+
         // 1. Let flags be the FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
