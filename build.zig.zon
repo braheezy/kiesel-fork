@@ -31,12 +31,6 @@
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/fac416f34dcb6e59c257dd99f7da8e1dd65beb0e.tar.gz",
             .hash = "libregexp-0.1.0-HanscXwNAAD6ChBeFGHxsZgalLURF6ATXfl0a9Yvz-3a",
         },
-        // Needed for mach-o/getsect.h when building libgc for macOS
-        .macos_sdk = .{
-            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/a4ea24f105902111633c6ae9f888b676ac5e36df.tar.gz",
-            .hash = "N-V-__8AAG0-dAOcye43JFbtpStxz5rnfcxwf6Qsn51omWtb",
-            .lazy = true,
-        },
         .parser_toolkit = .{
             .url = "https://github.com/ikskuh/parser-toolkit/archive/7817ed5d9096b40039c49498ddf7f11fa7a2fc4e.tar.gz",
             .hash = "parser_toolkit-0.1.0-baYGPbJAEwB2mV9PHH9LFc5yZTx3Ox5rkcJp87Fh8ECO",

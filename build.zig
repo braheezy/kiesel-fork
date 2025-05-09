@@ -130,11 +130,6 @@ pub fn build(b: *std.Build) void {
         }
     }
     if (enable_libgc) {
-        if (target.result.os.tag == .macos) {
-            if (b.lazyImport(@This(), "macos_sdk")) |build_macos_sdk| {
-                build_macos_sdk.addPaths(libgc.artifact("gc"));
-            }
-        }
         kiesel.linkLibrary(libgc.artifact("gc"));
     }
     if (enable_libregexp) {
