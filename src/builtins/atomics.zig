@@ -115,19 +115,17 @@ fn validateAtomicAccess(
     return (access_index * element_size) + offset;
 }
 
-/// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( typedArray, requestIndex [ , waitable ] )
+/// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( typedArray, requestIndex )
 /// https://tc39.es/ecma262/#sec-validateatomicaccessonintegertypedarray
 fn validateAtomicAccessOnIntegerTypedArray(
     agent: *Agent,
     typed_array: Value,
     request_index: Value,
-    waitable: ?bool,
 ) Agent.Error!u53 {
-    // 1. If waitable is not present, set waitable to false.
-    // 2. Let taRecord be ? ValidateIntegerTypedArray(typedArray, waitable).
-    const ta = try validateIntegerTypedArray(agent, typed_array, waitable orelse false);
+    // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, false).
+    const ta = try validateIntegerTypedArray(agent, typed_array, false);
 
-    // 3. Return ? ValidateAtomicAccess(taRecord, requestIndex).
+    // 2. Return ? ValidateAtomicAccess(taRecord, requestIndex).
     return validateAtomicAccess(agent, ta, request_index);
 }
 
@@ -356,7 +354,6 @@ fn atomicReadModifyWrite(
         agent,
         typed_array_value,
         index,
-        null,
     );
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
@@ -477,7 +474,6 @@ pub const namespace = struct {
             agent,
             typed_array_value,
             index,
-            null,
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
@@ -625,7 +621,6 @@ pub const namespace = struct {
             agent,
             typed_array_value,
             index,
-            null,
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
@@ -664,21 +659,19 @@ pub const namespace = struct {
         const index = arguments.get(1);
         const count_value = arguments.get(2);
 
-        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index, true).
-        const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
-            agent,
-            typed_array_value,
-            index,
-            true,
-        );
+        // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, true).
+        const ta = try validateIntegerTypedArray(agent, typed_array_value, true);
+
+        // 2. Let byteIndexInBuffer be ? ValidateAtomicAccess(taRecord, index).
+        const byte_index_in_buffer = try validateAtomicAccess(agent, ta, index);
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-        // 2. If count is undefined, then
+        // 3. If count is undefined, then
         const count = if (count_value.isUndefined()) blk: {
             // a. Let c be +∞.
             break :blk std.math.inf(f64);
         } else blk: {
-            // 3. Else,
+            // 4. Else,
             // a. Let intCount be ? ToIntegerOrInfinity(count).
             const int_count = try count_value.toIntegerOrInfinity(agent);
 
@@ -686,25 +679,25 @@ pub const namespace = struct {
             break :blk @max(int_count, 0);
         };
 
-        // 4. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
-        // 6. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
-        // 5. Let block be buffer.[[ArrayBufferData]].
+        // 6. Let block be buffer.[[ArrayBufferData]].
+        // 7. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
         const block = switch (buffer) {
             .array_buffer => return Value.from(0),
             .shared_array_buffer => |shared_array_buffer| &shared_array_buffer.fields.array_buffer_data,
         };
 
-        // TODO: 7. Let WL be GetWaiterList(block, byteIndexInBuffer).
+        // TODO: 8. Let WL be GetWaiterList(block, byteIndexInBuffer).
         _ = block;
         _ = byte_index_in_buffer;
 
-        // TODO: 8-12.
+        // TODO: 9-13.
         _ = count;
         const n = 0;
 
-        // 13. Return 𝔽(n).
+        // 14. Return 𝔽(n).
         return Value.from(n);
     }
 
@@ -763,7 +756,6 @@ pub const namespace = struct {
             agent,
             typed_array_value,
             index,
-            null,
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
