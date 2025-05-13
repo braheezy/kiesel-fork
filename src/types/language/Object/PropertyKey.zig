@@ -157,6 +157,6 @@ pub const PropertyKey = union(enum) {
             pub fn eql(_: @This(), a: PropertyKey, b: PropertyKey, _: usize) bool {
                 return a.eql(b);
             }
-        }, true);
+        }, false);
     }
 };

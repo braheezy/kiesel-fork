@@ -80,7 +80,7 @@ pub const ModuleRequest = struct {
             pub fn eql(_: @This(), a: ModuleRequest, b: ModuleRequest, _: usize) bool {
                 return a.eql(b);
             }
-        }, true);
+        }, false);
     }
 };
 

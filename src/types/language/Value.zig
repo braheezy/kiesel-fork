@@ -2238,7 +2238,7 @@ pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value)
         pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {
             return eqlFn(a, b);
         }
-    }, true);
+    }, false);
 }
 
 test format {

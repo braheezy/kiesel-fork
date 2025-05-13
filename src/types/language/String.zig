@@ -656,7 +656,7 @@ pub fn ArrayHashMapUnmanaged(comptime V: type) type {
         pub fn eql(_: @This(), a: *const String, b: *const String, _: usize) bool {
             return a.eql(b);
         }
-    }, true);
+    }, false);
 }
 
 test format {
