@@ -335,6 +335,10 @@ fn utf8StringValue(
     allocator: std.mem.Allocator,
     text: []const u8,
 ) std.mem.Allocator.Error!?[]const u8 {
+    // Only construct a full string if we need to unescape it.
+    if (std.mem.indexOfScalar(u8, text, '\\') == null) {
+        return try allocator.dupe(u8, text);
+    }
     const string = try ast.stringValueImpl(allocator, text);
     return switch (string.slice) {
         .ascii => |ascii| ascii,
