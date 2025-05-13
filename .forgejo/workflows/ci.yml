@@ -14,7 +14,7 @@ jobs:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v4
       - name: Install Zig
-        uses: https://github.com/mlugg/setup-zig@v1
+        uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.14.0
       - name: Install Rust
@@ -126,7 +126,7 @@ jobs:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v4
       - name: Install Zig
-        uses: https://github.com/mlugg/setup-zig@v1
+        uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.14.0
       - name: Install Rust
@@ -170,7 +170,7 @@ jobs:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v4
       - name: Install Zig
-        uses: https://github.com/mlugg/setup-zig@v1
+        uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.14.0
       - name: Check formatting
@@ -190,7 +190,7 @@ jobs:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v4
       - name: Install Zig
-        uses: https://github.com/mlugg/setup-zig@v1
+        uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.14.0
       - name: Run tests
@@ -218,7 +218,7 @@ jobs:
           cd test262
           git checkout $TEST262_COMMIT
       - name: Install Zig
-        uses: https://github.com/mlugg/setup-zig@v1
+        uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.14.0
       - name: Install Rust
