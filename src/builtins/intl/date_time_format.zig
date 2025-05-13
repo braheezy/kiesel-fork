@@ -767,9 +767,9 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
 const FormatDateTimeError =
     std.mem.Allocator.Error ||
     icu4zig.CalendarError ||
-    icu4zig.CalendarParseError ||
     icu4zig.DateTimeFormatterLoadError ||
-    icu4zig.DateTimeWriteError;
+    icu4zig.DateTimeWriteError ||
+    icu4zig.Rfc9557ParseError;
 
 fn formatDateTimeImpl(
     allocator: std.mem.Allocator,

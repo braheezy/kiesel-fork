@@ -302,7 +302,7 @@ pub const PluralRules = MakeObject(.{
 /// https://tc39.es/ecma402/#sec-resolveplural
 pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct {
     /// [[PluralCategory]]
-    plural_category: icu4zig.PluralRules.Category,
+    plural_category: icu4zig.PluralRules.PluralCategory,
 
     // TODO: [[FormattedString]]
 } {

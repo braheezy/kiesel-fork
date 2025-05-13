@@ -463,7 +463,7 @@ pub fn toLowerCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*
                 defer agent.gc_allocator.free(utf8);
                 const case_mapper = icu4zig.CaseMapper.init();
                 defer case_mapper.deinit();
-                const locale = icu4zig.Locale.und();
+                const locale = icu4zig.Locale.unknown();
                 defer locale.deinit();
                 const utf8_lowercase = try case_mapper.lowercase(agent.gc_allocator, utf8, locale);
                 return fromUtf8(agent, utf8_lowercase);
@@ -495,7 +495,7 @@ pub fn toUpperCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*
                 defer agent.gc_allocator.free(utf8);
                 const case_mapper = icu4zig.CaseMapper.init();
                 defer case_mapper.deinit();
-                const locale = icu4zig.Locale.und();
+                const locale = icu4zig.Locale.unknown();
                 defer locale.deinit();
                 const utf8_uppercase = try case_mapper.uppercase(agent.gc_allocator, utf8, locale);
                 return fromUtf8(agent, utf8_uppercase);

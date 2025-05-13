@@ -387,29 +387,17 @@ pub fn compareStrings(
     defer collator.deinit();
 
     const order = if (x.slice == .ascii and y.slice == .ascii) blk: {
-        break :blk collator.compare(
-            .{ .utf8 = x.slice.ascii },
-            .{ .utf8 = y.slice.ascii },
-        );
+        break :blk collator.compareUtf8(x.slice.ascii, y.slice.ascii);
     } else if (x.slice == .utf16 and y.slice == .utf16) blk: {
-        break :blk collator.compare(
-            .{ .utf16 = x.slice.utf16 },
-            .{ .utf16 = y.slice.utf16 },
-        );
+        break :blk collator.compareUtf16(x.slice.utf16, y.slice.utf16);
     } else if (x.slice == .ascii and y.slice == .utf16) blk: {
         const x_utf16 = try x.toUtf16(allocator);
         defer allocator.free(x_utf16);
-        break :blk collator.compare(
-            .{ .utf16 = x_utf16 },
-            .{ .utf16 = y.slice.utf16 },
-        );
+        break :blk collator.compareUtf16(x_utf16, y.slice.utf16);
     } else if (x.slice == .utf16 and y.slice == .ascii) blk: {
         const y_utf16 = try y.toUtf16(allocator);
         defer allocator.free(y_utf16);
-        break :blk collator.compare(
-            .{ .utf16 = x.slice.utf16 },
-            .{ .utf16 = y_utf16 },
-        );
+        break :blk collator.compareUtf16(x.slice.utf16, y_utf16);
     } else unreachable;
     return switch (order) {
         .lt => Value.from(-1),

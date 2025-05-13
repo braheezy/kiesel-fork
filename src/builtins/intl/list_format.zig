@@ -332,7 +332,7 @@ fn formatList(
         },
     );
     defer list_formatter.deinit();
-    return String.fromUtf8(agent, try list_formatter.format(agent.gc_allocator, .{ .utf8 = list }));
+    return String.fromUtf8(agent, try list_formatter.formatUtf8(agent.gc_allocator, list));
 }
 
 /// 14.5.5 StringListFromIterable ( iterable )

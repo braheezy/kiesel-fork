@@ -71,7 +71,7 @@ pub fn default() Platform {
         .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
         .stack_info = stackinfo.StackInfo.init() catch null,
         .default_locale = if (build_options.enable_intl)
-            icu4zig.Locale.und()
+            icu4zig.Locale.unknown()
         else {},
         .currentTime = std.time.milliTimestamp,
     };

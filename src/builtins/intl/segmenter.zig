@@ -261,38 +261,38 @@ const AnySegmenter = union(enum) {
     sentence: icu4zig.SentenceSegmenter,
 
     const BreakIterator = union(enum) {
-        grapheme: icu4zig.GraphemeClusterSegmenter.GraphemeClusterBreakIterator,
-        word: icu4zig.WordSegmenter.WordBreakIterator,
-        sentence: icu4zig.SentenceSegmenter.SentenceBreakIterator,
+        grapheme_utf8: icu4zig.GraphemeClusterSegmenter.GraphemeClusterBreakIteratorUtf8,
+        grapheme_utf16: icu4zig.GraphemeClusterSegmenter.GraphemeClusterBreakIteratorUtf16,
+        word_utf8: icu4zig.WordSegmenter.WordBreakIteratorUtf8,
+        word_utf16: icu4zig.WordSegmenter.WordBreakIteratorUtf16,
+        sentence_utf8: icu4zig.SentenceSegmenter.SentenceBreakIteratorUtf8,
+        sentence_utf16: icu4zig.SentenceSegmenter.SentenceBreakIteratorUtf16,
 
         fn deinit(self: BreakIterator) void {
             switch (self) {
-                .grapheme => |iterator| iterator.deinit(),
-                .word => |iterator| iterator.deinit(),
-                .sentence => |iterator| iterator.deinit(),
+                .grapheme_utf8 => |iterator| iterator.deinit(),
+                .grapheme_utf16 => |iterator| iterator.deinit(),
+                .word_utf8 => |iterator| iterator.deinit(),
+                .word_utf16 => |iterator| iterator.deinit(),
+                .sentence_utf8 => |iterator| iterator.deinit(),
+                .sentence_utf16 => |iterator| iterator.deinit(),
             }
         }
     };
 
     fn segment(self: AnySegmenter, string: *const String) BreakIterator {
         return switch (self) {
-            .grapheme => |segmenter| .{
-                .grapheme = segmenter.segment(switch (string.slice) {
-                    .ascii => |utf8| .{ .utf8 = utf8 },
-                    .utf16 => |utf16| .{ .utf16 = utf16 },
-                }),
+            .grapheme => |segmenter| switch (string.slice) {
+                .ascii => |utf8| .{ .grapheme_utf8 = segmenter.segmentUtf8(utf8) },
+                .utf16 => |utf16| .{ .grapheme_utf16 = segmenter.segmentUtf16(utf16) },
             },
-            .word => |segmenter| .{
-                .word = segmenter.segment(switch (string.slice) {
-                    .ascii => |utf8| .{ .utf8 = utf8 },
-                    .utf16 => |utf16| .{ .utf16 = utf16 },
-                }),
+            .word => |segmenter| switch (string.slice) {
+                .ascii => |utf8| .{ .word_utf8 = segmenter.segmentUtf8(utf8) },
+                .utf16 => |utf16| .{ .word_utf16 = segmenter.segmentUtf16(utf16) },
             },
-            .sentence => |segmenter| .{
-                .sentence = segmenter.segment(switch (string.slice) {
-                    .ascii => |utf8| .{ .utf8 = utf8 },
-                    .utf16 => |utf16| .{ .utf16 = utf16 },
-                }),
+            .sentence => |segmenter| switch (string.slice) {
+                .ascii => |utf8| .{ .sentence_utf8 = segmenter.segmentUtf8(utf8) },
+                .utf16 => |utf16| .{ .sentence_utf16 = segmenter.segmentUtf16(utf16) },
             },
         };
     }
@@ -369,14 +369,17 @@ fn findBoundaryBefore(
     defer iterator.deinit();
     var previous_index: usize = 0;
     return switch (iterator) {
-        .grapheme => |*it| while (it.next()) |index| : (previous_index = index) {
+        inline .grapheme_utf8,
+        .grapheme_utf16,
+        .sentence_utf8,
+        .sentence_utf16,
+        => |*it| while (it.next()) |index| : (previous_index = index) {
             if (index > start_index) break .{ .index = previous_index };
         } else null,
-        .word => |*it| while (it.next()) |index| : (previous_index = index) {
+        inline .word_utf8,
+        .word_utf16,
+        => |*it| while (it.next()) |index| : (previous_index = index) {
             if (index > start_index) break .{ .index = previous_index, .is_word_like = it.isWordLike() };
-        } else null,
-        .sentence => |*it| while (it.next()) |index| : (previous_index = index) {
-            if (index > start_index) break .{ .index = previous_index };
         } else null,
     };
 }
@@ -395,14 +398,15 @@ fn findBoundaryAfter(
     var iterator = segmenter.segment(string);
     defer iterator.deinit();
     return switch (iterator) {
-        .grapheme => |*it| while (it.next()) |index| {
+        inline .grapheme_utf8,
+        .grapheme_utf16,
+        .sentence_utf8,
+        .sentence_utf16,
+        => |*it| while (it.next()) |index| {
             if (index > start_index) break .{ .index = index };
         } else null,
-        .word => |*it| while (it.next()) |index| {
+        inline .word_utf8, .word_utf16 => |*it| while (it.next()) |index| {
             if (index > start_index) return .{ .index = index, .is_word_like = it.isWordLike() };
-        } else null,
-        .sentence => |*it| while (it.next()) |index| {
-            if (index > start_index) return .{ .index = index };
         } else null,
     };
 }
