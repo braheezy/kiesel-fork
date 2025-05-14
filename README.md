@@ -51,6 +51,7 @@ Further reading:
 - [Kiesel Devlog #9: JavaScript on a Printer](https://linus.dev/posts/kiesel-devlog-9/)
 - [Kiesel Devlog #10: Let's Make It Fast!](https://linus.dev/posts/kiesel-devlog-10/)
 - [Kiesel Devlog #11: Community Edition](https://linus.dev/posts/kiesel-devlog-11/)
+- [Kiesel Devlog #12: Write Once, Run Anywhere](https://linus.dev/posts/kiesel-devlog-12/)
 
 ## Build
 
