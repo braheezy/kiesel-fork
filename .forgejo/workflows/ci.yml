@@ -21,8 +21,6 @@ jobs:
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
           components: "rust-src"
-      - name: Set up Rust cache
-        uses: https://github.com/Swatinem/rust-cache@v2
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -133,8 +131,6 @@ jobs:
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
           components: "rust-src"
-      - name: Set up Rust cache
-        uses: https://github.com/Swatinem/rust-cache@v2
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -225,8 +221,6 @@ jobs:
         uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
           components: "rust-src"
-      - name: Set up Rust cache
-        uses: https://github.com/Swatinem/rust-cache@v2
       - name: Install Node.js
         uses: https://github.com/actions/setup-node@v4
       - name: Install dependencies
