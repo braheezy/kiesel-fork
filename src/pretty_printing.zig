@@ -1007,6 +1007,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
 
 fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
     const property_keys = ordinaryOwnPropertyKeys(object.agent, object) catch return;
+    defer object.agent.gc_allocator.free(property_keys);
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -1014,7 +1015,7 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
     try tty_config.setColor(writer, .reset);
 
     var printed_properties: usize = 0;
-    for (property_keys.items) |property_key| {
+    for (property_keys) |property_key| {
         const property_descriptor = (object.property_storage.getCreateIntrinsicIfNeeded(property_key) catch return).?;
         if (!property_descriptor.attributes.enumerable) continue;
 

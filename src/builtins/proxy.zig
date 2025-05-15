@@ -788,7 +788,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
 fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
-) Agent.Error!std.ArrayListUnmanaged(PropertyKey) {
+) Agent.Error![]PropertyKey {
     const proxy = object.as(Proxy);
 
     // 1. Perform ? ValidateNonRevokedProxy(O).
@@ -817,15 +817,9 @@ fn ownPropertyKeys(
 
     // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, property-key).
     const elements = try trap_result_array.createListFromArrayLike(agent, .property_key);
-    var trap_result = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
-        agent.gc_allocator,
-        elements.len,
-    );
-
-    var unique_property_keys: PropertyKey.HashMapUnmanaged(void) = .empty;
-    defer unique_property_keys.deinit(agent.gc_allocator);
-    if (elements.len > std.math.maxInt(u32)) return error.OutOfMemory;
-    try unique_property_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(elements.len));
+    var trap_result: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
+    defer trap_result.deinit(agent.gc_allocator);
+    try trap_result.ensureTotalCapacity(agent.gc_allocator, elements.len);
 
     for (elements) |element| {
         const property_key = switch (element.type()) {
@@ -833,17 +827,16 @@ fn ownPropertyKeys(
             .symbol => PropertyKey.from(element.asSymbol()),
             else => unreachable,
         };
-        trap_result.appendAssumeCapacity(property_key);
-        unique_property_keys.putAssumeCapacity(property_key, {});
-    }
+        const gop = try trap_result.getOrPut(agent.gc_allocator, property_key);
 
-    // 9. If trapResult contains any duplicate entries, throw a TypeError exception.
-    if (trap_result.items.len != unique_property_keys.count()) {
-        return agent.throwException(
-            .type_error,
-            "Proxy 'ownKeys' trap must not return duplicate property keys",
-            .{},
-        );
+        // 9. If trapResult contains any duplicate entries, throw a TypeError exception.
+        if (gop.found_existing) {
+            return agent.throwException(
+                .type_error,
+                "Proxy 'ownKeys' trap must not return duplicate property keys",
+                .{},
+            );
+        }
     }
 
     // 10. Let extensibleTarget be ? IsExtensible(target).
@@ -852,8 +845,8 @@ fn ownPropertyKeys(
     // 11. Let targetKeys be ? target.[[OwnPropertyKeys]]().
     // 12. Assert: targetKeys is a List of property keys.
     // 13. Assert: targetKeys contains no duplicate entries.
-    var target_keys = try target.internal_methods.ownPropertyKeys(agent, target);
-    defer target_keys.deinit(agent.gc_allocator);
+    const target_keys = try target.internal_methods.ownPropertyKeys(agent, target);
+    defer agent.gc_allocator.free(target_keys);
 
     // 14. Let targetConfigurableKeys be a new empty List.
     var target_configurable_keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
@@ -864,7 +857,7 @@ fn ownPropertyKeys(
     defer target_nonconfigurable_keys.deinit(agent.gc_allocator);
 
     // 16. For each element key of targetKeys, do
-    for (target_keys.items) |key| {
+    for (target_keys) |key| {
         // a. Let desc be ? target.[[GetOwnProperty]](key).
         const property_descriptor = try target.internal_methods.getOwnProperty(agent, target, key);
 
@@ -882,14 +875,14 @@ fn ownPropertyKeys(
     // 17. If extensibleTarget is true and targetNonconfigurableKeys is empty, then
     if (extensible_target and target_nonconfigurable_keys.items.len == 0) {
         // a. Return trapResult.
-        return trap_result;
+        return agent.gc_allocator.dupe(PropertyKey, trap_result.keys());
     }
 
     // 18. Let uncheckedResultKeys be a List whose elements are the elements of trapResult.
     var unchecked_result_keys: PropertyKey.HashMapUnmanaged(void) = .empty;
     defer unchecked_result_keys.deinit(agent.gc_allocator);
-    try unchecked_result_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(trap_result.items.len));
-    for (trap_result.items) |key| {
+    try unchecked_result_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(trap_result.count()));
+    for (trap_result.keys()) |key| {
         unchecked_result_keys.putAssumeCapacity(key, {});
     }
 
@@ -907,7 +900,7 @@ fn ownPropertyKeys(
     }
 
     // 20. If extensibleTarget is true, return trapResult.
-    if (extensible_target) return trap_result;
+    if (extensible_target) return agent.gc_allocator.dupe(PropertyKey, trap_result.keys());
 
     // 21. For each element key of targetConfigurableKeys, do
     for (target_configurable_keys.items) |key| {
@@ -932,7 +925,7 @@ fn ownPropertyKeys(
     }
 
     // 23. Return trapResult.
-    return trap_result;
+    return agent.gc_allocator.dupe(PropertyKey, trap_result.keys());
 }
 
 /// 10.5.12 [[Call]] ( thisArgument, argumentsList )

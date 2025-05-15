@@ -391,7 +391,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.All
 fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
-) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
+) std.mem.Allocator.Error![]PropertyKey {
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
 
@@ -436,7 +436,7 @@ fn ownPropertyKeys(
     }
 
     // 6. Return keys.
-    return keys;
+    return keys.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 10.4.5.9 TypedArray With Buffer Witness Records

@@ -91,7 +91,7 @@ delete: *const fn (
 ownPropertyKeys: *const fn (
     agent: *Agent,
     object: *Object,
-) Agent.Error!std.ArrayListUnmanaged(PropertyKey) = builtins.ordinary.internal_methods.ownPropertyKeys,
+) Agent.Error![]PropertyKey = builtins.ordinary.internal_methods.ownPropertyKeys,
 
 // [[Call]]
 call: ?*const fn (

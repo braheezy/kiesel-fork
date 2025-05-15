@@ -81,11 +81,11 @@ pub const prototype = struct {
             // a. If O.[[ObjectWasVisited]] is false, then
             if (!for_in_iterator.fields.state.object_was_visited) {
                 // i. Let keys be ? object.[[OwnPropertyKeys]]().
-                var keys = try object.internal_methods.ownPropertyKeys(agent, object);
-                defer keys.deinit(agent.gc_allocator);
+                const keys = try object.internal_methods.ownPropertyKeys(agent, object);
+                defer agent.gc_allocator.free(keys);
 
                 // ii. For each element key of keys, do
-                for (keys.items) |key| {
+                for (keys) |key| {
                     // 1. If key is a String, then
                     if (key == .string or key == .integer_index) {
                         // a. Append key to O.[[RemainingKeys]].

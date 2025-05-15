@@ -244,23 +244,25 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.All
 fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
-) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
+) std.mem.Allocator.Error![]PropertyKey {
     // 1. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
     // 2. Let symbolKeys be OrdinaryOwnPropertyKeys(O).
-    var symbol_keys = try ordinaryOwnPropertyKeys(agent, object);
-    defer symbol_keys.deinit(agent.gc_allocator);
+    const symbol_keys = try ordinaryOwnPropertyKeys(agent, object);
+    defer agent.gc_allocator.free(symbol_keys);
 
     // 3. Return the list-concatenation of exports and symbolKeys.
-    var keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
-    try keys.ensureUnusedCapacity(agent.gc_allocator, exports.len + symbol_keys.items.len);
+    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
+        agent.gc_allocator,
+        exports.len + symbol_keys.len,
+    );
     for (exports) |name| {
         const property_key = PropertyKey.from(try String.fromUtf8(agent, name));
         keys.appendAssumeCapacity(property_key);
     }
-    keys.appendSliceAssumeCapacity(symbol_keys.items);
-    return keys;
+    keys.appendSliceAssumeCapacity(symbol_keys);
+    return keys.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 10.4.6.12 ModuleNamespaceCreate ( module, exports )

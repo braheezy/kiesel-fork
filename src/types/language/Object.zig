@@ -465,14 +465,14 @@ pub fn setIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool 
     if (!status) return false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
-    var keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
-    defer keys.deinit(self.agent.gc_allocator);
+    const keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
+    defer self.agent.gc_allocator.free(keys);
 
     switch (level) {
         // 4. If level is sealed,
         .sealed => {
             // a. For each element k of keys, do
-            for (keys.items) |property_key| {
+            for (keys) |property_key| {
                 // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor { [[Configurable]]: false }).
                 try self.definePropertyOrThrow(property_key, .{ .configurable = false });
             }
@@ -483,7 +483,7 @@ pub fn setIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool 
             // a. Assert: level is frozen.
 
             // b. For each element k of keys, do
-            for (keys.items) |property_key| {
+            for (keys) |property_key| {
                 // i. Let currentDesc be ? O.[[GetOwnProperty]](k).
                 const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
                     self.agent,
@@ -529,11 +529,11 @@ pub fn testIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool
     if (extensible_) return false;
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
-    var keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
-    defer keys.deinit(self.agent.gc_allocator);
+    const keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
+    defer self.agent.gc_allocator.free(keys);
 
     // 5. For each element k of keys, do
-    for (keys.items) |property_key| {
+    for (keys) |property_key| {
         // a. Let currentDesc be ? O.[[GetOwnProperty]](k).
         const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
             self.agent,
@@ -605,14 +605,14 @@ pub fn enumerableOwnProperties(
     comptime kind: PropertyKind,
 ) Agent.Error!std.ArrayListUnmanaged(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
-    var own_keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
-    defer own_keys.deinit(self.agent.gc_allocator);
+    const own_keys = try self.internal_methods.ownPropertyKeys(self.agent, self);
+    defer self.agent.gc_allocator.free(own_keys);
 
     // 2. Let results be a new empty List.
     var results: std.ArrayListUnmanaged(Value) = .empty;
 
     // 3. For each element key of ownKeys, do
-    for (own_keys.items) |key| {
+    for (own_keys) |key| {
         // a. If key is a String, then
         if (key == .string or key == .integer_index) {
             // i. Let desc be ? O.[[GetOwnProperty]](key).
@@ -713,11 +713,11 @@ pub fn copyDataProperties(
     const from = source.toObject(self.agent) catch |err| try noexcept(err);
 
     // 3. Let keys be ? from.[[OwnPropertyKeys]]().
-    var keys = try from.internal_methods.ownPropertyKeys(self.agent, from);
-    defer keys.deinit(self.agent.gc_allocator);
+    const keys = try from.internal_methods.ownPropertyKeys(self.agent, from);
+    defer self.agent.gc_allocator.free(keys);
 
     // 4. For each element nextKey of keys, do
-    for (keys.items) |next_key| {
+    for (keys) |next_key| {
         // a. Let excluded be false.
         // b. For each element e of excludedItems, do
         const excluded = for (excluded_items) |e| {

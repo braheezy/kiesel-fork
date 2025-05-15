@@ -756,7 +756,7 @@ pub fn ordinaryDelete(agent: *Agent, object: *Object, property_key: PropertyKey)
 fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
-) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
+) std.mem.Allocator.Error![]PropertyKey {
     // 1. Return OrdinaryOwnPropertyKeys(O).
     return ordinaryOwnPropertyKeys(agent, object);
 }
@@ -766,7 +766,7 @@ fn ownPropertyKeys(
 pub fn ordinaryOwnPropertyKeys(
     agent: *Agent,
     object: *Object,
-) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
+) std.mem.Allocator.Error![]PropertyKey {
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
         agent.gc_allocator,
@@ -819,7 +819,7 @@ pub fn ordinaryOwnPropertyKeys(
     }
 
     // 5. Return keys.
-    return keys;
+    return keys.toOwnedSlice(agent.gc_allocator);
 }
 
 pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?*Object) std.mem.Allocator.Error!*Object {

@@ -271,15 +271,15 @@ pub const namespace = struct {
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        var keys = try target.asObject().internal_methods.ownPropertyKeys(
+        const keys = try target.asObject().internal_methods.ownPropertyKeys(
             agent,
             target.asObject(),
         );
-        defer keys.deinit(agent.gc_allocator);
+        defer agent.gc_allocator.free(keys);
 
         // 3. Return CreateArrayFromList(keys).
         return Value.from(
-            try createArrayFromListMapToValue(agent, PropertyKey, keys.items, struct {
+            try createArrayFromListMapToValue(agent, PropertyKey, keys, struct {
                 fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
                     return property_key.toValue(agent_);
                 }

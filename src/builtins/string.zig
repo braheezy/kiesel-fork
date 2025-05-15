@@ -349,7 +349,7 @@ fn defineOwnProperty(
 fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
-) std.mem.Allocator.Error!std.ArrayListUnmanaged(PropertyKey) {
+) std.mem.Allocator.Error![]PropertyKey {
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
     const str = object.as(String).fields.string_data;
@@ -416,7 +416,7 @@ fn ownPropertyKeys(
     }
 
     // 9. Return keys.
-    return keys;
+    return keys.toOwnedSlice(agent.gc_allocator);
 }
 
 /// 10.4.3.4 StringCreate ( value, prototype )
