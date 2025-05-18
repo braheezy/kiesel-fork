@@ -180,7 +180,7 @@ pub fn generatorStart(
             } else {
                 // TODO: d. Else,
                 // i. Assert: generatorBody is an Abstract Closure with no parameters.
-                // ii. Let result be generatorBody().
+                // ii. Let result be Completion(generatorBody()).
             };
 
             // e. Assert: If we return here, the generator either threw an exception or performed
