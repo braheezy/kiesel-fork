@@ -107,7 +107,6 @@ pub const PropertyKind = enum {
 };
 
 tag: Object.Tag,
-agent: *Agent,
 internal_methods: *const InternalMethods,
 property_storage: PropertyStorage,
 

@@ -53,7 +53,6 @@ pub fn MakeObject(
                 .fields = if (has_fields) args.fields,
                 .object = .{
                     .tag = options.tag,
-                    .agent = agent,
                     .internal_methods = args.internal_methods,
                     .property_storage = .{
                         .shape = agent.empty_shape,
