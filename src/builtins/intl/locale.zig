@@ -20,9 +20,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -150,9 +147,9 @@ fn makeLocaleRecord(
 /// 15.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Locale",
@@ -160,10 +157,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 15.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Locale.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -361,38 +358,38 @@ pub const constructor = struct {
 /// 15.3 Properties of the Intl.Locale Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "baseName", baseName, null, realm);
-        try defineBuiltinAccessor(object, "calendar", calendar, null, realm);
-        try defineBuiltinAccessor(object, "caseFirst", caseFirst, null, realm);
-        try defineBuiltinAccessor(object, "collation", collation, null, realm);
-        try defineBuiltinAccessor(object, "hourCycle", hourCycle, null, realm);
-        try defineBuiltinAccessor(object, "language", language, null, realm);
-        try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
-        try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
-        try defineBuiltinAccessor(object, "numberingSystem", numberingSystem, null, realm);
-        try defineBuiltinAccessor(object, "numeric", numeric, null, realm);
-        try defineBuiltinAccessor(object, "region", region, null, realm);
-        try defineBuiltinAccessor(object, "script", script, null, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "baseName", baseName, null, realm);
+        try object.defineBuiltinAccessor(agent, "calendar", calendar, null, realm);
+        try object.defineBuiltinAccessor(agent, "caseFirst", caseFirst, null, realm);
+        try object.defineBuiltinAccessor(agent, "collation", collation, null, realm);
+        try object.defineBuiltinAccessor(agent, "hourCycle", hourCycle, null, realm);
+        try object.defineBuiltinAccessor(agent, "language", language, null, realm);
+        try object.defineBuiltinFunction(agent, "maximize", maximize, 0, realm);
+        try object.defineBuiltinFunction(agent, "minimize", minimize, 0, realm);
+        try object.defineBuiltinAccessor(agent, "numberingSystem", numberingSystem, null, realm);
+        try object.defineBuiltinAccessor(agent, "numeric", numeric, null, realm);
+        try object.defineBuiltinAccessor(agent, "region", region, null, realm);
+        try object.defineBuiltinAccessor(agent, "script", script, null, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
 
         // 15.3.1 Intl.Locale.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
         );
 
         // 15.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Locale"),
             .writable = false,
             .enumerable = false,

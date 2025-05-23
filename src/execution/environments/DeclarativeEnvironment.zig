@@ -95,7 +95,6 @@ pub fn createImmutableBinding(
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
 pub fn initializeBinding(
     self: DeclarativeEnvironment,
-    _: *Agent,
     name: *const String,
     value: Value,
 ) void {
@@ -135,7 +134,7 @@ pub fn setMutableBinding(
         try self.createMutableBinding(agent, name, true);
 
         // c. Perform ! envRec.InitializeBinding(N, V).
-        self.initializeBinding(agent, name, value);
+        self.initializeBinding(name, value);
 
         // d. Return unused.
         return;

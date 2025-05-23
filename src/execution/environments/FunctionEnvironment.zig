@@ -104,7 +104,7 @@ pub fn getThisBinding(self: FunctionEnvironment, agent: *Agent) error{ExceptionT
 
 /// 9.1.1.3.5 GetSuperBase ( envRec )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: FunctionEnvironment) std.mem.Allocator.Error!Value {
+pub fn getSuperBase(self: FunctionEnvironment, agent: *Agent) std.mem.Allocator.Error!Value {
     // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object orelse {
         // 2. If home is undefined, return undefined.
@@ -114,7 +114,7 @@ pub fn getSuperBase(self: FunctionEnvironment) std.mem.Allocator.Error!Value {
     // 3. Assert: home is an ordinary object.
     // 4. Return ! home.[[GetPrototypeOf]]().
     return if (home.internal_methods.getPrototypeOf(
-        home.agent,
+        agent,
         home,
     ) catch |err| try noexcept(err)) |prototype|
         Value.from(prototype)

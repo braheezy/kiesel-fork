@@ -135,7 +135,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
             // i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
-            return base_object.privateGet(self.referenced_name.private_name);
+            return base_object.privateGet(agent, self.referenced_name.private_name);
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then
@@ -196,7 +196,12 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
         const global_obj = agent.getGlobalObject();
 
         // c. Perform ? Set(globalObj, V.[[ReferencedName]], W, false).
-        try global_obj.set(PropertyKey.from(self.referenced_name.value.asString()), value, .ignore);
+        try global_obj.set(
+            agent,
+            PropertyKey.from(self.referenced_name.value.asString()),
+            value,
+            .ignore,
+        );
 
         // d. Return unused.
         return;
@@ -210,7 +215,7 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
             // i. Return ? PrivateSet(baseObj, V.[[ReferencedName]], W).
-            return base_object.privateSet(self.referenced_name.private_name, value);
+            return base_object.privateSet(agent, self.referenced_name.private_name, value);
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then

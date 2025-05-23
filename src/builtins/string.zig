@@ -21,8 +21,6 @@ const PropertyKey = types.PropertyKey;
 const createArrayFromList = types.createArrayFromList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
 const noexcept = utils.noexcept;
@@ -254,7 +252,7 @@ pub fn getSubstitution(
                 std.debug.assert(named_captures != null);
 
                 // 4. Let capture be ? Get(namedCaptures, groupName).
-                const capture = try named_captures.?.get(PropertyKey.from(group_name));
+                const capture = try named_captures.?.get(agent, PropertyKey.from(group_name));
 
                 // 5. If capture is undefined, then
                 //     a. Let refReplacement be the empty String.
@@ -454,7 +452,7 @@ pub fn stringCreate(
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try string.definePropertyDirect(PropertyKey.from("length"), .{
+    try string.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(length))),
         .writable = false,
         .enumerable = false,
@@ -502,9 +500,9 @@ fn stringGetOwnProperty(
 /// 22.1.2 Properties of the String Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "String",
@@ -512,14 +510,14 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
-        try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
-        try defineBuiltinFunction(object, "raw", raw, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "fromCharCode", fromCharCode, 1, realm);
+        try object.defineBuiltinFunction(agent, "fromCodePoint", fromCodePoint, 1, realm);
+        try object.defineBuiltinFunction(agent, "raw", raw, 1, realm);
 
         // 22.1.2.3 String.prototype
         // https://tc39.es/ecma262/#sec-string.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%String.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -634,10 +632,10 @@ pub const constructor = struct {
         const cooked = try template.toObject(agent);
 
         // 3. Let literals be ? ToObject(? Get(cooked, "raw")).
-        const literals = try (try cooked.get(PropertyKey.from("raw"))).toObject(agent);
+        const literals = try (try cooked.get(agent, PropertyKey.from("raw"))).toObject(agent);
 
         // 4. Let literalCount be ? LengthOfArrayLike(literals).
-        const literal_count = try literals.lengthOfArrayLike();
+        const literal_count = try literals.lengthOfArrayLike(agent);
 
         // 5. If literalCount ≤ 0, return the empty String.
         if (literal_count == 0) return Value.from("");
@@ -652,7 +650,7 @@ pub const constructor = struct {
         // 8. Repeat,
         while (true) : (next_index += 1) {
             // a. Let nextLiteralVal be ? Get(literals, ! ToString(𝔽(nextIndex))).
-            const next_literal_value = try literals.get(PropertyKey.from(next_index));
+            const next_literal_value = try literals.get(agent, PropertyKey.from(next_index));
 
             // b. Let nextLiteral be ? ToString(nextLiteralVal).
             const next_literal = try next_literal_value.toString(agent);
@@ -683,79 +681,79 @@ pub const constructor = struct {
 /// 22.1.3 Properties of the String Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return stringCreate(realm.agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return stringCreate(agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "at", at, 1, realm);
-        try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
-        try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
-        try defineBuiltinFunction(object, "codePointAt", codePointAt, 1, realm);
-        try defineBuiltinFunction(object, "concat", concat, 1, realm);
-        try defineBuiltinFunction(object, "endsWith", endsWith, 1, realm);
-        try defineBuiltinFunction(object, "includes", includes, 1, realm);
-        try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
-        try defineBuiltinFunction(object, "isWellFormed", isWellFormed, 0, realm);
-        try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
-        try defineBuiltinFunction(object, "localeCompare", localeCompare, 1, realm);
-        try defineBuiltinFunction(object, "match", match, 1, realm);
-        try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
-        try defineBuiltinFunction(object, "padEnd", padEnd, 1, realm);
-        try defineBuiltinFunction(object, "padStart", padStart, 1, realm);
-        try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
-        try defineBuiltinFunction(object, "replace", replace, 2, realm);
-        try defineBuiltinFunction(object, "replaceAll", replaceAll, 2, realm);
-        try defineBuiltinFunction(object, "search", search, 1, realm);
-        try defineBuiltinFunction(object, "slice", slice, 2, realm);
-        try defineBuiltinFunction(object, "split", split, 2, realm);
-        try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
-        try defineBuiltinFunction(object, "substring", substring, 2, realm);
-        try defineBuiltinFunction(object, "toLocaleLowerCase", toLocaleLowerCase, 0, realm);
-        try defineBuiltinFunction(object, "toLocaleUpperCase", toLocaleUpperCase, 0, realm);
-        try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
-        try defineBuiltinFunction(object, "toWellFormed", toWellFormed, 0, realm);
-        try defineBuiltinFunction(object, "trim", trim, 0, realm);
-        try defineBuiltinFunction(object, "trimEnd", trimEnd, 0, realm);
-        try defineBuiltinFunction(object, "trimStart", trimStart, 0, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "at", at, 1, realm);
+        try object.defineBuiltinFunction(agent, "charAt", charAt, 1, realm);
+        try object.defineBuiltinFunction(agent, "charCodeAt", charCodeAt, 1, realm);
+        try object.defineBuiltinFunction(agent, "codePointAt", codePointAt, 1, realm);
+        try object.defineBuiltinFunction(agent, "concat", concat, 1, realm);
+        try object.defineBuiltinFunction(agent, "endsWith", endsWith, 1, realm);
+        try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
+        try object.defineBuiltinFunction(agent, "indexOf", indexOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "isWellFormed", isWellFormed, 0, realm);
+        try object.defineBuiltinFunction(agent, "lastIndexOf", lastIndexOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "localeCompare", localeCompare, 1, realm);
+        try object.defineBuiltinFunction(agent, "match", match, 1, realm);
+        try object.defineBuiltinFunction(agent, "matchAll", matchAll, 1, realm);
+        try object.defineBuiltinFunction(agent, "padEnd", padEnd, 1, realm);
+        try object.defineBuiltinFunction(agent, "padStart", padStart, 1, realm);
+        try object.defineBuiltinFunction(agent, "repeat", repeat, 1, realm);
+        try object.defineBuiltinFunction(agent, "replace", replace, 2, realm);
+        try object.defineBuiltinFunction(agent, "replaceAll", replaceAll, 2, realm);
+        try object.defineBuiltinFunction(agent, "search", search, 1, realm);
+        try object.defineBuiltinFunction(agent, "slice", slice, 2, realm);
+        try object.defineBuiltinFunction(agent, "split", split, 2, realm);
+        try object.defineBuiltinFunction(agent, "startsWith", startsWith, 1, realm);
+        try object.defineBuiltinFunction(agent, "substring", substring, 2, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleLowerCase", toLocaleLowerCase, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleUpperCase", toLocaleUpperCase, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLowerCase", toLowerCase, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toUpperCase", toUpperCase, 0, realm);
+        try object.defineBuiltinFunction(agent, "toWellFormed", toWellFormed, 0, realm);
+        try object.defineBuiltinFunction(agent, "trim", trim, 0, realm);
+        try object.defineBuiltinFunction(agent, "trimEnd", trimEnd, 0, realm);
+        try object.defineBuiltinFunction(agent, "trimStart", trimStart, 0, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
         // 22.1.3.6 String.prototype.constructor
         // https://tc39.es/ecma262/#sec-string.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%String%"()),
         );
 
         if (build_options.enable_annex_b) {
-            try defineBuiltinFunction(object, "substr", substr, 2, realm);
-            try defineBuiltinFunction(object, "anchor", anchor, 1, realm);
-            try defineBuiltinFunction(object, "big", big, 0, realm);
-            try defineBuiltinFunction(object, "blink", blink, 0, realm);
-            try defineBuiltinFunction(object, "bold", bold, 0, realm);
-            try defineBuiltinFunction(object, "fixed", fixed, 0, realm);
-            try defineBuiltinFunction(object, "fontcolor", fontcolor, 1, realm);
-            try defineBuiltinFunction(object, "fontsize", fontsize, 1, realm);
-            try defineBuiltinFunction(object, "italics", italics, 0, realm);
-            try defineBuiltinFunction(object, "link", link, 1, realm);
-            try defineBuiltinFunction(object, "small", small, 0, realm);
-            try defineBuiltinFunction(object, "strike", strike, 0, realm);
-            try defineBuiltinFunction(object, "sub", sub, 0, realm);
-            try defineBuiltinFunction(object, "sup", sup, 0, realm);
+            try object.defineBuiltinFunction(agent, "substr", substr, 2, realm);
+            try object.defineBuiltinFunction(agent, "anchor", anchor, 1, realm);
+            try object.defineBuiltinFunction(agent, "big", big, 0, realm);
+            try object.defineBuiltinFunction(agent, "blink", blink, 0, realm);
+            try object.defineBuiltinFunction(agent, "bold", bold, 0, realm);
+            try object.defineBuiltinFunction(agent, "fixed", fixed, 0, realm);
+            try object.defineBuiltinFunction(agent, "fontcolor", fontcolor, 1, realm);
+            try object.defineBuiltinFunction(agent, "fontsize", fontsize, 1, realm);
+            try object.defineBuiltinFunction(agent, "italics", italics, 0, realm);
+            try object.defineBuiltinFunction(agent, "link", link, 1, realm);
+            try object.defineBuiltinFunction(agent, "small", small, 0, realm);
+            try object.defineBuiltinFunction(agent, "strike", strike, 0, realm);
+            try object.defineBuiltinFunction(agent, "sub", sub, 0, realm);
+            try object.defineBuiltinFunction(agent, "sup", sup, 0, realm);
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
             const @"%String.prototype.trimStart%" = object.getPropertyValueDirect(PropertyKey.from("trimStart"));
-            try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
+            try object.defineBuiltinProperty(agent, "trimLeft", @"%String.prototype.trimStart%");
 
             // B.2.2.16 String.prototype.trimRight ( )
             // https://tc39.es/ecma262/#String.prototype.trimright
             const @"%String.prototype.trimEnd%" = object.getPropertyValueDirect(PropertyKey.from("trimEnd"));
-            try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
+            try object.defineBuiltinProperty(agent, "trimRight", @"%String.prototype.trimEnd%");
         }
     }
 
@@ -937,7 +935,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp();
+        const is_regexp = try search_string.isRegExp(agent);
 
         // 4. If isRegExp is true, throw a TypeError exception.
         if (is_regexp) {
@@ -996,7 +994,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp();
+        const is_regexp = try search_string.isRegExp(agent);
 
         // 4. If isRegExp is true, throw a TypeError exception.
         if (is_regexp) {
@@ -1204,12 +1202,12 @@ pub const prototype = struct {
         // 2. If regexp is neither undefined nor null, then
         if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let isRegExp be ? IsRegExp(regexp).
-            const is_reg_exp = try regexp.isRegExp();
+            const is_reg_exp = try regexp.isRegExp(agent);
 
             // b. If isRegExp is true, then
             if (is_reg_exp) {
                 // i. Let flags be ? Get(regexp, "flags").
-                const flags = try regexp.asObject().get(PropertyKey.from("flags"));
+                const flags = try regexp.asObject().get(agent, PropertyKey.from("flags"));
 
                 // ii. Perform ? RequireObjectCoercible(flags).
                 _ = try flags.requireObjectCoercible(agent);
@@ -1461,7 +1459,7 @@ pub const prototype = struct {
         // 2. If searchValue is neither undefined nor null, then
         if (!search_value.isUndefined() and !search_value.isNull()) {
             // a. Let isRegExp be ? IsRegExp(searchValue).
-            const is_reg_exp = try search_value.isRegExp();
+            const is_reg_exp = try search_value.isRegExp(agent);
 
             // b. If isRegExp is true, then
             if (is_reg_exp) {
@@ -1856,7 +1854,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp();
+        const is_regexp = try search_string.isRegExp(agent);
 
         // 4. If isRegExp is true, throw a TypeError exception.
         if (is_regexp) {

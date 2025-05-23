@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,25 +17,23 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 27.1.2.1 The %IteratorHelperPrototype% Object
 /// https://tc39.es/ecma262/#sec-%iteratorhelperprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
-        try defineBuiltinFunction(object, "return", @"return", 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
+        try object.defineBuiltinFunction(agent, "return", @"return", 0, realm);
 
         // 27.1.2.1.3 %IteratorHelperPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%iteratorhelperprototype%-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Iterator Helper"),
             .writable = false,
             .enumerable = false,

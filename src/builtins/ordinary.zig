@@ -48,14 +48,18 @@ pub fn ordinaryGetPrototypeOf(object: *Object) ?*Object {
 
 /// 10.1.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-setprototypeof-v
-fn setPrototypeOf(_: *Agent, object: *Object, prototype: ?*Object) std.mem.Allocator.Error!bool {
+fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) std.mem.Allocator.Error!bool {
     // 1. Return OrdinarySetPrototypeOf(O, V).
-    return ordinarySetPrototypeOf(object, prototype);
+    return ordinarySetPrototypeOf(agent, object, prototype);
 }
 
 /// 10.1.2.1 OrdinarySetPrototypeOf ( O, V )
 /// https://tc39.es/ecma262/#sec-ordinarysetprototypeof
-pub fn ordinarySetPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allocator.Error!bool {
+pub fn ordinarySetPrototypeOf(
+    agent: *Agent,
+    object: *Object,
+    prototype: ?*Object,
+) std.mem.Allocator.Error!bool {
     // 1. Let current be O.[[Prototype]].
     const current = object.prototype();
 
@@ -93,7 +97,7 @@ pub fn ordinarySetPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allo
     }
 
     // 8. Set O.[[Prototype]] to V.
-    try object.setPrototype(prototype);
+    try object.setPrototype(agent, prototype);
 
     // 9. Return true.
     return true;
@@ -115,16 +119,16 @@ pub fn ordinaryIsExtensible(object: *Object) bool {
 
 /// 10.1.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-preventextensions
-fn preventExtensions(_: *Agent, object: *Object) std.mem.Allocator.Error!bool {
+fn preventExtensions(agent: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     // 1. Return OrdinaryPreventExtensions(O).
-    return ordinaryPreventExtensions(object);
+    return ordinaryPreventExtensions(agent, object);
 }
 
 /// 10.1.4.1 OrdinaryPreventExtensions ( O )
 /// https://tc39.es/ecma262/#sec-ordinarypreventextensions
-pub fn ordinaryPreventExtensions(object: *Object) std.mem.Allocator.Error!bool {
+pub fn ordinaryPreventExtensions(agent: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     // 1. Set O.[[Extensible]] to false.
-    try object.setNonExtensible();
+    try object.setNonExtensible(agent);
 
     // 2. Return true.
     return true;
@@ -188,7 +192,7 @@ pub fn ordinaryDefineOwnProperty(
     const current = try object.internal_methods.getOwnProperty(agent, object, property_key);
 
     // 2. Let extensible be ? IsExtensible(O).
-    const extensible = try object.isExtensible();
+    const extensible = try object.isExtensible(agent);
 
     // 3. Return ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current).
     return validateAndApplyPropertyDescriptor(
@@ -700,7 +704,7 @@ pub fn ordinarySetWithOwnDescriptor(
             std.debug.assert(!receiver.property_storage.contains(property_key));
 
             // ii. Return ? CreateDataProperty(Receiver, P, V).
-            return receiver.createDataProperty(property_key, value);
+            return receiver.createDataProperty(agent, property_key, value);
         }
     }
 
@@ -758,18 +762,18 @@ fn ownPropertyKeys(
     object: *Object,
 ) std.mem.Allocator.Error![]PropertyKey {
     // 1. Return OrdinaryOwnPropertyKeys(O).
-    return ordinaryOwnPropertyKeys(agent, object);
+    return ordinaryOwnPropertyKeys(agent.gc_allocator, object);
 }
 
 /// 10.1.11.1 OrdinaryOwnPropertyKeys ( O )
 /// https://tc39.es/ecma262/#sec-ordinaryownpropertykeys
 pub fn ordinaryOwnPropertyKeys(
-    agent: *Agent,
+    allocator: std.mem.Allocator,
     object: *Object,
 ) std.mem.Allocator.Error![]PropertyKey {
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
-        agent.gc_allocator,
+        allocator,
         object.property_storage.count(),
     );
 
@@ -819,7 +823,7 @@ pub fn ordinaryOwnPropertyKeys(
     }
 
     // 5. Return keys.
-    return keys.toOwnedSlice(agent.gc_allocator);
+    return keys.toOwnedSlice(allocator);
 }
 
 pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?*Object) std.mem.Allocator.Error!*Object {
@@ -885,7 +889,7 @@ pub fn getPrototypeFromConstructor(
     comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? Get(constructor, "prototype").
-    const prototype = try constructor.get(PropertyKey.from("prototype"));
+    const prototype = try constructor.get(agent, PropertyKey.from("prototype"));
 
     const prototype_object = switch (prototype.type()) {
         .object => prototype.asObject(),

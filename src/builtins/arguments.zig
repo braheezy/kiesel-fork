@@ -31,7 +31,7 @@ const sameValue = types.sameValue;
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
 fn getOwnProperty(
-    _: *Agent,
+    agent: *Agent,
     object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
@@ -45,12 +45,12 @@ fn getOwnProperty(
     const map = object.as(Arguments).fields.parameter_map;
 
     // 4. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
+    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
 
     // 5. If isMapped is true, then
     if (is_mapped) {
         // a. Set desc.[[Value]] to ! Get(map, P).
-        descriptor.value = map.get(property_key) catch |err| try noexcept(err);
+        descriptor.value = map.get(agent, property_key) catch |err| try noexcept(err);
     }
 
     // 6. Return desc.
@@ -69,7 +69,7 @@ fn defineOwnProperty(
     const map = object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
+    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
 
     // 3. Let newArgDesc be Desc.
     var new_arg_property_descriptor = property_descriptor;
@@ -82,7 +82,7 @@ fn defineOwnProperty(
             // i. Set newArgDesc to a copy of Desc.
 
             // ii. Set newArgDesc.[[Value]] to ! Get(map, P).
-            new_arg_property_descriptor.value = map.get(property_key) catch |err| try noexcept(err);
+            new_arg_property_descriptor.value = map.get(agent, property_key) catch |err| try noexcept(err);
         }
     }
 
@@ -114,7 +114,7 @@ fn defineOwnProperty(
                 // 1. Assert: The following Set will succeed, since formal parameters mapped by
                 //    arguments objects are always writable.
                 // 2. Perform ! Set(map, P, Desc.[[Value]], false).
-                map.set(property_key, value, .ignore) catch |err| try noexcept(err);
+                map.set(agent, property_key, value, .ignore) catch |err| try noexcept(err);
             }
 
             // ii. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, then
@@ -145,7 +145,7 @@ fn get(
     const map = object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
+    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
 
     // 3. If isMapped is false, then
     if (!is_mapped) {
@@ -155,7 +155,7 @@ fn get(
         // 4. Else,
         // a. Assert: map contains a formal parameter mapping for P.
         // b. Return ! Get(map, P).
-        return map.get(property_key) catch |err| try noexcept(err);
+        return map.get(agent, property_key) catch |err| try noexcept(err);
     }
 }
 
@@ -176,14 +176,14 @@ fn set(
         const map = object.as(Arguments).fields.parameter_map;
 
         // b. Let isMapped be ! HasOwnProperty(map, P).
-        const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
+        const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
 
         // 3. If isMapped is true, then
         if (is_mapped) {
             // a. Assert: The following Set will succeed, since formal parameters mapped by
             //    arguments objects are always writable.
             // b. Perform ! Set(map, P, V, false).
-            map.set(property_key, value, .ignore) catch |err| try noexcept(err);
+            map.set(agent, property_key, value, .ignore) catch |err| try noexcept(err);
         }
     }
 
@@ -198,7 +198,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     const map = object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(property_key) catch |err| try noexcept(err);
+    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
 
     // 3. Let result be ? OrdinaryDelete(args, P).
     const result = try ordinaryDelete(agent, object, property_key);
@@ -236,7 +236,7 @@ pub fn createUnmappedArgumentsObject(
     // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try object.definePropertyDirect(PropertyKey.from("length"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(len))),
         .writable = true,
         .enumerable = false,
@@ -249,6 +249,7 @@ pub fn createUnmappedArgumentsObject(
         // a. Let val be argumentsList[index].
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
             value,
         );
@@ -259,7 +260,7 @@ pub fn createUnmappedArgumentsObject(
     // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try object.definePropertyDirect(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,
@@ -269,7 +270,7 @@ pub fn createUnmappedArgumentsObject(
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try object.definePropertyDirect(PropertyKey.from("callee"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
         .get = try realm.intrinsics.@"%ThrowTypeError%"(),
         .set = try realm.intrinsics.@"%ThrowTypeError%"(),
         .enumerable = false,
@@ -345,6 +346,7 @@ pub fn createMappedArgumentsObject(
         // a. Let val be argumentsList[index].
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
             value,
         );
@@ -355,7 +357,7 @@ pub fn createMappedArgumentsObject(
     // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(PropertyKey.from("length"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value = Value.from(@as(u53, @intCast(len))),
         .writable = true,
         .enumerable = false,
@@ -413,7 +415,7 @@ pub fn createMappedArgumentsObject(
     // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,
@@ -423,7 +425,7 @@ pub fn createMappedArgumentsObject(
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(PropertyKey.from("callee"), .{
+    try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
         .value = Value.from(function),
         .writable = true,
         .enumerable = false,

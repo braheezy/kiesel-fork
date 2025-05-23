@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,7 +16,6 @@ const String = types.String;
 const Value = types.Value;
 const createSegmentDataObject = builtins.intl.createSegmentDataObject;
 const createSegmentIterator = builtins.intl.createSegmentIterator;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
 const findBoundary = builtins.intl.findBoundary;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
 
@@ -52,15 +50,15 @@ pub fn createSegmentsObject(
 /// 19.5.2 The %IntlSegmentsPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "containing", containing, 1, realm);
-        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "containing", containing, 1, realm);
+        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
     }
 
     /// 19.5.2.1 %IntlSegmentsPrototype%.containing ( index )

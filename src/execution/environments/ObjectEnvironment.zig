@@ -25,13 +25,12 @@ outer_env: ?Environment,
 
 /// 9.1.1.2.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasbinding-n
-pub fn hasBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool {
-    const agent = self.binding_object.agent;
+pub fn hasBinding(self: ObjectEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     const property_key = PropertyKey.from(name);
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let foundBinding be ? HasProperty(bindingObject, N).
-    const found_binding = try self.binding_object.hasProperty(property_key);
+    const found_binding = try self.binding_object.hasProperty(agent, property_key);
 
     // 3. If foundBinding is false, return false.
     if (!found_binding) return false;
@@ -41,13 +40,14 @@ pub fn hasBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool
 
     // 5. Let unscopables be ? Get(bindingObject, %Symbol.unscopables%).
     const unscopables = try self.binding_object.get(
+        agent,
         PropertyKey.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
     );
 
     // 6. If unscopables is an Object, then
     if (unscopables.isObject()) {
         // a. Let blocked be ToBoolean(? Get(unscopables, N)).
-        const blocked = (try unscopables.asObject().get(property_key)).toBoolean();
+        const blocked = (try unscopables.asObject().get(agent, property_key)).toBoolean();
 
         // b. If blocked is true, return false.
         if (blocked) return false;
@@ -61,7 +61,7 @@ pub fn hasBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: ObjectEnvironment,
-    _: *Agent,
+    agent: *Agent,
     name: *const String,
     deletable: bool,
 ) Agent.Error!void {
@@ -71,7 +71,7 @@ pub fn createMutableBinding(
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
     //    }).
-    try self.binding_object.definePropertyOrThrow(property_key, .{
+    try self.binding_object.definePropertyOrThrow(agent, property_key, .{
         .value = .undefined,
         .writable = true,
         .enumerable = true,
@@ -83,10 +83,10 @@ pub fn createMutableBinding(
 
 /// 9.1.1.2.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createimmutablebinding-n-s
-pub fn createImmutableBinding(_: ObjectEnvironment, _: *Agent, _: *const String, _: bool) noreturn {
+pub fn createImmutableBinding(_: ObjectEnvironment, _: *const String, _: bool) noreturn {
     // The CreateImmutableBinding concrete method of an Object Environment Record is never used
     // within this specification.
-    unreachable;
+    @compileError("Should not be used");
 }
 
 /// 9.1.1.2.4 InitializeBinding ( N, V )
@@ -116,7 +116,7 @@ pub fn setMutableBinding(
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let stillExists be ? HasProperty(bindingObject, N).
-    const still_exists = try self.binding_object.hasProperty(property_key);
+    const still_exists = try self.binding_object.hasProperty(agent, property_key);
 
     // 3. If stillExists is false and S is true, throw a ReferenceError exception.
     if (!still_exists and strict) {
@@ -124,7 +124,7 @@ pub fn setMutableBinding(
     }
 
     // 4. Perform ? Set(bindingObject, N, V, S).
-    try self.binding_object.set(property_key, value, if (strict) .throw else .ignore);
+    try self.binding_object.set(agent, property_key, value, if (strict) .throw else .ignore);
 
     // 5. Return unused.
 }
@@ -141,7 +141,7 @@ pub fn getBindingValue(
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let value be ? HasProperty(bindingObject, N).
-    const value = try self.binding_object.hasProperty(property_key);
+    const value = try self.binding_object.hasProperty(agent, property_key);
 
     // 3. If value is false, then
     if (!value) {
@@ -151,18 +151,18 @@ pub fn getBindingValue(
     }
 
     // 4. Return ? Get(bindingObject, N).
-    return self.binding_object.get(property_key);
+    return self.binding_object.get(agent, property_key);
 }
 
 /// 9.1.1.2.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
-pub fn deleteBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool {
+pub fn deleteBinding(self: ObjectEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     const property_key = PropertyKey.from(name);
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
     return self.binding_object.internal_methods.delete(
-        self.binding_object.agent,
+        agent,
         self.binding_object,
         property_key,
     );

@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -15,12 +14,11 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const function = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .function = impl },
             0,
             "",
@@ -28,14 +26,14 @@ pub const function = struct {
         );
     }
 
-    pub fn init(_: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, _: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // The value of the [[Extensible]] internal slot of this function is false.
-        try object.setNonExtensible();
+        try object.setNonExtensible(agent);
 
         // The "length" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
         // }.
-        try defineBuiltinProperty(object, "length", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "length", PropertyDescriptor{
             .value = Value.from(0),
             .writable = false,
             .enumerable = false,
@@ -45,7 +43,7 @@ pub const function = struct {
         // The "name" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
         // }.
-        try defineBuiltinProperty(object, "name", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "name", PropertyDescriptor{
             .value = Value.from(""),
             .writable = false,
             .enumerable = false,

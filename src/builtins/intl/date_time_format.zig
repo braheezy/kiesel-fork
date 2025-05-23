@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -23,9 +22,6 @@ const Value = types.Value;
 const calendarToBcp47 = abstract_operations.calendarToBcp47;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -200,7 +196,7 @@ pub fn createDateTimeFormat(
     // TODO: 22-25.
 
     // 26. Let timeZone be ? Get(options, "timeZone").
-    const time_zone_value = try options.get(PropertyKey.from("timeZone"));
+    const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
     // 27. If timeZone is undefined, then
     const time_zone_string = if (time_zone_value.isUndefined()) blk: {
@@ -450,9 +446,9 @@ pub fn createDateTimeFormat(
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "DateTimeFormat",
@@ -460,10 +456,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 11.2.1 Intl.DateTimeFormat.prototype
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -503,27 +499,27 @@ pub const constructor = struct {
 /// 11.3 Properties of the Intl.DateTimeFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinAccessor(object, "format", format, null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinAccessor(agent, "format", format, null, realm);
 
         // 11.3.1 Intl.DateTimeFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
         );
 
         // 11.3.7 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.DateTimeFormat"),
             .writable = false,
             .enumerable = false,
@@ -569,6 +565,7 @@ pub const prototype = struct {
         //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = date_time_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -578,25 +575,30 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("calendar"),
             Value.from(resolved_options.calendar),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("numberingSystem"),
             Value.from(resolved_options.numbering_system),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("timeZone"),
             Value.from(resolved_options.time_zone),
         );
         if (resolved_options.date_style) |date_style| {
             try options.createDataPropertyDirect(
+                agent,
                 PropertyKey.from("dateStyle"),
                 Value.from(date_style),
             );
         }
         if (resolved_options.time_style) |time_style| {
             try options.createDataPropertyDirect(
+                agent,
                 PropertyKey.from("timeStyle"),
                 Value.from(time_style),
             );

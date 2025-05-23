@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,8 +17,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const findBoundary = builtins.intl.findBoundary;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -55,18 +52,18 @@ pub fn createSegmentIterator(
 /// 19.6.2 The %IntlSegmentIteratorPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
         // 19.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%Symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Segmenter String Iterator"),
             .writable = false,
             .enumerable = false,
@@ -162,18 +159,21 @@ pub fn createSegmentDataObject(
 
     // 6. Perform ! CreateDataPropertyOrThrow(result, "segment", segment).
     try result.createDataPropertyDirect(
+        agent,
         PropertyKey.from("segment"),
         Value.from(segment),
     );
 
     // 7. Perform ! CreateDataPropertyOrThrow(result, "index", 𝔽(startIndex)).
     try result.createDataPropertyDirect(
+        agent,
         PropertyKey.from("index"),
         Value.from(@as(u53, @intCast(start_index))),
     );
 
     // 8. Perform ! CreateDataPropertyOrThrow(result, "input", string).
     try result.createDataPropertyDirect(
+        agent,
         PropertyKey.from("input"),
         Value.from(string),
     );
@@ -188,6 +188,7 @@ pub fn createSegmentDataObject(
 
         // b. Perform ! CreateDataPropertyOrThrow(result, "isWordLike", isWordLike).
         try result.createDataPropertyDirect(
+            agent,
             PropertyKey.from("isWordLike"),
             Value.from(is_word_like),
         );

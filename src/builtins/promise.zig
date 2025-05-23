@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -23,9 +22,6 @@ const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -159,7 +155,10 @@ pub fn createResolvingFunctions(
 
             // 9. Let then be Completion(Get(resolution, "then")).
             // 11. Let thenAction be then.[[Value]].
-            const then_action = resolution.asObject().get(PropertyKey.from("then")) catch |err| switch (err) {
+            const then_action = resolution.asObject().get(
+                agent_,
+                PropertyKey.from("then"),
+            ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
 
                 // 10. If then is an abrupt completion, then
@@ -386,7 +385,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
     const resolving_functions = &additional_fields.resolving_functions;
 
     // 6. Let promise be ? Construct(C, « executor »).
-    const promise = try constructor_.asObject().construct(&.{Value.from(executor)}, null);
+    const promise = try constructor_.asObject().construct(agent, &.{Value.from(executor)}, null);
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
@@ -472,7 +471,7 @@ pub fn promiseResolve(agent: *Agent, constructor_: *Object, x: Value) Agent.Erro
     // 1. If IsPromise(x) is true, then
     if (x.isPromise()) {
         // a. Let xConstructor be ? Get(x, "constructor").
-        const x_constructor = try x.asObject().get(PropertyKey.from("constructor"));
+        const x_constructor = try x.asObject().get(agent, PropertyKey.from("constructor"));
 
         // b. If SameValue(xConstructor, C) is true, return x.
         if (sameValue(x_constructor, Value.from(constructor_))) return x.asObject();
@@ -700,7 +699,7 @@ pub fn newPromiseResolveThenableJob(
 /// 27.2.4.1.1 GetPromiseResolve ( promiseConstructor )
 fn getPromiseResolve(agent: *Agent, promise_constructor: *Object) Agent.Error!*Object {
     // 1. Let promiseResolve be ? Get(promiseConstructor, "resolve").
-    const promise_resolve = try promise_constructor.get(PropertyKey.from("resolve"));
+    const promise_resolve = try promise_constructor.get(agent, PropertyKey.from("resolve"));
 
     // 2. If IsCallable(promiseResolve) is false, throw a TypeError exception.
     if (!promise_resolve.isCallable()) {
@@ -1002,12 +1001,13 @@ fn performPromiseAllSettled(
 
                 // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
                 try object.createDataPropertyDirect(
+                    agent_,
                     PropertyKey.from("status"),
                     Value.from("fulfilled"),
                 );
 
                 // 11. Perform ! CreateDataPropertyOrThrow(obj, "value", x).
-                try object.createDataPropertyDirect(PropertyKey.from("value"), x);
+                try object.createDataPropertyDirect(agent_, PropertyKey.from("value"), x);
 
                 // 12. Set values[index] to obj.
                 values_.items[index_] = Value.from(object);
@@ -1110,12 +1110,13 @@ fn performPromiseAllSettled(
 
                 // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
                 try object.createDataPropertyDirect(
+                    agent_,
                     PropertyKey.from("status"),
                     Value.from("rejected"),
                 );
 
                 // 11. Perform ! CreateDataPropertyOrThrow(obj, "reason", x).
-                try object.createDataPropertyDirect(PropertyKey.from("reason"), x);
+                try object.createDataPropertyDirect(agent_, PropertyKey.from("reason"), x);
 
                 // 12. Set values[index] to obj.
                 values_.items[index_] = Value.from(object);
@@ -1227,7 +1228,7 @@ fn performPromiseAny(
                 //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                 //      [[Value]]: CreateArrayFromList(errors)
                 //    }).
-                try error_.definePropertyDirect(PropertyKey.from("errors"), .{
+                try error_.definePropertyDirect(agent, PropertyKey.from("errors"), .{
                     .configurable = true,
                     .enumerable = false,
                     .writable = true,
@@ -1323,7 +1324,7 @@ fn performPromiseAny(
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
-                    try error_.definePropertyDirect(PropertyKey.from("errors"), .{
+                    try error_.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
                         .configurable = true,
                         .enumerable = false,
                         .writable = true,
@@ -1539,9 +1540,9 @@ pub fn performPromiseThen(
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Promise",
@@ -1549,20 +1550,20 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "all", all, 1, realm);
-        try defineBuiltinFunction(object, "allSettled", allSettled, 1, realm);
-        try defineBuiltinFunction(object, "any", any, 1, realm);
-        try defineBuiltinFunction(object, "race", race, 1, realm);
-        try defineBuiltinFunction(object, "reject", reject, 1, realm);
-        try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
-        try defineBuiltinFunction(object, "try", @"try", 1, realm);
-        try defineBuiltinFunction(object, "withResolvers", withResolvers, 0, realm);
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "all", all, 1, realm);
+        try object.defineBuiltinFunction(agent, "allSettled", allSettled, 1, realm);
+        try object.defineBuiltinFunction(agent, "any", any, 1, realm);
+        try object.defineBuiltinFunction(agent, "race", race, 1, realm);
+        try object.defineBuiltinFunction(agent, "reject", reject, 1, realm);
+        try object.defineBuiltinFunction(agent, "resolve", resolve, 1, realm);
+        try object.defineBuiltinFunction(agent, "try", @"try", 1, realm);
+        try object.defineBuiltinFunction(agent, "withResolvers", withResolvers, 0, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Promise.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -1932,18 +1933,21 @@ pub const constructor = struct {
 
         // 4. Perform ! CreateDataPropertyOrThrow(obj, "promise", promiseCapability.[[Promise]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("promise"),
             Value.from(promise_capability.promise),
         );
 
         // 5. Perform ! CreateDataPropertyOrThrow(obj, "resolve", promiseCapability.[[Resolve]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("resolve"),
             Value.from(promise_capability.resolve),
         );
 
         // 6. Perform ! CreateDataPropertyOrThrow(obj, "reject", promiseCapability.[[Reject]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("reject"),
             Value.from(promise_capability.reject),
         );
@@ -1963,28 +1967,28 @@ pub const constructor = struct {
 /// 27.2.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
-        try defineBuiltinFunction(object, "finally", finally, 1, realm);
-        try defineBuiltinFunction(object, "then", then, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "catch", @"catch", 1, realm);
+        try object.defineBuiltinFunction(agent, "finally", finally, 1, realm);
+        try object.defineBuiltinFunction(agent, "then", then, 2, realm);
 
         // 27.2.5.2 Promise.prototype.constructor
         // https://tc39.es/ecma262/#sec-promise.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Promise%"()),
         );
 
         // 27.2.5.5 Promise.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Promise"),
             .writable = false,
             .enumerable = false,
@@ -2019,7 +2023,10 @@ pub const prototype = struct {
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
-        const constructor_ = try promise.asObject().speciesConstructor(try realm.intrinsics.@"%Promise%"());
+        const constructor_ = try promise.asObject().speciesConstructor(
+            agent,
+            try realm.intrinsics.@"%Promise%"(),
+        );
 
         // 4. Assert: IsConstructor(C) is true.
         std.debug.assert(Value.from(constructor_).isConstructor());
@@ -2189,6 +2196,7 @@ pub const prototype = struct {
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
         const constructor_ = try promise.asObject().speciesConstructor(
+            agent,
             try realm.intrinsics.@"%Promise%"(),
         );
 

@@ -65,16 +65,16 @@ pub const Iterator = struct {
 
     /// 7.4.7 IteratorComplete ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorcomplete
-    pub fn complete(iterator_result: *Object) Agent.Error!bool {
+    pub fn complete(agent: *Agent, iterator_result: *Object) Agent.Error!bool {
         // 1. Return ToBoolean(? Get(iteratorResult, "done")).
-        return (try iterator_result.get(PropertyKey.from("done"))).toBoolean();
+        return (try iterator_result.get(agent, PropertyKey.from("done"))).toBoolean();
     }
 
     /// 7.4.8 IteratorValue ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorvalue
-    pub fn value(iterator_result: *Object) Agent.Error!Value {
+    pub fn value(agent: *Agent, iterator_result: *Object) Agent.Error!Value {
         // Return ? Get(iteratorResult, "value").
-        return iterator_result.get(PropertyKey.from("value"));
+        return iterator_result.get(agent, PropertyKey.from("value"));
     }
 
     /// 7.4.9 IteratorStep ( iteratorRecord )
@@ -86,7 +86,7 @@ pub const Iterator = struct {
         // 2. Let done be Completion(IteratorComplete(result)).
         // 3. If done is a throw completion, then
         // 4. Set done to ! done.
-        const done = complete(result) catch |err| {
+        const done = complete(agent, result) catch |err| {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
@@ -119,7 +119,7 @@ pub const Iterator = struct {
 
         // 3. Let value be Completion(IteratorValue(result)).
         // 4. If value is a throw completion, then
-        const value_ = value(result) catch |err| {
+        const value_ = value(agent, result) catch |err| {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
@@ -250,9 +250,9 @@ pub const Iterator = struct {
 
 /// 7.4.2 GetIteratorDirect ( obj )
 /// https://tc39.es/ecma262/#sec-getiteratordirect
-pub fn getIteratorDirect(object: *Object) Agent.Error!Iterator {
+pub fn getIteratorDirect(agent: *Agent, object: *Object) Agent.Error!Iterator {
     // 1. Let nextMethod be ? Get(obj, "next").
-    const next_method = try object.get(PropertyKey.from("next"));
+    const next_method = try object.get(agent, PropertyKey.from("next"));
 
     // 2. Let iteratorRecord be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: nextMethod, [[Done]]: false }.
     const iterator: Iterator = .{
@@ -277,7 +277,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agen
     }
 
     // 3. Return ? GetIteratorDirect(iterator).
-    return getIteratorDirect(iterator.asObject());
+    return getIteratorDirect(agent, iterator.asObject());
 }
 
 pub const IteratorKind = enum { sync, @"async" };
@@ -386,7 +386,7 @@ pub fn getIteratorFlattenable(
     }
 
     // 6. Return ? GetIteratorDirect(iterator).
-    return getIteratorDirect(iterator.asObject());
+    return getIteratorDirect(agent, iterator.asObject());
 }
 
 /// 7.4.14 CreateIteratorResultObject ( value, done )
@@ -402,10 +402,10 @@ pub fn createIteratorResultObject(
     const object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
     // 2. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
-    try object.createDataPropertyDirect(PropertyKey.from("value"), value);
+    try object.createDataPropertyDirect(agent, PropertyKey.from("value"), value);
 
     // 3. Perform ! CreateDataPropertyOrThrow(obj, "done", done).
-    try object.createDataPropertyDirect(PropertyKey.from("done"), Value.from(done));
+    try object.createDataPropertyDirect(agent, PropertyKey.from("done"), Value.from(done));
 
     // 4. Return obj.
     return object;

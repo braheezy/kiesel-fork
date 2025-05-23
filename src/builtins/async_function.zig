@@ -22,7 +22,6 @@ const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
@@ -31,9 +30,9 @@ const promiseResolve = builtins.promiseResolve;
 /// 27.7.2 Properties of the AsyncFunction Constructor
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "AsyncFunction",
@@ -41,10 +40,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.7.2.1 AsyncFunction.prototype
         // https://tc39.es/ecma262/#sec-async-function-constructor-prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%AsyncFunction.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -79,17 +78,17 @@ pub const constructor = struct {
 /// 27.7.3 Properties of the AsyncFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.7.3.1 AsyncFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             PropertyDescriptor{
                 .value = Value.from(try realm.intrinsics.@"%AsyncFunction%"()),
@@ -101,7 +100,7 @@ pub const prototype = struct {
 
         // 27.7.3.2 AsyncFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-toStringTag
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("AsyncFunction"),
             .writable = false,
             .enumerable = false,

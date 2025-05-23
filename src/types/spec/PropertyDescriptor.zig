@@ -78,6 +78,7 @@ pub fn fromPropertyDescriptor(
     if (self.value) |value| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "value", Desc.[[Value]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("value"),
             value,
         );
@@ -87,6 +88,7 @@ pub fn fromPropertyDescriptor(
     if (self.writable) |writable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "writable", Desc.[[Writable]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("writable"),
             Value.from(writable),
         );
@@ -96,6 +98,7 @@ pub fn fromPropertyDescriptor(
     if (self.get) |get| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("get"),
             if (get) |o| Value.from(o) else .undefined,
         );
@@ -105,6 +108,7 @@ pub fn fromPropertyDescriptor(
     if (self.set) |set| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("set"),
             if (set) |o| Value.from(o) else .undefined,
         );
@@ -114,6 +118,7 @@ pub fn fromPropertyDescriptor(
     if (self.enumerable) |enumerable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "enumerable", Desc.[[Enumerable]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("enumerable"),
             Value.from(enumerable),
         );
@@ -123,6 +128,7 @@ pub fn fromPropertyDescriptor(
     if (self.configurable) |configurable| {
         // a. Perform ! CreateDataPropertyOrThrow(obj, "configurable", Desc.[[Configurable]]).
         try object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("configurable"),
             Value.from(configurable),
         );

@@ -19,7 +19,6 @@ const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const installErrorCause = builtins.installErrorCause;
 const noexcept = utils.noexcept;
@@ -28,9 +27,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.5.7.1 The AggregateError Constructor
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             2,
             "AggregateError",
@@ -38,10 +37,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.7.2.1 AggregateError.prototype
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%AggregateError.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -86,6 +85,7 @@ pub const constructor = struct {
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
             object.createNonEnumerableDataPropertyOrThrow(
+                agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
             ) catch |err| try noexcept(err);
@@ -106,6 +106,7 @@ pub const constructor = struct {
         //      [[Value]]: CreateArrayFromList(errorsList)
         //    }).
         try object.definePropertyDirect(
+            agent,
             PropertyKey.from("errors"),
             .{
                 .configurable = true,
@@ -123,33 +124,33 @@ pub const constructor = struct {
 /// 20.5.7.3 Properties of the AggregateError Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Error.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.7.3.1 AggregateError.prototype.constructor
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%AggregateError%"()),
         );
 
         // 20.5.7.3.2 AggregateError.prototype.message
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype.message
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "message",
             Value.from(""),
         );
 
         // 20.5.7.3.3 AggregateError.prototype.name
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype.name
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "name",
             Value.from("AggregateError"),
         );

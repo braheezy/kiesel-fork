@@ -21,9 +21,6 @@ const String = types.String;
 const StringParser = utils.StringParser;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 const hours_per_day = 24;
@@ -820,9 +817,9 @@ fn formatToDateString(
 /// 21.4.3 Properties of the Date Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             7,
             "Date",
@@ -830,14 +827,14 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "now", now, 0, realm);
-        try defineBuiltinFunction(object, "parse", parse, 1, realm);
-        try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "now", now, 0, realm);
+        try object.defineBuiltinFunction(agent, "parse", parse, 1, realm);
+        try object.defineBuiltinFunction(agent, "UTC", UTC, 7, realm);
 
         // 21.4.3.3 Date.prototype
         // https://tc39.es/ecma262/#sec-date.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Date.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -1017,57 +1014,57 @@ pub const constructor = struct {
 /// 21.4.4 Properties of the Date Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "getDate", getDate, 0, realm);
-        try defineBuiltinFunction(object, "getDay", getDay, 0, realm);
-        try defineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm);
-        try defineBuiltinFunction(object, "getHours", getHours, 0, realm);
-        try defineBuiltinFunction(object, "getMilliseconds", getMilliseconds, 0, realm);
-        try defineBuiltinFunction(object, "getMinutes", getMinutes, 0, realm);
-        try defineBuiltinFunction(object, "getMonth", getMonth, 0, realm);
-        try defineBuiltinFunction(object, "getSeconds", getSeconds, 0, realm);
-        try defineBuiltinFunction(object, "getTime", getTime, 0, realm);
-        try defineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm);
-        try defineBuiltinFunction(object, "getUTCDate", getUTCDate, 0, realm);
-        try defineBuiltinFunction(object, "getUTCDay", getUTCDay, 0, realm);
-        try defineBuiltinFunction(object, "getUTCFullYear", getUTCFullYear, 0, realm);
-        try defineBuiltinFunction(object, "getUTCHours", getUTCHours, 0, realm);
-        try defineBuiltinFunction(object, "getUTCMilliseconds", getUTCMilliseconds, 0, realm);
-        try defineBuiltinFunction(object, "getUTCMinutes", getUTCMinutes, 0, realm);
-        try defineBuiltinFunction(object, "getUTCMonth", getUTCMonth, 0, realm);
-        try defineBuiltinFunction(object, "getUTCSeconds", getUTCSeconds, 0, realm);
-        try defineBuiltinFunction(object, "setDate", setDate, 1, realm);
-        try defineBuiltinFunction(object, "setFullYear", setFullYear, 3, realm);
-        try defineBuiltinFunction(object, "setHours", setHours, 4, realm);
-        try defineBuiltinFunction(object, "setMilliseconds", setMilliseconds, 1, realm);
-        try defineBuiltinFunction(object, "setMinutes", setMinutes, 3, realm);
-        try defineBuiltinFunction(object, "setMonth", setMonth, 2, realm);
-        try defineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm);
-        try defineBuiltinFunction(object, "setTime", setTime, 1, realm);
-        try defineBuiltinFunction(object, "setUTCDate", setDate, 1, realm);
-        try defineBuiltinFunction(object, "setUTCFullYear", setFullYear, 3, realm);
-        try defineBuiltinFunction(object, "setUTCHours", setHours, 4, realm);
-        try defineBuiltinFunction(object, "setUTCMilliseconds", setMilliseconds, 1, realm);
-        try defineBuiltinFunction(object, "setUTCMinutes", setMinutes, 3, realm);
-        try defineBuiltinFunction(object, "setUTCMonth", setMonth, 2, realm);
-        try defineBuiltinFunction(object, "setUTCSeconds", setSeconds, 2, realm);
-        try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
-        try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
-        try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
-        try defineBuiltinFunction(object, "toLocaleDateString", toLocaleDateString, 0, realm);
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toLocaleTimeString", toLocaleTimeString, 0, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "toTimeString", toTimeString, 0, realm);
-        try defineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "getDate", getDate, 0, realm);
+        try object.defineBuiltinFunction(agent, "getDay", getDay, 0, realm);
+        try object.defineBuiltinFunction(agent, "getFullYear", getFullYear, 0, realm);
+        try object.defineBuiltinFunction(agent, "getHours", getHours, 0, realm);
+        try object.defineBuiltinFunction(agent, "getMilliseconds", getMilliseconds, 0, realm);
+        try object.defineBuiltinFunction(agent, "getMinutes", getMinutes, 0, realm);
+        try object.defineBuiltinFunction(agent, "getMonth", getMonth, 0, realm);
+        try object.defineBuiltinFunction(agent, "getSeconds", getSeconds, 0, realm);
+        try object.defineBuiltinFunction(agent, "getTime", getTime, 0, realm);
+        try object.defineBuiltinFunction(agent, "getTimezoneOffset", getTimezoneOffset, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCDate", getUTCDate, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCDay", getUTCDay, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCFullYear", getUTCFullYear, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCHours", getUTCHours, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCMilliseconds", getUTCMilliseconds, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCMinutes", getUTCMinutes, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCMonth", getUTCMonth, 0, realm);
+        try object.defineBuiltinFunction(agent, "getUTCSeconds", getUTCSeconds, 0, realm);
+        try object.defineBuiltinFunction(agent, "setDate", setDate, 1, realm);
+        try object.defineBuiltinFunction(agent, "setFullYear", setFullYear, 3, realm);
+        try object.defineBuiltinFunction(agent, "setHours", setHours, 4, realm);
+        try object.defineBuiltinFunction(agent, "setMilliseconds", setMilliseconds, 1, realm);
+        try object.defineBuiltinFunction(agent, "setMinutes", setMinutes, 3, realm);
+        try object.defineBuiltinFunction(agent, "setMonth", setMonth, 2, realm);
+        try object.defineBuiltinFunction(agent, "setSeconds", setSeconds, 2, realm);
+        try object.defineBuiltinFunction(agent, "setTime", setTime, 1, realm);
+        try object.defineBuiltinFunction(agent, "setUTCDate", setDate, 1, realm);
+        try object.defineBuiltinFunction(agent, "setUTCFullYear", setFullYear, 3, realm);
+        try object.defineBuiltinFunction(agent, "setUTCHours", setHours, 4, realm);
+        try object.defineBuiltinFunction(agent, "setUTCMilliseconds", setMilliseconds, 1, realm);
+        try object.defineBuiltinFunction(agent, "setUTCMinutes", setMinutes, 3, realm);
+        try object.defineBuiltinFunction(agent, "setUTCMonth", setMonth, 2, realm);
+        try object.defineBuiltinFunction(agent, "setUTCSeconds", setSeconds, 2, realm);
+        try object.defineBuiltinFunction(agent, "toDateString", toDateString_, 0, realm);
+        try object.defineBuiltinFunction(agent, "toISOString", toISOString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 1, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleDateString", toLocaleDateString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleTimeString", toLocaleTimeString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toTimeString", toTimeString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toUTCString", toUTCString, 0, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinFunctionWithAttributes(agent, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = true,
@@ -1075,20 +1072,20 @@ pub const prototype = struct {
 
         // 21.4.4.1 Date.prototype.constructor
         // https://tc39.es/ecma262/#sec-date.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Date%"()),
         );
 
         if (build_options.enable_annex_b) {
-            try defineBuiltinFunction(object, "getYear", getYear, 0, realm);
-            try defineBuiltinFunction(object, "setYear", setYear, 1, realm);
+            try object.defineBuiltinFunction(agent, "getYear", getYear, 0, realm);
+            try object.defineBuiltinFunction(agent, "setYear", setYear, 1, realm);
 
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
             const @"%Date.prototype.toUTCString%" = object.getPropertyValueDirect(PropertyKey.from("toUTCString"));
-            try defineBuiltinProperty(object, "toGMTString", @"%Date.prototype.toUTCString%");
+            try object.defineBuiltinProperty(agent, "toGMTString", @"%Date.prototype.toUTCString%");
         }
     }
 
@@ -2350,7 +2347,7 @@ pub const prototype = struct {
         };
 
         // 6. Return ? OrdinaryToPrimitive(O, tryFirst).
-        return object.ordinaryToPrimitive(try_first);
+        return object.ordinaryToPrimitive(agent, try_first);
     }
 
     /// B.2.3.1 Date.prototype.getYear ( )

@@ -19,8 +19,6 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const TypedArrayWithBufferWitness = builtins.typed_array.TypedArrayWithBufferWitness;
 const Value = types.Value;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
@@ -280,12 +278,14 @@ fn doWait(
 
         // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
         try result_object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("async"),
             Value.from(false),
         );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "not-equal").
         try result_object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("value"),
             Value.from("not-equal"),
         );
@@ -304,12 +304,14 @@ fn doWait(
 
         // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
         try result_object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("async"),
             Value.from(false),
         );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "timed-out").
         try result_object.createDataPropertyDirect(
+            agent,
             PropertyKey.from("value"),
             Value.from("timed-out"),
         );
@@ -326,12 +328,14 @@ fn doWait(
 
     // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
     try result_object.createDataPropertyDirect(
+        agent,
         PropertyKey.from("async"),
         Value.from(true),
     );
 
     // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
     try result_object.createDataPropertyDirect(
+        agent,
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
     );
@@ -400,31 +404,31 @@ fn atomicReadModifyWrite(
 }
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "add", add, 3, realm);
-        try defineBuiltinFunction(object, "and", @"and", 3, realm);
-        try defineBuiltinFunction(object, "compareExchange", compareExchange, 4, realm);
-        try defineBuiltinFunction(object, "exchange", exchange, 3, realm);
-        try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
-        try defineBuiltinFunction(object, "load", load, 2, realm);
-        try defineBuiltinFunction(object, "notify", notify, 3, realm);
-        try defineBuiltinFunction(object, "or", @"or", 3, realm);
-        try defineBuiltinFunction(object, "pause", pause, 0, realm);
-        try defineBuiltinFunction(object, "store", store, 3, realm);
-        try defineBuiltinFunction(object, "sub", sub, 3, realm);
-        try defineBuiltinFunction(object, "wait", wait, 4, realm);
-        try defineBuiltinFunction(object, "waitAsync", waitAsync, 4, realm);
-        try defineBuiltinFunction(object, "xor", xor, 3, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 3, realm);
+        try object.defineBuiltinFunction(agent, "and", @"and", 3, realm);
+        try object.defineBuiltinFunction(agent, "compareExchange", compareExchange, 4, realm);
+        try object.defineBuiltinFunction(agent, "exchange", exchange, 3, realm);
+        try object.defineBuiltinFunction(agent, "isLockFree", isLockFree, 1, realm);
+        try object.defineBuiltinFunction(agent, "load", load, 2, realm);
+        try object.defineBuiltinFunction(agent, "notify", notify, 3, realm);
+        try object.defineBuiltinFunction(agent, "or", @"or", 3, realm);
+        try object.defineBuiltinFunction(agent, "pause", pause, 0, realm);
+        try object.defineBuiltinFunction(agent, "store", store, 3, realm);
+        try object.defineBuiltinFunction(agent, "sub", sub, 3, realm);
+        try object.defineBuiltinFunction(agent, "wait", wait, 4, realm);
+        try object.defineBuiltinFunction(agent, "waitAsync", waitAsync, 4, realm);
+        try object.defineBuiltinFunction(agent, "xor", xor, 3, realm);
 
         // 25.4.17 Atomics [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-atomics-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Atomics"),
             .writable = false,
             .enumerable = false,

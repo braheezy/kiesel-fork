@@ -21,9 +21,6 @@ const Value = types.Value;
 const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createByteDataBlock = types.createByteDataBlock;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
@@ -302,7 +299,7 @@ pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Er
     if (!options.isObject()) return null;
 
     // 2. Let maxByteLength be ? Get(options, "maxByteLength").
-    const max_byte_length = try options.asObject().get(PropertyKey.from("maxByteLength"));
+    const max_byte_length = try options.asObject().get(agent, PropertyKey.from("maxByteLength"));
 
     // 3. If maxByteLength is undefined, return empty.
     if (max_byte_length.isUndefined()) return null;
@@ -610,9 +607,9 @@ pub fn getModifySetValueInBuffer(
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "ArrayBuffer",
@@ -620,13 +617,13 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "isView", isView, 1, realm);
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "isView", isView, 1, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%ArrayBuffer.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -690,33 +687,33 @@ pub const constructor = struct {
 /// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
-        try defineBuiltinAccessor(object, "detached", detached, null, realm);
-        try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
-        try defineBuiltinAccessor(object, "resizable", resizable, null, realm);
-        try defineBuiltinFunction(object, "resize", resize, 1, realm);
-        try defineBuiltinFunction(object, "slice", slice, 2, realm);
-        try defineBuiltinFunction(object, "transfer", transfer, 0, realm);
-        try defineBuiltinFunction(object, "transferToFixedLength", transferToFixedLength, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "byteLength", byteLength, null, realm);
+        try object.defineBuiltinAccessor(agent, "detached", detached, null, realm);
+        try object.defineBuiltinAccessor(agent, "maxByteLength", maxByteLength, null, realm);
+        try object.defineBuiltinAccessor(agent, "resizable", resizable, null, realm);
+        try object.defineBuiltinFunction(agent, "resize", resize, 1, realm);
+        try object.defineBuiltinFunction(agent, "slice", slice, 2, realm);
+        try object.defineBuiltinFunction(agent, "transfer", transfer, 0, realm);
+        try object.defineBuiltinFunction(agent, "transferToFixedLength", transferToFixedLength, 0, realm);
 
         // 25.1.6.2 ArrayBuffer.prototype.constructor
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%ArrayBuffer%"()),
         );
 
         // 25.1.6.7 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("ArrayBuffer"),
             .writable = false,
             .enumerable = false,
@@ -907,10 +904,13 @@ pub const prototype = struct {
         const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
         // 15. Let ctor be ? SpeciesConstructor(O, %ArrayBuffer%).
-        const constructor_ = try object.object.speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
+        const constructor_ = try object.object.speciesConstructor(
+            agent,
+            try realm.intrinsics.@"%ArrayBuffer%"(),
+        );
 
         // 16. Let new be ? Construct(ctor, « 𝔽(newLen) »).
-        const new_object = try constructor_.construct(&.{Value.from(new_len)}, null);
+        const new_object = try constructor_.construct(agent, &.{Value.from(new_len)}, null);
 
         // 17. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         // 18. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.

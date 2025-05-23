@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -23,8 +22,6 @@ const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSegmentsObject = builtins.intl.createSegmentsObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -32,9 +29,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 19.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Segmenter",
@@ -42,10 +39,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 19.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -139,27 +136,27 @@ pub const constructor = struct {
 /// 19.3 Properties of the Intl.Segmenter Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinFunction(object, "segment", segment, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinFunction(agent, "segment", segment, 1, realm);
 
         // 19.3.1 Intl.Segmenter.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
         );
 
         // 19.3.4 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Segmenter"),
             .writable = false,
             .enumerable = false,
@@ -189,6 +186,7 @@ pub const prototype = struct {
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = segmenter.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -198,6 +196,7 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("granularity"),
             Value.from(resolved_options.granularity),
         );

@@ -167,14 +167,16 @@ fn lazyIntrinsic(
 ) std.mem.Allocator.Error!*Object {
     const intrinsic = &@field(self.lazy_intrinsics, name);
     if (intrinsic.* == null) {
-        const object = try T.create(self.realm);
-        object.property_storage.shape = try object.property_storage.shape.makeUnique(self.realm.agent.gc_allocator);
+        const realm = self.realm;
+        const agent = realm.agent;
+        const object = try T.create(agent, realm);
+        object.property_storage.shape = try object.property_storage.shape.makeUnique(agent.gc_allocator);
         // Sanity check to ensure there is no dependency loop - creating the object must not
         // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
         // has been created twice and overwriting it would be a mistake.
         std.debug.assert(intrinsic.* == null);
         intrinsic.* = object;
-        try T.init(self.realm, object);
+        try T.init(agent, realm, object);
     }
     return intrinsic.*.?;
 }

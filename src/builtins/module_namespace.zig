@@ -18,7 +18,6 @@ const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getModuleNamespace = language.getModuleNamespace;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
@@ -249,7 +248,7 @@ fn ownPropertyKeys(
     const exports = object.as(ModuleNamespace).fields.exports;
 
     // 2. Let symbolKeys be OrdinaryOwnPropertyKeys(O).
-    const symbol_keys = try ordinaryOwnPropertyKeys(agent, object);
+    const symbol_keys = try ordinaryOwnPropertyKeys(agent.gc_allocator, object);
     defer agent.gc_allocator.free(symbol_keys);
 
     // 3. Return the list-concatenation of exports and symbolKeys.
@@ -319,7 +318,7 @@ pub fn moduleNamespaceCreate(
     {
         // 28.3.1 %Symbol.toStringTag%
         // https://tc39.es/ecma262/#sec-%symbol.tostringtag%
-        try defineBuiltinProperty(namespace, "%Symbol.toStringTag%", PropertyDescriptor{
+        try namespace.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Module"),
             .writable = false,
             .enumerable = false,

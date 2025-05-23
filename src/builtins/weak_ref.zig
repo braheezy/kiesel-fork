@@ -8,7 +8,6 @@ const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const gc = @import("../gc.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,16 +17,14 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 26.1.2 Properties of the WeakRef Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "WeakRef",
@@ -35,10 +32,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 26.1.2.1 WeakRef.prototype
         // https://tc39.es/ecma262/#sec-weak-ref.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%WeakRef.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -106,26 +103,26 @@ pub const constructor = struct {
 /// 26.1.3 Properties of the WeakRef Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "deref", deref, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "deref", deref, 0, realm);
 
         // 26.1.3.1 WeakRef.prototype.constructor
         // https://tc39.es/ecma262/#sec-weak-ref.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%WeakRef%"()),
         );
 
         // 26.1.3.3 WeakRef.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weak-ref.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("WeakRef"),
             .writable = false,
             .enumerable = false,

@@ -8,7 +8,6 @@ const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const gc = @import("../gc.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -20,16 +19,14 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 24.3.2 Properties of the WeakMap Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "WeakMap",
@@ -37,10 +34,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 24.3.2.1 WeakMap.prototype
         // https://tc39.es/ecma262/#sec-weakmap.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%WeakMap.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -80,7 +77,7 @@ pub const constructor = struct {
         }
 
         // 5. Let adder be ? Get(map, "set").
-        const adder = try map.get(PropertyKey.from("set"));
+        const adder = try map.get(agent, PropertyKey.from("set"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -99,29 +96,29 @@ pub const constructor = struct {
 /// 24.3.3 Properties of the WeakMap Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "delete", delete, 1, realm);
-        try defineBuiltinFunction(object, "get", get, 1, realm);
-        try defineBuiltinFunction(object, "has", has, 1, realm);
-        try defineBuiltinFunction(object, "set", set, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "delete", delete, 1, realm);
+        try object.defineBuiltinFunction(agent, "get", get, 1, realm);
+        try object.defineBuiltinFunction(agent, "has", has, 1, realm);
+        try object.defineBuiltinFunction(agent, "set", set, 2, realm);
 
         // 24.3.3.1 WeakMap.prototype.constructor
         // https://tc39.es/ecma262/#sec-weakmap.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%WeakMap%"()),
         );
 
         // 24.3.3.6 WeakMap.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weakmap.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("WeakMap"),
             .writable = false,
             .enumerable = false,

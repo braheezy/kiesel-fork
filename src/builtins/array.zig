@@ -26,9 +26,6 @@ const @"await" = builtins.@"await";
 const createArrayIterator = builtins.createArrayIterator;
 const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const isLessThan = types.isLessThan;
@@ -161,13 +158,13 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
 /// https://tc39.es/ecma262/#sec-arrayspeciescreate
 pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) Agent.Error!*Object {
     // 1. Let isArray be ? IsArray(originalArray).
-    const is_array = try Value.from(original_array).isArray();
+    const is_array = try Value.from(original_array).isArray(agent);
 
     // 2. If isArray is false, return ? ArrayCreate(length).
     if (!is_array) return arrayCreate(agent, length, null);
 
     // 3. Let C be ? Get(originalArray, "constructor").
-    var constructor_ = try original_array.get(PropertyKey.from("constructor"));
+    var constructor_ = try original_array.get(agent, PropertyKey.from("constructor"));
 
     // 4. If IsConstructor(C) is true, then
     if (constructor_.isConstructor()) {
@@ -207,7 +204,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor_.asObject().construct(&.{Value.from(length)}, null);
+    return constructor_.asObject().construct(agent, &.{Value.from(length)}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -387,9 +384,9 @@ pub fn arraySetLength(
 /// 23.1.2 Properties of the Array Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Array",
@@ -397,16 +394,16 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "from", from, 1, realm);
-        try defineBuiltinFunction(object, "fromAsync", fromAsync, 1, realm);
-        try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
-        try defineBuiltinFunction(object, "of", of, 0, realm);
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+        try object.defineBuiltinFunction(agent, "fromAsync", fromAsync, 1, realm);
+        try object.defineBuiltinFunction(agent, "isArray", isArray, 1, realm);
+        try object.defineBuiltinFunction(agent, "of", of, 0, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Array.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -448,7 +445,7 @@ pub const constructor = struct {
             // c. If len is not a Number, then
             if (!len.isNumber()) {
                 // i. Perform ! CreateDataPropertyOrThrow(array, "0", len).
-                try array.createDataPropertyDirect(PropertyKey.from(0), len);
+                try array.createDataPropertyDirect(agent, PropertyKey.from(0), len);
 
                 // ii. Let intLen be 1𝔽.
                 int_len = 1;
@@ -465,6 +462,7 @@ pub const constructor = struct {
 
             // e. Perform ! Set(array, "length", intLen, true).
             _ = array.set(
+                agent,
                 PropertyKey.from("length"),
                 Value.from(int_len),
                 .throw,
@@ -488,7 +486,7 @@ pub const constructor = struct {
 
                 // ii. Let itemK be values[k].
                 // iii. Perform ! CreateDataPropertyOrThrow(array, Pk, itemK).
-                try array.createDataPropertyDirect(property_key, item_k);
+                try array.createDataPropertyDirect(agent, property_key, item_k);
 
                 // iv. Set k to k + 1.
             }
@@ -537,7 +535,7 @@ pub const constructor = struct {
             // a. If IsConstructor(C) is true, then
             const array = if (constructor_.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
-                break :blk try constructor_.asObject().construct(&.{}, null);
+                break :blk try constructor_.asObject().construct(agent, &.{}, null);
             } else blk: {
                 // b. Else,
                 // i. Let A be ! ArrayCreate(0).
@@ -572,7 +570,7 @@ pub const constructor = struct {
                 // iv. If next is done, then
                 const next = try iterator.stepValue(agent) orelse {
                     // 1. Perform ? Set(A, "length", 𝔽(k), true).
-                    try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+                    try array.set(agent, PropertyKey.from("length"), Value.from(k), .throw);
 
                     // 2. Return A.
                     return Value.from(array);
@@ -596,7 +594,7 @@ pub const constructor = struct {
                 };
 
                 // vii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
-                _ = array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| {
+                _ = array.createDataPropertyOrThrow(agent, property_key, mapped_value) catch |err| {
                     // viii. IfAbruptCloseIterator(defineStatus, iteratorRecord).
                     return iterator.close(agent, @as(Agent.Error!Value, err));
                 };
@@ -610,12 +608,12 @@ pub const constructor = struct {
         const array_like = items.toObject(agent) catch |err| try noexcept(err);
 
         // 8. Let len be ? LengthOfArrayLike(arrayLike).
-        const len = try array_like.lengthOfArrayLike();
+        const len = try array_like.lengthOfArrayLike(agent);
 
         // 9. If IsConstructor(C) is true, then
         const array = if (constructor_.isConstructor()) blk: {
             // a. Let A be ? Construct(C, « 𝔽(len) »).
-            break :blk try constructor_.asObject().construct(&.{Value.from(len)}, null);
+            break :blk try constructor_.asObject().construct(agent, &.{Value.from(len)}, null);
         } else blk: {
             // 10. Else,
             // a. Let A be ? ArrayCreate(len).
@@ -631,7 +629,7 @@ pub const constructor = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ? Get(arrayLike, Pk).
-            const k_value = try array_like.get(property_key);
+            const k_value = try array_like.get(agent, property_key);
 
             // c. If mapping is true, then
             const mapped_value = if (mapping) blk: {
@@ -648,13 +646,13 @@ pub const constructor = struct {
             };
 
             // e. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
-            try array.createDataPropertyOrThrow(property_key, mapped_value);
+            try array.createDataPropertyOrThrow(agent, property_key, mapped_value);
 
             // f. Set k to k + 1.
         }
 
         // 13. Perform ? Set(A, "length", 𝔽(len), true).
-        try array.set(PropertyKey.from("length"), Value.from(len), .throw);
+        try array.set(agent, PropertyKey.from("length"), Value.from(len), .throw);
 
         // 14. Return A.
         return Value.from(array);
@@ -750,7 +748,7 @@ pub const constructor = struct {
                     // i. If IsConstructor(C) is true, then
                     const array = if (constructor_.isConstructor()) blk: {
                         // 1. Let A be ? Construct(C).
-                        break :blk try constructor_.asObject().construct(&.{}, null);
+                        break :blk try constructor_.asObject().construct(agent_, &.{}, null);
                     } else blk: {
                         // ii. Else,
                         // 1. Let A be ! ArrayCreate(0).
@@ -795,22 +793,22 @@ pub const constructor = struct {
                         const next_result = next_result_value.asObject();
 
                         // 6. Let done be ? IteratorComplete(nextResult).
-                        const done = try Iterator.complete(next_result);
+                        const done = try Iterator.complete(agent_, next_result);
 
                         // 7. If done is true,
                         if (done) {
                             // a. Perform ? Set(A, "length", 𝔽(k), true).
-                            try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+                            try array.set(agent_, PropertyKey.from("length"), Value.from(k), .throw);
 
                             // b. Return Completion Record { [[Type]]: return, [[Value]]: A, [[Target]]: empty }.
                             return .@"return"(Value.from(array));
                         }
 
                         // a. Perform ? Set(A, "length", 𝔽(k), true).
-                        try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+                        try array.set(agent_, PropertyKey.from("length"), Value.from(k), .throw);
 
                         // 8. Let nextValue be ? IteratorValue(nextResult).
-                        const next_value = try Iterator.value(next_result);
+                        const next_value = try Iterator.value(agent_, next_result);
 
                         // 9. If mapping is true, then
                         const mapped_value = if (mapping) blk: {
@@ -843,7 +841,7 @@ pub const constructor = struct {
                         };
 
                         // 11. Let defineStatus be CreateDataPropertyOrThrow(A, Pk, mappedValue).
-                        array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| switch (err) {
+                        array.createDataPropertyOrThrow(agent_, property_key, mapped_value) catch |err| switch (err) {
                             error.OutOfMemory => return error.OutOfMemory,
                             error.ExceptionThrown => {
                                 // 12. If defineStatus is an abrupt completion, return ? AsyncIteratorClose(iteratorRecord, defineStatus).
@@ -862,12 +860,16 @@ pub const constructor = struct {
                     const array_like = async_items.toObject(agent_) catch |err| try noexcept(err);
 
                     // iii. Let len be ? LengthOfArrayLike(arrayLike).
-                    const len = try array_like.lengthOfArrayLike();
+                    const len = try array_like.lengthOfArrayLike(agent_);
 
                     // iv. If IsConstructor(C) is true, then
                     const array = if (constructor_.isConstructor()) blk: {
                         // 1. Let A be ? Construct(C, « 𝔽(len) »).
-                        break :blk try constructor_.asObject().construct(&.{Value.from(len)}, null);
+                        break :blk try constructor_.asObject().construct(
+                            agent_,
+                            &.{Value.from(len)},
+                            null,
+                        );
                     } else blk: {
                         // v. Else,
                         // 1. Let A be ? ArrayCreate(len).
@@ -883,7 +885,7 @@ pub const constructor = struct {
                         const property_key = PropertyKey.from(k);
 
                         // 2. Let kValue be ? Get(arrayLike, Pk).
-                        var k_value = try array_like.get(property_key);
+                        var k_value = try array_like.get(agent_, property_key);
 
                         // 3. Set kValue to ? Await(kValue).
                         k_value = try @"await"(agent_, k_value);
@@ -907,13 +909,13 @@ pub const constructor = struct {
                         };
 
                         // 6. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
-                        try array.createDataPropertyOrThrow(property_key, mapped_value);
+                        try array.createDataPropertyOrThrow(agent_, property_key, mapped_value);
 
                         // 7. Set k to k + 1.
                     }
 
                     // viii. Perform ? Set(A, "length", 𝔽(len), true).
-                    try array.set(PropertyKey.from("length"), Value.from(len), .throw);
+                    try array.set(agent_, PropertyKey.from("length"), Value.from(len), .throw);
 
                     // ix. Return Completion Record { [[Type]]: return, [[Value]]: A, [[Target]]: empty }.
                     return .@"return"(Value.from(array));
@@ -935,11 +937,11 @@ pub const constructor = struct {
 
     /// 23.1.2.2 Array.isArray ( arg )
     /// https://tc39.es/ecma262/#sec-array.isarray
-    fn isArray(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    fn isArray(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const arg = arguments.get(0);
 
         // 1. Return ? IsArray(arg).
-        return Value.from(try arg.isArray());
+        return Value.from(try arg.isArray(agent));
     }
 
     /// 23.1.2.3 Array.of ( ...items )
@@ -958,7 +960,7 @@ pub const constructor = struct {
         const array = blk: {
             if (constructor_.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
-                break :blk try constructor_.asObject().construct(&.{len_number}, null);
+                break :blk try constructor_.asObject().construct(agent, &.{len_number}, null);
             } else {
                 // 5. Else,
                 // a. Let A be ? ArrayCreate(len).
@@ -975,13 +977,13 @@ pub const constructor = struct {
             const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
 
             // c. Perform ? CreateDataPropertyOrThrow(A, Pk, kValue).
-            try array.createDataPropertyOrThrow(property_key, k_value);
+            try array.createDataPropertyOrThrow(agent, property_key, k_value);
 
             // d. Set k to k + 1.
         }
 
         // 8. Perform ? Set(A, "length", lenNumber, true).
-        try array.set(PropertyKey.from("length"), len_number, .throw);
+        try array.set(agent, PropertyKey.from("length"), len_number, .throw);
 
         // 9. Return A.
         return Value.from(array);
@@ -998,58 +1000,58 @@ pub const constructor = struct {
 /// 23.1.3 Properties of the Array Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return arrayCreate(
-            realm.agent,
+            agent,
             0,
             try realm.intrinsics.@"%Object.prototype%"(),
         ) catch |err| try noexcept(err);
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "at", at, 1, realm);
-        try defineBuiltinFunction(object, "concat", concat, 1, realm);
-        try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
-        try defineBuiltinFunction(object, "entries", entries, 0, realm);
-        try defineBuiltinFunction(object, "every", every, 1, realm);
-        try defineBuiltinFunction(object, "fill", fill, 1, realm);
-        try defineBuiltinFunction(object, "filter", filter, 1, realm);
-        try defineBuiltinFunction(object, "find", find, 1, realm);
-        try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
-        try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
-        try defineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm);
-        try defineBuiltinFunction(object, "flat", flat, 0, realm);
-        try defineBuiltinFunction(object, "flatMap", flatMap, 1, realm);
-        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
-        try defineBuiltinFunction(object, "includes", includes, 1, realm);
-        try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
-        try defineBuiltinFunction(object, "join", join, 1, realm);
-        try defineBuiltinFunction(object, "keys", keys, 0, realm);
-        try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
-        try defineBuiltinFunction(object, "map", map, 1, realm);
-        try defineBuiltinFunction(object, "pop", pop, 0, realm);
-        try defineBuiltinFunction(object, "push", push, 1, realm);
-        try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
-        try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
-        try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
-        try defineBuiltinFunction(object, "shift", shift, 0, realm);
-        try defineBuiltinFunction(object, "slice", slice, 2, realm);
-        try defineBuiltinFunction(object, "some", some, 1, realm);
-        try defineBuiltinFunction(object, "sort", sort, 1, realm);
-        try defineBuiltinFunction(object, "splice", splice, 2, realm);
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
-        try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
-        try defineBuiltinFunction(object, "toSpliced", toSpliced, 2, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "unshift", unshift, 1, realm);
-        try defineBuiltinFunction(object, "values", values, 0, realm);
-        try defineBuiltinFunction(object, "with", with, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "at", at, 1, realm);
+        try object.defineBuiltinFunction(agent, "concat", concat, 1, realm);
+        try object.defineBuiltinFunction(agent, "copyWithin", copyWithin, 2, realm);
+        try object.defineBuiltinFunction(agent, "entries", entries, 0, realm);
+        try object.defineBuiltinFunction(agent, "every", every, 1, realm);
+        try object.defineBuiltinFunction(agent, "fill", fill, 1, realm);
+        try object.defineBuiltinFunction(agent, "filter", filter, 1, realm);
+        try object.defineBuiltinFunction(agent, "find", find, 1, realm);
+        try object.defineBuiltinFunction(agent, "findIndex", findIndex, 1, realm);
+        try object.defineBuiltinFunction(agent, "findLast", findLast, 1, realm);
+        try object.defineBuiltinFunction(agent, "findLastIndex", findLastIndex, 1, realm);
+        try object.defineBuiltinFunction(agent, "flat", flat, 0, realm);
+        try object.defineBuiltinFunction(agent, "flatMap", flatMap, 1, realm);
+        try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
+        try object.defineBuiltinFunction(agent, "indexOf", indexOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "join", join, 1, realm);
+        try object.defineBuiltinFunction(agent, "keys", keys, 0, realm);
+        try object.defineBuiltinFunction(agent, "lastIndexOf", lastIndexOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "map", map, 1, realm);
+        try object.defineBuiltinFunction(agent, "pop", pop, 0, realm);
+        try object.defineBuiltinFunction(agent, "push", push, 1, realm);
+        try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
+        try object.defineBuiltinFunction(agent, "reduceRight", reduceRight, 1, realm);
+        try object.defineBuiltinFunction(agent, "reverse", reverse, 0, realm);
+        try object.defineBuiltinFunction(agent, "shift", shift, 0, realm);
+        try object.defineBuiltinFunction(agent, "slice", slice, 2, realm);
+        try object.defineBuiltinFunction(agent, "some", some, 1, realm);
+        try object.defineBuiltinFunction(agent, "sort", sort, 1, realm);
+        try object.defineBuiltinFunction(agent, "splice", splice, 2, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toReversed", toReversed, 0, realm);
+        try object.defineBuiltinFunction(agent, "toSorted", toSorted, 1, realm);
+        try object.defineBuiltinFunction(agent, "toSpliced", toSpliced, 2, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "unshift", unshift, 1, realm);
+        try object.defineBuiltinFunction(agent, "values", values, 0, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 2, realm);
 
         // 23.1.3.3 Array.prototype.constructor
         // https://tc39.es/ecma262/#sec-array.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Array%"()),
         );
@@ -1059,14 +1061,14 @@ pub const prototype = struct {
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
         const @"%Array.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Array.prototype.values%");
+        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Array.prototype.values%");
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%
-        try defineBuiltinProperty(object, "%Symbol.unscopables%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.unscopables%", PropertyDescriptor{
             .value = blk: {
                 // 1. Let unscopableList be OrdinaryObjectCreate(null).
-                const unscopable_list = try ordinaryObjectCreate(realm.agent, null);
+                const unscopable_list = try ordinaryObjectCreate(agent, null);
 
                 // 2. Perform ! CreateDataPropertyOrThrow(unscopableList, "at", true).
                 // 3. Perform ! CreateDataPropertyOrThrow(unscopableList, "copyWithin", true).
@@ -1090,6 +1092,7 @@ pub const prototype = struct {
                     "toReversed", "toSorted",      "toSpliced", "values",
                 }) |name| {
                     try unscopable_list.createDataPropertyDirect(
+                        agent,
                         PropertyKey.from(name),
                         Value.from(true),
                     );
@@ -1116,7 +1119,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
         const relative_index = try index.toIntegerOrInfinity(agent);
@@ -1135,7 +1138,7 @@ pub const prototype = struct {
         const k: u53 = @intFromFloat(k_f64);
 
         // 7. Return ? Get(O, ! ToString(𝔽(k))).
-        return object.get(PropertyKey.from(k));
+        return object.get(agent, PropertyKey.from(k));
     }
 
     /// 23.1.3.2 Array.prototype.concat ( ...items )
@@ -1166,7 +1169,7 @@ pub const prototype = struct {
             // b. If spreadable is true, then
             if (spreadable) {
                 // i. Let len be ? LengthOfArrayLike(E).
-                const len = try element.asObject().lengthOfArrayLike();
+                const len = try element.asObject().lengthOfArrayLike(agent);
 
                 // ii. If n + len > 2**53 - 1, throw a TypeError exception.
                 if (std.meta.isError(std.math.add(u53, n, len))) {
@@ -1185,15 +1188,19 @@ pub const prototype = struct {
                     const property_key = PropertyKey.from(k);
 
                     // 2. Let exists be ? HasProperty(E, Pk).
-                    const exists = try element.asObject().hasProperty(property_key);
+                    const exists = try element.asObject().hasProperty(agent, property_key);
 
                     // 3. If exists is true, then
                     if (exists) {
                         // a. Let subElement be ? Get(E, Pk).
-                        const sub_element = try element.asObject().get(property_key);
+                        const sub_element = try element.asObject().get(agent, property_key);
 
                         // b. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), subElement).
-                        try array.createDataPropertyOrThrow(PropertyKey.from(n), sub_element);
+                        try array.createDataPropertyOrThrow(
+                            agent,
+                            PropertyKey.from(n),
+                            sub_element,
+                        );
                     }
 
                     // 4. Set n to n + 1.
@@ -1209,7 +1216,7 @@ pub const prototype = struct {
                 }
 
                 // iii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), E).
-                try array.createDataPropertyOrThrow(PropertyKey.from(n), element);
+                try array.createDataPropertyOrThrow(agent, PropertyKey.from(n), element);
 
                 // iv. Set n to n + 1.
                 n += 1;
@@ -1217,7 +1224,7 @@ pub const prototype = struct {
         }
 
         // 6. Perform ? Set(A, "length", 𝔽(n), true).
-        try array.set(PropertyKey.from("length"), Value.from(n), .throw);
+        try array.set(agent, PropertyKey.from("length"), Value.from(n), .throw);
 
         // 7. Return A.
         return Value.from(array);
@@ -1231,6 +1238,7 @@ pub const prototype = struct {
 
         // 2. Let spreadable be ? Get(O, %Symbol.isConcatSpreadable%).
         const spreadable = try value.asObject().get(
+            agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
         );
 
@@ -1238,7 +1246,7 @@ pub const prototype = struct {
         if (!spreadable.isUndefined()) return spreadable.toBoolean();
 
         // 4. Return ? IsArray(O).
-        return value.isArray();
+        return value.isArray(agent);
     }
 
     /// 23.1.3.4 Array.prototype.copyWithin ( target, start [ , end ] )
@@ -1252,7 +1260,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeTarget be ? ToIntegerOrInfinity(target).
@@ -1336,22 +1344,22 @@ pub const prototype = struct {
             const to_key = PropertyKey.from(to);
 
             // c. Let fromPresent be ? HasProperty(O, fromKey).
-            const from_present = try object.hasProperty(from_key);
+            const from_present = try object.hasProperty(agent, from_key);
 
             // d. If fromPresent is true, then
             if (from_present) {
                 // i. Let fromValue be ? Get(O, fromKey).
-                const from_value = try object.get(from_key);
+                const from_value = try object.get(agent, from_key);
 
                 // ii. Perform ? Set(O, toKey, fromValue, true).
-                try object.set(to_key, from_value, .throw);
+                try object.set(agent, to_key, from_value, .throw);
             } else {
                 // e. Else,
                 // i. Assert: fromPresent is false.
                 std.debug.assert(!from_present);
 
                 // ii. Perform ? DeletePropertyOrThrow(O, toKey).
-                try object.deletePropertyOrThrow(to_key);
+                try object.deletePropertyOrThrow(agent, to_key);
             }
 
             // f. Set from to from + direction.
@@ -1383,7 +1391,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -1399,12 +1407,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
                 const test_result = (try callback.callAssumeCallable(
@@ -1435,7 +1443,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
@@ -1478,7 +1486,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Perform ? Set(O, Pk, value, true).
-            try object.set(property_key, value, .throw);
+            try object.set(agent, property_key, value, .throw);
 
             // c. Set k to k + 1.
         }
@@ -1497,7 +1505,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -1519,12 +1527,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
                 const selected = (try callback.callAssumeCallable(
@@ -1536,7 +1544,7 @@ pub const prototype = struct {
                 // iii. If selected is true, then
                 if (selected) {
                     // 1. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(to)), kValue).
-                    try array.createDataPropertyOrThrow(PropertyKey.from(to), k_value);
+                    try array.createDataPropertyOrThrow(agent, PropertyKey.from(to), k_value);
 
                     // 2. Set to to to + 1.
                     to += 1;
@@ -1560,7 +1568,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
         const find_record = try findViaPredicate(
@@ -1586,7 +1594,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
         const find_record = try findViaPredicate(
@@ -1612,7 +1620,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
         const find_record = try findViaPredicate(
@@ -1638,7 +1646,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
         const find_record = try findViaPredicate(
@@ -1662,7 +1670,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let sourceLen be ? LengthOfArrayLike(O).
-        const source_len = try object.lengthOfArrayLike();
+        const source_len = try object.lengthOfArrayLike(agent);
 
         // 3. Let depthNum be 1.
         var depth_num: f64 = 1;
@@ -1718,12 +1726,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(source_index);
 
             // b. Let exists be ? HasProperty(source, P).
-            const exists = try source.hasProperty(property_key);
+            const exists = try source.hasProperty(agent, property_key);
 
             // c. If exists is true, then
             if (exists) {
                 // i. Let element be ? Get(source, P).
-                var element = try source.get(property_key);
+                var element = try source.get(agent, property_key);
 
                 // ii. If mapperFunction is present, then
                 if (mapper_function != null) {
@@ -1741,7 +1749,7 @@ pub const prototype = struct {
                 // iv. If depth > 0, then
                 if (depth > 0) {
                     // 1. Set shouldFlatten to ? IsArray(element).
-                    should_flatten = try element.isArray();
+                    should_flatten = try element.isArray(agent);
                 }
 
                 // v. If shouldFlatten is true, then
@@ -1754,7 +1762,7 @@ pub const prototype = struct {
                         depth - 1;
 
                     // 3. Let elementLen be ? LengthOfArrayLike(element).
-                    const element_len = try element.asObject().lengthOfArrayLike();
+                    const element_len = try element.asObject().lengthOfArrayLike(agent);
 
                     // NOTE: flattenIntoArray() is being called recursively here.
                     try agent.checkStackOverflow();
@@ -1780,6 +1788,7 @@ pub const prototype = struct {
 
                     // 2. Perform ? CreateDataPropertyOrThrow(target, ! ToString(𝔽(targetIndex)), element).
                     try target.createDataPropertyOrThrow(
+                        agent,
                         PropertyKey.from(@as(PropertyKey.IntegerIndex, @intFromFloat(target_index))),
                         element,
                     );
@@ -1806,7 +1815,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let sourceLen be ? LengthOfArrayLike(O).
-        const source_len = try object.lengthOfArrayLike();
+        const source_len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(mapperFunction) is false, throw a TypeError exception.
         if (!mapper_function.isCallable()) {
@@ -1842,7 +1851,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -1858,12 +1867,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
                 _ = try callback.callAssumeCallable(
@@ -1890,7 +1899,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If len = 0, return false.
         if (len == 0) return Value.from(false);
@@ -1919,7 +1928,7 @@ pub const prototype = struct {
         // 10. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. Let elementK be ? Get(O, ! ToString(𝔽(k))).
-            const element_k = try object.get(PropertyKey.from(k));
+            const element_k = try object.get(agent, PropertyKey.from(k));
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
             if (sameValueZero(search_element, element_k)) return Value.from(true);
@@ -1941,7 +1950,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If len = 0, return -1𝔽.
         if (len == 0) return Value.from(-1);
@@ -1973,12 +1982,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let elementK be ? Get(O, Pk).
-                const element_k = try object.get(property_key);
+                const element_k = try object.get(agent, property_key);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -2000,7 +2009,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If separator is undefined, let sep be ",".
         // 4. Else, let sep be ? ToString(separator).
@@ -2027,7 +2036,7 @@ pub const prototype = struct {
             if (k > 0) result.appendSegmentAssumeCapacity(sep);
 
             // b. Let element be ? Get(O, ! ToString(𝔽(k))).
-            const element = try object.get(PropertyKey.from(k));
+            const element = try object.get(agent, PropertyKey.from(k));
 
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
@@ -2065,7 +2074,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If len = 0, return -1𝔽.
         if (len == 0) return Value.from(-1);
@@ -2096,12 +2105,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let elementK be ? Get(O, Pk).
-                const element_k = try object.get(property_key);
+                const element_k = try object.get(agent, property_key);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -2125,7 +2134,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -2144,12 +2153,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
                 const mapped_value = try callback.callAssumeCallable(
@@ -2159,7 +2168,7 @@ pub const prototype = struct {
                 );
 
                 // iii. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
-                try array.createDataPropertyOrThrow(property_key, mapped_value);
+                try array.createDataPropertyOrThrow(agent, property_key, mapped_value);
             }
 
             // d. Set k to k + 1.
@@ -2176,12 +2185,12 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // If len = 0, then
         if (len == 0) {
             // a. Perform ? Set(O, "length", +0𝔽, true).
-            try object.set(PropertyKey.from("length"), Value.from(0), .throw);
+            try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
             return .undefined;
@@ -2197,13 +2206,13 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(new_len);
 
             // d. Let element be ? Get(O, index).
-            const element = try object.get(property_key);
+            const element = try object.get(agent, property_key);
 
             // e. Perform ? DeletePropertyOrThrow(O, index).
-            try object.deletePropertyOrThrow(property_key);
+            try object.deletePropertyOrThrow(agent, property_key);
 
             // f. Perform ? Set(O, "length", newLen, true).
-            try object.set(PropertyKey.from("length"), Value.from(new_len), .throw);
+            try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
 
             // g. Return element.
             return element;
@@ -2217,7 +2226,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        var len = try object.lengthOfArrayLike();
+        var len = try object.lengthOfArrayLike(agent);
 
         // 3. Let argCount be the number of elements in items.
         const arg_count: u53 = @intCast(arguments.count());
@@ -2230,14 +2239,14 @@ pub const prototype = struct {
         // 5. For each element E of items, do
         for (arguments.values) |element| {
             // a. Perform ? Set(O, ! ToString(𝔽(len)), E, true).
-            try object.set(PropertyKey.from(len), element, .throw);
+            try object.set(agent, PropertyKey.from(len), element, .throw);
 
             // b. Set len to len + 1.
             len += 1;
         }
 
         // 6. Perform ? Set(O, "length", 𝔽(len), true).
-        try object.set(PropertyKey.from("length"), Value.from(len), .throw);
+        try object.set(agent, PropertyKey.from("length"), Value.from(len), .throw);
 
         // 7. Return 𝔽(len).
         return Value.from(len);
@@ -2253,7 +2262,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -2290,12 +2299,12 @@ pub const prototype = struct {
                 const property_key = PropertyKey.from(k);
 
                 // ii. Set kPresent to ? HasProperty(O, Pk).
-                k_present = try object.hasProperty(property_key);
+                k_present = try object.hasProperty(agent, property_key);
 
                 // iii. If kPresent is true, then
                 if (k_present) {
                     // 1. Set accumulator to ? Get(O, Pk).
-                    accumulator = try object.get(property_key);
+                    accumulator = try object.get(agent, property_key);
                 }
 
                 // iv. Set k to k + 1.
@@ -2317,12 +2326,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback.callAssumeCallable(
@@ -2349,7 +2358,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -2386,12 +2395,12 @@ pub const prototype = struct {
                 const property_key = PropertyKey.from(k.?);
 
                 // ii. Set kPresent to ? HasProperty(O, Pk).
-                k_present = try object.hasProperty(property_key);
+                k_present = try object.hasProperty(agent, property_key);
 
                 // iii. If kPresent is true, then
                 if (k_present) {
                     // 1. Set accumulator to ? Get(O, Pk).
-                    accumulator = try object.get(property_key);
+                    accumulator = try object.get(agent, property_key);
                 }
 
                 // iv. Set k to k - 1.
@@ -2413,12 +2422,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k.?);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback.callAssumeCallable(
@@ -2442,7 +2451,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let middle be floor(len / 2).
         const middle = len / 2;
@@ -2462,46 +2471,46 @@ pub const prototype = struct {
             const lower_property_key = PropertyKey.from(lower);
 
             // d. Let lowerExists be ? HasProperty(O, lowerP).
-            const lower_exists = try object.hasProperty(lower_property_key);
+            const lower_exists = try object.hasProperty(agent, lower_property_key);
 
             // e. If lowerExists is true, then
             const lower_value = if (lower_exists) blk: {
                 // i. Let lowerValue be ? Get(O, lowerP).
-                break :blk try object.get(lower_property_key);
+                break :blk try object.get(agent, lower_property_key);
             } else undefined;
 
             // f. Let upperExists be ? HasProperty(O, upperP).
-            const upper_exists = try object.hasProperty(upper_property_key);
+            const upper_exists = try object.hasProperty(agent, upper_property_key);
 
             // g. If upperExists is true, then
             const upper_value = if (upper_exists) blk: {
                 // i. Let upperValue be ? Get(O, upperP).
-                break :blk try object.get(upper_property_key);
+                break :blk try object.get(agent, upper_property_key);
             } else undefined;
 
             // h. If lowerExists is true and upperExists is true, then
             if (lower_exists and upper_exists) {
                 // i. Perform ? Set(O, lowerP, upperValue, true).
-                try object.set(lower_property_key, upper_value, .throw);
+                try object.set(agent, lower_property_key, upper_value, .throw);
 
                 // ii. Perform ? Set(O, upperP, lowerValue, true)
-                try object.set(upper_property_key, lower_value, .throw);
+                try object.set(agent, upper_property_key, lower_value, .throw);
             }
             // i. Else if lowerExists is false and upperExists is true, then
             else if (!lower_exists and upper_exists) {
                 // i. Perform ? Set(O, lowerP, upperValue, true).
-                try object.set(lower_property_key, upper_value, .throw);
+                try object.set(agent, lower_property_key, upper_value, .throw);
 
                 // ii. Perform ? DeletePropertyOrThrow(O, upperP).
-                try object.deletePropertyOrThrow(upper_property_key);
+                try object.deletePropertyOrThrow(agent, upper_property_key);
             }
             // j. Else if lowerExists is true and upperExists is false, then
             else if (lower_exists and !upper_exists) {
                 // i. Perform ? DeletePropertyOrThrow(O, lowerP).
-                try object.deletePropertyOrThrow(lower_property_key);
+                try object.deletePropertyOrThrow(agent, lower_property_key);
 
                 // ii. Perform ? Set(O, upperP, lowerValue, true).
-                try object.set(upper_property_key, lower_value, .throw);
+                try object.set(agent, upper_property_key, lower_value, .throw);
             } else {
                 // k. Else,
                 // i. Assert: lowerExists and upperExists are both false.
@@ -2524,19 +2533,19 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If len = 0, then
         if (len == 0) {
             // a. Perform ? Set(O, "length", +0𝔽, true).
-            try object.set(PropertyKey.from("length"), Value.from(0), .throw);
+            try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
             return .undefined;
         }
 
         // 4. Let first be ? Get(O, "0").
-        const first = object.get(PropertyKey.from(0));
+        const first = object.get(agent, PropertyKey.from(0));
 
         // 5. Let k be 1.
         var k: u53 = 1;
@@ -2550,32 +2559,32 @@ pub const prototype = struct {
             const to = PropertyKey.from(k - 1);
 
             // c. Let fromPresent be ? HasProperty(O, from).
-            const from_present = try object.hasProperty(from);
+            const from_present = try object.hasProperty(agent, from);
 
             // d. If fromPresent is true, then
             if (from_present) {
                 // i. Let fromValue be ? Get(O, from).
-                const from_value = try object.get(from);
+                const from_value = try object.get(agent, from);
 
                 // ii. Perform ? Set(O, to, fromValue, true).
-                try object.set(to, from_value, .throw);
+                try object.set(agent, to, from_value, .throw);
             } else {
                 // e. Else,
                 // i. Assert: fromPresent is false.
                 std.debug.assert(!from_present);
 
                 // ii. Perform ? DeletePropertyOrThrow(O, to).
-                try object.deletePropertyOrThrow(to);
+                try object.deletePropertyOrThrow(agent, to);
             }
 
             // f. Set k to k + 1.
         }
 
         // 7. Perform ? DeletePropertyOrThrow(O, ! ToString(𝔽(len - 1))).
-        try object.deletePropertyOrThrow(PropertyKey.from(len - 1));
+        try object.deletePropertyOrThrow(agent, PropertyKey.from(len - 1));
 
         // 8. Perform ? Set(O, "length", 𝔽(len - 1), true).
-        try object.set(PropertyKey.from("length"), Value.from(len - 1), .throw);
+        try object.set(agent, PropertyKey.from("length"), Value.from(len - 1), .throw);
 
         // 9. Return first.
         return first;
@@ -2591,7 +2600,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
@@ -2646,15 +2655,15 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), kValue).
-                try array.createDataPropertyOrThrow(PropertyKey.from(n), k_value);
+                try array.createDataPropertyOrThrow(agent, PropertyKey.from(n), k_value);
             }
 
             // d. Set k to k + 1.
@@ -2662,7 +2671,7 @@ pub const prototype = struct {
         }
 
         // 15. Perform ? Set(A, "length", 𝔽(n), true).
-        try array.set(PropertyKey.from("length"), Value.from(n), .throw);
+        try array.set(agent, PropertyKey.from("length"), Value.from(n), .throw);
 
         // 16. Return A.
         return Value.from(array);
@@ -2678,7 +2687,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
@@ -2694,12 +2703,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ? HasProperty(O, Pk).
-            const k_present = try object.hasProperty(property_key);
+            const k_present = try object.hasProperty(agent, property_key);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let kValue be ? Get(O, Pk).
-                const k_value = try object.get(property_key);
+                const k_value = try object.get(agent, property_key);
 
                 // ii. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
                 const test_result = (try callback.callAssumeCallable(
@@ -2734,7 +2743,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 3. Let len be ? LengthOfArrayLike(obj).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 4. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:
@@ -2766,7 +2775,7 @@ pub const prototype = struct {
         // 8. Repeat, while j < itemCount,
         while (j < item_count) : (j += 1) {
             // a. Perform ? Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
-            try object.set(PropertyKey.from(j), sorted_list[@intCast(j)], .throw);
+            try object.set(agent, PropertyKey.from(j), sorted_list[@intCast(j)], .throw);
 
             // b. Set j to j + 1.
         }
@@ -2778,7 +2787,7 @@ pub const prototype = struct {
         // 10. Repeat, while j < len,
         while (j < len) : (j += 1) {
             // a. Perform ? DeletePropertyOrThrow(obj, ! ToString(𝔽(j))).
-            try object.deletePropertyOrThrow(PropertyKey.from(j));
+            try object.deletePropertyOrThrow(agent, PropertyKey.from(j));
 
             // b. Set j to j + 1.
         }
@@ -2798,7 +2807,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
@@ -2855,19 +2864,19 @@ pub const prototype = struct {
             const from = PropertyKey.from(actual_start + k);
 
             // b. If ? HasProperty(O, from) is true, then
-            if (try object.hasProperty(from)) {
+            if (try object.hasProperty(agent, from)) {
                 // i. Let fromValue be ? Get(O, from).
-                const from_value = try object.get(from);
+                const from_value = try object.get(agent, from);
 
                 // ii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(k)), fromValue).
-                try array.createDataPropertyOrThrow(PropertyKey.from(k), from_value);
+                try array.createDataPropertyOrThrow(agent, PropertyKey.from(k), from_value);
             }
 
             // c. Set k to k + 1.
         }
 
         // 15. Perform ? Set(A, "length", 𝔽(actualDeleteCount), true).
-        try array.set(PropertyKey.from("length"), Value.from(actual_delete_count), .throw);
+        try array.set(agent, PropertyKey.from("length"), Value.from(actual_delete_count), .throw);
 
         // 16. If itemCount < actualDeleteCount, then
         if (item_count < actual_delete_count) {
@@ -2883,16 +2892,16 @@ pub const prototype = struct {
                 const to = PropertyKey.from(k + item_count);
 
                 // iii. If ? HasProperty(O, from) is true, then
-                if (try object.hasProperty(from)) {
+                if (try object.hasProperty(agent, from)) {
                     // 1. Let fromValue be ? Get(O, from).
-                    const from_value = try object.get(from);
+                    const from_value = try object.get(agent, from);
 
                     // 2. Perform ? Set(O, to, fromValue, true).
-                    try object.set(to, from_value, .throw);
+                    try object.set(agent, to, from_value, .throw);
                 } else {
                     // iv. Else,
                     // 1. Perform ? DeletePropertyOrThrow(O, to).
-                    try object.deletePropertyOrThrow(to);
+                    try object.deletePropertyOrThrow(agent, to);
                 }
 
                 // v. Set k to k + 1.
@@ -2904,7 +2913,7 @@ pub const prototype = struct {
             // d. Repeat, while k > (len - actualDeleteCount + itemCount),
             while (k > (len - actual_delete_count + item_count)) : (k -= 1) {
                 // i. Perform ? DeletePropertyOrThrow(O, ! ToString(𝔽(k - 1))).
-                try object.deletePropertyOrThrow(PropertyKey.from(k - 1));
+                try object.deletePropertyOrThrow(agent, PropertyKey.from(k - 1));
 
                 // ii. Set k to k - 1.
             }
@@ -2923,16 +2932,16 @@ pub const prototype = struct {
                 const to = PropertyKey.from(k + item_count - 1);
 
                 // iii. If ? HasProperty(O, from) is true, then
-                if (try object.hasProperty(from)) {
+                if (try object.hasProperty(agent, from)) {
                     // 1. Let fromValue be ? Get(O, from).
-                    const from_value = try object.get(from);
+                    const from_value = try object.get(agent, from);
 
                     // 2. Perform ? Set(O, to, fromValue, true).
-                    try object.set(to, from_value, .throw);
+                    try object.set(agent, to, from_value, .throw);
                 } else {
                     // iv. Else,
                     // 1. Perform ? DeletePropertyOrThrow(O, to).
-                    try object.deletePropertyOrThrow(to);
+                    try object.deletePropertyOrThrow(agent, to);
                 }
 
                 // v. Set k to k - 1.
@@ -2945,7 +2954,7 @@ pub const prototype = struct {
         // 19. For each element E of items, do
         for (items) |element| {
             // a. Perform ? Set(O, ! ToString(𝔽(k)), E, true).
-            try object.set(PropertyKey.from(k), element, .throw);
+            try object.set(agent, PropertyKey.from(k), element, .throw);
 
             // b. Set k to k + 1.
             k += 1;
@@ -2953,6 +2962,7 @@ pub const prototype = struct {
 
         // 20. Perform ? Set(O, "length", 𝔽(len - actualDeleteCount + itemCount), true).
         try object.set(
+            agent,
             PropertyKey.from("length"),
             Value.from(len - actual_delete_count + item_count),
             .throw,
@@ -2969,7 +2979,7 @@ pub const prototype = struct {
         const array = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(array).
-        const len = try array.lengthOfArrayLike();
+        const len = try array.lengthOfArrayLike(agent);
 
         // OPTIMIZATION: If the array is empty the result will be an empty string
         if (len == 0) return Value.from(String.empty);
@@ -2993,7 +3003,7 @@ pub const prototype = struct {
             if (k > 0) result.appendStringAssumeCapacity(separator);
 
             // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = try array.get(PropertyKey.from(k));
+            const element = try array.get(agent, PropertyKey.from(k));
 
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
@@ -3022,7 +3032,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let A be ? ArrayCreate(len).
         const array = try arrayCreate(agent, len, null);
@@ -3039,10 +3049,10 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // c. Let fromValue be ? Get(O, from).
-            const from_value = try object.get(from);
+            const from_value = try object.get(agent, from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            try array.createDataPropertyDirect(property_key, from_value);
+            try array.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set k to k + 1.
         }
@@ -3066,7 +3076,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 3. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 4. Let A be ? ArrayCreate(len).
         const array = try arrayCreate(agent, len, null);
@@ -3098,7 +3108,7 @@ pub const prototype = struct {
         // 8. Repeat, while j < len,
         while (j < len) : (j += 1) {
             // a. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(j)), sortedList[j]).
-            try array.createDataPropertyDirect(PropertyKey.from(j), sorted_list[@intCast(j)]);
+            try array.createDataPropertyDirect(agent, PropertyKey.from(j), sorted_list[@intCast(j)]);
 
             // b. Set j to j + 1.
         }
@@ -3118,7 +3128,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
@@ -3179,10 +3189,10 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(i);
 
             // b. Let iValue be ? Get(O, Pi).
-            const i_value = try object.get(property_key);
+            const i_value = try object.get(agent, property_key);
 
             // c. Perform ! CreateDataPropertyOrThrow(A, Pi, iValue).
-            try array.createDataPropertyDirect(property_key, i_value);
+            try array.createDataPropertyDirect(agent, property_key, i_value);
 
             // d. Set i to i + 1.
         }
@@ -3193,7 +3203,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(i);
 
             // b. Perform ! CreateDataPropertyOrThrow(A, Pi, E).
-            try array.createDataPropertyDirect(property_key, element);
+            try array.createDataPropertyDirect(agent, property_key, element);
 
             // c. Set i to i + 1.
             i += 1;
@@ -3211,10 +3221,10 @@ pub const prototype = struct {
             const from = PropertyKey.from(r);
 
             // c. Let fromValue be ? Get(O, from).
-            const from_value = try object.get(from);
+            const from_value = try object.get(agent, from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pi, fromValue).
-            try array.createDataPropertyDirect(property_key, from_value);
+            try array.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set i to i + 1.
             // f. Set r to r + 1.
@@ -3233,7 +3243,7 @@ pub const prototype = struct {
         const array = try this_value.toObject(agent);
 
         // 2. Let func be ? Get(array, "join").
-        var func = try array.get(PropertyKey.from("join"));
+        var func = try array.get(agent, PropertyKey.from("join"));
 
         // 3. If IsCallable(func) is false, set func to the intrinsic function %Object.prototype.toString%.
         if (!func.isCallable()) func = Value.from(try realm.intrinsics.@"%Object.prototype.toString%"());
@@ -3249,7 +3259,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let argCount be the number of elements in items.
         const arg_count = arguments.count();
@@ -3275,22 +3285,22 @@ pub const prototype = struct {
                 );
 
                 // iii. Let fromPresent be ? HasProperty(O, from).
-                const from_present = try object.hasProperty(from);
+                const from_present = try object.hasProperty(agent, from);
 
                 // iv. If fromPresent is true, then
                 if (from_present) {
                     // 1. Let fromValue be ? Get(O, from).
-                    const from_value = try object.get(from);
+                    const from_value = try object.get(agent, from);
 
                     // 2. Perform ? Set(O, to, fromValue, true).
-                    try object.set(to, from_value, .throw);
+                    try object.set(agent, to, from_value, .throw);
                 } else {
                     // v. Else,
                     // 1. Assert: fromPresent is false.
                     std.debug.assert(!from_present);
 
                     // 2. Perform ? DeletePropertyOrThrow(O, to).
-                    try object.deletePropertyOrThrow(to);
+                    try object.deletePropertyOrThrow(agent, to);
                 }
 
                 // vi. Set k to k - 1.
@@ -3301,7 +3311,7 @@ pub const prototype = struct {
             for (arguments.values, 0..) |element, j| {
                 // i. Perform ? Set(O, ! ToString(j), E, true).
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j)));
-                try object.set(property_key, element, .throw);
+                try object.set(agent, property_key, element, .throw);
 
                 // ii. Set j to j + 1𝔽.
             }
@@ -3309,6 +3319,7 @@ pub const prototype = struct {
 
         // 5. Perform ? Set(O, "length", 𝔽(len + argCount), true).
         try object.set(
+            agent,
             PropertyKey.from("length"),
             Value.from(len + @as(u53, @intCast(arg_count))),
             .throw,
@@ -3338,7 +3349,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Let len be ? LengthOfArrayLike(O).
-        const len = try object.lengthOfArrayLike();
+        const len = try object.lengthOfArrayLike(agent);
 
         // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
         const relative_index = try index.toIntegerOrInfinity(agent);
@@ -3372,10 +3383,10 @@ pub const prototype = struct {
             const from_value = if (k == actual_index)
                 value
             else
-                try object.get(property_key);
+                try object.get(agent, property_key);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            try array.createDataPropertyDirect(property_key, from_value);
+            try array.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set k to k + 1.
         }
@@ -3420,7 +3431,7 @@ pub fn findViaPredicate(
 
         // b. NOTE: If O is a TypedArray, the following invocation of Get will return a normal completion.
         // c. Let kValue be ? Get(O, Pk).
-        const k_value = try object.get(property_key);
+        const k_value = try object.get(agent, property_key);
 
         // d. Let testResult be ? Call(predicate, thisArg, « kValue, 𝔽(k), O »).
         const test_result = try predicate.callAssumeCallable(
@@ -3489,7 +3500,7 @@ pub fn sortIndexedProperties(
             // b. If holes is skip-holes, then
             .skip_holes => blk: {
                 // i. Let kRead be ? HasProperty(obj, Pk).
-                break :blk try object.hasProperty(property_key);
+                break :blk try object.hasProperty(agent, property_key);
             },
             // c. Else,
             .read_through_holes => blk: {
@@ -3502,7 +3513,7 @@ pub fn sortIndexedProperties(
         // d. If kRead is true, then
         if (k_read) {
             // i. Let kValue be ? Get(obj, Pk).
-            const k_value = try object.get(property_key);
+            const k_value = try object.get(agent, property_key);
 
             // ii. Append kValue to items.
             try items.append(agent.gc_allocator, k_value);

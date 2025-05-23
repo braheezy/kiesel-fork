@@ -3,26 +3,24 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
 
 /// 27.1.5 The %AsyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-asynciteratorprototype
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
     }
 
     /// 27.1.3.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )

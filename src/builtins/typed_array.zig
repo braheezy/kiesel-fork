@@ -25,9 +25,6 @@ const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const cloneArrayBuffer = builtins.cloneArrayBuffer;
 const createArrayIterator = builtins.createArrayIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const findViaPredicate = builtins.findViaPredicate;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getOptionsObject = @import("intl/abstract_operations.zig").getOptionsObject;
@@ -210,7 +207,7 @@ pub const ElementType = enum {
 
 /// 10.4.5.1 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-preventextensions
-fn preventExtensions(_: *Agent, object: *Object) std.mem.Allocator.Error!bool {
+fn preventExtensions(agent: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     // 1. NOTE: The extensibility-related invariants specified in 6.1.7.3 do not allow this method
     //    to return true when O can gain (or lose and then regain) properties, which might occur
     //    for properties with integer index names when its underlying buffer is resized.
@@ -219,7 +216,7 @@ fn preventExtensions(_: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     if (!isTypedArrayFixedLength(object.as(TypedArray))) return false;
 
     // 3. Return OrdinaryPreventExtensions(O).
-    return ordinaryPreventExtensions(object);
+    return ordinaryPreventExtensions(agent, object);
 }
 
 /// 10.4.5.2 [[GetOwnProperty]] ( P )
@@ -720,9 +717,9 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// 23.2.2 Properties of the %TypedArray% Intrinsic Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "TypedArray",
@@ -730,14 +727,14 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "from", from, 1, realm);
-        try defineBuiltinFunction(object, "of", of, 0, realm);
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+        try object.defineBuiltinFunction(agent, "of", of, 0, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 23.2.2.3 %TypedArray%.prototype
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%TypedArray.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -834,7 +831,7 @@ pub const constructor = struct {
                 };
 
                 // vi. Perform ? Set(targetObj, Pk, mappedValue, true).
-                try target_object.set(property_key, mapped_value, .throw);
+                try target_object.set(agent, property_key, mapped_value, .throw);
 
                 // vii. Set k to k + 1.
             }
@@ -850,7 +847,7 @@ pub const constructor = struct {
         const array_like = source.toObject(agent) catch |err| try noexcept(err);
 
         // 9. Let len be ? LengthOfArrayLike(arrayLike).
-        const len = try array_like.lengthOfArrayLike();
+        const len = try array_like.lengthOfArrayLike(agent);
 
         // 10. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const target_object = try typedArrayCreateFromConstructor(
@@ -868,7 +865,7 @@ pub const constructor = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ? Get(arrayLike, Pk).
-            const k_value = try array_like.get(property_key);
+            const k_value = try array_like.get(agent, property_key);
 
             // c. If mapping is true, then
             const mapped_value = if (mapping) blk: {
@@ -885,7 +882,7 @@ pub const constructor = struct {
             };
 
             // e. Perform ? Set(targetObj, Pk, mappedValue, true).
-            try target_object.set(property_key, mapped_value, .throw);
+            try target_object.set(agent, property_key, mapped_value, .throw);
 
             // f. Set k to k + 1.
         }
@@ -924,7 +921,7 @@ pub const constructor = struct {
             const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
 
             // c. Perform ? Set(newObj, Pk, kValue, true).
-            try new_object.set(property_key, k_value, .throw);
+            try new_object.set(agent, property_key, k_value, .throw);
 
             // d. Set k to k + 1.
         }
@@ -944,65 +941,65 @@ pub const constructor = struct {
 /// 23.2.3 Properties of the %TypedArray% Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "at", at, 1, realm);
-        try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
-        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
-        try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
-        try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
-        try defineBuiltinFunction(object, "entries", entries, 0, realm);
-        try defineBuiltinFunction(object, "every", every, 1, realm);
-        try defineBuiltinFunction(object, "fill", fill, 1, realm);
-        try defineBuiltinFunction(object, "filter", filter, 1, realm);
-        try defineBuiltinFunction(object, "find", find, 1, realm);
-        try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
-        try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
-        try defineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm);
-        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
-        try defineBuiltinFunction(object, "includes", includes, 1, realm);
-        try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
-        try defineBuiltinFunction(object, "join", join, 1, realm);
-        try defineBuiltinFunction(object, "keys", keys, 0, realm);
-        try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
-        try defineBuiltinAccessor(object, "length", length, null, realm);
-        try defineBuiltinFunction(object, "map", map, 1, realm);
-        try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
-        try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
-        try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
-        try defineBuiltinFunction(object, "set", set_, 1, realm);
-        try defineBuiltinFunction(object, "slice", slice, 2, realm);
-        try defineBuiltinFunction(object, "some", some, 1, realm);
-        try defineBuiltinFunction(object, "sort", sort, 1, realm);
-        try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
-        try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
-        try defineBuiltinFunction(object, "values", values, 0, realm);
-        try defineBuiltinFunction(object, "with", with, 2, realm);
-        try defineBuiltinAccessor(object, "%Symbol.toStringTag%", @"%Symbol.toStringTag%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "at", at, 1, realm);
+        try object.defineBuiltinAccessor(agent, "buffer", buffer, null, realm);
+        try object.defineBuiltinAccessor(agent, "byteLength", byteLength, null, realm);
+        try object.defineBuiltinAccessor(agent, "byteOffset", byteOffset, null, realm);
+        try object.defineBuiltinFunction(agent, "copyWithin", copyWithin, 2, realm);
+        try object.defineBuiltinFunction(agent, "entries", entries, 0, realm);
+        try object.defineBuiltinFunction(agent, "every", every, 1, realm);
+        try object.defineBuiltinFunction(agent, "fill", fill, 1, realm);
+        try object.defineBuiltinFunction(agent, "filter", filter, 1, realm);
+        try object.defineBuiltinFunction(agent, "find", find, 1, realm);
+        try object.defineBuiltinFunction(agent, "findIndex", findIndex, 1, realm);
+        try object.defineBuiltinFunction(agent, "findLast", findLast, 1, realm);
+        try object.defineBuiltinFunction(agent, "findLastIndex", findLastIndex, 1, realm);
+        try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
+        try object.defineBuiltinFunction(agent, "indexOf", indexOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "join", join, 1, realm);
+        try object.defineBuiltinFunction(agent, "keys", keys, 0, realm);
+        try object.defineBuiltinFunction(agent, "lastIndexOf", lastIndexOf, 1, realm);
+        try object.defineBuiltinAccessor(agent, "length", length, null, realm);
+        try object.defineBuiltinFunction(agent, "map", map, 1, realm);
+        try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
+        try object.defineBuiltinFunction(agent, "reduceRight", reduceRight, 1, realm);
+        try object.defineBuiltinFunction(agent, "reverse", reverse, 0, realm);
+        try object.defineBuiltinFunction(agent, "set", set_, 1, realm);
+        try object.defineBuiltinFunction(agent, "slice", slice, 2, realm);
+        try object.defineBuiltinFunction(agent, "some", some, 1, realm);
+        try object.defineBuiltinFunction(agent, "sort", sort, 1, realm);
+        try object.defineBuiltinFunction(agent, "subarray", subarray, 2, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toReversed", toReversed, 0, realm);
+        try object.defineBuiltinFunction(agent, "toSorted", toSorted, 1, realm);
+        try object.defineBuiltinFunction(agent, "values", values, 0, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 2, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.toStringTag%", @"%Symbol.toStringTag%", null, realm);
 
         // 23.2.3.5 %TypedArray%.prototype.constructor
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%TypedArray%"()),
         );
 
         // 23.2.3.34 %TypedArray%.prototype.toString ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.tostring
-        try defineBuiltinProperty(object, "toString", Value.from(try realm.intrinsics.@"%Array.prototype.toString%"()));
+        try object.defineBuiltinProperty(agent, "toString", Value.from(try realm.intrinsics.@"%Array.prototype.toString%"()));
 
         // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
         const @"%TypedArray.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
+        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
     }
 
     /// 23.2.3.1 %TypedArray%.prototype.at ( index )
@@ -1035,7 +1032,7 @@ pub const prototype = struct {
         const k: u53 = @intFromFloat(k_f64);
 
         // 8. Return ! Get(O, ! ToString(𝔽(k))).
-        return object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+        return object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
     }
 
     /// 23.2.3.2 get %TypedArray%.prototype.buffer
@@ -1305,7 +1302,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback.callAssumeCallable(
@@ -1405,7 +1402,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Perform ! Set(O, Pk, value, true).
-            object.set(property_key, value, .throw) catch |err| try noexcept(err);
+            object.set(agent, property_key, value, .throw) catch |err| try noexcept(err);
 
             // c. Set k to k + 1.
         }
@@ -1449,7 +1446,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const selected = (try callback.callAssumeCallable(
@@ -1482,6 +1479,7 @@ pub const prototype = struct {
         for (kept.items, 0..) |element, n| {
             // a. Perform ! Set(A, ! ToString(𝔽(n)), e, true).
             typed_array.set(
+                agent,
                 PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
                 element,
                 .throw,
@@ -1634,7 +1632,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
             _ = try callback.callAssumeCallable(
@@ -1691,7 +1689,7 @@ pub const prototype = struct {
         // 11. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. Let elementK be ! Get(O, ! ToString(𝔽(k))).
-            const element_k = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+            const element_k = object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
             if (sameValueZero(search_element, element_k)) return Value.from(true);
@@ -1747,12 +1745,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ! HasProperty(O, Pk).
-            const k_present = object.hasProperty(property_key) catch |err| try noexcept(err);
+            const k_present = object.hasProperty(agent, property_key) catch |err| try noexcept(err);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let elementK be ! Get(O, Pk).
-                const element_k = object.get(property_key) catch |err| try noexcept(err);
+                const element_k = object.get(agent, property_key) catch |err| try noexcept(err);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1803,7 +1801,7 @@ pub const prototype = struct {
             if (k > 0) result.appendSegmentAssumeCapacity(sep);
 
             // b. Let element be ! Get(O, ! ToString(𝔽(k))).
-            const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+            const element = object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // c. If element is not undefined, then
             if (!element.isUndefined()) {
@@ -1877,12 +1875,12 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kPresent be ! HasProperty(O, Pk).
-            const k_present = object.hasProperty(property_key) catch |err| try noexcept(err);
+            const k_present = object.hasProperty(agent, property_key) catch |err| try noexcept(err);
 
             // c. If kPresent is true, then
             if (k_present) {
                 // i. Let elementK be ! Get(O, Pk).
-                const element_k = object.get(property_key) catch |err| try noexcept(err);
+                const element_k = object.get(agent, property_key) catch |err| try noexcept(err);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1952,7 +1950,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
             const mapped_value = try callback.callAssumeCallable(
@@ -1962,7 +1960,7 @@ pub const prototype = struct {
             );
 
             // d. Perform ? Set(A, Pk, mappedValue, true).
-            try array.set(property_key, mapped_value, .throw);
+            try array.set(agent, property_key, mapped_value, .throw);
 
             // e. Set k to k + 1.
         }
@@ -2015,7 +2013,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Set accumulator to ! Get(O, Pk).
-            accumulator = object.get(property_key) catch |err| try noexcept(err);
+            accumulator = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Set k to k + 1.
             k += 1;
@@ -2027,7 +2025,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
@@ -2087,7 +2085,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k.?);
 
             // b. Set accumulator to ! Get(O, Pk).
-            accumulator = object.get(property_key) catch |err| try noexcept(err);
+            accumulator = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Set k to k - 1.
             if (k != null) k = std.math.sub(u53, k.?, 1) catch null;
@@ -2099,7 +2097,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k.?);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
@@ -2144,16 +2142,16 @@ pub const prototype = struct {
             const lower_property_key = PropertyKey.from(lower);
 
             // d. Let lowerValue be ! Get(O, lowerP).
-            const lower_value = object.get(lower_property_key) catch |err| try noexcept(err);
+            const lower_value = object.get(agent, lower_property_key) catch |err| try noexcept(err);
 
             // e. Let upperValue be ! Get(O, upperP).
-            const upper_value = object.get(upper_property_key) catch |err| try noexcept(err);
+            const upper_value = object.get(agent, upper_property_key) catch |err| try noexcept(err);
 
             // f. Perform ! Set(O, lowerP, upperValue, true).
-            object.set(lower_property_key, upper_value, .throw) catch |err| try noexcept(err);
+            object.set(agent, lower_property_key, upper_value, .throw) catch |err| try noexcept(err);
 
             // g. Perform ! Set(O, upperP, lowerValue, true).
-            object.set(upper_property_key, lower_value, .throw) catch |err| try noexcept(err);
+            object.set(agent, upper_property_key, lower_value, .throw) catch |err| try noexcept(err);
 
             // h. Set lower to lower + 1.
             lower += 1;
@@ -2426,7 +2424,7 @@ pub const prototype = struct {
         const src = try source.toObject(agent);
 
         // 5. Let srcLength be ? LengthOfArrayLike(src).
-        const src_length = try src.lengthOfArrayLike();
+        const src_length = try src.lengthOfArrayLike(agent);
 
         // 6. If targetOffset = +∞, throw a RangeError exception.
         if (target_offset == std.math.inf(f64)) {
@@ -2455,7 +2453,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let value be ? Get(src, Pk).
-            const value = try src.get(property_key);
+            const value = try src.get(agent, property_key);
 
             // c. Let targetIndex be 𝔽(targetOffset + k).
             const target_index = target_offset + @as(f64, @floatFromInt(k));
@@ -2629,10 +2627,11 @@ pub const prototype = struct {
                     const property_key = PropertyKey.from(k);
 
                     // 2. Let kValue be ! Get(O, Pk).
-                    const k_value = object.get(property_key) catch |err| try noexcept(err);
+                    const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
                     // 3. Perform ! Set(A, ! ToString(𝔽(n)), kValue, true).
                     new_typed_array.set(
+                        agent,
                         PropertyKey.from(n),
                         k_value,
                         .throw,
@@ -2676,7 +2675,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // b. Let kValue be ! Get(O, Pk).
-            const k_value = object.get(property_key) catch |err| try noexcept(err);
+            const k_value = object.get(agent, property_key) catch |err| try noexcept(err);
 
             // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback.callAssumeCallable(
@@ -2744,6 +2743,7 @@ pub const prototype = struct {
         while (j < len) : (j += 1) {
             // a. Perform ! Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
             object.set(
+                agent,
                 PropertyKey.from(j),
                 sorted_list[@intCast(j)],
                 .throw,
@@ -2878,7 +2878,7 @@ pub const prototype = struct {
             if (k > 0) result.appendStringAssumeCapacity(separator);
 
             // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = array.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+            const element = array.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
@@ -2930,10 +2930,13 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // c. Let fromValue be ! Get(O, from).
-            const from_value = @constCast(typed_array).object.get(from) catch |err| try noexcept(err);
+            const from_value = @constCast(typed_array).object.get(
+                agent,
+                from,
+            ) catch |err| try noexcept(err);
 
             // d. Perform ! Set(A, Pk, fromValue, true).
-            new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
+            new_typed_array.set(agent, property_key, from_value, .throw) catch |err| try noexcept(err);
 
             // e. Set k to k + 1.
         }
@@ -2999,6 +3002,7 @@ pub const prototype = struct {
         while (j < len) : (j += 1) {
             // a. Perform ! Set(A, ! ToString(𝔽(j)), sortedList[j], true).
             new_typed_array.set(
+                agent,
                 PropertyKey.from(j),
                 sorted_list[@intCast(j)],
                 .throw,
@@ -3085,10 +3089,15 @@ pub const prototype = struct {
             const from_value = if (k == actual_index)
                 numeric_value
             else
-                @constCast(typed_array).object.get(property_key) catch |err| try noexcept(err);
+                @constCast(typed_array).object.get(agent, property_key) catch |err| try noexcept(err);
 
             // d. Perform ! Set(A, Pk, fromValue, true).
-            new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
+            new_typed_array.set(
+                agent,
+                property_key,
+                from_value,
+                .throw,
+            ) catch |err| try noexcept(err);
 
             // e. Set k to k + 1.
         }
@@ -3136,7 +3145,10 @@ fn typedArraySpeciesCreate(
     };
 
     // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
-    const constructor_ = try @constCast(exemplar).object.speciesConstructor(default_constructor);
+    const constructor_ = try @constCast(exemplar).object.speciesConstructor(
+        agent,
+        default_constructor,
+    );
 
     // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
     const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
@@ -3165,7 +3177,7 @@ fn typedArrayCreateFromConstructor(
     argument_list: []const Value,
 ) Agent.Error!*Object {
     // 1. Let newTypedArray be ? Construct(constructor, argumentList).
-    const new_typed_array = try constructor_.construct(argument_list, null);
+    const new_typed_array = try constructor_.construct(agent, argument_list, null);
 
     // 2. Let taRecord be ? ValidateTypedArray(newTypedArray, seq-cst).
     const ta = try validateTypedArray(agent, Value.from(new_typed_array), .seq_cst);
@@ -3699,7 +3711,7 @@ fn initializeTypedArrayFromList(
         // NOTE: The caller retains ownership over `values`, so we're not doing this.
 
         // d. Perform ? Set(O, Pk, kValue, true).
-        try typed_array.object.set(property_key, k_value, .throw);
+        try typed_array.object.set(agent, property_key, k_value, .throw);
 
         // e. Set k to k + 1.
     }
@@ -3716,7 +3728,7 @@ fn initializeTypedArrayFromArrayLike(
     array_like: *Object,
 ) Agent.Error!void {
     // 1. Let len be ? LengthOfArrayLike(arrayLike).
-    const len = try array_like.lengthOfArrayLike();
+    const len = try array_like.lengthOfArrayLike(agent);
 
     // 2. Perform ? AllocateTypedArrayBuffer(O, len).
     try allocateTypedArrayBuffer(agent, typed_array, len);
@@ -3730,10 +3742,10 @@ fn initializeTypedArrayFromArrayLike(
         const property_key = PropertyKey.from(k);
 
         // b. Let kValue be ? Get(arrayLike, Pk).
-        const k_value = try array_like.get(property_key);
+        const k_value = try array_like.get(agent, property_key);
 
         // c. Perform ? Set(O, Pk, kValue, true).
-        try typed_array.object.set(property_key, k_value, .throw);
+        try typed_array.object.set(agent, property_key, k_value, .throw);
 
         // d. Set k to k + 1.
     }
@@ -3916,9 +3928,9 @@ fn fromHexImpl(agent: *Agent, string: *const String) Agent.Error!struct {
 fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
     const name = element_type.typedArrayName();
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+        pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(
-                realm.agent,
+                agent,
                 .{ .constructor = impl },
                 3,
                 name,
@@ -3926,12 +3938,12 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             );
         }
 
-        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.bytes_per_element
-            try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
+            try object.defineBuiltinProperty(agent, "BYTES_PER_ELEMENT", PropertyDescriptor{
                 .value = Value.from(element_type.elementSize()),
                 .writable = false,
                 .enumerable = false,
@@ -3940,7 +3952,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 23.2.6.2 TypedArray.prototype
             // https://tc39.es/ecma262/#sec-typedarray.prototype
-            try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
                 .value = Value.from(try prototypeFn(&realm.intrinsics)),
                 .writable = false,
                 .enumerable = false,
@@ -3948,8 +3960,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             });
 
             if (element_type == .uint8) {
-                try defineBuiltinFunction(object, "fromBase64", fromBase64, 1, realm);
-                try defineBuiltinFunction(object, "fromHex", fromHex, 1, realm);
+                try object.defineBuiltinFunction(agent, "fromBase64", fromBase64, 1, realm);
+                try object.defineBuiltinFunction(agent, "fromHex", fromHex, 1, realm);
             }
         }
 
@@ -4116,7 +4128,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             const options = try getOptionsObject(agent, options_value);
 
             // 3. Let alphabet be ? Get(opts, "alphabet").
-            var alphabet_value = try options.get(PropertyKey.from("alphabet"));
+            var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 4. If alphabet is undefined, set alphabet to "base64".
             // 5. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
@@ -4130,7 +4142,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             };
 
             // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
-            var last_chunk_handling_value = try options.get(PropertyKey.from("lastChunkHandling"));
+            var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
             // 8. If lastChunkHandling is not one of "loose", "strict", or "stop-before-partial",
@@ -4222,16 +4234,16 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
     const name = element_type.typedArrayName();
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-            return builtins.Object.create(realm.agent, .{
+        pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+            return builtins.Object.create(agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
             });
         }
 
-        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
-            try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
+            try object.defineBuiltinProperty(agent, "BYTES_PER_ELEMENT", PropertyDescriptor{
                 .value = Value.from(element_type.elementSize()),
                 .writable = false,
                 .enumerable = false,
@@ -4242,15 +4254,15 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 23.2.7.2 TypedArray.prototype.constructor
             // https://tc39.es/ecma262/#sec-typedarray.prototype.constructor
-            try defineBuiltinProperty(
-                object,
+            try object.defineBuiltinProperty(
+                agent,
                 "constructor",
                 Value.from(try constructorFn(&realm.intrinsics)),
             );
 
             if (element_type == .uint8) {
-                try defineBuiltinFunction(object, "toBase64", toBase64, 0, realm);
-                try defineBuiltinFunction(object, "toHex", toHex, 0, realm);
+                try object.defineBuiltinFunction(agent, "toBase64", toBase64, 0, realm);
+                try object.defineBuiltinFunction(agent, "toHex", toHex, 0, realm);
             }
         }
 
@@ -4267,7 +4279,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const options = try getOptionsObject(agent, options_value);
 
             // 4. Let alphabet be ? Get(opts, "alphabet").
-            const alphabet_value = try options.get(PropertyKey.from("alphabet"));
+            const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
             const alphabet: Alphabet = blk: {
@@ -4280,7 +4292,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             };
 
             // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
-            const omit_padding = (try options.get(PropertyKey.from("omitPadding"))).toBoolean();
+            const omit_padding = (try options.get(agent, PropertyKey.from("omitPadding"))).toBoolean();
 
             // 8. Let toEncode be ? GetUint8ArrayBytes(O).
             const to_encode = try getUint8ArrayBytes(agent, typed_array);

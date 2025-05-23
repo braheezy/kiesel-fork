@@ -220,7 +220,6 @@ fn prettyPrintDate(
     date: *const builtins.Date,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = date.object.agent;
     const date_value = date.fields.date_value;
     const tty_config = state.tty_config;
 
@@ -229,7 +228,7 @@ fn prettyPrintDate(
     if (!std.math.isNan(date_value)) {
         try writer.print("{pretty}", .{
             Value.from(asciiString(std.fmt.allocPrint(
-                agent.gc_allocator,
+                arena.allocator(),
                 "{}",
                 .{fmtToDateString(date_value)},
             ) catch return)),
@@ -603,7 +602,6 @@ fn prettyPrintStringIterator(
 }
 
 fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
-    const agent = typed_array.object.agent;
     const element_type = typed_array.fields.element_type;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
     const tty_config = state.tty_config;
@@ -632,7 +630,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                         );
                         const value = std.mem.bytesAsValue(@"type".type(), bytes).*;
                         const numeric = if (@"type".isBigIntElementType())
-                            Value.from(BigInt.from(agent.gc_allocator, value) catch return)
+                            Value.from(BigInt.from(arena.allocator(), value) catch return)
                         else
                             Value.from(value);
                         if (i != 0) try writer.writeAll(", ");
@@ -726,7 +724,6 @@ fn prettyPrintIntlCollator(
     intl_collator: *const builtins.intl.Collator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_collator.object.agent;
     const locale = intl_collator.fields.locale;
     const tty_config = state.tty_config;
 
@@ -737,7 +734,7 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, usage: {pretty}, sensitivity: {pretty}, ignorePunctuation: " ++
         "{pretty}, collation: {pretty}, numeric: {pretty}, caseFirst: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.usage),
         Value.from(resolved_options.sensitivity),
         Value.from(resolved_options.ignore_punctuation),
@@ -754,7 +751,6 @@ fn prettyPrintIntlDateTimeFormat(
     intl_date_time_format: *const builtins.intl.DateTimeFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_date_time_format.object.agent;
     const locale = intl_date_time_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -764,7 +760,7 @@ fn prettyPrintIntlDateTimeFormat(
     try writer.writeAll("Intl.DisplayNames(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, calendar: {pretty}, numberingSystem: {pretty}, timeZone: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.calendar),
         Value.from(resolved_options.numbering_system),
         Value.from(resolved_options.time_zone),
@@ -784,7 +780,6 @@ fn prettyPrintIntlDisplayNames(
     intl_display_names: *const builtins.intl.DisplayNames,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_display_names.object.agent;
     const locale = intl_display_names.fields.locale;
     const tty_config = state.tty_config;
 
@@ -795,7 +790,7 @@ fn prettyPrintIntlDisplayNames(
     try tty_config.setColor(writer, .reset);
     if (intl_display_names.fields.type == .language) {
         try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}, languageDisplay: {pretty}", .{
-            Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
             Value.from(resolved_options.style),
             Value.from(resolved_options.type),
             Value.from(resolved_options.fallback),
@@ -803,7 +798,7 @@ fn prettyPrintIntlDisplayNames(
         });
     } else {
         try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}", .{
-            Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
             Value.from(resolved_options.style),
             Value.from(resolved_options.type),
             Value.from(resolved_options.fallback),
@@ -818,7 +813,6 @@ fn prettyPrintIntlDurationFormat(
     intl_duration_format: *const builtins.intl.DurationFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_duration_format.object.agent;
     const locale = intl_duration_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -834,7 +828,7 @@ fn prettyPrintIntlDurationFormat(
         "secondsDisplay: {pretty}, milliseconds: {pretty}, millisecondsDisplay: {pretty}, " ++
         "microseconds: {pretty}, microsecondsDisplay: {pretty}, nanoseconds: {pretty}, " ++
         "nanosecondsDisplay: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.numbering_system),
         Value.from(resolved_options.style),
         Value.from(resolved_options.years),
@@ -870,7 +864,6 @@ fn prettyPrintIntlListFormat(
     intl_list_format: *const builtins.intl.ListFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_list_format.object.agent;
     const locale = intl_list_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -880,7 +873,7 @@ fn prettyPrintIntlListFormat(
     try writer.writeAll("Intl.ListFormat(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, type: {pretty}, style: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.type),
         Value.from(resolved_options.style),
     });
@@ -893,7 +886,6 @@ fn prettyPrintIntlLocale(
     intl_locale: *const builtins.intl.Locale,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_locale.object.agent;
     const locale = intl_locale.fields.locale;
     const tty_config = state.tty_config;
 
@@ -901,7 +893,7 @@ fn prettyPrintIntlLocale(
     try writer.writeAll("Intl.Locale(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -912,7 +904,6 @@ fn prettyPrintIntlPluralRules(
     intl_plural_rules: *const builtins.intl.PluralRules,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_plural_rules.object.agent;
     const locale = intl_plural_rules.fields.locale;
     const tty_config = state.tty_config;
 
@@ -922,7 +913,7 @@ fn prettyPrintIntlPluralRules(
     try writer.writeAll("Intl.PluralRules(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, type: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.type),
     });
     try tty_config.setColor(writer, .white);
@@ -934,7 +925,6 @@ fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.intl.Segmenter,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_segmenter.object.agent;
     const locale = intl_segmenter.fields.locale;
     const tty_config = state.tty_config;
 
@@ -944,7 +934,7 @@ fn prettyPrintIntlSegmenter(
     try writer.writeAll("Intl.Segmenter(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, granularity: {pretty}", .{
-        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.granularity),
     });
     try tty_config.setColor(writer, .white);
@@ -1006,8 +996,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
 }
 
 fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const property_keys = ordinaryOwnPropertyKeys(object.agent, object) catch return;
-    defer object.agent.gc_allocator.free(property_keys);
+    const property_keys = ordinaryOwnPropertyKeys(arena.allocator(), object) catch return;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);

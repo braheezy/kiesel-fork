@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,15 +16,13 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "BigInt",
@@ -33,13 +30,13 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "asIntN", asIntN, 2, realm);
-        try defineBuiltinFunction(object, "asUintN", asUintN, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "asIntN", asIntN, 2, realm);
+        try object.defineBuiltinFunction(agent, "asUintN", asUintN, 2, realm);
 
         // 21.2.2.3 BigInt.prototype
         // https://tc39.es/ecma262/#sec-bigint.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%BigInt.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -131,28 +128,28 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.BigInt
 /// 21.2.3 Properties of the BigInt Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 21.2.3.1 BigInt.prototype.constructor
         // https://tc39.es/ecma262/#sec-bigint.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%BigInt%"()),
         );
 
         // 21.2.3.5 BigInt.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-bigint.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("BigInt"),
             .writable = false,
             .enumerable = false,

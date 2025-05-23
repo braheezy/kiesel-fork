@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,17 +16,13 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 20.4.2 Properties of the Symbol Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Symbol",
@@ -35,23 +30,21 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        const agent = realm.agent;
-
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.4.2.1 Symbol.asyncIterator
         // https://tc39.es/ecma262/#sec-symbol.asynciterator
-        try defineBuiltinProperty(object, "asyncIterator", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "asyncIterator", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
         });
 
-        try defineBuiltinFunction(object, "for", @"for", 1, realm);
+        try object.defineBuiltinFunction(agent, "for", @"for", 1, realm);
 
         // 20.4.2.3 Symbol.hasInstance
         // https://tc39.es/ecma262/#sec-symbol.hasinstance
-        try defineBuiltinProperty(object, "hasInstance", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "hasInstance", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.hasInstance%"),
             .writable = false,
             .enumerable = false,
@@ -60,7 +53,7 @@ pub const constructor = struct {
 
         // 20.4.2.4 Symbol.isConcatSpreadable
         // https://tc39.es/ecma262/#sec-symbol.isconcatspreadable
-        try defineBuiltinProperty(object, "isConcatSpreadable", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "isConcatSpreadable", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
             .writable = false,
             .enumerable = false,
@@ -69,18 +62,18 @@ pub const constructor = struct {
 
         // 20.4.2.5 Symbol.iterator
         // https://tc39.es/ecma262/#sec-symbol.iterator
-        try defineBuiltinProperty(object, "iterator", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "iterator", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.iterator%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
         });
 
-        try defineBuiltinFunction(object, "keyFor", keyFor, 1, realm);
+        try object.defineBuiltinFunction(agent, "keyFor", keyFor, 1, realm);
 
         // 20.4.2.7 Symbol.match
         // https://tc39.es/ecma262/#sec-symbol.match
-        try defineBuiltinProperty(object, "match", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "match", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.match%"),
             .writable = false,
             .enumerable = false,
@@ -89,7 +82,7 @@ pub const constructor = struct {
 
         // 20.4.2.8 Symbol.matchAll
         // https://tc39.es/ecma262/#sec-symbol.matchall
-        try defineBuiltinProperty(object, "matchAll", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "matchAll", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             .writable = false,
             .enumerable = false,
@@ -98,7 +91,7 @@ pub const constructor = struct {
 
         // 20.4.2.9 Symbol.prototype
         // https://tc39.es/ecma262/#sec-symbol.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Symbol.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -107,7 +100,7 @@ pub const constructor = struct {
 
         // 20.4.2.10 Symbol.replace
         // https://tc39.es/ecma262/#sec-symbol.replace
-        try defineBuiltinProperty(object, "replace", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "replace", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.replace%"),
             .writable = false,
             .enumerable = false,
@@ -116,7 +109,7 @@ pub const constructor = struct {
 
         // 20.4.2.11 Symbol.search
         // https://tc39.es/ecma262/#sec-symbol.search
-        try defineBuiltinProperty(object, "search", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "search", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.search%"),
             .writable = false,
             .enumerable = false,
@@ -125,7 +118,7 @@ pub const constructor = struct {
 
         // 20.4.2.12 Symbol.species
         // https://tc39.es/ecma262/#sec-symbol.species
-        try defineBuiltinProperty(object, "species", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "species", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.species%"),
             .writable = false,
             .enumerable = false,
@@ -134,7 +127,7 @@ pub const constructor = struct {
 
         // 20.4.2.13 Symbol.split
         // https://tc39.es/ecma262/#sec-symbol.split
-        try defineBuiltinProperty(object, "split", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "split", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.split%"),
             .writable = false,
             .enumerable = false,
@@ -143,7 +136,7 @@ pub const constructor = struct {
 
         // 20.4.2.14 Symbol.toPrimitive
         // https://tc39.es/ecma262/#sec-symbol.toprimitive
-        try defineBuiltinProperty(object, "toPrimitive", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "toPrimitive", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
             .writable = false,
             .enumerable = false,
@@ -152,7 +145,7 @@ pub const constructor = struct {
 
         // 20.4.2.15 Symbol.toStringTag
         // https://tc39.es/ecma262/#sec-symbol.tostringtag
-        try defineBuiltinProperty(object, "toStringTag", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "toStringTag", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.toStringTag%"),
             .writable = false,
             .enumerable = false,
@@ -161,7 +154,7 @@ pub const constructor = struct {
 
         // 20.4.2.16 Symbol.unscopables
         // https://tc39.es/ecma262/#sec-symbol.unscopables
-        try defineBuiltinProperty(object, "unscopables", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "unscopables", PropertyDescriptor{
             .value = Value.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
             .writable = false,
             .enumerable = false,
@@ -236,17 +229,17 @@ pub const constructor = struct {
 /// 20.4.3 Properties of the Symbol Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "description", description, null, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "description", description, null, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinFunctionWithAttributes(agent, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = true,
@@ -254,15 +247,15 @@ pub const prototype = struct {
 
         // 20.4.3.1 Symbol.prototype.constructor
         // https://tc39.es/ecma262/#sec-symbol.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Symbol%"()),
         );
 
         // 20.4.3.6 Symbol.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Symbol"),
             .writable = false,
             .enumerable = false,

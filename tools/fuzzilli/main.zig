@@ -7,7 +7,6 @@ const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const String = kiesel.types.String;
 const Value = kiesel.types.Value;
-const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 
 const coverage = @import("./coverage.zig");
 const REPRL_CRFD = coverage.REPRL_CRFD;
@@ -84,7 +83,7 @@ fn reprl() !u8 {
             try Realm.initializeHostDefinedRealm(&agent, .{});
             const realm = agent.currentRealm();
 
-            try defineBuiltinFunction(realm.global_object, "fuzzilli", fuzzilli, 2, realm);
+            try realm.global_object.defineBuiltinFunction(&agent, "fuzzilli", fuzzilli, 2, realm);
 
             const script = Script.parse(data, realm, null, .{}) catch break :blk 1;
             _ = script.evaluate() catch break :blk 1;

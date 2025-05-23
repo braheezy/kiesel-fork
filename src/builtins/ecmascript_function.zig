@@ -756,7 +756,10 @@ fn construct(
         try ordinaryCallBindThis(agent, function, callee_context, Value.from(this_argument));
 
         // b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
-        const initialize_result = this_argument.initializeInstanceElements(&function.object);
+        const initialize_result = this_argument.initializeInstanceElements(
+            agent,
+            &function.object,
+        );
 
         // c. If initializeResult is an abrupt completion, then
         initialize_result catch |err| {
@@ -889,7 +892,7 @@ pub fn ordinaryFunctionCreate(
     const len = parameter_list.expectedArgumentCount();
 
     // 22. Perform SetFunctionLength(F, len).
-    try setFunctionLength(function, @floatFromInt(len));
+    try setFunctionLength(agent, function, @floatFromInt(len));
 
     // 23. Return F.
     return function;
@@ -898,6 +901,7 @@ pub fn ordinaryFunctionCreate(
 /// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
 pub fn addRestrictedFunctionProperties(
+    agent: *Agent,
     function: *Object,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
@@ -916,6 +920,7 @@ pub fn addRestrictedFunctionProperties(
     //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try function.definePropertyDirect(
+        agent,
         PropertyKey.from("caller"),
         property_descriptor,
     );
@@ -924,6 +929,7 @@ pub fn addRestrictedFunctionProperties(
     //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try function.definePropertyDirect(
+        agent,
         PropertyKey.from("arguments"),
         property_descriptor,
     );
@@ -981,7 +987,7 @@ pub fn makeConstructor(
         // b. Perform ! DefinePropertyOrThrow(prototype, "constructor", PropertyDescriptor {
         //      [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: true
         //    }).
-        try prototype.definePropertyDirect(PropertyKey.from("constructor"), .{
+        try prototype.definePropertyDirect(agent, PropertyKey.from("constructor"), .{
             .value = Value.from(function),
             .writable = args.writable_prototype,
             .enumerable = false,
@@ -994,7 +1000,7 @@ pub fn makeConstructor(
     // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
     //      [[Value]]: prototype, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+    try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
         .value = Value.from(prototype),
         .writable = args.writable_prototype,
         .enumerable = false,
@@ -1028,6 +1034,7 @@ pub fn makeMethod(function: *ECMAScriptFunction, home_object: *Object) void {
 /// 10.2.8 DefineMethodProperty ( homeObject, key, closure, enumerable )
 /// https://tc39.es/ecma262/#sec-definemethodproperty
 pub fn defineMethodProperty(
+    agent: *Agent,
     home_object: *Object,
     key: PropertyKeyOrPrivateName,
     closure: *Object,
@@ -1056,6 +1063,7 @@ pub fn defineMethodProperty(
 
             // b. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
             try home_object.definePropertyOrThrow(
+                agent,
                 property_key,
                 property_descriptor,
             );
@@ -1072,12 +1080,12 @@ pub fn defineMethodProperty(
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
 pub fn setFunctionName(
+    agent: *Agent,
     function: *Object,
     key: anytype,
     prefix: ?[]const u8,
 ) std.mem.Allocator.Error!void {
     comptime std.debug.assert(@TypeOf(key) == PropertyKey or @TypeOf(key) == PropertyKeyOrPrivateName);
-    const agent = function.agent;
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
     std.debug.assert(
@@ -1137,7 +1145,7 @@ pub fn setFunctionName(
     // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
     //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try function.definePropertyDirect(PropertyKey.from("name"), .{
+    try function.definePropertyDirect(agent, PropertyKey.from("name"), .{
         .value = Value.from(name),
         .writable = false,
         .enumerable = false,
@@ -1149,7 +1157,7 @@ pub fn setFunctionName(
 
 /// 10.2.10 SetFunctionLength ( F, length )
 /// https://tc39.es/ecma262/#sec-setfunctionlength
-pub fn setFunctionLength(function: *Object, length: f64) std.mem.Allocator.Error!void {
+pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.Allocator.Error!void {
     std.debug.assert(
         std.math.isPositiveInf(length) or
             (std.math.isFinite(length) and std.math.trunc(length) == length and length >= 0),
@@ -1163,7 +1171,7 @@ pub fn setFunctionLength(function: *Object, length: f64) std.mem.Allocator.Error
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try function.definePropertyDirect(PropertyKey.from("length"), .{
+    try function.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value = Value.from(length),
         .writable = false,
         .enumerable = false,
@@ -1320,7 +1328,7 @@ fn functionDeclarationInstantiation(
     // 21. For each String paramName of parameterNames, do
     for (parameter_names) |parameter_name| {
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
-        const already_declared = env.hasBinding(parameter_name) catch |err| try noexcept(err);
+        const already_declared = env.hasBinding(agent, parameter_name) catch |err| try noexcept(err);
 
         // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
         //    functions that do not have parameter default values or rest parameters.

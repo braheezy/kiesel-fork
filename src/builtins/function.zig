@@ -8,7 +8,6 @@ const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -26,9 +25,6 @@ const Value = types.Value;
 const boundFunctionCreate = builtins.boundFunctionCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const fmtParseError = language.fmtParseError;
 const makeConstructor = builtins.makeConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -46,9 +42,9 @@ fn GrammarSymbol(comptime T: type) type {
 /// 20.2.2 Properties of the Function Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Function",
@@ -56,10 +52,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.2.2.1 Function.prototype
         // https://tc39.es/ecma262/#sec-function.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(realm.intrinsics.@"%Function.prototype%"() catch unreachable),
             .writable = false,
             .enumerable = false,
@@ -381,7 +377,7 @@ pub fn createDynamicFunction(
     );
 
     // 29. Perform SetFunctionName(F, "anonymous").
-    try setFunctionName(function, PropertyKey.from("anonymous"), null);
+    try setFunctionName(agent, function, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
         // 30. If kind is generator, then
@@ -395,7 +391,7 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+            try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
@@ -414,7 +410,7 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+            try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
@@ -440,9 +436,9 @@ pub fn createDynamicFunction(
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .function = function },
             0,
             "",
@@ -450,12 +446,12 @@ pub const prototype = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "apply", apply, 2, realm);
-        try defineBuiltinFunction(object, "bind", bind, 1, realm);
-        try defineBuiltinFunction(object, "call", call, 1, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "%Symbol.hasInstance%", @"%Symbol.hasInstance%", 1, realm, .{
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "apply", apply, 2, realm);
+        try object.defineBuiltinFunction(agent, "bind", bind, 1, realm);
+        try object.defineBuiltinFunction(agent, "call", call, 1, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunctionWithAttributes(agent, "%Symbol.hasInstance%", @"%Symbol.hasInstance%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -463,8 +459,8 @@ pub const prototype = struct {
 
         // 20.2.3.4 Function.prototype.constructor
         // https://tc39.es/ecma262/#sec-function.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Function%"()),
         );
@@ -524,12 +520,12 @@ pub const prototype = struct {
         var length: f64 = 0;
 
         // 5. Let targetHasLength be ? HasOwnProperty(Target, "length").
-        const target_has_length = try target.asObject().hasOwnProperty(PropertyKey.from("length"));
+        const target_has_length = try target.asObject().hasOwnProperty(agent, PropertyKey.from("length"));
 
         // 6. If targetHasLength is true, then
         if (target_has_length) {
             // a. Let targetLen be ? Get(Target, "length").
-            const target_length = try target.asObject().get(PropertyKey.from("length"));
+            const target_length = try target.asObject().get(agent, PropertyKey.from("length"));
 
             // b. If targetLen is a Number, then
             if (target_length.isNumber()) {
@@ -560,16 +556,16 @@ pub const prototype = struct {
         }
 
         // 7. Perform SetFunctionLength(F, L).
-        try setFunctionLength(function_, length);
+        try setFunctionLength(agent, function_, length);
 
         // 8. Let targetName be ? Get(Target, "name").
-        var target_name = try target.asObject().get(PropertyKey.from("name"));
+        var target_name = try target.asObject().get(agent, PropertyKey.from("name"));
 
         // 9. If targetName is not a String, set targetName to the empty String.
         if (!target_name.isString()) target_name = Value.from("");
 
         // 10. Perform SetFunctionName(F, targetName, "bound").
-        try setFunctionName(function_, PropertyKey.from(target_name.asString()), "bound");
+        try setFunctionName(agent, function_, PropertyKey.from(target_name.asString()), "bound");
 
         // 11. Return F.
         return Value.from(function_);

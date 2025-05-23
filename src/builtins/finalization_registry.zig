@@ -8,7 +8,6 @@ const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const gc = @import("../gc.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -19,17 +18,15 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "FinalizationRegistry",
@@ -37,10 +34,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 26.2.2.1 FinalizationRegistry.prototype
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%FinalizationRegistry.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -97,27 +94,27 @@ pub const constructor = struct {
 /// 26.2.3 Properties of the FinalizationRegistry Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "register", register, 2, realm);
-        try defineBuiltinFunction(object, "unregister", unregister, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "register", register, 2, realm);
+        try object.defineBuiltinFunction(agent, "unregister", unregister, 1, realm);
 
         // 26.2.3.1 FinalizationRegistry.prototype.constructor
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%FinalizationRegistry%"()),
         );
 
         // 26.2.3.4 FinalizationRegistry.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("FinalizationRegistry"),
             .writable = false,
             .enumerable = false,
@@ -172,6 +169,7 @@ pub const prototype = struct {
 
         // 6. Let cell be the Record { [[WeakRefTarget]]: target, [[HeldValue]]: heldValue, [[UnregisterToken]]: unregisterToken }.
         const cell: Cell = .{
+            .agent = agent,
             .is_unregistered = false,
             .finalization_registry = finalization_registry,
             .held_value = held_value,
@@ -196,7 +194,7 @@ pub const prototype = struct {
                     // NOTE: The weak ref target is managed by libgc.
 
                     // ii. Optionally, perform HostEnqueueFinalizationRegistryCleanupJob(fg).
-                    const finalizer_agent = finalizer_cell.finalization_registry.object.agent;
+                    const finalizer_agent = finalizer_cell.agent;
                     finalizer_agent.host_hooks.hostEnqueueFinalizationRegistryCleanupJob(finalizer_agent, finalizer_cell) catch {
                         // We are not required to run finalizers, so we can ignore OOMs.
                     };
@@ -269,7 +267,7 @@ pub const prototype = struct {
 /// 9.12 CleanupFinalizationRegistry ( finalizationRegistry )
 /// https://tc39.es/ecma262/#sec-cleanup-finalization-registry
 pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
-    const agent = cell.finalization_registry.object.agent;
+    const agent = cell.agent;
 
     // 1. Assert: finalizationRegistry has [[Cells]] and [[CleanupCallback]] internal slots.
     const finalization_registry = cell.finalization_registry;
@@ -300,9 +298,12 @@ pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
 }
 
 pub const Cell = struct {
+    agent: *Agent,
+
     // libgc does not support unregistering finalizers so we use a flag to
     // achieve the functionality.
     is_unregistered: bool,
+
     finalization_registry: *FinalizationRegistry,
 
     // [[WeakRefTarget]]

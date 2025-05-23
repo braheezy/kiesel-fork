@@ -69,7 +69,7 @@ fn construct(
     const new_target_ = if (object == new_target) target else new_target;
 
     // 6. Return ? Construct(target, args, newTarget).
-    return target.construct(args, new_target_);
+    return target.construct(agent, args, new_target_);
 }
 
 /// 10.4.1.3 BoundFunctionCreate ( targetFunction, boundThis, boundArgs )

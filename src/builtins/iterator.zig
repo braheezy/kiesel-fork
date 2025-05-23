@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,9 +17,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIteratorDirect = types.getIteratorDirect;
 const getIteratorFlattenable = types.getIteratorFlattenable;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -28,9 +24,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 27.1.3.1 The Iterator Constructor
 /// https://tc39.es/ecma262/#sec-iterator-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Iterator",
@@ -38,12 +34,12 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "from", from, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 27.1.3.2.2 Iterator.prototype
         // https://tc39.es/ecma262/#sec-iterator.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Iterator.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -113,50 +109,50 @@ pub const constructor = struct {
 /// 27.1.4 Properties of the Iterator Prototype Object
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "drop", drop, 1, realm);
-        try defineBuiltinFunction(object, "every", every, 1, realm);
-        try defineBuiltinFunction(object, "filter", filter, 1, realm);
-        try defineBuiltinFunction(object, "find", find, 1, realm);
-        try defineBuiltinFunction(object, "flatMap", flatMap, 1, realm);
-        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
-        try defineBuiltinFunction(object, "map", map, 1, realm);
-        try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
-        try defineBuiltinFunction(object, "some", some, 1, realm);
-        try defineBuiltinFunction(object, "take", take, 1, realm);
-        try defineBuiltinFunction(object, "toArray", toArray, 0, realm);
-        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "drop", drop, 1, realm);
+        try object.defineBuiltinFunction(agent, "every", every, 1, realm);
+        try object.defineBuiltinFunction(agent, "filter", filter, 1, realm);
+        try object.defineBuiltinFunction(agent, "find", find, 1, realm);
+        try object.defineBuiltinFunction(agent, "flatMap", flatMap, 1, realm);
+        try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "map", map, 1, realm);
+        try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
+        try object.defineBuiltinFunction(agent, "some", some, 1, realm);
+        try object.defineBuiltinFunction(agent, "take", take, 1, realm);
+        try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
+        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
         // 27.1.4.1 Iterator.prototype.constructor
         // https://tc39.es/ecma262/#sec-iterator.prototype.constructor
-        try defineBuiltinAccessor(
-            object,
+        try object.defineBuiltinAccessor(
+            agent,
             "constructor",
             struct {
                 /// 27.1.4.1.1 get Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype.constructor
-                fn get(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+                fn get(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     // 1. Return %Iterator%.
-                    return Value.from(try agent.currentRealm().intrinsics.@"%Iterator%"());
+                    return Value.from(try agent_.currentRealm().intrinsics.@"%Iterator%"());
                 }
             }.get,
             struct {
                 /// 27.1.4.1.2 set Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype.constructor
-                fn set(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+                fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const value = arguments.get(0);
 
                     // 1. Perform ? SetterThatIgnoresPrototypeProperties(this value,
                     //    %Iterator.prototype%, "constructor", v).
                     try this_value.setterThatIgnoresPrototypeProperties(
-                        agent,
-                        try agent.currentRealm().intrinsics.@"%Iterator.prototype%"(),
+                        agent_,
+                        try agent_.currentRealm().intrinsics.@"%Iterator.prototype%"(),
                         PropertyKey.from("constructor"),
                         value,
                     );
@@ -170,8 +166,8 @@ pub const prototype = struct {
 
         // 27.1.4.14 Iterator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.tostringtag%
-        try defineBuiltinAccessor(
-            object,
+        try object.defineBuiltinAccessor(
+            agent,
             "%Symbol.toStringTag%",
             struct {
                 /// 27.1.4.14.1 get Iterator.prototype [ %Symbol.toStringTag% ]
@@ -184,15 +180,15 @@ pub const prototype = struct {
             struct {
                 /// 27.1.4.14.2 set Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype-%symbol.tostringtag%
-                fn set(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+                fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const value = arguments.get(0);
 
                     // 1. Perform ? SetterThatIgnoresPrototypeProperties(this value,
                     //    %Iterator.prototype%, %Symbol.toStringTag%, v).
                     try this_value.setterThatIgnoresPrototypeProperties(
-                        agent,
-                        try agent.currentRealm().intrinsics.@"%Iterator.prototype%"(),
-                        PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"),
+                        agent_,
+                        try agent_.currentRealm().intrinsics.@"%Iterator.prototype%"(),
+                        PropertyKey.from(agent_.well_known_symbols.@"%Symbol.toStringTag%"),
                         value,
                     );
 
@@ -262,7 +258,7 @@ pub const prototype = struct {
         }
 
         // 9. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         const Captures = struct {
             integer_limit: f64,
@@ -360,7 +356,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -426,7 +422,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         const Captures = struct {
             predicate: Value,
@@ -529,7 +525,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -595,7 +591,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         const Captures = struct {
             mapper: Value,
@@ -738,7 +734,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -799,7 +795,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         const Captures = struct {
             mapper: Value,
@@ -898,7 +894,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         var accumulator: Value = undefined;
         var counter: u53 = undefined;
@@ -984,7 +980,7 @@ pub const prototype = struct {
         }
 
         // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -1072,7 +1068,7 @@ pub const prototype = struct {
         }
 
         // 9. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(object);
+        iterated = try getIteratorDirect(agent, object);
 
         const Captures = struct {
             integer_limit: f64,
@@ -1144,7 +1140,7 @@ pub const prototype = struct {
         const object = this_value.asObject();
 
         // 3. Let iterated be ? GetIteratorDirect(O).
-        var iterated = try getIteratorDirect(object);
+        var iterated = try getIteratorDirect(agent, object);
 
         // 4. Let items be a new empty List.
         var items: std.ArrayListUnmanaged(Value) = .empty;

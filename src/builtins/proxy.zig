@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,7 +17,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
 const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
@@ -62,7 +60,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     }
 
     // 9. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 10. If extensibleTarget is true, return handlerProto.
     if (extensible_target) {
@@ -121,7 +119,7 @@ fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Err
     if (!boolean_trap_result) return false;
 
     // 9. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 10. If extensibleTarget is true, return true.
     if (extensible_target) return true;
@@ -161,7 +159,7 @@ fn isExtensible(agent: *Agent, object: *Object) Agent.Error!bool {
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("isExtensible")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? IsExtensible(target).
-        return target.isExtensible();
+        return target.isExtensible(agent);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
@@ -172,7 +170,7 @@ fn isExtensible(agent: *Agent, object: *Object) Agent.Error!bool {
     )).toBoolean();
 
     // 8. Let targetResult be ? IsExtensible(target).
-    const target_result = try target.isExtensible();
+    const target_result = try target.isExtensible(agent);
 
     // 9. If booleanTrapResult is not targetResult, throw a TypeError exception.
     if (boolean_trap_result != target_result) {
@@ -219,7 +217,7 @@ fn preventExtensions(agent: *Agent, object: *Object) Agent.Error!bool {
     // 8. If booleanTrapResult is true, then
     if (boolean_trap_result) {
         // a. Let extensibleTarget be ? IsExtensible(target).
-        const extensible_target = try target.isExtensible();
+        const extensible_target = try target.isExtensible(agent);
 
         // b. If extensibleTarget is true, throw a TypeError exception.
         if (extensible_target) {
@@ -302,7 +300,7 @@ fn getOwnProperty(
         }
 
         // c. Let extensibleTarget be ? IsExtensible(target).
-        const extensible_target = try target.isExtensible();
+        const extensible_target = try target.isExtensible(agent);
 
         // d. If extensibleTarget is false, throw a TypeError exception.
         if (!extensible_target) {
@@ -318,7 +316,7 @@ fn getOwnProperty(
     }
 
     // 11. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 12. Let resultDesc be ? ToPropertyDescriptor(trapResultObj).
     var result_descriptor = try trap_result_obj.toPropertyDescriptor(agent);
@@ -431,7 +429,7 @@ fn defineOwnProperty(
     );
 
     // 11. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 12. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is false, then
     //     a. Let settingConfigFalse be true.
@@ -551,7 +549,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
             }
 
             // ii. Let extensibleTarget be ? IsExtensible(target).
-            const extensible_target = try target.isExtensible();
+            const extensible_target = try target.isExtensible(agent);
 
             // iii. If extensibleTarget is false, throw a TypeError exception.
             if (!extensible_target) {
@@ -768,7 +766,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     }
 
     // 12. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 13. If extensibleTarget is false, throw a TypeError exception.
     if (!extensible_target) {
@@ -840,7 +838,7 @@ fn ownPropertyKeys(
     }
 
     // 10. Let extensibleTarget be ? IsExtensible(target).
-    const extensible_target = try target.isExtensible();
+    const extensible_target = try target.isExtensible(agent);
 
     // 11. Let targetKeys be ? target.[[OwnPropertyKeys]]().
     // 12. Assert: targetKeys is a List of property keys.
@@ -993,7 +991,7 @@ fn construct(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("construct")) orelse {
         // 7. If trap is undefined, then
         //     a. Return ? Construct(target, argumentsList, newTarget).
-        return target.construct(arguments_list.values, new_target);
+        return target.construct(agent, arguments_list.values, new_target);
     };
 
     // 8. Let argArray be CreateArrayFromList(argumentsList).
@@ -1104,9 +1102,9 @@ fn proxyInternalMethods(target_is_callable: bool, target_is_constructor: bool) O
 /// 28.2.2 Properties of the Proxy Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             2,
             "Proxy",
@@ -1114,8 +1112,8 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "revocable", revocable, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "revocable", revocable, 2, realm);
     }
 
     /// 28.2.1.1 Proxy ( target, handler )
@@ -1193,10 +1191,10 @@ pub const constructor = struct {
         const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
         // 6. Perform ! CreateDataPropertyOrThrow(result, "proxy", proxy).
-        try result.createDataPropertyDirect(PropertyKey.from("proxy"), Value.from(proxy));
+        try result.createDataPropertyDirect(agent, PropertyKey.from("proxy"), Value.from(proxy));
 
         // 7. Perform ! CreateDataPropertyOrThrow(result, "revoke", revoker).
-        try result.createDataPropertyDirect(PropertyKey.from("revoke"), Value.from(revoker));
+        try result.createDataPropertyDirect(agent, PropertyKey.from("revoke"), Value.from(revoker));
 
         // 8. Return result.
         return Value.from(result);

@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -22,18 +21,15 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 10.2 Properties of the Intl.Collator Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Collator",
@@ -41,10 +37,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 10.2.1 Intl.Collator.prototype
         // https://tc39.es/ecma402/#sec-intl.collator.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Collator.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -223,27 +219,27 @@ pub const constructor = struct {
 /// 10.3 Properties of the Intl.Collator Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinAccessor(object, "compare", compare, null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinAccessor(agent, "compare", compare, null, realm);
 
         // 10.3.1 Intl.Collator.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.collator.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
         );
 
         // 10.3.4 Intl.Collator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.collator.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Collator"),
             .writable = false,
             .enumerable = false,
@@ -277,6 +273,7 @@ pub const prototype = struct {
         //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = collator.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -286,26 +283,32 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("usage"),
             Value.from(resolved_options.usage),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("sensitivity"),
             Value.from(resolved_options.sensitivity),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("ignorePunctuation"),
             Value.from(resolved_options.ignore_punctuation),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("collation"),
             Value.from(resolved_options.collation),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("numeric"),
             Value.from(resolved_options.numeric),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("caseFirst"),
             Value.from(resolved_options.case_first),
         );

@@ -3,6 +3,7 @@ const std = @import("std");
 const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 
+const Agent = execution.Agent;
 const Object = types.Object;
 const PrivateElement = types.PrivateElement;
 const PrivateName = types.PrivateName;
@@ -24,8 +25,8 @@ private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
 
 pub const LazyProperty = struct {
     pub const Initializer = union(PropertyType) {
-        value: *const fn (*Realm) std.mem.Allocator.Error!Value,
-        accessor: *const fn (*Realm) std.mem.Allocator.Error!Accessor,
+        value: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
+        accessor: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Accessor,
     };
 
     realm: *Realm,
@@ -182,9 +183,11 @@ pub fn getCreateIntrinsicIfNeeded(
     const property_metadata = self.shape.properties.get(property_key) orelse return null;
     if (self.lazy_properties.fetchRemove(property_key)) |kv| {
         const lazy_property = kv.value;
+        const realm = lazy_property.realm;
+        const agent = realm.agent;
         switch (property_metadata.index) {
-            .value => |index| self.values.items[@intFromEnum(index)] = try lazy_property.initializer.value(lazy_property.realm),
-            .accessor => |index| self.accessors.items[@intFromEnum(index)] = try lazy_property.initializer.accessor(lazy_property.realm),
+            .value => |index| self.values.items[@intFromEnum(index)] = try lazy_property.initializer.value(agent, realm),
+            .accessor => |index| self.accessors.items[@intFromEnum(index)] = try lazy_property.initializer.accessor(agent, realm),
         }
     }
     const value_or_accessor: ValueOrAccessor = switch (property_metadata.index) {

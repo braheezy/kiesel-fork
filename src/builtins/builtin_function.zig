@@ -203,7 +203,7 @@ pub fn createBuiltinFunction(
     });
 
     // 10. Perform SetFunctionLength(func, length).
-    try setFunctionLength(function, @floatFromInt(length));
+    try setFunctionLength(agent, function, @floatFromInt(length));
 
     // 11. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
@@ -214,7 +214,7 @@ pub fn createBuiltinFunction(
     //       ensure it only gets called once. It's the caller's responsibility to install the
     //       function name after the fact.
     if (maybe_name) |name| {
-        try setFunctionName(function, PropertyKey.from(name), args.prefix);
+        try setFunctionName(agent, function, PropertyKey.from(name), args.prefix);
     }
 
     // 13. Return func.

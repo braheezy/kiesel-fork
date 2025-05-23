@@ -240,7 +240,7 @@ fn evalDeclarationInstantiation(
                     const name = try String.fromUtf8(agent, name_utf8);
 
                     // a. If ! thisEnv.HasBinding(name) is true, then
-                    if (this_env.hasBinding(name) catch |err| try noexcept(err)) {
+                    if (this_env.hasBinding(agent, name) catch |err| try noexcept(err)) {
                         // i. Throw a SyntaxError exception.
                         return agent.throwException(.syntax_error, "idk", .{});
 
@@ -289,7 +289,10 @@ fn evalDeclarationInstantiation(
                 // 1. If varEnv is a Global Environment Record, then
                 if (var_env == .global_environment) {
                     // a. Let fnDefinable be ? CanDeclareGlobalFunction(varEnv, fn).
-                    const function_definable = try var_env.global_environment.canDeclareGlobalFunction(function_name);
+                    const function_definable = try var_env.global_environment.canDeclareGlobalFunction(
+                        agent,
+                        function_name,
+                    );
 
                     // b. If fnDefinable is false, throw a TypeError exception.
                     if (!function_definable) {
@@ -334,7 +337,10 @@ fn evalDeclarationInstantiation(
                     // a. If varEnv is a Global Environment Record, then
                     if (var_env == .global_environment) {
                         // i. Let vnDefinable be ? CanDeclareGlobalVar(varEn, vn).
-                        const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(var_name);
+                        const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(
+                            agent,
+                            var_name,
+                        );
 
                         // ii. If vnDefinable is false, throw a TypeError exception.
                         if (!var_name_definable) {
@@ -415,7 +421,10 @@ fn evalDeclarationInstantiation(
         } else {
             // d. Else,
             // i. Let bindingExists be ! varEnv.HasBinding(fn).
-            const binding_exists = var_env.hasBinding(function_name) catch |err| try noexcept(err);
+            const binding_exists = var_env.hasBinding(
+                agent,
+                function_name,
+            ) catch |err| try noexcept(err);
 
             // ii. If bindingExists is false, then
             if (!binding_exists) {
@@ -460,7 +469,10 @@ fn evalDeclarationInstantiation(
         } else {
             // b. Else,
             // i. Let bindingExists be ! varEnv.HasBinding(vn).
-            const binding_exists = var_env.hasBinding(var_name) catch |err| try noexcept(err);
+            const binding_exists = var_env.hasBinding(
+                agent,
+                var_name,
+            ) catch |err| try noexcept(err);
 
             // ii. If bindingExists is false, then
             if (!binding_exists) {

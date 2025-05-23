@@ -128,7 +128,7 @@ pub fn getTemplateObject(
         // c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
         //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        try template.definePropertyDirect(property_key, .{
+        try template.definePropertyDirect(agent, property_key, .{
             .value = Value.from(cooked_value),
             .writable = false,
             .enumerable = true,
@@ -141,7 +141,7 @@ pub fn getTemplateObject(
         // e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
         //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        try raw_obj.definePropertyDirect(property_key, .{
+        try raw_obj.definePropertyDirect(agent, property_key, .{
             .value = Value.from(raw_value),
             .writable = false,
             .enumerable = true,
@@ -152,12 +152,12 @@ pub fn getTemplateObject(
     }
 
     // 13. Perform ! SetIntegrityLevel(rawObj, frozen).
-    _ = raw_obj.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
+    _ = raw_obj.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 14. Perform ! DefinePropertyOrThrow(template, "raw", PropertyDescriptor {
     //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //     }).
-    try template.definePropertyDirect(PropertyKey.from("raw"), .{
+    try template.definePropertyDirect(agent, PropertyKey.from("raw"), .{
         .value = Value.from(raw_obj),
         .writable = false,
         .enumerable = false,
@@ -165,7 +165,7 @@ pub fn getTemplateObject(
     });
 
     // 15. Perform ! SetIntegrityLevel(template, frozen).
-    _ = template.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
+    _ = template.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
     try realm.template_map.putNoClobber(agent.gc_allocator, template_literal, template);
@@ -191,7 +191,7 @@ pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) 
     }
 
     // 6. Return ? Construct(constructor, argList).
-    return Value.from(try constructor.asObject().construct(arguments, null));
+    return Value.from(try constructor.asObject().construct(agent, arguments, null));
 }
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
@@ -333,7 +333,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
         }
 
         // b. Let attributesObj be Completion(Get(options, "with")).
-        const attributes_object = options.asObject().get(PropertyKey.from("with")) catch |err| {
+        const attributes_object = options.asObject().get(agent, PropertyKey.from("with")) catch |err| {
             // c. IfAbruptRejectPromise(attributesObj, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -362,6 +362,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
             // ii. Let entries be Completion(EnumerableOwnProperties(attributesObj, key+value)).
             const entries = attributes_object.asObject().enumerableOwnProperties(
+                agent,
                 .@"key+value",
             ) catch |err| {
                 // iii. IfAbruptRejectPromise(entries, promiseCapability).
@@ -687,6 +688,7 @@ pub fn instantiateOrdinaryFunctionObject(
 
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(
+            agent,
             function,
             PropertyKey.from(try String.fromUtf8(agent, name)),
             null,
@@ -719,7 +721,7 @@ pub fn instantiateOrdinaryFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, function, PropertyKey.from("default"), null);
 
         // 4. Perform MakeConstructor(F).
         try makeConstructor(agent, function, .{});
@@ -775,13 +777,13 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 10. Perform MakeConstructor(closure).
         try makeConstructor(agent, closure, .{});
 
         // 11. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(agent, name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(closure));
 
         // 12. Return closure.
         return closure;
@@ -817,7 +819,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 7. Perform MakeConstructor(closure).
         try makeConstructor(agent, closure, .{});
@@ -865,7 +867,7 @@ pub fn instantiateArrowFunctionExpression(
     );
 
     // 6. Perform SetFunctionName(closure, name).
-    try setFunctionName(closure, PropertyKey.from(name), null);
+    try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
     // 7. Return closure.
     return closure;
@@ -951,10 +953,16 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 2. Perform SetFunctionName(methodDef.[[Closure]], methodDef.[[Key]]).
-            try setFunctionName(method_def.closure, method_def.key, null);
+            try setFunctionName(agent, method_def.closure, method_def.key, null);
 
             // 3. Return ? DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
-            return defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
+            return defineMethodProperty(
+                agent,
+                object,
+                method_def.key,
+                method_def.closure,
+                enumerable,
+            );
         },
 
         // MethodDefinition : get ClassElementName ( ) { FunctionBody }
@@ -999,7 +1007,7 @@ pub fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 8. Perform SetFunctionName(closure, propKey, "get").
-            try setFunctionName(closure, property_key_or_private_name, "get");
+            try setFunctionName(agent, closure, property_key_or_private_name, "get");
 
             switch (property_key_or_private_name) {
                 // 9. If propKey is a Private Name, then
@@ -1022,7 +1030,7 @@ pub fn methodDefinitionEvaluation(
                     };
 
                     // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
-                    try object.definePropertyOrThrow(property_key, property_descriptor);
+                    try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
                     // c. Return unused.
                     return null;
@@ -1066,7 +1074,7 @@ pub fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey, "set").
-            try setFunctionName(closure, property_key_or_private_name, "set");
+            try setFunctionName(agent, closure, property_key_or_private_name, "set");
 
             switch (property_key_or_private_name) {
                 // 8. If propKey is a Private Name, then
@@ -1089,7 +1097,7 @@ pub fn methodDefinitionEvaluation(
                     };
 
                     // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
-                    try object.definePropertyOrThrow(property_key, property_descriptor);
+                    try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
                     // c. Return unused.
                     return null;
@@ -1133,7 +1141,7 @@ pub fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key_or_private_name, null);
+            try setFunctionName(agent, closure, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
@@ -1144,7 +1152,7 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+            try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype),
                 .writable = true,
                 .enumerable = false,
@@ -1152,7 +1160,13 @@ pub fn methodDefinitionEvaluation(
             });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
+            return defineMethodProperty(
+                agent,
+                object,
+                property_key_or_private_name,
+                closure,
+                enumerable,
+            );
         },
 
         // AsyncGeneratorMethod : async * ClassElementName ( UniqueFormalParameters ) { AsyncGeneratorBody }
@@ -1191,7 +1205,7 @@ pub fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key_or_private_name, null);
+            try setFunctionName(agent, closure, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
@@ -1202,7 +1216,7 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+            try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value = Value.from(prototype),
                 .writable = true,
                 .enumerable = false,
@@ -1210,7 +1224,13 @@ pub fn methodDefinitionEvaluation(
             });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
+            return defineMethodProperty(
+                agent,
+                object,
+                property_key_or_private_name,
+                closure,
+                enumerable,
+            );
         },
 
         // AsyncMethod : async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
@@ -1249,10 +1269,16 @@ pub fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key_or_private_name, null);
+            try setFunctionName(agent, closure, property_key_or_private_name, null);
 
             // 8. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
+            return defineMethodProperty(
+                agent,
+                object,
+                property_key_or_private_name,
+                closure,
+                enumerable,
+            );
         },
     }
 }
@@ -1289,7 +1315,7 @@ pub fn instantiateGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(function, PropertyKey.from(name), null);
+        try setFunctionName(agent, function, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1300,7 +1326,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1331,7 +1357,7 @@ pub fn instantiateGeneratorFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, function, PropertyKey.from("default"), null);
 
         // 4. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1342,7 +1368,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1400,7 +1426,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1411,7 +1437,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1419,7 +1445,7 @@ pub fn instantiateGeneratorFunctionExpression(
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(agent, name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(closure));
 
         // 13. Return closure.
         return closure;
@@ -1455,7 +1481,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1466,7 +1492,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1510,7 +1536,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(function, PropertyKey.from(name), null);
+        try setFunctionName(agent, function, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1521,7 +1547,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1551,7 +1577,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, function, PropertyKey.from("default"), null);
 
         // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1562,7 +1588,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1620,7 +1646,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1631,7 +1657,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -1639,7 +1665,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(agent, name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(closure));
 
         // 13. Return closure.
         return closure;
@@ -1675,7 +1701,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1686,7 +1712,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try closure.definePropertyDirect(PropertyKey.from("prototype"), .{
+        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value = Value.from(prototype),
             .writable = true,
             .enumerable = false,
@@ -2016,7 +2042,7 @@ pub fn classDefinitionEvaluation(
         } else {
             // h. Else,
             // i. Let protoParent be ? Get(superclass, "prototype").
-            const prototype_parent_value = try superclass.asObject().get(PropertyKey.from("prototype"));
+            const prototype_parent_value = try superclass.asObject().get(agent, PropertyKey.from("prototype"));
 
             // ii. If protoParent is not an Object and protoParent is not null, throw a TypeError
             //     exception.
@@ -2098,7 +2124,7 @@ pub fn classDefinitionEvaluation(
                     }
 
                     // 4. Let result be ? Construct(func, args, NewTarget).
-                    break :blk try prototype_function.?.construct(args, new_target.?);
+                    break :blk try prototype_function.?.construct(agent_, args, new_target.?);
                 } else blk: {
                     // v. Else,
                     // 1. NOTE: This branch behaves similarly to constructor() {}.
@@ -2113,7 +2139,7 @@ pub fn classDefinitionEvaluation(
                 };
 
                 // vi. Perform ? InitializeInstanceElements(result, F).
-                try result.initializeInstanceElements(function);
+                try result.initializeInstanceElements(agent_, function);
 
                 // vii. Return result.
                 return Value.from(result);
@@ -2134,7 +2160,7 @@ pub fn classDefinitionEvaluation(
                 .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
             },
         );
-        try setFunctionName(function, PropertyKey.from(class_name), null);
+        try setFunctionName(agent, function, PropertyKey.from(class_name), null);
         break :blk function;
     } else blk: {
         // 15. Else,
@@ -2156,6 +2182,7 @@ pub fn classDefinitionEvaluation(
 
         // d. Perform SetFunctionName(F, className).
         try setFunctionName(
+            agent,
             function,
             PropertyKey.from(class_name),
             null,
@@ -2179,6 +2206,7 @@ pub fn classDefinitionEvaluation(
 
     // 18. Perform ! DefineMethodProperty(proto, "constructor", F, false).
     _ = defineMethodProperty(
+        agent,
         prototype,
         .{ .property_key = PropertyKey.from("constructor") },
         function,
@@ -2317,7 +2345,7 @@ pub fn classDefinitionEvaluation(
     // 27. If classBinding is not undefined, then
     if (class_binding != null) {
         // a. Perform ! classEnv.InitializeBinding(classBinding, F).
-        class_env.initializeBinding(agent, class_binding.?, Value.from(function));
+        class_env.initializeBinding(class_binding.?, Value.from(function));
     }
 
     // 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
@@ -2340,6 +2368,7 @@ pub fn classDefinitionEvaluation(
     for (static_private_methods.items) |method| {
         // a. Perform ! PrivateMethodOrAccessorAdd(F, method).
         function.privateMethodOrAccessorAdd(
+            agent,
             method.private_name,
             method.private_element,
         ) catch |err| try noexcept(err);
@@ -2351,7 +2380,7 @@ pub fn classDefinitionEvaluation(
             // a. If elementRecord is a ClassFieldDefinition Record, then
             .class_field_definition => |class_field_definition| blk: {
                 // i. Let result be Completion(DefineField(F, elementRecord)).
-                break :blk function.defineField(class_field_definition);
+                break :blk function.defineField(agent, class_field_definition);
             },
             // b. Else,
             .class_static_block_definition => |class_static_block_definition| blk: {
@@ -2475,7 +2504,7 @@ pub fn instantiateAsyncFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(function, PropertyKey.from(name), null);
+        try setFunctionName(agent, function, PropertyKey.from(name), null);
 
         // 5. Return F.
         return function;
@@ -2499,7 +2528,7 @@ pub fn instantiateAsyncFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, function, PropertyKey.from("default"), null);
 
         // 4. Return F.
         return function;
@@ -2552,10 +2581,10 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 10. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(agent, name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(closure));
 
         // 11. Return closure.
         return closure;
@@ -2591,7 +2620,7 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
         // 7. Return closure.
         return closure;
@@ -2640,7 +2669,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     );
 
     // 8. Perform SetFunctionName(closure, name).
-    try setFunctionName(closure, PropertyKey.from(name), null);
+    try setFunctionName(agent, closure, PropertyKey.from(name), null);
 
     // 9. Return closure.
     return closure;

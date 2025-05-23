@@ -147,6 +147,7 @@ fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
     // From ArrayAccumulation:
     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
     try array.createDataPropertyDirect(
+        self.agent,
         PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
         init_value,
     );
@@ -157,7 +158,7 @@ fn executeArraySetLength(self: *Vm, length: u32, _: Executable) Agent.Error!void
     const array = self.result.?.asObject();
     // From ArrayAccumulation:
     // 2. Perform ? Set(array, "length", 𝔽(len), true).
-    try array.set(PropertyKey.from("length"), Value.from(length), .throw);
+    try array.set(self.agent, PropertyKey.from("length"), Value.from(length), .throw);
 }
 
 fn executeArraySetValueDirect(self: *Vm, index: u32, _: Executable) Agent.Error!void {
@@ -185,7 +186,7 @@ fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     //     b. If next is done, return nextIndex.
     while (try iterator.stepValue(self.agent)) |next| : (next_index += 1) {
         // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
-        try array.createDataPropertyDirect(PropertyKey.from(next_index), next);
+        try array.createDataPropertyDirect(self.agent, PropertyKey.from(next_index), next);
 
         // d. Set nextIndex to nextIndex + 1.
     }
@@ -516,7 +517,7 @@ fn executeCreateObjectPropertyIterator(self: *Vm, _: Executable) Agent.Error!voi
     const iterator = try createForInIterator(self.agent, object);
 
     // d. Let nextMethod be ! GetV(iterator, "next").
-    const next_method = iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
+    const next_method = iterator.get(self.agent, PropertyKey.from("next")) catch |err| try noexcept(err);
 
     // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
     const iterator_: Iterator = .{
@@ -621,7 +622,9 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
         const base = reference.base.environment;
 
         // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-        self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.asString()));
+        self.result = Value.from(
+            try base.deleteBinding(self.agent, reference.referenced_name.value.asString()),
+        );
     }
 }
 
@@ -878,7 +881,7 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
     }
 
     // 6. Let result be ? Construct(func, argList, newTarget).
-    var result = try function.asObject().construct(arguments, new_target);
+    var result = try function.asObject().construct(self.agent, arguments, new_target);
 
     // 7. Let thisER be GetThisEnvironment().
     const this_environment = self.agent.getThisEnvironment();
@@ -892,7 +895,7 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
     const constructor = &this_environment.function_environment.function_object.object;
 
     // 12. Perform ? InitializeInstanceElements(result, F).
-    try result.initializeInstanceElements(constructor);
+    try result.initializeInstanceElements(self.agent, constructor);
 
     // 13. Return result.
     self.result = Value.from(result);
@@ -985,7 +988,11 @@ fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
         var it = import_meta_values.iterator();
         while (it.next()) |entry| {
             // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
-            try import_meta.createDataPropertyDirect(entry.key_ptr.*, entry.value_ptr.*);
+            try import_meta.createDataPropertyDirect(
+                self.agent,
+                entry.key_ptr.*,
+                entry.value_ptr.*,
+            );
         }
 
         // d. Perform HostFinalizeImportMeta(importMeta, module).
@@ -1106,7 +1113,7 @@ fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
 
     // 6. Return ? HasProperty(rVal, ? ToPropertyKey(lVal)).
     self.result = Value.from(
-        try r_val.asObject().hasProperty(try l_val.toPropertyKey(self.agent)),
+        try r_val.asObject().hasProperty(self.agent, try l_val.toPropertyKey(self.agent)),
     );
 }
 
@@ -1431,7 +1438,7 @@ fn executeMakePrivateReferenceDirect(
         .null, .undefined => try base_value.toObject(self.agent),
         else => (try base_value.synthesizePrototype(self.agent)).?,
     };
-    self.result = try base_object.privateGet(private_name);
+    self.result = try base_object.privateGet(self.agent, private_name);
 }
 
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
@@ -1448,7 +1455,7 @@ fn executeMakeSuperPropertyReference(self: *Vm, strict: bool, _: Executable) Age
 
     // 3. Assert: env is a Function Environment Record.
     // 4. Let baseValue be GetSuperBase(env).
-    const base_value = try env.function_environment.getSuperBase();
+    const base_value = try env.function_environment.getSuperBase(self.agent);
 
     // 5. Return the Reference Record {
     //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
@@ -1506,7 +1513,7 @@ fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
     const object = self.stack.pop().?.asObject();
     // From PropertyDefinitionEvaluation:
     // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
-    try object.createDataPropertyDirect(property_name, property_value);
+    try object.createDataPropertyDirect(self.agent, property_name, property_value);
     self.result = Value.from(object);
 }
 
@@ -1533,7 +1540,7 @@ fn executeObjectSpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     const excluded_names: []const PropertyKey = &.{};
     // From PropertyDefinitionEvaluation:
     // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
-    try object.copyDataProperties(from_value, excluded_names);
+    try object.copyDataProperties(self.agent, from_value, excluded_names);
     self.result = Value.from(object);
 }
 
@@ -1611,7 +1618,7 @@ fn executeResolveBindingDirect(
         }
     } else {
         var distance: usize = 0;
-        while (!try env.hasBinding(name)) {
+        while (!try env.hasBinding(self.agent, name)) {
             env = env.outerEnv() orelse {
                 return self.agent.throwException(.reference_error, "'{}' is not defined", .{name});
             };

@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,8 +17,6 @@ const Set = builtins.Set;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 24.2.5.1 CreateSetIterator ( set, kind )
 /// https://tc39.es/ecma262/#sec-createsetiterator
@@ -46,18 +43,18 @@ pub fn createSetIterator(
 /// 24.2.5.2 The %SetIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
         // 24.2.5.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%setiteratorprototype%-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Set Iterator"),
             .writable = false,
             .enumerable = false,

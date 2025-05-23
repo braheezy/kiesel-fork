@@ -17,8 +17,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -37,6 +35,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
             const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
             for (x.items, 0..) |value_i, i| {
                 try array.createDataPropertyDirect(
+                    agent,
                     PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
                     try convertJsonValue(agent, value_i),
                 );
@@ -52,6 +51,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
             var it = x.iterator();
             while (it.next()) |entry| {
                 try object.createDataPropertyDirect(
+                    agent,
                     PropertyKey.from(
                         try String.fromUtf8(agent, try agent.gc_allocator.dupe(u8, entry.key_ptr.*)),
                     ),
@@ -101,17 +101,17 @@ fn internalizeJSONProperty(
     reviver: *Object,
 ) Agent.Error!Value {
     // 1. Let val be ? Get(holder, name).
-    const value = try holder.get(name);
+    const value = try holder.get(agent, name);
 
     // 2. If val is an Object, then
     if (value.isObject()) {
         // a. Let isArray be ? IsArray(val).
-        const is_array = try value.isArray();
+        const is_array = try value.isArray(agent);
 
         // b. If isArray is true, then
         if (is_array) {
             // i. Let len be ? LengthOfArrayLike(val).
-            const len = try value.asObject().lengthOfArrayLike();
+            const len = try value.asObject().lengthOfArrayLike(agent);
 
             // ii. Let I be 0.
             var i: u53 = 0;
@@ -140,7 +140,7 @@ fn internalizeJSONProperty(
                 } else {
                     // 4. Else,
                     // a. Perform ? CreateDataProperty(val, prop, newElement).
-                    _ = try value.asObject().createDataProperty(property_key, new_element);
+                    _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
 
                 // 5. Set I to I + 1.
@@ -148,7 +148,7 @@ fn internalizeJSONProperty(
         } else {
             // c. Else,
             // i. Let keys be ? EnumerableOwnProperties(val, key).
-            var keys = try value.asObject().enumerableOwnProperties(.key);
+            var keys = try value.asObject().enumerableOwnProperties(agent, .key);
             defer keys.deinit(agent.gc_allocator);
 
             // ii. For each String P of keys, do
@@ -174,7 +174,7 @@ fn internalizeJSONProperty(
                 } else {
                     // 3. Else,
                     // a. Perform ? CreateDataProperty(val, P, newElement).
-                    _ = try value.asObject().createDataProperty(property_key, new_element);
+                    _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
             }
         }
@@ -218,7 +218,7 @@ fn serializeJSONProperty(
     holder: *Object,
 ) Agent.Error!?*const String {
     // 1. Let value be ? Get(holder, key).
-    var value = try holder.get(key);
+    var value = try holder.get(agent, key);
 
     // 2. If value is an Object or value is a BigInt, then
     if (value.isObject() or value.isBigInt()) {
@@ -292,7 +292,7 @@ fn serializeJSONProperty(
         // 11. If value is an Object and IsCallable(value) is false, then
         .object => if (!value.isCallable()) {
             // a. Let isArray be ? IsArray(value).
-            const is_array = try value.isArray();
+            const is_array = try value.isArray(agent);
 
             // b. If isArray is true, return ? SerializeJSONArray(state, value).
             if (is_array) return try serializeJSONArray(agent, state, value.asObject());
@@ -400,7 +400,7 @@ fn serializeJSONObject(
     // 6. Else,
     //     a. Let K be ? EnumerableOwnProperties(value, key).
     var keys = state.property_list orelse blk: {
-        var keys = try value.enumerableOwnProperties(.key);
+        var keys = try value.enumerableOwnProperties(agent, .key);
         defer keys.deinit(agent.gc_allocator);
         var converted: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
         try converted.ensureUnusedCapacity(agent.gc_allocator, keys.items.len);
@@ -525,7 +525,7 @@ fn serializeJSONArray(
     state.indent = try String.concat(agent, &.{ state.indent, state.gap });
 
     // 6. Let len be ? LengthOfArrayLike(value).
-    const len = try value.lengthOfArrayLike();
+    const len = try value.lengthOfArrayLike(agent);
 
     // 5. Let partial be a new empty List.
     var partial = try std.ArrayListUnmanaged([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
@@ -614,24 +614,24 @@ fn serializeJSONArray(
 }
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.5.3 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("JSON"),
             .writable = false,
             .enumerable = false,
             .configurable = true,
         });
 
-        try defineBuiltinFunction(object, "parse", parse, 2, realm);
-        try defineBuiltinFunction(object, "stringify", stringify, 3, realm);
+        try object.defineBuiltinFunction(agent, "parse", parse, 2, realm);
+        try object.defineBuiltinFunction(agent, "stringify", stringify, 3, realm);
     }
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )
@@ -659,7 +659,7 @@ pub const namespace = struct {
             const root_name = PropertyKey.from("");
 
             // c. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
-            try root.createDataPropertyDirect(root_name, unfiltered);
+            try root.createDataPropertyDirect(agent, root_name, unfiltered);
 
             // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
             return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
@@ -701,7 +701,7 @@ pub const namespace = struct {
             } else {
                 // b. Else,
                 // i. Let isArray be ? IsArray(replacer).
-                const is_array = try replacer.isArray();
+                const is_array = try replacer.isArray(agent);
 
                 // ii. If isArray is true, then
                 if (is_array) {
@@ -709,7 +709,7 @@ pub const namespace = struct {
                     property_list = .empty;
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
-                    const len = try replacer.asObject().lengthOfArrayLike();
+                    const len = try replacer.asObject().lengthOfArrayLike(agent);
 
                     // 3. Let k be 0.
                     var k: u53 = 0;
@@ -720,7 +720,7 @@ pub const namespace = struct {
                         const property_key = PropertyKey.from(k);
 
                         // b. Let v be ? Get(replacer, prop).
-                        const k_value = try replacer.asObject().get(property_key);
+                        const k_value = try replacer.asObject().get(agent, property_key);
 
                         // c. Let item be undefined.
                         var item: ?PropertyKey = null;
@@ -808,7 +808,7 @@ pub const namespace = struct {
         );
 
         // 11. Perform ! CreateDataPropertyOrThrow(wrapper, the empty String, value).
-        try wrapper.createDataPropertyDirect(PropertyKey.from(""), value);
+        try wrapper.createDataPropertyDirect(agent, PropertyKey.from(""), value);
 
         // 12. Let state be the JSON Serialization Record {
         //       [[ReplacerFunction]]: ReplacerFunction, [[Stack]]: stack, [[Indent]]: indent,

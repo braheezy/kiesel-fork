@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,8 +17,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const typedArrayLength = builtins.typedArrayLength;
@@ -58,18 +55,18 @@ pub fn createArrayIterator(
 /// 23.1.5.2 The %ArrayIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Array Iterator"),
             .writable = false,
             .enumerable = false,
@@ -121,7 +118,7 @@ pub const prototype = struct {
         } else blk: {
             // 9. Else,
             // a. Let len be ? LengthOfArrayLike(array).
-            break :blk try array.lengthOfArrayLike();
+            break :blk try array.lengthOfArrayLike(agent);
         };
 
         // 10. If index ≥ len, then
@@ -149,7 +146,7 @@ pub const prototype = struct {
             const element_key = PropertyKey.from(index);
 
             // b. Let elementValue be ? Get(array, elementKey).
-            const element_value = try array.get(element_key);
+            const element_value = try array.get(agent, element_key);
 
             // c. If kind is value, then
             if (kind == .value) {

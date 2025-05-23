@@ -18,17 +18,15 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Error",
@@ -36,12 +34,12 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "isError", isError, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "isError", isError, 1, realm);
 
         // 20.5.2.2 Error.prototype
         // https://tc39.es/ecma262/#sec-error.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Error.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -81,6 +79,7 @@ pub const constructor = struct {
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
             object.createNonEnumerableDataPropertyOrThrow(
+                agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
             ) catch |err| try noexcept(err);
@@ -133,38 +132,38 @@ pub fn internalSet(
 /// 20.5.3 Properties of the Error Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.3.1 Error.prototype.constructor
         // https://tc39.es/ecma262/#sec-error.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Error%"()),
         );
 
         // 20.5.3.2 Error.prototype.message
         // https://tc39.es/ecma262/#sec-error.prototype.message
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "message",
             Value.from(""),
         );
 
         // 20.5.3.3 Error.prototype.name
         // https://tc39.es/ecma262/#sec-error.prototype.name
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "name",
             Value.from("Error"),
         );
 
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
     }
 
     /// 20.5.3.4 Error.prototype.toString ( )
@@ -178,13 +177,13 @@ pub const prototype = struct {
         const object = this_value.asObject();
 
         // 3. Let name be ? Get(O, "name").
-        const name = try object.get(PropertyKey.from("name"));
+        const name = try object.get(agent, PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
         const name_string = if (name.isUndefined()) String.fromLiteral("Error") else try name.toString(agent);
 
         // 5. Let msg be ? Get(O, "message").
-        const msg = try object.get(PropertyKey.from("message"));
+        const msg = try object.get(agent, PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
         const msg_string: *const String = if (msg.isUndefined()) .empty else try msg.toString(agent);
@@ -269,9 +268,9 @@ pub const uri_error = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+        pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(
-                realm.agent,
+                agent,
                 .{ .constructor = impl },
                 1,
                 name,
@@ -279,12 +278,12 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             );
         }
 
-        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 20.5.6.2.1 NativeError.prototype
             // https://tc39.es/ecma262/#sec-nativeerror.prototype
-            try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
                 .value = Value.from(try prototypeFn(&realm.intrinsics)),
                 .writable = false,
                 .enumerable = false,
@@ -336,6 +335,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
                 // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
                 object.createNonEnumerableDataPropertyOrThrow(
+                    agent,
                     PropertyKey.from("message"),
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
@@ -356,35 +356,35 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-            return builtins.Object.create(realm.agent, .{
+        pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+            return builtins.Object.create(agent, .{
                 .prototype = try realm.intrinsics.@"%Error.prototype%"(),
             });
         }
 
-        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
 
             // 20.5.6.3.1 NativeError.prototype.constructor
             // https://tc39.es/ecma262/#sec-nativeerror.prototype.constructor
-            try defineBuiltinProperty(
-                object,
+            try object.defineBuiltinProperty(
+                agent,
                 "constructor",
                 Value.from(try constructorFn(&realm.intrinsics)),
             );
 
             // 20.5.6.3.2 NativeError.prototype.message
             // https://tc39.es/ecma262/#sec-nativeerror.prototype.message
-            try defineBuiltinProperty(
-                object,
+            try object.defineBuiltinProperty(
+                agent,
                 "message",
                 Value.from(""),
             );
 
             // 20.5.6.3.3 NativeError.prototype.name
             // https://tc39.es/ecma262/#sec-nativeerror.prototype.name
-            try defineBuiltinProperty(
-                object,
+            try object.defineBuiltinProperty(
+                agent,
                 "name",
                 Value.from(name),
             );
@@ -408,12 +408,15 @@ fn MakeNativeError(comptime _: []const u8) type {
 /// https://tc39.es/ecma262/#sec-installerrorcause
 pub fn installErrorCause(agent: *Agent, object: *Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
-    if (options.isObject() and try options.asObject().hasProperty(PropertyKey.from("cause"))) {
+    if (options.isObject() and
+        try options.asObject().hasProperty(agent, PropertyKey.from("cause")))
+    {
         // a. Let cause be ? Get(options, "cause").
         const cause = try options.get(agent, PropertyKey.from("cause"));
 
         // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "cause", cause).
         object.createNonEnumerableDataPropertyOrThrow(
+            agent,
             PropertyKey.from("cause"),
             cause,
         ) catch |err| try noexcept(err);

@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -24,17 +23,15 @@ const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 17.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "PluralRules",
@@ -42,10 +39,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 17.2.1 Intl.PluralRules.prototype
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -144,27 +141,27 @@ pub const constructor = struct {
 /// 17.3 Properties of the Intl.PluralRules Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinFunction(object, "select", select, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinFunction(agent, "select", select, 1, realm);
 
         // 17.3.1 Intl.PluralRules.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
         );
 
         // 17.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.PluralRules"),
             .writable = false,
             .enumerable = false,
@@ -224,6 +221,7 @@ pub const prototype = struct {
         //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = plural_rules.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -233,10 +231,12 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("pluralCategories"),
             Value.from(try createArrayFromList(agent, plural_categories.items)),
         );

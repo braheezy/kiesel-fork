@@ -561,60 +561,72 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
     var descriptor: PropertyDescriptor = .{};
 
     // 3. Let hasEnumerable be ? HasProperty(Obj, "enumerable").
-    const has_enumerable = try self.asObject().hasProperty(PropertyKey.from("enumerable"));
+    const has_enumerable = try self.asObject().hasProperty(agent, PropertyKey.from("enumerable"));
 
     // 4. If hasEnumerable is true, then
     if (has_enumerable) {
         // a. Let enumerable be ToBoolean(? Get(Obj, "enumerable")).
-        const enumerable = (try self.asObject().get(PropertyKey.from("enumerable"))).toBoolean();
+        const enumerable = (try self.asObject().get(
+            agent,
+            PropertyKey.from("enumerable"),
+        )).toBoolean();
 
         // b. Set desc.[[Enumerable]] to enumerable.
         descriptor.enumerable = enumerable;
     }
 
     // 5. Let hasConfigurable be ? HasProperty(Obj, "configurable").
-    const has_configurable = try self.asObject().hasProperty(PropertyKey.from("configurable"));
+    const has_configurable = try self.asObject().hasProperty(
+        agent,
+        PropertyKey.from("configurable"),
+    );
 
     // 6. If hasConfigurable is true, then
     if (has_configurable) {
         // a. Let configurable be ToBoolean(? Get(Obj, "configurable")).
-        const configurable = (try self.asObject().get(PropertyKey.from("configurable"))).toBoolean();
+        const configurable = (try self.asObject().get(
+            agent,
+            PropertyKey.from("configurable"),
+        )).toBoolean();
 
         // b. Set desc.[[Configurable]] to configurable.
         descriptor.configurable = configurable;
     }
 
     // 7. Let hasValue be ? HasProperty(Obj, "value").
-    const has_value = try self.asObject().hasProperty(PropertyKey.from("value"));
+    const has_value = try self.asObject().hasProperty(agent, .from("value"));
 
     // 8. If hasValue is true, then
     if (has_value) {
         // a. Let value be ? Get(Obj, "value").
-        const value = try self.asObject().get(PropertyKey.from("value"));
+        const value = try self.asObject().get(agent, PropertyKey.from("value"));
 
         // b. Set desc.[[Value]] to value.
         descriptor.value = value;
     }
 
     // 9. Let hasWritable be ? HasProperty(Obj, "writable").
-    const has_writable = try self.asObject().hasProperty(PropertyKey.from("writable"));
+    const has_writable = try self.asObject().hasProperty(agent, PropertyKey.from("writable"));
 
     // 10. If hasWritable is true, then
     if (has_writable) {
         // a. Let writable be ToBoolean(? Get(Obj, "writable")).
-        const writable = (try self.asObject().get(PropertyKey.from("writable"))).toBoolean();
+        const writable = (try self.asObject().get(
+            agent,
+            PropertyKey.from("writable"),
+        )).toBoolean();
 
         // b. Set desc.[[Writable]] to writable.
         descriptor.writable = writable;
     }
 
     // 11. Let hasGet be ? HasProperty(Obj, "get").
-    const has_get = try self.asObject().hasProperty(PropertyKey.from("get"));
+    const has_get = try self.asObject().hasProperty(agent, PropertyKey.from("get"));
 
     // 12. If hasGet is true, then
     if (has_get) {
         // a. Let getter be ? Get(Obj, "get").
-        const getter = try self.asObject().get(PropertyKey.from("get"));
+        const getter = try self.asObject().get(agent, PropertyKey.from("get"));
 
         // b. If IsCallable(getter) is false and getter is not undefined, throw a TypeError
         //    exception.
@@ -627,12 +639,12 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
     }
 
     // 13. Let hasSet be ? HasProperty(Obj, "set").
-    const has_set = try self.asObject().hasProperty(PropertyKey.from("set"));
+    const has_set = try self.asObject().hasProperty(agent, PropertyKey.from("set"));
 
     // 14. If hasSet is true, then
     if (has_set) {
         // a. Let setter be ? Get(Obj, "set").
-        const setter = try self.asObject().get(PropertyKey.from("set"));
+        const setter = try self.asObject().get(agent, PropertyKey.from("set"));
 
         // b. If IsCallable(setter) is false and setter is not undefined, throw a TypeError
         //    exception.
@@ -711,7 +723,7 @@ pub fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
 
         // c. If preferredType is not present, let preferredType be number.
         // d. Return ? OrdinaryToPrimitive(input, preferredType).
-        return self.asObject().ordinaryToPrimitive(preferred_type orelse .number);
+        return self.asObject().ordinaryToPrimitive(agent, preferred_type orelse .number);
     }
 
     // 2. Return input.
@@ -1188,7 +1200,7 @@ pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}
 
 /// 7.2.2 IsArray ( argument )
 /// https://tc39.es/ecma262/#sec-isarray
-pub fn isArray(self: Value) error{ExceptionThrown}!bool {
+pub fn isArray(self: Value, agent: *Agent) error{ExceptionThrown}!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1200,13 +1212,13 @@ pub fn isArray(self: Value) error{ExceptionThrown}!bool {
     // 3. If argument is a Proxy exotic object, then
     if (object.is(builtins.Proxy)) {
         // a. Perform ? ValidateNonRevokedProxy(argument).
-        try validateNonRevokedProxy(object.agent, object.as(builtins.Proxy));
+        try validateNonRevokedProxy(agent, object.as(builtins.Proxy));
 
         // b. Let proxyTarget be argument.[[ProxyTarget]].
         const proxy_target = object.as(builtins.Proxy).fields.proxy_target.?;
 
         // c. Return ? IsArray(proxyTarget).
-        return from(proxy_target).isArray();
+        return from(proxy_target).isArray(agent);
     }
 
     // 4. Return false.
@@ -1241,14 +1253,13 @@ pub fn isConstructor(self: Value) bool {
 
 /// 7.2.6 IsRegExp ( argument )
 /// https://tc39.es/ecma262/#sec-isregexp
-pub fn isRegExp(self: Value) Agent.Error!bool {
+pub fn isRegExp(self: Value, agent: *Agent) Agent.Error!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
-    const agent = self.asObject().agent;
-
     // 2. Let matcher be ? Get(argument, %Symbol.match%).
     const matcher = try self.asObject().get(
+        agent,
         PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
     );
 
@@ -1351,7 +1362,7 @@ pub fn createListFromArrayLike(
     }
 
     // 3. Let len be ? LengthOfArrayLike(obj).
-    const len = try self.asObject().lengthOfArrayLike();
+    const len = try self.asObject().lengthOfArrayLike(agent);
 
     // 4. Let list be a new empty List.
     if (len > std.math.maxInt(usize)) return error.OutOfMemory;
@@ -1428,7 +1439,7 @@ pub fn ordinaryHasInstance(self: Value, agent: *Agent, object_value: Value) Agen
     if (!object_value.isObject()) return false;
 
     // 4. Let P be ? Get(C, "prototype").
-    const prototype = try self.asObject().get(PropertyKey.from("prototype"));
+    const prototype = try self.asObject().get(agent, PropertyKey.from("prototype"));
 
     // 5. If P is not an Object, throw a TypeError exception.
     if (!prototype.isObject()) {
@@ -1605,11 +1616,11 @@ pub fn setterThatIgnoresPrototypeProperties(
     // 4. If desc is undefined, then
     if (property_descriptor == null) {
         // a. Perform ? CreateDataPropertyOrThrow(thisValue, p, v).
-        try this_value.createDataPropertyOrThrow(property_key, value);
+        try this_value.createDataPropertyOrThrow(agent, property_key, value);
     } else {
         // 5. Else,
         // a. Perform ? Set(thisValue, p, v, true).
-        try this_value.set(property_key, value, .throw);
+        try this_value.set(agent, property_key, value, .throw);
     }
 
     // 6. Return unused.

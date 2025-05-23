@@ -19,9 +19,6 @@ const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createMapIterator = builtins.createMapIterator;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -56,13 +53,13 @@ pub fn addEntriesFromIterable(
         }
 
         // d. Let k be Completion(Get(next, "0")).
-        const k = next.asObject().get(PropertyKey.from(0)) catch |err| {
+        const k = next.asObject().get(agent, PropertyKey.from(0)) catch |err| {
             // e. IfAbruptCloseIterator(k, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 
         // f. Let v be Completion(Get(next, "1")).
-        const v = next.asObject().get(PropertyKey.from(1)) catch |err| {
+        const v = next.asObject().get(agent, PropertyKey.from(1)) catch |err| {
             // h. IfAbruptCloseIterator(v, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
@@ -80,9 +77,9 @@ pub fn addEntriesFromIterable(
 /// 24.1.2 Properties of the Map Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Map",
@@ -90,13 +87,13 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "groupBy", groupBy, 2, realm);
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.1.2.2 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Map.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -130,7 +127,7 @@ pub const constructor = struct {
         if (iterable.isUndefined() or iterable.isNull()) return Value.from(map);
 
         // 5. Let adder be ? Get(map, "set").
-        const adder = try map.get(PropertyKey.from("set"));
+        const adder = try map.get(agent, PropertyKey.from("set"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -152,7 +149,11 @@ pub const constructor = struct {
         const groups = try items.groupBy(agent, callback, .collection);
 
         // 2. Let map be ! Construct(%Map%).
-        const map = (try realm.intrinsics.@"%Map%"()).construct(&.{}, null) catch |err| try noexcept(err);
+        const map = (try realm.intrinsics.@"%Map%"()).construct(
+            agent,
+            &.{},
+            null,
+        ) catch |err| try noexcept(err);
 
         // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
         var it = groups.iterator();
@@ -180,28 +181,28 @@ pub const constructor = struct {
 /// 24.1.3 Properties of the Map Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "clear", clear, 0, realm);
-        try defineBuiltinFunction(object, "delete", delete, 1, realm);
-        try defineBuiltinFunction(object, "entries", entries, 0, realm);
-        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
-        try defineBuiltinFunction(object, "get", get, 1, realm);
-        try defineBuiltinFunction(object, "has", has, 1, realm);
-        try defineBuiltinFunction(object, "keys", keys, 0, realm);
-        try defineBuiltinFunction(object, "set", set, 2, realm);
-        try defineBuiltinAccessor(object, "size", size, null, realm);
-        try defineBuiltinFunction(object, "values", values, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "clear", clear, 0, realm);
+        try object.defineBuiltinFunction(agent, "delete", delete, 1, realm);
+        try object.defineBuiltinFunction(agent, "entries", entries, 0, realm);
+        try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "get", get, 1, realm);
+        try object.defineBuiltinFunction(agent, "has", has, 1, realm);
+        try object.defineBuiltinFunction(agent, "keys", keys, 0, realm);
+        try object.defineBuiltinFunction(agent, "set", set, 2, realm);
+        try object.defineBuiltinAccessor(agent, "size", size, null, realm);
+        try object.defineBuiltinFunction(agent, "values", values, 0, realm);
 
         // 24.1.3.2 Map.prototype.constructor
         // https://tc39.es/ecma262/#sec-map.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Map%"()),
         );
@@ -209,11 +210,11 @@ pub const prototype = struct {
         // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
         const @"%Map.prototype.entries%" = object.getPropertyValueDirect(PropertyKey.from("entries"));
-        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Map.prototype.entries%");
+        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Map.prototype.entries%");
 
         // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Map"),
             .writable = false,
             .enumerable = false,

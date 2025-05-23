@@ -7,7 +7,6 @@ const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -22,26 +21,24 @@ const Vm = bytecode.Vm;
 const asyncGeneratorYield = builtins.asyncGeneratorYield;
 const @"await" = builtins.@"await";
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 27.5.1 The %GeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 1, realm);
-        try defineBuiltinFunction(object, "return", @"return", 1, realm);
-        try defineBuiltinFunction(object, "throw", throw, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 1, realm);
+        try object.defineBuiltinFunction(agent, "return", @"return", 1, realm);
+        try object.defineBuiltinFunction(agent, "throw", throw, 1, realm);
 
         // 27.5.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
-        try defineBuiltinProperty(object, "constructor", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "constructor", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%GeneratorFunction.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -50,7 +47,7 @@ pub const prototype = struct {
 
         // 27.5.1.5 %GeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-generator.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Generator"),
             .writable = false,
             .enumerable = false,

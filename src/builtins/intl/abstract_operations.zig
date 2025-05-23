@@ -173,7 +173,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     };
 
     // 5. Let len be ? LengthOfArrayLike(O).
-    const len = try object.lengthOfArrayLike();
+    const len = try object.lengthOfArrayLike(agent);
 
     // 6. Let k be 0.
     var k: u53 = 0;
@@ -184,12 +184,12 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
         const property_key = PropertyKey.from(k);
 
         // b. Let kPresent be ? HasProperty(O, Pk).
-        const k_present = try object.hasProperty(property_key);
+        const k_present = try object.hasProperty(agent, property_key);
 
         // c. If kPresent is true, then
         if (k_present) {
             // i. Let kValue be ? Get(O, Pk).
-            const k_value = try object.get(property_key);
+            const k_value = try object.get(agent, property_key);
 
             // ii. If kValue is not a String and kValue is not an Object, throw a TypeError
             //     exception.
@@ -307,7 +307,7 @@ pub fn getNumberOption(
     fallback: ?i32,
 ) Agent.Error!?i32 {
     // 1. Let value be ? Get(options, property).
-    const value = try options.get(PropertyKey.from(property));
+    const value = try options.get(agent, PropertyKey.from(property));
 
     // 2. Return ? DefaultNumberOption(value, minimum, maximum, fallback).
     return defaultNumberOption(agent, value, property, minimum, maximum, fallback);

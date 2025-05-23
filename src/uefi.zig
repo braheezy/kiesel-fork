@@ -107,7 +107,7 @@ pub fn main() std.os.uefi.Status {
     };
     const realm = agent.currentRealm();
 
-    kiesel_runtime.addBindings(realm, realm.global_object) catch |err| switch (err) {
+    kiesel_runtime.addBindings(&agent, realm, realm.global_object) catch |err| switch (err) {
         error.OutOfMemory => return .out_of_resources,
     };
 

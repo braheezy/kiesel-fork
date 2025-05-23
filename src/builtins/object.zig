@@ -21,9 +21,6 @@ const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createArrayFromList = types.createArrayFromList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -32,9 +29,9 @@ const sameValue = types.sameValue;
 /// 20.1.2 Properties of the Object Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*types.Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*types.Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Object",
@@ -42,34 +39,34 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "assign", assign, 2, realm);
-        try defineBuiltinFunction(object, "create", create_, 2, realm);
-        try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
-        try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
-        try defineBuiltinFunction(object, "entries", entries, 1, realm);
-        try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
-        try defineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm);
-        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
-        try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
-        try defineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm);
-        try defineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm);
-        try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
-        try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
-        try defineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm);
-        try defineBuiltinFunction(object, "is", is, 2, realm);
-        try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
-        try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
-        try defineBuiltinFunction(object, "isSealed", isSealed, 1, realm);
-        try defineBuiltinFunction(object, "keys", keys, 1, realm);
-        try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
-        try defineBuiltinFunction(object, "seal", seal, 1, realm);
-        try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
-        try defineBuiltinFunction(object, "values", values, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "assign", assign, 2, realm);
+        try object.defineBuiltinFunction(agent, "create", create_, 2, realm);
+        try object.defineBuiltinFunction(agent, "defineProperties", defineProperties, 2, realm);
+        try object.defineBuiltinFunction(agent, "defineProperty", defineProperty, 3, realm);
+        try object.defineBuiltinFunction(agent, "entries", entries, 1, realm);
+        try object.defineBuiltinFunction(agent, "freeze", freeze, 1, realm);
+        try object.defineBuiltinFunction(agent, "fromEntries", fromEntries, 1, realm);
+        try object.defineBuiltinFunction(agent, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
+        try object.defineBuiltinFunction(agent, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
+        try object.defineBuiltinFunction(agent, "getOwnPropertyNames", getOwnPropertyNames, 1, realm);
+        try object.defineBuiltinFunction(agent, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm);
+        try object.defineBuiltinFunction(agent, "getPrototypeOf", getPrototypeOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "groupBy", groupBy, 2, realm);
+        try object.defineBuiltinFunction(agent, "hasOwn", hasOwn, 2, realm);
+        try object.defineBuiltinFunction(agent, "is", is, 2, realm);
+        try object.defineBuiltinFunction(agent, "isExtensible", isExtensible, 1, realm);
+        try object.defineBuiltinFunction(agent, "isFrozen", isFrozen, 1, realm);
+        try object.defineBuiltinFunction(agent, "isSealed", isSealed, 1, realm);
+        try object.defineBuiltinFunction(agent, "keys", keys, 1, realm);
+        try object.defineBuiltinFunction(agent, "preventExtensions", preventExtensions, 1, realm);
+        try object.defineBuiltinFunction(agent, "seal", seal, 1, realm);
+        try object.defineBuiltinFunction(agent, "setPrototypeOf", setPrototypeOf, 2, realm);
+        try object.defineBuiltinFunction(agent, "values", values, 1, realm);
 
         // 20.1.2.21 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Object.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -142,10 +139,10 @@ pub const constructor = struct {
                     // 2. If desc is not undefined and desc.[[Enumerable]] is true, then
                     if (descriptor != null and descriptor.?.enumerable == true) {
                         // a. Let propValue be ? Get(from, nextKey).
-                        const property_value = try from.get(next_key);
+                        const property_value = try from.get(agent, next_key);
 
                         // b. Perform ? Set(to, nextKey, propValue, true).
-                        try to.set(next_key, property_value, .throw);
+                        try to.set(agent, next_key, property_value, .throw);
                     }
                 }
             }
@@ -232,7 +229,7 @@ pub const constructor = struct {
             // b. If propDesc is not undefined and propDesc.[[Enumerable]] is true, then
             if (maybe_property_descriptor) |property_descriptor| if (property_descriptor.enumerable == true) {
                 // i. Let descObj be ? Get(props, nextKey).
-                const descriptor_object = try props.get(next_key);
+                const descriptor_object = try props.get(agent, next_key);
 
                 // ii. Let desc be ? ToPropertyDescriptor(descObj).
                 const descriptor = try descriptor_object.toPropertyDescriptor(agent);
@@ -248,7 +245,7 @@ pub const constructor = struct {
         // 5. For each element property of descriptors, do
         for (descriptors.items) |property| {
             // a. Perform ? DefinePropertyOrThrow(O, property.[[Key]], property.[[Descriptor]]).
-            try object.definePropertyOrThrow(property.key, property.descriptor);
+            try object.definePropertyOrThrow(agent, property.key, property.descriptor);
         }
 
         // 6. Return O.
@@ -274,7 +271,7 @@ pub const constructor = struct {
         const property_descriptor = try attributes.toPropertyDescriptor(agent);
 
         // 4. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.asObject().definePropertyOrThrow(property_key, property_descriptor);
+        try object.asObject().definePropertyOrThrow(agent, property_key, property_descriptor);
 
         // 5. Return O.
         return object;
@@ -289,7 +286,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let entryList be ? EnumerableOwnProperties(obj, key+value).
-        var entry_list = try obj.enumerableOwnProperties(.@"key+value");
+        var entry_list = try obj.enumerableOwnProperties(agent, .@"key+value");
         defer entry_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(entryList).
@@ -305,7 +302,7 @@ pub const constructor = struct {
         if (!object.isObject()) return object;
 
         // 2. Let status be ? SetIntegrityLevel(O, frozen).
-        const status = try object.asObject().setIntegrityLevel(.frozen);
+        const status = try object.asObject().setIntegrityLevel(agent, .frozen);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not freeze object", .{});
@@ -350,7 +347,7 @@ pub const constructor = struct {
                 const property_key = try key.toPropertyKey(agent_);
 
                 // b. Perform ! CreateDataPropertyOrThrow(obj, propertyKey, value).
-                try object_.createDataPropertyDirect(property_key, value);
+                try object_.createDataPropertyDirect(agent_, property_key, value);
 
                 // c. Return undefined.
                 return .undefined;
@@ -419,7 +416,7 @@ pub const constructor = struct {
                 const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
 
                 // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(descriptors, key, descriptor).
-                try descriptors.createDataPropertyDirect(key, Value.from(descriptor));
+                try descriptors.createDataPropertyDirect(agent, key, Value.from(descriptor));
             }
         }
 
@@ -525,7 +522,7 @@ pub const constructor = struct {
             const elements = try createArrayFromList(agent, entry.value_ptr.items);
 
             // b. Perform ! CreateDataPropertyOrThrow(obj, g.[[Key]], elements).
-            try object.createDataPropertyDirect(entry.key_ptr.*, Value.from(elements));
+            try object.createDataPropertyDirect(agent, entry.key_ptr.*, Value.from(elements));
         }
 
         // 4. Return obj.
@@ -545,7 +542,7 @@ pub const constructor = struct {
         const property_key = try property.toPropertyKey(agent);
 
         // 3. Return ? HasOwnProperty(obj, key).
-        return Value.from(try obj.hasOwnProperty(property_key));
+        return Value.from(try obj.hasOwnProperty(agent, property_key));
     }
 
     /// 20.1.2.15 Object.is ( value1, value2 )
@@ -560,38 +557,38 @@ pub const constructor = struct {
 
     /// 20.1.2.16 Object.isExtensible ( O )
     /// https://tc39.es/ecma262/#sec-object.isextensible
-    fn isExtensible(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    fn isExtensible(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? IsExtensible(O).
-        return Value.from(try object.asObject().isExtensible());
+        return Value.from(try object.asObject().isExtensible(agent));
     }
 
     /// 20.1.2.17 Object.isFrozen ( O )
     /// https://tc39.es/ecma262/#sec-object.isfrozen
-    fn isFrozen(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    fn isFrozen(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? TestIntegrityLevel(O, frozen).
-        return Value.from(try object.asObject().testIntegrityLevel(.frozen));
+        return Value.from(try object.asObject().testIntegrityLevel(agent, .frozen));
     }
 
     /// 20.1.2.18 Object.isSealed ( O )
     /// https://tc39.es/ecma262/#sec-object.issealed
-    fn isSealed(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    fn isSealed(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? TestIntegrityLevel(O, sealed).
-        return Value.from(try object.asObject().testIntegrityLevel(.sealed));
+        return Value.from(try object.asObject().testIntegrityLevel(agent, .sealed));
     }
 
     /// 20.1.2.19 Object.keys ( O )
@@ -603,7 +600,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let keyList be ? EnumerableOwnProperties(obj, key).
-        var key_list = try obj.enumerableOwnProperties(.key);
+        var key_list = try obj.enumerableOwnProperties(agent, .key);
         defer key_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keyList).
@@ -637,7 +634,7 @@ pub const constructor = struct {
         if (!object.isObject()) return Value.from(true);
 
         // 2. Let status be ? SetIntegrityLevel(O, sealed).
-        const status = try object.asObject().setIntegrityLevel(.sealed);
+        const status = try object.asObject().setIntegrityLevel(agent, .sealed);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not seal object", .{});
@@ -686,7 +683,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let valueList be ? EnumerableOwnProperties(obj, value).
-        var value_list = try obj.enumerableOwnProperties(.value);
+        var value_list = try obj.enumerableOwnProperties(agent, .value);
         defer value_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(valueList).
@@ -697,8 +694,8 @@ pub const constructor = struct {
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*types.Object {
-        return Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, _: *Realm) std.mem.Allocator.Error!*types.Object {
+        return Object.create(agent, .{
             .prototype = null,
             .internal_methods = &.{
                 .setPrototypeOf = builtins.immutable_prototype.setPrototypeOf,
@@ -706,28 +703,28 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
-        try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
-        try defineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "hasOwnProperty", hasOwnProperty, 1, realm);
+        try object.defineBuiltinFunction(agent, "isPrototypeOf", isPrototypeOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 20.1.3.1 Object.prototype.constructor
         // https://tc39.es/ecma262/#sec-object.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Object%"()),
         );
 
         if (build_options.enable_legacy) {
-            try defineBuiltinAccessor(object, "__proto__", @"get __proto__", @"set __proto__", realm);
-            try defineBuiltinFunction(object, "__defineGetter__", __defineGetter__, 2, realm);
-            try defineBuiltinFunction(object, "__defineSetter__", __defineSetter__, 2, realm);
-            try defineBuiltinFunction(object, "__lookupGetter__", __lookupGetter__, 1, realm);
-            try defineBuiltinFunction(object, "__lookupSetter__", __lookupSetter__, 1, realm);
+            try object.defineBuiltinAccessor(agent, "__proto__", @"get __proto__", @"set __proto__", realm);
+            try object.defineBuiltinFunction(agent, "__defineGetter__", __defineGetter__, 2, realm);
+            try object.defineBuiltinFunction(agent, "__defineSetter__", __defineSetter__, 2, realm);
+            try object.defineBuiltinFunction(agent, "__lookupGetter__", __lookupGetter__, 1, realm);
+            try object.defineBuiltinFunction(agent, "__lookupSetter__", __lookupSetter__, 1, realm);
         }
 
         // Ensure function intrinsics are set right after the object is created
@@ -746,7 +743,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 3. Return ? HasOwnProperty(O, P).
-        return Value.from(try object.hasOwnProperty(property_key));
+        return Value.from(try object.hasOwnProperty(agent, property_key));
     }
 
     /// 20.1.3.3 Object.prototype.isPrototypeOf ( V )
@@ -825,7 +822,7 @@ pub const prototype = struct {
         const object = this_value.toObject(agent) catch |err| try noexcept(err);
 
         // 4. Let isArray be ? IsArray(O).
-        const is_array = try this_value.isArray();
+        const is_array = try this_value.isArray(agent);
 
         // zig fmt: off
         // 5. If isArray is true, let builtinTag be "Array".
@@ -861,7 +858,7 @@ pub const prototype = struct {
         // zig fmt: on
 
         // 15. Let tag be ? Get(O, %Symbol.toStringTag%).
-        const tag_value = try object.get(PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
+        const tag_value = try object.get(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = if (tag_value.isString()) tag_value.asString() else builtin_tag;
@@ -952,7 +949,7 @@ pub const prototype = struct {
         const property_key = try property.toPropertyKey(agent);
 
         // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.definePropertyOrThrow(property_key, property_descriptor);
+        try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
         // 6. Return undefined.
         return .undefined;
@@ -985,7 +982,7 @@ pub const prototype = struct {
         const property_key = try property.toPropertyKey(agent);
 
         // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.definePropertyOrThrow(property_key, property_descriptor);
+        try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
         // 6. Return undefined.
         return .undefined;

@@ -66,13 +66,13 @@ pub fn MakeObject(
                 },
             };
             if (args.prototype != null) {
-                try self.object.setPrototype(args.prototype);
+                try self.object.setPrototype(agent, args.prototype);
             }
             if (!args.extensible) {
-                try self.object.setNonExtensible();
+                try self.object.setNonExtensible(agent);
             }
             if (has_is_htmldda and args.is_htmldda) {
-                try self.object.setIsHTMLDDA();
+                try self.object.setIsHTMLDDA(agent);
             }
             return &self.object;
         }

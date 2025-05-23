@@ -24,9 +24,6 @@ const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
 const String = kiesel.types.String;
 const Value = kiesel.types.Value;
-const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
-const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
-const defineBuiltinPropertyLazy = kiesel.utils.defineBuiltinPropertyLazy;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
@@ -77,43 +74,43 @@ fn resolveModulePath(
     return resolved_path;
 }
 
-fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!void {
-    try defineBuiltinPropertyLazy(
-        global_object,
+fn initializeGlobalObject(agent: *Agent, realm: *Realm, global_object: *Object) Agent.Error!void {
+    try global_object.defineBuiltinPropertyLazy(
+        agent,
         "Kiesel",
         struct {
-            fn initializer(realm_: *Realm) std.mem.Allocator.Error!Value {
-                return Value.from(try Kiesel.create(realm_));
+            fn initializer(agent_: *Agent, realm_: *Realm) std.mem.Allocator.Error!Value {
+                return Value.from(try Kiesel.create(agent_, realm_));
             }
         }.initializer,
         realm,
         .builtin_default,
     );
     if (kiesel.build_options.enable_runtime) {
-        try kiesel_runtime.addBindings(realm, global_object);
+        try kiesel_runtime.addBindings(agent, realm, global_object);
     }
 }
 
 const Kiesel = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        const kiesel_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
         if (kiesel.build_options.enable_annex_b) {
-            try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
+            try kiesel_object.defineBuiltinFunction(agent, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         }
-        try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
-        try defineBuiltinFunction(kiesel_object, "detachArrayBuffer", detachArrayBuffer, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "isMerlin", isMerlin, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "readFile", readFile_, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
-        try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
-        try defineBuiltinFunction(kiesel_object, "sleep", sleep, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "writeFile", writeFile, 2, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "createRealm", createRealm, 0, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "detachArrayBuffer", detachArrayBuffer, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "evalScript", evalScript, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "isMerlin", isMerlin, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "print", print, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "readFile", readFile_, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "readLine", readLine, 0, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "readStdin", readStdin, 0, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "sleep", sleep, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "writeFile", writeFile, 2, realm);
         if (kiesel.build_options.enable_libgc) {
-            const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
-            try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
-            try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
+            const gc_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+            try gc_object.defineBuiltinFunction(agent, "collect", collect, 0, realm);
+            try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
         }
         return kiesel_object;
     }
@@ -156,7 +153,7 @@ const Kiesel = struct {
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
         _ = agent.execution_context_stack.pop().?;
-        try initializeGlobalObject(realm, realm.global_object);
+        try initializeGlobalObject(agent, realm, realm.global_object);
         return Value.from(realm.global_object);
     }
 
@@ -354,7 +351,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     const stderr = agent.platform.stderr;
 
     const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
-        const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
+        const ptr = try agent.gc_allocator.create(ScriptOrModuleHostDefined);
         ptr.* = .{ .base_dir = options.base_dir };
         break :blk ptr;
     });
@@ -885,7 +882,7 @@ pub fn main() !u8 {
             }
 
             const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
-                const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
+                const ptr = try agent_.gc_allocator.create(ScriptOrModuleHostDefined);
                 ptr.* = .{ .base_dir = std.fs.path.dirname(module_path).? };
                 break :blk ptr;
             });
@@ -930,7 +927,7 @@ pub fn main() !u8 {
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
-    try initializeGlobalObject(realm, realm.global_object);
+    try initializeGlobalObject(&agent, realm, realm.global_object);
 
     const cwd = try std.process.getCwdAlloc(allocator);
     defer allocator.free(cwd);

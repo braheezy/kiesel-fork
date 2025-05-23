@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -21,9 +20,6 @@ const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSharedByteDataBlock = types.createSharedByteDataBlock;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -107,9 +103,9 @@ pub fn allocateSharedArrayBuffer(
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "SharedArrayBuffer",
@@ -117,12 +113,12 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%SharedArrayBuffer.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -173,30 +169,30 @@ pub const constructor = struct {
 /// 25.2.5 Properties of the SharedArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
-        try defineBuiltinFunction(object, "grow", grow, 1, realm);
-        try defineBuiltinAccessor(object, "growable", growable, null, realm);
-        try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
-        try defineBuiltinFunction(object, "slice", slice, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "byteLength", byteLength, null, realm);
+        try object.defineBuiltinFunction(agent, "grow", grow, 1, realm);
+        try object.defineBuiltinAccessor(agent, "growable", growable, null, realm);
+        try object.defineBuiltinAccessor(agent, "maxByteLength", maxByteLength, null, realm);
+        try object.defineBuiltinFunction(agent, "slice", slice, 2, realm);
 
         // 25.2.5.2 SharedArrayBuffer.prototype.constructor
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%SharedArrayBuffer%"()),
         );
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("SharedArrayBuffer"),
             .writable = false,
             .enumerable = false,
@@ -389,11 +385,12 @@ pub const prototype = struct {
 
         // 14. Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
         const constructor_ = try object.object.speciesConstructor(
+            agent,
             try realm.intrinsics.@"%SharedArrayBuffer%"(),
         );
 
         // 15. Let new be ? Construct(ctor, « 𝔽(newLen) »).
-        const new_object = try constructor_.construct(&.{Value.from(new_len)}, null);
+        const new_object = try constructor_.construct(agent, &.{Value.from(new_len)}, null);
 
         // 16. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         // 17. If IsSharedArrayBuffer(new) is false, throw a TypeError exception.

@@ -18,9 +18,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSetIterator = builtins.createSetIterator;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const noexcept = utils.noexcept;
@@ -57,7 +54,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     } else object_value.asObject();
 
     // 2. Let rawSize be ? Get(obj, "size").
-    const raw_size = try object.get(PropertyKey.from("size"));
+    const raw_size = try object.get(agent, PropertyKey.from("size"));
 
     // 3. Let numSize be ? ToNumber(rawSize).
     const num_size = try raw_size.toNumber(agent);
@@ -86,7 +83,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     }
 
     // 8. Let has be ? Get(obj, "has").
-    const has = try object.get(PropertyKey.from("has"));
+    const has = try object.get(agent, PropertyKey.from("has"));
 
     // 9. If IsCallable(has) is false, throw a TypeError exception.
     if (!has.isCallable()) {
@@ -98,7 +95,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     }
 
     // 10. Let keys be ? Get(obj, "keys").
-    const keys = try object.get(PropertyKey.from("keys"));
+    const keys = try object.get(agent, PropertyKey.from("keys"));
 
     // 11. If IsCallable(keys) is false, throw a TypeError exception.
     if (!keys.isCallable()) {
@@ -154,9 +151,9 @@ fn setDataSize(set_data: SetData) usize {
 /// 24.2.3 Properties of the Set Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "Set",
@@ -164,12 +161,12 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.2.3.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Set.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -203,7 +200,7 @@ pub const constructor = struct {
         if (iterable.isUndefined() or iterable.isNull()) return Value.from(set);
 
         // 5. Let adder be ? Get(set, "add").
-        const adder = try set.get(PropertyKey.from("add"));
+        const adder = try set.get(agent, PropertyKey.from("add"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -238,33 +235,33 @@ pub const constructor = struct {
 /// 24.2.4 Properties of the Set Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "add", add, 1, realm);
-        try defineBuiltinFunction(object, "clear", clear, 0, realm);
-        try defineBuiltinFunction(object, "delete", delete, 1, realm);
-        try defineBuiltinFunction(object, "difference", difference, 1, realm);
-        try defineBuiltinFunction(object, "entries", entries, 0, realm);
-        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
-        try defineBuiltinFunction(object, "has", has, 1, realm);
-        try defineBuiltinFunction(object, "intersection", intersection, 1, realm);
-        try defineBuiltinFunction(object, "isDisjointFrom", isDisjointFrom, 1, realm);
-        try defineBuiltinFunction(object, "isSubsetOf", isSubsetOf, 1, realm);
-        try defineBuiltinFunction(object, "isSupersetOf", isSupersetOf, 1, realm);
-        try defineBuiltinAccessor(object, "size", size, null, realm);
-        try defineBuiltinFunction(object, "symmetricDifference", symmetricDifference, 1, realm);
-        try defineBuiltinFunction(object, "union", @"union", 1, realm);
-        try defineBuiltinFunction(object, "values", values, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
+        try object.defineBuiltinFunction(agent, "clear", clear, 0, realm);
+        try object.defineBuiltinFunction(agent, "delete", delete, 1, realm);
+        try object.defineBuiltinFunction(agent, "difference", difference, 1, realm);
+        try object.defineBuiltinFunction(agent, "entries", entries, 0, realm);
+        try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "has", has, 1, realm);
+        try object.defineBuiltinFunction(agent, "intersection", intersection, 1, realm);
+        try object.defineBuiltinFunction(agent, "isDisjointFrom", isDisjointFrom, 1, realm);
+        try object.defineBuiltinFunction(agent, "isSubsetOf", isSubsetOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "isSupersetOf", isSupersetOf, 1, realm);
+        try object.defineBuiltinAccessor(agent, "size", size, null, realm);
+        try object.defineBuiltinFunction(agent, "symmetricDifference", symmetricDifference, 1, realm);
+        try object.defineBuiltinFunction(agent, "union", @"union", 1, realm);
+        try object.defineBuiltinFunction(agent, "values", values, 0, realm);
 
         // 24.2.4.3 Set.prototype.constructor
         // https://tc39.es/ecma262/#sec-set.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Set%"()),
         );
@@ -272,15 +269,15 @@ pub const prototype = struct {
         // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
         const @"%Set.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
+        try object.defineBuiltinProperty(agent, "keys", @"%Set.prototype.values%");
 
         // 24.2.4.18 Set.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-set.prototype-%symbol.iterator%
-        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Set.prototype.values%");
+        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Set.prototype.values%");
 
         // 24.2.4.19 Set.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-set.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Set"),
             .writable = false,
             .enumerable = false,

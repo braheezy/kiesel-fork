@@ -17,17 +17,15 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 21.1.2 Properties of the Number Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "Number",
@@ -35,10 +33,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.1.2.1 Number.EPSILON
         // https://tc39.es/ecma262/#sec-number.epsilon
-        try defineBuiltinProperty(object, "EPSILON", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "EPSILON", PropertyDescriptor{
             .value = Value.from(std.math.floatEps(f64)),
             .writable = false,
             .enumerable = false,
@@ -47,7 +45,7 @@ pub const constructor = struct {
 
         // 21.1.2.6 Number.MAX_SAFE_INTEGER
         // https://tc39.es/ecma262/#sec-number.max_safe_integer
-        try defineBuiltinProperty(object, "MAX_SAFE_INTEGER", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "MAX_SAFE_INTEGER", PropertyDescriptor{
             .value = Value.from(std.math.maxInt(u53)),
             .writable = false,
             .enumerable = false,
@@ -56,7 +54,7 @@ pub const constructor = struct {
 
         // 21.1.2.7 Number.MAX_VALUE
         // https://tc39.es/ecma262/#sec-number.max_value
-        try defineBuiltinProperty(object, "MAX_VALUE", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "MAX_VALUE", PropertyDescriptor{
             .value = Value.from(std.math.floatMax(f64)),
             .writable = false,
             .enumerable = false,
@@ -65,7 +63,7 @@ pub const constructor = struct {
 
         // 21.1.2.8 Number.MIN_SAFE_INTEGER
         // https://tc39.es/ecma262/#sec-number.min_safe_integer
-        try defineBuiltinProperty(object, "MIN_SAFE_INTEGER", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "MIN_SAFE_INTEGER", PropertyDescriptor{
             .value = Value.from(-@as(f64, @floatFromInt(std.math.maxInt(u53)))),
             .writable = false,
             .enumerable = false,
@@ -74,7 +72,7 @@ pub const constructor = struct {
 
         // 21.1.2.8 Number.MIN_VALUE
         // https://tc39.es/ecma262/#sec-number.min_value
-        try defineBuiltinProperty(object, "MIN_VALUE", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "MIN_VALUE", PropertyDescriptor{
             .value = Value.from(std.math.floatTrueMin(f64)),
             .writable = false,
             .enumerable = false,
@@ -83,7 +81,7 @@ pub const constructor = struct {
 
         // 21.1.2.10 Number.NaN
         // https://tc39.es/ecma262/#sec-number.nan
-        try defineBuiltinProperty(object, "NaN", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "NaN", PropertyDescriptor{
             .value = .nan,
             .writable = false,
             .enumerable = false,
@@ -92,7 +90,7 @@ pub const constructor = struct {
 
         // 21.1.2.11 Number.NEGATIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.negative_infinity
-        try defineBuiltinProperty(object, "NEGATIVE_INFINITY", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "NEGATIVE_INFINITY", PropertyDescriptor{
             .value = .negative_infinity,
             .writable = false,
             .enumerable = false,
@@ -101,33 +99,33 @@ pub const constructor = struct {
 
         // 21.1.2.12 Number.parseFloat ( string )
         // https://tc39.es/ecma262/#sec-number.parsefloat
-        try defineBuiltinProperty(object, "parseFloat", Value.from(
+        try object.defineBuiltinProperty(agent, "parseFloat", Value.from(
             try realm.intrinsics.@"%parseFloat%"(),
         ));
 
         // 21.1.2.13 Number.parseInt ( string, radix )
         // https://tc39.es/ecma262/#sec-number.parseint
-        try defineBuiltinProperty(object, "parseInt", Value.from(
+        try object.defineBuiltinProperty(agent, "parseInt", Value.from(
             try realm.intrinsics.@"%parseInt%"(),
         ));
 
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
-        try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "POSITIVE_INFINITY", PropertyDescriptor{
             .value = .infinity,
             .writable = false,
             .enumerable = false,
             .configurable = false,
         });
 
-        try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
-        try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
-        try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
-        try defineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm);
+        try object.defineBuiltinFunction(agent, "isFinite", isFinite, 1, realm);
+        try object.defineBuiltinFunction(agent, "isInteger", isInteger, 1, realm);
+        try object.defineBuiltinFunction(agent, "isNaN", isNaN, 1, realm);
+        try object.defineBuiltinFunction(agent, "isSafeInteger", isSafeInteger, 1, realm);
 
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Number.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -242,8 +240,8 @@ pub const constructor = struct {
 /// 21.1.3 Properties of the Number Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return Number.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return Number.create(agent, .{
             .fields = .{
                 .number_data = types.Number.from(0),
             },
@@ -251,18 +249,18 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "toExponential", toExponential, 1, realm);
-        try defineBuiltinFunction(object, "toFixed", toFixed, 1, realm);
-        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
-        try defineBuiltinFunction(object, "toPrecision", toPrecision, 1, realm);
-        try defineBuiltinFunction(object, "toString", toString, 1, realm);
-        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "toExponential", toExponential, 1, realm);
+        try object.defineBuiltinFunction(agent, "toFixed", toFixed, 1, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPrecision", toPrecision, 1, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 1, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 21.1.3.1 Number.prototype.constructor
         // https://tc39.es/ecma262/#sec-number.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Number%"()),
         );

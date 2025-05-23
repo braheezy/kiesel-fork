@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -22,8 +21,6 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -31,9 +28,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             2,
             "DisplayNames",
@@ -41,10 +38,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 12.2.1 Intl.DisplayNames.prototype
         // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DisplayNames.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -245,27 +242,27 @@ pub const constructor = struct {
 /// 12.3 Properties of the Intl.DisplayNames Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinFunction(object, "of", of, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinFunction(agent, "of", of, 1, realm);
 
         // 12.3.1 Intl.DisplayNames.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
         );
 
         // 12.3.4 Intl.DisplayNames.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.displaynames.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.DisplayNames"),
             .writable = false,
             .enumerable = false,
@@ -295,6 +292,7 @@ pub const prototype = struct {
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = display_names.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -304,19 +302,23 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("fallback"),
             Value.from(resolved_options.fallback),
         );
         if (display_names.fields.type == .language) {
             try options.createDataPropertyDirect(
+                agent,
                 PropertyKey.from("languageDisplay"),
                 Value.from(resolved_options.language_display),
             );

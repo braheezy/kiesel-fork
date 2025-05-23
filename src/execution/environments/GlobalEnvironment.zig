@@ -31,14 +31,14 @@ outer_env: ?Environment,
 
 /// 9.1.1.4.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
-pub fn hasBinding(self: GlobalEnvironment, name: *const String) Agent.Error!bool {
+pub fn hasBinding(self: GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, return true.
     if (self.declarative_record.hasBinding(name)) return true;
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
     // 4. Return ? ObjRec.HasBinding(N).
-    return self.object_record.hasBinding(name);
+    return self.object_record.hasBinding(agent, name);
 }
 
 /// 9.1.1.4.2 CreateMutableBinding ( N, D )
@@ -89,7 +89,7 @@ pub fn initializeBinding(
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
         // a. Return ! DclRec.InitializeBinding(N, V).
-        return self.declarative_record.initializeBinding(agent, name, value);
+        return self.declarative_record.initializeBinding(name, value);
     }
 
     // 3. Assert: If the binding exists, it must be in the Object Environment Record.
@@ -141,7 +141,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
-pub fn deleteBinding(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
+pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -154,12 +154,12 @@ pub fn deleteBinding(self: *GlobalEnvironment, name: *const String) Agent.Error!
     const global_object = self.object_record.binding_object;
 
     // 5. Let existingProp be ? HasOwnProperty(globalObject, N).
-    const existing_prop = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const existing_prop = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
 
     // 6. If existingProp is true, then
     if (existing_prop) {
         // a. Return ? ObjRec.DeleteBinding(N).
-        return self.object_record.deleteBinding(name);
+        return self.object_record.deleteBinding(agent, name);
     }
 
     // 7. Return true.
@@ -189,7 +189,7 @@ pub fn withBaseObject(_: GlobalEnvironment) ?*Object {
 
 /// 9.1.1.4.11 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
-pub fn getThisBinding(self: GlobalEnvironment, _: *Agent) Value {
+pub fn getThisBinding(self: GlobalEnvironment) Value {
     // 1. Return envRec.[[GlobalThisValue]].
     return Value.from(self.global_this_value);
 }
@@ -204,14 +204,18 @@ pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool 
 
 /// 9.1.1.4.13 HasRestrictedGlobalProperty ( envRec, N )
 /// https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty
-pub fn hasRestrictedGlobalProperty(self: GlobalEnvironment, name: *const String) Agent.Error!bool {
+pub fn hasRestrictedGlobalProperty(
+    self: GlobalEnvironment,
+    agent: *Agent,
+    name: *const String,
+) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
     const existing_property = try global_object.internal_methods.getOwnProperty(
-        global_object.agent,
+        agent,
         global_object,
         PropertyKey.from(name),
     ) orelse {
@@ -228,36 +232,44 @@ pub fn hasRestrictedGlobalProperty(self: GlobalEnvironment, name: *const String)
 
 /// 9.1.1.4.14 CanDeclareGlobalVar ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
-pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
+pub fn canDeclareGlobalVar(
+    self: *GlobalEnvironment,
+    agent: *Agent,
+    name: *const String,
+) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
 
     // 4. If hasProperty is true, return true.
     if (has_property) return true;
 
     // 5. Return ? IsExtensible(globalObject).
-    return global_object.isExtensible();
+    return global_object.isExtensible(agent);
 }
 
 /// 9.1.1.4.15 CanDeclareGlobalFunction ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
-pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: *const String) Agent.Error!bool {
+pub fn canDeclareGlobalFunction(
+    self: *GlobalEnvironment,
+    agent: *Agent,
+    name: *const String,
+) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
     const existing_prop = try global_object.internal_methods.getOwnProperty(
-        global_object.agent,
+        agent,
         global_object,
         PropertyKey.from(name),
     ) orelse {
         // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
-        return global_object.isExtensible();
+        return global_object.isExtensible(agent);
     };
 
     // 5. If existingProp.[[Configurable]] is true, return true.
@@ -286,10 +298,10 @@ pub fn createGlobalVarBinding(
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
 
     // 4. Let extensible be ? IsExtensible(globalObject).
-    const extensible = try global_object.isExtensible();
+    const extensible = try global_object.isExtensible(agent);
 
     // 5. If hasProperty is false and extensible is true, then
     if (!has_property and extensible) {
@@ -338,10 +350,10 @@ pub fn createGlobalFunctionBinding(
     };
 
     // 6. Perform ? DefinePropertyOrThrow(globalObject, N, desc).
-    try global_object.definePropertyOrThrow(property_key, property_descriptor);
+    try global_object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
     // 7. Perform ? Set(globalObject, N, V, false).
-    try global_object.set(property_key, value, .ignore);
+    try global_object.set(agent, property_key, value, .ignore);
 
     // 8. Return unused.
 }

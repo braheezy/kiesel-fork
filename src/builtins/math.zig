@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -15,23 +14,21 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 
 /// 21.3.1 Value Properties of the Math Object
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.3.1.1 Math.E
         // https://tc39.es/ecma262/#sec-math.e
-        try defineBuiltinProperty(object, "E", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "E", PropertyDescriptor{
             .value = Value.from(std.math.e),
             .writable = false,
             .enumerable = false,
@@ -40,7 +37,7 @@ pub const namespace = struct {
 
         // 21.3.1.2 Math.LN10
         // https://tc39.es/ecma262/#sec-math.ln10
-        try defineBuiltinProperty(object, "LN10", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "LN10", PropertyDescriptor{
             .value = Value.from(std.math.ln10),
             .writable = false,
             .enumerable = false,
@@ -49,7 +46,7 @@ pub const namespace = struct {
 
         // 21.3.1.2 Math.LN2
         // https://tc39.es/ecma262/#sec-math.ln2
-        try defineBuiltinProperty(object, "LN2", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "LN2", PropertyDescriptor{
             .value = Value.from(std.math.ln2),
             .writable = false,
             .enumerable = false,
@@ -58,7 +55,7 @@ pub const namespace = struct {
 
         // 21.3.1.4 Math.LOG10E
         // https://tc39.es/ecma262/#sec-math.log10e
-        try defineBuiltinProperty(object, "LOG10E", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "LOG10E", PropertyDescriptor{
             .value = Value.from(std.math.log10e),
             .writable = false,
             .enumerable = false,
@@ -67,7 +64,7 @@ pub const namespace = struct {
 
         // 21.3.1.5 Math.LOG2E
         // https://tc39.es/ecma262/#sec-math.log2e
-        try defineBuiltinProperty(object, "LOG2E", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "LOG2E", PropertyDescriptor{
             .value = Value.from(std.math.log2e),
             .writable = false,
             .enumerable = false,
@@ -76,7 +73,7 @@ pub const namespace = struct {
 
         // 21.3.1.6 Math.PI
         // https://tc39.es/ecma262/#sec-math.pi
-        try defineBuiltinProperty(object, "PI", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "PI", PropertyDescriptor{
             .value = Value.from(std.math.pi),
             .writable = false,
             .enumerable = false,
@@ -85,7 +82,7 @@ pub const namespace = struct {
 
         // 21.3.1.7 Math.SQRT1_2
         // https://tc39.es/ecma262/#sec-math.sqrt1_2
-        try defineBuiltinProperty(object, "SQRT1_2", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "SQRT1_2", PropertyDescriptor{
             .value = Value.from(std.math.sqrt1_2),
             .writable = false,
             .enumerable = false,
@@ -94,7 +91,7 @@ pub const namespace = struct {
 
         // 21.3.1.8 Math.SQRT2
         // https://tc39.es/ecma262/#sec-math.sqrt2
-        try defineBuiltinProperty(object, "SQRT2", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "SQRT2", PropertyDescriptor{
             .value = Value.from(std.math.sqrt2),
             .writable = false,
             .enumerable = false,
@@ -103,50 +100,50 @@ pub const namespace = struct {
 
         // 21.3.1.9 Math [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-math-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Math"),
             .writable = false,
             .enumerable = false,
             .configurable = true,
         });
 
-        try defineBuiltinFunction(object, "abs", abs, 1, realm);
-        try defineBuiltinFunction(object, "acos", acos, 1, realm);
-        try defineBuiltinFunction(object, "acosh", acosh, 1, realm);
-        try defineBuiltinFunction(object, "asin", asin, 1, realm);
-        try defineBuiltinFunction(object, "asinh", asinh, 1, realm);
-        try defineBuiltinFunction(object, "atan", atan, 1, realm);
-        try defineBuiltinFunction(object, "atanh", atanh, 1, realm);
-        try defineBuiltinFunction(object, "atan2", atan2, 2, realm);
-        try defineBuiltinFunction(object, "cbrt", cbrt, 1, realm);
-        try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
-        try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
-        try defineBuiltinFunction(object, "cos", cos, 1, realm);
-        try defineBuiltinFunction(object, "cosh", cosh, 1, realm);
-        try defineBuiltinFunction(object, "exp", exp, 1, realm);
-        try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
-        try defineBuiltinFunction(object, "f16round", f16round, 1, realm);
-        try defineBuiltinFunction(object, "floor", floor, 1, realm);
-        try defineBuiltinFunction(object, "fround", fround, 1, realm);
-        try defineBuiltinFunction(object, "hypot", hypot, 2, realm);
-        try defineBuiltinFunction(object, "imul", imul, 2, realm);
-        try defineBuiltinFunction(object, "log", log, 1, realm);
-        try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
-        try defineBuiltinFunction(object, "log10", log10, 1, realm);
-        try defineBuiltinFunction(object, "log2", log2, 1, realm);
-        try defineBuiltinFunction(object, "max", max, 2, realm);
-        try defineBuiltinFunction(object, "min", min, 2, realm);
-        try defineBuiltinFunction(object, "pow", pow, 2, realm);
-        try defineBuiltinFunction(object, "random", random, 0, realm);
-        try defineBuiltinFunction(object, "round", round, 1, realm);
-        try defineBuiltinFunction(object, "sign", sign, 1, realm);
-        try defineBuiltinFunction(object, "sin", sin, 1, realm);
-        try defineBuiltinFunction(object, "sinh", sinh, 1, realm);
-        try defineBuiltinFunction(object, "sqrt", sqrt, 1, realm);
-        try defineBuiltinFunction(object, "sumPrecise", sumPrecise, 1, realm);
-        try defineBuiltinFunction(object, "tan", tan, 1, realm);
-        try defineBuiltinFunction(object, "tanh", tanh, 1, realm);
-        try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
+        try object.defineBuiltinFunction(agent, "abs", abs, 1, realm);
+        try object.defineBuiltinFunction(agent, "acos", acos, 1, realm);
+        try object.defineBuiltinFunction(agent, "acosh", acosh, 1, realm);
+        try object.defineBuiltinFunction(agent, "asin", asin, 1, realm);
+        try object.defineBuiltinFunction(agent, "asinh", asinh, 1, realm);
+        try object.defineBuiltinFunction(agent, "atan", atan, 1, realm);
+        try object.defineBuiltinFunction(agent, "atanh", atanh, 1, realm);
+        try object.defineBuiltinFunction(agent, "atan2", atan2, 2, realm);
+        try object.defineBuiltinFunction(agent, "cbrt", cbrt, 1, realm);
+        try object.defineBuiltinFunction(agent, "ceil", ceil, 1, realm);
+        try object.defineBuiltinFunction(agent, "clz32", clz32, 1, realm);
+        try object.defineBuiltinFunction(agent, "cos", cos, 1, realm);
+        try object.defineBuiltinFunction(agent, "cosh", cosh, 1, realm);
+        try object.defineBuiltinFunction(agent, "exp", exp, 1, realm);
+        try object.defineBuiltinFunction(agent, "expm1", expm1, 1, realm);
+        try object.defineBuiltinFunction(agent, "f16round", f16round, 1, realm);
+        try object.defineBuiltinFunction(agent, "floor", floor, 1, realm);
+        try object.defineBuiltinFunction(agent, "fround", fround, 1, realm);
+        try object.defineBuiltinFunction(agent, "hypot", hypot, 2, realm);
+        try object.defineBuiltinFunction(agent, "imul", imul, 2, realm);
+        try object.defineBuiltinFunction(agent, "log", log, 1, realm);
+        try object.defineBuiltinFunction(agent, "log1p", log1p, 1, realm);
+        try object.defineBuiltinFunction(agent, "log10", log10, 1, realm);
+        try object.defineBuiltinFunction(agent, "log2", log2, 1, realm);
+        try object.defineBuiltinFunction(agent, "max", max, 2, realm);
+        try object.defineBuiltinFunction(agent, "min", min, 2, realm);
+        try object.defineBuiltinFunction(agent, "pow", pow, 2, realm);
+        try object.defineBuiltinFunction(agent, "random", random, 0, realm);
+        try object.defineBuiltinFunction(agent, "round", round, 1, realm);
+        try object.defineBuiltinFunction(agent, "sign", sign, 1, realm);
+        try object.defineBuiltinFunction(agent, "sin", sin, 1, realm);
+        try object.defineBuiltinFunction(agent, "sinh", sinh, 1, realm);
+        try object.defineBuiltinFunction(agent, "sqrt", sqrt, 1, realm);
+        try object.defineBuiltinFunction(agent, "sumPrecise", sumPrecise, 1, realm);
+        try object.defineBuiltinFunction(agent, "tan", tan, 1, realm);
+        try object.defineBuiltinFunction(agent, "tanh", tanh, 1, realm);
+        try object.defineBuiltinFunction(agent, "trunc", trunc, 1, realm);
     }
 
     /// 21.3.2.1 Math.abs ( x )

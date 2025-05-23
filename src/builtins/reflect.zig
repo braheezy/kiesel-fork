@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -16,34 +15,32 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "apply", apply, 3, realm);
-        try defineBuiltinFunction(object, "construct", construct, 2, realm);
-        try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
-        try defineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm);
-        try defineBuiltinFunction(object, "get", get, 2, realm);
-        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
-        try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
-        try defineBuiltinFunction(object, "has", has, 2, realm);
-        try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
-        try defineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm);
-        try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
-        try defineBuiltinFunction(object, "set", set, 3, realm);
-        try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "apply", apply, 3, realm);
+        try object.defineBuiltinFunction(agent, "construct", construct, 2, realm);
+        try object.defineBuiltinFunction(agent, "defineProperty", defineProperty, 3, realm);
+        try object.defineBuiltinFunction(agent, "deleteProperty", deleteProperty, 2, realm);
+        try object.defineBuiltinFunction(agent, "get", get, 2, realm);
+        try object.defineBuiltinFunction(agent, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
+        try object.defineBuiltinFunction(agent, "getPrototypeOf", getPrototypeOf, 1, realm);
+        try object.defineBuiltinFunction(agent, "has", has, 2, realm);
+        try object.defineBuiltinFunction(agent, "isExtensible", isExtensible, 1, realm);
+        try object.defineBuiltinFunction(agent, "ownKeys", ownKeys, 1, realm);
+        try object.defineBuiltinFunction(agent, "preventExtensions", preventExtensions, 1, realm);
+        try object.defineBuiltinFunction(agent, "set", set, 3, realm);
+        try object.defineBuiltinFunction(agent, "setPrototypeOf", setPrototypeOf, 2, realm);
 
         // 28.1.14 Reflect [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-reflect-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Reflect"),
             .writable = false,
             .enumerable = false,
@@ -96,7 +93,7 @@ pub const namespace = struct {
         const args = try arguments_list.createListFromArrayLike(agent, null);
 
         // 5. Return ? Construct(target, args, newTarget).
-        return Value.from(try target.asObject().construct(args, new_target.asObject()));
+        return Value.from(try target.asObject().construct(agent, args, new_target.asObject()));
     }
 
     /// 28.1.3 Reflect.defineProperty ( target, propertyKey, attributes )

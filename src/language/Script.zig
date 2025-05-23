@@ -165,7 +165,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         }
 
         // b. Let hasRestrictedGlobal be ? HasRestrictedGlobalProperty(env, name).
-        const has_restricted_global = try env.hasRestrictedGlobalProperty(name);
+        const has_restricted_global = try env.hasRestrictedGlobalProperty(agent, name);
 
         // c. NOTE: Global var and function bindings (except those that are introduced by
         //    non-strict direct eval) are non-configurable and are therefore restricted global
@@ -228,7 +228,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             // iv. If declaredFunctionNames does not contain fn, then
             if (!declared_function_names.contains(function_name)) {
                 // 1. Let fnDefinable be ? CanDeclareGlobalFunction(env, fn).
-                const function_definable = try env.canDeclareGlobalFunction(function_name);
+                const function_definable = try env.canDeclareGlobalFunction(agent, function_name);
 
                 // 2. If fnDefinable is false, throw a TypeError exception.
                 if (!function_definable) {
@@ -270,7 +270,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
                     // a. Let vnDefinable be ? CanDeclareGlobalVar(env, vn).
-                    const var_name_definable = try env.canDeclareGlobalVar(var_name);
+                    const var_name_definable = try env.canDeclareGlobalVar(agent, var_name);
 
                     // b. If vnDefinable is false, throw a TypeError exception.
                     if (!var_name_definable) {

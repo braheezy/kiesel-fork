@@ -67,7 +67,7 @@ pub fn initializeHostDefinedRealm(
     realm.agent = agent;
 
     // 2. Perform CreateIntrinsics(realm).
-    try realm.createIntrinsics();
+    try realm.createIntrinsics(agent);
 
     realm.* = .{
         .intrinsics = realm.intrinsics,
@@ -136,7 +136,7 @@ pub fn initializeHostDefinedRealm(
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Realm) std.mem.Allocator.Error!void {
+fn createIntrinsics(self: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
     self.intrinsics = .{ .realm = self };
 
@@ -159,7 +159,11 @@ fn createIntrinsics(self: *Realm) std.mem.Allocator.Error!void {
     // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
     // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
-    try addRestrictedFunctionProperties(try self.intrinsics.@"%Function.prototype%"(), self);
+    try addRestrictedFunctionProperties(
+        agent,
+        try self.intrinsics.@"%Function.prototype%"(),
+        self,
+    );
 
     // 4. Return unused.
 }
@@ -189,11 +193,11 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
         switch (property[1]) {
             .property_descriptor => |property_descriptor| {
                 // c. Perform ? DefinePropertyOrThrow(global, name, desc).
-                try global.definePropertyOrThrow(property_key, property_descriptor);
+                try global.definePropertyOrThrow(self.agent, property_key, property_descriptor);
             },
             .lazy_property => |initializer| {
                 // NOTE: There aren't any accessors on the global object so this only ever creates data properties.
-                try global.definePropertyOrThrow(property_key, .{
+                try global.definePropertyOrThrow(self.agent, property_key, .{
                     .value = undefined,
                     .writable = true,
                     .enumerable = false,

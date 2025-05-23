@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -21,9 +20,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinAccessor = utils.defineBuiltinAccessor;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
@@ -288,9 +284,9 @@ fn setViewValue(
 /// 25.3.3 Properties of the DataView Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             1,
             "DataView",
@@ -298,10 +294,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.3.3.1 DataView.prototype
         // https://tc39.es/ecma262/#sec-dataview.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%DataView.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -456,50 +452,50 @@ pub const constructor = struct {
 /// 25.3.4 Properties of the DataView Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
-        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
-        try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
-        try defineBuiltinFunction(object, "getBigInt64", getBigInt64, 1, realm);
-        try defineBuiltinFunction(object, "getBigUint64", getBigUint64, 1, realm);
-        try defineBuiltinFunction(object, "getFloat16", getFloat16, 1, realm);
-        try defineBuiltinFunction(object, "getFloat32", getFloat32, 1, realm);
-        try defineBuiltinFunction(object, "getFloat64", getFloat64, 1, realm);
-        try defineBuiltinFunction(object, "getInt8", getInt8, 1, realm);
-        try defineBuiltinFunction(object, "getInt16", getInt16, 1, realm);
-        try defineBuiltinFunction(object, "getInt32", getInt32, 1, realm);
-        try defineBuiltinFunction(object, "getUint8", getUint8, 1, realm);
-        try defineBuiltinFunction(object, "getUint16", getUint16, 1, realm);
-        try defineBuiltinFunction(object, "getUint32", getUint32, 1, realm);
-        try defineBuiltinFunction(object, "setBigInt64", setBigInt64, 2, realm);
-        try defineBuiltinFunction(object, "setBigUint64", setBigUint64, 2, realm);
-        try defineBuiltinFunction(object, "setFloat16", setFloat16, 2, realm);
-        try defineBuiltinFunction(object, "setFloat32", setFloat32, 2, realm);
-        try defineBuiltinFunction(object, "setFloat64", setFloat64, 2, realm);
-        try defineBuiltinFunction(object, "setInt8", setInt8, 2, realm);
-        try defineBuiltinFunction(object, "setInt16", setInt16, 2, realm);
-        try defineBuiltinFunction(object, "setInt32", setInt32, 2, realm);
-        try defineBuiltinFunction(object, "setUint8", setUint8, 2, realm);
-        try defineBuiltinFunction(object, "setUint16", setUint16, 2, realm);
-        try defineBuiltinFunction(object, "setUint32", setUint32, 2, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "buffer", buffer, null, realm);
+        try object.defineBuiltinAccessor(agent, "byteLength", byteLength, null, realm);
+        try object.defineBuiltinAccessor(agent, "byteOffset", byteOffset, null, realm);
+        try object.defineBuiltinFunction(agent, "getBigInt64", getBigInt64, 1, realm);
+        try object.defineBuiltinFunction(agent, "getBigUint64", getBigUint64, 1, realm);
+        try object.defineBuiltinFunction(agent, "getFloat16", getFloat16, 1, realm);
+        try object.defineBuiltinFunction(agent, "getFloat32", getFloat32, 1, realm);
+        try object.defineBuiltinFunction(agent, "getFloat64", getFloat64, 1, realm);
+        try object.defineBuiltinFunction(agent, "getInt8", getInt8, 1, realm);
+        try object.defineBuiltinFunction(agent, "getInt16", getInt16, 1, realm);
+        try object.defineBuiltinFunction(agent, "getInt32", getInt32, 1, realm);
+        try object.defineBuiltinFunction(agent, "getUint8", getUint8, 1, realm);
+        try object.defineBuiltinFunction(agent, "getUint16", getUint16, 1, realm);
+        try object.defineBuiltinFunction(agent, "getUint32", getUint32, 1, realm);
+        try object.defineBuiltinFunction(agent, "setBigInt64", setBigInt64, 2, realm);
+        try object.defineBuiltinFunction(agent, "setBigUint64", setBigUint64, 2, realm);
+        try object.defineBuiltinFunction(agent, "setFloat16", setFloat16, 2, realm);
+        try object.defineBuiltinFunction(agent, "setFloat32", setFloat32, 2, realm);
+        try object.defineBuiltinFunction(agent, "setFloat64", setFloat64, 2, realm);
+        try object.defineBuiltinFunction(agent, "setInt8", setInt8, 2, realm);
+        try object.defineBuiltinFunction(agent, "setInt16", setInt16, 2, realm);
+        try object.defineBuiltinFunction(agent, "setInt32", setInt32, 2, realm);
+        try object.defineBuiltinFunction(agent, "setUint8", setUint8, 2, realm);
+        try object.defineBuiltinFunction(agent, "setUint16", setUint16, 2, realm);
+        try object.defineBuiltinFunction(agent, "setUint32", setUint32, 2, realm);
 
         // 25.3.4.4 DataView.prototype.constructor
         // https://tc39.es/ecma262/#sec-dataview.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%DataView%"()),
         );
 
         // 25.3.4.25 DataView.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("DataView"),
             .writable = false,
             .enumerable = false,

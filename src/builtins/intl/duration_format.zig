@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -22,8 +21,6 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
@@ -33,9 +30,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 13.2 Properties of the Intl.DurationFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "DurationFormat",
@@ -43,10 +40,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 13.2.1 Intl.DurationFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -396,27 +393,27 @@ pub const constructor = struct {
 /// 13.3 Properties of the Intl.DurationFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinFunction(object, "format", format, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinFunction(agent, "format", format, 1, realm);
 
         // 13.3.1 Intl.DurationFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
         );
 
         // 13.3.5 Intl.DurationFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.DurationFormat"),
             .writable = false,
             .enumerable = false,
@@ -464,6 +461,7 @@ pub const prototype = struct {
         //         iv. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = duration_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(
                 try String.fromAscii(
@@ -473,95 +471,118 @@ pub const prototype = struct {
             ),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("numberingSystem"),
             Value.from(resolved_options.numbering_system),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("years"),
             Value.from(resolved_options.years),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("yearsDisplay"),
             Value.from(resolved_options.years_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("months"),
             Value.from(resolved_options.months),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("monthsDisplay"),
             Value.from(resolved_options.months_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("weeks"),
             Value.from(resolved_options.weeks),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("weeksDisplay"),
             Value.from(resolved_options.weeks_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("days"),
             Value.from(resolved_options.days),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("daysDisplay"),
             Value.from(resolved_options.days_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("hours"),
             Value.from(resolved_options.hours),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("hoursDisplay"),
             Value.from(resolved_options.hours_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("minutes"),
             Value.from(resolved_options.minutes),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("minutesDisplay"),
             Value.from(resolved_options.minutes_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("seconds"),
             Value.from(resolved_options.seconds),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("secondsDisplay"),
             Value.from(resolved_options.seconds_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("milliseconds"),
             Value.from(resolved_options.milliseconds),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("millisecondsDisplay"),
             Value.from(resolved_options.milliseconds_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("microseconds"),
             Value.from(resolved_options.microseconds),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("microsecondsDisplay"),
             Value.from(resolved_options.microseconds_display),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("nanoseconds"),
             Value.from(resolved_options.nanoseconds),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("nanosecondsDisplay"),
             Value.from(resolved_options.nanoseconds_display),
         );
         if (resolved_options.fractional_digits) |fractional_digits| {
             try options.createDataPropertyDirect(
+                agent,
                 PropertyKey.from("fractionalDigits"),
                 Value.from(fractional_digits),
             );
@@ -902,7 +923,7 @@ const Duration = struct {
         };
 
         // 3. Let days be ? Get(input, "days").
-        const days = try input.get(PropertyKey.from("days"));
+        const days = try input.get(agent, PropertyKey.from("days"));
 
         // 4. If days is not undefined, set result.[[Days]] to ? ToIntegerIfIntegral(days).
         if (!days.isUndefined()) {
@@ -910,7 +931,7 @@ const Duration = struct {
         }
 
         // 5. Let hours be ? Get(input, "hours").
-        const hours = try input.get(PropertyKey.from("hours"));
+        const hours = try input.get(agent, PropertyKey.from("hours"));
 
         // 6. If hours is not undefined, set result.[[Hours]] to ? ToIntegerIfIntegral(hours).
         if (!hours.isUndefined()) {
@@ -918,7 +939,7 @@ const Duration = struct {
         }
 
         // 7. Let microseconds be ? Get(input, "microseconds").
-        const microseconds = try input.get(PropertyKey.from("microseconds"));
+        const microseconds = try input.get(agent, PropertyKey.from("microseconds"));
 
         // 8. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
         if (!microseconds.isUndefined()) {
@@ -926,7 +947,7 @@ const Duration = struct {
         }
 
         // 9. Let milliseconds be ? Get(input, "milliseconds").
-        const milliseconds = try input.get(PropertyKey.from("milliseconds"));
+        const milliseconds = try input.get(agent, PropertyKey.from("milliseconds"));
 
         // 10. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
         if (!milliseconds.isUndefined()) {
@@ -934,7 +955,7 @@ const Duration = struct {
         }
 
         // 11. Let minutes be ? Get(input, "minutes").
-        const minutes = try input.get(PropertyKey.from("minutes"));
+        const minutes = try input.get(agent, PropertyKey.from("minutes"));
 
         // 12. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(minutes).
         if (!minutes.isUndefined()) {
@@ -942,7 +963,7 @@ const Duration = struct {
         }
 
         // 13. Let months be ? Get(input, "months").
-        const months = try input.get(PropertyKey.from("months"));
+        const months = try input.get(agent, PropertyKey.from("months"));
 
         // 14. If months is not undefined, set result.[[Months]] to ? ToIntegerIfIntegral(months).
         if (!months.isUndefined()) {
@@ -950,7 +971,7 @@ const Duration = struct {
         }
 
         // 15. Let nanoseconds be ? Get(input, "nanoseconds").
-        const nanoseconds = try input.get(PropertyKey.from("nanoseconds"));
+        const nanoseconds = try input.get(agent, PropertyKey.from("nanoseconds"));
 
         // 16. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
         if (!nanoseconds.isUndefined()) {
@@ -958,7 +979,7 @@ const Duration = struct {
         }
 
         // 17. Let seconds be ? Get(input, "seconds").
-        const seconds = try input.get(PropertyKey.from("seconds"));
+        const seconds = try input.get(agent, PropertyKey.from("seconds"));
 
         // 18. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(seconds).
         if (!seconds.isUndefined()) {
@@ -966,7 +987,7 @@ const Duration = struct {
         }
 
         // 19. Let weeks be ? Get(input, "weeks").
-        const weeks = try input.get(PropertyKey.from("weeks"));
+        const weeks = try input.get(agent, PropertyKey.from("weeks"));
 
         // 20. If weeks is not undefined, set result.[[Weeks]] to ? ToIntegerIfIntegral(weeks).
         if (!weeks.isUndefined()) {
@@ -974,7 +995,7 @@ const Duration = struct {
         }
 
         // 21. Let years be ? Get(input, "years").
-        const years = try input.get(PropertyKey.from("years"));
+        const years = try input.get(agent, PropertyKey.from("years"));
 
         // 22. If years is not undefined, set result.[[Years]] to ? ToIntegerIfIntegral(years).
         if (!years.isUndefined()) {

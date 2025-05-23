@@ -91,7 +91,7 @@ pub fn getBindingValue(
 pub fn deleteBinding(_: ModuleEnvironment, _: *const String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
-    unreachable;
+    @compileError("Should not be used");
 }
 
 /// 9.1.1.5.3 HasThisBinding ( )
@@ -103,7 +103,7 @@ pub fn hasThisBinding(_: ModuleEnvironment) bool {
 
 /// 9.1.1.5.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getthisbinding
-pub fn getThisBinding(_: ModuleEnvironment, _: *Agent) Value {
+pub fn getThisBinding(_: ModuleEnvironment) Value {
     // 1. Return undefined.
     return .undefined;
 }

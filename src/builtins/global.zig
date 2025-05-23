@@ -33,7 +33,7 @@ fn LazyIntrinsicInitializer(
 ) Object.PropertyStorage.LazyProperty.Initializer {
     return .{
         .value = struct {
-            fn initializer(realm: *Realm) std.mem.Allocator.Error!Value {
+            fn initializer(_: *Agent, realm: *Realm) std.mem.Allocator.Error!Value {
                 return Value.from(try lazyIntrinsicFn(&realm.intrinsics));
             }
         }.initializer,
@@ -292,16 +292,16 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+        pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(
-                realm.agent,
+                agent,
                 .{ .function = @field(module, options.name) },
                 options.length,
                 options.name,
                 .{ .realm = realm },
             );
         }
-        pub fn init(_: *Realm, _: *Object) std.mem.Allocator.Error!void {}
+        pub fn init(_: *Agent, _: *Realm, _: *Object) std.mem.Allocator.Error!void {}
     };
 }
 

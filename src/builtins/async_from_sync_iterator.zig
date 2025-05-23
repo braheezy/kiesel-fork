@@ -19,7 +19,6 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
@@ -44,7 +43,7 @@ pub fn createAsyncFromSyncIterator(
     });
 
     // 3. Let nextMethod be ! Get(asyncIterator, "next").
-    const next_method = async_iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
+    const next_method = async_iterator.get(agent, PropertyKey.from("next")) catch |err| try noexcept(err);
 
     // 4. Let iteratorRecord be the Iterator Record {
     //      [[Iterator]]: asyncIterator, [[NextMethod]]: nextMethod, [[Done]]: false
@@ -62,16 +61,16 @@ pub fn createAsyncFromSyncIterator(
 /// 27.1.6.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
-        try defineBuiltinFunction(object, "return", @"return", 0, realm);
-        try defineBuiltinFunction(object, "throw", throw, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
+        try object.defineBuiltinFunction(agent, "return", @"return", 0, realm);
+        try object.defineBuiltinFunction(agent, "throw", throw, 0, realm);
     }
 
     /// 27.1.4.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
@@ -356,13 +355,13 @@ fn asyncFromSyncIteratorContinuation(
     //    guaranteed not to throw.
 
     // 2. Let done be Completion(IteratorComplete(result)).
-    const done = Iterator.complete(result) catch |err| {
+    const done = Iterator.complete(agent, result) catch |err| {
         // 3. IfAbruptRejectPromise(done, promiseCapability).
         return promise_capability.rejectPromise(agent, err) catch |err_| try noexcept(err_);
     };
 
     // 4. Let value be Completion(IteratorValue(result)).
-    const value = Iterator.value(result) catch |err| {
+    const value = Iterator.value(agent, result) catch |err| {
         // 5. IfAbruptRejectPromise(value, promiseCapability).
         return promise_capability.rejectPromise(agent, err) catch |err_| try noexcept(err_);
     };

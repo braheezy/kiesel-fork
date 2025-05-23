@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -19,8 +18,6 @@ const String = types.String;
 const Value = types.Value;
 const advanceStringIndex = builtins.advanceStringIndex;
 const createIteratorResultObject = types.createIteratorResultObject;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const regExpExec = builtins.regExpExec;
 
 /// 22.2.9.1 CreateRegExpStringIterator ( R, S, global, fullUnicode )
@@ -64,18 +61,18 @@ pub fn createRegExpStringIterator(
 /// 22.2.9.2 The %RegExpStringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "next", next, 0, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
         // 22.2.9.2.2 %RegExpStringIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-%symbol.tostringtag%
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("RegExp String Iterator"),
             .writable = false,
             .enumerable = false,
@@ -138,18 +135,18 @@ pub const prototype = struct {
         }
 
         // 12. Let matchStr be ? ToString(? Get(match, "0")).
-        const match_str = try (try match.get(PropertyKey.from(0))).toString(agent);
+        const match_str = try (try match.get(agent, PropertyKey.from(0))).toString(agent);
 
         // 13. If matchStr is the empty String, then
         if (match_str.isEmpty()) {
             // a. Let thisIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
-            const this_index = try (try reg_exp.get(PropertyKey.from("lastIndex"))).toLength(agent);
+            const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
             // b. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
             const next_index = advanceStringIndex(string, this_index, full_unicode);
 
             // c. Perform ? Set(R, "lastIndex", 𝔽(nextIndex), true).
-            try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+            try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
         }
 
         // 14. Return CreateIteratorResultObject(match, false).

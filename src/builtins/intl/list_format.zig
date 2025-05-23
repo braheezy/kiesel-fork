@@ -9,7 +9,6 @@ const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -22,8 +21,6 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -32,9 +29,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 14.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(
-            realm.agent,
+            agent,
             .{ .constructor = impl },
             0,
             "ListFormat",
@@ -42,10 +39,10 @@ pub const constructor = struct {
         );
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 14.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat.prototype%"()),
             .writable = false,
             .enumerable = false,
@@ -172,27 +169,27 @@ pub const constructor = struct {
 /// 14.3 Properties of the Intl.ListFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
-        try defineBuiltinFunction(object, "format", format, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
+        try object.defineBuiltinFunction(agent, "format", format, 1, realm);
 
         // 14.3.1 Intl.ListFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.constructor
-        try defineBuiltinProperty(
-            object,
+        try object.defineBuiltinProperty(
+            agent,
             "constructor",
             Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
         );
 
         // 14.3.5 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.ListFormat"),
             .writable = false,
             .enumerable = false,
@@ -222,14 +219,17 @@ pub const prototype = struct {
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = list_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("locale"),
             Value.from(try String.fromAscii(agent, try list_format.fields.locale.toString(agent.gc_allocator))),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("type"),
             Value.from(resolved_options.type),
         );
         try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("style"),
             Value.from(resolved_options.style),
         );

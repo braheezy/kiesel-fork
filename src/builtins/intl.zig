@@ -9,7 +9,6 @@ const abstract_operations = @import("intl/abstract_operations.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -23,8 +22,6 @@ const availableCanonicalNumberingSystems = abstract_operations.availableCanonica
 const availableCanonicalUnits = abstract_operations.availableCanonicalUnits;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
-const defineBuiltinFunction = utils.defineBuiltinFunction;
-const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 comptime {
     const build_options = @import("build-options");
@@ -59,19 +56,19 @@ pub const createSegmentsObject = segments.createSegmentsObject;
 pub const findBoundary = segmenter.findBoundary;
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(realm.agent, .{
+    pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
+        return builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
-        try defineBuiltinFunction(object, "supportedValuesOf", supportedValuesOf, 1, realm);
+    pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "getCanonicalLocales", getCanonicalLocales, 1, realm);
+        try object.defineBuiltinFunction(agent, "supportedValuesOf", supportedValuesOf, 1, realm);
 
         // 8.1.1 Intl [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl-toStringTag
-        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl"),
             .writable = false,
             .enumerable = false,
@@ -80,7 +77,7 @@ pub const namespace = struct {
 
         // 8.2.1 Intl.Collator ( . . . )
         // https://tc39.es/ecma402/#sec-intl.collator-intro
-        try defineBuiltinProperty(object, "Collator", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "Collator", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
             .writable = true,
             .enumerable = false,
@@ -89,7 +86,7 @@ pub const namespace = struct {
 
         // 8.2.2 Intl.DateTimeFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.datetimeformat-intro
-        try defineBuiltinProperty(object, "DateTimeFormat", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "DateTimeFormat", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
             .writable = true,
             .enumerable = false,
@@ -98,7 +95,7 @@ pub const namespace = struct {
 
         // 8.2.3 Intl.DisplayNames ( . . . )
         // https://tc39.es/ecma402/#sec-intl.displaynames-intro
-        try defineBuiltinProperty(object, "DisplayNames", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "DisplayNames", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
             .writable = true,
             .enumerable = false,
@@ -107,7 +104,7 @@ pub const namespace = struct {
 
         // 8.2.4 Intl.DurationFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.durationformat-intro
-        try defineBuiltinProperty(object, "DurationFormat", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "DurationFormat", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
             .writable = true,
             .enumerable = false,
@@ -116,7 +113,7 @@ pub const namespace = struct {
 
         // 8.2.5 Intl.ListFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.listformat-intro
-        try defineBuiltinProperty(object, "ListFormat", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "ListFormat", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
             .writable = true,
             .enumerable = false,
@@ -125,7 +122,7 @@ pub const namespace = struct {
 
         // 8.2.6 Intl.Locale ( . . . )
         // https://tc39.es/ecma402/#sec-intl.locale-intro
-        try defineBuiltinProperty(object, "Locale", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "Locale", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
             .writable = true,
             .enumerable = false,
@@ -134,7 +131,7 @@ pub const namespace = struct {
 
         // 8.2.8 Intl.PluralRules ( . . . )
         // https://tc39.es/ecma402/#sec-intl.pluralrules-intro
-        try defineBuiltinProperty(object, "PluralRules", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "PluralRules", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
             .writable = true,
             .enumerable = false,
@@ -143,7 +140,7 @@ pub const namespace = struct {
 
         // 8.2.10 Intl.Segmenter ( . . . )
         // https://tc39.es/ecma402/#sec-intl.segmenter-intro
-        try defineBuiltinProperty(object, "Segmenter", PropertyDescriptor{
+        try object.defineBuiltinProperty(agent, "Segmenter", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
             .writable = true,
             .enumerable = false,
