@@ -108,10 +108,10 @@ pub const constructor = struct {
             agent,
             PropertyKey.from("errors"),
             .{
-                .configurable = true,
-                .enumerable = false,
-                .writable = true,
-                .value = Value.from(try createArrayFromList(agent, errors_list)),
+                .value_or_accessor = .{
+                    .value = Value.from(try createArrayFromList(agent, errors_list)),
+                },
+                .attributes = .builtin_default,
             },
         );
 

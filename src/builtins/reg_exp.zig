@@ -142,9 +142,14 @@ pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
     //      [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     try object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
-        .writable = true,
-        .enumerable = false,
-        .configurable = false,
+        .value_or_accessor = .{
+            .value = .undefined,
+        },
+        .attributes = .{
+            .writable = true,
+            .enumerable = false,
+            .configurable = false,
+        },
     });
 
     // 3. Return obj.

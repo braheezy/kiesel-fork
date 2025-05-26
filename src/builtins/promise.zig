@@ -1228,10 +1228,10 @@ fn performPromiseAny(
                 //      [[Value]]: CreateArrayFromList(errors)
                 //    }).
                 try error_.definePropertyDirect(agent, PropertyKey.from("errors"), .{
-                    .configurable = true,
-                    .enumerable = false,
-                    .writable = true,
-                    .value = Value.from(try createArrayFromList(agent, errors.items)),
+                    .value_or_accessor = .{
+                        .value = Value.from(try createArrayFromList(agent, errors.items)),
+                    },
+                    .attributes = .builtin_default,
                 });
 
                 // 3. Return ThrowCompletion(error).
@@ -1324,10 +1324,10 @@ fn performPromiseAny(
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
                     try error_.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
-                        .configurable = true,
-                        .enumerable = false,
-                        .writable = true,
-                        .value = Value.from(try createArrayFromList(agent_, errors_.items)),
+                        .value_or_accessor = .{
+                            .value = Value.from(try createArrayFromList(agent_, errors_.items)),
+                        },
+                        .attributes = .builtin_default,
                     });
 
                     // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).

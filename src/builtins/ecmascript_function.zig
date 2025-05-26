@@ -909,11 +909,14 @@ pub fn addRestrictedFunctionProperties(
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
 
-    const property_descriptor: PropertyDescriptor = .{
-        .get = thrower,
-        .set = thrower,
-        .enumerable = false,
-        .configurable = true,
+    const property_descriptor: Object.PropertyStorage.CompletePropertyDescriptor = .{
+        .value_or_accessor = .{
+            .accessor = .{
+                .get = thrower,
+                .set = thrower,
+            },
+        },
+        .attributes = .builtin_default,
     };
 
     // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor {
@@ -988,10 +991,14 @@ pub fn makeConstructor(
         //      [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: true
         //    }).
         try prototype.definePropertyDirect(agent, PropertyKey.from("constructor"), .{
-            .value = Value.from(function),
-            .writable = args.writable_prototype,
-            .enumerable = false,
-            .configurable = true,
+            .value_or_accessor = .{
+                .value = Value.from(function),
+            },
+            .attributes = .{
+                .writable = args.writable_prototype,
+                .enumerable = false,
+                .configurable = true,
+            },
         });
 
         break :blk prototype;
@@ -1001,10 +1008,14 @@ pub fn makeConstructor(
     //      [[Value]]: prototype, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-        .value = Value.from(prototype),
-        .writable = args.writable_prototype,
-        .enumerable = false,
-        .configurable = false,
+        .value_or_accessor = .{
+            .value = Value.from(prototype),
+        },
+        .attributes = .{
+            .writable = args.writable_prototype,
+            .enumerable = false,
+            .configurable = false,
+        },
     });
 
     // 7. Return unused.
@@ -1146,10 +1157,14 @@ pub fn setFunctionName(
     //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try function.definePropertyDirect(agent, PropertyKey.from("name"), .{
-        .value = Value.from(name),
-        .writable = false,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(name),
+        },
+        .attributes = .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        },
     });
 
     // 7. Return unused.
@@ -1172,10 +1187,14 @@ pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try function.definePropertyDirect(agent, PropertyKey.from("length"), .{
-        .value = Value.from(length),
-        .writable = false,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(length),
+        },
+        .attributes = .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        },
     });
 
     // 3. Return unused.

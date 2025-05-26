@@ -391,10 +391,14 @@ pub fn createDynamicFunction(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype_),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
+                .value_or_accessor = .{
+                    .value = Value.from(prototype_),
+                },
+                .attributes = .{
+                    .writable = true,
+                    .enumerable = false,
+                    .configurable = false,
+                },
             });
         },
 
@@ -410,10 +414,14 @@ pub fn createDynamicFunction(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype_),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
+                .value_or_accessor = .{
+                    .value = Value.from(prototype_),
+                },
+                .attributes = .{
+                    .writable = true,
+                    .enumerable = false,
+                    .configurable = false,
+                },
             });
         },
 

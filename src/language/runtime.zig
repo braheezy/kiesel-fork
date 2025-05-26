@@ -129,10 +129,14 @@ pub fn getTemplateObject(
         //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
         try template.definePropertyDirect(agent, property_key, .{
-            .value = Value.from(cooked_value),
-            .writable = false,
-            .enumerable = true,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(cooked_value),
+            },
+            .attributes = .{
+                .writable = false,
+                .enumerable = true,
+                .configurable = false,
+            },
         });
 
         // d. Let rawValue be the String value rawStrings[index].
@@ -142,10 +146,14 @@ pub fn getTemplateObject(
         //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
         try raw_obj.definePropertyDirect(agent, property_key, .{
-            .value = Value.from(raw_value),
-            .writable = false,
-            .enumerable = true,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(raw_value),
+            },
+            .attributes = .{
+                .writable = false,
+                .enumerable = true,
+                .configurable = false,
+            },
         });
 
         // f. Set index to index + 1.
@@ -158,10 +166,10 @@ pub fn getTemplateObject(
     //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //     }).
     try template.definePropertyDirect(agent, PropertyKey.from("raw"), .{
-        .value = Value.from(raw_obj),
-        .writable = false,
-        .enumerable = false,
-        .configurable = false,
+        .value_or_accessor = .{
+            .value = Value.from(raw_obj),
+        },
+        .attributes = .none,
     });
 
     // 15. Perform ! SetIntegrityLevel(template, frozen).
@@ -1153,10 +1161,14 @@ pub fn methodDefinitionEvaluation(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
+                .value_or_accessor = .{
+                    .value = Value.from(prototype),
+                },
+                .attributes = .{
+                    .writable = true,
+                    .enumerable = false,
+                    .configurable = false,
+                },
             });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
@@ -1217,10 +1229,14 @@ pub fn methodDefinitionEvaluation(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
+                .value_or_accessor = .{
+                    .value = Value.from(prototype),
+                },
+                .attributes = .{
+                    .writable = true,
+                    .enumerable = false,
+                    .configurable = false,
+                },
             });
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
@@ -1327,10 +1343,14 @@ pub fn instantiateGeneratorFunctionObject(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 7. Return F.
@@ -1369,10 +1389,14 @@ pub fn instantiateGeneratorFunctionObject(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 6. Return F.
@@ -1438,10 +1462,14 @@ pub fn instantiateGeneratorFunctionExpression(
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
         try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
@@ -1493,10 +1521,14 @@ pub fn instantiateGeneratorFunctionExpression(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 9. Return closure.
@@ -1548,10 +1580,14 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 7. Return F.
@@ -1589,10 +1625,14 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 6. Return F.
@@ -1658,10 +1698,14 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
         try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
@@ -1713,10 +1757,14 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
+            .value_or_accessor = .{
+                .value = Value.from(prototype),
+            },
+            .attributes = .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
         });
 
         // 9. Return closure.

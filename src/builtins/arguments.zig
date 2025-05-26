@@ -237,10 +237,10 @@ pub fn createUnmappedArgumentsObject(
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
-        .value = Value.from(@as(u53, @intCast(len))),
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(@as(u53, @intCast(len))),
+        },
+        .attributes = .builtin_default,
     });
 
     // 5. Let index be 0.
@@ -261,20 +261,23 @@ pub fn createUnmappedArgumentsObject(
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
     try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
-        .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
+        },
+        .attributes = .builtin_default,
     });
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
-        .get = try realm.intrinsics.@"%ThrowTypeError%"(),
-        .set = try realm.intrinsics.@"%ThrowTypeError%"(),
-        .enumerable = false,
-        .configurable = false,
+        .value_or_accessor = .{
+            .accessor = .{
+                .get = try realm.intrinsics.@"%ThrowTypeError%"(),
+                .set = try realm.intrinsics.@"%ThrowTypeError%"(),
+            },
+        },
+        .attributes = .none,
     });
 
     // 9. Return obj.
@@ -358,10 +361,10 @@ pub fn createMappedArgumentsObject(
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
     try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
-        .value = Value.from(@as(u53, @intCast(len))),
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(@as(u53, @intCast(len))),
+        },
+        .attributes = .builtin_default,
     });
 
     // 17. Let mappedNames be a new empty List.
@@ -416,20 +419,20 @@ pub fn createMappedArgumentsObject(
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
     try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
-        .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
+        },
+        .attributes = .builtin_default,
     });
 
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
     try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
-        .value = Value.from(function),
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+        .value_or_accessor = .{
+            .value = Value.from(function),
+        },
+        .attributes = .builtin_default,
     });
 
     // 22. Return obj.

@@ -453,10 +453,10 @@ pub fn stringCreate(
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     try string.definePropertyDirect(agent, PropertyKey.from("length"), .{
-        .value = Value.from(@as(u53, @intCast(length))),
-        .writable = false,
-        .enumerable = false,
-        .configurable = false,
+        .value_or_accessor = .{
+            .value = Value.from(@as(u53, @intCast(length))),
+        },
+        .attributes = .none,
     });
 
     // 9. Return S.

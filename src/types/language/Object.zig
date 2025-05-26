@@ -220,7 +220,7 @@ pub fn definePropertyDirect(
     self: *Object,
     agent: *Agent,
     property_key: PropertyKey,
-    property_descriptor: PropertyDescriptor,
+    property_descriptor: PropertyStorage.CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
     if (self.internal_methods.defineOwnProperty == &builtins.ordinary.internal_methods.defineOwnProperty and
         self.internal_methods.getOwnProperty == &builtins.ordinary.internal_methods.getOwnProperty and
@@ -229,14 +229,14 @@ pub fn definePropertyDirect(
         try self.property_storage.set(
             agent.gc_allocator,
             property_key,
-            .fromPropertyDescriptor(property_descriptor),
+            property_descriptor,
         );
     } else {
         const result = self.internal_methods.defineOwnProperty(
             agent,
             self,
             property_key,
-            property_descriptor,
+            property_descriptor.toPropertyDescriptor(),
         ) catch |err| try noexcept(err);
         std.debug.assert(result);
     }
@@ -592,11 +592,11 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     // 2. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }.
-    const new_descriptor: PropertyDescriptor = .{
-        .value = value,
-        .writable = true,
-        .enumerable = false,
-        .configurable = true,
+    const new_descriptor: PropertyStorage.CompletePropertyDescriptor = .{
+        .value_or_accessor = .{
+            .value = value,
+        },
+        .attributes = .builtin_default,
     };
 
     // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
