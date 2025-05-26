@@ -71,12 +71,6 @@ pub const Attributes = packed struct(u3) {
         .configurable = true,
     };
 
-    pub fn eql(a: Attributes, b: Attributes) bool {
-        return a.writable == b.writable and
-            a.enumerable == b.enumerable and
-            a.configurable == b.configurable;
-    }
-
     pub fn fromPropertyDescriptor(property_descriptor: PropertyDescriptor) Attributes {
         return .{
             .writable = property_descriptor.writable orelse false,
@@ -212,7 +206,7 @@ pub fn set(
     const value_or_accessor = property_descriptor.value_or_accessor;
     const attributes = property_descriptor.attributes;
     if (self.shape.properties.get(property_key)) |property_metadata| {
-        const property_attributes_change = !property_metadata.attributes.eql(attributes);
+        const property_attributes_change = property_metadata.attributes != attributes;
         const property_type_change = std.meta.activeTag(property_metadata.index) != std.meta.activeTag(value_or_accessor);
         if (property_attributes_change or property_type_change) {
             self.shape = try self.shape.setProperty(

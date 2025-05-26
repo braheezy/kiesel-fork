@@ -44,7 +44,7 @@ pub const Transition = union(enum) {
             .set_prototype => return a.set_prototype == b.set_prototype,
             .set_non_extensible, .set_is_htmldda => true,
             .set_property => a.set_property[0].eql(b.set_property[0]) and
-                a.set_property[1].eql(b.set_property[1]),
+                a.set_property[1] == b.set_property[1],
             .delete_property => a.delete_property.eql(b.delete_property),
         };
     }
