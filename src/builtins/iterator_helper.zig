@@ -12,7 +12,6 @@ const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
@@ -33,12 +32,16 @@ pub const prototype = struct {
 
         // 27.1.2.1.3 %IteratorHelperPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%iteratorhelperprototype%-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Iterator Helper"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Iterator Helper"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 27.1.2.1.1 %IteratorHelperPrototype%.next ( )

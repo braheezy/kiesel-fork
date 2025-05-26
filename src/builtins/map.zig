@@ -12,7 +12,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -93,12 +92,12 @@ pub const constructor = struct {
 
         // 24.1.2.2 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Map.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Map.prototype%"()),
+            .none,
+        );
     }
 
     /// 24.1.1.1 Map ( [ iterable ] )
@@ -214,12 +213,16 @@ pub const prototype = struct {
 
         // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Map"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Map"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 24.1.3.1 Map.prototype.clear ( )

@@ -13,7 +13,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -37,12 +36,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 24.3.2.1 WeakMap.prototype
         // https://tc39.es/ecma262/#sec-weakmap.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%WeakMap.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%WeakMap.prototype%"()),
+            .none,
+        );
     }
 
     /// 24.3.1.1 WeakMap ( [ iterable ] )
@@ -118,12 +117,16 @@ pub const prototype = struct {
 
         // 24.3.3.6 WeakMap.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weakmap.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("WeakMap"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("WeakMap"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 24.3.3.2 WeakMap.prototype.delete ( key )

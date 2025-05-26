@@ -10,7 +10,6 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -33,22 +32,22 @@ pub const function = struct {
         // The "length" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
         // }.
-        try object.defineBuiltinProperty(agent, "length", PropertyDescriptor{
-            .value = Value.from(0),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "length",
+            Value.from(0),
+            .none,
+        );
 
         // The "name" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
         // }.
-        try object.defineBuiltinProperty(agent, "name", PropertyDescriptor{
-            .value = Value.from(""),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "name",
+            Value.from(""),
+            .none,
+        );
     }
 
     fn impl(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {

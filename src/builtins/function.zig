@@ -17,7 +17,6 @@ const Diagnostics = language.Diagnostics;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Parser = @import("../language/Parser.zig");
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -55,12 +54,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.2.2.1 Function.prototype
         // https://tc39.es/ecma262/#sec-function.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(realm.intrinsics.@"%Function.prototype%"() catch unreachable),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(realm.intrinsics.@"%Function.prototype%"() catch unreachable),
+            .none,
+        );
     }
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
@@ -451,11 +450,14 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "bind", bind, 1, realm);
         try object.defineBuiltinFunction(agent, "call", call, 1, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
-        try object.defineBuiltinFunctionWithAttributes(agent, "%Symbol.hasInstance%", @"%Symbol.hasInstance%", 1, realm, .{
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinFunctionWithAttributes(
+            agent,
+            "%Symbol.hasInstance%",
+            @"%Symbol.hasInstance%",
+            1,
+            realm,
+            .none,
+        );
 
         // 20.2.3.4 Function.prototype.constructor
         // https://tc39.es/ecma262/#sec-function.prototype.constructor

@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Number = types.Number;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const getIterator = types.getIterator;
@@ -28,84 +27,88 @@ pub const namespace = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.3.1.1 Math.E
         // https://tc39.es/ecma262/#sec-math.e
-        try object.defineBuiltinProperty(agent, "E", PropertyDescriptor{
-            .value = Value.from(std.math.e),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "E",
+            Value.from(std.math.e),
+            .none,
+        );
 
         // 21.3.1.2 Math.LN10
         // https://tc39.es/ecma262/#sec-math.ln10
-        try object.defineBuiltinProperty(agent, "LN10", PropertyDescriptor{
-            .value = Value.from(std.math.ln10),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "LN10",
+            Value.from(std.math.ln10),
+            .none,
+        );
 
         // 21.3.1.2 Math.LN2
         // https://tc39.es/ecma262/#sec-math.ln2
-        try object.defineBuiltinProperty(agent, "LN2", PropertyDescriptor{
-            .value = Value.from(std.math.ln2),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "LN2",
+            Value.from(std.math.ln2),
+            .none,
+        );
 
         // 21.3.1.4 Math.LOG10E
         // https://tc39.es/ecma262/#sec-math.log10e
-        try object.defineBuiltinProperty(agent, "LOG10E", PropertyDescriptor{
-            .value = Value.from(std.math.log10e),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "LOG10E",
+            Value.from(std.math.log10e),
+            .none,
+        );
 
         // 21.3.1.5 Math.LOG2E
         // https://tc39.es/ecma262/#sec-math.log2e
-        try object.defineBuiltinProperty(agent, "LOG2E", PropertyDescriptor{
-            .value = Value.from(std.math.log2e),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "LOG2E",
+            Value.from(std.math.log2e),
+            .none,
+        );
 
         // 21.3.1.6 Math.PI
         // https://tc39.es/ecma262/#sec-math.pi
-        try object.defineBuiltinProperty(agent, "PI", PropertyDescriptor{
-            .value = Value.from(std.math.pi),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "PI",
+            Value.from(std.math.pi),
+            .none,
+        );
 
         // 21.3.1.7 Math.SQRT1_2
         // https://tc39.es/ecma262/#sec-math.sqrt1_2
-        try object.defineBuiltinProperty(agent, "SQRT1_2", PropertyDescriptor{
-            .value = Value.from(std.math.sqrt1_2),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "SQRT1_2",
+            Value.from(std.math.sqrt1_2),
+            .none,
+        );
 
         // 21.3.1.8 Math.SQRT2
         // https://tc39.es/ecma262/#sec-math.sqrt2
-        try object.defineBuiltinProperty(agent, "SQRT2", PropertyDescriptor{
-            .value = Value.from(std.math.sqrt2),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "SQRT2",
+            Value.from(std.math.sqrt2),
+            .none,
+        );
 
         // 21.3.1.9 Math [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-math-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Math"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Math"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         try object.defineBuiltinFunction(agent, "abs", abs, 1, realm);
         try object.defineBuiltinFunction(agent, "acos", acos, 1, realm);

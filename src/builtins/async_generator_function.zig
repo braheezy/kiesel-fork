@@ -10,7 +10,6 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -32,12 +31,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.4.2.1 AsyncGeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
+            .none,
+        );
     }
 
     /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
@@ -76,29 +75,41 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.4.3.1 AsyncGeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-constructor
-        try object.defineBuiltinProperty(agent, "constructor", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction%"()),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 27.4.3.2 AsyncGeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorPrototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%AsyncGeneratorPrototype%"()),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 27.4.3.3 AsyncGeneratorFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-tostringtag
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("AsyncGeneratorFunction"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("AsyncGeneratorFunction"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 };

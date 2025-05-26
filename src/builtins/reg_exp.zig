@@ -16,7 +16,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -697,12 +696,12 @@ pub const constructor = struct {
 
         // 22.2.5.2 RegExp.prototype
         // https://tc39.es/ecma262/#sec-regexp.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%RegExp.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%RegExp.prototype%"()),
+            .none,
+        );
     }
 
     /// 22.2.4.1 RegExp ( pattern, flags )

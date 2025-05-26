@@ -14,7 +14,6 @@ const DataBlock = types.DataBlock;
 const ElementType = builtins.typed_array.ElementType;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -623,12 +622,12 @@ pub const constructor = struct {
 
         // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%ArrayBuffer.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%ArrayBuffer.prototype%"()),
+            .none,
+        );
     }
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
@@ -713,12 +712,16 @@ pub const prototype = struct {
 
         // 25.1.6.7 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("ArrayBuffer"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("ArrayBuffer"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 25.1.6.1 get ArrayBuffer.prototype.byteLength

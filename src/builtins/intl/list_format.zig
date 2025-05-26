@@ -14,7 +14,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -42,12 +41,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 14.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.ListFormat.prototype%"()),
+            .none,
+        );
     }
 
     /// 14.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
@@ -189,12 +188,16 @@ pub const prototype = struct {
 
         // 14.3.5 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.ListFormat"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.ListFormat"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 14.3.2 Intl.ListFormat.prototype.resolvedOptions ( )

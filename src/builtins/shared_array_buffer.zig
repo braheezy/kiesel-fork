@@ -13,7 +13,6 @@ const ArrayBufferLike = builtins.array_buffer.ArrayBufferLike;
 const DataBlock = types.DataBlock;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
@@ -118,12 +117,12 @@ pub const constructor = struct {
 
         // 25.2.4.1 SharedArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%SharedArrayBuffer.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%SharedArrayBuffer.prototype%"()),
+            .none,
+        );
     }
 
     /// 25.2.3.1 SharedArrayBuffer ( length [ , options ] )
@@ -192,12 +191,16 @@ pub const prototype = struct {
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("SharedArrayBuffer"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("SharedArrayBuffer"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 25.2.5.1 get SharedArrayBuffer.prototype.byteLength

@@ -15,7 +15,6 @@ const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -1563,12 +1562,12 @@ pub const constructor = struct {
 
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Promise.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Promise.prototype%"()),
+            .none,
+        );
     }
 
     /// 27.2.3.1 Promise ( executor )
@@ -1988,12 +1987,16 @@ pub const prototype = struct {
 
         // 27.2.5.5 Promise.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Promise"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Promise"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 27.2.5.1 Promise.prototype.catch ( onRejected )

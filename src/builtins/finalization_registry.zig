@@ -14,7 +14,6 @@ const Arguments = types.Arguments;
 const JobCallback = execution.JobCallback;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -37,12 +36,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 26.2.2.1 FinalizationRegistry.prototype
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%FinalizationRegistry.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%FinalizationRegistry.prototype%"()),
+            .none,
+        );
     }
 
     /// 26.2.1.1 FinalizationRegistry ( cleanupCallback )
@@ -114,12 +113,16 @@ pub const prototype = struct {
 
         // 26.2.3.4 FinalizationRegistry.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("FinalizationRegistry"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("FinalizationRegistry"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 26.2.3.2 FinalizationRegistry.prototype.register ( target, heldValue [ , unregisterToken ] )

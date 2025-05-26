@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -66,12 +65,16 @@ pub const prototype = struct {
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Array Iterator"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Array Iterator"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 23.1.5.2.1 %ArrayIteratorPrototype%.next ( )

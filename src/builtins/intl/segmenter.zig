@@ -14,7 +14,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -42,12 +41,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 19.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.Segmenter.prototype%"()),
+            .none,
+        );
     }
 
     /// 19.1.1 Intl.Segmenter ( [ locales [ , options ] ] )
@@ -156,12 +155,16 @@ pub const prototype = struct {
 
         // 19.3.4 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.Segmenter"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.Segmenter"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 19.3.2 Intl.Segmenter.prototype.resolvedOptions ( )

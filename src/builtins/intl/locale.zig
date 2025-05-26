@@ -15,7 +15,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -160,12 +159,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 15.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.Locale.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.Locale.prototype%"()),
+            .none,
+        );
     }
 
     /// 15.1.1 Intl.Locale ( tag [ , options ] )
@@ -389,12 +388,16 @@ pub const prototype = struct {
 
         // 15.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.Locale"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.Locale"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 15.3.2 get Intl.Locale.prototype.baseName

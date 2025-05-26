@@ -734,12 +734,12 @@ pub const constructor = struct {
 
         // 23.2.2.3 %TypedArray%.prototype
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%TypedArray.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%TypedArray.prototype%"()),
+            .none,
+        );
     }
 
     /// 23.2.1.1 %TypedArray% ( )
@@ -3943,21 +3943,21 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.bytes_per_element
-            try object.defineBuiltinProperty(agent, "BYTES_PER_ELEMENT", PropertyDescriptor{
-                .value = Value.from(element_type.elementSize()),
-                .writable = false,
-                .enumerable = false,
-                .configurable = false,
-            });
+            try object.defineBuiltinPropertyWithAttributes(
+                agent,
+                "BYTES_PER_ELEMENT",
+                Value.from(element_type.elementSize()),
+                .none,
+            );
 
             // 23.2.6.2 TypedArray.prototype
             // https://tc39.es/ecma262/#sec-typedarray.prototype
-            try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-                .value = Value.from(try prototypeFn(&realm.intrinsics)),
-                .writable = false,
-                .enumerable = false,
-                .configurable = false,
-            });
+            try object.defineBuiltinPropertyWithAttributes(
+                agent,
+                "prototype",
+                Value.from(try prototypeFn(&realm.intrinsics)),
+                .none,
+            );
 
             if (element_type == .uint8) {
                 try object.defineBuiltinFunction(agent, "fromBase64", fromBase64, 1, realm);
@@ -4243,12 +4243,12 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
-            try object.defineBuiltinProperty(agent, "BYTES_PER_ELEMENT", PropertyDescriptor{
-                .value = Value.from(element_type.elementSize()),
-                .writable = false,
-                .enumerable = false,
-                .configurable = false,
-            });
+            try object.defineBuiltinPropertyWithAttributes(
+                agent,
+                "BYTES_PER_ELEMENT",
+                Value.from(element_type.elementSize()),
+                .none,
+            );
 
             const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
 

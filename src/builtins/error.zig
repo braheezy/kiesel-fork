@@ -12,7 +12,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -39,12 +38,12 @@ pub const constructor = struct {
 
         // 20.5.2.2 Error.prototype
         // https://tc39.es/ecma262/#sec-error.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Error.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Error.prototype%"()),
+            .none,
+        );
     }
 
     /// 20.5.1.1 Error ( message [ , options ] )
@@ -283,12 +282,12 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
             // 20.5.6.2.1 NativeError.prototype
             // https://tc39.es/ecma262/#sec-nativeerror.prototype
-            try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-                .value = Value.from(try prototypeFn(&realm.intrinsics)),
-                .writable = false,
-                .enumerable = false,
-                .configurable = false,
-            });
+            try object.defineBuiltinPropertyWithAttributes(
+                agent,
+                "prototype",
+                Value.from(try prototypeFn(&realm.intrinsics)),
+                .none,
+            );
         }
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )

@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Set = builtins.Set;
 const Value = types.Value;
@@ -54,12 +53,16 @@ pub const prototype = struct {
 
         // 24.2.5.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%setiteratorprototype%-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Set Iterator"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Set Iterator"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 24.2.5.2.1 %SetIteratorPrototype%.next ( )

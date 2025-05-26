@@ -12,7 +12,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -166,12 +165,12 @@ pub const constructor = struct {
 
         // 24.2.3.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Set.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Set.prototype%"()),
+            .none,
+        );
     }
 
     /// 24.2.2.1 Set ( [ iterable ] )
@@ -277,12 +276,16 @@ pub const prototype = struct {
 
         // 24.2.4.19 Set.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-set.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Set"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Set"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 24.2.4.1 Set.prototype.add ( value )

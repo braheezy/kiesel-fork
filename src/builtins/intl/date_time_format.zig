@@ -14,7 +14,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -459,12 +458,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 11.2.1 Intl.DateTimeFormat.prototype
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat.prototype%"()),
+            .none,
+        );
     }
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
@@ -519,12 +518,16 @@ pub const prototype = struct {
 
         // 11.3.7 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.DateTimeFormat"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.DateTimeFormat"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 11.3.2 Intl.DateTimeFormat.prototype.resolvedOptions ( )

@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -39,12 +38,12 @@ pub const constructor = struct {
 
         // 27.1.3.2.2 Iterator.prototype
         // https://tc39.es/ecma262/#sec-iterator.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Iterator.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Iterator.prototype%"()),
+            .none,
+        );
     }
 
     /// 27.1.3.1.1 Iterator ( )

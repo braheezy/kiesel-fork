@@ -14,7 +14,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -43,12 +42,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 13.2.1 Intl.DurationFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.DurationFormat.prototype%"()),
+            .none,
+        );
     }
 
     /// 13.1.1 Intl.DurationFormat ( [ locales [ , options ] ] )
@@ -413,12 +412,16 @@ pub const prototype = struct {
 
         // 13.3.5 Intl.DurationFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.DurationFormat"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.DurationFormat"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 13.3.2 Intl.DurationFormat.prototype.resolvedOptions ( )

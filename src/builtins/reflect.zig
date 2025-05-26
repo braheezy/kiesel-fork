@@ -10,7 +10,6 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -40,12 +39,16 @@ pub const namespace = struct {
 
         // 28.1.14 Reflect [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-reflect-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Reflect"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Reflect"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 28.1.1 Reflect.apply ( target, thisArgument, argumentsList )

@@ -318,12 +318,12 @@ pub fn moduleNamespaceCreate(
     {
         // 28.3.1 %Symbol.toStringTag%
         // https://tc39.es/ecma262/#sec-%symbol.tostringtag%
-        try namespace.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Module"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try namespace.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Module"),
+            .none,
+        );
     }
 
     // 9. Set module.[[Namespace]] to M.

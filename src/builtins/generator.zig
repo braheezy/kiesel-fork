@@ -14,7 +14,6 @@ const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
@@ -38,21 +37,29 @@ pub const prototype = struct {
 
         // 27.5.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
-        try object.defineBuiltinProperty(agent, "constructor", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%GeneratorFunction.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%GeneratorFunction.prototype%"()),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 27.5.1.5 %GeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-generator.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Generator"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Generator"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 27.5.1.2 %GeneratorPrototype%.next ( value )

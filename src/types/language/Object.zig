@@ -340,15 +340,14 @@ pub fn defineBuiltinFunction(
     comptime length: u32,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
-    const function_name = comptime getFunctionName(name);
-    const builtin_function = try createBuiltinFunction(
+    return self.defineBuiltinFunctionWithAttributes(
         agent,
-        .{ .function = function },
+        name,
+        function,
         length,
-        function_name,
-        .{ .realm = realm },
+        realm,
+        .builtin_default,
     );
-    try self.defineBuiltinProperty(agent, name, Value.from(builtin_function));
 }
 
 pub fn defineBuiltinFunctionWithAttributes(
@@ -358,11 +357,7 @@ pub fn defineBuiltinFunctionWithAttributes(
     comptime function: Behaviour.Function,
     comptime length: u32,
     realm: *Realm,
-    attributes: struct {
-        writable: bool,
-        enumerable: bool,
-        configurable: bool,
-    },
+    attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const builtin_function = try createBuiltinFunction(
@@ -372,12 +367,12 @@ pub fn defineBuiltinFunctionWithAttributes(
         function_name,
         .{ .realm = realm },
     );
-    try self.defineBuiltinProperty(agent, name, PropertyDescriptor{
-        .value = Value.from(builtin_function),
-        .writable = attributes.writable,
-        .enumerable = attributes.enumerable,
-        .configurable = attributes.configurable,
-    });
+    try self.defineBuiltinPropertyWithAttributes(
+        agent,
+        name,
+        Value.from(builtin_function),
+        attributes,
+    );
 }
 
 pub fn defineBuiltinFunctionLazy(
@@ -414,21 +409,19 @@ pub fn defineBuiltinProperty(
     self: *Object,
     agent: *Agent,
     comptime name: []const u8,
-    value_or_property_descriptor: anytype,
+    value: Value,
 ) std.mem.Allocator.Error!void {
-    const T = @TypeOf(value_or_property_descriptor);
+    return self.defineBuiltinPropertyWithAttributes(agent, name, value, .builtin_default);
+}
+
+pub fn defineBuiltinPropertyWithAttributes(
+    self: *Object,
+    agent: *Agent,
+    comptime name: []const u8,
+    value: Value,
+    attributes: Object.PropertyStorage.Attributes,
+) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
-    const value: Value, const attributes: Object.PropertyStorage.Attributes = switch (T) {
-        Value => .{
-            value_or_property_descriptor,
-            .builtin_default,
-        },
-        PropertyDescriptor => .{
-            value_or_property_descriptor.value.?,
-            .fromPropertyDescriptor(value_or_property_descriptor),
-        },
-        else => @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T)),
-    };
     self.property_storage.shape = try self.property_storage.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,

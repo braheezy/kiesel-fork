@@ -15,7 +15,6 @@ const ElementType = builtins.typed_array.ElementType;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Order = builtins.array_buffer.Order;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
@@ -297,12 +296,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.3.3.1 DataView.prototype
         // https://tc39.es/ecma262/#sec-dataview.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%DataView.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%DataView.prototype%"()),
+            .none,
+        );
     }
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
@@ -495,12 +494,16 @@ pub const prototype = struct {
 
         // 25.3.4.25 DataView.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("DataView"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("DataView"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 25.3.4.1 get DataView.prototype.buffer

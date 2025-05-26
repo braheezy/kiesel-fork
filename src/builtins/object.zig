@@ -66,12 +66,12 @@ pub const constructor = struct {
 
         // 20.1.2.21 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Object.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Object.prototype%"()),
+            .none,
+        );
     }
 
     /// 20.1.1.1 Object ( [ value ] )

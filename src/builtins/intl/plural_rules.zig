@@ -15,7 +15,6 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Number = types.Number;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -42,12 +41,12 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 17.2.1 Intl.PluralRules.prototype
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Intl.PluralRules.prototype%"()),
+            .none,
+        );
     }
 
     /// 17.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
@@ -161,12 +160,16 @@ pub const prototype = struct {
 
         // 17.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl.PluralRules"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl.PluralRules"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 17.3.2 Intl.PluralRules.prototype.resolvedOptions ( )

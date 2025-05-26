@@ -12,7 +12,6 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Number = types.Number;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -36,12 +35,12 @@ pub const constructor = struct {
 
         // 21.2.2.3 BigInt.prototype
         // https://tc39.es/ecma262/#sec-bigint.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%BigInt.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%BigInt.prototype%"()),
+            .none,
+        );
     }
 
     /// 21.2.1.1 BigInt ( value )
@@ -149,12 +148,16 @@ pub const prototype = struct {
 
         // 21.2.3.5 BigInt.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-bigint.prototype-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("BigInt"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("BigInt"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 21.2.3.4.1 ThisBigIntValue ( value )

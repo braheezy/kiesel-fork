@@ -517,12 +517,12 @@ pub const constructor = struct {
 
         // 22.1.2.3 String.prototype
         // https://tc39.es/ecma262/#sec-string.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%String.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%String.prototype%"()),
+            .none,
+        );
     }
 
     /// 22.1.1.1 String ( value )

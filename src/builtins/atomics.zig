@@ -14,7 +14,6 @@ const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const TypedArrayWithBufferWitness = builtins.typed_array.TypedArrayWithBufferWitness;
@@ -428,12 +427,16 @@ pub const namespace = struct {
 
         // 25.4.17 Atomics [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-atomics-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Atomics"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Atomics"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 25.4.4 Atomics.add ( typedArray, index, value )

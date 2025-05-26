@@ -13,7 +13,6 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -68,84 +67,80 @@ pub const namespace = struct {
 
         // 8.1.1 Intl [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl-toStringTag
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Intl"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Intl"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 8.2.1 Intl.Collator ( . . . )
         // https://tc39.es/ecma402/#sec-intl.collator-intro
-        try object.defineBuiltinProperty(agent, "Collator", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "Collator",
+            Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+        );
 
         // 8.2.2 Intl.DateTimeFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.datetimeformat-intro
-        try object.defineBuiltinProperty(agent, "DateTimeFormat", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "DateTimeFormat",
+            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
+        );
 
         // 8.2.3 Intl.DisplayNames ( . . . )
         // https://tc39.es/ecma402/#sec-intl.displaynames-intro
-        try object.defineBuiltinProperty(agent, "DisplayNames", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "DisplayNames",
+            Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
+        );
 
         // 8.2.4 Intl.DurationFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.durationformat-intro
-        try object.defineBuiltinProperty(agent, "DurationFormat", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "DurationFormat",
+            Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
+        );
 
         // 8.2.5 Intl.ListFormat ( . . . )
         // https://tc39.es/ecma402/#sec-intl.listformat-intro
-        try object.defineBuiltinProperty(agent, "ListFormat", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "ListFormat",
+            Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
+        );
 
         // 8.2.6 Intl.Locale ( . . . )
         // https://tc39.es/ecma402/#sec-intl.locale-intro
-        try object.defineBuiltinProperty(agent, "Locale", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "Locale",
+            Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+        );
 
         // 8.2.8 Intl.PluralRules ( . . . )
         // https://tc39.es/ecma402/#sec-intl.pluralrules-intro
-        try object.defineBuiltinProperty(agent, "PluralRules", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "PluralRules",
+            Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
+        );
 
         // 8.2.10 Intl.Segmenter ( . . . )
         // https://tc39.es/ecma402/#sec-intl.segmenter-intro
-        try object.defineBuiltinProperty(agent, "Segmenter", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinProperty(
+            agent,
+            "Segmenter",
+            Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
+        );
     }
 
     /// 8.3.1 Intl.getCanonicalLocales ( locales )

@@ -16,7 +16,6 @@ const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
@@ -44,21 +43,29 @@ pub const prototype = struct {
 
         // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
-        try object.defineBuiltinProperty(agent, "constructor", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 27.6.1.5 %AsyncGeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-tostringtag
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("AsyncGenerator"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("AsyncGenerator"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 27.6.1.2 %AsyncGeneratorPrototype%.next ( value )

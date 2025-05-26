@@ -12,7 +12,6 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Map = builtins.Map;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
@@ -54,12 +53,16 @@ pub const prototype = struct {
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("Map Iterator"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("Map Iterator"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
     }
 
     /// 24.1.5.2.1 %MapIteratorPrototype%.next ( )

@@ -14,7 +14,6 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PreferredType = Value.PreferredType;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -834,12 +833,12 @@ pub const constructor = struct {
 
         // 21.4.3.3 Date.prototype
         // https://tc39.es/ecma262/#sec-date.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Date.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Date.prototype%"()),
+            .none,
+        );
     }
 
     /// 21.4.2.1 Date ( ...values )
@@ -1064,11 +1063,18 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toTimeString", toTimeString, 0, realm);
         try object.defineBuiltinFunction(agent, "toUTCString", toUTCString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
-        try object.defineBuiltinFunctionWithAttributes(agent, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinFunctionWithAttributes(
+            agent,
+            "%Symbol.toPrimitive%",
+            @"%Symbol.toPrimitive%",
+            1,
+            realm,
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 21.4.4.1 Date.prototype.constructor
         // https://tc39.es/ecma262/#sec-date.prototype.constructor

@@ -12,7 +12,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -36,66 +35,66 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.1.2.1 Number.EPSILON
         // https://tc39.es/ecma262/#sec-number.epsilon
-        try object.defineBuiltinProperty(agent, "EPSILON", PropertyDescriptor{
-            .value = Value.from(std.math.floatEps(f64)),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "EPSILON",
+            Value.from(std.math.floatEps(f64)),
+            .none,
+        );
 
         // 21.1.2.6 Number.MAX_SAFE_INTEGER
         // https://tc39.es/ecma262/#sec-number.max_safe_integer
-        try object.defineBuiltinProperty(agent, "MAX_SAFE_INTEGER", PropertyDescriptor{
-            .value = Value.from(std.math.maxInt(u53)),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "MAX_SAFE_INTEGER",
+            Value.from(std.math.maxInt(u53)),
+            .none,
+        );
 
         // 21.1.2.7 Number.MAX_VALUE
         // https://tc39.es/ecma262/#sec-number.max_value
-        try object.defineBuiltinProperty(agent, "MAX_VALUE", PropertyDescriptor{
-            .value = Value.from(std.math.floatMax(f64)),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "MAX_VALUE",
+            Value.from(std.math.floatMax(f64)),
+            .none,
+        );
 
         // 21.1.2.8 Number.MIN_SAFE_INTEGER
         // https://tc39.es/ecma262/#sec-number.min_safe_integer
-        try object.defineBuiltinProperty(agent, "MIN_SAFE_INTEGER", PropertyDescriptor{
-            .value = Value.from(-@as(f64, @floatFromInt(std.math.maxInt(u53)))),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "MIN_SAFE_INTEGER",
+            Value.from(-@as(f64, @floatFromInt(std.math.maxInt(u53)))),
+            .none,
+        );
 
         // 21.1.2.8 Number.MIN_VALUE
         // https://tc39.es/ecma262/#sec-number.min_value
-        try object.defineBuiltinProperty(agent, "MIN_VALUE", PropertyDescriptor{
-            .value = Value.from(std.math.floatTrueMin(f64)),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "MIN_VALUE",
+            Value.from(std.math.floatTrueMin(f64)),
+            .none,
+        );
 
         // 21.1.2.10 Number.NaN
         // https://tc39.es/ecma262/#sec-number.nan
-        try object.defineBuiltinProperty(agent, "NaN", PropertyDescriptor{
-            .value = .nan,
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "NaN",
+            .nan,
+            .none,
+        );
 
         // 21.1.2.11 Number.NEGATIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.negative_infinity
-        try object.defineBuiltinProperty(agent, "NEGATIVE_INFINITY", PropertyDescriptor{
-            .value = .negative_infinity,
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "NEGATIVE_INFINITY",
+            .negative_infinity,
+            .none,
+        );
 
         // 21.1.2.12 Number.parseFloat ( string )
         // https://tc39.es/ecma262/#sec-number.parsefloat
@@ -111,12 +110,12 @@ pub const constructor = struct {
 
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
-        try object.defineBuiltinProperty(agent, "POSITIVE_INFINITY", PropertyDescriptor{
-            .value = .infinity,
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "POSITIVE_INFINITY",
+            .infinity,
+            .none,
+        );
 
         try object.defineBuiltinFunction(agent, "isFinite", isFinite, 1, realm);
         try object.defineBuiltinFunction(agent, "isInteger", isInteger, 1, realm);
@@ -125,12 +124,12 @@ pub const constructor = struct {
 
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Number.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Number.prototype%"()),
+            .none,
+        );
     }
 
     /// 21.1.1.1 Number ( value )

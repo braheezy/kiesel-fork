@@ -11,7 +11,6 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
@@ -623,12 +622,16 @@ pub const namespace = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.5.3 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
-        try object.defineBuiltinProperty(agent, "%Symbol.toStringTag%", PropertyDescriptor{
-            .value = Value.from("JSON"),
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.toStringTag%",
+            Value.from("JSON"),
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         try object.defineBuiltinFunction(agent, "parse", parse, 2, realm);
         try object.defineBuiltinFunction(agent, "stringify", stringify, 3, realm);

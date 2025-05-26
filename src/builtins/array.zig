@@ -403,12 +403,12 @@ pub const constructor = struct {
 
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
-        try object.defineBuiltinProperty(agent, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Array.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "prototype",
+            Value.from(try realm.intrinsics.@"%Array.prototype%"()),
+            .none,
+        );
     }
 
     /// 23.1.1.1 Array ( ...values )
@@ -1065,8 +1065,10 @@ pub const prototype = struct {
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%
-        try object.defineBuiltinProperty(agent, "%Symbol.unscopables%", PropertyDescriptor{
-            .value = blk: {
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "%Symbol.unscopables%",
+            blk: {
                 // 1. Let unscopableList be OrdinaryObjectCreate(null).
                 const unscopable_list = try ordinaryObjectCreate(agent, null);
 
@@ -1101,10 +1103,12 @@ pub const prototype = struct {
                 // 18. Return unscopableList.
                 break :blk Value.from(unscopable_list);
             },
-            .writable = false,
-            .enumerable = false,
-            .configurable = true,
-        });
+            .{
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // Ensure function intrinsics are set right after the object is created
         _ = try realm.intrinsics.@"%Array.prototype.toString%"();
