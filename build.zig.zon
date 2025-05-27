@@ -2,7 +2,7 @@
     .name = .kiesel,
     .version = "0.1.0",
     .fingerprint = 0x411228af4a775b43,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .any_pointer = .{
             .url = "https://github.com/ikskuh/any-pointer/archive/68132fe118ec6b84b3a0d526d16b9b4610edf64f.tar.gz",
