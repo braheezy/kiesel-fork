@@ -16,6 +16,9 @@ const REPRL_DWFD = coverage.REPRL_DWFD;
 const REPRL_MAX_DATA_SIZE = coverage.REPRL_MAX_DATA_SIZE;
 const __sanitizer_cov_reset_edgeguards = coverage.__sanitizer_cov_reset_edgeguards;
 
+// Usually provided by libFuzzer: https://github.com/llvm/llvm-project/blob/909212feecc197e469384924554087125ef1b7ea/compiler-rt/lib/fuzzer/FuzzerTracePC.cpp#L28
+export threadlocal var __sancov_lowest_stack: usize = 0;
+
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#adding-custom-fuzzilli-javascript-builtin
 fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // Don't throw as the fuzzed code itself might call this function

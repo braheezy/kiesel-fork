@@ -17,6 +17,7 @@ const shmem_data = extern struct {
     num_edges: u32,
 
     pub fn edges(self: *shmem_data) [*]u8 {
+        @disableInstrumentation();
         return @ptrFromInt(@intFromPtr(self) + 4);
     }
 };
@@ -26,6 +27,7 @@ var __edges_start: ?[*]u32 = null;
 var __edges_stop: ?[*]u32 = null;
 
 pub fn __sanitizer_cov_reset_edgeguards() void {
+    @disableInstrumentation();
     var N: u32 = 0;
     var x = __edges_start.?;
     while (@intFromPtr(x) < @intFromPtr(__edges_stop.?) and N < MAX_EDGES) : (x += 1) {
@@ -35,6 +37,7 @@ pub fn __sanitizer_cov_reset_edgeguards() void {
 }
 
 export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void {
+    @disableInstrumentation();
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
 
@@ -93,6 +96,7 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
 }
 
 export fn __sanitizer_cov_trace_pc_guard(guard: *u32) void {
+    @disableInstrumentation();
     // There's a small race condition here: if this function executes in two threads for the same
     // edge at the same time, the first thread might disable the edge (by setting the guard to zero)
     // before the second thread fetches the guard value (and thus the index). However, our
