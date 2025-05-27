@@ -10,7 +10,6 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const Arguments_ = types.Arguments;
 const Environment = execution.Environment;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -18,13 +17,11 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
-const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryDelete = builtins.ordinaryDelete;
 const ordinaryGet = builtins.ordinaryGet;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
-const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinarySet = builtins.ordinarySet;
 const sameValue = types.sameValue;
 
@@ -42,15 +39,15 @@ fn getOwnProperty(
     };
 
     // 3. Let map be args.[[ParameterMap]].
-    const map = object.as(Arguments).fields.parameter_map;
+    const map = &object.as(Arguments).fields.parameter_map;
 
     // 4. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
+    const is_mapped = map.has(property_key);
 
     // 5. If isMapped is true, then
     if (is_mapped) {
         // a. Set desc.[[Value]] to ! Get(map, P).
-        descriptor.value = map.get(agent, property_key) catch |err| try noexcept(err);
+        descriptor.value = map.get(agent, property_key);
     }
 
     // 6. Return desc.
@@ -66,10 +63,10 @@ fn defineOwnProperty(
     property_descriptor: PropertyDescriptor,
 ) std.mem.Allocator.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
-    const map = object.as(Arguments).fields.parameter_map;
+    const map = &object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
+    const is_mapped = map.has(property_key);
 
     // 3. Let newArgDesc be Desc.
     var new_arg_property_descriptor = property_descriptor;
@@ -82,7 +79,7 @@ fn defineOwnProperty(
             // i. Set newArgDesc to a copy of Desc.
 
             // ii. Set newArgDesc.[[Value]] to ! Get(map, P).
-            new_arg_property_descriptor.value = map.get(agent, property_key) catch |err| try noexcept(err);
+            new_arg_property_descriptor.value = map.get(agent, property_key);
         }
     }
 
@@ -102,11 +99,7 @@ fn defineOwnProperty(
         // a. If IsAccessorDescriptor(Desc) is true, then
         if (property_descriptor.isAccessorDescriptor()) {
             // i. Perform ! map.[[Delete]](P).
-            _ = map.internal_methods.delete(
-                agent,
-                map,
-                property_key,
-            ) catch |err| try noexcept(err);
+            map.delete(property_key);
         } else {
             // b. Else,
             // i. If Desc has a [[Value]] field, then
@@ -114,17 +107,13 @@ fn defineOwnProperty(
                 // 1. Assert: The following Set will succeed, since formal parameters mapped by
                 //    arguments objects are always writable.
                 // 2. Perform ! Set(map, P, Desc.[[Value]], false).
-                map.set(agent, property_key, value, .ignore) catch |err| try noexcept(err);
+                map.set(agent, property_key, value);
             }
 
             // ii. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, then
             if (property_descriptor.writable == false) {
                 // 1. Perform ! map.[[Delete]](P).
-                _ = map.internal_methods.delete(
-                    agent,
-                    map,
-                    property_key,
-                ) catch |err| try noexcept(err);
+                map.delete(property_key);
             }
         }
     }
@@ -142,10 +131,10 @@ fn get(
     receiver: Value,
 ) Agent.Error!Value {
     // 1. Let map be args.[[ParameterMap]].
-    const map = object.as(Arguments).fields.parameter_map;
+    const map = &object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
+    const is_mapped = map.has(property_key);
 
     // 3. If isMapped is false, then
     if (!is_mapped) {
@@ -155,7 +144,7 @@ fn get(
         // 4. Else,
         // a. Assert: map contains a formal parameter mapping for P.
         // b. Return ! Get(map, P).
-        return map.get(agent, property_key) catch |err| try noexcept(err);
+        return map.get(agent, property_key);
     }
 }
 
@@ -173,17 +162,17 @@ fn set(
     // 2. Else,
     if (sameValue(Value.from(object), receiver)) {
         // a. Let map be args.[[ParameterMap]].
-        const map = object.as(Arguments).fields.parameter_map;
+        const map = &object.as(Arguments).fields.parameter_map;
 
         // b. Let isMapped be ! HasOwnProperty(map, P).
-        const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
+        const is_mapped = map.has(property_key);
 
         // 3. If isMapped is true, then
         if (is_mapped) {
             // a. Assert: The following Set will succeed, since formal parameters mapped by
             //    arguments objects are always writable.
             // b. Perform ! Set(map, P, V, false).
-            map.set(agent, property_key, value, .ignore) catch |err| try noexcept(err);
+            map.set(agent, property_key, value);
         }
     }
 
@@ -195,10 +184,10 @@ fn set(
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-delete-p
 fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
-    const map = object.as(Arguments).fields.parameter_map;
+    const map = &object.as(Arguments).fields.parameter_map;
 
     // 2. Let isMapped be ! HasOwnProperty(map, P).
-    const is_mapped = map.hasOwnProperty(agent, property_key) catch |err| try noexcept(err);
+    const is_mapped = map.has(property_key);
 
     // 3. Let result be ? OrdinaryDelete(args, P).
     const result = try ordinaryDelete(agent, object, property_key);
@@ -206,7 +195,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     // 4. If result is true and isMapped is true, then
     if (result and is_mapped) {
         // a. Perform ! map.[[Delete]](P).
-        _ = map.internal_methods.delete(agent, map, property_key) catch |err| try noexcept(err);
+        map.delete(property_key);
     }
 
     // 5. Return result.
@@ -326,14 +315,16 @@ pub fn createMappedArgumentsObject(
         // 9. Set obj.[[Prototype]] to %Object.prototype%.
         .prototype = try realm.intrinsics.@"%Object.prototype%"(),
 
-        .fields = .{ .parameter_map = undefined },
+        .fields = .{
+            // 10. Let map be OrdinaryObjectCreate(null).
+            // 11. Set obj.[[ParameterMap]] to map.
+            .parameter_map = .{
+                // Temporarily set to empty so that creating properties below doesn't invoke IB.
+                .items = &.{},
+                .environment = env,
+            },
+        },
     });
-
-    // 10. Let map be OrdinaryObjectCreate(null).
-    const map = try ordinaryObjectCreate(agent, null);
-
-    // 11. Set obj.[[ParameterMap]] to map.
-    object.as(Arguments).fields.parameter_map = map;
 
     // 12. Let parameterNames be the BoundNames of formals.
     var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
@@ -368,47 +359,37 @@ pub fn createMappedArgumentsObject(
     });
 
     // 17. Let mappedNames be a new empty List.
-    var mapped_names: std.StringHashMapUnmanaged(void) = .empty;
+    var mapped_names: String.HashMapUnmanaged(void) = .empty;
     defer mapped_names.deinit(agent.gc_allocator);
 
+    const map = &object.as(Arguments).fields.parameter_map;
+    map.items = try agent.gc_allocator.alloc(?*const String, @min(number_of_parameters, len));
+    @memset(map.items, null);
+
     // 18. Set index to numberOfParameters - 1.
-    var index: ?u53 = std.math.sub(u53, @intCast(number_of_parameters), 1) catch null;
+    var maybe_index: ?u53 = std.math.sub(u53, @intCast(number_of_parameters), 1) catch null;
 
     // 19. Repeat, while index ≥ 0,
-    while (index != null) : (index = (std.math.sub(u53, index.?, 1) catch null)) {
+    while (maybe_index != null) : (maybe_index = (std.math.sub(u53, maybe_index.?, 1) catch null)) {
         // a. Let name be parameterNames[index].
-        const name = parameter_names.items[@intCast(index.?)];
+        const index: usize = @intCast(maybe_index.?);
+        const name = try String.fromUtf8(agent, parameter_names.items[index]);
+
+        const gop = try mapped_names.getOrPut(agent.gc_allocator, name);
 
         // b. If mappedNames does not contain name, then
-        if (!mapped_names.contains(name)) {
+        if (!gop.found_existing) {
             // i. Append name to mappedNames.
-            try mapped_names.put(agent.gc_allocator, name, {});
 
             // ii. If index < len, then
-            if (index.? < len) {
+            if (index < len) {
                 // 1. Let g be MakeArgGetter(name, env).
-                const getter = try makeArgGetter(
-                    agent,
-                    try String.fromUtf8(agent, name),
-                    env,
-                );
-
                 // 2. Let p be MakeArgSetter(name, env).
-                const setter = try makeArgSetter(
-                    agent,
-                    try String.fromUtf8(agent, name),
-                    env,
-                );
-
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
                 //      [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true
                 //    }).
-                _ = map.internal_methods.defineOwnProperty(agent, map, PropertyKey.from(index.?), .{
-                    .set = setter,
-                    .get = getter,
-                    .enumerable = false,
-                    .configurable = true,
-                }) catch |err| try noexcept(err);
+                // NOTE: The getter and setter are implemented via the ParameterMap methods.
+                map.items[index] = name;
             }
         }
 
@@ -439,96 +420,40 @@ pub fn createMappedArgumentsObject(
     return object;
 }
 
-/// 10.4.4.7.1 MakeArgGetter ( name, env )
-/// https://tc39.es/ecma262/#sec-makearggetter
-fn makeArgGetter(
-    agent: *Agent,
-    name: *const String,
-    env: Environment,
-) std.mem.Allocator.Error!*Object {
-    const Captures = struct {
-        name: *const String,
-        env: Environment,
-    };
-    const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .name = name, .env = env };
+const ParameterMap = struct {
+    items: []?*const String,
+    environment: Environment,
 
-    // 1. Let getterClosure be a new Abstract Closure with no parameters that captures name and env
-    //    and performs the following steps when called:
-    const getter_closure = struct {
-        fn func(agent_: *Agent, _: Value, _: Arguments_) Agent.Error!Value {
-            const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-            const name_ = captures_.name;
-            const env_ = captures_.env;
+    pub fn has(self: *const ParameterMap, property_key: PropertyKey) bool {
+        if (property_key != .integer_index) return false;
+        const index: usize = @intCast(property_key.integer_index);
+        return index < self.items.len and self.items[index] != null;
+    }
 
-            // a. Return env.GetBindingValue(name, false).
-            return env_.getBindingValue(agent_, name_, false);
-        }
-    }.func;
+    pub fn get(self: *const ParameterMap, agent: *Agent, property_key: PropertyKey) Value {
+        const index: usize = @intCast(property_key.integer_index);
+        const name = self.items[index].?;
+        // Bindings are always initialized before this is called, so this can't fail.
+        return self.environment.getBindingValue(agent, name, false) catch unreachable;
+    }
 
-    // 2. Let getter be CreateBuiltinFunction(getterClosure, 0, "", « »).
-    // 3. NOTE: getter is never directly accessible to ECMAScript code.
-    const getter = try createBuiltinFunction(
-        agent,
-        .{ .function = getter_closure },
-        1,
-        "",
-        .{ .additional_fields = .make(*Captures, captures) },
-    );
+    pub fn set(self: *ParameterMap, agent: *Agent, property_key: PropertyKey, value: Value) void {
+        const index: usize = @intCast(property_key.integer_index);
+        const name = self.items[index].?;
+        // Bindings are always initialized before this is called, so this can't fail.
+        self.environment.setMutableBinding(agent, name, value, false) catch unreachable;
+    }
 
-    // 4. Return getter.
-    return getter;
-}
-
-/// 10.4.4.7.2 MakeArgSetter ( name, env )
-/// https://tc39.es/ecma262/#sec-makeargsetter
-fn makeArgSetter(
-    agent: *Agent,
-    name: *const String,
-    env: Environment,
-) std.mem.Allocator.Error!*Object {
-    const Captures = struct {
-        name: *const String,
-        env: Environment,
-    };
-    const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .name = name, .env = env };
-
-    // 1. Let setterClosure be a new Abstract Closure with parameters (value) that captures name
-    //    and env and performs the following steps when called:
-    const setter_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments: Arguments_) Agent.Error!Value {
-            const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-            const name_ = captures_.name;
-            const env_ = captures_.env;
-            const value = arguments.get(0);
-
-            // a. Return ! env.SetMutableBinding(name, value, false).
-            env_.setMutableBinding(agent_, name_, value, false) catch |err| try noexcept(err);
-            return .undefined;
-        }
-    }.func;
-
-    // 2. Let setter be CreateBuiltinFunction(setterClosure, 1, "", « »).
-    // 3. NOTE: setter is never directly accessible to ECMAScript code.
-    const setter = try createBuiltinFunction(
-        agent,
-        .{ .function = setter_closure },
-        1,
-        "",
-        .{ .additional_fields = .make(*Captures, captures) },
-    );
-
-    // 4. Return setter.
-    return setter;
-}
+    pub fn delete(self: *ParameterMap, property_key: PropertyKey) void {
+        const index: usize = @intCast(property_key.integer_index);
+        self.items[index] = null;
+    }
+};
 
 pub const Arguments = MakeObject(.{
     .Fields = struct {
         /// [[ParameterMap]]
-        parameter_map: *Object,
+        parameter_map: ParameterMap,
     },
     .tag = .arguments,
 });
