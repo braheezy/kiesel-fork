@@ -1,0 +1,15 @@
+.{
+    .name = .libregexp,
+    .version = "0.1.0",
+    .fingerprint = 0xc7e5900671eca91d,
+    .dependencies = .{
+        .quickjs = .{
+            .url = "https://github.com/quickjs-ng/quickjs/archive/2a12c7efa5624503cbe34347784f6d1e0adf3a53.tar.gz",
+            .hash = "N-V-__8AALiHOwDrr_2rGmmogR2uoZDKn9pCI5kVmTz0XqOk",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+    },
+}

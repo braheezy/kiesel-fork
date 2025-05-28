@@ -28,8 +28,7 @@
             .hash = "N-V-__8AANqjLgAqBbIioR8gvfLWJ6K1IrgQlwcd9-X9txll",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/fac416f34dcb6e59c257dd99f7da8e1dd65beb0e.tar.gz",
-            .hash = "libregexp-0.1.0-HanscXwNAAD6ChBeFGHxsZgalLURF6ATXfl0a9Yvz-3a",
+            .path = "./pkg/libregexp",
         },
         .parser_toolkit = .{
             .url = "https://github.com/ikskuh/parser-toolkit/archive/7817ed5d9096b40039c49498ddf7f11fa7a2fc4e.tar.gz",
