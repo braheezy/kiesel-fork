@@ -76,34 +76,9 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_runtime", enable_runtime);
     options.addOption(std.SemanticVersion, "version", version);
 
-    const libgc_cflags_extra: []const u8 = blk: {
-        var cflags: std.ArrayListUnmanaged([]const u8) = .empty;
-        defer cflags.deinit(b.allocator);
-        cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR") catch @panic("OOM");
-        if (optimize != .Debug) {
-            cflags.append(b.allocator, "-DNO_GETENV") catch @panic("OOM");
-        }
-        break :blk std.mem.join(b.allocator, " ", cflags.items) catch @panic("OOM");
-    };
-
     const any_pointer = b.dependency("any_pointer", .{});
     const args = b.dependency("args", .{});
     const kiesel_runtime = b.dependency("kiesel_runtime", .{});
-    const libgc = b.dependency("libgc", .{
-        .target = target,
-        .optimize = optimize,
-        .BUILD_SHARED_LIBS = false,
-        .CFLAGS_EXTRA = libgc_cflags_extra,
-        .enable_gcj_support = false,
-        .enable_java_finalization = false,
-        .enable_large_config = true,
-        .disable_gc_debug = true,
-        .enable_dynamic_pointer_mask = enable_nan_boxing,
-    });
-    const libregexp = b.dependency("libregexp", .{
-        .target = target,
-        .optimize = optimize,
-    });
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const stackinfo = b.dependency("stackinfo", .{ .target = target });
     const unicode_id = b.dependency("unicode_id", .{});
@@ -121,6 +96,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
     if (enable_intl) {
         if (b.lazyDependency("icu4zig", .{
             .target = target,
@@ -129,11 +105,39 @@ pub fn build(b: *std.Build) void {
             kiesel.addImport("icu4zig", icu4zig.module("icu4zig"));
         }
     }
+
     if (enable_libgc) {
-        kiesel.linkLibrary(libgc.artifact("gc"));
+        const cflags_extra: []const u8 = blk: {
+            var cflags: std.ArrayListUnmanaged([]const u8) = .empty;
+            defer cflags.deinit(b.allocator);
+            cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR") catch @panic("OOM");
+            if (optimize != .Debug) {
+                cflags.append(b.allocator, "-DNO_GETENV") catch @panic("OOM");
+            }
+            break :blk std.mem.join(b.allocator, " ", cflags.items) catch @panic("OOM");
+        };
+        if (b.lazyDependency("libgc", .{
+            .target = target,
+            .optimize = optimize,
+            .BUILD_SHARED_LIBS = false,
+            .CFLAGS_EXTRA = cflags_extra,
+            .enable_gcj_support = false,
+            .enable_java_finalization = false,
+            .enable_large_config = true,
+            .disable_gc_debug = true,
+            .enable_dynamic_pointer_mask = enable_nan_boxing,
+        })) |libgc| {
+            kiesel.linkLibrary(libgc.artifact("gc"));
+        }
     }
+
     if (enable_libregexp) {
-        kiesel.linkLibrary(libregexp.artifact("regexp"));
+        if (b.lazyDependency("libregexp", .{
+            .target = target,
+            .optimize = optimize,
+        })) |libregexp| {
+            kiesel.linkLibrary(libregexp.artifact("regexp"));
+        }
     }
 
     // Ensure the runtime uses the kiesel module defined above.

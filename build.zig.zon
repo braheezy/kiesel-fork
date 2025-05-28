@@ -26,9 +26,11 @@
         .libgc = .{
             .url = "https://github.com/ivmai/bdwgc/archive/c52b5ad2788e72f7f33cde3f7b11633decfd07b2.tar.gz",
             .hash = "N-V-__8AANqjLgAqBbIioR8gvfLWJ6K1IrgQlwcd9-X9txll",
+            .lazy = true,
         },
         .libregexp = .{
             .path = "./pkg/libregexp",
+            .lazy = true,
         },
         .parser_toolkit = .{
             .url = "https://github.com/ikskuh/parser-toolkit/archive/7817ed5d9096b40039c49498ddf7f11fa7a2fc4e.tar.gz",
