@@ -66,10 +66,10 @@ pub const constructor = struct {
 
         // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.PluralRules.prototype%", « [[InitializedPluralRules]], [[Locale]], [[Type]],
-        //    [[MinimumIntegerDigits]], [[MinimumFractionDigits]], [[MaximumFractionDigits]],
-        //    [[MinimumSignificantDigits]], [[MaximumSignificantDigits]], [[RoundingType]],
-        //    [[RoundingIncrement]], [[RoundingMode]], [[ComputedRoundingPriority]],
-        //    [[TrailingZeroDisplay]] »).
+        //    [[Notation]], [[MinimumIntegerDigits]], [[MinimumFractionDigits]],
+        //    [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
+        //    [[MaximumSignificantDigits]], [[RoundingType]], [[RoundingIncrement]],
+        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
         const plural_rules = try ordinaryCreateFromConstructor(
             PluralRules,
             agent,
@@ -78,6 +78,7 @@ pub const constructor = struct {
             .{
                 .locale = undefined,
                 .type = undefined,
+                .notation = undefined,
             },
         );
 
@@ -130,9 +131,35 @@ pub const constructor = struct {
         });
         plural_rules.as(PluralRules).fields.type = type_map.get(type_.slice.ascii).?;
 
-        // TODO: 12. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
+        // 12. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
+        //     "engineering", "compact" », "standard").
+        const notation = try options.getOption(
+            agent,
+            "notation",
+            .string,
+            &.{
+                String.fromLiteral("standard"),
+                String.fromLiteral("scientific"),
+                String.fromLiteral("engineering"),
+                String.fromLiteral("compact"),
+            },
+            String.fromLiteral("standard"),
+        );
 
-        // 13. Return pluralRules.
+        // 13. Set pluralRules.[[Notation]] to notation.
+        const notation_map = std.StaticStringMap(
+            PluralRules.Fields.Notation,
+        ).initComptime(&.{
+            .{ "standard", .standard },
+            .{ "scientific", .scientific },
+            .{ "engineering", .engineering },
+            .{ "compact", .compact },
+        });
+        plural_rules.as(PluralRules).fields.notation = notation_map.get(notation.slice.ascii).?;
+
+        // TODO: 14. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
+
+        // 15. Return pluralRules.
         return Value.from(plural_rules);
     }
 };
@@ -240,6 +267,11 @@ pub const prototype = struct {
         );
         try options.createDataPropertyDirect(
             agent,
+            PropertyKey.from("notation"),
+            Value.from(resolved_options.notation),
+        );
+        try options.createDataPropertyDirect(
+            agent,
             PropertyKey.from("pluralCategories"),
             Value.from(try createArrayFromList(agent, plural_categories.items)),
         );
@@ -280,14 +312,25 @@ pub const PluralRules = MakeObject(.{
             ordinal,
         };
 
+        pub const Notation = enum {
+            standard,
+            scientific,
+            engineering,
+            compact,
+        };
+
         /// [[Locale]]
         locale: icu4zig.Locale,
 
         /// [[Type]]
         type: Type,
 
+        /// [[Notation]]
+        notation: Notation,
+
         pub const ResolvedOptions = struct {
             type: *const String,
+            notation: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
@@ -295,7 +338,16 @@ pub const PluralRules = MakeObject(.{
                 .cardinal => String.fromLiteral("cardinal"),
                 .ordinal => String.fromLiteral("ordinal"),
             };
-            return .{ .type = @"type" };
+            const notation = switch (self.notation) {
+                .standard => String.fromLiteral("standard"),
+                .scientific => String.fromLiteral("scientific"),
+                .engineering => String.fromLiteral("engineering"),
+                .compact => String.fromLiteral("compact"),
+            };
+            return .{
+                .type = @"type",
+                .notation = notation,
+            };
         }
     },
     .tag = .intl_plural_rules,
@@ -325,7 +377,11 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
     // 5. Let type be pluralRules.[[Type]].
     const @"type" = plural_rules_object.fields.type;
 
-    // 6. Let p be PluralRuleSelect(locale, type, s).
+    // 6. Let notation be pluralRules.[[Notation]].
+    const notation = plural_rules_object.fields.notation;
+
+    // 7. Let p be PluralRuleSelect(locale, type, notation, s).
+    _ = notation; // TODO: Use this once ICU4X supports it.
     const plural_rules = icu4zig.PluralRules.init(locale, switch (@"type") {
         .cardinal => .cardinal,
         .ordinal => .ordinal,
@@ -336,6 +392,6 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         .f64 => |value| .{ .f64 = value },
     }) catch unreachable;
 
-    // 7. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    // 8. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
 }

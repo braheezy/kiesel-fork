@@ -912,9 +912,10 @@ fn prettyPrintIntlPluralRules(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.PluralRules(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, type: {pretty}", .{
+    try writer.print("{pretty}, type: {pretty}, notation: {pretty}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
         Value.from(resolved_options.type),
+        Value.from(resolved_options.notation),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
