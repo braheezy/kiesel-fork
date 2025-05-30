@@ -29,7 +29,7 @@ const data_block_max_byte_length = types.data_block_max_byte_length;
 pub fn allocateSharedArrayBuffer(
     agent: *Agent,
     constructor_: *Object,
-    byte_length: u64,
+    byte_length: usize,
     max_byte_length: ?u53,
 ) Agent.Error!*Object {
     // 1. Let slots be « [[ArrayBufferData]] ».
@@ -62,7 +62,7 @@ pub fn allocateSharedArrayBuffer(
         agent,
         constructor_,
         "%SharedArrayBuffer.prototype%",
-        .{ .array_buffer_data = undefined },
+        undefined,
     );
 
     // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; otherwise let
@@ -75,6 +75,8 @@ pub fn allocateSharedArrayBuffer(
     object.as(SharedArrayBuffer).fields = .{
         // 8. Set obj.[[ArrayBufferData]] to block.
         .array_buffer_data = block,
+
+        .array_buffer_byte_length_data = undefined,
     };
 
     // 9. If allocatingGrowableBuffer is true, then
@@ -85,14 +87,14 @@ pub fn allocateSharedArrayBuffer(
         // b. Let byteLengthBlock be ? CreateSharedByteDataBlock(8).
         // c. Perform SetValueInBuffer(byteLengthBlock, 0, biguint64, ℤ(byteLength), true, seq-cst).
         // d. Set obj.[[ArrayBufferByteLengthData]] to byteLengthBlock.
-        // TODO: This should be an atomic usize on the DataBlock struct, for now we use the
-        //       ArrayBuffer's slice length (NOT thread safe!)
+        object.as(SharedArrayBuffer).fields.array_buffer_byte_length_data = .init(byte_length);
 
         // e. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
         object.as(SharedArrayBuffer).fields.array_buffer_max_byte_length = max_byte_length.?;
     } else {
         // 10. Else,
         // a. Set obj.[[ArrayBufferByteLength]] to byteLength.
+        // NOTE: For fixed-length SABs we use the [[ArrayBufferData]] slice length.
     }
 
     // 11. Return obj.
@@ -256,7 +258,8 @@ pub const prototype = struct {
         //    The loop exits if it was able to attempt to grow uncontended.
         // b. Let currentByteLength be ℝ(RawBytesToNumeric(biguint64, currentByteLengthRawBytes,
         //    isLittleEndian)).
-        const current_byte_length = object.fields.array_buffer_data.items.len;
+        const byte_length_block = &object.fields.array_buffer_byte_length_data;
+        const current_byte_length = byte_length_block.load(.seq_cst);
 
         // c. If newByteLength = currentByteLength, return undefined.
         if (new_byte_length == current_byte_length) return .undefined;
@@ -291,6 +294,7 @@ pub const prototype = struct {
             "Cannot resize buffer to size {}",
             .{new_byte_length},
         );
+        byte_length_block.store(@intCast(new_byte_length), .seq_cst);
         @memset(object.fields.array_buffer_data.items[current_byte_length..], 0);
         return .undefined;
     }
@@ -438,7 +442,8 @@ pub const SharedArrayBuffer = MakeObject(.{
         /// [[ArrayBufferByteLength]]
         array_buffer_data: DataBlock,
 
-        // TODO: [[ArrayBufferByteLengthData]]
+        /// [[ArrayBufferByteLengthData]]
+        array_buffer_byte_length_data: std.atomic.Value(usize),
 
         /// [[ArrayBufferMaxByteLength]]
         array_buffer_max_byte_length: ?u53 = null,

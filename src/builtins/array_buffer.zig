@@ -115,10 +115,25 @@ pub fn allocateArrayBuffer(
 
 /// 25.1.3.2 ArrayBufferByteLength ( arrayBuffer, order )
 /// https://tc39.es/ecma262/#sec-arraybufferbytelength
-pub fn arrayBufferByteLength(array_buffer: anytype, _: Order) u53 {
-    // TODO: 1. If IsSharedArrayBuffer(arrayBuffer) is true and arrayBuffer has an
-    //          [[ArrayBufferByteLengthData]] internal slot, then
-    // [...]
+pub fn arrayBufferByteLength(array_buffer: anytype, order: Order) u53 {
+    // 1. If IsSharedArrayBuffer(arrayBuffer) is true and arrayBuffer has an
+    //    [[ArrayBufferByteLengthData]] internal slot, then
+    if (@TypeOf(array_buffer) == ArrayBufferLike and
+        array_buffer == .shared_array_buffer and
+        array_buffer.shared_array_buffer.fields.array_buffer_max_byte_length != null)
+    {
+        // a. Let bufferByteLengthBlock be arrayBuffer.[[ArrayBufferByteLengthData]].
+        // b. Let rawLength be GetRawBytesFromSharedBlock(bufferByteLengthBlock, 0, biguint64,
+        //    true, order).
+        // c. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
+        //    agent's Agent Record.
+        // d. Return ℝ(RawBytesToNumeric(biguint64, rawLength, isLittleEndian)).
+        const buffer_byte_length_block = &array_buffer.shared_array_buffer.fields.array_buffer_byte_length_data;
+        return switch (order) {
+            .seq_cst => @intCast(buffer_byte_length_block.load(.seq_cst)),
+            .unordered => @intCast(buffer_byte_length_block.load(.unordered)),
+        };
+    }
 
     // 2. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
