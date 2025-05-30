@@ -258,22 +258,12 @@ pub fn arraySetLength(
     // 12. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
         // a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-        const succeeded = ordinaryDefineOwnProperty(
+        return ordinaryDefineOwnProperty(
             agent,
             array,
             PropertyKey.from("length"),
             new_len_desc,
         ) catch |err| try noexcept(err);
-
-        // Force sparse storage for array holes added to the end
-        if (new_len > old_len and succeeded and array.property_storage.indexed_properties.storage != .sparse) {
-            try array.property_storage.indexed_properties.migrateStorage(
-                agent.gc_allocator,
-                .sparse,
-            );
-        }
-
-        return succeeded;
     }
 
     // 13. If oldLenDesc.[[Writable]] is false, return false.
@@ -321,10 +311,11 @@ pub fn arraySetLength(
         else => null,
     };
     defer if (sparse_indices) |*indices| indices.deinit(agent.gc_allocator);
-    var index = if (sparse_indices) |*indices|
-        indices.pop()
-    else
-        std.math.sub(u32, old_len, 1) catch null;
+    var index: ?u32 = switch (array.property_storage.indexed_properties.storage) {
+        .none => null,
+        .sparse => sparse_indices.?.pop(),
+        else => @intCast(array.property_storage.indexed_properties.count() - 1),
+    };
     while (index != null and index.? >= new_len) : ({
         index = if (sparse_indices) |*indices|
             indices.pop()

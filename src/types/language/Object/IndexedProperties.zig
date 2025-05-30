@@ -88,7 +88,7 @@ fn migrateStorageIfNeeded(
     }
 }
 
-pub fn migrateStorage(
+fn migrateStorage(
     self: *IndexedProperties,
     allocator: std.mem.Allocator,
     new_storage_type: Storage.Type,
