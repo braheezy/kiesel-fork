@@ -180,54 +180,55 @@ const NanBoxingImpl = enum(u64) {
     const nan_mask: u64 = 0x7ff8000000000000;
     const payload_len = 48;
 
-    undefined = initBits(.undefined, 0, {}),
-    null = initBits(.null, 0, {}),
-    boolean_false = initBits(.boolean, 0, false),
-    boolean_true = initBits(.boolean, 0, true),
+    undefined = initBits(.undefined, {}),
+    null = initBits(.null, {}),
+    boolean_false = initBits(.boolean, false),
+    boolean_true = initBits(.boolean, true),
     number_nan = nan_mask,
     _,
 
     /// We always have the highest bit in the 52 bits of the fraction field
     /// (the quiet bit) set. Then, we use the 3 bits below the quiet bit as
     /// a tag for non-f64 values (except f64-NaN itself).
-    const Tag = enum(u3) {
-        number_f64 = 0,
-        undefined,
-        null,
-        boolean,
-        string,
-        symbol_or_big_int,
-        number_i32,
-        object,
+    ///
+    /// For pointer values the sign bit is set.
+    const Tag = enum(u16) {
+        number_f64 = 0x0000,
+        number_i32 = 0x0001,
+        undefined = 0x0002,
+        null = 0x0003,
+        boolean = 0x0004,
+        object = 0x8001,
+        string = 0x8002,
+        symbol = 0x8003,
+        big_int = 0x8004,
+
+        fn Payload(comptime tag: Tag) type {
+            return switch (tag) {
+                .number_f64 => f64,
+                .number_i32 => i32,
+                .undefined,
+                .null,
+                => void,
+                .boolean => bool,
+                .object => *Object,
+                .string => *const String,
+                .symbol => *const Symbol,
+                .big_int => *const BigInt,
+            };
+        }
     };
 
-    fn TagPayload(comptime tag: Tag, comptime sign_bit: u1) type {
-        return switch (tag) {
-            .number_f64 => f64,
-            .undefined,
-            .null,
-            => void,
-            .boolean => bool,
-            .string => *const String,
-            .symbol_or_big_int => switch (sign_bit) {
-                0 => *const Symbol,
-                1 => *const BigInt,
-            },
-            .number_i32 => i32,
-            .object => *Object,
-        };
-    }
-
-    fn initBits(comptime tag: Tag, comptime sign_bit: u1, payload: TagPayload(tag, sign_bit)) u64 {
+    fn initBits(comptime tag: Tag, payload: tag.Payload()) u64 {
         const T = @TypeOf(payload);
         const tag_bits: u64 = @as(u64, @intFromEnum(tag)) << payload_len;
+        comptime std.debug.assert(tag_bits & nan_mask == 0);
         if (T == f64) {
             return @bitCast(payload);
         } else if (@typeInfo(T) == .pointer) {
-            const high_sign_bit = @bitReverse(@as(u64, sign_bit));
             const ptr_bits = @intFromPtr(payload);
             std.debug.assert(nan_mask & ptr_bits == 0);
-            return nan_mask | tag_bits | high_sign_bit | ptr_bits;
+            return nan_mask | tag_bits | ptr_bits;
         } else if (@sizeOf(T) != 0) {
             // @bitCast() doesn't work on void
             const payload_bits: std.meta.Int(.unsigned, @bitSizeOf(T)) = @bitCast(payload);
@@ -237,21 +238,21 @@ const NanBoxingImpl = enum(u64) {
         }
     }
 
-    fn init(comptime tag: Tag, comptime sign_bit: u1, payload: TagPayload(tag, sign_bit)) NanBoxingImpl {
-        return @enumFromInt(initBits(tag, sign_bit, payload));
+    fn init(comptime tag: Tag, payload: tag.Payload()) NanBoxingImpl {
+        return @enumFromInt(initBits(tag, payload));
     }
 
     /// If the NaN bits are set, then parses the tag from the fraction section.
     /// Otherwise, returns number_f64.
     fn getTag(self: NanBoxingImpl) Tag {
         const bits: u64 = @intFromEnum(self);
-        const tag_bits: u3 = @truncate(bits >> payload_len);
+        const tag_bits: u16 = @truncate((bits & ~nan_mask) >> payload_len);
         return if (bits & nan_mask == nan_mask) @enumFromInt(tag_bits) else .number_f64;
     }
 
-    fn getPayload(self: NanBoxingImpl, comptime tag: Tag, comptime sign_bit: u1) TagPayload(tag, sign_bit) {
+    fn getPayload(self: NanBoxingImpl, comptime tag: Tag) tag.Payload() {
         std.debug.assert(self.getTag() == tag);
-        const T = TagPayload(tag, sign_bit);
+        const T = tag.Payload();
         const bits: u64 = @intFromEnum(self);
         if (@typeInfo(T) == .pointer) {
             const ptr_bits: if (@sizeOf(T) >= 8) u48 else usize = @truncate(bits);
@@ -272,22 +273,22 @@ const NanBoxingImpl = enum(u64) {
             return if (value) .boolean_true else .boolean_false;
         } else if (isZigString(T)) {
             const string = String.fromLiteral(value);
-            return init(.string, 0, string);
+            return init(.string, string);
         } else if (is_number or T == Number) {
             const number = if (T == Number) value else Number.from(value);
             switch (number) {
-                .i32 => |x| return init(.number_i32, 0, x),
+                .i32 => |x| return init(.number_i32, x),
                 .f64 => |x| {
                     // Normalize all NaN values to avoid type confusion vulnerabilities.
-                    return if (std.math.isNan(x)) .number_nan else init(.number_f64, 0, x);
+                    return if (std.math.isNan(x)) .number_nan else init(.number_f64, x);
                 },
             }
         } else if (@typeInfo(T) == .pointer) {
             switch (@typeInfo(T).pointer.child) {
-                BigInt => return init(.symbol_or_big_int, 1, value),
-                Object => return init(.object, 0, value),
-                String => return init(.string, 0, value),
-                Symbol => return init(.symbol_or_big_int, 0, value),
+                Object => return init(.object, value),
+                String => return init(.string, value),
+                Symbol => return init(.symbol, value),
+                BigInt => return init(.big_int, value),
                 else => {},
             }
         }
@@ -300,15 +301,9 @@ const NanBoxingImpl = enum(u64) {
             .null => .null,
             .boolean => .boolean,
             .string => .string,
-            .symbol_or_big_int => {
-                const bits: u64 = @intFromEnum(self);
-                const high_bit: u1 = @truncate(@bitReverse(bits));
-                return switch (high_bit) {
-                    0 => .symbol,
-                    1 => .big_int,
-                };
-            },
+            .symbol => .symbol,
             .number_i32, .number_f64 => .number,
+            .big_int => .big_int,
             .object => .object,
         };
     }
@@ -323,26 +318,26 @@ const NanBoxingImpl = enum(u64) {
 
     pub fn asNumber(self: NanBoxingImpl) Number {
         return switch (self.getTag()) {
-            .number_i32 => .{ .i32 = self.getPayload(.number_i32, 0) },
-            .number_f64 => .{ .f64 = self.getPayload(.number_f64, 0) },
+            .number_i32 => .{ .i32 = self.getPayload(.number_i32) },
+            .number_f64 => .{ .f64 = self.getPayload(.number_f64) },
             else => unreachable,
         };
     }
 
     pub fn asString(self: NanBoxingImpl) *const String {
-        return self.getPayload(.string, 0);
+        return self.getPayload(.string);
     }
 
     pub fn asSymbol(self: NanBoxingImpl) *const Symbol {
-        return self.getPayload(.symbol_or_big_int, 0);
+        return self.getPayload(.symbol);
     }
 
     pub fn asBigInt(self: NanBoxingImpl) *const BigInt {
-        return self.getPayload(.symbol_or_big_int, 1);
+        return self.getPayload(.big_int);
     }
 
     pub fn asObject(self: NanBoxingImpl) *Object {
-        return self.getPayload(.object, 0);
+        return self.getPayload(.object);
     }
 };
 
@@ -475,7 +470,7 @@ pub fn __isI32(self: Value) bool {
 /// Leaks an implementation detail, use with care.
 pub fn __asI32(self: Value) i32 {
     return switch (Impl) {
-        NanBoxingImpl => self.impl.getPayload(.number_i32, 0),
+        NanBoxingImpl => self.impl.getPayload(.number_i32),
         TaggedUnionImpl => self.impl.number_i32,
         else => unreachable,
     };
@@ -493,7 +488,7 @@ pub fn __isF64(self: Value) bool {
 /// Leaks an implementation detail, use with care.
 pub fn __asF64(self: Value) f64 {
     return switch (Impl) {
-        NanBoxingImpl => self.impl.getPayload(.number_f64, 0),
+        NanBoxingImpl => self.impl.getPayload(.number_f64),
         TaggedUnionImpl => self.impl.number_f64,
         else => unreachable,
     };
@@ -2290,32 +2285,88 @@ test format {
     }
 }
 
+test @"undefined" {
+    const value: Value = .undefined;
+    try std.testing.expect(value.isUndefined());
+}
+
+test @"null" {
+    const value: Value = .null;
+    try std.testing.expect(value.isNull());
+}
+
 test nan {
-    try std.testing.expect(std.math.isNan(nan.asNumber().f64));
+    const value: Value = .nan;
+    try std.testing.expect(value.isNumber());
+    try std.testing.expect(value.asNumber().isNan());
 }
 
 test infinity {
-    const inf = std.math.inf(f64);
-    try std.testing.expectEqual(infinity.asNumber().f64, inf);
+    const value: Value = .infinity;
+    try std.testing.expect(value.isNumber());
+    try std.testing.expect(value.asNumber().isPositiveInf());
 }
 
 test negative_infinity {
-    const inf = std.math.inf(f64);
-    try std.testing.expectEqual(negative_infinity.asNumber().f64, -inf);
+    const value: Value = .negative_infinity;
+    try std.testing.expect(value.isNumber());
+    try std.testing.expect(value.asNumber().isNegativeInf());
 }
 
 test from {
-    const inf = std.math.inf(f64);
-    try std.testing.expectEqual(from(true).asBoolean(), true);
-    try std.testing.expectEqual(from(false).asBoolean(), false);
-    try std.testing.expectEqual(from("").asString().slice.ascii, "");
-    try std.testing.expectEqual(from("foo").asString().slice.ascii, "foo");
-    try std.testing.expectEqual(from("123").asString().slice.ascii, "123");
-    try std.testing.expectEqual(from(0).asNumber().i32, 0);
-    try std.testing.expectEqual(from(0.0).asNumber().i32, 0);
-    try std.testing.expectEqual(from(123).asNumber().i32, 123);
-    try std.testing.expectEqual(from(123.0).asNumber().i32, 123);
-    try std.testing.expectEqual(from(123.456).asNumber().f64, 123.456);
-    try std.testing.expectEqual(from(std.math.inf(f64)).asNumber().f64, inf);
-    try std.testing.expect(std.math.isNan(from(std.math.nan(f64)).asNumber().f64));
+    {
+        const value = Value.from(true);
+        try std.testing.expect(value.isBoolean());
+        try std.testing.expectEqual(value.asBoolean(), true);
+    }
+    {
+        const value = Value.from(false);
+        try std.testing.expect(value.isBoolean());
+        try std.testing.expectEqual(value.asBoolean(), false);
+    }
+    {
+        const value = Value.from("foo");
+        try std.testing.expect(value.isString());
+        try std.testing.expectEqual(value.asString().slice.ascii, "foo");
+    }
+    {
+        const value = Value.from(123.456);
+        try std.testing.expect(value.isNumber());
+        try std.testing.expectEqual(value.asNumber().f64, 123.456);
+    }
+    {
+        const value = Value.from(123);
+        try std.testing.expect(value.isNumber());
+        try std.testing.expectEqual(value.asNumber().i32, 123);
+    }
+    {
+        const value = Value.from(std.math.inf(f64));
+        try std.testing.expect(value.isNumber());
+        try std.testing.expectEqual(value.asNumber().f64, std.math.inf(f64));
+    }
+    {
+        const value = Value.from(std.math.nan(f64));
+        try std.testing.expect(value.isNumber());
+        try std.testing.expect(value.asNumber().isNan());
+    }
+    {
+        const symbol = try Symbol.init(std.testing.allocator, null);
+        defer symbol.deinit(std.testing.allocator);
+        const value = Value.from(symbol);
+        try std.testing.expect(value.isSymbol());
+        try std.testing.expectEqual(value.asSymbol(), symbol);
+    }
+    {
+        const big_int = try BigInt.from(std.testing.allocator, 123);
+        defer big_int.deinit(std.testing.allocator);
+        const value = Value.from(big_int);
+        try std.testing.expect(value.isBigInt());
+        try std.testing.expectEqual(value.asBigInt(), big_int);
+    }
+    {
+        const object: *Object = @ptrFromInt(0x8);
+        const value = Value.from(object);
+        try std.testing.expect(value.isObject());
+        try std.testing.expectEqual(value.asObject(), object);
+    }
 }
