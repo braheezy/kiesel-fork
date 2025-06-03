@@ -33,7 +33,6 @@ const isStrictlyEqual = types.isStrictlyEqual;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
-const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
 const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 const sameValueZero = types.sameValueZero;
 
@@ -59,28 +58,31 @@ fn defineOwnProperty(
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
+        const length_property_metadata = array.property_storage.shape.properties.get(
+            PropertyKey.from("length"),
+        ).?;
+
         // b. Assert: lengthDesc is not undefined.
-        var length_descriptor = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
-
         // c. Assert: IsDataDescriptor(lengthDesc) is true.
-        std.debug.assert(length_descriptor.isDataDescriptor());
-
         // d. Assert: lengthDesc.[[Configurable]] is false.
-        std.debug.assert(length_descriptor.configurable == false);
+        std.debug.assert(length_property_metadata.index == .value);
+        std.debug.assert(!length_property_metadata.attributes.configurable);
 
         // e. Let length be lengthDesc.[[Value]].
         // f. Assert: length is a non-negative integral Number.
-        const length = length_descriptor.value.?.asNumber().toUint32();
+        const length_index = length_property_metadata.index.value;
+        const length_value = array.property_storage.values.items[@intFromEnum(length_index)];
+        const length: u32 = @intFromFloat(length_value.asNumber().asFloat());
 
         // g. Let index be ! ToUint32(P).
         const index: u32 = @intCast(property_key.integer_index);
 
         // h. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
-        if (index >= length and length_descriptor.writable == false)
+        if (index >= length and length_property_metadata.attributes.writable == false)
             return false;
 
         // i. Let succeeded be ! OrdinaryDefineOwnProperty(A, P, Desc).
-        var succeeded = ordinaryDefineOwnProperty(
+        const succeeded = ordinaryDefineOwnProperty(
             agent,
             array,
             property_key,
@@ -94,18 +96,9 @@ fn defineOwnProperty(
         // k. If index ≥ length, then
         if (index >= length) {
             // i. Set lengthDesc.[[Value]] to index + 1𝔽.
-            length_descriptor.value = Value.from(index + 1);
-
             // ii. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", lengthDesc).
-            succeeded = ordinaryDefineOwnProperty(
-                agent,
-                array,
-                PropertyKey.from("length"),
-                length_descriptor,
-            ) catch |err| try noexcept(err);
-
             // iii. Assert: succeeded is true.
-            std.debug.assert(succeeded);
+            array.property_storage.values.items[@intFromEnum(length_index)] = Value.from(index + 1);
         }
 
         // l. Return true.
@@ -243,17 +236,20 @@ pub fn arraySetLength(
     new_len_desc.value = Value.from(new_len);
 
     // 7. Let oldLenDesc be OrdinaryGetOwnProperty(A, "length").
+    const length_property_metadata = array.property_storage.shape.properties.get(
+        PropertyKey.from("length"),
+    ).?;
+
     // 8. Assert: oldLenDesc is not undefined.
-    const old_len_desc = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
-
     // 9. Assert: IsDataDescriptor(oldLenDesc) is true.
-    std.debug.assert(old_len_desc.isDataDescriptor());
-
     // 10. Assert: oldLenDesc.[[Configurable]] is false.
-    std.debug.assert(old_len_desc.configurable == false);
+    std.debug.assert(length_property_metadata.index == .value);
+    std.debug.assert(!length_property_metadata.attributes.configurable);
 
     // 11. Let oldLen be oldLenDesc.[[Value]].
-    const old_len: u32 = @intFromFloat(old_len_desc.value.?.asNumber().asFloat());
+    const length_index = length_property_metadata.index.value;
+    const old_len_value = array.property_storage.values.items[@intFromEnum(length_index)];
+    const old_len: u32 = @intFromFloat(old_len_value.asNumber().asFloat());
 
     // 12. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
@@ -267,7 +263,7 @@ pub fn arraySetLength(
     }
 
     // 13. If oldLenDesc.[[Writable]] is false, return false.
-    if (old_len_desc.writable == false) return false;
+    if (length_property_metadata.attributes.writable == false) return false;
 
     var new_writable: bool = undefined;
 
