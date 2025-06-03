@@ -576,7 +576,6 @@ pub fn ordinarySet(
     receiver: Value,
 ) Agent.Error!bool {
     // OPTIMIZATION: Fast path for ordinary objects and regular properties
-    // TODO: Add a fast path for indexed properties
     if (!property_key.isArrayIndex() and
         receiver.isObject() and object == receiver.asObject() and
         object.internal_methods.getOwnProperty == &getOwnProperty and
@@ -608,6 +607,27 @@ pub fn ordinarySet(
                 _ = try Value.from(setter).callAssumeCallable(agent, receiver, &.{value});
             },
         }
+        return true;
+    }
+
+    // OPTIMIZATION: Fast path for setting existing indexed properties
+    if (property_key.isArrayIndex() and
+        receiver.isObject() and object == receiver.asObject() and
+        // Sparse arrays may invoke setters or reach the prototype chain
+        object.property_storage.indexed_properties.storage != .sparse and
+        // Adding new properties needs special handling e.g. for arrays
+        object.property_storage.indexed_properties.count() > property_key.integer_index)
+    {
+        try object.property_storage.indexed_properties.set(
+            agent.gc_allocator,
+            @intCast(property_key.integer_index),
+            .{
+                .value_or_accessor = .{
+                    .value = value,
+                },
+                .attributes = .all,
+            },
+        );
         return true;
     }
 
