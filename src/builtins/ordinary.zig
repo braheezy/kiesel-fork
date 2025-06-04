@@ -458,10 +458,12 @@ pub fn ordinaryHasProperty(
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool {
+    const has_ordinary_internal_methods =
+        object.internal_methods.getOwnProperty == &getOwnProperty and
+        object.internal_methods.getPrototypeOf == &getPrototypeOf;
+
     // OPTIMIZATION: Fast path for ordinary objects
-    if (object.internal_methods.getOwnProperty == &getOwnProperty and
-        object.internal_methods.getPrototypeOf == &getPrototypeOf)
-    {
+    if (has_ordinary_internal_methods) {
         if (object.property_storage.contains(property_key)) return true;
         const parent = object.prototype() orelse return false;
         return parent.internal_methods.hasProperty(agent, parent, property_key);
@@ -506,10 +508,26 @@ pub fn ordinaryGet(
     property_key: PropertyKey,
     receiver: Value,
 ) Agent.Error!Value {
+    const has_ordinary_internal_methods =
+        object.internal_methods.getOwnProperty == &getOwnProperty and
+        object.internal_methods.getPrototypeOf == &getPrototypeOf;
+
     // OPTIMIZATION: Fast path for ordinary objects
-    if (object.internal_methods.getOwnProperty == &getOwnProperty and
-        object.internal_methods.getPrototypeOf == &getPrototypeOf)
-    {
+    if (has_ordinary_internal_methods) {
+        // If we have an array index, dense storage, and no out of bounds access, return the value directly.
+        if (property_key.isArrayIndex() and
+            object.property_storage.indexed_properties.storage != .sparse and
+            object.property_storage.indexed_properties.count() > property_key.integer_index)
+        {
+            const index: u32 = @intCast(property_key.integer_index);
+            return switch (object.property_storage.indexed_properties.storage) {
+                .none, .sparse => unreachable,
+                .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
+                .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
+                .dense_value => |dense_value| dense_value.items[index],
+            };
+        }
+        // Otherwise go through the prototype chain and invoke the getter if necessary.
         const property_descriptor = try object.property_storage.getCreateIntrinsicIfNeeded(property_key) orelse {
             const parent = object.prototype() orelse return .undefined;
             return parent.internal_methods.get(agent, parent, property_key, receiver);
@@ -575,13 +593,18 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    // OPTIMIZATION: Fast path for ordinary objects and regular properties
-    if (!property_key.isArrayIndex() and
-        receiver.isObject() and object == receiver.asObject() and
+    const has_ordinary_internal_methods =
         object.internal_methods.getOwnProperty == &getOwnProperty and
         object.internal_methods.getPrototypeOf == &getPrototypeOf and
         object.internal_methods.isExtensible == &isExtensible and
-        object.internal_methods.defineOwnProperty == &defineOwnProperty)
+        object.internal_methods.defineOwnProperty == &defineOwnProperty;
+    const receiver_is_self = receiver.isObject() and object == receiver.asObject();
+
+    // OPTIMIZATION: Fast path for ordinary objects and regular properties
+    // This excludes arrays which have a custom defineOwnProperty method for the length property.
+    if (!property_key.isArrayIndex() and
+        has_ordinary_internal_methods and
+        receiver_is_self)
     {
         const property_metadata = object.property_storage.shape.properties.get(property_key) orelse {
             if (object.prototype()) |parent| {
@@ -610,14 +633,14 @@ pub fn ordinarySet(
         return true;
     }
 
-    // OPTIMIZATION: Fast path for setting existing indexed properties
+    // OPTIMIZATION: Fast path for ordinary objects or arrays and indexed properties
     if (property_key.isArrayIndex() and
-        receiver.isObject() and object == receiver.asObject() and
-        // Sparse arrays may invoke setters or reach the prototype chain
+        (has_ordinary_internal_methods or object.is(builtins.Array)) and
+        receiver_is_self and
         object.property_storage.indexed_properties.storage != .sparse and
-        // Adding new properties needs special handling e.g. for arrays
         object.property_storage.indexed_properties.count() > property_key.integer_index)
     {
+        // If we have an array index, dense storage, and no out of bounds access, set the value directly.
         try object.property_storage.indexed_properties.set(
             agent.gc_allocator,
             @intCast(property_key.integer_index),
