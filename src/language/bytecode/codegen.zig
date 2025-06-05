@@ -1,10 +1,12 @@
 const std = @import("std");
 
 const ast = @import("../ast.zig");
+const instructions = @import("instructions.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Executable = @import("Executable.zig");
+const Instruction = instructions.Instruction;
 const IteratorKind = types.IteratorKind;
 const String = types.String;
 const Value = types.Value;
@@ -391,8 +393,9 @@ fn bindingInitialization(
                         try executable.addInstruction(.load, {});
                         try executable.addInstruction(.load_this_value_for_evaluate_call, {});
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
-                        try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-                        try executable.addInstruction(.evaluate_call, .{ .argument_count = 1 });
+                        try executable.addInstruction(.evaluate_call, .{
+                            .arguments = .{ .count = 1 },
+                        });
 
                         // Initialize binding and pop reference
                         if (environment != null) {
@@ -418,8 +421,9 @@ fn bindingInitialization(
                         try executable.addInstruction(.load, {});
                         try executable.addInstruction(.load_this_value_for_evaluate_call, {});
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
-                        try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-                        try executable.addInstruction(.evaluate_call, .{ .argument_count = 1 });
+                        try executable.addInstruction(.evaluate_call, .{
+                            .arguments = .{ .count = 1 },
+                        });
 
                         try bindingInitialization(
                             binding_pattern,
@@ -892,10 +896,8 @@ pub fn codegenNewExpression(
     try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
     try executable.addInstruction(.load, {});
 
-    try codegenArguments(node.arguments, executable, ctx);
-
     try executable.addInstruction(.evaluate_new, .{
-        .argument_count = try castIndex(u16, node.arguments.len),
+        .arguments = try codegenArguments(node.arguments, executable, ctx),
     });
 }
 
@@ -926,8 +928,6 @@ pub fn codegenCallExpression(
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     }
 
-    try codegenArguments(node.arguments, executable, ctx);
-
     // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
     //    ref.[[ReferencedName]] is "eval", then
     if (node.expression.* == .primary_expression and
@@ -937,7 +937,7 @@ pub fn codegenCallExpression(
         // This handles the SameValue(func, %eval%) check and then conditionally invokes
         // PerformEval or EvaluateCall.
         try executable.addInstruction(.evaluate_call_direct_eval, .{
-            .argument_count = try castIndex(u16, node.arguments.len),
+            .arguments = try codegenArguments(node.arguments, executable, ctx),
             .strict = ctx.contained_in_strict_mode_code,
         });
         return;
@@ -947,7 +947,7 @@ pub fn codegenCallExpression(
     // 8. Let tailCall be IsInTailPosition(thisCall).
     // 9. Return ? EvaluateCall(func, ref, arguments, tailCall).
     try executable.addInstruction(.evaluate_call, .{
-        .argument_count = try castIndex(u16, node.arguments.len),
+        .arguments = try codegenArguments(node.arguments, executable, ctx),
     });
 }
 
@@ -1014,9 +1014,8 @@ pub fn codegenSuperCall(
     ctx: *Context,
 ) Executable.Error!void {
     // SuperCall : super Arguments
-    try codegenArguments(node.arguments, executable, ctx);
     try executable.addInstruction(.evaluate_super_call, .{
-        .argument_count = try castIndex(u16, node.arguments.len),
+        .arguments = try codegenArguments(node.arguments, executable, ctx),
     });
 }
 
@@ -1026,7 +1025,7 @@ pub fn codegenArguments(
     node: ast.Arguments,
     executable: *Executable,
     ctx: *Context,
-) Executable.Error!void {
+) Executable.Error!Instruction.Arguments {
     // Arguments : ( )
     // 1. Return a new empty List.
     var spread_indices: std.ArrayListUnmanaged(usize) = .empty;
@@ -1070,9 +1069,7 @@ pub fn codegenArguments(
         },
     };
 
-    if (spread_indices.items.len == 0) {
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
-    } else {
+    if (spread_indices.items.len != 0) {
         try executable.addInstruction(.array_create, .{
             .length = try castIndex(u32, spread_indices.items.len),
         });
@@ -1088,6 +1085,11 @@ pub fn codegenArguments(
             try executable.addInstruction(.load, {});
         }
     }
+
+    return .{
+        .count = try castIndex(u16, node.len),
+        .has_spread = spread_indices.items.len != 0,
+    };
 }
 
 /// 13.3.9.1 Runtime Semantics: Evaluation
@@ -1133,13 +1135,11 @@ pub fn codegenOptionalExpression(
                 try executable.addInstructionWithConstant(.load_constant, .undefined);
             }
 
-            try codegenArguments(arguments, executable, ctx);
-
             // 1. Let thisChain be this OptionalChain.
             // 2. Let tailCall be IsInTailPosition(thisChain).
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
             try executable.addInstruction(.evaluate_call, .{
-                .argument_count = try castIndex(u16, arguments.len),
+                .arguments = try codegenArguments(arguments, executable, ctx),
             });
         },
 
@@ -1273,9 +1273,10 @@ pub fn codegenTaggedTemplate(
     // 3. Let thisCall be this MemberExpression.
     // 4. Let tailCall be IsInTailPosition(thisCall).
     // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
-    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call, .{
-        .argument_count = try castIndex(u16, @divFloor(node.template_literal.spans.len, 2) + 1),
+        .arguments = .{
+            .count = try castIndex(u16, @divFloor(node.template_literal.spans.len, 2) + 1),
+        },
     });
 }
 
@@ -2904,8 +2905,9 @@ fn forInOfBodyEvaluation(
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     try executable.addInstruction(.dup_iterator, {});
     try executable.addInstruction(.load_iterator_next_args, {});
-    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
-    try executable.addInstruction(.evaluate_call, .{ .argument_count = 0 });
+    try executable.addInstruction(.evaluate_call, .{
+        .arguments = .{ .count = 0 },
+    });
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
     if (iterator_kind == .@"async") try executable.addInstruction(.@"await", {});

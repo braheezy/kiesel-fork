@@ -100,35 +100,29 @@ fn fetchInstructionTag(self: *Vm, executable: Executable) Instruction.Tag {
     return @enumFromInt(executable.instructions.items[self.ip]);
 }
 
-fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
-    const value = self.stack.pop().?;
-    if (value.isUndefined()) return &.{};
-    const array = value.asObject();
-    const len = getArrayLength(array);
-    var argument_spread_indices = try std.ArrayListUnmanaged(usize).initCapacity(self.agent.gc_allocator, len);
-    for (0..len) |i| {
-        const argument_spread_index = array.getPropertyValueDirect(
-            PropertyKey.from(@as(u53, @intCast(i))),
-        ).asNumber().i32;
-        argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
-    }
-    return argument_spread_indices.toOwnedSlice(self.agent.gc_allocator);
-}
-
-fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
+fn getArguments(self: *Vm, arguments: Instruction.Arguments) Agent.Error![]const Value {
     self.function_arguments.clearRetainingCapacity();
-    try self.function_arguments.ensureTotalCapacity(self.agent.gc_allocator, argument_count); // May still resize when spreading
-    const argument_spread_indices = try self.getArgumentSpreadIndices();
-    defer self.agent.gc_allocator.free(argument_spread_indices);
-    for (0..argument_count) |i| {
-        const argument = self.stack.pop().?;
-        if (std.mem.indexOfScalar(usize, argument_spread_indices, argument_count - i - 1) == null) {
-            try self.function_arguments.insert(self.agent.gc_allocator, 0, argument);
-        } else {
-            var iterator = try getIterator(self.agent, argument, .sync);
-            var n: usize = 0;
-            while (try iterator.stepValue(self.agent)) |value| : (n += 1) {
-                try self.function_arguments.insert(self.agent.gc_allocator, n, value);
+    if (!arguments.has_spread) {
+        try self.function_arguments.appendSlice(
+            self.agent.gc_allocator,
+            self.stack.items[self.stack.items.len - arguments.count ..],
+        );
+        self.stack.items.len -= arguments.count;
+    } else {
+        const array = self.stack.pop().?.asObject();
+        const argument_spread_indices = array.property_storage.indexed_properties.storage.dense_i32.items;
+        // May still resize when spreading
+        try self.function_arguments.ensureTotalCapacity(self.agent.gc_allocator, arguments.count);
+        for (0..arguments.count) |i| {
+            const argument = self.stack.pop().?;
+            if (std.mem.indexOfScalar(i32, argument_spread_indices, @intCast(arguments.count - i - 1)) == null) {
+                try self.function_arguments.insert(self.agent.gc_allocator, 0, argument);
+            } else {
+                var iterator = try getIterator(self.agent, argument, .sync);
+                var n: usize = 0;
+                while (try iterator.stepValue(self.agent)) |value| : (n += 1) {
+                    try self.function_arguments.insert(self.agent.gc_allocator, n, value);
+                }
             }
         }
     }
@@ -638,8 +632,8 @@ fn executeDupReference(self: *Vm, _: Executable) Agent.Error!void {
     try self.reference_stack.append(self.agent.gc_allocator, reference);
 }
 
-fn executeEvaluateCall(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
-    const arguments = try self.getArguments(argument_count);
+fn executeEvaluateCall(self: *Vm, args: Instruction.Arguments, _: Executable) Agent.Error!void {
+    const arguments = try self.getArguments(args);
     const this_value = self.stack.pop().?;
     const function = self.stack.pop().?;
 
@@ -653,11 +647,11 @@ fn executeEvaluateCall(self: *Vm, argument_count: u16, _: Executable) Agent.Erro
 
 fn executeEvaluateCallDirectEval(
     self: *Vm,
-    argument_count: u16,
+    args: Instruction.Arguments,
     strict: bool,
     _: Executable,
 ) Agent.Error!void {
-    const arguments = try self.getArguments(argument_count);
+    const arguments = try self.getArguments(args);
     const this_value = self.stack.pop().?;
     const function = self.stack.pop().?;
 
@@ -684,8 +678,8 @@ fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
     self.result = try evaluateImportCall(self.agent, specifier, options);
 }
 
-fn executeEvaluateNew(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
-    const arguments = try self.getArguments(argument_count);
+fn executeEvaluateNew(self: *Vm, args: Instruction.Arguments, _: Executable) Agent.Error!void {
+    const arguments = try self.getArguments(args);
     const constructor = self.stack.pop().?;
     self.result = try evaluateNew(self.agent, constructor, arguments);
 }
@@ -858,7 +852,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent.Error!void {
+fn executeEvaluateSuperCall(self: *Vm, args: Instruction.Arguments, _: Executable) Agent.Error!void {
     // 1. Let newTarget be GetNewTarget().
     const new_target = self.agent.getNewTarget();
 
@@ -869,7 +863,7 @@ fn executeEvaluateSuperCall(self: *Vm, argument_count: u16, _: Executable) Agent
     const function = try getSuperConstructor(self.agent);
 
     // 4. Let argList be ? ArgumentListEvaluation of Arguments.
-    const arguments = try self.getArguments(argument_count);
+    const arguments = try self.getArguments(args);
 
     // 5. If IsConstructor(func) is false, throw a TypeError exception.
     if (!function.isConstructor()) {
@@ -1850,15 +1844,15 @@ fn executeInstruction(
         .delete => self.executeDelete(executable),
         .dup_iterator => self.executeDupIterator(executable),
         .dup_reference => self.executeDupReference(executable),
-        .evaluate_call => self.executeEvaluateCall(payload.argument_count, executable),
-        .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(payload.argument_count, payload.strict, executable),
+        .evaluate_call => self.executeEvaluateCall(payload.arguments, executable),
+        .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(payload.arguments, payload.strict, executable),
         .evaluate_import_call => self.executeEvaluateImportCall(executable),
-        .evaluate_new => self.executeEvaluateNew(payload.argument_count, executable),
+        .evaluate_new => self.executeEvaluateNew(payload.arguments, executable),
         .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(payload.strict, executable),
         .evaluate_property_access_with_expression_key_direct => self.executeEvaluatePropertyAccessWithExpressionKeyDirect(executable),
         .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(payload.strict, payload.identifier, payload.property_lookup_cache_index, executable),
         .evaluate_property_access_with_identifier_key_direct => self.executeEvaluatePropertyAccessWithIdentifierKeyDirect(payload.identifier, payload.property_lookup_cache_index, executable),
-        .evaluate_super_call => self.executeEvaluateSuperCall(payload.argument_count, executable),
+        .evaluate_super_call => self.executeEvaluateSuperCall(payload.arguments, executable),
         .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(payload, executable),
         .get_iterator => self.executeGetIterator(payload.kind, executable),
         .get_new_target => self.executeGetNewTarget(executable),

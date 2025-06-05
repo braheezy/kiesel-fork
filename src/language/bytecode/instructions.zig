@@ -75,11 +75,11 @@ pub const Instruction = union(enum(u8)) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call: struct {
-        argument_count: u16,
+        arguments: Arguments,
     },
     /// Store EvaluateCall() as the result value, possibly invoking direct eval.
     evaluate_call_direct_eval: struct {
-        argument_count: u16,
+        arguments: Arguments,
         strict: bool,
     },
     /// Store evaluation of a import() call as the result value.
@@ -89,7 +89,7 @@ pub const Instruction = union(enum(u8)) {
     /// (last to first) as an argument, the value on the stack afterwards is the constructor to
     /// call.
     evaluate_new: struct {
-        argument_count: u16,
+        arguments: Arguments,
     },
     /// Store EvaluatePropertyAccessWithExpressionKey() as the result value.
     evaluate_property_access_with_expression_key: struct {
@@ -110,7 +110,7 @@ pub const Instruction = union(enum(u8)) {
     },
     /// Store evaluation of a super() call as the result value.
     evaluate_super_call: struct {
-        argument_count: u16,
+        arguments: Arguments,
     },
     /// Perform ForDeclarationBindingInstantiation with the given identifier and constant-ness.
     for_declaration_binding_instantiation: AstNodeIndex,
@@ -277,6 +277,11 @@ pub const Instruction = union(enum(u8)) {
     pub fn Payload(comptime tag: Instruction.Tag) type {
         return @FieldType(Instruction, @tagName(tag));
     }
+
+    pub const Arguments = struct {
+        count: u16,
+        has_spread: bool = false,
+    };
 };
 
 pub const InstructionIterator = struct {
