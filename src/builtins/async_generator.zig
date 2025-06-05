@@ -342,7 +342,7 @@ pub fn asyncGeneratorStart(
                 }
 
                 // i. Let result be Completion(Evaluation of generatorBody).
-                break :blk generator_function_.fields.evaluateBodyWithVm(
+                break :blk generator_function_.fields.evaluateBody(
                     agent_,
                     &closure_generator.fields.evaluation_state.vm,
                 );
@@ -397,7 +397,7 @@ pub fn asyncGeneratorStart(
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
     generator.fields.evaluation_state = .{
-        .vm = try Vm.init(agent),
+        .vm = try Vm.init(agent, undefined),
         .closure = closure,
         .generator_function = generator_function,
     };

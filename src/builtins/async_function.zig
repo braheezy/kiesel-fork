@@ -175,7 +175,7 @@ pub fn asyncBlockStart(
             //     i. Assert: asyncBody is an Abstract Closure with no parameters.
             //     ii. Let result be Completion(asyncBody()).
             const result = switch (async_body_) {
-                .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_),
+                .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_, null),
                 .abstract_closure => |abstract_closure| abstract_closure.func(agent_, abstract_closure.captures),
                 .module => |module| generateAndRunBytecode(agent_, module, .{}),
             };

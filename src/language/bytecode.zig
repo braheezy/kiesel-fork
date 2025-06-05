@@ -77,7 +77,7 @@ pub fn generateAndRunBytecode(
         executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
     }
 
-    var vm = try Vm.init(agent);
+    var vm = try Vm.init(agent, &executable);
     defer vm.deinit();
-    return vm.run(executable);
+    return vm.run();
 }

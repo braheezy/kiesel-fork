@@ -347,18 +347,12 @@ pub const ECMAScriptFunction = MakeObject(.{
             const array = try createArrayFromList(agent, arguments.values);
             executable.constants.keys()[executable.constants.count() - 1] = Value.from(array);
             try executable.constants.reIndex(executable.allocator);
-            var vm = try Vm.init(agent);
+            var vm = try Vm.init(agent, executable);
             defer vm.deinit();
-            _ = try vm.run(executable.*);
+            _ = try vm.run();
         }
 
-        pub fn evaluateBody(self: *@This(), agent: *Agent) Agent.Error!Completion {
-            var vm = try Vm.init(agent);
-            defer vm.deinit();
-            return self.evaluateBodyWithVm(agent, &vm);
-        }
-
-        pub fn evaluateBodyWithVm(self: *@This(), agent: *Agent, vm: *Vm) Agent.Error!Completion {
+        pub fn evaluateBody(self: *@This(), agent: *Agent, maybe_vm: ?*Vm) Agent.Error!Completion {
             // OPTIMIZATION: If the body is empty we can directly return a normal completion.
             if (self.ecmascript_code.statement_list.items.len == 0) {
                 return Completion.normal(null);
@@ -386,7 +380,14 @@ pub const ECMAScriptFunction = MakeObject(.{
                 self.cached_body_executable = executable;
                 break :blk executable;
             };
-            return vm.run(executable.*);
+            if (maybe_vm) |vm| {
+                vm.executable = executable;
+                return vm.run();
+            } else {
+                var vm = try Vm.init(agent, executable);
+                defer vm.deinit();
+                return vm.run();
+            }
         }
     },
     .tag = .ecmascript_function,
@@ -593,7 +594,7 @@ fn evaluateFunctionBody(
     // 3. NOTE: If the previous step resulted in a normal completion, then evaluation finished by
     //    proceeding past the end of the FunctionStatementList.
     // 4. Return ReturnCompletion(undefined).
-    const completion = try function.fields.evaluateBody(agent);
+    const completion = try function.fields.evaluateBody(agent, null);
     return switch (completion.type) {
         .@"return" => completion.value.?,
         .normal => .undefined,
