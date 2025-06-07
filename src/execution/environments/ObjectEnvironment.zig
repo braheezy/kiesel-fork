@@ -26,7 +26,7 @@ outer_env: ?Environment,
 /// 9.1.1.2.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasbinding-n
 pub fn hasBinding(self: ObjectEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let foundBinding be ? HasProperty(bindingObject, N).
@@ -65,7 +65,7 @@ pub fn createMutableBinding(
     name: *const String,
     deletable: bool,
 ) Agent.Error!void {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
@@ -112,7 +112,7 @@ pub fn setMutableBinding(
     value: Value,
     strict: bool,
 ) Agent.Error!void {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let stillExists be ? HasProperty(bindingObject, N).
@@ -137,7 +137,7 @@ pub fn getBindingValue(
     name: *const String,
     strict: bool,
 ) Agent.Error!Value {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let value be ? HasProperty(bindingObject, N).
@@ -157,7 +157,7 @@ pub fn getBindingValue(
 /// 9.1.1.2.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
 pub fn deleteBinding(self: ObjectEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).

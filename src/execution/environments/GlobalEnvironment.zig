@@ -142,6 +142,8 @@ pub fn getBindingValue(
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
 pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
+    const property_key: PropertyKey = .{ .string = name };
+
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -154,7 +156,7 @@ pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const Strin
     const global_object = self.object_record.binding_object;
 
     // 5. Let existingProp be ? HasOwnProperty(globalObject, N).
-    const existing_prop = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
+    const existing_prop = try global_object.hasOwnProperty(agent, property_key);
 
     // 6. If existingProp is true, then
     if (existing_prop) {
@@ -209,6 +211,8 @@ pub fn hasRestrictedGlobalProperty(
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
+    const property_key: PropertyKey = .{ .string = name };
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
@@ -217,7 +221,7 @@ pub fn hasRestrictedGlobalProperty(
     const existing_property = try global_object.internal_methods.getOwnProperty(
         agent,
         global_object,
-        PropertyKey.from(name),
+        property_key,
     ) orelse {
         // 4. If existingProp is undefined, return false.
         return false;
@@ -237,12 +241,14 @@ pub fn canDeclareGlobalVar(
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
+    const property_key: PropertyKey = .{ .string = name };
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(agent, property_key);
 
     // 4. If hasProperty is true, return true.
     if (has_property) return true;
@@ -258,6 +264,8 @@ pub fn canDeclareGlobalFunction(
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
+    const property_key: PropertyKey = .{ .string = name };
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
@@ -266,7 +274,7 @@ pub fn canDeclareGlobalFunction(
     const existing_prop = try global_object.internal_methods.getOwnProperty(
         agent,
         global_object,
-        PropertyKey.from(name),
+        property_key,
     ) orelse {
         // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
         return global_object.isExtensible(agent);
@@ -293,12 +301,14 @@ pub fn createGlobalVarBinding(
     name: *const String,
     deletable: bool,
 ) Agent.Error!void {
+    const property_key: PropertyKey = .{ .string = name };
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(agent, PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(agent, property_key);
 
     // 4. Let extensible be ? IsExtensible(globalObject).
     const extensible = try global_object.isExtensible(agent);
@@ -324,7 +334,7 @@ pub fn createGlobalFunctionBinding(
     value: Value,
     deletable: bool,
 ) Agent.Error!void {
-    const property_key = PropertyKey.from(name);
+    const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
