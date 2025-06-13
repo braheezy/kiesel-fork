@@ -207,7 +207,10 @@ pub const Number = union(enum) {
             .{ .f64 = -self.asFloat() }
         else switch (self) {
             .f64 => |x| .{ .f64 = -x },
-            .i32 => |x| .{ .i32 = -x },
+            .i32 => |x| if (-%x != x)
+                .{ .i32 = -x }
+            else
+                .{ .f64 = -self.asFloat() },
         };
     }
 
