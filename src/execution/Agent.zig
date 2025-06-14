@@ -69,30 +69,26 @@ pub const QueuedJob = struct {
 
 pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator.Error!Agent {
     pretty_printing.state.tty_config = platform.tty_config;
-    var self: Agent = .{
+    return .{
         // TODO: Do we want to remove these aliases? In that case you'd have to type out
         //       `agent.platform.gc_allocator.alloc()` every time, or we remove both levels of
         //       indirection and make it `agent.alloc()`.
         .gc_allocator = platform.gc_allocator,
         .gc_allocator_atomic = platform.gc_allocator_atomic,
         .options = options,
-        .pre_allocated = undefined,
-        .well_known_symbols = undefined,
+        .pre_allocated = .{
+            .zero = try BigInt.from(platform.gc_allocator, 0),
+            .one = try BigInt.from(platform.gc_allocator, 1),
+        },
+        .well_known_symbols = try .init(platform.gc_allocator),
         .global_symbol_registry = .empty,
         .host_hooks = .{},
         .execution_context_stack = .empty,
         .queued_jobs = .empty,
-        .empty_shape = undefined,
+        .empty_shape = try .init(platform.gc_allocator),
         .string_cache = .empty,
         .platform = platform,
     };
-    self.pre_allocated = .{
-        .zero = try BigInt.from(self.gc_allocator, 0),
-        .one = try BigInt.from(self.gc_allocator, 1),
-    };
-    self.well_known_symbols = try .init(self.gc_allocator);
-    self.empty_shape = try Object.Shape.init(self.gc_allocator);
-    return self;
 }
 
 pub fn deinit(self: *Agent) void {
