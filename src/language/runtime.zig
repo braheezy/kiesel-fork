@@ -1990,6 +1990,7 @@ pub fn classDefinitionEvaluation(
     class_tail: ast.ClassTail,
     class_binding: ?*const String,
     class_name: *const String,
+    source_text: []const u8,
 ) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
@@ -2239,6 +2240,15 @@ pub fn classDefinitionEvaluation(
         break :blk function;
     };
 
+    // FIXME: The spec sets [[SourceText]] after calling ClassDefinitionEvaluation, which doesn't
+    //        work for static blocks. See https://github.com/tc39/ecma262/issues/2669.
+    if (function.is(builtins.ECMAScriptFunction)) {
+        function.as(builtins.ECMAScriptFunction).fields.source_text = source_text;
+    } else if (function.is(builtins.BuiltinFunction)) {
+        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        class_constructor_fields.source_text = source_text;
+    } else unreachable;
+
     // 16. Perform MakeConstructor(F, false, proto).
     try makeConstructor(agent, function, .{ .writable_prototype = false, .prototype = prototype });
 
@@ -2472,20 +2482,14 @@ pub fn bindingClassDeclarationEvaluation(
         const class_name = try String.fromUtf8(agent, identifier);
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
+        // 3. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
         const value = try classDefinitionEvaluation(
             agent,
             class_declaration.class_tail,
             class_name,
             class_name,
+            class_declaration.source_text,
         );
-
-        // 3. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
-        if (value.is(builtins.ECMAScriptFunction)) {
-            value.as(builtins.ECMAScriptFunction).fields.source_text = class_declaration.source_text;
-        } else if (value.is(builtins.BuiltinFunction)) {
-            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-            class_constructor_fields.source_text = class_declaration.source_text;
-        } else unreachable;
 
         // 4. Let env be the running execution context's LexicalEnvironment.
         const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -2500,23 +2504,15 @@ pub fn bindingClassDeclarationEvaluation(
     else {
         // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and
         //    "default".
-        const value = try classDefinitionEvaluation(
+        // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
+        // 3. Return value.
+        return classDefinitionEvaluation(
             agent,
             class_declaration.class_tail,
             null,
             String.fromLiteral("default"),
+            class_declaration.source_text,
         );
-
-        // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
-        if (value.is(builtins.ECMAScriptFunction)) {
-            value.as(builtins.ECMAScriptFunction).fields.source_text = class_declaration.source_text;
-        } else if (value.is(builtins.BuiltinFunction)) {
-            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-            class_constructor_fields.source_text = class_declaration.source_text;
-        } else unreachable;
-
-        // 3. Return value.
-        return value;
     }
 }
 

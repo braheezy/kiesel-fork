@@ -10,7 +10,6 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const BlockDeclarationInstantiationType = runtime.BlockDeclarationInstantiationType;
-const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
@@ -426,43 +425,29 @@ fn executeClassDefinitionEvaluation(
         const class_name = try String.fromUtf8(self.agent, identifier);
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
+        // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
+        // 4. Return value.
         const value = try classDefinitionEvaluation(
             self.agent,
             class_expression.class_tail,
             class_name,
             class_name,
+            class_expression.source_text,
         );
-
-        // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
-        if (value.is(builtins.ECMAScriptFunction)) {
-            value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
-        } else if (value.is(builtins.BuiltinFunction)) {
-            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-            class_constructor_fields.source_text = class_expression.source_text;
-        } else unreachable;
-
-        // 4. Return value.
         self.result = Value.from(value);
     }
     // ClassExpression : class ClassTail
     else {
         // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and "".
+        // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
+        // 3. Return value.
         const value = try classDefinitionEvaluation(
             self.agent,
             class_expression.class_tail,
             null,
             .empty,
+            class_expression.source_text,
         );
-
-        // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
-        if (value.is(builtins.ECMAScriptFunction)) {
-            value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
-        } else if (value.is(builtins.BuiltinFunction)) {
-            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-            class_constructor_fields.source_text = class_expression.source_text;
-        } else unreachable;
-
-        // 3. Return value.
         self.result = Value.from(value);
     }
 }
