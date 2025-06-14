@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/e805d44c5de403b62e9b92a9ad4921fb4c9421b1.tar.gz",
-            .hash = "icu4zig-0.1.0-IT7GrEI8AgBnBEy4PmcPS49SAB9zytTpVilxmX1zFlw7",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/c394476d64751f36022f90733824acb5b79ca564.tar.gz",
+            .hash = "icu4zig-0.1.0-IT7GrLpDAgAgUYkvDujuTz0xqVv805heHqJhGqSPPcHS",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -24,8 +24,8 @@
             .hash = "kiesel_runtime-0.1.0-goZjAUAVAQBpLTHKkw1lgJkSTdRsZSpBBDWVHVP41Bnl",
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/c52b5ad2788e72f7f33cde3f7b11633decfd07b2.tar.gz",
-            .hash = "N-V-__8AANqjLgAqBbIioR8gvfLWJ6K1IrgQlwcd9-X9txll",
+            .url = "https://github.com/ivmai/bdwgc/archive/9e224cb87759c1ca420a5cd5c6082d29b9ed58cb.tar.gz",
+            .hash = "N-V-__8AAOOlLgDLwcDKt7y40crc8-egXF1or0HkThBiWoZH",
             .lazy = true,
         },
         .libregexp = .{
@@ -33,8 +33,8 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/7817ed5d9096b40039c49498ddf7f11fa7a2fc4e.tar.gz",
-            .hash = "parser_toolkit-0.1.0-baYGPbJAEwB2mV9PHH9LFc5yZTx3Ox5rkcJp87Fh8ECO",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/0d5e00d4830bca53d10fee5d562152f1329d5784.tar.gz",
+            .hash = "parser_toolkit-0.1.0-baYGPS1CEwDuQk1W_5QEfKF_BWU5lN4qb8kVZoQ6Id9k",
         },
         .stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/72edb4301313aabe2593d62814fccc8c39f6dbd1.tar.gz",

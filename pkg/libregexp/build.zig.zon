@@ -4,8 +4,8 @@
     .fingerprint = 0xc7e5900671eca91d,
     .dependencies = .{
         .quickjs = .{
-            .url = "https://github.com/quickjs-ng/quickjs/archive/2a12c7efa5624503cbe34347784f6d1e0adf3a53.tar.gz",
-            .hash = "N-V-__8AALiHOwDrr_2rGmmogR2uoZDKn9pCI5kVmTz0XqOk",
+            .url = "https://github.com/quickjs-ng/quickjs/archive/3d3b58d8815f0eef8122fad142a65f3bd21d273b.tar.gz",
+            .hash = "N-V-__8AAAPxOwAuis0t9b6eC_AHLuenZ2wND74IitOOIhKf",
         },
     },
     .paths = .{
