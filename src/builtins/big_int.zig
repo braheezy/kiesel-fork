@@ -77,9 +77,9 @@ pub const constructor = struct {
 
         // 3. Let mod be ℝ(bigint) modulo 2**bits.
         // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise, return ℤ(mod).
-        const result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.managed.truncate(&big_int.managed, .signed, @intCast(bits));
-        return Value.from(result);
+        var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try result.truncate(&big_int.managed, .signed, @intCast(bits));
+        return Value.from(try types.BigInt.from(agent.gc_allocator, result));
     }
 
     /// 21.2.2.2 BigInt.asUintN ( bits, bigint )
@@ -95,9 +95,9 @@ pub const constructor = struct {
         const big_int = try big_int_value.toBigInt(agent);
 
         // 3. Return ℤ(ℝ(bigint) modulo 2**bits).
-        const result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.managed.truncate(&big_int.managed, .unsigned, @intCast(bits));
-        return Value.from(result);
+        var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try result.truncate(&big_int.managed, .unsigned, @intCast(bits));
+        return Value.from(try types.BigInt.from(agent.gc_allocator, result));
     }
 };
 
@@ -116,12 +116,12 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.BigInt
     // 2. Return ℤ(ℝ(number)).
     const string = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{number.asFloat()});
     defer agent.gc_allocator.free(string);
-    const big_int = try types.BigInt.from(agent.gc_allocator, 0);
-    big_int.managed.setString(10, string) catch |err| switch (err) {
+    var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+    result.setString(10, string) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
-    return big_int;
+    return types.BigInt.from(agent.gc_allocator, result);
 }
 
 /// 21.2.3 Properties of the BigInt Prototype Object

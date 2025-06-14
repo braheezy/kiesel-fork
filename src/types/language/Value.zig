@@ -1821,13 +1821,13 @@ pub fn stringToBigInt(
     } else blk: {
         break :blk .{ 10, trimmed_string };
     };
-    const big_int = try BigInt.from(agent.gc_allocator, 0);
-    big_int.managed.setString(base, value) catch |err| switch (err) {
+    var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+    result.setString(base, value) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return big_int;
+    return BigInt.from(agent.gc_allocator, result);
 }
 
 /// 7.2.8 SameType ( x, y )

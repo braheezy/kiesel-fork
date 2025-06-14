@@ -25,7 +25,7 @@ pub fn format(
     try writer.writeAll("n");
 }
 
-pub fn from(allocator: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!*BigInt {
+pub fn from(allocator: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!*const BigInt {
     var managed = switch (@TypeOf(value)) {
         std.math.big.int.Managed => value,
         else => try std.math.big.int.Managed.initSet(allocator, value),
@@ -37,8 +37,8 @@ pub fn from(allocator: std.mem.Allocator, value: anytype) std.mem.Allocator.Erro
 }
 
 /// For tests not using the GC allocator.
-pub fn deinit(self: *BigInt, allocator: std.mem.Allocator) void {
-    self.managed.deinit();
+pub fn deinit(self: *const BigInt, allocator: std.mem.Allocator) void {
+    @constCast(self).managed.deinit();
     allocator.destroy(self);
 }
 

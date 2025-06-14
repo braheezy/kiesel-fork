@@ -27,7 +27,6 @@ const PropertyKey = types.PropertyKey;
 const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Reference = types.Reference;
 const String = types.String;
-const Symbol = types.Symbol;
 const Value = types.Value;
 const allImportAttributesSupported = language.allImportAttributesSupported;
 const arrayCreate = builtins.arrayCreate;
@@ -2031,12 +2030,9 @@ pub fn classDefinitionEvaluation(
                 // 1. Assert: This is only possible for getter/setter pairs.
             } else {
                 // ii. Else,
-                const description = try String.fromUtf8(agent, declared_name);
-                const symbol = try Symbol.init(agent.gc_allocator, description);
-                symbol.is_private = true;
-
                 // 1. Let name be a new Private Name whose [[Description]] is dn.
-                const name: PrivateName = .{ .symbol = symbol };
+                const description = try String.fromUtf8(agent, declared_name);
+                const name = try PrivateName.init(agent.gc_allocator, description);
 
                 // 2. Append name to classPrivateEnvironment.[[Names]].
                 try class_private_environment.names.putNoClobber(agent.gc_allocator, declared_name, name);

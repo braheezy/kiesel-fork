@@ -264,12 +264,12 @@ pub const NumericLiteral = struct {
                 return Value.from(number);
             },
             .big_int => {
-                const big_int = try BigInt.from(allocator, 0);
-                big_int.managed.setString(base, str) catch |err| switch (err) {
+                var result = try std.math.big.int.Managed.init(allocator);
+                result.setString(base, str) catch |err| switch (err) {
                     error.InvalidBase, error.InvalidCharacter => unreachable,
                     error.OutOfMemory => return error.OutOfMemory,
                 };
-                return Value.from(big_int);
+                return Value.from(try BigInt.from(allocator, result));
             },
         }
     }

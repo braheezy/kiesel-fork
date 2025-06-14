@@ -20,7 +20,7 @@ description: ?*const String,
 pub fn init(
     allocator: std.mem.Allocator,
     description: ?*const String,
-) std.mem.Allocator.Error!*Symbol {
+) std.mem.Allocator.Error!*const Symbol {
     const symbol = try allocator.create(Symbol);
     symbol.* = .{ .description = description };
     return symbol;

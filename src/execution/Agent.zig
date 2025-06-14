@@ -92,8 +92,8 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
 }
 
 pub fn deinit(self: *Agent) void {
-    @constCast(self.pre_allocated.zero).deinit(self.gc_allocator);
-    @constCast(self.pre_allocated.one).deinit(self.gc_allocator);
+    self.pre_allocated.zero.deinit(self.gc_allocator);
+    self.pre_allocated.one.deinit(self.gc_allocator);
     self.well_known_symbols.deinit(self.gc_allocator);
     self.global_symbol_registry.deinit(self.gc_allocator);
     self.execution_context_stack.deinit(self.gc_allocator);

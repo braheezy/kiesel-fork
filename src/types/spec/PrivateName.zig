@@ -5,6 +5,7 @@ const std = @import("std");
 
 const types = @import("../../types.zig");
 
+const String = types.String;
 const Symbol = types.Symbol;
 
 const PrivateName = @This();
@@ -13,6 +14,15 @@ const PrivateName = @This();
 /// names can easily be implemented using symbols.
 /// This should be considered an implementation detail and not relied upon for anything else.
 symbol: *const Symbol,
+
+pub fn init(
+    allocator: std.mem.Allocator,
+    description: *const String,
+) std.mem.Allocator.Error!PrivateName {
+    const symbol = try allocator.create(Symbol);
+    symbol.* = .{ .description = description, .is_private = true };
+    return .{ .symbol = symbol };
+}
 
 pub fn format(
     self: PrivateName,
