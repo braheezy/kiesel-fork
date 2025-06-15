@@ -47,6 +47,7 @@ pub const shared_array_buffer = @import("builtins/shared_array_buffer.zig");
 pub const string = @import("builtins/string.zig");
 pub const string_iterator = @import("builtins/string_iterator.zig");
 pub const symbol = @import("builtins/symbol.zig");
+pub const temporal = @import("builtins/temporal.zig");
 pub const throw_type_error = @import("builtins/throw_type_error.zig");
 pub const typed_array = @import("builtins/typed_array.zig");
 pub const weak_map = @import("builtins/weak_map.zig");

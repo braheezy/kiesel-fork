@@ -42,7 +42,8 @@ fn LazyIntrinsicInitializer(
 
 const num_properties = 59 +
     (if (build_options.enable_annex_b) 2 else 0) +
-    (if (build_options.enable_intl) 1 else 0);
+    (if (build_options.enable_intl) 1 else 0) +
+    (if (build_options.enable_temporal) 1 else 0);
 
 pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectProperty {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
@@ -287,6 +288,8 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         .{ "unescape", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%unescape%") } },
     } else .{}) ++ (if (build_options.enable_intl) [_]GlobalObjectProperty{
         .{ "Intl", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%Intl%") } },
+    } else .{}) ++ (if (build_options.enable_temporal) [_]GlobalObjectProperty{
+        .{ "Temporal", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%Temporal%") } },
     } else .{});
 }
 

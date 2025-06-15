@@ -135,6 +135,24 @@ lazy_intrinsics: struct {
     @"%Symbol.prototype%": ?*Object = null,
     @"%SyntaxError%": ?*Object = null,
     @"%SyntaxError.prototype%": ?*Object = null,
+    @"%Temporal%": ?*Object = null,
+    @"%Temporal.Duration%": ?*Object = null,
+    @"%Temporal.Duration.prototype%": ?*Object = null,
+    @"%Temporal.Instant%": ?*Object = null,
+    @"%Temporal.Instant.prototype%": ?*Object = null,
+    @"%Temporal.Now%": ?*Object = null,
+    @"%Temporal.PlainDate%": ?*Object = null,
+    @"%Temporal.PlainDate.prototype%": ?*Object = null,
+    @"%Temporal.PlainDateTime%": ?*Object = null,
+    @"%Temporal.PlainDateTime.prototype%": ?*Object = null,
+    @"%Temporal.PlainMonthDay%": ?*Object = null,
+    @"%Temporal.PlainMonthDay.prototype%": ?*Object = null,
+    @"%Temporal.PlainTime%": ?*Object = null,
+    @"%Temporal.PlainTime.prototype%": ?*Object = null,
+    @"%Temporal.PlainYearMonth%": ?*Object = null,
+    @"%Temporal.PlainYearMonth.prototype%": ?*Object = null,
+    @"%Temporal.ZonedDateTime%": ?*Object = null,
+    @"%Temporal.ZonedDateTime.prototype%": ?*Object = null,
     @"%ThrowTypeError%": ?*Object = null,
     @"%TypedArray%": ?*Object = null,
     @"%TypedArray.prototype%": ?*Object = null,
@@ -549,6 +567,60 @@ pub fn @"%SyntaxError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
 }
 pub fn @"%SyntaxError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.@"error".syntax_error.prototype);
+}
+pub fn @"%Temporal%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal%", builtins.temporal.namespace);
+}
+pub fn @"%Temporal.Duration%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.Duration%", builtins.temporal.duration.constructor);
+}
+pub fn @"%Temporal.Duration.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.Duration.prototype%", builtins.temporal.duration.prototype);
+}
+pub fn @"%Temporal.Instant%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.Instant%", builtins.temporal.instant.constructor);
+}
+pub fn @"%Temporal.Instant.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.Instant.prototype%", builtins.temporal.instant.prototype);
+}
+pub fn @"%Temporal.Now%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.Now%", builtins.temporal.now.namespace);
+}
+pub fn @"%Temporal.PlainDate%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainDate%", builtins.temporal.plain_date.constructor);
+}
+pub fn @"%Temporal.PlainDate.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainDate.prototype%", builtins.temporal.plain_date.prototype);
+}
+pub fn @"%Temporal.PlainDateTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainDateTime%", builtins.temporal.plain_date_time.constructor);
+}
+pub fn @"%Temporal.PlainDateTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainDateTime.prototype%", builtins.temporal.plain_date_time.prototype);
+}
+pub fn @"%Temporal.PlainMonthDay%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainMonthDay%", builtins.temporal.plain_month_day.constructor);
+}
+pub fn @"%Temporal.PlainMonthDay.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainMonthDay.prototype%", builtins.temporal.plain_month_day.prototype);
+}
+pub fn @"%Temporal.PlainTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainTime%", builtins.temporal.plain_time.constructor);
+}
+pub fn @"%Temporal.PlainTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainTime.prototype%", builtins.temporal.plain_time.prototype);
+}
+pub fn @"%Temporal.PlainYearMonth%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainYearMonth%", builtins.temporal.plain_year_month.constructor);
+}
+pub fn @"%Temporal.PlainYearMonth.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.PlainYearMonth.prototype%", builtins.temporal.plain_year_month.prototype);
+}
+pub fn @"%Temporal.ZonedDateTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.ZonedDateTime%", builtins.temporal.zoned_date_time.constructor);
+}
+pub fn @"%Temporal.ZonedDateTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Temporal.ZonedDateTime.prototype%", builtins.temporal.zoned_date_time.prototype);
 }
 pub fn @"%ThrowTypeError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%ThrowTypeError%", builtins.throw_type_error.function);

@@ -943,6 +943,126 @@ fn prettyPrintIntlSegmenter(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintTemporalDuration(
+    temporal_duration: *const builtins.temporal.Duration,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_duration;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.Duration(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalInstant(
+    temporal_instant: *const builtins.temporal.Instant,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_instant;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.Instant(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalPlainDate(
+    temporal_plain_date: *const builtins.temporal.PlainDate,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_plain_date;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.PlainDate(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalPlainDateTime(
+    temporal_plain_date_time: *const builtins.temporal.PlainDateTime,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_plain_date_time;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.PlainDateTime(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalPlainMonthDay(
+    temporal_plain_month_day: *const builtins.temporal.PlainMonthDay,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_plain_month_day;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.PlainMonthDay(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalPlainTime(
+    temporal_plain_time: *const builtins.temporal.PlainTime,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_plain_time;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.PlainTime(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalPlainYearMonth(
+    temporal_plain_year_month: *const builtins.temporal.PlainYearMonth,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_plain_year_month;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.PlainYearMonth(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintTemporalZonedDateTime(
+    temporal_zoned_date_time: *const builtins.temporal.ZonedDateTime,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    _ = temporal_zoned_date_time;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Temporal.ZonedDateTime(");
+    try tty_config.setColor(writer, .reset);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(
     object: anytype,
     writer: anytype,
@@ -1118,6 +1238,15 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.intl.Locale, prettyPrintIntlLocale },
             .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },
             .{ builtins.intl.Segmenter, prettyPrintIntlSegmenter },
+        } else .{} ++ if (build_options.enable_temporal) .{
+            .{ builtins.temporal.Duration, prettyPrintTemporalDuration },
+            .{ builtins.temporal.Instant, prettyPrintTemporalInstant },
+            .{ builtins.temporal.PlainDate, prettyPrintTemporalPlainDate },
+            .{ builtins.temporal.PlainDateTime, prettyPrintTemporalPlainDateTime },
+            .{ builtins.temporal.PlainMonthDay, prettyPrintTemporalPlainMonthDay },
+            .{ builtins.temporal.PlainTime, prettyPrintTemporalPlainTime },
+            .{ builtins.temporal.PlainYearMonth, prettyPrintTemporalPlainYearMonth },
+            .{ builtins.temporal.ZonedDateTime, prettyPrintTemporalZonedDateTime },
         } else .{}) |entry| {
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
