@@ -63,6 +63,7 @@
         "README.md",
         "build.zig",
         "build.zig.zon",
+        "pkg/",
         "src/",
         "tools/",
     },
