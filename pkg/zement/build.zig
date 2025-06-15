@@ -7,12 +7,16 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const enable_intl = b.option(bool, "enable-intl", "Enable Intl") orelse true;
+    const enable_temporal = b.option(bool, "enable-temporal", "Enable Temporal") orelse true;
 
     const features = blk: {
         var features = std.ArrayList([]const u8).init(b.allocator);
         defer features.deinit();
         if (enable_intl) {
             features.append("intl") catch @panic("OOM");
+        }
+        if (enable_temporal) {
+            features.append("temporal") catch @panic("OOM");
         }
         break :blk (std.mem.join(b.allocator, ",", features.items) catch @panic("OOM"));
     };

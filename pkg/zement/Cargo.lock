@@ -11,6 +11,16 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "calendrical_calculations"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f6df87e869fb08be61c7e97ced8e69ab802df1d8bc612ed67dba78c07fbc12c"
+dependencies = [
+ "core_maths",
+ "displaydoc",
+]
+
+[[package]]
+name = "calendrical_calculations"
+version = "0.2.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "core_maths",
@@ -83,7 +93,24 @@ dependencies = [
  "displaydoc",
  "ryu",
  "smallvec",
- "writeable",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+]
+
+[[package]]
+name = "icu_calendar"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7a6ed1ea995a24dff839bc5ca4471ce2fa18ba14d8b09061c2527a46a1c6079"
+dependencies = [
+ "calendrical_calculations 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "displaydoc",
+ "icu_calendar_data 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale_core 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_provider 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
 ]
 
 [[package]]
@@ -91,17 +118,23 @@ name = "icu_calendar"
 version = "2.0.2"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
- "calendrical_calculations",
+ "calendrical_calculations 0.2.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "displaydoc",
- "icu_calendar_data",
- "icu_locale",
- "icu_locale_core",
- "icu_provider",
- "ixdtf",
- "tinystr",
- "writeable",
- "zerovec",
+ "icu_calendar_data 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "ixdtf 0.6.0-dev",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
+
+[[package]]
+name = "icu_calendar_data"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7219c8639ab936713a87b571eed2bc2615aa9137e8af6eb221446ee5644acc18"
 
 [[package]]
 name = "icu_calendar_data"
@@ -116,28 +149,28 @@ dependencies = [
  "diplomat",
  "diplomat-runtime",
  "fixed_decimal",
- "icu_calendar",
+ "icu_calendar 2.0.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_casemap",
  "icu_collator",
- "icu_collections",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_datetime",
  "icu_decimal",
  "icu_experimental",
  "icu_list",
- "icu_locale",
- "icu_locale_core",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_normalizer",
  "icu_plurals",
  "icu_properties",
- "icu_provider",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_provider_adapters",
  "icu_segmenter",
  "icu_time",
- "potential_utf",
- "tinystr",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "unicode-bidi",
- "writeable",
- "zerovec",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -147,13 +180,13 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "icu_casemap_data",
- "icu_collections",
- "icu_locale_core",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_properties",
- "icu_provider",
- "potential_utf",
- "writeable",
- "zerovec",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -168,17 +201,17 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "icu_collator_data",
- "icu_collections",
- "icu_locale",
- "icu_locale_core",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_normalizer",
  "icu_properties",
- "icu_provider",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "smallvec",
  "utf16_iter",
  "utf8_iter",
  "write16",
- "zerovec",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -189,13 +222,26 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 [[package]]
 name = "icu_collections"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "200072f5d0e3614556f94a9930d5dc3e0662a652823904c3a75dc3b0af7fee47"
+dependencies = [
+ "displaydoc",
+ "potential_utf 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "yoke 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerofrom 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
+]
+
+[[package]]
+name = "icu_collections"
+version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "potential_utf",
- "yoke",
- "zerofrom",
- "zerovec",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "yoke 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -206,21 +252,21 @@ dependencies = [
  "displaydoc",
  "either",
  "fixed_decimal",
- "icu_calendar",
+ "icu_calendar 2.0.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_datetime_data",
  "icu_decimal",
- "icu_locale",
- "icu_locale_core",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_pattern",
  "icu_plurals",
- "icu_provider",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_time",
- "litemap",
- "potential_utf",
+ "litemap 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "smallvec",
- "tinystr",
- "writeable",
- "zerovec",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -236,12 +282,12 @@ dependencies = [
  "displaydoc",
  "fixed_decimal",
  "icu_decimal_data",
- "icu_locale",
- "icu_locale_core",
- "icu_provider",
- "tinystr",
- "writeable",
- "zerovec",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -258,28 +304,28 @@ dependencies = [
  "either",
  "fixed_decimal",
  "icu_casemap",
- "icu_collections",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_decimal",
  "icu_experimental_data",
  "icu_list",
- "icu_locale",
- "icu_locale_core",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_normalizer",
  "icu_pattern",
  "icu_plurals",
  "icu_properties",
- "icu_provider",
- "litemap",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "litemap 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "num-bigint",
  "num-rational",
  "num-traits",
- "potential_utf",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "smallvec",
- "tinystr",
- "writeable",
- "zerofrom",
- "zerotrie",
- "zerovec",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerotrie 0.2.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -294,11 +340,11 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "icu_list_data",
- "icu_locale",
- "icu_provider",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "regex-automata",
- "writeable",
- "zerovec",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -309,16 +355,45 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 [[package]]
 name = "icu_locale"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ae5921528335e91da1b6c695dbf1ec37df5ac13faa3f91e5640be93aa2fbefd"
+dependencies = [
+ "displaydoc",
+ "icu_collections 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale_core 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale_data 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_provider 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "potential_utf 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
+]
+
+[[package]]
+name = "icu_locale"
+version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "icu_collections",
- "icu_locale_core",
- "icu_locale_data",
- "icu_provider",
- "potential_utf",
- "tinystr",
- "zerovec",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_data 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
+]
+
+[[package]]
+name = "icu_locale_core"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cde2700ccaed3872079a65fb1a78f6c0a36c91570f28755dda67bc8f7d9f00a"
+dependencies = [
+ "displaydoc",
+ "litemap 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
 ]
 
 [[package]]
@@ -327,11 +402,17 @@ version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "litemap",
- "tinystr",
- "writeable",
- "zerovec",
+ "litemap 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
+
+[[package]]
+name = "icu_locale_data"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fdef0c124749d06a743c69e938350816554eb63ac979166590e2b4ee4252765"
 
 [[package]]
 name = "icu_locale_data"
@@ -344,15 +425,15 @@ version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "icu_collections",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_normalizer_data",
  "icu_properties",
- "icu_provider",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "smallvec",
  "utf16_iter",
  "utf8_iter",
  "write16",
- "zerovec",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -367,9 +448,9 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "either",
- "writeable",
- "yoke",
- "zerovec",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "yoke 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -379,10 +460,10 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "fixed_decimal",
- "icu_locale",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_plurals_data",
- "icu_provider",
- "zerovec",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -396,14 +477,14 @@ version = "2.0.1"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "icu_collections",
- "icu_locale_core",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_properties_data",
- "icu_provider",
- "potential_utf",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "unicode-bidi",
- "zerotrie",
- "zerovec",
+ "zerotrie 0.2.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -414,17 +495,34 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 [[package]]
 name = "icu_provider"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c80da27b5f4187909049ee2d72f276f0d9f99a42c306bd0131ecfe04d8e5af"
+dependencies = [
+ "displaydoc",
+ "icu_locale_core 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait",
+ "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "yoke 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerofrom 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerotrie 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
+]
+
+[[package]]
+name = "icu_provider"
+version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "icu_locale_core",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "stable_deref_trait",
- "tinystr",
- "writeable",
- "yoke",
- "zerofrom",
- "zerotrie",
- "zerovec",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "yoke 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerotrie 0.2.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -432,10 +530,10 @@ name = "icu_provider_adapters"
 version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
- "icu_locale",
- "icu_provider",
- "tinystr",
- "zerovec",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -445,14 +543,14 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "core_maths",
  "displaydoc",
- "icu_collections",
- "icu_locale",
- "icu_locale_core",
- "icu_provider",
+ "icu_collections 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_segmenter_data",
- "potential_utf",
+ "potential_utf 0.1.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "utf8_iter",
- "zerovec",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -465,24 +563,33 @@ name = "icu_time"
 version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
- "calendrical_calculations",
+ "calendrical_calculations 0.2.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "displaydoc",
- "icu_calendar",
- "icu_locale_core",
- "icu_provider",
+ "icu_calendar 2.0.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
  "icu_time_data",
- "ixdtf",
+ "ixdtf 0.6.0-dev",
  "serde",
- "tinystr",
- "writeable",
- "zerotrie",
- "zerovec",
+ "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerotrie 0.2.2 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
 name = "icu_time_data"
 version = "2.0.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
+
+[[package]]
+name = "ixdtf"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8289f7f711a1a51f80e2e368355d023042ca55d8d554fd5e953f01464c15842d"
+dependencies = [
+ "displaydoc",
+]
 
 [[package]]
 name = "ixdtf"
@@ -497,6 +604,12 @@ name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+
+[[package]]
+name = "litemap"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "litemap"
@@ -545,11 +658,21 @@ dependencies = [
 [[package]]
 name = "potential_utf"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5a7c30837279ca13e7c867e9e40053bc68740f988cb07f7ca6df43cc734b585"
+dependencies = [
+ "serde",
+ "zerovec 0.11.2",
+]
+
+[[package]]
+name = "potential_utf"
+version = "0.1.2"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "serde",
- "writeable",
- "zerovec",
+ "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -646,12 +769,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "temporal_capi"
+version = "0.0.9"
+source = "git+https://github.com/boa-dev/temporal.git?rev=ad46374b7f5394a0641d3195f357d0d39109a93b#ad46374b7f5394a0641d3195f357d0d39109a93b"
+dependencies = [
+ "diplomat",
+ "diplomat-runtime",
+ "icu_calendar 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits",
+ "temporal_rs",
+ "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "temporal_rs"
+version = "0.0.9"
+source = "git+https://github.com/boa-dev/temporal.git?rev=ad46374b7f5394a0641d3195f357d0d39109a93b#ad46374b7f5394a0641d3195f357d0d39109a93b"
+dependencies = [
+ "core_maths",
+ "icu_calendar 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "icu_locale 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ixdtf 0.5.0",
+ "num-traits",
+ "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tinystr"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d4f6d1145dcb577acf783d4e601bc1d76a13337bb54e6233add580b07344c8b"
+dependencies = [
+ "displaydoc",
+ "zerovec 0.11.2",
+]
+
+[[package]]
 name = "tinystr"
 version = "0.8.1"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "zerovec",
+ "zerovec 0.11.3-dev",
 ]
 
 [[package]]
@@ -687,9 +848,27 @@ checksum = "d1890f4022759daae28ed4fe62859b1236caebfc61ede2f63ed4e695f3f6d936"
 [[package]]
 name = "writeable"
 version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
+
+[[package]]
+name = "writeable"
+version = "0.6.1"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "either",
+]
+
+[[package]]
+name = "yoke"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f41bb01b8226ef4bfd589436a297c53d118f65921786300e427be8d487695cc"
+dependencies = [
+ "serde",
+ "stable_deref_trait",
+ "yoke-derive 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerofrom 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -699,8 +878,20 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "serde",
  "stable_deref_trait",
- "yoke-derive",
- "zerofrom",
+ "yoke-derive 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+]
+
+[[package]]
+name = "yoke-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38da3c9736e16c5d3c8c597a9aaa5d1fa565d0532ae05e27c24aa62fb32c0ab6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]
@@ -719,6 +910,16 @@ name = "zement"
 version = "0.1.0"
 dependencies = [
  "icu_capi",
+ "temporal_capi",
+]
+
+[[package]]
+name = "zerofrom"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50cc42e0333e05660c3587f3bf9d0478688e15d870fab3346451ce7f8c9fbea5"
+dependencies = [
+ "zerofrom-derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -726,7 +927,19 @@ name = "zerofrom"
 version = "0.1.6"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
- "zerofrom-derive",
+ "zerofrom-derive 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+]
+
+[[package]]
+name = "zerofrom-derive"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]
@@ -743,11 +956,31 @@ dependencies = [
 [[package]]
 name = "zerotrie"
 version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f0bbd478583f79edad978b407914f61b2972f5af6fa089686016be8f9af595"
+dependencies = [
+ "displaydoc",
+]
+
+[[package]]
+name = "zerotrie"
+version = "0.2.2"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
  "displaydoc",
- "yoke",
- "zerofrom",
+ "yoke 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+]
+
+[[package]]
+name = "zerovec"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a05eb080e015ba39cc9e23bbe5e7fb04d5fb040350f99f34e338d5fdd294428"
+dependencies = [
+ "yoke 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerofrom 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec-derive 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -755,9 +988,20 @@ name = "zerovec"
 version = "0.11.3-dev"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
 dependencies = [
- "yoke",
- "zerofrom",
- "zerovec-derive",
+ "yoke 0.8.0 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerofrom 0.1.6 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+ "zerovec-derive 0.11.1 (git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5)",
+]
+
+[[package]]
+name = "zerovec-derive"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b96237efa0c878c64bd89c436f661be4e46b2f3eff1ebb976f7ef2321d2f58f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

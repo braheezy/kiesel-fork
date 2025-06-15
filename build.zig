@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     const enable_intl = b.option(
         bool,
         "enable-intl",
-        "Enable the Intl built-in object (requires Rust-based icu4x build)",
+        "Enable the Intl built-in object (requires cargo)",
     ) orelse true;
     const enable_legacy = b.option(
         bool,
@@ -32,12 +32,12 @@ pub fn build(b: *std.Build) void {
     const enable_libgc = b.option(
         bool,
         "enable-libgc",
-        "Enable building with libgc (uses stubs otherwise)",
+        "Enable building with libgc",
     ) orelse true;
     const enable_libregexp = b.option(
         bool,
         "enable-libregexp",
-        "Enable building with libregexp (uses stubs otherwise)",
+        "Enable building with libregexp",
     ) orelse true;
     const enable_nan_boxing = b.option(
         bool,
@@ -51,6 +51,11 @@ pub fn build(b: *std.Build) void {
         bool,
         "enable-runtime",
         "Enable the web-compatible runtime",
+    ) orelse true;
+    const enable_temporal = b.option(
+        bool,
+        "enable-temporal",
+        "Enable the Temporal built-in object (requires cargo)",
     ) orelse true;
 
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
@@ -74,6 +79,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_libregexp", enable_libregexp);
     options.addOption(bool, "enable_nan_boxing", enable_nan_boxing);
     options.addOption(bool, "enable_runtime", enable_runtime);
+    options.addOption(bool, "enable_temporal", enable_temporal);
     options.addOption(std.SemanticVersion, "version", version);
 
     const any_pointer = b.dependency("any_pointer", .{});
@@ -141,7 +147,16 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    if (enable_intl) {
+    if (enable_temporal) {
+        if (b.lazyDependency("temporal_rs", .{
+            .target = target,
+            .optimize = optimize,
+        })) |temporal_rs| {
+            kiesel.addIncludePath(temporal_rs.path("temporal_capi/bindings/c"));
+        }
+    }
+
+    if (enable_intl or enable_temporal) {
         if (b.lazyDependency("zement", .{
             .target = target,
             .optimize = optimize,

@@ -40,6 +40,11 @@
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/72edb4301313aabe2593d62814fccc8c39f6dbd1.tar.gz",
             .hash = "stackinfo-0.1.0-NZ2qTskbAAAefz3d7vjalblduNIyOzuwKg9Yx6CnUtee",
         },
+        .temporal_rs = .{
+            .url = "https://github.com/boa-dev/temporal/archive/ad46374b7f5394a0641d3195f357d0d39109a93b.tar.gz",
+            .hash = "N-V-__8AADk3FgBjxBgHmi21DRUMMdmAxgVCGCRotg5YWItf",
+            .lazy = true,
+        },
         .unicode_id = .{
             .url = "https://codeberg.org/injuly/unicode-id/archive/ab463d6fe5dae906ac112c1361a7436bd1c9cda9.tar.gz",
             .hash = "unicode_id-0.0.1-MsAuU1OBAQDvOQJbtbcLiuTJfsoWQTnC7NCTCG4wBY26",

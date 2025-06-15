@@ -27,6 +27,7 @@ possible in pure Zig - currently with the following exceptions:
 - [libregexp](https://github.com/bellard/quickjs/blob/master/libregexp.h) for
   regular expressions
 - [ICU4X](https://github.com/unicode-org/icu4x) for `Intl`-related functionality
+- [temporal_rs](https://github.com/boa-dev/temporal) for `Temporal`-related functionality
 
 A simple CLI (REPL/file interpreter) is available but being easy to embed in
 other projects is also a goal.
@@ -81,6 +82,7 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | `enable-libregexp`  | `true`                                       | Enables building with `libregexp`                                                                                                       |
 | `enable-nan-boxing` | `true` on x86_64/aarch64, `false` otherwise  | Enables NaN-boxing which requires a maximum of 48 bits of addressable memory                                                            |
 | `enable-runtime`    | `true`                                       | Enables the [web-compatible runtime](https://codeberg.org/kiesel-js/runtime)                                                            |
+| `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal)               |
 | `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                   |
 | `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                |
 
