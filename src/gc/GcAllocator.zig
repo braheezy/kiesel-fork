@@ -5,7 +5,7 @@
 const std = @import("std");
 
 const build_options = @import("build-options");
-const libgc = @import("../c/libgc.zig").libgc;
+const libgc = @import("../c/libgc.zig");
 
 const GcAllocator = @This();
 
@@ -21,12 +21,12 @@ pub const vtable: std.mem.Allocator.VTable = .{
 };
 
 pub fn init(kind: Kind) GcAllocator {
-    if (libgc.GC_is_init_called() == 0) {
-        libgc.GC_init();
+    if (libgc.c.GC_is_init_called() == 0) {
+        libgc.c.GC_init();
         if (build_options.enable_nan_boxing) {
-            libgc.GC_set_pointer_mask(std.math.maxInt(u48));
+            libgc.c.GC_set_pointer_mask(std.math.maxInt(u48));
         }
-        libgc.GC_start_mark_threads();
+        libgc.c.GC_start_mark_threads();
     }
     return .{ .kind = kind };
 }
@@ -50,8 +50,8 @@ fn alignedAlloc(self: *GcAllocator, len: usize, alignment: std.mem.Alignment) ?[
     // the aligned address.
     const total_bytes = len + alignment_bytes - 1 + @sizeOf(usize);
     const unaligned_ptr: [*]u8 = @ptrCast(switch (self.kind) {
-        .normal => libgc.GC_malloc(total_bytes),
-        .atomic => libgc.GC_malloc_atomic(total_bytes),
+        .normal => libgc.c.GC_malloc(total_bytes),
+        .atomic => libgc.c.GC_malloc_atomic(total_bytes),
     } orelse return null);
     const unaligned_addr = @intFromPtr(unaligned_ptr);
     const aligned_addr = std.mem.alignForward(usize, unaligned_addr + @sizeOf(usize), alignment_bytes);
@@ -63,13 +63,13 @@ fn alignedAlloc(self: *GcAllocator, len: usize, alignment: std.mem.Alignment) ?[
 
 fn alignedFree(ptr: [*]u8) void {
     const unaligned_ptr = getHeader(ptr).*;
-    libgc.GC_free(unaligned_ptr);
+    libgc.c.GC_free(unaligned_ptr);
 }
 
 pub fn alignedAllocSize(ptr: [*]u8) usize {
     const unaligned_ptr = getHeader(ptr).*;
     const delta = @intFromPtr(ptr) - @intFromPtr(unaligned_ptr);
-    return libgc.GC_size(unaligned_ptr) - delta;
+    return libgc.c.GC_size(unaligned_ptr) - delta;
 }
 
 fn alloc(

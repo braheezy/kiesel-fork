@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const libregexp = @import("../c/libregexp.zig").libregexp;
+const libregexp = @import("../c/libregexp.zig");
 
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
@@ -94,14 +94,14 @@ pub const ParsedFlags = packed struct(u8) {
 
     pub fn asLreFlags(self: ParsedFlags) c_int {
         var flags: c_int = 0;
-        if (self.d) flags |= libregexp.LRE_FLAG_INDICES;
-        if (self.g) flags |= libregexp.LRE_FLAG_GLOBAL;
-        if (self.i) flags |= libregexp.LRE_FLAG_IGNORECASE;
-        if (self.m) flags |= libregexp.LRE_FLAG_MULTILINE;
-        if (self.s) flags |= libregexp.LRE_FLAG_DOTALL;
-        if (self.u) flags |= libregexp.LRE_FLAG_UNICODE;
-        if (self.v) flags |= libregexp.LRE_FLAG_UNICODE_SETS;
-        if (self.y) flags |= libregexp.LRE_FLAG_STICKY;
+        if (self.d) flags |= libregexp.c.LRE_FLAG_INDICES;
+        if (self.g) flags |= libregexp.c.LRE_FLAG_GLOBAL;
+        if (self.i) flags |= libregexp.c.LRE_FLAG_IGNORECASE;
+        if (self.m) flags |= libregexp.c.LRE_FLAG_MULTILINE;
+        if (self.s) flags |= libregexp.c.LRE_FLAG_DOTALL;
+        if (self.u) flags |= libregexp.c.LRE_FLAG_UNICODE;
+        if (self.v) flags |= libregexp.c.LRE_FLAG_UNICODE_SETS;
+        if (self.y) flags |= libregexp.c.LRE_FLAG_STICKY;
         return flags;
     }
 };
@@ -202,7 +202,7 @@ pub fn regExpInitialize(
     const buf = try agent.gc_allocator.dupeZ(u8, try p.toUtf8(agent.gc_allocator));
     defer agent.gc_allocator.free(buf);
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
-    const re_bytecode = libregexp.lre_compile(
+    const re_bytecode = libregexp.c.lre_compile(
         &re_bytecode_len,
         &error_msg,
         error_msg.len,
@@ -300,7 +300,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     );
 
     const re_bytecode = reg_exp.fields.re_bytecode;
-    const capture_count: usize = @intCast(libregexp.lre_get_capture_count(@ptrCast(re_bytecode)));
+    const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(@ptrCast(re_bytecode)));
 
     // libregexp's capture count includes the matched string
     std.debug.assert(capture_count >= 1);
@@ -308,14 +308,14 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const captures_list = try agent.gc_allocator.alloc(?*u8, capture_count * 2);
 
     // 3. Let flags be R.[[OriginalFlags]].
-    const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+    const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
 
     // 4. If flags contains "g", let global be true; else let global be false.
     // 5. If flags contains "y", let sticky be true; else let sticky be false.
     // 6. If flags contains "d", let hasIndices be true; else let hasIndices be false.
 
     // 7. If global is false and sticky is false, set lastIndex to 0.
-    if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) == 0) {
+    if ((re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) == 0) {
         last_index = 0;
     }
 
@@ -326,7 +326,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
-    const result = if (last_index > length) 0 else libregexp.lre_exec(
+    const result = if (last_index > length) 0 else libregexp.c.lre_exec(
         @ptrCast(captures_list),
         @ptrCast(re_bytecode),
         buf.ptr,
@@ -342,7 +342,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
     if (result < 0) return error.OutOfMemory;
     if (result == 0) {
-        if (last_index > length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
+        if (last_index > length or (re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) != 0) {
             try reg_exp.object.set(
                 agent,
                 PropertyKey.from("lastIndex"),
@@ -360,7 +360,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const end_index = match.end_index;
 
     // 16. If global is true or sticky is true, then
-    if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
+    if ((re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) != 0) {
         // a. Perform ? Set(R, "lastIndex", 𝔽(e), true).
         try reg_exp.object.set(
             agent,
@@ -411,7 +411,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
     try array.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(matched_substr));
 
-    var group_name_ptr = libregexp.lre_get_groupnames(@ptrCast(re_bytecode));
+    var group_name_ptr = libregexp.c.lre_get_groupnames(@ptrCast(re_bytecode));
     const has_groups = group_name_ptr != null;
 
     // 30. If R contains any GroupName, then
@@ -516,7 +516,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     }
 
     // 35. If hasIndices is true, then
-    if ((re_flags & libregexp.LRE_FLAG_INDICES) != 0) {
+    if ((re_flags & libregexp.c.LRE_FLAG_INDICES) != 0) {
         // a. Let indicesArray be MakeMatchIndicesIndexPairArray(S, indices, groupNames, hasGroups).
         const indices_array = try makeMatchIndicesIndexPairArray(
             agent,
@@ -992,7 +992,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0073 (LATIN SMALL LETTER S).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_DOTALL);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_DOTALL);
     }
 
     /// 22.2.6.4 get RegExp.prototype.flags
@@ -1090,7 +1090,7 @@ pub const prototype = struct {
 
         // 3. Let flags be R.[[OriginalFlags]].
         const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
-        const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+        const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
 
         // 4. If flags contains codeUnit, return true.
         // 5. Return false.
@@ -1103,7 +1103,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0067 (LATIN SMALL LETTER G).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_GLOBAL);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_GLOBAL);
     }
 
     /// 22.2.6.6 get RegExp.prototype.hasIndices
@@ -1112,7 +1112,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_INDICES);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_INDICES);
     }
 
     /// 22.2.6.7 get RegExp.prototype.ignoreCase
@@ -1121,7 +1121,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_IGNORECASE);
     }
 
     /// 22.2.6.8 RegExp.prototype [ %Symbol.match% ] ( string )
@@ -1269,7 +1269,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_MULTILINE);
     }
 
     /// 22.2.6.11 RegExp.prototype [ %Symbol.replace% ] ( string, replaceValue )
@@ -1582,7 +1582,7 @@ pub const prototype = struct {
 
         // 6. Let flags be R.[[OriginalFlags]].
         const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
-        const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+        const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
 
         // 7. Return EscapeRegExpPattern(src, flags).
         return Value.from(try escapeRegExpPattern(agent, src, re_flags));
@@ -1793,7 +1793,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_STICKY);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_STICKY);
     }
 
     /// 22.2.6.16 RegExp.prototype.test ( S )
@@ -1850,7 +1850,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0075 (LATIN SMALL LETTER U).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UNICODE);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_UNICODE);
     }
 
     /// 22.2.6.19 get RegExp.prototype.unicodeSets
@@ -1859,7 +1859,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UNICODE_SETS);
+        return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_UNICODE_SETS);
     }
 
     /// B.2.4.1 RegExp.prototype.compile ( pattern, flags )

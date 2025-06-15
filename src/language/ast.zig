@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const libregexp = @import("../c/libregexp.zig").libregexp;
+const libregexp = @import("../c/libregexp.zig");
 
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
@@ -474,7 +474,7 @@ pub const RegularExpressionLiteral = struct {
         defer allocator.free(buf);
         var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
-        _ = libregexp.lre_compile(
+        _ = libregexp.c.lre_compile(
             &re_bytecode_len,
             &error_msg,
             error_msg.len,
