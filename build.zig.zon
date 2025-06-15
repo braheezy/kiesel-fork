@@ -44,6 +44,10 @@
             .url = "https://codeberg.org/injuly/unicode-id/archive/ab463d6fe5dae906ac112c1361a7436bd1c9cda9.tar.gz",
             .hash = "unicode_id-0.0.1-MsAuU1OBAQDvOQJbtbcLiuTJfsoWQTnC7NCTCG4wBY26",
         },
+        .zement = .{
+            .path = "./pkg/zement",
+            .lazy = true,
+        },
         .zigline = .{
             .url = "https://github.com/alimpfard/zigline/archive/51f4b56bfd969a7b093a072f52562746ff215647.tar.gz",
             .hash = "N-V-__8AAK0TAgD4BBVEDr_a3ghcBGr44WChlcyNMPC-NUSY",

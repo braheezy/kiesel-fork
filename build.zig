@@ -101,6 +101,7 @@ pub fn build(b: *std.Build) void {
         if (b.lazyDependency("icu4zig", .{
             .target = target,
             .optimize = optimize,
+            .@"link-icu4x" = false,
         })) |icu4zig| {
             kiesel.addImport("icu4zig", icu4zig.module("icu4zig"));
         }
@@ -137,6 +138,20 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         })) |libregexp| {
             kiesel.linkLibrary(libregexp.artifact("regexp"));
+        }
+    }
+
+    if (enable_intl) {
+        if (b.lazyDependency("zement", .{
+            .target = target,
+            .optimize = optimize,
+            .@"enable-intl" = enable_intl,
+        })) |zement| {
+            kiesel.addLibraryPath(zement.namedLazyPath("lib"));
+            kiesel.linkSystemLibrary("zement", .{
+                .preferred_link_mode = .static,
+                .use_pkg_config = .no,
+            });
         }
     }
 
@@ -179,6 +194,7 @@ pub fn build(b: *std.Build) void {
                     if (b.lazyDependency("icu4zig", .{
                         .target = target,
                         .optimize = optimize,
+                        .@"link-icu4x" = false,
                     })) |icu4zig| {
                         module.addImport("icu4zig", icu4zig.module("icu4zig"));
                     }

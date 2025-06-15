@@ -1,0 +1,21 @@
+[package]
+name = "zement"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies.icu_capi]
+git = "https://github.com/unicode-org/icu4x.git"
+rev = "ed457c605c06a07101b20c68d0b1ca20656ee5b5"
+default-features = false
+features = ["compiled_data", "default_components", "experimental", "std"]
+
+[features]
+intl = []
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+strip = true
+lto = true
+panic = "abort"
