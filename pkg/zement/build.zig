@@ -19,16 +19,16 @@ pub fn build(b: *std.Build) void {
 
     var cargo_args = std.ArrayList([]const u8).init(b.allocator);
     defer cargo_args.deinit();
-    cargo_args.appendSlice(&.{
-        "--features",
-        features,
-        // Required for cross-compilation, most targets won't be installed
-        "-Z",
-        "build-std=std,panic_abort",
-    }) catch @panic("OOM");
+    cargo_args.appendSlice(&.{ "--features", features }) catch @panic("OOM");
     if (optimize != .Debug) {
         cargo_args.append("--release") catch @panic("OOM");
     }
+    if (!target.query.isNative()) {
+        // Required for cross-compilation, most targets won't be installed.
+        // -Z requires nightly so we don't enforce this for native builds.
+        cargo_args.appendSlice(&.{ "-Z", "build-std=std,panic_abort" }) catch @panic("OOM");
+    }
+
     const build_dir = build_crab.addCargoBuild(
         b,
         .{
