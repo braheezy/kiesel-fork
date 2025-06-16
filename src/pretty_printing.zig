@@ -1229,7 +1229,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.WeakRef, prettyPrintWeakRef },
             .{ builtins.WeakSet, prettyPrintWeakSet },
             .{ builtins.WrapForValidIterator, prettyPrintWrapForValidIterator },
-        } ++ if (build_options.enable_intl) .{
+        } ++ (if (build_options.enable_intl) .{
             .{ builtins.intl.Collator, prettyPrintIntlCollator },
             .{ builtins.intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
             .{ builtins.intl.DisplayNames, prettyPrintIntlDisplayNames },
@@ -1238,7 +1238,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.intl.Locale, prettyPrintIntlLocale },
             .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },
             .{ builtins.intl.Segmenter, prettyPrintIntlSegmenter },
-        } else .{} ++ if (build_options.enable_temporal) .{
+        } else .{}) ++ (if (build_options.enable_temporal) .{
             .{ builtins.temporal.Duration, prettyPrintTemporalDuration },
             .{ builtins.temporal.Instant, prettyPrintTemporalInstant },
             .{ builtins.temporal.PlainDate, prettyPrintTemporalPlainDate },
@@ -1247,7 +1247,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.temporal.PlainTime, prettyPrintTemporalPlainTime },
             .{ builtins.temporal.PlainYearMonth, prettyPrintTemporalPlainYearMonth },
             .{ builtins.temporal.ZonedDateTime, prettyPrintTemporalZonedDateTime },
-        } else .{}) |entry| {
+        } else .{})) |entry| {
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }
