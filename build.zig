@@ -168,6 +168,10 @@ pub fn build(b: *std.Build) void {
                 .use_pkg_config = .no,
             });
             kiesel.linkLibrary(zement.artifact("unwind_stubs"));
+            if (target.result.os.tag == .windows) {
+                // For GetUserProfileDirectoryW
+                kiesel.linkSystemLibrary("userenv", .{});
+            }
         }
     }
 
