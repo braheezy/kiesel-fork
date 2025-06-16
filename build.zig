@@ -167,6 +167,7 @@ pub fn build(b: *std.Build) void {
                 .preferred_link_mode = .static,
                 .use_pkg_config = .no,
             });
+            kiesel.linkLibrary(zement.artifact("unwind_stubs"));
         }
     }
 

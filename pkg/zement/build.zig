@@ -50,4 +50,15 @@ pub fn build(b: *std.Build) void {
     // issues: https://github.com/ziglang/zig/issues/20476
     // So for now we export the paths and do a bit of manual setup in the main build.zig.
     b.addNamedLazyPath("lib", build_dir);
+
+    const unwind_stubs = b.addLibrary(.{
+        .linkage = .static,
+        .name = "unwind_stubs",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/unwind_stubs.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(unwind_stubs);
 }
