@@ -22,6 +22,10 @@ const Value = types.Value;
 const cleanupFinalizationRegistry = builtins.cleanupFinalizationRegistry;
 const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
+// These are imported directly from the source as Temporal might not be enabled
+const ns_min_instant = @import("../builtins/temporal/instant.zig").ns_min_instant;
+const ns_max_instant = @import("../builtins/temporal/instant.zig").ns_max_instant;
+
 /// 7.3.29 HostEnsureCanAddPrivateElement ( O )
 /// https://tc39.es/ecma262/#sec-hostensurecanaddprivateelement
 pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: *Object) Agent.Error!void {
@@ -177,4 +181,14 @@ pub fn hostPromiseRejectionTracker(
     _: HostHooks.PromiseRejectionTrackerOperation,
 ) void {
     // The default implementation of HostPromiseRejectionTracker is to return unused.
+}
+
+/// 2.3.1 HostSystemUTCEpochNanoseconds ( global )
+/// https://tc39.es/proposal-temporal/#sec-hostsystemutcepochnanoseconds
+pub fn hostSystemUTCEpochNanoseconds(agent: *Agent) i128 {
+    // 1. Let ns be the approximate current UTC date and time, in nanoseconds since the epoch.
+    const ns = agent.platform.currentTimeNs();
+
+    // 2. Return the result of clamping ns between nsMinInstant and nsMaxInstant.
+    return std.math.clamp(ns, ns_min_instant, ns_max_instant);
 }

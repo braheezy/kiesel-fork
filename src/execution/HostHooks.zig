@@ -109,3 +109,6 @@ hostResizeArrayBuffer: *const fn (
     buffer: *builtins.ArrayBuffer,
     new_byte_length: u53,
 ) Agent.Error!ResizeArrayBufferHandled = default_host_hooks.hostResizeArrayBuffer,
+hostSystemUTCEpochNanoseconds: *const fn (
+    agent: *Agent,
+) i128 = default_host_hooks.hostSystemUTCEpochNanoseconds,

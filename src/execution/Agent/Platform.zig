@@ -18,7 +18,8 @@ stderr: std.io.AnyWriter,
 tty_config: std.io.tty.Config,
 stack_info: ?stackinfo.StackInfo,
 default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
-currentTime: *const fn () i64,
+currentTimeMs: *const fn () i64,
+currentTimeNs: *const fn () i128,
 
 /// Whether `fd_t` is defined
 const has_fd_t = std.posix.system.fd_t != void;
@@ -73,7 +74,8 @@ pub fn default() Platform {
         .default_locale = if (build_options.enable_intl)
             icu4zig.Locale.unknown()
         else {},
-        .currentTime = std.time.milliTimestamp,
+        .currentTimeMs = std.time.milliTimestamp,
+        .currentTimeNs = std.time.nanoTimestamp,
     };
 }
 

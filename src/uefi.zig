@@ -93,7 +93,8 @@ pub fn main() std.os.uefi.Status {
         .tty_config = .no_color,
         .stack_info = null,
         .default_locale = {},
-        .currentTime = std.time.milliTimestamp,
+        .currentTimeMs = std.time.milliTimestamp,
+        .currentTimeNs = std.time.nanoTimestamp,
     };
     defer platform.deinit();
     var agent = Agent.init(&platform, .{}) catch |err| switch (err) {

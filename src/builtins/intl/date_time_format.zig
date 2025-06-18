@@ -648,7 +648,7 @@ pub const prototype = struct {
                     // 3. If date is not provided or is undefined, then
                     const x = if (date.isUndefined()) blk: {
                         // a. Let x be ! Call(%Date.now%, undefined).
-                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
+                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTimeMs()));
                     } else blk: {
                         // 4. Else,
                         // a. Let x be ? ToNumber(date).
