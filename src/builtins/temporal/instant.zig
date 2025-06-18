@@ -11,6 +11,7 @@ const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
+const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Realm = execution.Realm;
@@ -95,6 +96,7 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
+        try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
 
         // 8.3.1 Temporal.Instant.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.constructor
@@ -131,6 +133,21 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(ms).
         return Value.from(@as(f64, @floatFromInt(ms)));
+    }
+
+    /// 8.3.4 get Temporal.Instant.prototype.epochNanoseconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.instant.prototype.epochnanoseconds
+    fn epochNanoseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return instant.[[EpochNanoseconds]].
+        const ns = temporal_rs.fromI128Nanoseconds(
+            temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(instant.fields.inner),
+        );
+        const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
+        return Value.from(try BigInt.from(agent.gc_allocator, managed));
     }
 };
 
