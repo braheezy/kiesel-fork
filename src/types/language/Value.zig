@@ -2230,6 +2230,36 @@ pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {
     return self.toObject(agent);
 }
 
+/// 13.38 ToIntegerWithTruncation ( argument )
+/// https://tc39.es/proposal-temporal/#sec-tointegerwithtruncation
+pub fn toIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(argument).
+    const number = try self.toNumber(agent);
+
+    // 2. If number is NaN, +∞𝔽 or -∞𝔽, throw a RangeError exception.
+    if (!number.isFinite()) {
+        return agent.throwException(.range_error, "{} is not a finite number", .{self});
+    }
+
+    // 3. Return truncate(ℝ(number)).
+    return number.truncate().asFloat();
+}
+
+/// 14.5.1.1 ToIntegerIfIntegral ( argument )
+/// https://tc39.es/proposal-temporal/#sec-tointegerifintegral
+pub fn toIntegerIfIntegral(self: Value, agent: *Agent) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(argument).
+    const number = try self.toNumber(agent);
+
+    // 2. If number is not an integral Number, throw a RangeError exception.
+    if (!number.isIntegral()) {
+        return agent.throwException(.range_error, "{} is not an integral number", .{self});
+    }
+
+    // 3. Return ℝ(number).
+    return number.asFloat();
+}
+
 pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.ArrayHashMapUnmanaged(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {

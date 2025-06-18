@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const temporal_rs = @import("../c/temporal_rs.zig");
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -10,6 +12,7 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Object = types.Object;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 
 comptime {
@@ -130,3 +133,30 @@ pub const namespace = struct {
         );
     }
 };
+
+/// 12.1.1 CanonicalizeCalendar ( id )
+/// https://tc39.es/proposal-temporal/#sec-temporal-canonicalizecalendar
+pub fn canonicalizeCalendar(
+    agent: *Agent,
+    id: *const String,
+) Agent.Error!temporal_rs.c.AnyCalendarKind {
+    const temporal_rs_calendar = blk: {
+        const string = switch (id.slice) {
+            .ascii => |ascii| ascii,
+            .utf16 => break :blk error.RangeError,
+        };
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Calendar_from_utf8(.{
+                .data = string.ptr,
+                .len = string.len,
+            }),
+        );
+    } catch |err| switch (err) {
+        error.RangeError => {
+            return agent.throwException(.range_error, "Invalid calendar {}", .{id});
+        },
+        else => unreachable,
+    };
+    defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar);
+    return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
+}

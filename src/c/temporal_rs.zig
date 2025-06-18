@@ -4,8 +4,39 @@ pub const c = @cImport({
     if (!build_options.enable_temporal) {
         @compileError("temporal not enabled");
     }
+    @cInclude("Calendar.h");
+    @cInclude("Duration.h");
     @cInclude("ErrorKind.h");
+    @cInclude("Instant.h");
+    @cInclude("PlainDate.h");
+    @cInclude("PlainDateTime.h");
+    @cInclude("PlainMonthDay.h");
+    @cInclude("PlainTime.h");
+    @cInclude("PlainYearMonth.h");
+    @cInclude("TimeZone.h");
+    @cInclude("ZonedDateTime.h");
 });
+
+// https://github.com/boa-dev/temporal/blob/ad46374b7f5394a0641d3195f357d0d39109a93b/temporal_capi/src/instant.rs#L161-L174
+pub fn fromI128Nanoseconds(ns: c.I128Nanoseconds) i128 {
+    // TODO: This was ported verbatim from temporal_rs but is broken for negative values.
+    // See: https://github.com/boa-dev/temporal/issues/352
+    const is_neg = ns.high < 0;
+    const ns_high_abs: u128 = @intCast(@abs(ns.high));
+    const total: i128 = @intCast((ns_high_abs << 64) + ns.low);
+    return if (is_neg) -total else total;
+}
+
+// https://github.com/boa-dev/temporal/blob/ad46374b7f5394a0641d3195f357d0d39109a93b/temporal_capi/src/instant.rs#L176-L187
+pub fn toI128Nanoseconds(ns: i128) c.I128Nanoseconds {
+    // TODO: This was ported verbatim from temporal_rs but is broken for negative values.
+    // See: https://github.com/boa-dev/temporal/issues/352
+    const is_neg = ns < 0;
+    const ns_abs = @abs(ns);
+    const high: i64 = @intCast(ns_abs >> 64);
+    const low: u64 = @truncate(ns_abs);
+    return .{ .high = if (is_neg) -high else high, .low = low };
+}
 
 // https://github.com/boa-dev/temporal/blob/main/temporal_capi/src/error.rs
 pub const TemporalError = error{
