@@ -1,6 +1,8 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+const temporal_rs = @import("c/temporal_rs.zig");
+
 const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
@@ -947,12 +949,34 @@ fn prettyPrintTemporalDuration(
     temporal_duration: *const builtins.temporal.Duration,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_duration;
     const tty_config = state.tty_config;
+
+    const years = temporal_rs.c.temporal_rs_Duration_years(temporal_duration.fields.inner);
+    const months = temporal_rs.c.temporal_rs_Duration_months(temporal_duration.fields.inner);
+    const weeks = temporal_rs.c.temporal_rs_Duration_weeks(temporal_duration.fields.inner);
+    const days = temporal_rs.c.temporal_rs_Duration_days(temporal_duration.fields.inner);
+    const hours = temporal_rs.c.temporal_rs_Duration_hours(temporal_duration.fields.inner);
+    const minutes = temporal_rs.c.temporal_rs_Duration_minutes(temporal_duration.fields.inner);
+    const seconds = temporal_rs.c.temporal_rs_Duration_seconds(temporal_duration.fields.inner);
+    const milliseconds = temporal_rs.c.temporal_rs_Duration_milliseconds(temporal_duration.fields.inner);
+    const microseconds = temporal_rs.c.temporal_rs_Duration_microseconds(temporal_duration.fields.inner);
+    const nanoseconds = temporal_rs.c.temporal_rs_Duration_nanoseconds(temporal_duration.fields.inner);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.Duration(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
+        Value.from(@as(f64, @floatFromInt(years))),
+        Value.from(@as(f64, @floatFromInt(months))),
+        Value.from(@as(f64, @floatFromInt(weeks))),
+        Value.from(@as(f64, @floatFromInt(days))),
+        Value.from(@as(f64, @floatFromInt(hours))),
+        Value.from(@as(f64, @floatFromInt(minutes))),
+        Value.from(@as(f64, @floatFromInt(seconds))),
+        Value.from(@as(f64, @floatFromInt(milliseconds))),
+        Value.from(microseconds),
+        Value.from(nanoseconds),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -962,12 +986,18 @@ fn prettyPrintTemporalInstant(
     temporal_instant: *const builtins.temporal.Instant,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_instant;
     const tty_config = state.tty_config;
+
+    const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
+        temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(temporal_instant.fields.inner),
+    );
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.Instant(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}", .{
+        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -977,12 +1007,23 @@ fn prettyPrintTemporalPlainDate(
     temporal_plain_date: *const builtins.temporal.PlainDate,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_plain_date;
     const tty_config = state.tty_config;
+
+    const iso_year = temporal_rs.c.temporal_rs_PlainDate_iso_year(temporal_plain_date.fields.inner);
+    const iso_month = temporal_rs.c.temporal_rs_PlainDate_iso_month(temporal_plain_date.fields.inner);
+    const iso_day = temporal_rs.c.temporal_rs_PlainDate_iso_day(temporal_plain_date.fields.inner);
+    const calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(temporal_plain_date.fields.inner);
+    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDate(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}", .{
+        Value.from(iso_year),
+        Value.from(iso_month),
+        Value.from(iso_day),
+        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -992,12 +1033,35 @@ fn prettyPrintTemporalPlainDateTime(
     temporal_plain_date_time: *const builtins.temporal.PlainDateTime,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_plain_date_time;
     const tty_config = state.tty_config;
+
+    const iso_year = temporal_rs.c.temporal_rs_PlainDateTime_iso_year(temporal_plain_date_time.fields.inner);
+    const iso_month = temporal_rs.c.temporal_rs_PlainDateTime_iso_month(temporal_plain_date_time.fields.inner);
+    const iso_day = temporal_rs.c.temporal_rs_PlainDateTime_iso_day(temporal_plain_date_time.fields.inner);
+    const hour = temporal_rs.c.temporal_rs_PlainDateTime_hour(temporal_plain_date_time.fields.inner);
+    const minute = temporal_rs.c.temporal_rs_PlainDateTime_minute(temporal_plain_date_time.fields.inner);
+    const second = temporal_rs.c.temporal_rs_PlainDateTime_second(temporal_plain_date_time.fields.inner);
+    const millisecond = temporal_rs.c.temporal_rs_PlainDateTime_millisecond(temporal_plain_date_time.fields.inner);
+    const microsecond = temporal_rs.c.temporal_rs_PlainDateTime_microsecond(temporal_plain_date_time.fields.inner);
+    const nanosecond = temporal_rs.c.temporal_rs_PlainDateTime_nanosecond(temporal_plain_date_time.fields.inner);
+    const calendar = temporal_rs.c.temporal_rs_PlainDateTime_calendar(temporal_plain_date_time.fields.inner);
+    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDateTime(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
+        Value.from(iso_year),
+        Value.from(iso_month),
+        Value.from(iso_day),
+        Value.from(hour),
+        Value.from(minute),
+        Value.from(second),
+        Value.from(millisecond),
+        Value.from(microsecond),
+        Value.from(nanosecond),
+        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -1007,12 +1071,21 @@ fn prettyPrintTemporalPlainMonthDay(
     temporal_plain_month_day: *const builtins.temporal.PlainMonthDay,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_plain_month_day;
     const tty_config = state.tty_config;
+
+    const iso_month = temporal_rs.c.temporal_rs_PlainMonthDay_iso_month(temporal_plain_month_day.fields.inner);
+    const iso_day = temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(temporal_plain_month_day.fields.inner);
+    const calendar = temporal_rs.c.temporal_rs_PlainMonthDay_calendar(temporal_plain_month_day.fields.inner);
+    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainMonthDay(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}", .{
+        Value.from(iso_month),
+        Value.from(iso_day),
+        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -1022,12 +1095,26 @@ fn prettyPrintTemporalPlainTime(
     temporal_plain_time: *const builtins.temporal.PlainTime,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_plain_time;
     const tty_config = state.tty_config;
+
+    const hour = temporal_rs.c.temporal_rs_PlainTime_hour(temporal_plain_time.fields.inner);
+    const minute = temporal_rs.c.temporal_rs_PlainTime_minute(temporal_plain_time.fields.inner);
+    const second = temporal_rs.c.temporal_rs_PlainTime_second(temporal_plain_time.fields.inner);
+    const millisecond = temporal_rs.c.temporal_rs_PlainTime_millisecond(temporal_plain_time.fields.inner);
+    const microsecond = temporal_rs.c.temporal_rs_PlainTime_microsecond(temporal_plain_time.fields.inner);
+    const nanosecond = temporal_rs.c.temporal_rs_PlainTime_nanosecond(temporal_plain_time.fields.inner);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainTime(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
+        Value.from(hour),
+        Value.from(minute),
+        Value.from(second),
+        Value.from(millisecond),
+        Value.from(microsecond),
+        Value.from(nanosecond),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -1037,12 +1124,21 @@ fn prettyPrintTemporalPlainYearMonth(
     temporal_plain_year_month: *const builtins.temporal.PlainYearMonth,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_plain_year_month;
     const tty_config = state.tty_config;
+
+    const iso_year = temporal_rs.c.temporal_rs_PlainYearMonth_iso_year(temporal_plain_year_month.fields.inner);
+    const iso_month = temporal_rs.c.temporal_rs_PlainYearMonth_iso_month(temporal_plain_year_month.fields.inner);
+    const calendar = temporal_rs.c.temporal_rs_PlainYearMonth_calendar(temporal_plain_year_month.fields.inner);
+    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainYearMonth(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}, {pretty}", .{
+        Value.from(iso_year),
+        Value.from(iso_month),
+        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -1052,12 +1148,24 @@ fn prettyPrintTemporalZonedDateTime(
     temporal_zoned_date_time: *const builtins.temporal.ZonedDateTime,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    _ = temporal_zoned_date_time;
     const tty_config = state.tty_config;
+
+    const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
+        temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(temporal_zoned_date_time.fields.inner),
+    );
+    const time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(temporal_zoned_date_time.fields.inner);
+    // TODO: Print time zone, right now there doesn't seem to be a way to get it as a string
+    _ = time_zone;
+    const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(temporal_zoned_date_time.fields.inner);
+    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.ZonedDateTime(");
     try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, {pretty}", .{
+        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
+        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
