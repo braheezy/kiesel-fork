@@ -12,7 +12,7 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
 rev = "ad46374b7f5394a0641d3195f357d0d39109a93b"
-# "compiled_data" is the only feature, enabled by default
+features = ["compiled_data"]
 
 [features]
 intl = []

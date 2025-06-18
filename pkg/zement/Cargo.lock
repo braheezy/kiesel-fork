@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
+name = "bytes"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
+
+[[package]]
 name = "calendrical_calculations"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25,6 +31,16 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "core_maths",
  "displaydoc",
+]
+
+[[package]]
+name = "combine"
+version = "4.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+dependencies = [
+ "bytes",
+ "memchr",
 ]
 
 [[package]]
@@ -600,6 +616,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jiff-tzdb"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1283705eb0a21404d2bfd6eef2a7593d240bc42a0bdb39db0ad6fa2ec026524"
+
+[[package]]
 name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -615,6 +637,12 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 name = "litemap"
 version = "0.8.0"
 source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20c68d0b1ca20656ee5b5#ed457c605c06a07101b20c68d0b1ca20656ee5b5"
+
+[[package]]
+name = "memchr"
+version = "2.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
 name = "num-bigint"
@@ -787,13 +815,26 @@ name = "temporal_rs"
 version = "0.0.9"
 source = "git+https://github.com/boa-dev/temporal.git?rev=ad46374b7f5394a0641d3195f357d0d39109a93b#ad46374b7f5394a0641d3195f357d0d39109a93b"
 dependencies = [
+ "combine",
  "core_maths",
  "icu_calendar 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "icu_locale 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ixdtf 0.5.0",
+ "jiff-tzdb",
  "num-traits",
+ "timezone_provider",
  "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tzif",
  "writeable 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "timezone_provider"
+version = "0.0.9"
+source = "git+https://github.com/boa-dev/temporal.git?rev=ad46374b7f5394a0641d3195f357d0d39109a93b#ad46374b7f5394a0641d3195f357d0d39109a93b"
+dependencies = [
+ "zerotrie 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "zerovec 0.11.2",
 ]
 
 [[package]]
@@ -813,6 +854,15 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=ed457c605c06a07101b20
 dependencies = [
  "displaydoc",
  "zerovec 0.11.3-dev",
+]
+
+[[package]]
+name = "tzif"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cecffbab91858408738280e7bb6aac788f59a522dda961cd6b15542f0c08559"
+dependencies = [
+ "combine",
 ]
 
 [[package]]
