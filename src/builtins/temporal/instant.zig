@@ -94,6 +94,8 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
+
         // 8.3.1 Temporal.Instant.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.constructor
         try object.defineBuiltinProperty(
@@ -114,6 +116,21 @@ pub const prototype = struct {
                 .configurable = true,
             },
         );
+    }
+
+    /// 8.3.3 get Temporal.Instant.prototype.epochMilliseconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.instant.prototype.epochmilliseconds
+    fn epochMilliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Let ns be instant.[[EpochNanoseconds]].
+        // 4. Let ms be floor(ℝ(ns) / 10**6).
+        const ms = temporal_rs.c.temporal_rs_Instant_epoch_milliseconds(instant.fields.inner);
+
+        // 5. Return 𝔽(ms).
+        return Value.from(@as(f64, @floatFromInt(ms)));
     }
 };
 
