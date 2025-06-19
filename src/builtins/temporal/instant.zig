@@ -37,6 +37,7 @@ pub const constructor = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "fromEpochMilliseconds", fromEpochMilliseconds, 1, realm);
+        try object.defineBuiltinFunction(agent, "fromEpochNanoseconds", fromEpochNanoseconds, 1, realm);
 
         // 8.2.1 Temporal.Instant.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype
@@ -112,6 +113,35 @@ pub const constructor = struct {
                     .range_error,
                     "Invalid epoch milliseconds {}",
                     .{epoch_milliseconds_bigint.managed},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+        return Value.from(
+            createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 8.2.4 Temporal.Instant.fromEpochNanoseconds ( epochNanoseconds )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.fromepochnanoseconds
+    fn fromEpochNanoseconds(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const epoch_nanoseconds_value = arguments.get(0);
+
+        // 1. Set epochNanoseconds to ? ToBigInt(epochNanoseconds).
+        const epoch_nanoseconds_bigint = try epoch_nanoseconds_value.toBigInt(agent);
+        const epoch_nanoseconds = epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128);
+
+        // 2. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
+        // 3. Return ! CreateTemporalInstant(epochNanoseconds).
+        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_try_new(temporal_rs.toI128Nanoseconds(epoch_nanoseconds)),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid epoch nanoseconds {}",
+                    .{epoch_nanoseconds_bigint.managed},
                 );
             },
             else => unreachable,
