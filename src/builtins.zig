@@ -176,6 +176,7 @@ pub const moduleNamespaceCreate = module_namespace.moduleNamespaceCreate;
 pub const newPromiseCapability = promise.newPromiseCapability;
 pub const newPromiseReactionJob = promise.newPromiseReactionJob;
 pub const newPromiseResolveThenableJob = promise.newPromiseResolveThenableJob;
+pub const numberToBigInt = big_int.numberToBigInt;
 pub const numericToRawBytes = array_buffer.numericToRawBytes;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
 pub const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;

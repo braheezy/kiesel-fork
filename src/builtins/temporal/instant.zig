@@ -8,6 +8,7 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,6 +18,8 @@ const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const noexcept = utils.noexcept;
+const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 8.2 Properties of the Temporal.Instant Constructor
@@ -33,6 +36,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "fromEpochMilliseconds", fromEpochMilliseconds, 1, realm);
+
         // 8.2.1 Temporal.Instant.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -81,6 +86,39 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             try createTemporalInstant(agent, temporal_rs_instant.?, new_target),
+        );
+    }
+
+    /// 8.2.3 Temporal.Instant.fromEpochMilliseconds ( epochMilliseconds )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.fromepochmilliseconds
+    fn fromEpochMilliseconds(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const epoch_milliseconds_value = arguments.get(0);
+
+        // 1. Set epochMilliseconds to ? ToNumber(epochMilliseconds).
+        const epoch_milliseconds_number = try epoch_milliseconds_value.toNumber(agent);
+
+        // 2. Set epochMilliseconds to ? NumberToBigInt(epochMilliseconds).
+        const epoch_milliseconds_bigint = try numberToBigInt(agent, epoch_milliseconds_number);
+        const epoch_milliseconds = epoch_milliseconds_bigint.managed.toInt(i64) catch std.math.maxInt(i64);
+
+        // 3. Let epochNanoseconds be epochMilliseconds × ℤ(10**6).
+        // 4. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
+        // 5. Return ! CreateTemporalInstant(epochNanoseconds).
+        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_from_epoch_milliseconds(epoch_milliseconds),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid epoch milliseconds {}",
+                    .{epoch_milliseconds_bigint.managed},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+        return Value.from(
+            createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
         );
     }
 };
