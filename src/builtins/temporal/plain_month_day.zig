@@ -123,6 +123,8 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+
         // 10.3.1 Temporal.PlainMonthDay.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype.constructor
         try object.defineBuiltinProperty(
@@ -142,6 +144,17 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 10.3.11 Temporal.PlainMonthDay.prototype.valueOf ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype.valueof
+    fn valueOf(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        // 1. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "Cannot convert Temporal.PlainMonthDay to primitive value",
+            .{},
         );
     }
 };

@@ -144,6 +144,8 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+
         // 6.3.1 Temporal.ZonedDateTime.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.constructor
         try object.defineBuiltinProperty(
@@ -163,6 +165,17 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 6.3.44 Temporal.ZonedDateTime.prototype.valueOf ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.valueof
+    fn valueOf(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        // 1. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "Cannot convert Temporal.ZonedDateTime to primitive value",
+            .{},
         );
     }
 };

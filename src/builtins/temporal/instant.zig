@@ -165,6 +165,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 8.3.1 Temporal.Instant.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.constructor
@@ -216,6 +217,17 @@ pub const prototype = struct {
         );
         const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
         return Value.from(try BigInt.from(agent.gc_allocator, managed));
+    }
+
+    /// 8.3.14 Temporal.Instant.prototype.valueOf ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.valueof
+    fn valueOf(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        // 1. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "Cannot convert Temporal.Instant to primitive value",
+            .{},
+        );
     }
 };
 
