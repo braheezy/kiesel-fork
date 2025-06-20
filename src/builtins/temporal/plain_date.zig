@@ -14,6 +14,7 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -116,6 +117,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 3.3.1 Temporal.PlainDate.prototype.constructor
@@ -137,6 +139,25 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 3.3.3 get Temporal.PlainDate.prototype.calendarId
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.calendarid
+    fn calendarId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let temporalDate be the this value.
+        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Return temporalDate.[[Calendar]].
+        const temporal_rs_calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(
+            plain_date.fields.inner,
+        );
+        const calendar_id = temporal_rs.fromDiplomatStringView(
+            temporal_rs.c.temporal_rs_Calendar_identifier(temporal_rs_calendar.?),
+        );
+        return Value.from(
+            try String.fromAscii(agent, try agent.gc_allocator.dupe(u8, calendar_id)),
         );
     }
 

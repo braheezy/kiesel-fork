@@ -1013,7 +1013,7 @@ fn prettyPrintTemporalPlainDate(
     const iso_month = temporal_rs.c.temporal_rs_PlainDate_iso_month(temporal_plain_date.fields.inner);
     const iso_day = temporal_rs.c.temporal_rs_PlainDate_iso_day(temporal_plain_date.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(temporal_plain_date.fields.inner);
-    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
+    const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDate(");
@@ -1022,7 +1022,7 @@ fn prettyPrintTemporalPlainDate(
         Value.from(iso_year),
         Value.from(iso_month),
         Value.from(iso_day),
-        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+        Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1045,7 +1045,7 @@ fn prettyPrintTemporalPlainDateTime(
     const microsecond = temporal_rs.c.temporal_rs_PlainDateTime_microsecond(temporal_plain_date_time.fields.inner);
     const nanosecond = temporal_rs.c.temporal_rs_PlainDateTime_nanosecond(temporal_plain_date_time.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainDateTime_calendar(temporal_plain_date_time.fields.inner);
-    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
+    const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDateTime(");
@@ -1060,7 +1060,7 @@ fn prettyPrintTemporalPlainDateTime(
         Value.from(millisecond),
         Value.from(microsecond),
         Value.from(nanosecond),
-        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+        Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1076,7 +1076,7 @@ fn prettyPrintTemporalPlainMonthDay(
     const iso_month = temporal_rs.c.temporal_rs_PlainMonthDay_iso_month(temporal_plain_month_day.fields.inner);
     const iso_day = temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(temporal_plain_month_day.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainMonthDay_calendar(temporal_plain_month_day.fields.inner);
-    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
+    const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainMonthDay(");
@@ -1084,7 +1084,7 @@ fn prettyPrintTemporalPlainMonthDay(
     try writer.print("{pretty}, {pretty}, {pretty}", .{
         Value.from(iso_month),
         Value.from(iso_day),
-        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+        Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1129,7 +1129,7 @@ fn prettyPrintTemporalPlainYearMonth(
     const iso_year = temporal_rs.c.temporal_rs_PlainYearMonth_iso_year(temporal_plain_year_month.fields.inner);
     const iso_month = temporal_rs.c.temporal_rs_PlainYearMonth_iso_month(temporal_plain_year_month.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainYearMonth_calendar(temporal_plain_year_month.fields.inner);
-    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
+    const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainYearMonth(");
@@ -1137,7 +1137,7 @@ fn prettyPrintTemporalPlainYearMonth(
     try writer.print("{pretty}, {pretty}, {pretty}", .{
         Value.from(iso_year),
         Value.from(iso_month),
-        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+        Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1157,14 +1157,14 @@ fn prettyPrintTemporalZonedDateTime(
     // TODO: Print time zone, right now there doesn't seem to be a way to get it as a string
     _ = time_zone;
     const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(temporal_zoned_date_time.fields.inner);
-    const calendar_id = temporal_rs.c.temporal_rs_Calendar_identifier(calendar);
+    const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.ZonedDateTime(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, {pretty}", .{
         Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
-        Value.from(asciiString(calendar_id.data[0..calendar_id.len])),
+        Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");

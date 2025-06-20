@@ -38,6 +38,10 @@ pub fn toI128Nanoseconds(ns: i128) c.I128Nanoseconds {
     return .{ .high = if (is_neg) -high else high, .low = low };
 }
 
+pub fn fromDiplomatStringView(sv: c.DiplomatStringView) []const u8 {
+    return sv.data[0..sv.len];
+}
+
 // https://github.com/boa-dev/temporal/blob/main/temporal_capi/src/error.rs
 pub const TemporalError = error{
     GenericError,
