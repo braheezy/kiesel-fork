@@ -2217,6 +2217,29 @@ pub fn createArrayFromListMapToValue(
     return array;
 }
 
+/// 9.2.9 GetOptionsObject ( options )
+/// https://tc39.es/ecma402/#sec-getoptionsobject
+pub fn getOptionsObject(self: Value, agent: *Agent) Agent.Error!*Object {
+    // 1. If options is undefined, then
+    if (self.isUndefined()) {
+        // a. Return OrdinaryObjectCreate(null).
+        return ordinaryObjectCreate(agent, null);
+    }
+
+    // 2. If options is an Object, then
+    if (self.isObject()) {
+        // a. Return options.
+        return self.asObject();
+    }
+
+    // 3. Throw a TypeError exception.
+    return agent.throwException(
+        .type_error,
+        "Options must either be an object or undefined",
+        .{},
+    );
+}
+
 /// 9.2.12 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
 pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {

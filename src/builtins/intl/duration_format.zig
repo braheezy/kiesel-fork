@@ -21,7 +21,6 @@ const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getNumberOption = abstract_operations.getNumberOption;
-const getOptionsObject = abstract_operations.getOptionsObject;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -101,7 +100,7 @@ pub const constructor = struct {
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
         // 4. Let options be ? GetOptionsObject(options).
-        const options = try getOptionsObject(agent, options_value);
+        const options = try options_value.getOptionsObject(agent);
 
         // 5. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
         //    "best fit").

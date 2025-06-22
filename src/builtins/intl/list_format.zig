@@ -21,7 +21,6 @@ const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIterator = types.getIterator;
-const getOptionsObject = abstract_operations.getOptionsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -83,7 +82,7 @@ pub const constructor = struct {
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
         // 4. Set options to ? GetOptionsObject(options).
-        const options = try getOptionsObject(agent, options_value);
+        const options = try options_value.getOptionsObject(agent);
 
         // 5. Let opt be a new Record.
 

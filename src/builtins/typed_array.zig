@@ -27,7 +27,6 @@ const createArrayIterator = builtins.createArrayIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const findViaPredicate = builtins.findViaPredicate;
 const getIteratorFromMethod = types.getIteratorFromMethod;
-const getOptionsObject = @import("intl/abstract_operations.zig").getOptionsObject;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isDetachedBuffer = builtins.isDetachedBuffer;
@@ -4125,7 +4124,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             const string = string_value.asString();
 
             // 2. Let opts be ? GetOptionsObject(options).
-            const options = try getOptionsObject(agent, options_value);
+            const options = try options_value.getOptionsObject(agent);
 
             // 3. Let alphabet be ? Get(opts, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
@@ -4276,7 +4275,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const typed_array = try validateUint8Array(agent, this_value);
 
             // 3. Let opts be ? GetOptionsObject(options).
-            const options = try getOptionsObject(agent, options_value);
+            const options = try options_value.getOptionsObject(agent);
 
             // 4. Let alphabet be ? Get(opts, "alphabet").
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
