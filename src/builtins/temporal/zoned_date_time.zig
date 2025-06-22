@@ -18,7 +18,6 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const isValidEpochNanoseconds = builtins.isValidEpochNanoseconds;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -67,10 +66,12 @@ pub const constructor = struct {
 
         // 2. Set epochNanoseconds to ? ToBigInt(epochNanoseconds).
         const epoch_nanoseconds_bigint = try epoch_nanoseconds_value.toBigInt(agent);
-        const epoch_nanoseconds = epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128);
+        const epoch_nanoseconds = temporal_rs.toI128Nanoseconds(
+            epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128),
+        );
 
         // 3. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
-        if (!isValidEpochNanoseconds(epoch_nanoseconds)) {
+        if (!temporal_rs.c.temporal_rs_I128Nanoseconds_is_valid(epoch_nanoseconds)) {
             return agent.throwException(
                 .range_error,
                 "Invalid epoch nanoseconds {}",
@@ -120,7 +121,7 @@ pub const constructor = struct {
         // 11. Return ? CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar, NewTarget).
         const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
-                temporal_rs.toI128Nanoseconds(epoch_nanoseconds),
+                epoch_nanoseconds,
                 calendar,
                 temporal_rs_time_zone,
             ),

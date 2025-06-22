@@ -167,7 +167,6 @@ pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescript
 pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const isFixedLengthArrayBuffer = array_buffer.isFixedLengthArrayBuffer;
 pub const isTypedArrayOutOfBounds = typed_array.isTypedArrayOutOfBounds;
-pub const isValidEpochNanoseconds = temporal.instant.isValidEpochNanoseconds;
 pub const keyForSymbol = symbol.keyForSymbol;
 pub const makeClassConstructor = ecmascript_function.makeClassConstructor;
 pub const makeConstructor = ecmascript_function.makeConstructor;

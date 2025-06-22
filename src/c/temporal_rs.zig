@@ -9,6 +9,7 @@ pub const c = @cImport({
     @cInclude("Calendar.h");
     @cInclude("Duration.h");
     @cInclude("ErrorKind.h");
+    @cInclude("I128Nanoseconds.h");
     @cInclude("Instant.h");
     @cInclude("PlainDate.h");
     @cInclude("PlainDateTime.h");

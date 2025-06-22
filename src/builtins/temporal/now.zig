@@ -50,7 +50,7 @@ pub const namespace = struct {
 
         // 2. Return ! CreateTemporalInstant(ns).
         const temporal_rs_instant = temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_Instant_try_new(temporal_rs.toI128Nanoseconds(ns)),
+            temporal_rs.c.temporal_rs_Instant_try_new(ns),
         ) catch unreachable;
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
@@ -68,11 +68,13 @@ pub const namespace = struct {
 
 /// 2.3.3 SystemUTCEpochNanoseconds ( )
 /// https://tc39.es/proposal-temporal/#sec-temporal-systemutcepochnanoseconds
-pub fn systemUTCEpochNanoseconds(agent: *Agent) i128 {
+pub fn systemUTCEpochNanoseconds(agent: *Agent) temporal_rs.c.I128Nanoseconds {
     // NOTE: The host implementation can get the global object itself if needed, passing the agent
     //       is enough.
     // 1. Let global be GetGlobalObject().
     // 2. Let nowNs be HostSystemUTCEpochNanoseconds(global).
+    const now_ns = agent.host_hooks.hostSystemUTCEpochNanoseconds(agent);
+
     // 3. Return ℤ(nowNs).
-    return agent.host_hooks.hostSystemUTCEpochNanoseconds(agent);
+    return temporal_rs.toI128Nanoseconds(now_ns);
 }

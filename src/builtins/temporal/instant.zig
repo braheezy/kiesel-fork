@@ -69,10 +69,12 @@ pub const constructor = struct {
 
         // 2. Let epochNanoseconds be ? ToBigInt(epochNanoseconds).
         const epoch_nanoseconds_bigint = try epoch_nanoseconds_value.toBigInt(agent);
-        const epoch_nanoseconds = epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128);
+        const epoch_nanoseconds = temporal_rs.toI128Nanoseconds(
+            epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128),
+        );
 
         // 3. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
-        if (!isValidEpochNanoseconds(epoch_nanoseconds)) {
+        if (!temporal_rs.c.temporal_rs_I128Nanoseconds_is_valid(epoch_nanoseconds)) {
             return agent.throwException(
                 .range_error,
                 "Invalid epoch nanoseconds {}",
@@ -82,7 +84,7 @@ pub const constructor = struct {
 
         // 4. Return ? CreateTemporalInstant(epochNanoseconds, NewTarget).
         const temporal_rs_instant = temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_Instant_try_new(temporal_rs.toI128Nanoseconds(epoch_nanoseconds)),
+            temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         ) catch unreachable;
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
@@ -130,12 +132,14 @@ pub const constructor = struct {
 
         // 1. Set epochNanoseconds to ? ToBigInt(epochNanoseconds).
         const epoch_nanoseconds_bigint = try epoch_nanoseconds_value.toBigInt(agent);
-        const epoch_nanoseconds = epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128);
+        const epoch_nanoseconds = temporal_rs.toI128Nanoseconds(
+            epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128),
+        );
 
         // 2. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
         // 3. Return ! CreateTemporalInstant(epochNanoseconds).
         const temporal_rs_instant = temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_Instant_try_new(temporal_rs.toI128Nanoseconds(epoch_nanoseconds)),
+            temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         ) catch |err| switch (err) {
             error.RangeError => {
                 return agent.throwException(
@@ -252,19 +256,6 @@ pub const ns_per_day = 86400000000000;
 /// nsMinInstant = -nsMaxInstant = -8.64 × 10**21
 /// https://tc39.es/proposal-temporal/#eqn-nsMinInstant
 pub const ns_min_instant = -8640000000000000000000;
-
-/// 8.5.1 IsValidEpochNanoseconds ( epochNanoseconds )
-/// https://tc39.es/proposal-temporal/#sec-temporal-isvalidepochnanoseconds
-pub fn isValidEpochNanoseconds(epoch_nanoseconds: i128) bool {
-    // 1. If ℝ(epochNanoseconds) < nsMinInstant or ℝ(epochNanoseconds) > nsMaxInstant, then
-    if (epoch_nanoseconds < ns_min_instant or epoch_nanoseconds > ns_max_instant) {
-        // a. Return false.
-        return false;
-    }
-
-    // 2. Return true.
-    return true;
-}
 
 /// 8.5.2 CreateTemporalInstant ( epochNanoseconds [ , newTarget ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createtemporalinstant
