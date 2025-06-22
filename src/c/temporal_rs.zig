@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const build_options = @import("build-options");
 
 pub const c = @cImport({
@@ -41,6 +43,53 @@ pub fn toI128Nanoseconds(ns: i128) c.I128Nanoseconds {
 pub fn fromDiplomatStringView(sv: c.DiplomatStringView) []const u8 {
     return sv.data[0..sv.len];
 }
+
+pub const DiplomatWrite = struct {
+    pub const Context = struct {
+        gpa: std.mem.Allocator,
+        array_list: std.ArrayListUnmanaged(u8) = .empty,
+    };
+
+    inner: c.DiplomatWrite,
+
+    pub fn init(context: *Context) DiplomatWrite {
+        return .{
+            .inner = .{
+                .context = context,
+                .buf = undefined,
+                .len = 0,
+                .cap = 0,
+                .grow_failed = false,
+                .flush = flush,
+                .grow = grow,
+            },
+        };
+    }
+
+    pub fn deinit(self: *const DiplomatWrite) void {
+        const context: *Context = @alignCast(@ptrCast(self.inner.context.?));
+        context.array_list.deinit(context.gpa);
+    }
+
+    pub fn toOwnedSlice(self: *const DiplomatWrite) std.mem.Allocator.Error![]u8 {
+        if (self.inner.grow_failed) return error.OutOfMemory;
+        const context: *Context = @alignCast(@ptrCast(self.inner.context.?));
+        return context.array_list.toOwnedSlice(context.gpa);
+    }
+
+    fn flush(inner: ?*c.DiplomatWrite) callconv(.c) void {
+        const context: *Context = @alignCast(@ptrCast(inner.?.context.?));
+        context.array_list.items.len = inner.?.len;
+    }
+
+    fn grow(inner: ?*c.DiplomatWrite, size: usize) callconv(.c) bool {
+        const context: *Context = @alignCast(@ptrCast(inner.?.context.?));
+        context.array_list.ensureTotalCapacity(context.gpa, size) catch return false;
+        inner.?.buf = context.array_list.items.ptr;
+        inner.?.cap = context.array_list.capacity;
+        return true;
+    }
+};
 
 // https://github.com/boa-dev/temporal/blob/main/temporal_capi/src/error.rs
 pub const TemporalError = error{

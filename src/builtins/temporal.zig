@@ -160,3 +160,43 @@ pub fn canonicalizeCalendar(
     defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar);
     return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
 }
+
+/// 13.10 GetTemporalShowCalendarNameOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalshowcalendarnameoption
+pub fn getTemporalShowCalendarNameOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.DisplayCalendar {
+    // 1. Let stringValue be ? GetOption(options, "calendarName", string, « "auto", "always",
+    //    "never", "critical" », "auto").
+    const string_value = try options.getOption(
+        agent,
+        "calendarName",
+        .string,
+        &.{
+            String.fromLiteral("auto"),
+            String.fromLiteral("always"),
+            String.fromLiteral("never"),
+            String.fromLiteral("critical"),
+        },
+        String.fromLiteral("auto"),
+    );
+
+    // 2. If stringValue is "always", return always.
+    if (string_value.eql(String.fromLiteral("always"))) {
+        return temporal_rs.c.DisplayCalendar_Always;
+    }
+
+    // 3. If stringValue is "never", return never.
+    if (string_value.eql(String.fromLiteral("never"))) {
+        return temporal_rs.c.DisplayCalendar_Never;
+    }
+
+    // 4. If stringValue is "critical", return critical.
+    if (string_value.eql(String.fromLiteral("critical"))) {
+        return temporal_rs.c.DisplayCalendar_Critical;
+    }
+
+    // 5. Return auto.
+    return temporal_rs.c.DisplayCalendar_Auto;
+}

@@ -159,6 +159,7 @@ pub const getGeneratorKind = generator.getGeneratorKind;
 pub const getModifySetValueInBuffer = array_buffer.getModifySetValueInBuffer;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const getSubstitution = string.getSubstitution;
+pub const getTemporalShowCalendarNameOption = temporal.getTemporalShowCalendarNameOption;
 pub const getValueFromBuffer = array_buffer.getValueFromBuffer;
 pub const globalObjectProperties = global.globalObjectProperties;
 pub const installErrorCause = @"error".installErrorCause;

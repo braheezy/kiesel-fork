@@ -18,6 +18,7 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 3.2 Properties of the Temporal.PlainDate Constructor
@@ -118,6 +119,9 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 3.3.1 Temporal.PlainDate.prototype.constructor
@@ -159,6 +163,68 @@ pub const prototype = struct {
         return Value.from(
             try String.fromAscii(agent, try agent.gc_allocator.dupe(u8, calendar_id)),
         );
+    }
+
+    /// 3.3.32 Temporal.PlainDate.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let temporalDate be the this value.
+        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Return TemporalDateToString(temporalDate, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
+            plain_date.fields.inner,
+            temporal_rs.c.DisplayCalendar_Auto,
+            &write.inner,
+        );
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 3.3.31 Temporal.PlainDate.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let temporalDate be the this value.
+        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Return TemporalDateToString(temporalDate, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
+            plain_date.fields.inner,
+            temporal_rs.c.DisplayCalendar_Auto,
+            &write.inner,
+        );
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 3.3.30 Temporal.PlainDate.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let temporalDate be the this value.
+        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. Let showCalendar be ? GetTemporalShowCalendarNameOption(resolvedOptions).
+        const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
+
+        // 5. Return TemporalDateToString(temporalDate, showCalendar).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
+            plain_date.fields.inner,
+            show_calendar,
+            &write.inner,
+        );
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 3.3.33 Temporal.PlainDate.prototype.valueOf ( )
