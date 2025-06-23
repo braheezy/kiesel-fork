@@ -126,6 +126,8 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
+        try object.defineBuiltinAccessor(agent, "day", day, null, realm);
+        try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -170,6 +172,34 @@ pub const prototype = struct {
         return Value.from(
             try String.fromAscii(agent, try agent.gc_allocator.dupe(u8, calendar_id)),
         );
+    }
+
+    /// 10.3.5 get Temporal.PlainMonthDay.prototype.day
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.day
+    fn day(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let monthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
+
+        // 3. Return 𝔽(CalendarISOToDate(monthDay.[[Calendar]], monthDay.[[ISODate]]).[[Day]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(plain_month_day.fields.inner));
+    }
+
+    /// 10.3.4 get Temporal.PlainMonthDay.prototype.monthCode
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.monthcode
+    fn monthCode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let monthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
+
+        // 3. Return CalendarISOToDate(monthDay.[[Calendar]], monthDay.[[ISODate]]).[[MonthCode]].
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainMonthDay_month_code(
+            plain_month_day.fields.inner,
+            &write.inner,
+        );
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 10.3.10 Temporal.PlainMonthDay.prototype.toJSON ( )
