@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const temporal_rs = @import("../c/temporal_rs.zig");
+
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -20,6 +22,7 @@ const String = types.String;
 const StringParser = utils.StringParser;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalInstant = builtins.createTemporalInstant;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 const hours_per_day = 24;
@@ -1092,6 +1095,10 @@ pub const prototype = struct {
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
             const @"%Date.prototype.toUTCString%" = object.getPropertyValueDirect(PropertyKey.from("toUTCString"));
             try object.defineBuiltinProperty(agent, "toGMTString", @"%Date.prototype.toUTCString%");
+        }
+
+        if (build_options.enable_temporal) {
+            try object.defineBuiltinFunction(agent, "toTemporalInstant", toTemporalInstant, 0, realm);
         }
     }
 
@@ -2227,6 +2234,35 @@ pub const prototype = struct {
             "{}",
             .{fmtToDateString(time_value)},
         )));
+    }
+
+    /// 14.9.1 Date.prototype.toTemporalInstant ( )
+    /// https://tc39.es/proposal-temporal/#sec-date.prototype.totemporalinstant
+    fn toTemporalInstant(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. Let ns be ? NumberToBigInt(t) × ℤ(10**6).
+        if (std.math.isNan(time_value)) {
+            return agent.throwException(
+                .range_error,
+                "Cannot convert invalid date to Temporal.Instant",
+                .{},
+            );
+        }
+        std.debug.assert(@trunc(time_value) == time_value);
+        const ns = temporal_rs.toI128Nanoseconds(@as(i128, @intFromFloat(time_value)) * 1_000_000);
+
+        // 5. Return ! CreateTemporalInstant(ns).
+        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_try_new(ns),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+        return Value.from(try createTemporalInstant(agent, temporal_rs_instant.?, null));
     }
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )
