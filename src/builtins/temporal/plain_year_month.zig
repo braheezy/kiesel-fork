@@ -126,10 +126,19 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
+        try object.defineBuiltinAccessor(agent, "daysInMonth", daysInMonth, null, realm);
+        try object.defineBuiltinAccessor(agent, "daysInYear", daysInYear, null, realm);
+        try object.defineBuiltinAccessor(agent, "era", era, null, realm);
+        try object.defineBuiltinAccessor(agent, "eraYear", eraYear, null, realm);
+        try object.defineBuiltinAccessor(agent, "inLeapYear", inLeapYear, null, realm);
+        try object.defineBuiltinAccessor(agent, "month", month, null, realm);
+        try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
+        try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinAccessor(agent, "year", year, null, realm);
 
         // 9.3.1 Temporal.PlainYearMonth.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.constructor
@@ -169,6 +178,123 @@ pub const prototype = struct {
         );
         return Value.from(
             try String.fromAscii(agent, try agent.gc_allocator.dupe(u8, calendar_id)),
+        );
+    }
+
+    /// 9.3.10 get Temporal.PlainYearMonth.prototype.daysInMonth
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.daysinmonth
+    fn daysInMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return 𝔽(CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[DaysInMonth]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainYearMonth_days_in_month(plain_year_month.fields.inner));
+    }
+
+    /// 9.3.9 get Temporal.PlainYearMonth.prototype.daysInYear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.daysinyear
+    fn daysInYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return 𝔽(CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[DaysInYear]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_days_in_year(plain_year_month.fields.inner),
+        );
+    }
+
+    /// 9.3.4 get Temporal.PlainYearMonth.prototype.era
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.era
+    fn era(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[Era]].
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainYearMonth_era(plain_year_month.fields.inner, &write.inner);
+        if (write.inner.len == 0) {
+            std.debug.assert(write.inner.cap == 0); // Nothing to free
+            return .undefined;
+        }
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 9.3.5 get Temporal.PlainYearMonth.prototype.eraYear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.erayear
+    fn eraYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Let result be CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[EraYear]].
+        const result = temporal_rs.c.temporal_rs_PlainYearMonth_era_year(
+            plain_year_month.fields.inner,
+        );
+
+        // 4. If result is undefined, return undefined.
+        if (!result.is_ok) return .undefined;
+
+        // 5. Return 𝔽(result).
+        return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 9.3.12 get Temporal.PlainYearMonth.prototype.inLeapYear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.inleapyear
+    fn inLeapYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[InLeapYear]].
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_in_leap_year(plain_year_month.fields.inner),
+        );
+    }
+
+    /// 9.3.7 get Temporal.PlainYearMonth.prototype.month
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.month
+    fn month(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return 𝔽(CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[MOnth]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_month(plain_year_month.fields.inner),
+        );
+    }
+
+    /// 9.3.8 get Temporal.PlainYearMonth.prototype.monthCode
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.monthcode
+    fn monthCode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[MonthCode]].
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.c.temporal_rs_PlainYearMonth_month_code(
+            plain_year_month.fields.inner,
+            &write.inner,
+        );
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 9.3.11 get Temporal.PlainYearMonth.prototype.monthsInYear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.monthsinyear
+    fn monthsInYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return 𝔽(CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[MonthsInYear]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_months_in_year(plain_year_month.fields.inner),
         );
     }
 
@@ -242,6 +368,19 @@ pub const prototype = struct {
             .type_error,
             "Cannot convert Temporal.PlainYearMonth to primitive value",
             .{},
+        );
+    }
+
+    /// 9.3.6 get Temporal.PlainYearMonth.prototype.year
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.year
+    fn year(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let yearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(yearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return 𝔽(CalendarISOToDate(yearMonth.[[Calendar]], yearMonth.[[ISODate]]).[[Year]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_year(plain_year_month.fields.inner),
         );
     }
 };
