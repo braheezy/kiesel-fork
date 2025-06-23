@@ -164,11 +164,11 @@ pub const prototype = struct {
     /// 3.3.3 get Temporal.PlainDate.prototype.calendarId
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.calendarid
     fn calendarId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return temporalDate.[[Calendar]].
+        // 3. Return plainDate.[[Calendar]].
         const temporal_rs_calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(
             plain_date.fields.inner,
         );
@@ -183,22 +183,22 @@ pub const prototype = struct {
     /// 3.3.9 get Temporal.PlainDate.prototype.day
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.day
     fn day(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[Day]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[Day]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_day(plain_date.fields.inner));
     }
 
     /// 3.3.10 get Temporal.PlainDate.prototype.dayOfWeek
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.dayofweek
     fn dayOfWeek(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[DayOfWeek]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DayOfWeek]]).
         const day_of_week = temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_PlainDate_day_of_week(plain_date.fields.inner),
         ) catch |err| switch (err) {
@@ -214,33 +214,33 @@ pub const prototype = struct {
     /// 3.3.11 get Temporal.PlainDate.prototype.dayOfYear
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.dayofyear
     fn dayOfYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[DayOfYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DayOfYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_day_of_year(plain_date.fields.inner));
     }
 
     /// 3.3.15 get Temporal.PlainDate.prototype.daysInMonth
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.daysinmonth
     fn daysInMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[DaysInMonth]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInMonth]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_days_in_month(plain_date.fields.inner));
     }
 
     /// 3.3.14 get Temporal.PlainDate.prototype.daysInWeek
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.daysinweek
     fn daysInWeek(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[DaysInWeek]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInWeek]]).
         const days_in_week = temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_PlainDate_days_in_week(plain_date.fields.inner),
         ) catch |err| switch (err) {
@@ -256,11 +256,11 @@ pub const prototype = struct {
     /// 3.3.16 get Temporal.PlainDate.prototype.daysInYear
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.daysinyear
     fn daysInYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[DaysInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_days_in_year(plain_date.fields.inner));
     }
 
@@ -302,33 +302,33 @@ pub const prototype = struct {
     /// 3.3.18 get Temporal.PlainDate.prototype.inLeapYear
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.inleapyear
     fn inLeapYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[inLeapYear]].
+        // 3. Return CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[inLeapYear]].
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_in_leap_year(plain_date.fields.inner));
     }
 
     /// 3.3.7 get Temporal.PlainDate.prototype.month
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.month
     fn month(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[Month]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[Month]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_month(plain_date.fields.inner));
     }
 
     /// 3.3.8 get Temporal.PlainDate.prototype.monthCode
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.monthcode
     fn monthCode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[MonthCode]].
+        // 3. Return CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[MonthCode]].
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainDate_month_code(plain_date.fields.inner, &write.inner);
@@ -338,22 +338,22 @@ pub const prototype = struct {
     /// 3.3.17 get Temporal.PlainDate.prototype.monthsInYear
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.monthsinyear
     fn monthsInYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[MonthsInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_months_in_year(plain_date.fields.inner));
     }
 
     /// 3.3.32 Temporal.PlainDate.prototype.toJSON ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tojson
     fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return TemporalDateToString(temporalDate, auto).
+        // 3. Return TemporalDateToString(plainDate, auto).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
@@ -367,11 +367,11 @@ pub const prototype = struct {
     /// 3.3.31 Temporal.PlainDate.prototype.toLocaleString ( [ locales [ , options ] ] )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return TemporalDateToString(temporalDate, auto).
+        // 3. Return TemporalDateToString(plainDate, auto).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
@@ -387,8 +387,8 @@ pub const prototype = struct {
     fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const options_value = arguments.get(0);
 
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
         // 3. Let resolvedOptions be ? GetOptionsObject(options).
@@ -397,7 +397,7 @@ pub const prototype = struct {
         // 4. Let showCalendar be ? GetTemporalShowCalendarNameOption(resolvedOptions).
         const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
 
-        // 5. Return TemporalDateToString(temporalDate, showCalendar).
+        // 5. Return TemporalDateToString(plainDate, showCalendar).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainDate_to_ixdtf_string(
@@ -422,11 +422,11 @@ pub const prototype = struct {
     /// 3.3.12 get Temporal.PlainDate.prototype.weekOfYear
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.weekofyear
     fn weekOfYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Let result be CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[WeekOfYear]].[[Week]].
+        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[WeekOfYear]].[[Week]].
         const result = temporal_rs.c.temporal_rs_PlainDate_week_of_year(plain_date.fields.inner);
 
         // 4. If result is undefined, return undefined.
@@ -439,22 +439,22 @@ pub const prototype = struct {
     /// 3.3.6 get Temporal.PlainDate.prototype.year
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.year
     fn year(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[Year]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[Year]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_year(plain_date.fields.inner));
     }
 
     /// 3.3.13 get Temporal.PlainDate.prototype.yearOfWeek
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindate.prototype.yearofweek
     fn yearOfWeek(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let temporalDate be the this value.
-        // 2. Perform ? RequireInternalSlot(temporalDate, [[InitializedTemporalDate]]).
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Let result be CalendarISOToDate(temporalDate.[[Calendar]], temporalDate.[[ISODate]]).[[WeekOfYear]].[[Year]].
+        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[WeekOfYear]].[[Year]].
         const result = temporal_rs.c.temporal_rs_PlainDate_year_of_week(plain_date.fields.inner);
 
         // 4. If result is undefined, return undefined.

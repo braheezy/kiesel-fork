@@ -177,11 +177,11 @@ pub const prototype = struct {
     /// 5.3.3 get Temporal.PlainDateTime.prototype.calendarId
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaindatetime.prototype.calendarid
     fn calendarId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(dateTime, [[InitializedTemporalDateTime]]).
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return dateTime.[[Calendar]].
+        // 3. Return plainDateTime.[[Calendar]].
         const temporal_rs_calendar = temporal_rs.c.temporal_rs_PlainDateTime_calendar(
             plain_date_time.fields.inner,
         );

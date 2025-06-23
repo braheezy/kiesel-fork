@@ -158,11 +158,11 @@ pub const prototype = struct {
     /// 10.3.3 get Temporal.PlainMonthDay.prototype.calendarId
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.calendarid
     fn calendarId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return monthDay.[[Calendar]].
+        // 3. Return plainMonthDay.[[Calendar]].
         const temporal_rs_calendar = temporal_rs.c.temporal_rs_PlainMonthDay_calendar(
             plain_month_day.fields.inner,
         );
@@ -177,22 +177,22 @@ pub const prototype = struct {
     /// 10.3.5 get Temporal.PlainMonthDay.prototype.day
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.day
     fn day(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return 𝔽(CalendarISOToDate(monthDay.[[Calendar]], monthDay.[[ISODate]]).[[Day]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[Day]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(plain_month_day.fields.inner));
     }
 
     /// 10.3.4 get Temporal.PlainMonthDay.prototype.monthCode
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.monthcode
     fn monthCode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return CalendarISOToDate(monthDay.[[Calendar]], monthDay.[[ISODate]]).[[MonthCode]].
+        // 3. Return CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[MonthCode]].
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainMonthDay_month_code(
@@ -205,11 +205,11 @@ pub const prototype = struct {
     /// 10.3.10 Temporal.PlainMonthDay.prototype.toJSON ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype.tojson
     fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return TemporalMonthDayToString(monthDay, auto).
+        // 3. Return TemporalMonthDayToString(plainMonthDay, auto).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
@@ -223,11 +223,11 @@ pub const prototype = struct {
     /// 10.3.9 Temporal.PlainMonthDay.prototype.toLocaleString ( [ locales [ , options ] ] )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return TemporalMonthDayToString(monthDay, auto).
+        // 3. Return TemporalMonthDayToString(plainMonthDay, auto).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
@@ -243,8 +243,8 @@ pub const prototype = struct {
     fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const options_value = arguments.get(0);
 
-        // 1. Let monthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(monthDay, [[InitializedTemporalMonthDay]]).
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Let resolvedOptions be ? GetOptionsObject(options).
@@ -253,7 +253,7 @@ pub const prototype = struct {
         // 4. Let showCalendar be ? GetTemporalShowCalendarNameOption(resolvedOptions).
         const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
 
-        // 5. Return TemporalMonthDayToString(monthDay, showCalendar).
+        // 5. Return TemporalMonthDayToString(plainMonthDay, showCalendar).
         var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
