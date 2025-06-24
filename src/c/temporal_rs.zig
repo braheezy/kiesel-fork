@@ -49,6 +49,11 @@ pub fn fromDiplomatStringView(sv: c.DiplomatStringView) []const u8 {
     return sv.data[0..sv.len];
 }
 
+/// Convert a Zig slice to a Rust `DiplomatStringView`.
+pub fn toDiplomatStringView(s: []const u8) c.DiplomatStringView {
+    return .{ .data = s.ptr, .len = s.len };
+}
+
 pub const DiplomatWrite = struct {
     pub const Context = struct {
         gpa: std.mem.Allocator,

@@ -94,15 +94,17 @@ pub const constructor = struct {
         const time_zone = try time_zone_value.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(time_zone);
         const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(.{
-                .data = time_zone.ptr,
-                .len = time_zone.len,
-            }),
+            temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
+                temporal_rs.toDiplomatStringView(time_zone),
+            ),
         ) catch |err| switch (err) {
             error.RangeError => return agent.throwException(.range_error, "Invalid time zone", .{}),
             else => unreachable,
         };
-        if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
+        if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?) or
+            // https://github.com/boa-dev/temporal/blob/3455373e250dc3c3c5ee0112f379bbc97d7c351c/src/builtins/core/timezone.rs#L109-L111
+            std.mem.eql(u8, time_zone, "Z"))
+        {
             return agent.throwException(.range_error, "Invalid time zone", .{});
         }
         errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);

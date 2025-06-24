@@ -134,6 +134,59 @@ pub const namespace = struct {
     }
 };
 
+/// 11.1.8 ToTemporalTimeZoneIdentifier ( temporalTimeZoneLike )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporaltimezoneidentifier
+pub fn toTemporalTimeZoneIdentifier(
+    agent: *Agent,
+    temporal_time_zone_like: Value,
+) Agent.Error!*const temporal_rs.c.TimeZone {
+    // 1. If temporalTimeZoneLike is an Object, then
+    if (temporal_time_zone_like.isObject()) {
+        // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
+        if (temporal_time_zone_like.asObject().is(ZonedDateTime)) {
+            // i. Return temporalTimeZoneLike.[[TimeZone]].
+            const temporal_rs_time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
+                temporal_time_zone_like.asObject().as(ZonedDateTime).fields.inner,
+            );
+            return temporal_rs_time_zone.?;
+        }
+    }
+
+    // 2. If temporalTimeZoneLike is not a String, throw a TypeError exception.
+    if (!temporal_time_zone_like.isString()) {
+        return agent.throwException(
+            .type_error,
+            "Time zone must be a string or Temporal.ZonedDateTime object",
+            .{},
+        );
+    }
+
+    // 3. Let parseResult be ? ParseTemporalTimeZoneString(temporalTimeZoneLike).
+    // 4. Let offsetMinutes be parseResult.[[OffsetMinutes]].
+    // 5. If offsetMinutes is not empty, return FormatOffsetTimeZoneIdentifier(offsetMinutes).
+    // 6. Let name be parseResult.[[Name]].
+    // 7. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(name).
+    // 8. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
+    // 9. Return timeZoneIdentifierRecord.[[Identifier]].
+    const time_zone = try temporal_time_zone_like.asString().toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(time_zone);
+    const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_TimeZone_try_from_str(
+            temporal_rs.toDiplomatStringView(time_zone),
+        ),
+    ) catch |err| switch (err) {
+        error.RangeError => return agent.throwException(.range_error, "Invalid time zone", .{}),
+        else => unreachable,
+    };
+    if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?) or
+        // https://github.com/boa-dev/temporal/blob/3455373e250dc3c3c5ee0112f379bbc97d7c351c/src/builtins/core/timezone.rs#L109-L111
+        std.mem.eql(u8, time_zone, "Z"))
+    {
+        return agent.throwException(.range_error, "Invalid time zone", .{});
+    }
+    return temporal_rs_time_zone.?;
+}
+
 /// 12.1.1 CanonicalizeCalendar ( id )
 /// https://tc39.es/proposal-temporal/#sec-temporal-canonicalizecalendar
 pub fn canonicalizeCalendar(
