@@ -799,7 +799,7 @@ dependencies = [
 [[package]]
 name = "temporal_capi"
 version = "0.0.9"
-source = "git+https://github.com/boa-dev/temporal.git?rev=531cee14769e8c077c59a1faf67d5465e85f5afa#531cee14769e8c077c59a1faf67d5465e85f5afa"
+source = "git+https://github.com/boa-dev/temporal.git?rev=89bfca1f5b918d00a19354664e1da11da51305ee#89bfca1f5b918d00a19354664e1da11da51305ee"
 dependencies = [
  "diplomat",
  "diplomat-runtime",
@@ -813,7 +813,7 @@ dependencies = [
 [[package]]
 name = "temporal_rs"
 version = "0.0.9"
-source = "git+https://github.com/boa-dev/temporal.git?rev=531cee14769e8c077c59a1faf67d5465e85f5afa#531cee14769e8c077c59a1faf67d5465e85f5afa"
+source = "git+https://github.com/boa-dev/temporal.git?rev=89bfca1f5b918d00a19354664e1da11da51305ee#89bfca1f5b918d00a19354664e1da11da51305ee"
 dependencies = [
  "combine",
  "core_maths",
@@ -831,7 +831,7 @@ dependencies = [
 [[package]]
 name = "timezone_provider"
 version = "0.0.9"
-source = "git+https://github.com/boa-dev/temporal.git?rev=531cee14769e8c077c59a1faf67d5465e85f5afa#531cee14769e8c077c59a1faf67d5465e85f5afa"
+source = "git+https://github.com/boa-dev/temporal.git?rev=89bfca1f5b918d00a19354664e1da11da51305ee#89bfca1f5b918d00a19354664e1da11da51305ee"
 dependencies = [
  "zerotrie 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerovec 0.11.2",

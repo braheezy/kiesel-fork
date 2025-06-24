@@ -20,27 +20,31 @@ pub const c = @cImport({
     @cInclude("ZonedDateTime.h");
 });
 
-// https://github.com/boa-dev/temporal/blob/ad46374b7f5394a0641d3195f357d0d39109a93b/temporal_capi/src/instant.rs#L161-L174
+const u64_high_bit_mask: u64 = 1 << 63;
+
+/// Covert a Rust `I128Nanoseconds` struct to a Zig `i128`.
+///
+/// Ported from temporal_rs's [`From<ffi::I128Nanoseconds>`](https://github.com/boa-dev/temporal/blob/89bfca1f5b918d00a19354664e1da11da51305ee/temporal_capi/src/instant.rs#L172-L186) trait for `i128`.
 pub fn fromI128Nanoseconds(ns: c.I128Nanoseconds) i128 {
-    // TODO: This was ported verbatim from temporal_rs but is broken for negative values.
-    // See: https://github.com/boa-dev/temporal/issues/352
-    const is_neg = ns.high < 0;
-    const ns_high_abs: u128 = @intCast(@abs(ns.high));
-    const total: i128 = @intCast((ns_high_abs << 64) + ns.low);
+    const is_neg = (ns.high & u64_high_bit_mask) != 0;
+    const ns_high: u128 = @intCast((ns.high & ~u64_high_bit_mask));
+    const total: i128 = @intCast((ns_high << 64) + ns.low);
     return if (is_neg) -total else total;
 }
 
-// https://github.com/boa-dev/temporal/blob/ad46374b7f5394a0641d3195f357d0d39109a93b/temporal_capi/src/instant.rs#L176-L187
+/// Covert a Zig `i128` to a Rust `I128Nanoseconds` struct.
+///
+/// Ported from temporal_rs's [`From<i128>`](https://github.com/boa-dev/temporal/blob/89bfca1f5b918d00a19354664e1da11da51305ee/temporal_capi/src/instant.rs#L188-L207) trait for `ffi::I128Nanoseconds`.
 pub fn toI128Nanoseconds(ns: i128) c.I128Nanoseconds {
-    // TODO: This was ported verbatim from temporal_rs but is broken for negative values.
-    // See: https://github.com/boa-dev/temporal/issues/352
+    std.debug.assert(ns != std.math.minInt(i128));
     const is_neg = ns < 0;
     const ns_abs = @abs(ns);
-    const high: i64 = @intCast(ns_abs >> 64);
+    const high: u64 = @intCast(ns_abs >> 64);
     const low: u64 = @truncate(ns_abs);
-    return .{ .high = if (is_neg) -high else high, .low = low };
+    return .{ .high = if (is_neg) high | u64_high_bit_mask else high, .low = low };
 }
 
+/// Convert a Rust `DiplomatStringView` to a Zig slice.
 pub fn fromDiplomatStringView(sv: c.DiplomatStringView) []const u8 {
     return sv.data[0..sv.len];
 }

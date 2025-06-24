@@ -11,7 +11,7 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "531cee14769e8c077c59a1faf67d5465e85f5afa"
+rev = "89bfca1f5b918d00a19354664e1da11da51305ee"
 features = ["compiled_data"]
 
 [features]
