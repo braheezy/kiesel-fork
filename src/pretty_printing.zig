@@ -1154,16 +1154,21 @@ fn prettyPrintTemporalZonedDateTime(
         temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(temporal_zoned_date_time.fields.inner),
     );
     const time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(temporal_zoned_date_time.fields.inner);
-    // TODO: Print time zone, right now there doesn't seem to be a way to get it as a string
-    _ = time_zone;
+    var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = arena.allocator() };
+    var write = temporal_rs.DiplomatWrite.init(&context);
+    temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner),
+    ) catch unreachable;
+    const time_zone_id = write.toOwnedSlice() catch return;
     const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(temporal_zoned_date_time.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.ZonedDateTime(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}", .{
+    try writer.print("{pretty}, {pretty}, {pretty}", .{
         Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
+        Value.from(asciiString(time_zone_id)),
         Value.from(asciiString(calendar_id)),
     });
     try tty_config.setColor(writer, .white);
