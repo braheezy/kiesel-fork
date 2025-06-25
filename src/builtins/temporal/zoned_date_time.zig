@@ -149,6 +149,7 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
+        try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 6.3.1 Temporal.ZonedDateTime.prototype.constructor
@@ -190,6 +191,25 @@ pub const prototype = struct {
         return Value.from(
             try String.fromAscii(agent, try agent.gc_allocator.dupe(u8, calendar_id)),
         );
+    }
+
+    /// 6.3.4 get Temporal.ZonedDateTime.prototype.timeZoneId
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.timezoneid
+    fn timeZoneId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return zonedDateTime.[[TimeZone]].
+        const temporal_rs_time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
+            zoned_date_time.fields.inner,
+        );
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 6.3.44 Temporal.ZonedDateTime.prototype.valueOf ( )
