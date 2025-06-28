@@ -13,6 +13,7 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -32,6 +33,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 7.2.1 Temporal.Duration.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -121,6 +124,15 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalDuration(agent, temporal_rs_duration.?, new_target),
         );
+    }
+
+    /// 7.2.2 Temporal.Duration.from ( item )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+
+        // 1. Return ? ToTemporalDuration(item).
+        return Value.from(try toTemporalDuration(agent, item));
     }
 };
 
@@ -340,6 +352,242 @@ pub const Duration = MakeObject(.{
     },
     .tag = .temporal_duration,
 });
+
+/// 7.5.12 ToTemporalDuration ( item )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalduration
+pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
+    // 1. If item is an Object and item has an [[InitializedTemporalDuration]] internal slot, then
+    if (item.isObject() and item.asObject().is(Duration)) {
+        // a. Return ! CreateTemporalDuration(item.[[Years]], item.[[Months]], item.[[Weeks]],
+        //    item.[[Days]], item.[[Hours]], item.[[Minutes]], item.[[Seconds]],
+        //    item.[[Milliseconds]], item.[[Microseconds]], item.[[Nanoseconds]]).
+        const duration = item.asObject().as(Duration);
+        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_try_new(
+                temporal_rs.c.temporal_rs_Duration_years(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_months(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_days(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_hours(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_minutes(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_seconds(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_milliseconds(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_microseconds(duration.fields.inner),
+                temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner),
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+        return createTemporalDuration(agent, temporal_rs_duration.?, null);
+    }
+
+    // 2. If item is not an Object, then
+    if (!item.isObject()) {
+        // a. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(.type_error, "Duration must be a string or object", .{});
+        }
+
+        // b. Return ? ParseTemporalDurationString(item).
+        const duration_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(duration_utf8);
+        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_from_utf8(
+                temporal_rs.toDiplomatStringView(duration_utf8),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => return agent.throwException(.range_error, "Invalid duration string", .{}),
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+        return createTemporalDuration(agent, temporal_rs_duration.?, null);
+    }
+
+    // 3. Let result be a new Partial Duration Record with each field set to 0.
+    // 4. Let partial be ? ToTemporalPartialDurationRecord(item).
+    const partial = try toTemporalPartialDuration(agent, item);
+
+    // 5. If partial.[[Years]] is not undefined, set result.[[Years]] to partial.[[Years]].
+    // 6. If partial.[[Months]] is not undefined, set result.[[Months]] to partial.[[Months]].
+    // 7. If partial.[[Weeks]] is not undefined, set result.[[Weeks]] to partial.[[Weeks]].
+    // 8. If partial.[[Days]] is not undefined, set result.[[Days]] to partial.[[Days]].
+    // 9. If partial.[[Hours]] is not undefined, set result.[[Hours]] to partial.[[Hours]].
+    // 10. If partial.[[Minutes]] is not undefined, set result.[[Minutes]] to partial.[[Minutes]].
+    // 11. If partial.[[Seconds]] is not undefined, set result.[[Seconds]] to partial.[[Seconds]].
+    // 12. If partial.[[Milliseconds]] is not undefined, set result.[[Milliseconds]] to partial.[[Milliseconds]].
+    // 13. If partial.[[Microseconds]] is not undefined, set result.[[Microseconds]] to partial.[[Microseconds]].
+    // 14. If partial.[[Nanoseconds]] is not undefined, set result.[[Nanoseconds]] to partial.[[Nanoseconds]].
+    // 15. Return ? CreateTemporalDuration(result.[[Years]], result.[[Months]], result.[[Weeks]],
+    //     result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
+    //     result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]).
+    const temporal_rs_duration = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_Duration_from_partial_duration(partial),
+    ) catch |err| switch (err) {
+        error.RangeError => return agent.throwException(.range_error, "Invalid duration", .{}),
+        else => unreachable,
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(agent, temporal_rs_duration.?, null);
+}
+
+/// 7.5.18 ToTemporalPartialDurationRecord ( temporalDurationLike )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalpartialdurationrecord
+pub fn toTemporalPartialDuration(
+    agent: *Agent,
+    temporal_duration_like_value: Value,
+) Agent.Error!temporal_rs.c.PartialDuration {
+    // 1. If temporalDurationLike is not an Object, then
+    if (!temporal_duration_like_value.isObject()) {
+        // a. Throw a TypeError exception.
+        return agent.throwException(.type_error, "Duration-like must be an object", .{});
+    }
+    const temporal_duration_like = temporal_duration_like_value.asObject();
+
+    // 2. Let result be a new partial Duration Record with each field set to undefined.
+    var result: temporal_rs.c.PartialDuration = .{
+        .years = .{ .is_ok = false },
+        .months = .{ .is_ok = false },
+        .weeks = .{ .is_ok = false },
+        .days = .{ .is_ok = false },
+        .hours = .{ .is_ok = false },
+        .minutes = .{ .is_ok = false },
+        .seconds = .{ .is_ok = false },
+        .milliseconds = .{ .is_ok = false },
+        .microseconds = .{ .is_ok = false },
+        .nanoseconds = .{ .is_ok = false },
+    };
+
+    // 3. NOTE: The following steps read properties and perform independent validation in
+    //    alphabetical order.
+
+    // 4. Let days be ? Get(temporalDurationLike, "days").
+    const days = try temporal_duration_like.get(agent, PropertyKey.from("days"));
+
+    // 5. If days is not undefined, set result.[[Days]] to ? ToIntegerIfIntegral(days).
+    if (!days.isUndefined()) {
+        result.days = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try days.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 6. Let hours be ? Get(temporalDurationLike, "hours").
+    const hours = try temporal_duration_like.get(agent, PropertyKey.from("hours"));
+
+    // 7. If hours is not undefined, set result.[[Hours]] to ? ToIntegerIfIntegral(hours).
+    if (!hours.isUndefined()) {
+        result.hours = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try hours.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 8. Let microseconds be ? Get(temporalDurationLike, "microseconds").
+    const microseconds = try temporal_duration_like.get(agent, PropertyKey.from("microseconds"));
+
+    // 9. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
+    if (!microseconds.isUndefined()) {
+        result.microseconds = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = try microseconds.toIntegerIfIntegral(agent) },
+        };
+    }
+
+    // 10. Let milliseconds be ? Get(temporalDurationLike, "milliseconds").
+    const milliseconds = try temporal_duration_like.get(agent, PropertyKey.from("milliseconds"));
+
+    // 11. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
+    if (!milliseconds.isUndefined()) {
+        result.milliseconds = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try milliseconds.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 12. Let minutes be ? Get(temporalDurationLike, "minutes").
+    const minutes = try temporal_duration_like.get(agent, PropertyKey.from("minutes"));
+
+    // 13. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(minutes).
+    if (!minutes.isUndefined()) {
+        result.minutes = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try minutes.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 14. Let months be ? Get(temporalDurationLike, "months").
+    const months = try temporal_duration_like.get(agent, PropertyKey.from("months"));
+
+    // 15. If months is not undefined, set result.[[Months]] to ? ToIntegerIfIntegral(months).
+    if (!months.isUndefined()) {
+        result.months = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try months.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 16. Let nanoseconds be ? Get(temporalDurationLike, "nanoseconds").
+    const nanoseconds = try temporal_duration_like.get(agent, PropertyKey.from("nanoseconds"));
+
+    // 17. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
+    if (!nanoseconds.isUndefined()) {
+        result.nanoseconds = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = try nanoseconds.toIntegerIfIntegral(agent) },
+        };
+    }
+
+    // 18. Let seconds be ? Get(temporalDurationLike, "seconds").
+    const seconds = try temporal_duration_like.get(agent, PropertyKey.from("seconds"));
+
+    // 19. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(seconds).
+    if (!seconds.isUndefined()) {
+        result.seconds = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try seconds.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 20. Let weeks be ? Get(temporalDurationLike, "weeks").
+    const weeks = try temporal_duration_like.get(agent, PropertyKey.from("weeks"));
+
+    // 21. If weeks is not undefined, set result.[[Weeks]] to ? ToIntegerIfIntegral(weeks).
+    if (!weeks.isUndefined()) {
+        result.weeks = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try weeks.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 22. Let years be ? Get(temporalDurationLike, "years").
+    const years = try temporal_duration_like.get(agent, PropertyKey.from("years"));
+
+    // 23. If years is not undefined, set result.[[Years]] to ? ToIntegerIfIntegral(years).
+    if (!years.isUndefined()) {
+        result.years = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try years.toIntegerIfIntegral(agent)) },
+        };
+    }
+
+    // 24. If years is undefined, and months is undefined, and weeks is undefined, and days is
+    //     undefined, and hours is undefined, and minutes is undefined, and seconds is undefined,
+    //     and milliseconds is undefined, and microseconds is undefined, and nanoseconds is
+    //     undefined, throw a TypeError exception.
+    if (!result.years.is_ok and !result.months.is_ok and !result.weeks.is_ok and
+        !result.days.is_ok and !result.hours.is_ok and !result.minutes.is_ok and
+        !result.seconds.is_ok and !result.milliseconds.is_ok and !result.microseconds.is_ok and
+        !result.nanoseconds.is_ok)
+    {
+        return agent.throwException(
+            .type_error,
+            "Duration-like object must have at least one field defined",
+            .{},
+        );
+    }
+
+    // 25. Return result.
+    return result;
+}
 
 /// 7.5.19 CreateTemporalDuration ( years, months, weeks, days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds [ , newTarget ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createtemporalduration
