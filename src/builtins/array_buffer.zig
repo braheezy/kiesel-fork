@@ -486,7 +486,7 @@ pub fn numericToRawBytes(
             //    column in Table 71 for Element Type type.
             const conversionOperation = element_type.conversationOperation();
 
-            // c. Let intValue be ℝ(conversionOperation(value)).
+            // c. Let intValue be ℝ(! conversionOperation(value)).
             const int_value = conversionOperation(value, agent) catch |err| try noexcept(err);
 
             // d. If intValue ≥ 0, then

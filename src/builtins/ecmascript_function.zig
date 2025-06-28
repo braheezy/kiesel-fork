@@ -1433,10 +1433,10 @@ fn functionDeclarationInstantiation(
     };
     defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
 
-    // 24-26.
+    // 24-28.
     try function.fields.evaluateArguments(agent, arguments_list, if (!has_duplicates) env else null);
 
-    // 27. If hasParameterExpressions is false, then
+    // 29. If hasParameterExpressions is false, then
     const var_env = if (!has_parameter_expressions) blk: {
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
 
@@ -1471,7 +1471,7 @@ fn functionDeclarationInstantiation(
         // d. Let varEnv be env.
         break :blk env;
     } else blk: {
-        // 28. Else,
+        // 30. Else,
         // a. NOTE: A separate Environment Record is needed to ensure that closures created by
         //    expressions in the formal parameter list do not have visibility of declarations in
         //    the function body.
@@ -1521,9 +1521,9 @@ fn functionDeclarationInstantiation(
         break :blk var_env;
     };
 
-    // 29. NOTE: Annex B.3.2.1 adds additional steps at this point.
+    // 31. NOTE: Annex B.3.2.1 adds additional steps at this point.
 
-    // 30. If strict is false, then
+    // 32. If strict is false, then
     const lex_env = if (!strict) blk: {
         // a. Let lexEnv be NewDeclarativeEnvironment(varEnv).
         const lex_env: Environment = .{
@@ -1538,18 +1538,18 @@ fn functionDeclarationInstantiation(
 
         break :blk lex_env;
     } else blk: {
-        // 31. Else,
+        // 33. Else,
         // a. Let lexEnv be varEnv.
         break :blk var_env;
     };
 
-    // 32. Set the LexicalEnvironment of calleeContext to lexEnv.
+    // 34. Set the LexicalEnvironment of calleeContext to lexEnv.
     callee_context.ecmascript_code.lexical_environment = lex_env;
 
-    // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
+    // 35. Let lexDeclarations be the LexicallyScopedDeclarations of code.
     const lex_declarations = cached_ast_values.lexically_scoped_declarations;
 
-    // 34. For each element d of lexDeclarations, do
+    // 36. For each element d of lexDeclarations, do
     for (lex_declarations, 0..) |declaration, i| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
         //    declaration, formal parameter, or a var name. Lexically declared names are only
@@ -1571,10 +1571,10 @@ fn functionDeclarationInstantiation(
         }
     }
 
-    // 35. Let privateEnv be the PrivateEnvironment of calleeContext.
+    // 37. Let privateEnv be the PrivateEnvironment of calleeContext.
     const private_env = callee_context.ecmascript_code.private_environment;
 
-    // 36. For each Parse Node f of functionsToInitialize, do
+    // 38. For each Parse Node f of functionsToInitialize, do
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
@@ -1598,5 +1598,5 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
     }
 
-    // 37. Return unused.
+    // 39. Return unused.
 }
