@@ -134,7 +134,19 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "blank", blank, null, realm);
+        try object.defineBuiltinAccessor(agent, "days", days, null, realm);
+        try object.defineBuiltinAccessor(agent, "hours", hours, null, realm);
+        try object.defineBuiltinAccessor(agent, "microseconds", microseconds, null, realm);
+        try object.defineBuiltinAccessor(agent, "milliseconds", milliseconds, null, realm);
+        try object.defineBuiltinAccessor(agent, "minutes", minutes, null, realm);
+        try object.defineBuiltinAccessor(agent, "months", months, null, realm);
+        try object.defineBuiltinAccessor(agent, "nanoseconds", nanoseconds, null, realm);
+        try object.defineBuiltinAccessor(agent, "seconds", seconds, null, realm);
+        try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinAccessor(agent, "weeks", weeks, null, realm);
+        try object.defineBuiltinAccessor(agent, "years", years, null, realm);
 
         // 7.3.1 Temporal.Duration.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.constructor
@@ -158,6 +170,129 @@ pub const prototype = struct {
         );
     }
 
+    /// 7.3.14 get Temporal.Duration.prototype.blank
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.blank
+    fn blank(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. If DurationSign(duration) = 0, return true.
+        // 4. Return false.
+        return Value.from(temporal_rs.c.temporal_rs_Duration_is_zero(duration.fields.inner));
+    }
+
+    /// 7.3.6 get Temporal.Duration.prototype.days
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.days
+    fn days(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Days]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_days(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.7 get Temporal.Duration.prototype.hours
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.hours
+    fn hours(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Hours]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_hours(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.11 get Temporal.Duration.prototype.microseconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.microseconds
+    fn microseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Microseconds]]).
+        return Value.from(temporal_rs.c.temporal_rs_Duration_microseconds(duration.fields.inner));
+    }
+
+    /// 7.3.10 get Temporal.Duration.prototype.milliseconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.milliseconds
+    fn milliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Milliseconds]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_milliseconds(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.8 get Temporal.Duration.prototype.minutes
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.minutes
+    fn minutes(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Minutes]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_minutes(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.4 get Temporal.Duration.prototype.months
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.months
+    fn months(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Months]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_months(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.12 get Temporal.Duration.prototype.nanoseconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.nanoseconds
+    fn nanoseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Nanoseconds]]).
+        return Value.from(temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner));
+    }
+
+    /// 7.3.9 get Temporal.Duration.prototype.seconds
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.seconds
+    fn seconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Seconds]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_seconds(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.13 get Temporal.Duration.prototype.sign
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.sign
+    fn sign(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(DurationSign(duration)).
+        return Value.from(temporal_rs.c.temporal_rs_Duration_sign(duration.fields.inner));
+    }
+
     /// 7.3.25 Temporal.Duration.prototype.valueOf ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.valueof
     fn valueOf(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -166,6 +301,32 @@ pub const prototype = struct {
             .type_error,
             "Cannot convert Temporal.Duration to primitive value",
             .{},
+        );
+    }
+
+    /// 7.3.5 get Temporal.Duration.prototype.weeks
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.weeks
+    fn weeks(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Weeks]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner))),
+        );
+    }
+
+    /// 7.3.3 get Temporal.Duration.prototype.years
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.duration.prototype.years
+    fn years(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return 𝔽(duration.[[Years]]).
+        return Value.from(
+            @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_years(duration.fields.inner))),
         );
     }
 };
