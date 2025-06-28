@@ -85,9 +85,6 @@ status: Status,
 /// [[EvaluationError]]
 evaluation_error: ?Agent.Exception,
 
-/// [[DFSIndex]]
-dfs_index: ?usize,
-
 /// [[DFSAncestorIndex]]
 dfs_ancestor_index: ?usize,
 
@@ -416,8 +413,8 @@ fn innerModuleLinking(
     // 4. Set module.[[Status]] to linking.
     module.status = .linking;
 
-    // 5. Set module.[[DFSIndex]] to index.
-    module.dfs_index = index;
+    // 5. Let moduleIndex be index.
+    const module_index = index;
 
     // 6. Set module.[[DFSAncestorIndex]] to index.
     module.dfs_ancestor_index = index;
@@ -469,11 +466,11 @@ fn innerModuleLinking(
 
     // 11. Assert: module occurs exactly once in stack.
 
-    // 12. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
-    std.debug.assert(module.dfs_ancestor_index.? <= module.dfs_index.?);
+    // 12. Assert: module.[[DFSAncestorIndex]] ≤ moduleIndex.
+    std.debug.assert(module.dfs_ancestor_index.? <= module_index);
 
-    // 13. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
-    if (module.dfs_ancestor_index.? == module.dfs_index.?) {
+    // 13. If module.[[DFSAncestorIndex]] = moduleIndex, then
+    if (module.dfs_ancestor_index.? == module_index) {
         // a. Let done be false.
         // b. Repeat, while done is false,
         while (true) {
@@ -608,7 +605,7 @@ pub fn parse(
     //       [[Context]]: empty, [[ImportMeta]]: empty, [[RequestedModules]]: requestedModules,
     //       [[LoadedModules]]: « », [[ImportEntries]]: importEntries, [[LocalExportEntries]]: localExportEntries,
     //       [[IndirectExportEntries]]: indirectExportEntries, [[StarExportEntries]]: starExportEntries,
-    //       [[DFSIndex]]: empty, [[DFSAncestorIndex]]: empty
+    //       [[DFSAncestorIndex]]: empty
     //     }.
     const self = try agent.gc_allocator.create(SourceTextModule);
     self.* = .{
@@ -633,7 +630,6 @@ pub fn parse(
         .indirect_export_entries = indirect_export_entries,
         .star_export_entries = star_export_entries,
         .loaded_modules = .empty,
-        .dfs_index = null,
         .dfs_ancestor_index = null,
     };
     return self;
@@ -799,8 +795,8 @@ fn innerModuleEvaluation(
     // 5. Set module.[[Status]] to evaluating.
     module.status = .evaluating;
 
-    // 6. Set module.[[DFSIndex]] to index.
-    module.dfs_index = index;
+    // 6. Let moduleIndex be index.
+    const module_index = index;
 
     // 7. Set module.[[DFSAncestorIndex]] to index.
     module.dfs_ancestor_index = index;
@@ -896,11 +892,11 @@ fn innerModuleEvaluation(
 
     // 14. Assert: module occurs exactly once in stack.
 
-    // 15. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
-    std.debug.assert(module.dfs_ancestor_index.? <= module.dfs_index.?);
+    // 15. Assert: module.[[DFSAncestorIndex]] ≤ moduleIndex.
+    std.debug.assert(module.dfs_ancestor_index.? <= module_index);
 
-    // 16. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
-    if (module.dfs_ancestor_index == module.dfs_index) {
+    // 16. If module.[[DFSAncestorIndex]] = moduleIndex, then
+    if (module.dfs_ancestor_index == module_index) {
         // a. Let done be false.
         // b. Repeat, while done is false,
         while (true) {
