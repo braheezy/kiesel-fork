@@ -8,6 +8,7 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,6 +18,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 7.2 Properties of the Temporal.Duration Constructor
@@ -146,6 +148,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "abs", abs, 0, realm);
         try object.defineBuiltinAccessor(agent, "blank", blank, null, realm);
         try object.defineBuiltinAccessor(agent, "days", days, null, realm);
         try object.defineBuiltinAccessor(agent, "hours", hours, null, realm);
@@ -154,6 +157,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "minutes", minutes, null, realm);
         try object.defineBuiltinAccessor(agent, "months", months, null, realm);
         try object.defineBuiltinAccessor(agent, "nanoseconds", nanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "negated", negated, 0, realm);
         try object.defineBuiltinAccessor(agent, "seconds", seconds, null, realm);
         try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
@@ -179,6 +183,28 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 7.3.17 Temporal.Duration.prototype.abs ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.abs
+    fn abs(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return ! CreateTemporalDuration(abs(duration.[[Years]]), abs(duration.[[Months]]),
+        //    abs(duration.[[Weeks]]), abs(duration.[[Days]]), abs(duration.[[Hours]]),
+        //    abs(duration.[[Minutes]]), abs(duration.[[Seconds]]), abs(duration.[[Milliseconds]]),
+        //    abs(duration.[[Microseconds]]), abs(duration.[[Nanoseconds]])).
+        const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_abs(duration.fields.inner);
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration);
+        return Value.from(
+            createTemporalDuration(
+                agent,
+                temporal_rs_duration.?,
+                null,
+            ) catch |err| try noexcept(err),
         );
     }
 
@@ -279,6 +305,25 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(duration.[[Nanoseconds]]).
         return Value.from(temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner));
+    }
+
+    /// 7.3.16 Temporal.Duration.prototype.negated ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.negated
+    fn negated(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return CreateNegatedTemporalDuration(duration).
+        const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_negated(duration.fields.inner);
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+        return Value.from(
+            createTemporalDuration(
+                agent,
+                temporal_rs_duration.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 7.3.9 get Temporal.Duration.prototype.seconds
