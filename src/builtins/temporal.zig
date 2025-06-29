@@ -140,14 +140,16 @@ pub const namespace = struct {
 pub fn toTemporalTimeZoneIdentifier(
     agent: *Agent,
     temporal_time_zone_like: Value,
-) Agent.Error!*const temporal_rs.c.TimeZone {
+) Agent.Error!*temporal_rs.c.TimeZone {
     // 1. If temporalTimeZoneLike is an Object, then
     if (temporal_time_zone_like.isObject()) {
         // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
         if (temporal_time_zone_like.asObject().is(ZonedDateTime)) {
             // i. Return temporalTimeZoneLike.[[TimeZone]].
-            const temporal_rs_time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
-                temporal_time_zone_like.asObject().as(ZonedDateTime).fields.inner,
+            const temporal_rs_time_zone = temporal_rs.c.temporal_rs_TimeZone_clone(
+                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
+                    temporal_time_zone_like.asObject().as(ZonedDateTime).fields.inner,
+                ),
             );
             return temporal_rs_time_zone.?;
         }

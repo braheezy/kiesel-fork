@@ -18,9 +18,11 @@ const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const noexcept = utils.noexcept;
 const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 
 /// 8.2 Properties of the Temporal.Instant Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-instant-constructor
@@ -169,6 +171,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "toZonedDateTimeISO", toZonedDateTimeISO, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 8.3.1 Temporal.Instant.prototype.constructor
@@ -221,6 +224,46 @@ pub const prototype = struct {
         );
         const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
         return Value.from(try BigInt.from(agent.gc_allocator, managed));
+    }
+
+    /// 8.3.15 Temporal.Instant.prototype.toZonedDateTimeISO ( timeZone )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.tozoneddatetimeiso
+    fn toZonedDateTimeISO(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const time_zone_value = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
+        const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
+        errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
+
+        // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
+        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
+                temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(instant.fields.inner),
+                temporal_rs.c.AnyCalendarKind_Iso,
+                time_zone,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid time zone identifier: {}",
+                    .{time_zone_value},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 8.3.14 Temporal.Instant.prototype.valueOf ( )
