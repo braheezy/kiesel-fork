@@ -15,10 +15,15 @@ const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
+const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
+const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -171,6 +176,9 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "toZonedDateTimeISO", toZonedDateTimeISO, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
@@ -224,6 +232,129 @@ pub const prototype = struct {
         );
         const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
         return Value.from(try BigInt.from(agent.gc_allocator, managed));
+    }
+
+    /// 8.3.13 Temporal.Instant.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return TemporalInstantToString(instant, undefined, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
+                instant.fields.inner,
+                null,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 8.3.12 Temporal.Instant.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return TemporalInstantToString(instant, undefined, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
+                instant.fields.inner,
+                null,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 8.3.11 Temporal.Instant.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalFractionalSecondDigitsOption reads
+        //    "fractionalSecondDigits" and GetRoundingModeOption reads "roundingMode").
+
+        // 5. Let digits be ? GetTemporalFractionalSecondDigitsOption(resolvedOptions).
+        const precision = try getTemporalFractionalSecondDigitsOption(agent, options);
+
+        // 6. Let roundingMode be ? GetRoundingModeOption(resolvedOptions, trunc).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_Trunc,
+        );
+
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .time,
+            .unset,
+            &.{},
+        );
+
+        // 8. If smallestUnit is hour, throw a RangeError exception.
+        if (smallest_unit == temporal_rs.c.Unit_Hour) {
+            return agent.throwException(
+                .range_error,
+                "Invalid value for option 'smallestUnit'",
+                .{},
+            );
+        }
+
+        // 9. Let timeZone be ? Get(resolvedOptions, "timeZone").
+        const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
+
+        var maybe_time_zone: ?*temporal_rs.c.TimeZone = null;
+        defer if (maybe_time_zone) |time_zone| temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
+
+        // 10. If timeZone is not undefined, then
+        if (!time_zone_value.isUndefined()) {
+            // a. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
+            maybe_time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
+        }
+
+        // 11. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 12. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]], precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 13. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
+        // 14. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
+                instant.fields.inner,
+                maybe_time_zone,
+                .{
+                    .precision = precision,
+                    .smallest_unit = if (smallest_unit) |ok|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                },
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 8.3.15 Temporal.Instant.prototype.toZonedDateTimeISO ( timeZone )
