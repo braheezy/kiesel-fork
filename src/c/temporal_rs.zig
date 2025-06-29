@@ -54,6 +54,11 @@ pub fn toDiplomatStringView(s: []const u8) c.DiplomatStringView {
     return .{ .data = s.ptr, .len = s.len };
 }
 
+// Convert a Rust `Option<T>` to a Zig `?T`.
+pub fn fromOptional(value: anytype) ?Success(@TypeOf(value)) {
+    return success(value);
+}
+
 pub const DiplomatWrite = struct {
     pub const Context = struct {
         gpa: std.mem.Allocator,

@@ -162,6 +162,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weeks", weeks, null, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
         try object.defineBuiltinAccessor(agent, "years", years, null, realm);
 
         // 7.3.1 Temporal.Duration.prototype.constructor
@@ -372,6 +373,116 @@ pub const prototype = struct {
         return Value.from(
             @as(f64, @floatFromInt(temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner))),
         );
+    }
+
+    /// 7.3.15 Temporal.Duration.prototype.with ( temporalDurationLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like_value = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Let temporalDurationLike be ? ToTemporalPartialDurationRecord(temporalDurationLike).
+        const temporal_duration_like = try toTemporalPartialDuration(
+            agent,
+            temporal_duration_like_value,
+        );
+
+        // 4. If temporalDurationLike.[[Years]] is not undefined, then
+        //     a. Let years be temporalDurationLike.[[Years]].
+        // 5. Else,
+        //     a. Let years be duration.[[Years]].
+        const years_ = temporal_rs.fromOptional(temporal_duration_like.years) orelse
+            temporal_rs.c.temporal_rs_Duration_years(duration.fields.inner);
+
+        // 6. If temporalDurationLike.[[Months]] is not undefined, then
+        //     a. Let months be temporalDurationLike.[[Months]].
+        // 7. Else,
+        //     a. Let months be duration.[[Months]].
+        const months_ = temporal_rs.fromOptional(temporal_duration_like.months) orelse
+            temporal_rs.c.temporal_rs_Duration_months(duration.fields.inner);
+
+        // 8. If temporalDurationLike.[[Weeks]] is not undefined, then
+        //     a. Let weeks be temporalDurationLike.[[Weeks]].
+        // 9. Else,
+        //     a. Let weeks be duration.[[Weeks]].
+        const weeks_ = temporal_rs.fromOptional(temporal_duration_like.weeks) orelse
+            temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner);
+
+        // 10. If temporalDurationLike.[[Days]] is not undefined, then
+        //     a. Let days be temporalDurationLike.[[Days]].
+        // 11. Else,
+        //     a. Let days be duration.[[Days]].
+        const days_ = temporal_rs.fromOptional(temporal_duration_like.days) orelse
+            temporal_rs.c.temporal_rs_Duration_days(duration.fields.inner);
+
+        // 12. If temporalDurationLike.[[Hours]] is not undefined, then
+        //     a. Let hours be temporalDurationLike.[[Hours]].
+        // 13. Else,
+        //     a. Let hours be duration.[[Hours]].
+        const hours_ = temporal_rs.fromOptional(temporal_duration_like.hours) orelse
+            temporal_rs.c.temporal_rs_Duration_hours(duration.fields.inner);
+
+        // 14. If temporalDurationLike.[[Minutes]] is not undefined, then
+        //     a. Let minutes be temporalDurationLike.[[Minutes]].
+        // 15. Else,
+        //     a. Let minutes be duration.[[Minutes]].
+        const minutes_ = temporal_rs.fromOptional(temporal_duration_like.minutes) orelse
+            temporal_rs.c.temporal_rs_Duration_minutes(duration.fields.inner);
+
+        // 16. If temporalDurationLike.[[Seconds]] is not undefined, then
+        //     a. Let seconds be temporalDurationLike.[[Seconds]].
+        // 17. Else,
+        //     a. Let seconds be duration.[[Seconds]].
+        const seconds_ = temporal_rs.fromOptional(temporal_duration_like.seconds) orelse
+            temporal_rs.c.temporal_rs_Duration_seconds(duration.fields.inner);
+
+        // 18. If temporalDurationLike.[[Milliseconds]] is not undefined, then
+        //     a. Let milliseconds be temporalDurationLike.[[Milliseconds]].
+        // 19. Else,
+        //     a. Let milliseconds be duration.[[Milliseconds]].
+        const milliseconds_ = temporal_rs.fromOptional(temporal_duration_like.milliseconds) orelse
+            temporal_rs.c.temporal_rs_Duration_milliseconds(duration.fields.inner);
+
+        // 20. If temporalDurationLike.[[Microseconds]] is not undefined, then
+        //     a. Let microseconds be temporalDurationLike.[[Microseconds]].
+        // 21. Else,
+        //     a. Let microseconds be duration.[[Microseconds]].
+        const microseconds_ = temporal_rs.fromOptional(temporal_duration_like.microseconds) orelse
+            temporal_rs.c.temporal_rs_Duration_microseconds(duration.fields.inner);
+
+        // 22. If temporalDurationLike.[[Nanoseconds]] is not undefined, then
+        //     a. Let nanoseconds be temporalDurationLike.[[Nanoseconds]].
+        // 23. Else,
+        //     a. Let nanoseconds be duration.[[Nanoseconds]].
+        const nanoseconds_ = temporal_rs.fromOptional(temporal_duration_like.nanoseconds) orelse
+            temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner);
+
+        // 24. Return ? CreateTemporalDuration(years, months, weeks, days, hours, minutes, seconds,
+        //     milliseconds, microseconds, nanoseconds).
+        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_try_new(
+                years_,
+                months_,
+                weeks_,
+                days_,
+                hours_,
+                minutes_,
+                seconds_,
+                milliseconds_,
+                microseconds_,
+                nanoseconds_,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid duration", .{});
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+        return Value.from(try createTemporalDuration(agent, temporal_rs_duration.?, null));
     }
 
     /// 7.3.3 get Temporal.Duration.prototype.years
