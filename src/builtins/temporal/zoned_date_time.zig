@@ -81,7 +81,7 @@ pub const constructor = struct {
 
         // 4. If timeZone is not a String, throw a TypeError exception.
         if (!time_zone_value.isString()) {
-            return agent.throwException(.range_error, "Time zone is not a string", .{});
+            return agent.throwException(.type_error, "Time zone is not a string", .{});
         }
 
         // 5. Let timeZoneParse be ? ParseTimeZoneIdentifier(timeZone).
