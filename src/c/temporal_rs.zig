@@ -20,6 +20,12 @@ pub const c = @cImport({
     @cInclude("ZonedDateTime.h");
 });
 
+pub const to_string_rounding_options_auto: c.ToStringRoundingOptions = .{
+    .precision = .{ .is_minute = false, .precision = .{ .is_ok = false } },
+    .smallest_unit = .{ .is_ok = false },
+    .rounding_mode = .{ .is_ok = false },
+};
+
 const u64_high_bit_mask: u64 = 1 << 63;
 
 /// Covert a Rust `I128Nanoseconds` struct to a Zig `i128`.

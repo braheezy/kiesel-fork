@@ -16,8 +16,12 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
+const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -160,6 +164,9 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "negated", negated, 0, realm);
         try object.defineBuiltinAccessor(agent, "seconds", seconds, null, realm);
         try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weeks", weeks, null, realm);
         try object.defineBuiltinFunction(agent, "with", with, 1, realm);
@@ -349,6 +356,121 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(DurationSign(duration)).
         return Value.from(temporal_rs.c.temporal_rs_Duration_sign(duration.fields.inner));
+    }
+
+    /// 7.3.23 Temporal.Duration.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return TemporalDurationToString(duration, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_to_string(
+                duration.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 7.3.24 Temporal.Duration.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Return TemporalDurationToString(duration, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_to_string(
+                duration.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 7.3.22 Temporal.Duration.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalFractionalSecondDigitsOption reads
+        //    "fractionalSecondDigits" and GetRoundingModeOption reads "roundingMode").
+
+        // 5. Let digits be ? GetTemporalFractionalSecondDigitsOption(resolvedOptions).
+        const precision = try getTemporalFractionalSecondDigitsOption(agent, options);
+
+        // 6. Let roundingMode be ? GetRoundingModeOption(resolvedOptions, trunc).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_Trunc,
+        );
+
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .time,
+            .unset,
+            &.{},
+        );
+
+        // 8. If smallestUnit is hour or minute, throw a RangeError exception.
+        // 9. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 10. If precision.[[Unit]] is nanosecond and precision.[[Increment]] = 1, then
+        //     a. Return TemporalDurationToString(duration, precision.[[Precision]]).
+        // 11. Let largestUnit be DefaultTemporalLargestUnit(duration).
+        // 12. Let internalDuration be ToInternalDurationRecord(duration).
+        // 13. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]], precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 14. Set internalDuration to CombineDateAndTimeDuration(internalDuration.[[Date]], timeDuration).
+        // 15. Let roundedLargestUnit be LargerOfTwoTemporalUnits(largestUnit, second).
+        // 16. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
+        // 17. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_to_string(
+                duration.fields.inner,
+                .{
+                    .precision = precision,
+                    .smallest_unit = if (smallest_unit) |ok|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                },
+                &write.inner,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid duration string options",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 7.3.25 Temporal.Duration.prototype.valueOf ( )
