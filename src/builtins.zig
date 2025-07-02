@@ -217,6 +217,7 @@ pub const sortIndexedProperties = array.sortIndexedProperties;
 pub const stringCreate = string.stringCreate;
 pub const systemTimeZoneIdentifier = date.systemTimeZoneIdentifier;
 pub const toTemporalDuration = temporal.duration.toTemporalDuration;
+pub const toTemporalInstant = temporal.instant.toTemporalInstant;
 pub const toTemporalPartialDuration = temporal.duration.toTemporalPartialDuration;
 pub const toTemporalTimeZoneIdentifier = temporal.toTemporalTimeZoneIdentifier;
 pub const triggerPromiseReactions = promise.triggerPromiseReactions;

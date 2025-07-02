@@ -43,6 +43,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
         try object.defineBuiltinFunction(agent, "fromEpochMilliseconds", fromEpochMilliseconds, 1, realm);
         try object.defineBuiltinFunction(agent, "fromEpochNanoseconds", fromEpochNanoseconds, 1, realm);
 
@@ -97,6 +98,15 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalInstant(agent, temporal_rs_instant.?, new_target),
         );
+    }
+
+    /// 8.2.2 Temporal.Instant.from ( item )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+
+        // 1. Return ? ToTemporalInstant(item).
+        return Value.from(try toTemporalInstant(agent, item));
     }
 
     /// 8.2.3 Temporal.Instant.fromEpochMilliseconds ( epochMilliseconds )
@@ -456,4 +466,68 @@ pub fn createTemporalInstant(
         "%Temporal.Instant.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 8.5.3 ToTemporalInstant ( item )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalinstant
+pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
+    var item = item_;
+
+    // 1. If item is an Object, then
+    if (item.isObject()) {
+        // a. If item has an [[InitializedTemporalInstant]] or [[InitializedTemporalZonedDateTime]]
+        //    internal slot, then
+        if (item.asObject().is(Instant) or item.asObject().is(builtins.temporal.ZonedDateTime)) {
+            // i. Return ! CreateTemporalInstant(item.[[EpochNanoseconds]]).
+            const epoch_nanoseconds = if (item.asObject().is(Instant))
+                temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(
+                    item.asObject().as(Instant).fields.inner,
+                )
+            else
+                temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(
+                    item.asObject().as(builtins.temporal.ZonedDateTime).fields.inner,
+                );
+            const temporal_rs_instant = temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
+            ) catch unreachable;
+            errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+            return createTemporalInstant(agent, temporal_rs_instant.?, null);
+        }
+
+        // b. NOTE: This use of ToPrimitive allows Instant-like objects to be converted.
+        // c. Set item to ? ToPrimitive(item, string).
+        item = try item.toPrimitive(agent, .string);
+    }
+
+    // 2. If item is not a String, throw a TypeError exception.
+    if (!item.isString()) {
+        return agent.throwException(.type_error, "Instant must be a string or object", .{});
+    }
+
+    // 3. Let parsed be ? ParseISODateTime(item, « TemporalInstantString »).
+    // 4. Assert: Either parsed.[[TimeZone]].[[OffsetString]] is not empty or
+    //    parsed.[[TimeZone]].[[Z]] is true, but not both.
+    // 5. If parsed.[[TimeZone]].[[Z]] is true, let offsetNanoseconds be 0; otherwise, let
+    //    offsetNanoseconds be ! ParseDateTimeUTCOffset(parsed.[[TimeZone]].[[OffsetString]]).
+    // 6. If parsed.[[Time]] is start-of-day, let time be MidnightTimeRecord(); else let time be
+    //    parsed.[[Time]].
+    // 7. Let balanced be BalanceISODateTime(parsed.[[Year]], parsed.[[Month]], parsed.[[Day]],
+    //    time.[[Hour]], time.[[Minute]], time.[[Second]], time.[[Millisecond]],
+    //    time.[[Microsecond]], time.[[Nanosecond]] - offsetNanoseconds).
+    // 8. Perform ? CheckISODaysRange(balanced.[[ISODate]]).
+    // 9. Let epochNanoseconds be GetUTCEpochNanoseconds(balanced).
+    // 10. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
+    // 11. Return ! CreateTemporalInstant(epochNanoseconds).
+    const instant_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(instant_utf8);
+    const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_Instant_from_utf8(
+            temporal_rs.toDiplomatStringView(instant_utf8),
+        ),
+    ) catch |err| switch (err) {
+        error.RangeError => return agent.throwException(.range_error, "Invalid instant string", .{}),
+        else => unreachable,
+    };
+    errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+    return createTemporalInstant(agent, temporal_rs_instant.?, null);
 }
