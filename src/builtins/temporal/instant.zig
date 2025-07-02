@@ -208,6 +208,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -264,6 +265,28 @@ pub const prototype = struct {
         );
         const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
         return Value.from(try BigInt.from(agent.gc_allocator, managed));
+    }
+
+    /// 8.3.10 Temporal.Instant.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Set other to ? ToTemporalInstant(other).
+        const other = try toTemporalInstant(agent, other_value);
+
+        // 4. If instant.[[EpochNanoseconds]] ≠ other.[[EpochNanoseconds]], return false.
+        // 5. Return true.
+        return Value.from(
+            temporal_rs.c.temporal_rs_Instant_equals(
+                instant.fields.inner,
+                other.as(Instant).fields.inner,
+            ),
+        );
     }
 
     /// 8.3.13 Temporal.Instant.prototype.toJSON ( )
