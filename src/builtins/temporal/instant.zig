@@ -43,6 +43,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
         try object.defineBuiltinFunction(agent, "fromEpochMilliseconds", fromEpochMilliseconds, 1, realm);
         try object.defineBuiltinFunction(agent, "fromEpochNanoseconds", fromEpochNanoseconds, 1, realm);
@@ -97,6 +98,27 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             try createTemporalInstant(agent, temporal_rs_instant.?, new_target),
+        );
+    }
+
+    /// 8.2.5 Temporal.Instant.compare ( one, two )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+
+        // 1. Set one to ? ToTemporalInstant(one).
+        const one = try toTemporalInstant(agent, one_value);
+
+        // 2. Set two to ? ToTemporalInstant(two).
+        const two = try toTemporalInstant(agent, two_value);
+
+        // 3. Return 𝔽(CompareEpochNanoseconds(one.[[EpochNanoseconds]], two.[[EpochNanoseconds]])).
+        return Value.from(
+            temporal_rs.c.temporal_rs_Instant_compare(
+                one.as(Instant).fields.inner,
+                two.as(Instant).fields.inner,
+            ),
         );
     }
 
