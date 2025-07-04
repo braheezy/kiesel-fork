@@ -101,10 +101,7 @@ pub const constructor = struct {
             error.RangeError => return agent.throwException(.range_error, "Invalid time zone", .{}),
             else => unreachable,
         };
-        if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?) or
-            // https://github.com/boa-dev/temporal/blob/3455373e250dc3c3c5ee0112f379bbc97d7c351c/src/builtins/core/timezone.rs#L109-L111
-            std.mem.eql(u8, time_zone, "Z"))
-        {
+        if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
             return agent.throwException(.range_error, "Invalid time zone", .{});
         }
         errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
