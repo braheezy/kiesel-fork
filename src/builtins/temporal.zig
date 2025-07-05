@@ -254,6 +254,66 @@ pub fn getTemporalShowCalendarNameOption(
     return temporal_rs.c.DisplayCalendar_Auto;
 }
 
+/// 13.11 GetTemporalShowTimeZoneNameOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalshowtimezonenameoption
+pub fn getTemporalShowTimeZoneNameOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.DisplayTimeZone {
+    // 1. Let stringValue be ? GetOption(options, "timeZoneName", string, « "auto", "never", "critical" », "auto").
+    const string_value = try options.getOption(
+        agent,
+        "timeZoneName",
+        .string,
+        &.{
+            String.fromLiteral("auto"),
+            String.fromLiteral("never"),
+            String.fromLiteral("critical"),
+        },
+        String.fromLiteral("auto"),
+    );
+
+    // 2. If stringValue is "never", return never.
+    if (string_value.eql(String.fromLiteral("never"))) {
+        return temporal_rs.c.DisplayTimeZone_Never;
+    }
+
+    // 3. If stringValue is "critical", return critical.
+    if (string_value.eql(String.fromLiteral("critical"))) {
+        return temporal_rs.c.DisplayTimeZone_Critical;
+    }
+
+    // 4. Return auto.
+    return temporal_rs.c.DisplayTimeZone_Auto;
+}
+
+/// 13.12 GetTemporalShowOffsetOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalshowoffsetoption
+pub fn getTemporalShowOffsetOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.DisplayOffset {
+    // 1. Let stringValue be ? GetOption(options, "offset", string, « "auto", "never" », "auto").
+    const string_value = try options.getOption(
+        agent,
+        "offset",
+        .string,
+        &.{
+            String.fromLiteral("auto"),
+            String.fromLiteral("never"),
+        },
+        String.fromLiteral("auto"),
+    );
+
+    // 2. If stringValue is "never", return never.
+    if (string_value.eql(String.fromLiteral("never"))) {
+        return temporal_rs.c.DisplayOffset_Never;
+    }
+
+    // 3. Return auto.
+    return temporal_rs.c.DisplayOffset_Auto;
+}
+
 /// 13.15 GetTemporalFractionalSecondDigitsOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalfractionalseconddigitsoption
 pub fn getTemporalFractionalSecondDigitsOption(

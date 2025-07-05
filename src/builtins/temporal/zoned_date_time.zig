@@ -19,6 +19,12 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
+const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const getTemporalShowOffsetOption = builtins.getTemporalShowOffsetOption;
+const getTemporalShowTimeZoneNameOption = builtins.getTemporalShowTimeZoneNameOption;
+const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -171,6 +177,9 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
@@ -606,6 +615,134 @@ pub const prototype = struct {
         var write = temporal_rs.DiplomatWrite.init(&context);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 6.3.43 Temporal.ZonedDateTime.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
+                zoned_date_time.fields.inner,
+                temporal_rs.c.DisplayOffset_Auto,
+                temporal_rs.c.DisplayTimeZone_Auto,
+                temporal_rs.c.DisplayCalendar_Auto,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 6.3.42 Temporal.ZonedDateTime.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
+                zoned_date_time.fields.inner,
+                temporal_rs.c.DisplayOffset_Auto,
+                temporal_rs.c.DisplayTimeZone_Auto,
+                temporal_rs.c.DisplayCalendar_Auto,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 6.3.41 Temporal.ZonedDateTime.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalShowCalendarNameOption reads "calendarName",
+        //    GetTemporalFractionalSecondDigitsOption reads "fractionalSecondDigits",
+        //    GetTemporalShowOffsetOption reads "offset", and GetRoundingModeOption reads
+        //    "roundingMode").
+
+        // 5. Let showCalendar be ? GetTemporalShowCalendarNameOption(resolvedOptions).
+        const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
+
+        // 6. Let digits be ? GetTemporalFractionalSecondDigitsOption(resolvedOptions).
+        const precision = try getTemporalFractionalSecondDigitsOption(agent, options);
+
+        // 7. Let showOffset be ? GetTemporalShowOffsetOption(resolvedOptions).
+        const show_offset = try getTemporalShowOffsetOption(agent, options);
+
+        // 8. Let roundingMode be ? GetRoundingModeOption(resolvedOptions, trunc).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_Trunc,
+        );
+
+        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .time,
+            .unset,
+            &.{},
+        );
+
+        // 10. If smallestUnit is hour, throw a RangeError exception.
+        if (smallest_unit == temporal_rs.c.Unit_Hour) {
+            return agent.throwException(
+                .range_error,
+                "Invalid value for option 'smallestUnit'",
+                .{},
+            );
+        }
+
+        // 11. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
+        const show_time_zone = try getTemporalShowTimeZoneNameOption(agent, options);
+
+        // 12. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 13. Return TemporalZonedDateTimeToString(zonedDateTime, precision.[[Precision]],
+        //     showCalendar, showTimeZone, showOffset, precision.[[Increment]], precision.[[Unit]],
+        //     roundingMode).
+        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
+        var write = temporal_rs.DiplomatWrite.init(&context);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
+                zoned_date_time.fields.inner,
+                show_offset,
+                show_time_zone,
+                show_calendar,
+                .{
+                    .precision = precision,
+                    .smallest_unit = if (smallest_unit) |ok|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                },
+                &write.inner,
+            ),
         ) catch unreachable;
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
