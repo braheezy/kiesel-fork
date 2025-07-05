@@ -213,8 +213,7 @@ pub const prototype = struct {
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[Era]].
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_era(plain_year_month.fields.inner, &write.inner);
         if (write.inner.len == 0) {
             std.debug.assert(write.inner.cap == 0); // Nothing to free
@@ -276,8 +275,7 @@ pub const prototype = struct {
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MonthCode]].
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_month_code(
             plain_year_month.fields.inner,
             &write.inner,
@@ -306,8 +304,7 @@ pub const prototype = struct {
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return TemporalYearMonthToString(plainYearMonth, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_to_ixdtf_string(
             plain_year_month.fields.inner,
             temporal_rs.c.DisplayCalendar_Auto,
@@ -324,8 +321,7 @@ pub const prototype = struct {
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return TemporalYearMonthToString(plainYearMonth, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_to_ixdtf_string(
             plain_year_month.fields.inner,
             temporal_rs.c.DisplayCalendar_Auto,
@@ -350,8 +346,7 @@ pub const prototype = struct {
         const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
 
         // 5. Return TemporalYearMonthToString(plainYearMonth, showCalendar).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_to_ixdtf_string(
             plain_year_month.fields.inner,
             show_calendar,

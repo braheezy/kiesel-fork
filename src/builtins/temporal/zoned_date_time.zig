@@ -363,8 +363,7 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[Era]].
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_ZonedDateTime_era(zoned_date_time.fields.inner, &write.inner);
         if (write.inner.len == 0) {
             std.debug.assert(write.inner.cap == 0); // Nothing to free
@@ -517,8 +516,7 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[MonthCode]].
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_ZonedDateTime_month_code(zoned_date_time.fields.inner, &write.inner);
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
@@ -560,8 +558,7 @@ pub const prototype = struct {
 
         // 3. Let offsetNanoseconds be GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return FormatUTCOffsetNanoseconds(offsetNanoseconds).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         // NOTE: I don't think this is actually fallible
         // https://github.com/boa-dev/temporal/blob/34522ae99c9d6e2ac2782162eaf01b36494951ca/src/builtins/core/timezone.rs#L183-L198
         temporal_rs.temporalErrorResult(
@@ -611,8 +608,7 @@ pub const prototype = struct {
         const temporal_rs_time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
             zoned_date_time.fields.inner,
         );
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner),
         ) catch unreachable;
@@ -627,8 +623,7 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
@@ -650,8 +645,7 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
@@ -725,8 +719,7 @@ pub const prototype = struct {
         // 13. Return TemporalZonedDateTimeToString(zonedDateTime, precision.[[Precision]],
         //     showCalendar, showTimeZone, showOffset, precision.[[Increment]], precision.[[Unit]],
         //     roundingMode).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,

@@ -193,8 +193,7 @@ pub const prototype = struct {
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[MonthCode]].
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainMonthDay_month_code(
             plain_month_day.fields.inner,
             &write.inner,
@@ -210,8 +209,7 @@ pub const prototype = struct {
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return TemporalMonthDayToString(plainMonthDay, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
             plain_month_day.fields.inner,
             temporal_rs.c.DisplayCalendar_Auto,
@@ -228,8 +226,7 @@ pub const prototype = struct {
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return TemporalMonthDayToString(plainMonthDay, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
             plain_month_day.fields.inner,
             temporal_rs.c.DisplayCalendar_Auto,
@@ -254,8 +251,7 @@ pub const prototype = struct {
         const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
 
         // 5. Return TemporalMonthDayToString(plainMonthDay, showCalendar).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainMonthDay_to_ixdtf_string(
             plain_month_day.fields.inner,
             show_calendar,

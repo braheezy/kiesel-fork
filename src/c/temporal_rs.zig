@@ -60,23 +60,24 @@ pub fn toDiplomatStringView(s: []const u8) c.DiplomatStringView {
     return .{ .data = s.ptr, .len = s.len };
 }
 
-// Convert a Rust `Option<T>` to a Zig `?T`.
+/// Convert a Rust `Option<T>` to a Zig `?T`.
 pub fn fromOptional(value: anytype) ?Success(@TypeOf(value)) {
     return success(value);
 }
 
 pub const DiplomatWrite = struct {
-    pub const Context = struct {
-        gpa: std.mem.Allocator,
-        array_list: std.ArrayListUnmanaged(u8) = .empty,
-    };
-
+    gpa: std.mem.Allocator,
+    array_list: std.ArrayListUnmanaged(u8),
     inner: c.DiplomatWrite,
 
-    pub fn init(context: *Context) DiplomatWrite {
+    pub fn init(gpa: std.mem.Allocator) DiplomatWrite {
         return .{
+            .gpa = gpa,
+            .array_list = .empty,
             .inner = .{
-                .context = context,
+                // NOTE: We use `@fieldParentPtr()` on the `inner` struct field to get to the other
+                //       fields instead of creating a context externally and storing a pointer.
+                .context = null,
                 .buf = undefined,
                 .len = 0,
                 .cap = 0,
@@ -87,30 +88,77 @@ pub const DiplomatWrite = struct {
         };
     }
 
-    pub fn deinit(self: *const DiplomatWrite) void {
-        const context: *Context = @alignCast(@ptrCast(self.inner.context.?));
-        context.array_list.deinit(context.gpa);
+    pub fn deinit(self: *DiplomatWrite) void {
+        self.array_list.deinit(self.gpa);
     }
 
-    pub fn toOwnedSlice(self: *const DiplomatWrite) std.mem.Allocator.Error![]u8 {
+    pub fn toOwnedSlice(self: *DiplomatWrite) std.mem.Allocator.Error![]u8 {
         if (self.inner.grow_failed) return error.OutOfMemory;
-        const context: *Context = @alignCast(@ptrCast(self.inner.context.?));
-        return context.array_list.toOwnedSlice(context.gpa);
+        self.inner = undefined; // Invalidate the inner struct to prevent further writes
+        return self.array_list.toOwnedSlice(self.gpa);
     }
 
     fn flush(inner: ?*c.DiplomatWrite) callconv(.c) void {
-        const context: *Context = @alignCast(@ptrCast(inner.?.context.?));
-        context.array_list.items.len = inner.?.len;
+        const self: *DiplomatWrite = @fieldParentPtr("inner", inner.?);
+        self.array_list.items.len = inner.?.len;
     }
 
     fn grow(inner: ?*c.DiplomatWrite, size: usize) callconv(.c) bool {
-        const context: *Context = @alignCast(@ptrCast(inner.?.context.?));
-        context.array_list.ensureTotalCapacity(context.gpa, size) catch return false;
-        inner.?.buf = context.array_list.items.ptr;
-        inner.?.cap = context.array_list.capacity;
+        const self: *DiplomatWrite = @fieldParentPtr("inner", inner.?);
+        self.array_list.ensureTotalCapacity(self.gpa, size) catch return false;
+        inner.?.buf = self.array_list.items.ptr;
+        inner.?.cap = self.array_list.capacity;
         return true;
     }
 };
+
+test DiplomatWrite {
+    const gpa = std.testing.allocator;
+    var write = DiplomatWrite.init(gpa);
+    defer write.deinit();
+
+    const WriteImpl = struct {
+        inner: *c.DiplomatWrite,
+
+        // https://github.com/rust-diplomat/diplomat/blob/2b903255187976779798fc89df3fee7298641c80/runtime/src/write.rs#L70-L73
+        pub fn flush(self: @This()) void {
+            self.inner.flush.?(self.inner);
+        }
+
+        // https://github.com/rust-diplomat/diplomat/blob/2b903255187976779798fc89df3fee7298641c80/runtime/src/write.rs#L76-L94
+        pub fn writeStr(self: @This(), s: []const u8) void {
+            if (self.inner.grow_failed) {
+                return;
+            }
+            const needed_len = self.inner.len + s.len;
+            if (needed_len > self.inner.cap) {
+                const success_ = self.inner.grow.?(self.inner, needed_len);
+                if (!success_) {
+                    self.inner.grow_failed = true;
+                    return;
+                }
+            }
+            std.debug.assert(needed_len <= self.inner.cap);
+            @memcpy(self.inner.buf[self.inner.len..][0..s.len], s);
+            self.inner.len = needed_len;
+        }
+    };
+
+    var write_impl: WriteImpl = .{ .inner = &write.inner };
+    write_impl.writeStr("Hello World");
+    write_impl.flush();
+
+    try std.testing.expectEqual(write.array_list.items.ptr, write.inner.buf);
+    try std.testing.expectEqual(write.array_list.items.len, write.inner.len);
+    try std.testing.expectEqual(write.array_list.capacity, write.inner.cap);
+    try std.testing.expectEqual(false, write.inner.grow_failed);
+    try std.testing.expectEqualSlices(u8, "Hello World", write.array_list.items);
+
+    const slice = try write.toOwnedSlice();
+    defer gpa.free(slice);
+    try std.testing.expectEqualSlices(u8, "Hello World", slice);
+    try std.testing.expectEqualSlices(u8, &.{}, write.array_list.items);
+}
 
 // https://github.com/boa-dev/temporal/blob/main/temporal_capi/src/error.rs
 pub const TemporalError = error{

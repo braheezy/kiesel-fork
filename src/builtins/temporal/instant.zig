@@ -297,8 +297,7 @@ pub const prototype = struct {
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
@@ -318,8 +317,7 @@ pub const prototype = struct {
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
@@ -392,8 +390,7 @@ pub const prototype = struct {
         // 12. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]], precision.[[Increment]], precision.[[Unit]], roundingMode).
         // 13. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
         // 14. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,

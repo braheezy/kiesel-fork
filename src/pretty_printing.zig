@@ -1154,8 +1154,7 @@ fn prettyPrintTemporalZonedDateTime(
         temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(temporal_zoned_date_time.fields.inner),
     );
     const time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(temporal_zoned_date_time.fields.inner);
-    var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = arena.allocator() };
-    var write = temporal_rs.DiplomatWrite.init(&context);
+    var write = temporal_rs.DiplomatWrite.init(arena.allocator());
     temporal_rs.temporalErrorResult(
         temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner),
     ) catch unreachable;

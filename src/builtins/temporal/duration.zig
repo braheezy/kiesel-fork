@@ -366,8 +366,7 @@ pub const prototype = struct {
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
         // 3. Return TemporalDurationToString(duration, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
@@ -386,8 +385,7 @@ pub const prototype = struct {
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
         // 3. Return TemporalDurationToString(duration, auto).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
@@ -445,8 +443,7 @@ pub const prototype = struct {
         // 15. Let roundedLargestUnit be LargerOfTwoTemporalUnits(largestUnit, second).
         // 16. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
         // 17. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
-        var context: temporal_rs.DiplomatWrite.Context = .{ .gpa = agent.gc_allocator };
-        var write = temporal_rs.DiplomatWrite.init(&context);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
