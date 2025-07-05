@@ -183,6 +183,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "daysInYear", daysInYear, null, realm);
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "era", era, null, realm);
         try object.defineBuiltinAccessor(agent, "eraYear", eraYear, null, realm);
         try object.defineBuiltinAccessor(agent, "hour", hour, null, realm);
@@ -374,6 +375,29 @@ pub const prototype = struct {
         );
         const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
         return Value.from(try BigInt.from(agent.gc_allocator, managed));
+    }
+
+    /// 6.3.40 Temporal.ZonedDateTime.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Set other to ? ToTemporalZonedDateTime(other).
+        const other = try toTemporalZonedDateTime(agent, other_value, null);
+
+        // 4. If zonedDateTime.[[EpochNanoseconds]] ≠ other.[[EpochNanoseconds]], return false.
+        // 5. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, return false.
+        // 6. Return CalendarEquals(zonedDateTime.[[Calendar]], other.[[Calendar]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_ZonedDateTime_equals(
+                zoned_date_time.fields.inner,
+                other.as(ZonedDateTime).fields.inner,
+            ),
+        );
     }
 
     /// 6.3.5 get Temporal.ZonedDateTime.prototype.era
