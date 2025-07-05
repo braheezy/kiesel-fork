@@ -21,6 +21,10 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalInstant = builtins.createTemporalInstant;
+const createTemporalDate = builtins.createTemporalDate;
+const createTemporalDateTime = builtins.createTemporalDateTime;
+const createTemporalTime = builtins.createTemporalTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
@@ -200,8 +204,12 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
+        try object.defineBuiltinFunction(agent, "toInstant", toInstant, 0, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainDateTime", toPlainDateTime, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainTime", toPlainTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
@@ -661,6 +669,27 @@ pub const prototype = struct {
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
+    /// 6.3.47 Temporal.ZonedDateTime.prototype.toInstant ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.toinstant
+    fn toInstant(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return ! CreateTemporalInstant(zonedDateTime.[[EpochNanoseconds]]).
+        const temporal_rs_instant = temporal_rs.c.temporal_rs_ZonedDateTime_to_instant(
+            zoned_date_time.fields.inner,
+        );
+        errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+        return Value.from(
+            createTemporalInstant(
+                agent,
+                temporal_rs_instant.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+    }
+
     /// 6.3.43 Temporal.ZonedDateTime.prototype.toJSON ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.tojson
     fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
@@ -703,6 +732,81 @@ pub const prototype = struct {
             ),
         ) catch unreachable;
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 6.3.48 Temporal.ZonedDateTime.prototype.toPlainDate ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.toplaindate
+    fn toPlainDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], zonedDateTime.[[Calendar]]).
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
+                zoned_date_time.fields.inner,
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+        return Value.from(
+            createTemporalDate(
+                agent,
+                temporal_rs_plain_date.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 6.3.50 Temporal.ZonedDateTime.prototype.toPlainDateTime ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.toplaindatetime
+    fn toPlainDateTime(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return ! CreateTemporalDateTime(isoDateTime, zonedDateTime.[[Calendar]]).
+        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_datetime(
+                zoned_date_time.fields.inner,
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        return Value.from(
+            createTemporalDateTime(
+                agent,
+                temporal_rs_plain_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 6.3.49 Temporal.ZonedDateTime.prototype.toPlainTime ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.toplaintime
+    fn toPlainTime(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
+        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
+                zoned_date_time.fields.inner,
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
+        return Value.from(
+            createTemporalTime(
+                agent,
+                temporal_rs_plain_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 6.3.41 Temporal.ZonedDateTime.prototype.toString ( [ options ] )
