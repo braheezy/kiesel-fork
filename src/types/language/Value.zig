@@ -2253,6 +2253,21 @@ pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {
     return self.toObject(agent);
 }
 
+/// 13.37 ToPositiveIntegerWithTruncation ( argument )
+/// https://tc39.es/proposal-temporal/#sec-topositiveintegerwithtruncation
+pub fn toPositiveIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {
+    // 1. Let integer be ? ToIntegerWithTruncation(argument).
+    const integer = try self.toIntegerWithTruncation(agent);
+
+    // 2. If integer ≤ 0, throw a RangeError exception.
+    if (integer <= 0) {
+        return agent.throwException(.range_error, "{} is not a positive number", .{self});
+    }
+
+    // 3. Return integer.
+    return integer;
+}
+
 /// 13.38 ToIntegerWithTruncation ( argument )
 /// https://tc39.es/proposal-temporal/#sec-tointegerwithtruncation
 pub fn toIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {

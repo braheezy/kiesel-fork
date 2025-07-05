@@ -8,24 +8,34 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalOffsetOption = builtins.getTemporalOffsetOption;
+const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const getTemporalShowOffsetOption = builtins.getTemporalShowOffsetOption;
 const getTemporalShowTimeZoneNameOption = builtins.getTemporalShowTimeZoneNameOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toMonthCode = builtins.toMonthCode;
+const toOffsetString = builtins.toOffsetString;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-zoneddatetime-constructor
@@ -41,6 +51,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 6.2.1 Temporal.ZonedDateTime.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -139,6 +151,16 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, new_target),
         );
+    }
+
+    /// 6.2.2 Temporal.ZonedDateTime.from ( item [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Return ? ToTemporalZonedDateTime(item, options).
+        return Value.from(try toTemporalZonedDateTime(agent, item, options));
     }
 };
 
@@ -815,6 +837,339 @@ pub const ZonedDateTime = MakeObject(.{
     },
     .tag = .temporal_zoned_date_time,
 });
+
+/// 6.5.2 ToTemporalZonedDateTime ( item [ , options ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalzoneddatetime
+pub fn toTemporalZonedDateTime(
+    agent: *Agent,
+    item: Value,
+    maybe_options_value: ?Value,
+) Agent.Error!*Object {
+    // 1. If options is not present, set options to undefined.
+    const options_value: Value = maybe_options_value orelse .undefined;
+
+    // 2. Let offsetBehaviour be option.
+    // 3. Let matchBehaviour be match-exactly.
+    // 4. If item is an Object, then
+    const temporal_rs_zoned_date_time = if (item.isObject()) blk: {
+        // a. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
+        if (item.asObject().is(ZonedDateTime)) {
+            // i. NOTE: The following steps, and similar ones below, read options and perform
+            //    independent validation in alphabetical order (GetTemporalDisambiguationOption
+            //    reads "disambiguation", GetTemporalOffsetOption reads "offset", and
+            //    GetTemporalOverflowOption reads "overflow").
+
+            // ii. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // iii. Perform ? GetTemporalDisambiguationOption(resolvedOptions).
+            _ = try getTemporalDisambiguationOption(agent, options);
+
+            // iv. Perform ? GetTemporalOffsetOption(resolvedOptions, reject).
+            _ = try getTemporalOffsetOption(
+                agent,
+                options,
+                temporal_rs.c.OffsetDisambiguation_Reject,
+            );
+
+            // v. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // vi. Return ! CreateTemporalZonedDateTime(item.[[EpochNanoseconds]],
+            //     item.[[TimeZone]], item.[[Calendar]]).
+            const epoch_nanoseconds = temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(
+                item.asObject().as(ZonedDateTime).fields.inner,
+            );
+            const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(
+                item.asObject().as(ZonedDateTime).fields.inner,
+            );
+            const time_zone = temporal_rs.c.temporal_rs_TimeZone_clone(
+                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
+                    item.asObject().as(ZonedDateTime).fields.inner,
+                ),
+            );
+            errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
+            const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
+                    epoch_nanoseconds,
+                    temporal_rs.c.temporal_rs_Calendar_kind(calendar),
+                    time_zone,
+                ),
+            ) catch unreachable;
+            return createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err);
+        }
+
+        // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day »,
+        //    « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
+        //    « time-zone »).
+        // d. Let timeZone be fields.[[TimeZone]].
+        // e. Let offsetString be fields.[[OffsetString]].
+        // f. If offsetString is unset, then
+        // i. Set offsetBehaviour to wall.
+        const partial_zoned_date_time = try toTemporalPartialZonedDateTime(agent, item.asObject());
+
+        // g. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // h. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        const disambiguation = try getTemporalDisambiguationOption(agent, options);
+
+        // i. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
+        const offset_option = try getTemporalOffsetOption(
+            agent,
+            options,
+            temporal_rs.c.Disambiguation_Reject,
+        );
+
+        // j. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // k. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
+        // l. Let isoDate be result.[[ISODate]].
+        // m. Let time be result.[[Time]].
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
+                partial_zoned_date_time,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_option } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid zoned datetime", .{});
+            },
+            error.TypeError => {
+                return agent.throwException(.type_error, "Missing zoned datetime field", .{});
+            },
+            else => unreachable,
+        };
+    } else blk: {
+        // 5. Else,
+
+        // a. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(
+                .type_error,
+                "Zoned datetime must be a string or object",
+                .{},
+            );
+        }
+
+        // b. Let result be ? ParseISODateTime(item, « TemporalDateTimeString[+Zoned] »).
+        // c. Let annotation be result.[[TimeZone]].[[TimeZoneAnnotation]].
+        // d. Assert: annotation is not empty.
+        // e. Let timeZone be ? ToTemporalTimeZoneIdentifier(annotation).
+        // f. Let offsetString be result.[[TimeZone]].[[OffsetString]].
+        // g. If result.[[TimeZone]].[[Z]] is true, then
+        // i. Set offsetBehaviour to exact.
+        // h. Else if offsetString is empty, then
+        // i. Set offsetBehaviour to wall.
+        // i. Let calendar be result.[[Calendar]].
+        // j. If calendar is empty, set calendar to "iso8601".
+        // k. Set calendar to ? CanonicalizeCalendar(calendar).
+        // l. Set matchBehaviour to match-minutes.
+        // m. If offsetString is not empty, then
+        // i. Let offsetParseResult be ParseText(StringToCodePoints(offsetString), UTCOffset[+SubMinutePrecision]).
+        // ii. Assert: offsetParseResult is a Parse Node.
+        // iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set matchBehaviour to match-exactly.
+
+        // n. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // o. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        const disambiguation = try getTemporalDisambiguationOption(agent, options);
+
+        // p. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
+        const offset_option = try getTemporalOffsetOption(
+            agent,
+            options,
+            temporal_rs.c.Disambiguation_Reject,
+        );
+
+        // q. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        _ = try getTemporalOverflowOption(agent, options);
+
+        // r. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        const zoned_date_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(zoned_date_time_utf8);
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_from_utf8(
+                temporal_rs.toDiplomatStringView(zoned_date_time_utf8),
+                disambiguation,
+                offset_option,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => return agent.throwException(
+                .range_error,
+                "Invalid zoned datetime string",
+                .{},
+            ),
+            else => unreachable,
+        };
+    };
+    errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+
+    // 6. Let offsetNanoseconds be 0.
+    // 7. If offsetBehaviour is option, then
+    //     a. Set offsetNanoseconds to ! ParseDateTimeUTCOffset(offsetString).
+    // 8. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
+    //    offsetNanoseconds, timeZone, disambiguation, offsetOption, matchBehaviour).
+    // 9. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+    return createTemporalZonedDateTime(
+        agent,
+        temporal_rs_zoned_date_time.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// Custom function to create a PartialZonedDateTime based on:
+///
+/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
+/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
+pub fn toTemporalPartialZonedDateTime(
+    agent: *Agent,
+    object: *Object,
+) Agent.Error!temporal_rs.c.PartialZonedDateTime {
+    var result: temporal_rs.c.PartialZonedDateTime = .{
+        .date = .{
+            .year = .{ .is_ok = false },
+            .month = .{ .is_ok = false },
+            .month_code = .{ .data = null },
+            .day = .{ .is_ok = false },
+            .era = .{ .data = null },
+            .era_year = .{ .is_ok = false },
+            .calendar = undefined,
+        },
+        .time = .{
+            .hour = .{ .is_ok = false },
+            .minute = .{ .is_ok = false },
+            .second = .{ .is_ok = false },
+            .millisecond = .{ .is_ok = false },
+            .microsecond = .{ .is_ok = false },
+            .nanosecond = .{ .is_ok = false },
+        },
+        .offset = .{ .is_ok = false },
+        .timezone = null,
+    };
+
+    const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, object);
+    result.date.calendar = calendar;
+
+    const day = try object.get(agent, PropertyKey.from("day"));
+    if (!day.isUndefined()) {
+        result.date.day = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const era = try object.get(agent, PropertyKey.from("era"));
+    if (!era.isUndefined()) {
+        const era_string = try era.toString(agent);
+        const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
+        result.date.era = temporal_rs.toDiplomatStringView(era_utf8);
+    }
+
+    const era_year = try object.get(agent, PropertyKey.from("eraYear"));
+    if (!era_year.isUndefined()) {
+        result.date.era_year = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const hour = try object.get(agent, PropertyKey.from("hour"));
+    if (!hour.isUndefined()) {
+        result.time.hour = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try hour.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const microsecond = try object.get(agent, PropertyKey.from("microsecond"));
+    if (!microsecond.isUndefined()) {
+        result.time.microsecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try microsecond.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const millisecond = try object.get(agent, PropertyKey.from("millisecond"));
+    if (!millisecond.isUndefined()) {
+        result.time.millisecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try millisecond.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const minute = try object.get(agent, PropertyKey.from("minute"));
+    if (!minute.isUndefined()) {
+        result.time.minute = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try minute.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const month = try object.get(agent, PropertyKey.from("month"));
+    if (!month.isUndefined()) {
+        result.date.month = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try month.toPositiveIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const month_code = try object.get(agent, PropertyKey.from("monthCode"));
+    if (!month_code.isUndefined()) {
+        const month_code_utf8 = try toMonthCode(agent, month_code);
+        result.date.month_code = temporal_rs.toDiplomatStringView(month_code_utf8);
+    }
+
+    const nanosecond = try object.get(agent, PropertyKey.from("nanosecond"));
+    if (!nanosecond.isUndefined()) {
+        result.time.nanosecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try nanosecond.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const offset = try object.get(agent, PropertyKey.from("offset"));
+    if (!offset.isUndefined()) {
+        const offset_utf8 = try toOffsetString(agent, offset);
+        result.offset = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = temporal_rs.toDiplomatStringView(offset_utf8) },
+        };
+    }
+
+    const second = try object.get(agent, PropertyKey.from("second"));
+    if (!second.isUndefined()) {
+        result.time.second = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try second.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const time_zone_value = try object.get(agent, PropertyKey.from("timeZone"));
+    // NOTE: Undefined check is done as part of ToTemporalTimeZoneIdentifier
+    const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
+    errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
+    result.timezone = time_zone;
+
+    const year = try object.get(agent, PropertyKey.from("year"));
+    if (!year.isUndefined()) {
+        result.date.year = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    return result;
+}
 
 /// 6.5.3 CreateTemporalZonedDateTime ( epochNanoseconds, timeZone, calendar [ , newTarget ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createtemporalzoneddatetime

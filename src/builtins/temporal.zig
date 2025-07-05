@@ -214,6 +214,230 @@ pub fn canonicalizeCalendar(
     return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
 }
 
+/// 12.2.8 ToTemporalCalendarIdentifier ( temporalCalendarLike )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalcalendaridentifier
+pub fn toTemporalCalendarIdentifier(
+    agent: *Agent,
+    temporal_calendar_like: Value,
+) Agent.Error!temporal_rs.c.AnyCalendarKind {
+    // 1. If temporalCalendarLike is an Object, then
+    if (temporal_calendar_like.isObject()) {
+        // a. If temporalCalendarLike has an [[InitializedTemporalDate]],
+        //    [[InitializedTemporalDateTime]], [[InitializedTemporalMonthDay]],
+        //    [[InitializedTemporalYearMonth]], or [[InitializedTemporalZonedDateTime]] internal
+        //    slot, then
+        const item = temporal_calendar_like.asObject();
+        if (switch (item.tag) {
+            .temporal_plain_date => temporal_rs.c.temporal_rs_PlainDate_calendar(
+                item.as(builtins.temporal.PlainDate).fields.inner,
+            ),
+            .temporal_plain_date_time => temporal_rs.c.temporal_rs_PlainDateTime_calendar(
+                item.as(builtins.temporal.PlainDateTime).fields.inner,
+            ),
+            .temporal_plain_month_day => temporal_rs.c.temporal_rs_PlainMonthDay_calendar(
+                item.as(builtins.temporal.PlainMonthDay).fields.inner,
+            ),
+            .temporal_plain_year_month => temporal_rs.c.temporal_rs_PlainYearMonth_calendar(
+                item.as(builtins.temporal.PlainYearMonth).fields.inner,
+            ),
+            .temporal_zoned_date_time => temporal_rs.c.temporal_rs_ZonedDateTime_calendar(
+                item.as(builtins.temporal.ZonedDateTime).fields.inner,
+            ),
+            else => null,
+        }) |calendar| {
+            // i. Return temporalCalendarLike.[[Calendar]].
+            return temporal_rs.c.temporal_rs_Calendar_kind(calendar);
+        }
+    }
+
+    // 2. If temporalCalendarLike is not a String, throw a TypeError exception.
+    if (!temporal_calendar_like.isString()) {
+        return agent.throwException(
+            .type_error,
+            "Calendar must be a string or object",
+            .{},
+        );
+    }
+
+    // 3. Let identifier be ? ParseTemporalCalendarString(temporalCalendarLike).
+    // 4. Return ? CanonicalizeCalendar(identifier).
+    const calendar_utf8 = try temporal_calendar_like.asString().toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(calendar_utf8);
+    const temporal_rs_calendar = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_Calendar_from_utf8(
+            temporal_rs.toDiplomatStringView(calendar_utf8),
+        ),
+    ) catch |err| switch (err) {
+        error.RangeError => {
+            return agent.throwException(
+                .range_error,
+                "Invalid calendar {}",
+                .{temporal_calendar_like},
+            );
+        },
+        else => unreachable,
+    };
+    defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar.?);
+    return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar.?);
+}
+
+/// 12.2.9 GetTemporalCalendarIdentifierWithISODefault ( item )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalcalendarslotvaluewithisodefault
+pub fn getTemporalCalendarIdentifierWithISODefault(
+    agent: *Agent,
+    item: *Object,
+) Agent.Error!temporal_rs.c.AnyCalendarKind {
+    // 1. If item has an [[InitializedTemporalDate]], [[InitializedTemporalDateTime]],
+    //    [[InitializedTemporalMonthDay]], [[InitializedTemporalYearMonth]], or
+    //    [[InitializedTemporalZonedDateTime]] internal slot, then
+    if (switch (item.tag) {
+        .temporal_plain_date => temporal_rs.c.temporal_rs_PlainDate_calendar(
+            item.as(builtins.temporal.PlainDate).fields.inner,
+        ),
+        .temporal_plain_date_time => temporal_rs.c.temporal_rs_PlainDateTime_calendar(
+            item.as(builtins.temporal.PlainDateTime).fields.inner,
+        ),
+        .temporal_plain_month_day => temporal_rs.c.temporal_rs_PlainMonthDay_calendar(
+            item.as(builtins.temporal.PlainMonthDay).fields.inner,
+        ),
+        .temporal_plain_year_month => temporal_rs.c.temporal_rs_PlainYearMonth_calendar(
+            item.as(builtins.temporal.PlainYearMonth).fields.inner,
+        ),
+        .temporal_zoned_date_time => temporal_rs.c.temporal_rs_ZonedDateTime_calendar(
+            item.as(builtins.temporal.ZonedDateTime).fields.inner,
+        ),
+        else => null,
+    }) |calendar| {
+        // a. Return item.[[Calendar]].
+        return temporal_rs.c.temporal_rs_Calendar_kind(calendar);
+    }
+
+    // 2. Let calendarLike be ? Get(item, "calendar").
+    const calendar_like = try item.get(agent, PropertyKey.from("calendar"));
+
+    // 3. If calendarLike is undefined, then
+    if (calendar_like.isUndefined()) {
+        // a. Return "iso8601".
+        return temporal_rs.c.AnyCalendarKind_Iso;
+    }
+
+    // 4. Return ? ToTemporalCalendarIdentifier(calendarLike).
+    return toTemporalCalendarIdentifier(agent, calendar_like);
+}
+
+/// 13.6 GetTemporalOverflowOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporaloverflowoption
+pub fn getTemporalOverflowOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.ArithmeticOverflow {
+    // 1. Let stringValue be ? GetOption(options, "overflow", string, « "constrain", "reject" »,
+    //    "constrain").
+    const string_value = try options.getOption(
+        agent,
+        "overflow",
+        .string,
+        &.{
+            String.fromLiteral("constrain"),
+            String.fromLiteral("reject"),
+        },
+        String.fromLiteral("constrain"),
+    );
+
+    // 2. If stringValue is "constrain", return constrain.
+    // 3. Return reject.
+    const arithmetic_overflow_map = std.StaticStringMap(
+        temporal_rs.c.ArithmeticOverflow,
+    ).initComptime(&.{
+        .{ "constrain", temporal_rs.c.ArithmeticOverflow_Constrain },
+        .{ "reject", temporal_rs.c.ArithmeticOverflow_Reject },
+    });
+    return arithmetic_overflow_map.get(string_value.slice.ascii).?;
+}
+
+/// 13.7 GetTemporalDisambiguationOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporaldisambiguationoption
+pub fn getTemporalDisambiguationOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.Disambiguation {
+    // 1. Let stringValue be ? GetOption(options, "disambiguation", string, « "compatible",
+    //    "earlier", "later", "reject" », "compatible").
+    const string_value = try options.getOption(
+        agent,
+        "disambiguation",
+        .string,
+        &.{
+            String.fromLiteral("compatible"),
+            String.fromLiteral("earlier"),
+            String.fromLiteral("later"),
+            String.fromLiteral("reject"),
+        },
+        String.fromLiteral("compatible"),
+    );
+
+    // 2. If stringValue is "compatible", return compatible.
+    // 3. If stringValue is "earlier", return earlier.
+    // 4. If stringValue is "later", return later.
+    // 5. Return reject.
+    const disambiguation_map = std.StaticStringMap(
+        temporal_rs.c.Disambiguation,
+    ).initComptime(&.{
+        .{ "compatible", temporal_rs.c.Disambiguation_Compatible },
+        .{ "earlier", temporal_rs.c.Disambiguation_Earlier },
+        .{ "later", temporal_rs.c.Disambiguation_Later },
+        .{ "reject", temporal_rs.c.Disambiguation_Reject },
+    });
+    return disambiguation_map.get(string_value.slice.ascii).?;
+}
+
+/// 13.9 GetTemporalOffsetOption ( options, fallback )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporaloffsetoption
+pub fn getTemporalOffsetOption(
+    agent: *Agent,
+    options: *Object,
+    fallback: temporal_rs.c.OffsetDisambiguation,
+) Agent.Error!temporal_rs.c.OffsetDisambiguation {
+    // 1. If fallback is prefer, let stringFallback be "prefer".
+    // 2. Else if fallback is use, let stringFallback be "use".
+    // 3. Else if fallback is ignore, let stringFallback be "ignore".
+    // 4. Else, let stringFallback be "reject".
+    // 5. Let stringValue be ? GetOption(options, "offset", string, « "prefer", "use", "ignore",
+    //    "reject" », stringFallback).
+    const string_value = try options.getOption(
+        agent,
+        "offset",
+        .string,
+        &.{
+            String.fromLiteral("prefer"),
+            String.fromLiteral("use"),
+            String.fromLiteral("ignore"),
+            String.fromLiteral("reject"),
+        },
+        switch (fallback) {
+            temporal_rs.c.OffsetDisambiguation_Prefer => String.fromLiteral("prefer"),
+            temporal_rs.c.OffsetDisambiguation_Use => String.fromLiteral("use"),
+            temporal_rs.c.OffsetDisambiguation_Ignore => String.fromLiteral("ignore"),
+            temporal_rs.c.OffsetDisambiguation_Reject => String.fromLiteral("reject"),
+            else => unreachable,
+        },
+    );
+
+    // 6. If stringValue is "prefer", return prefer.
+    // 7. If stringValue is "use", return use.
+    // 8. If stringValue is "ignore", return ignore.
+    // 9. Return reject.
+    const offset_disambiguation_map = std.StaticStringMap(
+        temporal_rs.c.OffsetDisambiguation,
+    ).initComptime(&.{
+        .{ "prefer", temporal_rs.c.OffsetDisambiguation_Prefer },
+        .{ "use", temporal_rs.c.OffsetDisambiguation_Use },
+        .{ "ignore", temporal_rs.c.OffsetDisambiguation_Ignore },
+        .{ "reject", temporal_rs.c.OffsetDisambiguation_Reject },
+    });
+    return offset_disambiguation_map.get(string_value.slice.ascii).?;
+}
+
 /// 13.10 GetTemporalShowCalendarNameOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalshowcalendarnameoption
 pub fn getTemporalShowCalendarNameOption(
@@ -236,22 +460,18 @@ pub fn getTemporalShowCalendarNameOption(
     );
 
     // 2. If stringValue is "always", return always.
-    if (string_value.eql(String.fromLiteral("always"))) {
-        return temporal_rs.c.DisplayCalendar_Always;
-    }
-
     // 3. If stringValue is "never", return never.
-    if (string_value.eql(String.fromLiteral("never"))) {
-        return temporal_rs.c.DisplayCalendar_Never;
-    }
-
     // 4. If stringValue is "critical", return critical.
-    if (string_value.eql(String.fromLiteral("critical"))) {
-        return temporal_rs.c.DisplayCalendar_Critical;
-    }
-
     // 5. Return auto.
-    return temporal_rs.c.DisplayCalendar_Auto;
+    const display_calendar_map = std.StaticStringMap(
+        temporal_rs.c.DisplayCalendar,
+    ).initComptime(&.{
+        .{ "auto", temporal_rs.c.DisplayCalendar_Auto },
+        .{ "always", temporal_rs.c.DisplayCalendar_Always },
+        .{ "never", temporal_rs.c.DisplayCalendar_Never },
+        .{ "critical", temporal_rs.c.DisplayCalendar_Critical },
+    });
+    return display_calendar_map.get(string_value.slice.ascii).?;
 }
 
 /// 13.11 GetTemporalShowTimeZoneNameOption ( options )
@@ -274,17 +494,16 @@ pub fn getTemporalShowTimeZoneNameOption(
     );
 
     // 2. If stringValue is "never", return never.
-    if (string_value.eql(String.fromLiteral("never"))) {
-        return temporal_rs.c.DisplayTimeZone_Never;
-    }
-
     // 3. If stringValue is "critical", return critical.
-    if (string_value.eql(String.fromLiteral("critical"))) {
-        return temporal_rs.c.DisplayTimeZone_Critical;
-    }
-
     // 4. Return auto.
-    return temporal_rs.c.DisplayTimeZone_Auto;
+    const display_time_zone_map = std.StaticStringMap(
+        temporal_rs.c.DisplayTimeZone,
+    ).initComptime(&.{
+        .{ "auto", temporal_rs.c.DisplayTimeZone_Auto },
+        .{ "never", temporal_rs.c.DisplayTimeZone_Never },
+        .{ "critical", temporal_rs.c.DisplayTimeZone_Critical },
+    });
+    return display_time_zone_map.get(string_value.slice.ascii).?;
 }
 
 /// 13.12 GetTemporalShowOffsetOption ( options )
@@ -306,12 +525,14 @@ pub fn getTemporalShowOffsetOption(
     );
 
     // 2. If stringValue is "never", return never.
-    if (string_value.eql(String.fromLiteral("never"))) {
-        return temporal_rs.c.DisplayOffset_Never;
-    }
-
     // 3. Return auto.
-    return temporal_rs.c.DisplayOffset_Auto;
+    const display_offset_map = std.StaticStringMap(
+        temporal_rs.c.DisplayOffset,
+    ).initComptime(&.{
+        .{ "auto", temporal_rs.c.DisplayOffset_Auto },
+        .{ "never", temporal_rs.c.DisplayOffset_Never },
+    });
+    return display_offset_map.get(string_value.slice.ascii).?;
 }
 
 /// 13.15 GetTemporalFractionalSecondDigitsOption ( options )
@@ -572,6 +793,75 @@ pub fn getTemporalUnitValuedOption(
         .{ "nanoseconds", temporal_rs.c.Unit_Nanosecond },
     });
     return unit_map.get(value.slice.ascii).?;
+}
+
+/// 13.39 ToMonthCode ( argument )
+/// https://tc39.es/proposal-temporal/#sec-temporal-tomonthcode
+pub fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+    // 1. Let monthCode be ? ToPrimitive(argument, string).
+    const month_code = try argument.toPrimitive(agent, .string);
+
+    // 2. If monthCode is not a String, throw a TypeError exception.
+    if (!month_code.isString()) {
+        return agent.throwException(.type_error, "Month code must be a string", .{});
+    }
+
+    const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
+
+    // 3. If the length of monthCode is not 3 or 4, throw a RangeError exception.
+    // 4. If the first code unit of monthCode is not 0x004D (LATIN CAPITAL LETTER M), throw a
+    //    RangeError exception.
+    // 5. If the second code unit of monthCode is not in the inclusive interval from 0x0030 (DIGIT
+    //    ZERO) to 0x0039 (DIGIT NINE), throw a RangeError exception.
+    // 6. If the third code unit of monthCode is not in the inclusive interval from 0x0030 (DIGIT
+    //    ZERO) to 0x0039 (DIGIT NINE), throw a RangeError exception.
+    // 7. If the length of monthCode is 4 and the fourth code unit of monthCode is not 0x004C
+    //    (LATIN CAPITAL LETTER L), throw a RangeError exception.
+    // 8. Let monthCodeDigits be the substring of monthCode from 1 to 3.
+    // 9. Let monthCodeInteger be ℝ(StringToNumber(monthCodeDigits)).
+    // 10. If monthCodeInteger is 0 and the length of monthCode is not 4, throw a RangeError
+    //     exception.
+    const valid =
+        (month_code_utf8.len == 3 or month_code_utf8.len == 4) and
+        month_code_utf8[0] == 'M' and
+        std.ascii.isDigit(month_code_utf8[1]) and
+        std.ascii.isDigit(month_code_utf8[2]) and
+        (month_code_utf8.len != 4 or (month_code_utf8[3] == 'L' and
+            (month_code_utf8[1] != '0' or month_code_utf8[2] != '0')));
+    if (!valid) {
+        return agent.throwException(.range_error, "Invalid month code", .{});
+    }
+
+    // 11. Return monthCode.
+    return month_code_utf8;
+}
+
+/// 13.40 ToOffsetString ( argument )
+/// https://tc39.es/proposal-temporal/#sec-temporal-tooffsetstring
+pub fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+    // 1. Let offset be ? ToPrimitive(argument, string).
+    const offset = try argument.toPrimitive(agent, .string);
+
+    // 2. If offset is not a String, throw a TypeError exception.
+    if (!offset.isString()) {
+        return agent.throwException(.type_error, "Offset must be a string", .{});
+    }
+
+    // 3. Perform ? ParseDateTimeUTCOffset(offset).
+    // 4. Return offset.
+    const offset_utf8 = try offset.asString().toUtf8(agent.gc_allocator);
+    const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(
+            temporal_rs.toDiplomatStringView(offset_utf8),
+        ),
+    ) catch |err| switch (err) {
+        error.RangeError => {
+            return agent.throwException(.range_error, "Invalid offset string", .{});
+        },
+        else => unreachable,
+    };
+    defer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
+    return offset_utf8;
 }
 
 /// 14.5.2.3 GetRoundingModeOption ( options, fallback )
