@@ -117,6 +117,12 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinAccessor(agent, "hour", hour, null, realm);
+        try object.defineBuiltinAccessor(agent, "microsecond", microsecond, null, realm);
+        try object.defineBuiltinAccessor(agent, "millisecond", millisecond, null, realm);
+        try object.defineBuiltinAccessor(agent, "minute", minute, null, realm);
+        try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
+        try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 4.3.1 Temporal.PlainTime.prototype.constructor
@@ -139,6 +145,72 @@ pub const prototype = struct {
                 .configurable = true,
             },
         );
+    }
+
+    /// 4.3.3 get Temporal.PlainTime.prototype.hour
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.hour
+    fn hour(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Hour]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_hour(plain_time.fields.inner));
+    }
+
+    /// 4.3.7 get Temporal.PlainTime.prototype.microsecond
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.microsecond
+    fn microsecond(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Microsecond]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_microsecond(plain_time.fields.inner));
+    }
+
+    /// 4.3.6 get Temporal.PlainTime.prototype.millisecond
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.millisecond
+    fn millisecond(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Millisecond]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_millisecond(plain_time.fields.inner));
+    }
+
+    /// 4.3.4 get Temporal.PlainTime.prototype.minute
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.minute
+    fn minute(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Minute]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_minute(plain_time.fields.inner));
+    }
+
+    /// 4.3.8 get Temporal.PlainTime.prototype.nanosecond
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.nanosecond
+    fn nanosecond(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Nanosecond]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_nanosecond(plain_time.fields.inner));
+    }
+
+    /// 4.3.5 get Temporal.PlainTime.prototype.second
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.plaintime.prototype.second
+    fn second(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return 𝔽(plainTime.[[Time]].[[Second]]).
+        return Value.from(temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner));
     }
 
     /// 4.3.19 Temporal.PlainTime.prototype.valueOf ( )
