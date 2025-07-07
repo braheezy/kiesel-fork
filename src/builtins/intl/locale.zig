@@ -5,7 +5,6 @@ const std = @import("std");
 
 const icu4zig = @import("icu4zig");
 
-const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -19,18 +18,8 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
-
-const UnicodeExtensions = struct {
-    ca: ?*const String = null,
-    co: ?*const String = null,
-    hc: ?*const String = null,
-    kf: ?*const String = null,
-    kn: ?*const String = null,
-    nu: ?*const String = null,
-};
 
 /// 15.1.2 UpdateLanguageId ( tag, options )
 /// https://tc39.es/ecma402/#sec-updatelanguageid
@@ -82,65 +71,6 @@ fn updateLanguageId(
 
     // 15. Return newTag.
     return new_tag;
-}
-
-/// 15.1.3 MakeLocaleRecord ( tag, options, localeExtensionKeys )
-/// https://tc39.es/ecma402/#sec-makelocalerecord
-fn makeLocaleRecord(
-    agent: *Agent,
-    tag: icu4zig.Locale,
-    options: UnicodeExtensions,
-) std.mem.Allocator.Error!icu4zig.Locale {
-    // 1-8.
-    // This code ain't nice, I know.
-    const str = try tag.toString(agent.gc_allocator);
-    var parts: std.ArrayListUnmanaged([]const u8) = .empty;
-    defer parts.deinit(agent.gc_allocator);
-    const end = std.mem.indexOf(u8, str, "-x-");
-    if (std.mem.indexOf(u8, str, "-u-")) |start| {
-        try parts.append(agent.gc_allocator, str[0 .. start + 2]);
-        const unicode_extensions = str[start + 3 .. end orelse str.len];
-        var it = std.mem.splitScalar(u8, unicode_extensions, '-');
-        outer: while (it.next()) |key| {
-            if (key.len == 0) break;
-            const value: ?[]const u8 = blk: {
-                var value_parts: std.ArrayListUnmanaged([]const u8) = .empty;
-                defer value_parts.deinit(agent.gc_allocator);
-                while (it.peek()) |next| {
-                    if (next.len == 2) break;
-                    try value_parts.append(agent.gc_allocator, it.next().?);
-                }
-                break :blk if (value_parts.items.len > 0)
-                    try std.mem.join(agent.gc_allocator, "-", value_parts.items)
-                else
-                    null;
-            };
-            inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
-                if (std.mem.eql(u8, key, field_name)) {
-                    if (@field(options, field_name) != null) continue :outer;
-                }
-            }
-            try parts.append(agent.gc_allocator, key);
-            if (value != null) try parts.append(agent.gc_allocator, value.?);
-        }
-    } else {
-        try parts.append(agent.gc_allocator, str[0 .. end orelse str.len]);
-        inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
-            if (@field(options, field_name) != null) {
-                try parts.append(agent.gc_allocator, "u");
-                break;
-            }
-        }
-    }
-    inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
-        if (@field(options, field_name)) |new_value| {
-            try parts.append(agent.gc_allocator, field_name);
-            try parts.append(agent.gc_allocator, new_value.slice.ascii); // All extensions have been validated and should be ASCII at this point
-        }
-    }
-    if (end != null) try parts.append(agent.gc_allocator, str[end.? + 1 ..]);
-    const new_str = try std.mem.join(agent.gc_allocator, "-", parts.items);
-    return icu4zig.Locale.fromString(new_str) catch unreachable;
 }
 
 /// 15.2 Properties of the Intl.Locale Constructor
@@ -234,106 +164,146 @@ pub const constructor = struct {
         tag = try updateLanguageId(agent, tag, options);
 
         // 14. Let opt be a new Record.
-        var opt: UnicodeExtensions = .{};
 
         // 15. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
-        const calendar = try options.getOption(agent, "calendar", .string, null, null);
+        const maybe_calendar = try options.getOption(
+            agent,
+            "calendar",
+            .string,
+            null,
+            null,
+        );
 
         // 16. If calendar is not undefined, then
-        if (calendar != null) {
+        if (maybe_calendar) |calendar| {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(try calendar.?.toUtf8(agent.gc_allocator))) {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid locale identifier type '{}'",
-                    .{calendar.?},
-                );
-            }
+            var value = try calendar.toUtf8(agent.gc_allocator);
+            // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
+            var it = std.mem.splitScalar(u8, value, '-');
+            while (it.next()) |part| if (part.len < 3) {
+                value = "x";
+                break;
+            };
+            tag.setUnicodeExtension("ca", value) catch {
+                return agent.throwException(.range_error, "Invalid u-ca subtag '{}'", .{calendar});
+            };
         }
 
         // 17. Set opt.[[ca]] to calendar.
-        opt.ca = calendar;
+        // NOTE: This is done as part of step 16.a.
 
         // 18. Let collation be ? GetOption(options, "collation", string, empty, undefined).
-        const collation = try options.getOption(agent, "collation", .string, null, null);
+        const maybe_collation = try options.getOption(
+            agent,
+            "collation",
+            .string,
+            null,
+            null,
+        );
 
         // 19. If collation is not undefined, then
-        if (collation != null) {
+        if (maybe_collation) |collation| {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(try collation.?.toUtf8(agent.gc_allocator))) {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid locale identifier type '{}'",
-                    .{collation.?},
-                );
-            }
+            var value = try collation.toUtf8(agent.gc_allocator);
+            // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
+            var it = std.mem.splitScalar(u8, value, '-');
+            while (it.next()) |part| if (part.len < 3) {
+                value = "x";
+                break;
+            };
+            tag.setUnicodeExtension("co", value) catch {
+                return agent.throwException(.range_error, "Invalid u-co subtag '{}'", .{collation});
+            };
         }
 
         // 20. Set opt.[[co]] to collation.
-        opt.co = collation;
+        // NOTE: This is done as part of step 19.a.
 
         // 21. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
         //     undefined).
-        const hc = try options.getOption(
+        const maybe_hc = try options.getOption(
             agent,
             "hourCycle",
             .string,
-            &.{ String.fromLiteral("h11"), String.fromLiteral("h12"), String.fromLiteral("h23"), String.fromLiteral("h24") },
+            &.{
+                String.fromLiteral("h11"),
+                String.fromLiteral("h12"),
+                String.fromLiteral("h23"),
+                String.fromLiteral("h24"),
+            },
             null,
         );
 
         // 22. Set opt.[[hc]] to hc.
-        opt.hc = hc;
+        if (maybe_hc) |hc| {
+            tag.setUnicodeExtension("hc", hc.slice.ascii) catch unreachable;
+        }
 
         // 23. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
         //     undefined).
-        const kf = try options.getOption(
+        const maybe_kf = try options.getOption(
             agent,
             "caseFirst",
             .string,
-            &.{ String.fromLiteral("upper"), String.fromLiteral("lower"), String.fromLiteral("false") },
+            &.{
+                String.fromLiteral("upper"),
+                String.fromLiteral("lower"),
+                String.fromLiteral("false"),
+            },
             null,
         );
 
         // 24. Set opt.[[kf]] to kf.
-        opt.kf = kf;
+        if (maybe_kf) |kf| {
+            tag.setUnicodeExtension("kf", kf.slice.ascii) catch unreachable;
+        }
 
         // 25. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
-        const kn_value = try options.getOption(agent, "numeric", .boolean, null, null);
+        const maybe_kn = try options.getOption(agent, "numeric", .boolean, null, null);
 
         // 26. If kn is not undefined, set kn to ! ToString(kn).
-        const kn = if (kn_value == true) String.fromLiteral("true") else if (kn_value == false) String.fromLiteral("false") else null;
-
         // 27. Set opt.[[kn]] to kn.
-        opt.kn = kn;
+        if (maybe_kn) |kn| {
+            tag.setUnicodeExtension("kn", if (kn) "true" else "false") catch unreachable;
+        }
 
         // 28. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
         //     undefined).
-        const numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
+        const maybe_numbering_system = try options.getOption(
+            agent,
+            "numberingSystem",
+            .string,
+            null,
+            null,
+        );
 
         // 29. If numberingSystem is not undefined, then
-        if (numbering_system != null) {
+        if (maybe_numbering_system) |numbering_system| {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(try numbering_system.?.toUtf8(agent.gc_allocator))) {
+            var value = try numbering_system.toUtf8(agent.gc_allocator);
+            // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
+            var it = std.mem.splitScalar(u8, value, '-');
+            while (it.next()) |part| if (part.len < 3) {
+                value = "x";
+                break;
+            };
+            tag.setUnicodeExtension("nu", value) catch {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier type '{}'",
-                    .{numbering_system.?},
+                    "Invalid u-nu subtag '{}'",
+                    .{numbering_system},
                 );
-            }
+            };
         }
 
         // 30. Set opt.[[nu]] to numberingSystem.
-        opt.nu = numbering_system;
-
-        // 31. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
-        tag = try makeLocaleRecord(agent, tag, opt);
+        // NOTE: This is done as part of step 29.a.
 
         locale.as(Locale).fields = .{
-            // NOTE: The ICU4X locale stores all of this for us :)
+            // 31. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
             // 32. Set locale.[[Locale]] to r.[[locale]].
             // 33. Set locale.[[Calendar]] to r.[[ca]].
             // 34. Set locale.[[Collation]] to r.[[co]].
