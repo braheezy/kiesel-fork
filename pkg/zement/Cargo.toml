@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies.icu_capi]
 git = "https://github.com/unicode-org/icu4x.git"
-rev = "ed457c605c06a07101b20c68d0b1ca20656ee5b5"
+rev = "692ed203b85a5c62c8141f2199093b412aec35b2"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 
@@ -13,6 +13,12 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 git = "https://github.com/boa-dev/temporal.git"
 rev = "34522ae99c9d6e2ac2782162eaf01b36494951ca"
 features = ["compiled_data"]
+
+# icu_capi points to a git version of diplomat between releases, which causes duplicate symbol
+# linker errors. Force it to use the same version as temporal_capi.
+[patch.'https://github.com/rust-diplomat/diplomat.git']
+diplomat = "0.12.0"
+diplomat-runtime = "0.12.0"
 
 [features]
 intl = []
