@@ -203,6 +203,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "offset", offset, null, realm);
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "startOfDay", startOfDay, 0, realm);
         try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
         try object.defineBuiltinFunction(agent, "toInstant", toInstant, 0, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
@@ -648,6 +649,41 @@ pub const prototype = struct {
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Second]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_second(zoned_date_time.fields.inner),
+        );
+    }
+
+    /// 6.3.45 Temporal.ZonedDateTime.prototype.startOfDay ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.startofday
+    fn startOfDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let timeZone be zonedDateTime.[[TimeZone]].
+        // 4. Let calendar be zonedDateTime.[[Calendar]].
+        // 5. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+        // 6. Let epochNanoseconds be ? GetStartOfDay(timeZone, isoDateTime.[[ISODate]]).
+        // 7. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_start_of_day(zoned_date_time.fields.inner),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                // TODO: Improve error message, not sure what this should say
+                return agent.throwException(
+                    .range_error,
+                    "Can't get start of day for ZonedDateTime",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
         );
     }
 
