@@ -535,6 +535,36 @@ pub fn getTemporalShowOffsetOption(
     return display_offset_map.get(string_value.slice.ascii).?;
 }
 
+/// 13.13 GetDirectionOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-getdirectionoption
+pub fn getTemporalDirectionOption(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.TransitionDirection {
+    // 1. Let stringValue be ? GetOption(options, "direction", string, « "next", "previous" »,
+    //    required).
+    const string_value = try options.getOption(
+        agent,
+        "direction",
+        .string,
+        &.{
+            String.fromLiteral("next"),
+            String.fromLiteral("previous"),
+        },
+        .required,
+    );
+
+    // 2. If stringValue is "next", return next.
+    // 3. Return previous.
+    const transition_direction_map = std.StaticStringMap(
+        temporal_rs.c.TransitionDirection,
+    ).initComptime(&.{
+        .{ "next", temporal_rs.c.TransitionDirection_Next },
+        .{ "previous", temporal_rs.c.TransitionDirection_Previous },
+    });
+    return transition_direction_map.get(string_value.slice.ascii).?;
+}
+
 /// 13.15 GetTemporalFractionalSecondDigitsOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalfractionalseconddigitsoption
 pub fn getTemporalFractionalSecondDigitsOption(

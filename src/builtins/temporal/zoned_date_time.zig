@@ -26,6 +26,7 @@ const createTemporalDate = builtins.createTemporalDate;
 const createTemporalDateTime = builtins.createTemporalDateTime;
 const createTemporalTime = builtins.createTemporalTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalDirectionOption = builtins.getTemporalDirectionOption;
 const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOffsetOption = builtins.getTemporalOffsetOption;
@@ -37,6 +38,7 @@ const getTemporalShowTimeZoneNameOption = builtins.getTemporalShowTimeZoneNameOp
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const toMonthCode = builtins.toMonthCode;
 const toOffsetString = builtins.toOffsetString;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
@@ -190,6 +192,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "era", era, null, realm);
         try object.defineBuiltinAccessor(agent, "eraYear", eraYear, null, realm);
+        try object.defineBuiltinFunction(agent, "getTimeZoneTransition", getTimeZoneTransition, 1, realm);
         try object.defineBuiltinAccessor(agent, "hour", hour, null, realm);
         try object.defineBuiltinAccessor(agent, "hoursInDay", hoursInDay, null, realm);
         try object.defineBuiltinAccessor(agent, "inLeapYear", inLeapYear, null, realm);
@@ -445,6 +448,77 @@ pub const prototype = struct {
 
         // 6. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 6.3.46 Temporal.ZonedDateTime.prototype.getTimeZoneTransition ( directionParam )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.gettimezonetransition
+    fn getTimeZoneTransition(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const direction_param = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let timeZone be zonedDateTime.[[TimeZone]].
+
+        // 4. If directionParam is undefined, throw a TypeError exception.
+        if (direction_param.isUndefined()) {
+            return agent.throwException(.type_error, "Direction must not be undefined", .{});
+        }
+
+        // 5. If directionParam is a String, then
+        const options = if (direction_param.isString()) blk: {
+            // a. Let paramString be directionParam.
+
+            // b. Set directionParam to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(directionParam, "direction", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("direction"),
+                Value.from(direction_param.asString()),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 6. Else,
+            // a. Set directionParam to ? GetOptionsObject(directionParam).
+            break :blk try direction_param.getOptionsObject(agent);
+        };
+
+        // 7. Let direction be ? GetDirectionOption(directionParam).
+        const direction = try getTemporalDirectionOption(agent, options);
+
+        // 8. If IsOffsetTimeZoneIdentifier(timeZone) is true, return null.
+        // 9. If direction is next, then
+        //     a. Let transition be GetNamedTimeZoneNextTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+        // 10. Else,
+        //     a. Assert: direction is previous.
+        //     b. Let transition be GetNamedTimeZonePreviousTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+        // 11. If transition is null, return null.
+        // 12. Return ! CreateTemporalZonedDateTime(transition, timeZone, zonedDateTime.[[Calendar]]).
+        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_ZonedDateTime_get_time_zone_transition(
+                zoned_date_time.fields.inner,
+                direction,
+            ),
+        ) catch |err| switch (err) {
+            // https://github.com/boa-dev/temporal/blob/9a85f6db71cb8a3c9119c79f87e0124b9e510a35/src/tzdb.rs#L686
+            error.GenericError => {
+                return agent.throwException(.internal_error, "Not implemented", .{});
+            },
+            else => unreachable,
+        };
+        if (temporal_rs_zoned_date_time == null) return .null;
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 6.3.11 get Temporal.ZonedDateTime.prototype.hour
