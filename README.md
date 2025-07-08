@@ -63,10 +63,14 @@ Further reading:
 The `main` branch targets Zig 0.14. The `zig-dev` branch targets Zig 0.15-dev
 and is kept up to date on a best effort basis.
 
-To build and run the Kiesel CLI:
+To build and run the Kiesel CLI you need to have `zig` and optionally `cargo`
+installed. Rust is required for some features, see the Build Options below.
+
+Use either of the following commands to build the kiesel binary:
 
 ```console
-zig build run
+zig build       # just build the binary to zig-out/bin/kiesel
+zig build run   # build and run the binary
 ```
 
 ### Build Options
@@ -74,17 +78,17 @@ zig build run
 These can be set by passing `-D<name>=<value>` to `zig build`.
 
 | Name                | Default                                      | Description                                                                                                                             |
-| ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `enable-annex-b`    | `true`                                       | Enables support for [ECMA-262 Annex B](https://tc39.es/ecma262/#sec-additional-ecmascript-features-for-web-browsers) language features. |
-| `enable-intl`       | `true`                                       | Enables support for [ECMA-402 (`Intl`)](https://tc39.es/ecma402/), which depends on `cargo` being available for the ICU4X library.      |
-| `enable-legacy`     | `true`                                       | Enables support for [legacy](https://tc39.es/ecma262/#sec-conformance) language features                                                |
-| `enable-libgc`      | `true`                                       | Enables building with `libgc`                                                                                                           |
-| `enable-libregexp`  | `true`                                       | Enables building with `libregexp`                                                                                                       |
-| `enable-nan-boxing` | `true` on x86_64/aarch64, `false` otherwise  | Enables NaN-boxing which requires a maximum of 48 bits of addressable memory                                                            |
-| `enable-runtime`    | `true`                                       | Enables the [web-compatible runtime](https://codeberg.org/kiesel-js/runtime)                                                            |
-| `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal)               |
-| `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                   |
-| `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                |
+| ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enable-annex-b`    | `true`                                       | Enables support for [ECMA-262 Annex B](https://tc39.es/ecma262/#sec-additional-ecmascript-features-for-web-browsers) language features.       |
+| `enable-intl`       | `true`                                       | Enables support for [ECMA-402 (`Intl`)](https://tc39.es/ecma402/), depends on `cargo`                                                         |
+| `enable-legacy`     | `true`                                       | Enables support for [legacy](https://tc39.es/ecma262/#sec-conformance) language features                                                      |
+| `enable-libgc`      | `true`                                       | Enables building with `libgc`                                                                                                                 |
+| `enable-libregexp`  | `true`                                       | Enables building with `libregexp`                                                                                                             |
+| `enable-nan-boxing` | `true` on x86_64/aarch64, `false` otherwise  | Enables NaN-boxing which requires a maximum of 48 bits of addressable memory                                                                  |
+| `enable-runtime`    | `true`                                       | Enables the [web-compatible runtime](https://codeberg.org/kiesel-js/runtime)                                                                  |
+| `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal), depends on `cargo` |
+| `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                         |
+| `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                      |
 
 ## Usage
 
