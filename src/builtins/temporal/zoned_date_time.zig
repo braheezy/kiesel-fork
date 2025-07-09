@@ -57,6 +57,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 6.2.1 Temporal.ZonedDateTime.prototype
@@ -156,6 +157,27 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
             try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, new_target),
+        );
+    }
+
+    /// 6.2.3 Temporal.ZonedDateTime.compare ( one, two )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+
+        // 1. Set one to ? ToTemporalZonedDateTime(one).
+        const one = try toTemporalZonedDateTime(agent, one_value, null);
+
+        // 2. Set two to ? ToTemporalZonedDateTime(two).
+        const two = try toTemporalZonedDateTime(agent, two_value, null);
+
+        // 3. Return 𝔽(CompareEpochNanoseconds(one.[[EpochNanoseconds]], two.[[EpochNanoseconds]])).
+        return Value.from(
+            temporal_rs.c.temporal_rs_ZonedDateTime_compare_instant(
+                one.as(ZonedDateTime).fields.inner,
+                two.as(ZonedDateTime).fields.inner,
+            ),
         );
     }
 
