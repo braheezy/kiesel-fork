@@ -557,9 +557,13 @@ pub const prototype = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-temporal-plaindatetime-instances
 pub const PlainDateTime = MakeObject(.{
     .Fields = struct {
-        // TODO: Add GC finalizer to destroy this
         inner: *temporal_rs.c.PlainDateTime,
     },
+    .finalizer = struct {
+        fn finalizer(object: *Object) void {
+            temporal_rs.c.temporal_rs_PlainDateTime_destroy(object.as(PlainDateTime).fields.inner);
+        }
+    }.finalizer,
     .tag = .temporal_plain_date_time,
 });
 

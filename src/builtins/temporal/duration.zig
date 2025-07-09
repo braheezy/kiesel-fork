@@ -622,9 +622,13 @@ pub const prototype = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-temporal-duration-instances
 pub const Duration = MakeObject(.{
     .Fields = struct {
-        // TODO: Add GC finalizer to destroy this
         inner: *temporal_rs.c.Duration,
     },
+    .finalizer = struct {
+        fn finalizer(object: *Object) void {
+            temporal_rs.c.temporal_rs_Duration_destroy(object.as(Duration).fields.inner);
+        }
+    }.finalizer,
     .tag = .temporal_duration,
 });
 

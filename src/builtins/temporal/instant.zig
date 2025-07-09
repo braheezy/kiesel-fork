@@ -465,9 +465,13 @@ pub const prototype = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-temporal-instant-instances
 pub const Instant = MakeObject(.{
     .Fields = struct {
-        // TODO: Add GC finalizer to destroy this
         inner: *temporal_rs.c.Instant,
     },
+    .finalizer = struct {
+        fn finalizer(object: *Object) void {
+            temporal_rs.c.temporal_rs_Instant_destroy(object.as(Instant).fields.inner);
+        }
+    }.finalizer,
     .tag = .temporal_instant,
 });
 

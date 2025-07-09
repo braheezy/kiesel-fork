@@ -1070,9 +1070,13 @@ pub const prototype = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-temporal-zoneddatetime-instances
 pub const ZonedDateTime = MakeObject(.{
     .Fields = struct {
-        // TODO: Add GC finalizer to destroy this
         inner: *temporal_rs.c.ZonedDateTime,
     },
+    .finalizer = struct {
+        fn finalizer(object: *Object) void {
+            temporal_rs.c.temporal_rs_ZonedDateTime_destroy(object.as(ZonedDateTime).fields.inner);
+        }
+    }.finalizer,
     .tag = .temporal_zoned_date_time,
 });
 

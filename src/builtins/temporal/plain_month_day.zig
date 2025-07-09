@@ -276,9 +276,13 @@ pub const prototype = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-temporal-plainmonthday-instances
 pub const PlainMonthDay = MakeObject(.{
     .Fields = struct {
-        // TODO: Add GC finalizer to destroy this
         inner: *temporal_rs.c.PlainMonthDay,
     },
+    .finalizer = struct {
+        fn finalizer(object: *Object) void {
+            temporal_rs.c.temporal_rs_PlainMonthDay_destroy(object.as(PlainMonthDay).fields.inner);
+        }
+    }.finalizer,
     .tag = .temporal_plain_month_day,
 });
 
