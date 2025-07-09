@@ -18,6 +18,10 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
+const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 5.2 Properties of the Temporal.PlainDateTime Constructor
@@ -168,6 +172,9 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
@@ -485,6 +492,123 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_PlainDateTime_second(plain_date_time.fields.inner),
         );
+    }
+
+    /// 5.3.36 Temporal.PlainDateTime.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Return ISODateTimeToString(plainDateTime.[[ISODateTime]], plainDateTime.[[Calendar]],
+        //    auto, auto).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
+                plain_date_time.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                temporal_rs.c.DisplayCalendar_Auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 5.3.35 Temporal.PlainDateTime.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Return ISODateTimeToString(plainDateTime.[[ISODateTime]], plainDateTime.[[Calendar]],
+        //    auto, auto).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
+                plain_date_time.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                temporal_rs.c.DisplayCalendar_Auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 5.3.34 Temporal.PlainDateTime.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalShowCalendarNameOption reads "calendarName",
+        //    GetTemporalFractionalSecondDigitsOption reads "fractionalSecondDigits", and
+        //    GetRoundingModeOption reads "roundingMode").
+
+        // 5. Let showCalendar be ? GetTemporalShowCalendarNameOption(resolvedOptions).
+        const show_calendar = try getTemporalShowCalendarNameOption(agent, options);
+
+        // 6. Let digits be ? GetTemporalFractionalSecondDigitsOption(resolvedOptions).
+        const precision = try getTemporalFractionalSecondDigitsOption(agent, options);
+
+        // 7. Let roundingMode be ? GetRoundingModeOption(resolvedOptions, trunc).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_Trunc,
+        );
+
+        // 8. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    time, unset).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .time,
+            .unset,
+            &.{},
+        );
+
+        // 9. If smallestUnit is hour, throw a RangeError exception.
+        if (smallest_unit == temporal_rs.c.Unit_Hour) {
+            return agent.throwException(
+                .range_error,
+                "Invalid value for option 'smallestUnit'",
+                .{},
+            );
+        }
+
+        // 10. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 11. Let result be RoundISODateTime(plainDateTime.[[ISODateTime]],
+        //     precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 12. If ISODateTimeWithinLimits(result) is false, throw a RangeError exception.
+        // 13. Return ISODateTimeToString(result, plainDateTime.[[Calendar]],
+        //     precision.[[Precision]], showCalendar).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
+                plain_date_time.fields.inner,
+                .{
+                    .precision = precision,
+                    .smallest_unit = if (smallest_unit) |ok|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                },
+                show_calendar,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 5.3.37 Temporal.PlainDateTime.prototype.valueOf ( )
