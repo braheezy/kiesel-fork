@@ -175,7 +175,7 @@ pub const prototype = struct {
                 .weak_set_data = weak_set_data,
             } };
             gc.registerFinalizer(weak_value.getPtr(), finalizer_data, struct {
-                pub fn finalizer(data: *CleanupValueData) void {
+                pub fn finalizer(_: *anyopaque, data: *CleanupValueData) void {
                     // i. Replace the element of set.[[WeakSetData]] whose value
                     //    is value with an element whose value is empty.
                     _ = data.weak_set_data.*.remove(data.value);

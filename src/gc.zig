@@ -29,25 +29,30 @@ pub fn FinalizerData(comptime T: type) type {
         nextFinalizerFunc: ?*const fn (?*anyopaque, ?*anyopaque) callconv(.c) void = null,
         next_finalizer_data: ?*anyopaque = null,
         data: T,
-
-        pub const Data = T;
     };
 }
 
 pub fn registerFinalizer(
-    target: *anyopaque,
-    data: anytype,
-    comptime finalizer: *const fn (data: *@TypeOf(data.*).Data) void,
+    object: *anyopaque,
+    /// Must be a `*FinalizerData(T)`.
+    finalizer_data: anytype,
+    comptime finalizer: *const fn (object: *anyopaque, data: *@TypeOf(finalizer_data.data)) void,
 ) void {
-    libgc.c.GC_register_finalizer(target, struct {
-        fn func(func_target: ?*anyopaque, func_data: ?*anyopaque) callconv(.c) void {
-            const finalizer_data: @TypeOf(data) = @alignCast(@ptrCast(func_data));
-            finalizer(&finalizer_data.data);
-            if (finalizer_data.nextFinalizerFunc) |nextFinalizerFunc| {
-                nextFinalizerFunc(func_target, finalizer_data.next_finalizer_data);
+    libgc.c.GC_register_finalizer(
+        object,
+        struct {
+            fn func(object_: ?*anyopaque, client_data: ?*anyopaque) callconv(.c) void {
+                const finalizer_data_: @TypeOf(finalizer_data) = @alignCast(@ptrCast(client_data));
+                finalizer(object_.?, &finalizer_data_.data);
+                if (finalizer_data_.nextFinalizerFunc) |nextFinalizerFunc| {
+                    nextFinalizerFunc(object_, finalizer_data_.next_finalizer_data);
+                }
             }
-        }
-    }.func, data, &data.nextFinalizerFunc, &data.next_finalizer_data);
+        }.func,
+        finalizer_data,
+        &finalizer_data.nextFinalizerFunc,
+        &finalizer_data.next_finalizer_data,
+    );
 }
 
 /// Asserts that the link has not already been registered with an object.

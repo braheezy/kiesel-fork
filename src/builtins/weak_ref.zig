@@ -87,7 +87,7 @@ pub const constructor = struct {
             const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(*?Value.Weak));
             finalizer_data.* = .{ .data = weak_ref_target_ptr };
             gc.registerFinalizer(weak_ref_target_ptr.*.?.getPtr(), finalizer_data, struct {
-                pub fn finalize(weak_ref_target: **?Value.Weak) void {
+                pub fn finalize(_: *anyopaque, weak_ref_target: **?Value.Weak) void {
                     // i. Set ref.[[WeakRefTarget]] to empty.
                     weak_ref_target.*.* = null;
                 }

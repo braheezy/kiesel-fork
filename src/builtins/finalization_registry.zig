@@ -189,7 +189,7 @@ pub const prototype = struct {
             // Implements 9.9.3 Execution step 1.b
             // https://tc39.es/ecma262/#sec-weakref-execution
             gc.registerFinalizer(Value.Weak.init(target).getPtr(), finalizer_data, struct {
-                fn finalizer(finalizer_cell: *Cell) void {
+                fn finalizer(_: *anyopaque, finalizer_cell: *Cell) void {
                     // unregister() calls will set this
                     if (finalizer_cell.is_unregistered) return;
 
@@ -210,7 +210,7 @@ pub const prototype = struct {
                 unregister_finalizer_data.* = .{ .data = &finalizer_data.data };
 
                 gc.registerFinalizer(weak_unregister_token.getPtr(), unregister_finalizer_data, struct {
-                    fn finalizer(finalizer_cell: **Cell) void {
+                    fn finalizer(_: *anyopaque, finalizer_cell: **Cell) void {
                         finalizer_cell.*.unregister_token = null;
                     }
                 }.finalizer);

@@ -233,7 +233,7 @@ pub const prototype = struct {
                 .weak_map_data = weak_map_data,
             } };
             gc.registerFinalizer(weak_key.getPtr(), finalizer_data, struct {
-                pub fn finalizer(data: *CleanupEntryData) void {
+                pub fn finalizer(_: *anyopaque, data: *CleanupEntryData) void {
                     // i. Set r.[[Key]] to empty.
                     // ii. Set r.[[Value]] to empty.
                     _ = data.weak_map_data.*.remove(data.key);
