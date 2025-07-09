@@ -1,6 +1,8 @@
 const std = @import("std");
 
+const build_options = @import("build-options");
 const execution = @import("../../../execution.zig");
+const gc = @import("../../../gc.zig");
 const types = @import("../../../types.zig");
 
 const Agent = execution.Agent;
@@ -10,6 +12,7 @@ const Object = types.Object;
 pub fn MakeObject(
     comptime options: struct {
         Fields: type = void,
+        finalizer: ?fn (object: *Object) void = null,
         tag: Object.Tag = .unset,
     },
 ) type {
@@ -40,6 +43,8 @@ pub fn MakeObject(
     };
 
     return struct {
+        const Self = @This();
+
         pub const Fields = options.Fields;
         pub const tag = options.tag;
 
@@ -47,7 +52,7 @@ pub fn MakeObject(
         object: Object,
 
         pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!*Object {
-            const self = try agent.gc_allocator.create(@This());
+            const self = try agent.gc_allocator.create(Self);
             errdefer agent.gc_allocator.destroy(self);
             self.* = .{
                 .fields = if (has_fields) args.fields,
@@ -72,6 +77,16 @@ pub fn MakeObject(
             }
             if (has_is_htmldda and args.is_htmldda) {
                 try self.object.setIsHTMLDDA(agent);
+            }
+            if (build_options.enable_libgc and options.finalizer != null) {
+                const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(void));
+                finalizer_data.* = .{ .data = {} };
+                gc.registerFinalizer(self, finalizer_data, struct {
+                    fn finalizer(ptr: *anyopaque, _: *void) void {
+                        const self_: *Self = @alignCast(@ptrCast(ptr));
+                        options.finalizer.?(&self_.object);
+                    }
+                }.finalizer);
             }
             return &self.object;
         }
