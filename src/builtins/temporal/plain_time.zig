@@ -14,8 +14,12 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
+const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 4.2 Properties of the Temporal.PlainTime Constructor
@@ -123,6 +127,9 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "minute", minute, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
+        try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 4.3.1 Temporal.PlainTime.prototype.constructor
@@ -211,6 +218,112 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(plainTime.[[Time]].[[Second]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner));
+    }
+
+    /// 4.3.18 Temporal.PlainTime.prototype.toJSON ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
+                plain_time.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 4.3.17 Temporal.PlainTime.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
+                plain_time.fields.inner,
+                temporal_rs.to_string_rounding_options_auto,
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 4.3.16 Temporal.PlainTime.prototype.toString ( [ options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const options_value = arguments.get(0);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalFractionalSecondDigitsOption reads
+        //    "fractionalSecondDigits" and GetRoundingModeOption reads "roundingMode").
+
+        // 5. Let digits be ? GetTemporalFractionalSecondDigitsOption(resolvedOptions).
+        const precision = try getTemporalFractionalSecondDigitsOption(agent, options);
+
+        // 6. Let roundingMode be ? GetRoundingModeOption(resolvedOptions, trunc).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_Trunc,
+        );
+
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    time, unset).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .time,
+            .unset,
+            &.{},
+        );
+
+        // 8. If smallestUnit is hour, throw a RangeError exception.
+        if (smallest_unit == temporal_rs.c.Unit_Hour) {
+            return agent.throwException(
+                .range_error,
+                "Invalid value for option 'smallestUnit'",
+                .{},
+            );
+        }
+
+        // 9. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 10. Let roundResult be RoundTime(plainTime.[[Time]], precision.[[Increment]],
+        //     precision.[[Unit]], roundingMode).
+        // 11. Return TimeRecordToString(roundResult, precision.[[Precision]]).
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
+                plain_time.fields.inner,
+                .{
+                    .precision = precision,
+                    .smallest_unit = if (smallest_unit) |ok|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                },
+                &write.inner,
+            ),
+        ) catch unreachable;
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 4.3.19 Temporal.PlainTime.prototype.valueOf ( )
