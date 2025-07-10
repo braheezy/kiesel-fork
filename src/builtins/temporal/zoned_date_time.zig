@@ -1332,19 +1332,21 @@ pub fn toTemporalPartialZonedDateTime(
         };
     }
 
-    const era = try object.get(agent, PropertyKey.from("era"));
-    if (!era.isUndefined()) {
-        const era_string = try era.toString(agent);
-        const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
-        result.date.era = temporal_rs.toDiplomatStringView(era_utf8);
-    }
+    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+        const era = try object.get(agent, PropertyKey.from("era"));
+        if (!era.isUndefined()) {
+            const era_string = try era.toString(agent);
+            const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
+            result.date.era = temporal_rs.toDiplomatStringView(era_utf8);
+        }
 
-    const era_year = try object.get(agent, PropertyKey.from("eraYear"));
-    if (!era_year.isUndefined()) {
-        result.date.era_year = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
-        };
+        const era_year = try object.get(agent, PropertyKey.from("eraYear"));
+        if (!era_year.isUndefined()) {
+            result.date.era_year = .{
+                .is_ok = true,
+                .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
+            };
+        }
     }
 
     const hour = try object.get(agent, PropertyKey.from("hour"));
