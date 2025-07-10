@@ -40,6 +40,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 4.2.1 Temporal.PlainTime.prototype
@@ -113,6 +114,27 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         return Value.from(
             try createTemporalTime(agent, temporal_rs_plain_time.?, new_target),
+        );
+    }
+
+    /// 4.2.3 Temporal.PlainTime.compare ( one, two )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+
+        // 1. Set one to ? ToTemporalTime(one).
+        const one = try toTemporalPlainTime(agent, one_value, null);
+
+        // 2. Set two to ? ToTemporalTime(two).
+        const two = try toTemporalPlainTime(agent, two_value, null);
+
+        // 3. Return 𝔽(CompareTimeRecord(one.[[Time]], two.[[Time]])).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainTime_compare(
+                one.as(PlainTime).fields.inner,
+                two.as(PlainTime).fields.inner,
+            ),
         );
     }
 
