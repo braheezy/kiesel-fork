@@ -631,7 +631,7 @@ pub fn toTemporalPlainDate(
             ),
         ) catch |err| switch (err) {
             error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain date date", .{});
+                return agent.throwException(.range_error, "Invalid plain date", .{});
             },
             error.TypeError => {
                 return agent.throwException(.type_error, "Missing plain date field", .{});

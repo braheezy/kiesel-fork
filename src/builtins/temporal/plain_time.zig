@@ -8,18 +8,22 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 4.2 Properties of the Temporal.PlainTime Constructor
@@ -36,6 +40,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 4.2.1 Temporal.PlainTime.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -108,6 +114,16 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalTime(agent, temporal_rs_plain_time.?, new_target),
         );
+    }
+
+    /// 4.2.2 Temporal.PlainTime.from ( item [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Return ? ToTemporalTime(item, options).
+        return Value.from(try toTemporalPlainTime(agent, item, options));
     }
 };
 
@@ -375,4 +391,280 @@ pub fn createTemporalTime(
         "%Temporal.PlainTime.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 4.5.6 ToTemporalTime ( item [ , options ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporaltime
+pub fn toTemporalPlainTime(
+    agent: *Agent,
+    item: Value,
+    maybe_options_value: ?Value,
+) Agent.Error!*Object {
+    // 1. If options is not present, set options to undefined.
+    const options_value: Value = maybe_options_value orelse .undefined;
+
+    // 2. If item is an Object, then
+    const temporal_rs_plain_time = if (item.isObject()) blk: {
+        // a. If item has an [[InitializedTemporalTime]] internal slot, then
+        if (item.asObject().is(builtins.temporal.PlainTime)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalTime(item.[[Time]]).
+            const plain_time = item.asObject().as(builtins.temporal.PlainTime);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainTime_try_new(
+                    temporal_rs.c.temporal_rs_PlainTime_hour(plain_time.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainTime_minute(plain_time.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainTime_millisecond(plain_time.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainTime_microsecond(plain_time.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainTime_nanosecond(plain_time.fields.inner),
+                ),
+            ) catch unreachable;
+        }
+
+        // b. If item has an [[InitializedTemporalDateTime]] internal slot, then
+        if (item.asObject().is(builtins.temporal.PlainDateTime)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalTime(item.[[ISODateTime]].[[Time]]).
+            const plain_date_time = item.asObject().as(builtins.temporal.PlainDateTime);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
+                    plain_date_time.fields.inner,
+                ),
+            ) catch unreachable;
+        }
+
+        // c. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
+        if (item.asObject().is(builtins.temporal.ZonedDateTime)) {
+            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
+
+            // ii. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // iii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iv. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
+            const zoned_date_time = item.asObject().as(builtins.temporal.ZonedDateTime);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
+                    zoned_date_time.fields.inner,
+                ),
+            ) catch unreachable;
+        }
+
+        // d. Let result be ? ToTemporalTimeRecord(item).
+        const partial_time = try toTemporalPartialTime(agent, item.asObject(), .complete);
+
+        // e. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // f. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // g. Set result to ? RegulateTime(result.[[Hour]], result.[[Minute]], result.[[Second]],
+        //    result.[[Millisecond]], result.[[Microsecond]], result.[[Nanosecond]], overflow).
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainTime_from_partial(
+                partial_time,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid plain time", .{});
+            },
+            else => unreachable,
+        };
+    } else blk: {
+        // 3. Else,
+
+        // a. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(
+                .type_error,
+                "Plain time must be a string or object",
+                .{},
+            );
+        }
+
+        // b. Let parseResult be ? ParseISODateTime(item, « TemporalTimeString »).
+        // c. Assert: parseResult.[[Time]] is not start-of-day.
+        // d. Set result to parseResult.[[Time]].
+        // e. NOTE: A successful parse using TemporalTimeString guarantees absence of ambiguity
+        //    with respect to any ISO 8601 date-only, year-month, or month-day representation.
+        const plain_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(plain_time_utf8);
+        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainTime_from_utf8(
+                temporal_rs.toDiplomatStringView(plain_time_utf8),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => return agent.throwException(
+                .range_error,
+                "Invalid plain time string",
+                .{},
+            ),
+            else => unreachable,
+        };
+
+        // f. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // g. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        _ = try getTemporalOverflowOption(agent, options);
+
+        break :blk temporal_rs_plain_time;
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
+
+    // 4. Return ! CreateTemporalTime(result).
+    return createTemporalTime(
+        agent,
+        temporal_rs_plain_time.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// 4.5.12 ToTemporalTimeRecord ( temporalTimeLike [ , completeness ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporaltimerecord
+fn toTemporalPartialTime(
+    agent: *Agent,
+    temporal_time_like: *Object,
+    completeness: enum { partial, complete },
+) Agent.Error!temporal_rs.c.PartialTime {
+    // 1. If completeness is not present, set completeness to complete.
+
+    // 2. If completeness is complete, then
+    //     a. Let result be a new TemporalTimeLike Record with each field set to 0.
+    // 3. Else,
+    //     a. Let result be a new TemporalTimeLike Record with each field set to unset.
+    var result: temporal_rs.c.PartialTime = switch (completeness) {
+        .complete => .{
+            .hour = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .minute = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .second = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .millisecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .microsecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .nanosecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+        },
+        .partial => .{
+            .hour = .{ .is_ok = false },
+            .minute = .{ .is_ok = false },
+            .second = .{ .is_ok = false },
+            .millisecond = .{ .is_ok = false },
+            .microsecond = .{ .is_ok = false },
+            .nanosecond = .{ .is_ok = false },
+        },
+    };
+
+    // 4. Let any be false.
+    var any = false;
+
+    // 5. Let hour be ? Get(temporalTimeLike, "hour").
+    const hour = try temporal_time_like.get(agent, PropertyKey.from("hour"));
+
+    // 6. If hour is not undefined, then
+    if (!hour.isUndefined()) {
+        // a. Set result.[[Hour]] to ? ToIntegerWithTruncation(hour).
+        result.hour = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try hour.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 7. Let microsecond be ? Get(temporalTimeLike, "microsecond").
+    const microsecond = try temporal_time_like.get(agent, PropertyKey.from("microsecond"));
+
+    // 8. If microsecond is not undefined, then
+    if (!microsecond.isUndefined()) {
+        // a. Set result.[[Microsecond]] to ? ToIntegerWithTruncation(microsecond).
+        result.microsecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try microsecond.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 9. Let millisecond be ? Get(temporalTimeLike, "millisecond").
+    const millisecond = try temporal_time_like.get(agent, PropertyKey.from("millisecond"));
+
+    // 10. If millisecond is not undefined, then
+    if (!millisecond.isUndefined()) {
+        // a. Set result.[[Millisecond]] to ? ToIntegerWithTruncation(millisecond).
+        result.millisecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try millisecond.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 11. Let minute be ? Get(temporalTimeLike, "minute").
+    const minute = try temporal_time_like.get(agent, PropertyKey.from("minute"));
+
+    // 12. If minute is not undefined, then
+    if (!minute.isUndefined()) {
+        // a. Set result.[[Minute]] to ? ToIntegerWithTruncation(minute).
+        result.minute = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try minute.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 13. Let nanosecond be ? Get(temporalTimeLike, "nanosecond").
+    const nanosecond = try temporal_time_like.get(agent, PropertyKey.from("nanosecond"));
+
+    // 14. If nanosecond is not undefined, then
+    if (!nanosecond.isUndefined()) {
+        // a. Set result.[[Nanosecond]] to ? ToIntegerWithTruncation(nanosecond).
+        result.nanosecond = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try nanosecond.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 15. Let second be ? Get(temporalTimeLike, "second").
+    const second = try temporal_time_like.get(agent, PropertyKey.from("second"));
+
+    // 16. If second is not undefined, then
+    if (!second.isUndefined()) {
+        // a. Set result.[[Second]] to ? ToIntegerWithTruncation(second).
+        result.second = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try second.toIntegerWithTruncation(agent)) },
+        };
+
+        // b. Set any to true.
+        any = true;
+    }
+
+    // 17. If any is false, throw a TypeError exception.
+    if (!any) {
+        return agent.throwException(.type_error, "Missing plain time field", .{});
+    }
+
+    // 18. Return result.
+    return result;
 }

@@ -230,6 +230,7 @@ pub const toTemporalDuration = temporal.duration.toTemporalDuration;
 pub const toTemporalInstant = temporal.instant.toTemporalInstant;
 pub const toTemporalPartialDuration = temporal.duration.toTemporalPartialDuration;
 pub const toTemporalPlainDate = temporal.plain_date.toTemporalPlainDate;
+pub const toTemporalPlainTime = temporal.plain_time.toTemporalPlainTime;
 pub const toTemporalTimeZoneIdentifier = temporal.toTemporalTimeZoneIdentifier;
 pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const typedArrayElementSize = typed_array.typedArrayElementSize;
