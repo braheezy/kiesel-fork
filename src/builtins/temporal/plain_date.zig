@@ -8,18 +8,24 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toMonthCode = builtins.toMonthCode;
 
 /// 3.2 Properties of the Temporal.PlainDate Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaindate-constructor
@@ -35,6 +41,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 3.2.1 Temporal.PlainDate.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -105,6 +113,16 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalDate(agent, temporal_rs_plain_date.?, new_target),
         );
+    }
+
+    /// 3.2.2 Temporal.PlainDate.from ( item [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Return ? ToTemporalDate(item, options).
+        return Value.from(try toTemporalPlainDate(agent, item, options));
     }
 };
 
@@ -500,4 +518,219 @@ pub fn createTemporalDate(
         "%Temporal.PlainDate.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 3.5.4 ToTemporalDate ( item [ , options ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporaldate
+pub fn toTemporalPlainDate(
+    agent: *Agent,
+    item: Value,
+    maybe_options_value: ?Value,
+) Agent.Error!*Object {
+    // 1. If options is not present, set options to undefined.
+    const options_value: Value = maybe_options_value orelse .undefined;
+
+    // 2. If item is an Object, then
+    const temporal_rs_plain_date = if (item.isObject()) blk: {
+        // a. If item has an [[InitializedTemporalDate]] internal slot, then
+        if (item.asObject().is(PlainDate)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalDate(item.[[ISODate]], item.[[Calendar]]).
+            const plain_date = item.asObject().as(PlainDate);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainDate_try_new(
+                    temporal_rs.c.temporal_rs_PlainDate_year(plain_date.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainDate_month(plain_date.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainDate_day(plain_date.fields.inner),
+                    temporal_rs.c.temporal_rs_Calendar_kind(
+                        temporal_rs.c.temporal_rs_PlainDate_calendar(plain_date.fields.inner),
+                    ),
+                ),
+            ) catch unreachable;
+        }
+
+        // b. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
+        if (item.asObject().is(builtins.temporal.ZonedDateTime)) {
+            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
+
+            // ii. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // iii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iv. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], item.[[Calendar]]).
+            const zoned_date_time = item.asObject().as(builtins.temporal.ZonedDateTime);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
+                    zoned_date_time.fields.inner,
+                ),
+            ) catch unreachable;
+        }
+
+        // c. If item has an [[InitializedTemporalDateTime]] internal slot, then
+        if (item.asObject().is(builtins.temporal.PlainDateTime)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalDate(item.[[ISODateTime]].[[ISODate]], item.[[Calendar]]).
+            const plain_date_time = item.asObject().as(builtins.temporal.PlainDateTime);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
+                    plain_date_time.fields.inner,
+                ),
+            ) catch unreachable;
+        }
+
+        // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day », «», «»).
+        const partial_date = try toTemporalPartialDate(agent, item.asObject());
+
+        // f. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // g. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // h. Let isoDate be ? CalendarDateFromFields(calendar, fields, overflow).
+        // i. Return ! CreateTemporalDate(isoDate, calendar).
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_from_partial(
+                partial_date,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid plain date date", .{});
+            },
+            error.TypeError => {
+                return agent.throwException(.type_error, "Missing plain date field", .{});
+            },
+            else => unreachable,
+        };
+    } else blk: {
+        // 3. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(
+                .type_error,
+                "Plain date must be a string or object",
+                .{},
+            );
+        }
+
+        // 4. Let result be ? ParseISODateTime(item, « TemporalDateTimeString[~Zoned] »).
+        // 5. Let calendar be result.[[Calendar]].
+        // 6. If calendar is empty, set calendar to "iso8601".
+        // 7. Set calendar to ? CanonicalizeCalendar(calendar).
+        const plain_date_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(plain_date_utf8);
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_from_utf8(
+                temporal_rs.toDiplomatStringView(plain_date_utf8),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => return agent.throwException(
+                .range_error,
+                "Invalid plain date string",
+                .{},
+            ),
+            else => unreachable,
+        };
+
+        // 8. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 9. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        _ = try getTemporalOverflowOption(agent, options);
+
+        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 11. Return ? CreateTemporalDate(isoDate, calendar).
+        break :blk temporal_rs_plain_date;
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+
+    return createTemporalDate(
+        agent,
+        temporal_rs_plain_date.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// Custom function to create a PartialDate based on:
+///
+/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
+/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
+fn toTemporalPartialDate(
+    agent: *Agent,
+    object: *Object,
+) Agent.Error!temporal_rs.c.PartialDate {
+    var result: temporal_rs.c.PartialDate = .{
+        .year = .{ .is_ok = false },
+        .month = .{ .is_ok = false },
+        .month_code = .{ .data = null },
+        .day = .{ .is_ok = false },
+        .era = .{ .data = null },
+        .era_year = .{ .is_ok = false },
+        .calendar = undefined,
+    };
+
+    const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, object);
+    result.calendar = calendar;
+
+    const day = try object.get(agent, PropertyKey.from("day"));
+    if (!day.isUndefined()) {
+        result.day = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
+        };
+    }
+
+    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+        const era = try object.get(agent, PropertyKey.from("era"));
+        if (!era.isUndefined()) {
+            const era_string = try era.toString(agent);
+            const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
+            result.era = temporal_rs.toDiplomatStringView(era_utf8);
+        }
+
+        const era_year = try object.get(agent, PropertyKey.from("eraYear"));
+        if (!era_year.isUndefined()) {
+            result.era_year = .{
+                .is_ok = true,
+                .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
+            };
+        }
+    }
+
+    const month = try object.get(agent, PropertyKey.from("month"));
+    if (!month.isUndefined()) {
+        result.month = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try month.toPositiveIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const month_code = try object.get(agent, PropertyKey.from("monthCode"));
+    if (!month_code.isUndefined()) {
+        const month_code_utf8 = try toMonthCode(agent, month_code);
+        result.month_code = temporal_rs.toDiplomatStringView(month_code_utf8);
+    }
+
+    const year = try object.get(agent, PropertyKey.from("year"));
+    if (!year.isUndefined()) {
+        result.year = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    return result;
 }
