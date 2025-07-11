@@ -44,6 +44,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 5.2.1 Temporal.PlainDateTime.prototype
@@ -147,6 +148,27 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         return Value.from(
             try createTemporalDateTime(agent, temporal_rs_plain_date_time.?, new_target),
+        );
+    }
+
+    /// 5.2.3 Temporal.PlainDateTime.compare ( one, two )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+
+        // 1. Set one to ? ToTemporalDateTime(one).
+        const one = try toTemporalPlainDateTime(agent, one_value, null);
+
+        // 2. Set two to ? ToTemporalDateTime(two).
+        const two = try toTemporalPlainDateTime(agent, two_value, null);
+
+        // 3. Return 𝔽(CompareISODateTime(one.[[ISODateTime]], two.[[ISODateTime]])).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainDateTime_compare(
+                one.as(PlainDateTime).fields.inner,
+                two.as(PlainDateTime).fields.inner,
+            ),
         );
     }
 
