@@ -284,7 +284,7 @@ pub fn fulfillPromise(
     promise: *Promise,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: The value of promise.[[PromiseState]] is pending.
+    // 1. Assert: promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
     // 2. Let reactions be promise.[[PromiseFulfillReactions]].
@@ -362,7 +362,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
             // d. Set resolvingFunctions.[[Reject]] to reject.
             resolving_functions_.reject = reject;
 
-            // e. Return undefined.
+            // e. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -416,7 +416,7 @@ pub fn rejectPromise(
     promise: *Promise,
     reason: Value,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: The value of promise.[[PromiseState]] is pending.
+    // 1. Assert: promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
     // 2. Let reactions be promise.[[PromiseRejectReactions]].
@@ -1504,7 +1504,7 @@ pub fn performPromiseThen(
         },
 
         // 11. Else,
-        //     a. Assert: The value of promise.[[PromiseState]] is rejected.
+        //     a. Assert: promise.[[PromiseState]] is rejected.
         .rejected => {
             // b. Let reason be promise.[[PromiseResult]].
             const reason = promise.fields.promise_result;
@@ -2079,7 +2079,7 @@ pub const prototype = struct {
                             const function_ = agent__.activeFunctionObject();
                             const value_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
 
-                            // 1. Return value.
+                            // 1. Return NormalCompletion(value).
                             return value_;
                         }
                     }.func;

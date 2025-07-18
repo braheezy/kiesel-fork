@@ -1186,7 +1186,7 @@ pub fn initializeInstanceElements(
     agent: *Agent,
     constructor: *Object,
 ) Agent.Error!void {
-    // 1. Let methods be the value of constructor.[[PrivateMethods]].
+    // 1. Let methods be constructor.[[PrivateMethods]].
     const methods = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
         break :blk constructor.as(builtins.ECMAScriptFunction).fields.private_methods;
     } else if (constructor.is(builtins.BuiltinFunction)) blk: {
@@ -1200,7 +1200,7 @@ pub fn initializeInstanceElements(
         try self.privateMethodOrAccessorAdd(agent, method.private_name, method.private_element);
     }
 
-    // 3. Let fields be the value of constructor.[[Fields]].
+    // 3. Let fields be constructor.[[Fields]].
     const fields = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
         break :blk constructor.as(builtins.ECMAScriptFunction).fields.fields;
     } else if (constructor.is(builtins.BuiltinFunction)) blk: {

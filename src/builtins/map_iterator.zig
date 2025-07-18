@@ -110,7 +110,7 @@ pub const prototype = struct {
                 break .{ key, value };
             }
         } else {
-            // e. Return undefined.
+            // e. Return NormalCompletion(unused).
             map_iterator.fields = .completed;
             map.fields.unregisterIterator(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));

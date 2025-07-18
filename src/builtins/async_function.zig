@@ -219,7 +219,7 @@ pub fn asyncBlockStart(
                 },
             }
 
-            // i. Return unused.
+            // i. Return NormalCompletion(unused).
         }
     }.func;
 
@@ -278,7 +278,7 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             _ = async_context_;
             _ = previous_context;
 
-            // f. Return undefined.
+            // f. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -311,7 +311,7 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             _ = async_context_;
             _ = previous_context;
 
-            // f. Return undefined.
+            // f. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;

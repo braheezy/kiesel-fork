@@ -86,7 +86,7 @@ pub const prototype = struct {
             return Value.from(try createIteratorResultObject(agent, Value.from(result_string), false));
         }
 
-        // d. Return undefined.
+        // d. Return NormalCompletion(unused).
         string_iterator.fields = .completed;
         return Value.from(try createIteratorResultObject(agent, .undefined, true));
     }

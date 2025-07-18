@@ -349,7 +349,7 @@ pub const constructor = struct {
                 // b. Perform ! CreateDataPropertyOrThrow(obj, propertyKey, value).
                 try object_.createDataPropertyDirect(agent_, property_key, value);
 
-                // c. Return undefined.
+                // c. Return NormalCompletion(undefined).
                 return .undefined;
             }
         }.func;

@@ -1155,7 +1155,7 @@ pub const constructor = struct {
                 // b. Let p be F.[[RevocableProxy]].
                 const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
                 const revocable_proxy = additional_fields.revocable_proxy orelse {
-                    // c. If p is null, return undefined.
+                    // c. If p is null, return NormalCompletion(undefined).
                     return .undefined;
                 };
 
@@ -1169,7 +1169,7 @@ pub const constructor = struct {
                 // g. Set p.[[ProxyHandler]] to null.
                 revocable_proxy.as(Proxy).fields.proxy_handler = null;
 
-                // h. Return undefined.
+                // h. Return NormalCompletion(undefined).
                 return .undefined;
             }
         }.func;

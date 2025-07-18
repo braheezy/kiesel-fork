@@ -390,7 +390,7 @@ pub fn asyncGeneratorStart(
             // k. Perform AsyncGeneratorDrainQueue(acGenerator).
             try asyncGeneratorDrainQueue(agent_, closure_generator);
 
-            // l. Return undefined.
+            // l. Return NormalCompletion(undefined).
         }
     }.func;
 
@@ -766,7 +766,7 @@ pub fn asyncGeneratorAwaitReturn(
             // d. Perform AsyncGeneratorDrainQueue(generator).
             try asyncGeneratorDrainQueue(agent_, generator_);
 
-            // e. Return undefined.
+            // e. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -803,7 +803,7 @@ pub fn asyncGeneratorAwaitReturn(
             // d. Perform AsyncGeneratorDrainQueue(generator).
             try asyncGeneratorDrainQueue(agent_, generator_);
 
-            // e. Return undefined.
+            // e. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;

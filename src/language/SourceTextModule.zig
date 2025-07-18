@@ -959,7 +959,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             // a. Perform AsyncModuleExecutionFulfilled(module).
             try asyncModuleExecutionFulfilled(agent_, module_);
 
-            // b. Return undefined.
+            // b. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -988,7 +988,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
                 .stack_trace = try agent_.captureStackTrace(),
             });
 
-            // b. Return undefined.
+            // b. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;

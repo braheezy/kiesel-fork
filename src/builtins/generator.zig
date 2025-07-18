@@ -137,7 +137,7 @@ pub fn generatorStart(
     generator: *Generator,
     generator_function: *builtins.ECMAScriptFunction,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: The value of generator.[[GeneratorState]] is suspended-start.
+    // 1. Assert: generator.[[GeneratorState]] is suspended-start.
     std.debug.assert(generator.fields.generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
@@ -226,7 +226,7 @@ pub fn generatorStart(
                 return err;
             };
 
-            // l. Return CreateIteratorResultObject(resultValue, true).
+            // l. Return NormalCompletion(CreateIteratorResultObject(resultValue, true)).
             return createIteratorResultObject(agent_, result_value, true);
         }
     }.func;

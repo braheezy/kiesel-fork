@@ -535,7 +535,7 @@ pub fn typeof(self: Value) *const String {
                 // 12. NOTE: This step is replaced in section B.3.6.3.
             }
 
-            // 13. If val has a [[Call]] internal slot, return "function".
+            // 13. If val has a [[Call]] internal method, return "function".
             if (self.asObject().internal_methods.call) |_| break :blk String.fromLiteral("function");
 
             // 14. Return "object".
@@ -1884,8 +1884,8 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
     std.debug.assert(sameType(x, y));
 
     return switch (x.type()) {
-        // 2. If x is either null or undefined, return true.
-        .null, .undefined => true,
+        // 2. If x is either undefined or null, return true.
+        .undefined, .null => true,
 
         // 3. If x is a BigInt, then
         //     a. Return BigInt::equal(x, y).

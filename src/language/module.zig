@@ -285,7 +285,7 @@ fn continueDynamicImport(
     const rejected_closure_captures = try agent.gc_allocator.create(RejectedClosureCaptures);
     rejected_closure_captures.* = .{ .promise_capability = promise_capability };
 
-    // 3. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
+    // 4. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
     //    promiseCapability and performs the following steps when called:
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
@@ -301,7 +301,7 @@ fn continueDynamicImport(
                 &.{reason},
             ) catch |err| try noexcept(err);
 
-            // b. Return unused.
+            // b. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -354,7 +354,7 @@ fn continueDynamicImport(
                         &.{exception.value},
                     ) catch |err_| try noexcept(err_);
 
-                    // ii. Return unused.
+                    // ii. Return NormalCompletion(undefined).
                     return .undefined;
                 },
             };
@@ -390,7 +390,7 @@ fn continueDynamicImport(
                         &.{Value.from(namespace)},
                     ) catch |err| try noexcept(err);
 
-                    // iii. Return unused.
+                    // iii. Return NormalCompletion(undefined).
                     return .undefined;
                 }
             }.func;

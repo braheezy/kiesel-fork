@@ -2186,7 +2186,7 @@ pub fn classDefinitionEvaluation(
                 // vi. Perform ? InitializeInstanceElements(result, F).
                 try result.initializeInstanceElements(agent_, function);
 
-                // vii. Return result.
+                // vii. Return NormalCompletion(result).
                 return Value.from(result);
             }
         }.func;
