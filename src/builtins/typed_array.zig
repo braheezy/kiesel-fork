@@ -3152,10 +3152,7 @@ fn typedArraySpeciesCreate(
     // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
     const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
 
-    // 4. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
-    std.debug.assert(result.is(TypedArray));
-
-    // 5. If result.[[ContentType]] is not exemplar.[[ContentType]], throw a TypeError exception.
+    // 4. If result.[[ContentType]] is not exemplar.[[ContentType]], throw a TypeError exception.
     if (result.as(TypedArray).fields.content_type != exemplar.fields.content_type) {
         return agent.throwException(
             .type_error,
@@ -3164,7 +3161,7 @@ fn typedArraySpeciesCreate(
         );
     }
 
-    // 6. Return result.
+    // 5. Return result.
     return result;
 }
 
@@ -3181,7 +3178,10 @@ fn typedArrayCreateFromConstructor(
     // 2. Let taRecord be ? ValidateTypedArray(newTypedArray, seq-cst).
     const ta = try validateTypedArray(agent, Value.from(new_typed_array), .seq_cst);
 
-    // 3. If the number of elements in argumentList is 1 and argumentList[0] is a Number, then
+    // 3. Assert: newTypedArray has all the internal slots mentioned in Properties of TypedArray Instances.
+    std.debug.assert(new_typed_array.is(TypedArray));
+
+    // 4. If the number of elements in argumentList is 1 and argumentList[0] is a Number, then
     if (argument_list.len == 1 and argument_list[0].isNumber()) {
         // a. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
         if (isTypedArrayOutOfBounds(ta)) {
@@ -3201,7 +3201,7 @@ fn typedArrayCreateFromConstructor(
         }
     }
 
-    // 4. Return newTypedArray.
+    // 5. Return newTypedArray.
     return new_typed_array;
 }
 
@@ -3226,13 +3226,10 @@ fn typedArrayCreateSameType(
     // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
     const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
 
-    // 3. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
-    std.debug.assert(result.is(TypedArray));
-
-    // 4. Assert: result.[[ContentType]] is exemplar.[[ContentType]].
+    // 3. Assert: result.[[ContentType]] is exemplar.[[ContentType]].
     std.debug.assert(result.as(TypedArray).fields.content_type == exemplar.fields.content_type);
 
-    // 5. Return result.
+    // 4. Return result.
     return result;
 }
 
