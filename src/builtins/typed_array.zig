@@ -2193,7 +2193,75 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 23.2.3.26.1 SetTypedArrayFromTypedArray ( target, targetOffset, source )
+    /// 23.2.3.26.1 SetTypedArrayFromArrayLike ( target, targetOffset, source )
+    /// https://tc39.es/ecma262/#sec-settypedarrayfromarraylike
+    fn setTypedArrayFromArrayLike(
+        agent: *Agent,
+        target: *const TypedArray,
+        target_offset: f64,
+        source: Value,
+    ) Agent.Error!void {
+        std.debug.assert(target_offset >= 0);
+
+        // 1. Let targetRecord be MakeTypedArrayWithBufferWitnessRecord(target, seq-cst).
+        const target_ta = makeTypedArrayWithBufferWitnessRecord(target, .seq_cst);
+
+        // 2. If IsTypedArrayOutOfBounds(targetRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(target_ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // 3. Let targetLength be TypedArrayLength(targetRecord).
+        const target_length = typedArrayLength(target_ta);
+
+        // 4. Let src be ? ToObject(source).
+        const src = try source.toObject(agent);
+
+        // 5. Let srcLength be ? LengthOfArrayLike(src).
+        const src_length = try src.lengthOfArrayLike(agent);
+
+        // 6. If targetOffset = +∞, throw a RangeError exception.
+        if (target_offset == std.math.inf(f64)) {
+            return agent.throwException(.range_error, "Offset must not be infinite", .{});
+        }
+
+        // 7. If srcLength + targetOffset > targetLength, throw a RangeError exception.
+        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
+            x > target_length
+        else |_|
+            true)
+        {
+            return agent.throwException(
+                .range_error,
+                "Offset {} and source length {} are out of range for target length {}",
+                .{ target_offset, src_length, target_length },
+            );
+        }
+
+        // 8. Let k be 0.
+        var k: u53 = 0;
+
+        // 9. Repeat, while k < srcLength,
+        while (k < src_length) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let value be ? Get(src, Pk).
+            const value = try src.get(agent, property_key);
+
+            // c. Let targetIndex be 𝔽(targetOffset + k).
+            const target_index = target_offset + @as(f64, @floatFromInt(k));
+
+            // d. Perform ? TypedArraySetElement(target, targetIndex, value).
+            try typedArraySetElement(agent, target, target_index, value);
+
+            // e. Set k to k + 1.
+        }
+
+        // 10. Return unused.
+    }
+
+    /// 23.2.3.26.2 SetTypedArrayFromTypedArray ( target, targetOffset, source )
     /// https://tc39.es/ecma262/#sec-settypedarrayfromtypedarray
     fn setTypedArrayFromTypedArray(
         agent: *Agent,
@@ -2396,74 +2464,6 @@ pub const prototype = struct {
         }
 
         // 25. Return unused.
-    }
-
-    /// 23.2.3.26.2 SetTypedArrayFromArrayLike ( target, targetOffset, source )
-    /// https://tc39.es/ecma262/#sec-settypedarrayfromarraylike
-    fn setTypedArrayFromArrayLike(
-        agent: *Agent,
-        target: *const TypedArray,
-        target_offset: f64,
-        source: Value,
-    ) Agent.Error!void {
-        std.debug.assert(target_offset >= 0);
-
-        // 1. Let targetRecord be MakeTypedArrayWithBufferWitnessRecord(target, seq-cst).
-        const target_ta = makeTypedArrayWithBufferWitnessRecord(target, .seq_cst);
-
-        // 2. If IsTypedArrayOutOfBounds(targetRecord) is true, throw a TypeError exception.
-        if (isTypedArrayOutOfBounds(target_ta)) {
-            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
-        }
-
-        // 3. Let targetLength be TypedArrayLength(targetRecord).
-        const target_length = typedArrayLength(target_ta);
-
-        // 4. Let src be ? ToObject(source).
-        const src = try source.toObject(agent);
-
-        // 5. Let srcLength be ? LengthOfArrayLike(src).
-        const src_length = try src.lengthOfArrayLike(agent);
-
-        // 6. If targetOffset = +∞, throw a RangeError exception.
-        if (target_offset == std.math.inf(f64)) {
-            return agent.throwException(.range_error, "Offset must not be infinite", .{});
-        }
-
-        // 7. If srcLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
-            x > target_length
-        else |_|
-            true)
-        {
-            return agent.throwException(
-                .range_error,
-                "Offset {} and source length {} are out of range for target length {}",
-                .{ target_offset, src_length, target_length },
-            );
-        }
-
-        // 8. Let k be 0.
-        var k: u53 = 0;
-
-        // 9. Repeat, while k < srcLength,
-        while (k < src_length) : (k += 1) {
-            // a. Let Pk be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
-
-            // b. Let value be ? Get(src, Pk).
-            const value = try src.get(agent, property_key);
-
-            // c. Let targetIndex be 𝔽(targetOffset + k).
-            const target_index = target_offset + @as(f64, @floatFromInt(k));
-
-            // d. Perform ? TypedArraySetElement(target, targetIndex, value).
-            try typedArraySetElement(agent, target, target_index, value);
-
-            // e. Set k to k + 1.
-        }
-
-        // 10. Return unused.
     }
 
     /// 23.2.3.27 %TypedArray%.prototype.slice ( start, end )
