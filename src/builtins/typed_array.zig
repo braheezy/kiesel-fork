@@ -3125,47 +3125,7 @@ pub const prototype = struct {
     }
 };
 
-/// 23.2.4.1 TypedArraySpeciesCreate ( exemplar, argumentList )
-/// https://tc39.es/ecma262/#typedarray-species-create
-fn typedArraySpeciesCreate(
-    agent: *Agent,
-    exemplar: *const TypedArray,
-    argument_list: []const Value,
-) Agent.Error!*Object {
-    const realm = agent.currentRealm();
-
-    // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
-    //    exemplar.[[TypedArrayName]] in Table 71.
-    const default_constructor = switch (exemplar.fields.element_type) {
-        inline else => |element_type| blk: {
-            const name = element_type.typedArrayName();
-            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
-        },
-    };
-
-    // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
-    const constructor_ = try @constCast(exemplar).object.speciesConstructor(
-        agent,
-        default_constructor,
-    );
-
-    // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
-    const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
-
-    // 4. If result.[[ContentType]] is not exemplar.[[ContentType]], throw a TypeError exception.
-    if (result.as(TypedArray).fields.content_type != exemplar.fields.content_type) {
-        return agent.throwException(
-            .type_error,
-            "Cannot convert between BigInt and Number typed arrays",
-            .{},
-        );
-    }
-
-    // 5. Return result.
-    return result;
-}
-
-/// 23.2.4.2 TypedArrayCreateFromConstructor ( constructor, argumentList )
+/// 23.2.4.1 TypedArrayCreateFromConstructor ( constructor, argumentList )
 /// https://tc39.es/ecma262/#sec-typedarraycreatefromconstructor
 fn typedArrayCreateFromConstructor(
     agent: *Agent,
@@ -3205,7 +3165,7 @@ fn typedArrayCreateFromConstructor(
     return new_typed_array;
 }
 
-/// 23.2.4.3 TypedArrayCreateSameType ( exemplar, argumentList )
+/// 23.2.4.2 TypedArrayCreateSameType ( exemplar, argumentList )
 /// https://tc39.es/ecma262/#sec-typedarray-create-same-type
 fn typedArrayCreateSameType(
     agent: *Agent,
@@ -3230,6 +3190,46 @@ fn typedArrayCreateSameType(
     std.debug.assert(result.as(TypedArray).fields.content_type == exemplar.fields.content_type);
 
     // 4. Return result.
+    return result;
+}
+
+/// 23.2.4.3 TypedArraySpeciesCreate ( exemplar, argumentList )
+/// https://tc39.es/ecma262/#typedarray-species-create
+fn typedArraySpeciesCreate(
+    agent: *Agent,
+    exemplar: *const TypedArray,
+    argument_list: []const Value,
+) Agent.Error!*Object {
+    const realm = agent.currentRealm();
+
+    // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
+    //    exemplar.[[TypedArrayName]] in Table 71.
+    const default_constructor = switch (exemplar.fields.element_type) {
+        inline else => |element_type| blk: {
+            const name = element_type.typedArrayName();
+            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
+        },
+    };
+
+    // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
+    const constructor_ = try @constCast(exemplar).object.speciesConstructor(
+        agent,
+        default_constructor,
+    );
+
+    // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
+    const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
+
+    // 4. If result.[[ContentType]] is not exemplar.[[ContentType]], throw a TypeError exception.
+    if (result.as(TypedArray).fields.content_type != exemplar.fields.content_type) {
+        return agent.throwException(
+            .type_error,
+            "Cannot convert between BigInt and Number typed arrays",
+            .{},
+        );
+    }
+
+    // 5. Return result.
     return result;
 }
 
