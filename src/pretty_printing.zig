@@ -1155,9 +1155,7 @@ fn prettyPrintTemporalZonedDateTime(
     );
     const time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(temporal_zoned_date_time.fields.inner);
     var write = temporal_rs.DiplomatWrite.init(arena.allocator());
-    temporal_rs.temporalErrorResult(
-        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner),
-    ) catch unreachable;
+    temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
     const time_zone_id = write.toOwnedSlice() catch return;
     const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(temporal_zoned_date_time.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));

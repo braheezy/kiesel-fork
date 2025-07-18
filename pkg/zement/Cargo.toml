@@ -11,7 +11,7 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "34522ae99c9d6e2ac2782162eaf01b36494951ca"
+rev = "c0405f6c3da466750fda35204cd05a280ece189c"
 features = ["compiled_data"]
 
 # icu_capi points to a git version of diplomat between releases, which causes duplicate symbol

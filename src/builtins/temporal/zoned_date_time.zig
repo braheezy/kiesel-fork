@@ -795,9 +795,7 @@ pub const prototype = struct {
             zoned_date_time.fields.inner,
         );
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner),
-        ) catch unreachable;
+        temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner);
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
