@@ -631,160 +631,53 @@ pub fn getTemporalFractionalSecondDigitsOption(
     };
 }
 
-const TemporalUnit = enum {
-    required,
-    unset,
-    auto,
-
-    year,
-    month,
-    week,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond,
-    microsecond,
-    nanosecond,
-};
-
-/// 13.17 GetTemporalUnitValuedOption ( options, key, unitGroup, default [ , extraValues ] )
+/// 13.17 GetTemporalUnitValuedOption ( options, key, default )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalunitvaluedoption
 pub fn getTemporalUnitValuedOption(
     agent: *Agent,
     options: *Object,
     comptime key: []const u8,
-    comptime unit_group: enum { date, time, datetime },
-    comptime default: TemporalUnit,
-    comptime extra_values: []const TemporalUnit,
+    comptime default: enum { required, unset },
 ) Agent.Error!?temporal_rs.c.Unit {
-    const allowed_strings, const default_value = comptime result: {
-        // 1. Let allowedValues be a new empty List.
-        // 2. For each row of Table 21, except the header row, in table order, do
-        //     a. Let unit be the value in the "Value" column of the row.
-        //     b. If the "Category" column of the row is date and unitGroup is date or datetime, append unit to allowedValues.
-        //     c. Else if the "Category" column of the row is time and unitGroup is time or datetime, append unit to allowedValues.
-        var allowed_values: []const TemporalUnit = switch (unit_group) {
-            .date => &.{
-                .year,
-                .month,
-                .week,
-                .day,
-            },
-            .time => &.{
-                .hour,
-                .minute,
-                .second,
-                .millisecond,
-                .microsecond,
-                .nanosecond,
-            },
-            .datetime => &.{
-                .year,
-                .month,
-                .week,
-                .day,
-                .hour,
-                .minute,
-                .second,
-                .millisecond,
-                .microsecond,
-                .nanosecond,
-            },
-        };
-
-        // 3. If extraValues is present, then
-        //     a. Set allowedValues to the list-concatenation of allowedValues and extraValues.
-        allowed_values = allowed_values ++ extra_values;
-
-        const default_value = switch (default) {
-            // 4. If default is unset, then
-            .unset => blk: {
-                // a. Let defaultValue be undefined.
-                break :blk null;
-            },
-            // 5. Else if default is required, then
-            .required => blk: {
-                // a. Let defaultValue be required.
-                break :blk .required;
-            },
-            // 6. Else if default is auto, then
-            .auto => blk: {
-                // a. Append default to allowedValues.
-                allowed_values = allowed_values ++ .{.auto};
-
-                // b. Let defaultValue be "auto".
-                break :blk String.fromLiteral("auto");
-            },
-            // 7. Else,
-            else => |value| blk: {
-                // a. Assert: allowedValues contains default.
-                std.debug.assert(std.mem.indexOf(TemporalUnit, allowed_values, default) != null);
-
-                // b. Let defaultValue be the value in the "Singular property name" column of Table 21
-                //    corresponding to the row with default in the "Value" column.
-                break :blk String.fromLiteral(@tagName(value));
-            },
-        };
-
-        // 8. Let allowedStrings be a new empty List.
-        var allowed_strings: []const *const String = &.{};
-
-        // 9. For each element value of allowedValues, do
-        for (allowed_values) |value| {
-            // a. If value is auto, then
-            if (value == .auto) {
-                // i. Append "auto" to allowedStrings.
-                allowed_strings = allowed_strings ++ .{String.fromLiteral("auto")};
-            } else {
-                // b. Else,
-                // i. Let singularName be the value in the "Singular property name" column of Table 21
-                //    corresponding to the row with value in the "Value" column.
-                const singular_name: *const String = switch (value) {
-                    .year => String.fromLiteral("year"),
-                    .month => String.fromLiteral("month"),
-                    .week => String.fromLiteral("week"),
-                    .day => String.fromLiteral("day"),
-                    .hour => String.fromLiteral("hour"),
-                    .minute => String.fromLiteral("minute"),
-                    .second => String.fromLiteral("second"),
-                    .millisecond => String.fromLiteral("millisecond"),
-                    .microsecond => String.fromLiteral("microsecond"),
-                    .nanosecond => String.fromLiteral("nanosecond"),
-                    else => unreachable,
-                };
-
-                // ii. Append singularName to allowedStrings.
-                allowed_strings = allowed_strings ++ .{singular_name};
-
-                // iii. Let pluralName be the value in the "Plural property name" column of the
-                //      corresponding row.
-                const plural_name: *const String = switch (value) {
-                    .year => String.fromLiteral("years"),
-                    .month => String.fromLiteral("months"),
-                    .week => String.fromLiteral("weeks"),
-                    .day => String.fromLiteral("days"),
-                    .hour => String.fromLiteral("hours"),
-                    .minute => String.fromLiteral("minutes"),
-                    .second => String.fromLiteral("seconds"),
-                    .millisecond => String.fromLiteral("milliseconds"),
-                    .microsecond => String.fromLiteral("microseconds"),
-                    .nanosecond => String.fromLiteral("nanoseconds"),
-                    else => unreachable,
-                };
-
-                // iv. Append pluralName to allowedStrings.
-                allowed_strings = allowed_strings ++ .{plural_name};
-            }
-        }
-
-        break :result .{ allowed_strings, default_value };
+    // 1. Let allowedStrings be a List containing all values in the "Singular property name" and
+    //    "Plural property name" columns of Table 21, except the header row.
+    // 2. Append "auto" to allowedStrings.
+    // 3. NOTE: For each singular Temporal unit name that is contained within allowedStrings, the
+    //    corresponding plural name is also contained within it.
+    const allowed_strings: []const *const String = &.{
+        String.fromLiteral("auto"),
+        String.fromLiteral("year"),
+        String.fromLiteral("years"),
+        String.fromLiteral("month"),
+        String.fromLiteral("months"),
+        String.fromLiteral("week"),
+        String.fromLiteral("weeks"),
+        String.fromLiteral("day"),
+        String.fromLiteral("days"),
+        String.fromLiteral("hour"),
+        String.fromLiteral("hours"),
+        String.fromLiteral("minute"),
+        String.fromLiteral("minutes"),
+        String.fromLiteral("second"),
+        String.fromLiteral("seconds"),
+        String.fromLiteral("millisecond"),
+        String.fromLiteral("milliseconds"),
+        String.fromLiteral("microsecond"),
+        String.fromLiteral("microseconds"),
+        String.fromLiteral("nanosecond"),
+        String.fromLiteral("nanoseconds"),
     };
 
-    // 10. NOTE: For each singular Temporal unit name that is contained within allowedStrings, the
-    //     corresponding plural name is also contained within it.
+    // 4. If default is unset, then
+    //     a. Let defaultValue be undefined.
+    // 5. Else,
+    //     a. Let defaultValue be default.
+    const default_value = switch (default) {
+        .unset => null,
+        .required => .required,
+    };
 
-    // 11. Let value be ? GetOption(options, key, string, allowedStrings, defaultValue).
+    // 6. Let value be ? GetOption(options, key, string, allowedStrings, defaultValue).
     const value = try options.getOption(
         agent,
         key,
@@ -792,13 +685,13 @@ pub fn getTemporalUnitValuedOption(
         allowed_strings,
         default_value,
     ) orelse {
-        // 12. If value is undefined, return unset.
+        // 7. If value is undefined, return unset.
         return null;
     };
 
-    // 13. If value is "auto", return auto.
-    // 14. Return the value in the "Value" column of Table 21 corresponding to the row with value
-    //     in its "Singular property name" or "Plural property name" column.
+    // 8. If value is "auto", return auto.
+    // 9. Return the value in the "Value" column of Table 21 corresponding to the row with value in
+    //    its "Singular property name" or "Plural property name" column.
     const unit_map = std.StaticStringMap(temporal_rs.c.Unit).initComptime(&.{
         .{ "auto", temporal_rs.c.Unit_Auto },
         .{ "year", temporal_rs.c.Unit_Year },
@@ -825,7 +718,54 @@ pub fn getTemporalUnitValuedOption(
     return unit_map.get(value.slice.ascii).?;
 }
 
-/// 13.39 ToMonthCode ( argument )
+/// 13.18 ValidateTemporalUnitValue ( value, unitGroup [ , extraValues ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-validatetemporalunitvaluedoption
+pub fn validateTemporalUnitValue(
+    agent: *Agent,
+    maybe_value: ?temporal_rs.c.Unit,
+    comptime key: []const u8,
+    comptime unit_group: enum { date, time, datetime },
+    comptime extra_values: []const temporal_rs.c.Unit,
+) Agent.Error!void {
+    // 1. If value is unset, return unused.
+    const value = maybe_value orelse return;
+
+    // 2. If extraValues is present and extraValues contains value, return unused.
+    if (std.mem.indexOfScalar(temporal_rs.c.Unit, extra_values, value) != null) return;
+
+    // 3. Let category be the value in the “Category” column of the row of Table 21 whose “Value”
+    //    column contains value. If there is no such row, throw a RangeError exception.
+    const category: enum { date, time } = switch (value) {
+        temporal_rs.c.Unit_Auto => {
+            return agent.throwException(.range_error, "Invalid value for option '{s}'", .{key});
+        },
+        temporal_rs.c.Unit_Year,
+        temporal_rs.c.Unit_Month,
+        temporal_rs.c.Unit_Week,
+        temporal_rs.c.Unit_Day,
+        => .date,
+        temporal_rs.c.Unit_Hour,
+        temporal_rs.c.Unit_Minute,
+        temporal_rs.c.Unit_Second,
+        temporal_rs.c.Unit_Millisecond,
+        temporal_rs.c.Unit_Microsecond,
+        temporal_rs.c.Unit_Nanosecond,
+        => .time,
+        else => unreachable,
+    };
+
+    // 4. If category is date and unitGroup is date or datetime, return unused.
+    // 5. If category is time and unitGroup is time or datetime, return unused.
+    switch (category) {
+        .date => if (unit_group == .date or unit_group == .datetime) return,
+        .time => if (unit_group == .time or unit_group == .datetime) return,
+    }
+
+    // 6. Throw a RangeError exception.
+    return agent.throwException(.range_error, "Invalid value for option '{s}'", .{key});
+}
+
+/// 13.40 ToMonthCode ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tomonthcode
 pub fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let monthCode be ? ToPrimitive(argument, string).
@@ -866,7 +806,7 @@ pub fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     return month_code_utf8;
 }
 
-/// 13.40 ToOffsetString ( argument )
+/// 13.41 ToOffsetString ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tooffsetstring
 pub fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let offset be ? ToPrimitive(argument, string).

@@ -42,6 +42,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const toMonthCode = builtins.toMonthCode;
 const toOffsetString = builtins.toOffsetString;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
+const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-zoneddatetime-constructor
@@ -973,17 +974,19 @@ pub const prototype = struct {
             temporal_rs.c.RoundingMode_Trunc,
         );
 
-        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
-            .time,
             .unset,
-            &.{},
         );
 
-        // 10. If smallestUnit is hour, throw a RangeError exception.
+        // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 11. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -992,11 +995,11 @@ pub const prototype = struct {
             );
         }
 
-        // 11. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
+        // 12. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
         const show_time_zone = try getTemporalShowTimeZoneNameOption(agent, options);
 
-        // 12. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 13. Return TemporalZonedDateTimeToString(zonedDateTime, precision.[[Precision]],
+        // 13. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 14. Return TemporalZonedDateTimeToString(zonedDateTime, precision.[[Precision]],
         //     showCalendar, showTimeZone, showOffset, precision.[[Increment]], precision.[[Unit]],
         //     roundingMode).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
@@ -1111,7 +1114,7 @@ pub fn toTemporalZonedDateTime(
     const options_value: Value = maybe_options_value orelse .undefined;
 
     // 2. Let offsetBehaviour be option.
-    // 3. Let matchBehaviour be match-exactly.
+    // 2. Let hasUTCDesignator be false.
     // 4. If item is an Object, then
     const temporal_rs_zoned_date_time = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
@@ -1171,29 +1174,27 @@ pub fn toTemporalZonedDateTime(
         //    « time-zone »).
         // d. Let timeZone be fields.[[TimeZone]].
         // e. Let offsetString be fields.[[OffsetString]].
-        // f. If offsetString is unset, then
-        // i. Set offsetBehaviour to wall.
         const partial_zoned_date_time = try toTemporalPartialZonedDateTime(agent, item.asObject());
 
-        // g. Let resolvedOptions be ? GetOptionsObject(options).
+        // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
 
-        // h. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        // g. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
         const disambiguation = try getTemporalDisambiguationOption(agent, options);
 
-        // i. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
+        // h. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
         const offset_option = try getTemporalOffsetOption(
             agent,
             options,
             temporal_rs.c.Disambiguation_Reject,
         );
 
-        // j. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        // i. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
         const overflow = try getTemporalOverflowOption(agent, options);
 
-        // k. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
-        // l. Let isoDate be result.[[ISODate]].
-        // m. Let time be result.[[Time]].
+        // j. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
+        // k. Let isoDate be result.[[ISODate]].
+        // l. Let time be result.[[Time]].
         break :blk temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
                 partial_zoned_date_time,
@@ -1228,35 +1229,36 @@ pub fn toTemporalZonedDateTime(
         // e. Let timeZone be ? ToTemporalTimeZoneIdentifier(annotation).
         // f. Let offsetString be result.[[TimeZone]].[[OffsetString]].
         // g. If result.[[TimeZone]].[[Z]] is true, then
-        // i. Set offsetBehaviour to exact.
-        // h. Else if offsetString is empty, then
-        // i. Set offsetBehaviour to wall.
-        // i. Let calendar be result.[[Calendar]].
-        // j. If calendar is empty, set calendar to "iso8601".
-        // k. Set calendar to ? CanonicalizeCalendar(calendar).
-        // l. Set matchBehaviour to match-minutes.
-        // m. If offsetString is not empty, then
-        // i. Let offsetParseResult be ParseText(StringToCodePoints(offsetString), UTCOffset[+SubMinutePrecision]).
-        // ii. Assert: offsetParseResult is a Parse Node.
-        // iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set matchBehaviour to match-exactly.
+        //     i. Set hasUTCDesignator to true.
+        // h. Let calendar be result.[[Calendar]].
+        // i. If calendar is empty, set calendar to "iso8601".
+        // j. Set calendar to ? CanonicalizeCalendar(calendar).
+        // k. Set matchBehaviour to match-minutes.
+        // l. If offsetString is not empty, then
+        //     i. Let offsetParseResult be ParseText(StringToCodePoints(offsetString),
+        //        UTCOffset[+SubMinutePrecision]).
+        //     ii. Assert: offsetParseResult is a Parse Node.
+        //     iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set
+        //          matchBehaviour to match-exactly.
 
-        // n. Let resolvedOptions be ? GetOptionsObject(options).
+        // m. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
 
-        // o. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        // n. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
         const disambiguation = try getTemporalDisambiguationOption(agent, options);
 
-        // p. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
+        // o. Let offsetOption be ? GetTemporalOffsetOption(resolvedOptions, reject).
         const offset_option = try getTemporalOffsetOption(
             agent,
             options,
             temporal_rs.c.Disambiguation_Reject,
         );
 
-        // q. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        // p. Perform ? GetTemporalOverflowOption(resolvedOptions).
         _ = try getTemporalOverflowOption(agent, options);
 
-        // r. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // q. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // r. Let time be result.[[Time]].
         const zoned_date_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(zoned_date_time_utf8);
         break :blk temporal_rs.temporalErrorResult(
@@ -1276,12 +1278,18 @@ pub fn toTemporalZonedDateTime(
     };
     errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
 
-    // 6. Let offsetNanoseconds be 0.
-    // 7. If offsetBehaviour is option, then
+    // 6. If hasUTCDesignator is true, then
+    //     a. Let offsetBehaviour be exact.
+    // 7. Else if offsetString is empty or offsetString is unset, then
+    //     a. Let offsetBehaviour be wall.
+    // 8. Else,
+    //     a. Let offsetBehaviour be option.
+    // 9. Let offsetNanoseconds be 0.
+    // 10. If offsetBehaviour is option, then
     //     a. Set offsetNanoseconds to ! ParseDateTimeUTCOffset(offsetString).
-    // 8. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
+    // 11. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
     //    offsetNanoseconds, timeZone, disambiguation, offsetOption, matchBehaviour).
-    // 9. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+    // 12. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
     return createTemporalZonedDateTime(
         agent,
         temporal_rs_zoned_date_time.?,

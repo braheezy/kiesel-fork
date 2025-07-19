@@ -28,6 +28,7 @@ const noexcept = utils.noexcept;
 const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
+const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 8.2 Properties of the Temporal.Instant Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-instant-constructor
@@ -355,17 +356,19 @@ pub const prototype = struct {
             temporal_rs.c.RoundingMode_Trunc,
         );
 
-        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
-            .time,
             .unset,
-            &.{},
         );
 
-        // 8. If smallestUnit is hour, throw a RangeError exception.
+        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 9. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -374,22 +377,22 @@ pub const prototype = struct {
             );
         }
 
-        // 9. Let timeZone be ? Get(resolvedOptions, "timeZone").
+        // 10. Let timeZone be ? Get(resolvedOptions, "timeZone").
         const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
         var maybe_time_zone: ?*temporal_rs.c.TimeZone = null;
         defer if (maybe_time_zone) |time_zone| temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
 
-        // 10. If timeZone is not undefined, then
+        // 11. If timeZone is not undefined, then
         if (!time_zone_value.isUndefined()) {
             // a. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
             maybe_time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
         }
 
-        // 11. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 12. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]], precision.[[Increment]], precision.[[Unit]], roundingMode).
-        // 13. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
-        // 14. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
+        // 12. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 13. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]], precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 14. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
+        // 15. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(

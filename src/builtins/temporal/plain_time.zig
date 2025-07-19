@@ -25,6 +25,7 @@ const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 4.2 Properties of the Temporal.PlainTime Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaintime-constructor
@@ -322,18 +323,19 @@ pub const prototype = struct {
             temporal_rs.c.RoundingMode_Trunc,
         );
 
-        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
-        //    time, unset).
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
-            .time,
             .unset,
-            &.{},
         );
 
-        // 8. If smallestUnit is hour, throw a RangeError exception.
+        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 9. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -342,10 +344,10 @@ pub const prototype = struct {
             );
         }
 
-        // 9. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 10. Let roundResult be RoundTime(plainTime.[[Time]], precision.[[Increment]],
+        // 10. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 11. Let roundResult be RoundTime(plainTime.[[Time]], precision.[[Increment]],
         //     precision.[[Unit]], roundingMode).
-        // 11. Return TimeRecordToString(roundResult, precision.[[Precision]]).
+        // 12. Return TimeRecordToString(roundResult, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
@@ -520,10 +522,10 @@ pub fn toTemporalPlainTime(
         }
 
         // b. Let parseResult be ? ParseISODateTime(item, « TemporalTimeString »).
-        // c. Assert: parseResult.[[Time]] is not start-of-day.
-        // d. Set result to parseResult.[[Time]].
-        // e. NOTE: A successful parse using TemporalTimeString guarantees absence of ambiguity
-        //    with respect to any ISO 8601 date-only, year-month, or month-day representation.
+        // c. If ParseText(StringToCodePoints(item), AmbiguousTemporalTimeString) is a Parse Node,
+        //    throw a RangeError exception.
+        // d. Assert: parseResult.[[Time]] is not start-of-day.
+        // e. Set result to parseResult.[[Time]].
         const plain_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(plain_time_utf8);
         const temporal_rs_plain_time = temporal_rs.temporalErrorResult(

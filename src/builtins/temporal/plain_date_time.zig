@@ -29,6 +29,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
+const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 5.2 Properties of the Temporal.PlainDateTime Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaindatetime-constructor
@@ -607,17 +608,18 @@ pub const prototype = struct {
         );
 
         // 8. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
-        //    time, unset).
+        //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
-            .time,
             .unset,
-            &.{},
         );
 
-        // 9. If smallestUnit is hour, throw a RangeError exception.
+        // 9. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 10. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -626,11 +628,11 @@ pub const prototype = struct {
             );
         }
 
-        // 10. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 11. Let result be RoundISODateTime(plainDateTime.[[ISODateTime]],
+        // 11. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 12. Let result be RoundISODateTime(plainDateTime.[[ISODateTime]],
         //     precision.[[Increment]], precision.[[Unit]], roundingMode).
-        // 12. If ISODateTimeWithinLimits(result) is false, throw a RangeError exception.
-        // 13. Return ISODateTimeToString(result, plainDateTime.[[Calendar]],
+        // 13. If ISODateTimeWithinLimits(result) is false, throw a RangeError exception.
+        // 14. Return ISODateTimeToString(result, plainDateTime.[[Calendar]],
         //     precision.[[Precision]], showCalendar).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(

@@ -24,6 +24,7 @@ const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 7.2 Properties of the Temporal.Duration Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-duration-constructor
@@ -422,27 +423,29 @@ pub const prototype = struct {
             temporal_rs.c.RoundingMode_Trunc,
         );
 
-        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit", time, unset).
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
-            .time,
             .unset,
-            &.{},
         );
 
-        // 8. If smallestUnit is hour or minute, throw a RangeError exception.
-        // 9. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 10. If precision.[[Unit]] is nanosecond and precision.[[Increment]] = 1, then
+        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 9. If smallestUnit is hour or minute, throw a RangeError exception.
+        // 10. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
+        // 11. If precision.[[Unit]] is nanosecond and precision.[[Increment]] = 1, then
         //     a. Return TemporalDurationToString(duration, precision.[[Precision]]).
-        // 11. Let largestUnit be DefaultTemporalLargestUnit(duration).
-        // 12. Let internalDuration be ToInternalDurationRecord(duration).
-        // 13. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]], precision.[[Increment]], precision.[[Unit]], roundingMode).
-        // 14. Set internalDuration to CombineDateAndTimeDuration(internalDuration.[[Date]], timeDuration).
-        // 15. Let roundedLargestUnit be LargerOfTwoTemporalUnits(largestUnit, second).
-        // 16. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
-        // 17. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
+        // 12. Let largestUnit be DefaultTemporalLargestUnit(duration).
+        // 13. Let internalDuration be ToInternalDurationRecord(duration).
+        // 14. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]], precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 15. Set internalDuration to CombineDateAndTimeDuration(internalDuration.[[Date]], timeDuration).
+        // 16. Let roundedLargestUnit be LargerOfTwoTemporalUnits(largestUnit, second).
+        // 17. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
+        // 18. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_Duration_to_string(
