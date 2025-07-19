@@ -763,7 +763,7 @@ pub const Expression = union(enum) {
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype
-    pub fn assignmentTargetType(self: Expression) enum { simple, invalid } {
+    pub fn assignmentTargetType(self: Expression, is_strict: ?bool) enum { simple, web_compat, invalid } {
         switch (self) {
             // IdentifierReference : Identifier
             // IdentifierReference :
@@ -793,6 +793,26 @@ pub const Expression = union(enum) {
                 // 1. Return simple.
                 return .simple;
             },
+
+            // CallExpression :
+            //     CoverCallExpressionAndAsyncArrowHead
+            //     CallExpression Arguments
+            .call_expression => {
+                // 1. If the host is a web browser or otherwise supports Runtime Errors for
+                //    Function Call Assignment Targets and IsStrict(this CallExpression) is false,
+                //    then
+                //     a. Return web-compat.
+                // The strictness is passed as a nullable boolean as we only have to check it
+                // during parsing, in codegen we know the assignment target type is simple or
+                // web-compat.
+                if (build_options.enable_annex_b and is_strict != true) {
+                    return .web_compat;
+                }
+
+                // 2. Return invalid.
+                return .invalid;
+            },
+
             else => {},
         }
 

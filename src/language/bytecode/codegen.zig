@@ -1315,101 +1315,127 @@ pub fn codegenUpdateExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    std.debug.assert(node.expression.analyze(.is_reference));
-
     // UpdateExpression : LeftHandSideExpression ++
     if (node.type == .postfix and node.operator == .@"++") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference, {});
+        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
-        // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
+        // 2. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
+        //    ReferenceError exception.
+        if (node.expression.assignmentTargetType(null) == .web_compat) {
+            try executable.addInstruction(.throw_call_assignment_reference_error, {});
+            return;
+        }
+
+        // 3. Let oldValue be ? ToNumeric(? GetValue(lhs)).
         try executable.addInstruction(.get_value, {});
         try executable.addInstruction(.to_numeric, {});
 
         try executable.addInstruction(.load, {});
 
-        // 3. If oldValue is a Number, then
+        // 4. If oldValue is a Number, then
         //     a. Let newValue be Number::add(oldValue, 1𝔽).
-        // 4. Else,
+        // 5. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
         try executable.addInstruction(.increment, {});
 
-        // 5. Perform ? PutValue(lhs, newValue).
+        // 6. Perform ? PutValue(lhs, newValue).
         try executable.addInstruction(.put_value, {});
 
-        // 6. Return oldValue.
+        // 7. Return oldValue.
         try executable.addInstruction(.store, {});
     }
     // UpdateExpression : LeftHandSideExpression --
     else if (node.type == .postfix and node.operator == .@"--") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference, {});
+        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
-        // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
+        // 2. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
+        //    ReferenceError exception.
+        if (node.expression.assignmentTargetType(null) == .web_compat) {
+            try executable.addInstruction(.throw_call_assignment_reference_error, {});
+            return;
+        }
+
+        // 3. Let oldValue be ? ToNumeric(? GetValue(lhs)).
         try executable.addInstruction(.get_value, {});
         try executable.addInstruction(.to_numeric, {});
 
         try executable.addInstruction(.load, {});
 
-        // 3. If oldValue is a Number, then
+        // 4. If oldValue is a Number, then
         //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
-        // 4. Else,
+        // 5. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
         try executable.addInstruction(.decrement, {});
 
-        // 5. Perform ? PutValue(lhs, newValue).
+        // 6. Perform ? PutValue(lhs, newValue).
         try executable.addInstruction(.put_value, {});
 
-        // 6. Return oldValue.
+        // 7. Return oldValue.
         try executable.addInstruction(.store, {});
     }
     // UpdateExpression : ++ UnaryExpression
     else if (node.type == .prefix and node.operator == .@"++") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference, {});
+        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
-        // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
+        // 2. If the AssignmentTargetType of UnaryExpression is web-compat, throw a ReferenceError
+        //    exception.
+        if (node.expression.assignmentTargetType(null) == .web_compat) {
+            try executable.addInstruction(.throw_call_assignment_reference_error, {});
+            return;
+        }
+
+        // 3. Let oldValue be ? ToNumeric(? GetValue(expr)).
         try executable.addInstruction(.get_value, {});
         try executable.addInstruction(.to_numeric, {});
 
-        // 3. If oldValue is a Number, then
+        // 4. If oldValue is a Number, then
         //     a. Let newValue be Number::add(oldValue, 1𝔽).
-        // 4. Else,
+        // 5. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
         try executable.addInstruction(.increment, {});
 
-        // 5. Perform ? PutValue(expr, newValue).
+        // 6. Perform ? PutValue(expr, newValue).
         try executable.addInstruction(.put_value, {});
 
-        // 6. Return newValue.
+        // 7. Return newValue.
     }
     // UpdateExpression : -- UnaryExpression
     else if (node.type == .prefix and node.operator == .@"--") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference, {});
+        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
-        // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
+        // 2. If the AssignmentTargetType of UnaryExpression is web-compat, throw a ReferenceError
+        //    exception.
+        if (node.expression.assignmentTargetType(null) == .web_compat) {
+            try executable.addInstruction(.throw_call_assignment_reference_error, {});
+            return;
+        }
+
+        // 3. Let oldValue be ? ToNumeric(? GetValue(expr)).
         try executable.addInstruction(.get_value, {});
         try executable.addInstruction(.to_numeric, {});
 
-        // 3. If oldValue is a Number, then
+        // 4. If oldValue is a Number, then
         //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
-        // 4. Else,
+        // 5. Else,
         //     a. Assert: oldValue is a BigInt.
         //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
         try executable.addInstruction(.decrement, {});
 
-        // 5. Perform ? PutValue(expr, newValue).
+        // 6. Perform ? PutValue(expr, newValue).
         try executable.addInstruction(.put_value, {});
 
-        // 6. Return newValue.
+        // 7. Return newValue.
     } else unreachable;
 }
 
@@ -1749,20 +1775,27 @@ pub fn codegenAssignmentExpression(
             // a. Let lRef be ? Evaluation of LeftHandSideExpression.
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-            // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
+            // b. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
+            //    ReferenceError exception.
+            if (node.lhs_expression.assignmentTargetType(null) == .web_compat) {
+                try executable.addInstruction(.throw_call_assignment_reference_error, {});
+                return;
+            }
+
+            // TODO: c. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
             //          LeftHandSideExpression are both true, then
             if (false) {
                 // i. Let lhs be the StringValue of LeftHandSideExpression.
                 // ii. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
             } else {
-                // c. Else,
+                // d. Else,
                 // i. Let rRef be ? Evaluation of AssignmentExpression.
                 // ii. Let rVal be ? GetValue(rRef).
                 try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
             }
 
-            // d. Perform ? PutValue(lRef, rVal).
-            // e. Return rVal.
+            // e. Perform ? PutValue(lRef, rVal).
+            // f. Return rVal.
             try executable.addInstruction(.put_value, {});
             return;
         }
@@ -1783,25 +1816,30 @@ pub fn codegenAssignmentExpression(
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
     else if (node.operator != .@"&&=" and node.operator != .@"||=" and node.operator != .@"??=") {
-        std.debug.assert(node.lhs_expression.analyze(.is_reference));
-
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.dup_reference, {});
+        if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
 
-        // 2. Let lVal be ? GetValue(lRef).
+        // 2. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
+        //    ReferenceError exception.
+        if (node.lhs_expression.assignmentTargetType(null) == .web_compat) {
+            try executable.addInstruction(.throw_call_assignment_reference_error, {});
+            return;
+        }
+
+        // 3. Let lVal be ? GetValue(lRef).
         try executable.addInstruction(.get_value, {});
         try executable.addInstruction(.load, {});
 
-        // 3. Let rRef be ? Evaluation of AssignmentExpression.
-        // 4. Let rVal be ? GetValue(rRef).
+        // 4. Let rRef be ? Evaluation of AssignmentExpression.
+        // 5. Let rVal be ? GetValue(rRef).
         try codegenExpressionAndGetValue(node.rhs_expression.*, executable, ctx);
         try executable.addInstruction(.load, {});
 
-        // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
-        // 6. Let opText be the sequence of Unicode code points associated with assignmentOpText
+        // 6. Let assignmentOpText be the source text matched by AssignmentOperator.
+        // 7. Let opText be the sequence of Unicode code points associated with assignmentOpText
         //    in the following table:
-        // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
+        // 8. Let r be ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
         switch (node.operator) {
             .@"+=" => try executable.addInstruction(.binary_operator_add, {}),
             .@"-=" => try executable.addInstruction(.binary_operator_sub, {}),
@@ -1818,8 +1856,8 @@ pub fn codegenAssignmentExpression(
             else => {},
         }
 
-        // 8. Perform ? PutValue(lRef, r).
-        // 9. Return r.
+        // 9. Perform ? PutValue(lRef, r).
+        // 10. Return r.
         try executable.addInstruction(.put_value, {});
     }
     // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
@@ -2964,9 +3002,16 @@ fn forInOfBodyEvaluation(
                 .for_declaration => unreachable,
             }
 
-            // TODO: 2. If lhsRef is an abrupt completion, then
+            // 2. If lhsKind is assignment and the AssignmentTargetType of lhs is web-compat, throw
+            //    a ReferenceError exception.
+            if (lhs_kind == .assignment and lhs.expression.assignmentTargetType(null) == .web_compat) {
+                try executable.addInstruction(.throw_call_assignment_reference_error, {});
+                return;
+            }
+
+            // TODO: 3. If lhsRef is an abrupt completion, then
             //     a. Let status be lhsRef.
-            // 3. Else,
+            // 4. Else,
             //     a. Let status be Completion(PutValue(lhsRef.[[Value]], nextValue)).
             try executable.addInstruction(.put_value, {});
         }

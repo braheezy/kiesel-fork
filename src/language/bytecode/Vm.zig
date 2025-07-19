@@ -1654,6 +1654,10 @@ fn executeThrow(self: *Vm) Agent.Error!void {
     return error.ExceptionThrown;
 }
 
+fn executeThrowCallAssignmentReferenceError(self: *Vm) Agent.Error!void {
+    return self.agent.throwException(.reference_error, "Invalid assignment to function call", .{});
+}
+
 fn executeToNumber(self: *Vm) Agent.Error!void {
     const value = self.result.?;
 
@@ -1868,6 +1872,7 @@ fn executeInstruction(
         .store => self.executeStore(),
         .store_constant => self.executeStoreConstant(payload),
         .throw => self.executeThrow(),
+        .throw_call_assignment_reference_error => self.executeThrowCallAssignmentReferenceError(),
         .to_number => self.executeToNumber(),
         .to_numeric => self.executeToNumeric(),
         .to_object => self.executeToObject(),

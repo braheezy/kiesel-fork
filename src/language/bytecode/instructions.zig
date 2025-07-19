@@ -250,6 +250,8 @@ pub const Instruction = union(enum(u8)) {
     store_constant: ConstantIndex,
     /// Throw the last value from the stack as an exception.
     throw,
+    /// Throw ReferenceError for a function call assignment (web-compat assignment target type)
+    throw_call_assignment_reference_error,
     /// Store ToNumber() as the result value.
     to_number,
     /// Store ToNumeric() as the result value.
