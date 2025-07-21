@@ -5,27 +5,27 @@
     .minimum_zig_version = "0.14.1",
     .dependencies = .{
         .any_pointer = .{
-            .url = "https://github.com/ikskuh/any-pointer/archive/68132fe118ec6b84b3a0d526d16b9b4610edf64f.tar.gz",
-            .hash = "N-V-__8AAJ9AAADMXRuM-8Tczp7EheJnSdxHaoAOCjyLJI0T",
+            .url = "https://github.com/ikskuh/any-pointer/archive/0f9725a324d48239d1d7e07b7f270b0a87be576a.tar.gz",
+            .hash = "N-V-__8AABtBAABwSNNZpjUoWFLYSZZXjKgv9hKsDuZq64Zk",
         },
         .args = .{
             .url = "https://github.com/ikskuh/zig-args/archive/9425b94c103a031777fdd272c555ce93a7dea581.tar.gz",
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/9e0f413dc2bba36a54eb100ea781278e242c032c.tar.gz",
-            .hash = "icu4zig-0.1.0-IT7GrCFFAgCetMeDPSZ8YxDv4I1LBSsbFsOsLpItT9Em",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/a63b1eba8ce552659dc11f4dcbb2f797c004ba62.tar.gz",
+            .hash = "icu4zig-0.1.0-IT7GrJA8AgAlew4LiEeOjrLieoSv8VHSPEgB2XSbcVVV",
             .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/ec7982f47f1eecd167071ba59792c92bce4e5ddd.tar.gz",
-            .hash = "kiesel_runtime-0.1.0-goZjAUAVAQBpLTHKkw1lgJkSTdRsZSpBBDWVHVP41Bnl",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/ab0f87360f3bf7a4c18acf65ab06182364793a4c.tar.gz",
+            .hash = "kiesel_runtime-0.1.0-goZjAVAVAQDfuGJOxlhczZIskM3gU2y2mwUFL6T2VTOi",
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/9e224cb87759c1ca420a5cd5c6082d29b9ed58cb.tar.gz",
-            .hash = "N-V-__8AAOOlLgDLwcDKt7y40crc8-egXF1or0HkThBiWoZH",
+            .url = "https://github.com/ivmai/bdwgc/archive/88a61fc6f2688d8e1ea94f3f810c23db89a3f30b.tar.gz",
+            .hash = "N-V-__8AAH_yLgBqgBTm4R0v8xAfB3oKkC9cvxUk1pc02B9w",
             .lazy = true,
         },
         .libregexp = .{
@@ -33,16 +33,16 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/0d5e00d4830bca53d10fee5d562152f1329d5784.tar.gz",
-            .hash = "parser_toolkit-0.1.0-baYGPS1CEwDuQk1W_5QEfKF_BWU5lN4qb8kVZoQ6Id9k",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/c1a466b8df22cab7d665f44c645fb44f0aaf5077.tar.gz",
+            .hash = "parser_toolkit-0.1.0-baYGPXNCEwCoVvgTA29nOamiDp5yOC76lUaayy5Z2bYh",
         },
         .stackinfo = .{
-            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/72edb4301313aabe2593d62814fccc8c39f6dbd1.tar.gz",
-            .hash = "stackinfo-0.1.0-NZ2qTskbAAAefz3d7vjalblduNIyOzuwKg9Yx6CnUtee",
+            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/b9e94aa7f6a778d704a2989df6267223446eb762.tar.gz",
+            .hash = "stackinfo-0.1.0-NZ2qTp8bAAD6l36ZqllIVQvCh3EqEpseSt8ku_gI6IdJ",
         },
         .temporal_rs = .{
-            .url = "https://github.com/boa-dev/temporal/archive/c0405f6c3da466750fda35204cd05a280ece189c.tar.gz",
-            .hash = "N-V-__8AAAKZHAB_AgcER2c5S0j1GRaQaBCHubSKBlMxuTc4",
+            .url = "https://github.com/boa-dev/temporal/archive/9012478d69158632abc91199606525ff3d38b339.tar.gz",
+            .hash = "N-V-__8AAHjrHAD69KCOwCuy5-9Ys9vbFIov_pFbC9BMJC4W",
             .lazy = true,
         },
         .unicode_id = .{
