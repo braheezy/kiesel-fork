@@ -8,17 +8,21 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalDate = builtins.createTemporalDate;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 9.2 Properties of the Temporal.PlainYearMonth Constructor
@@ -136,6 +140,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 1, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
@@ -328,6 +333,61 @@ pub const prototype = struct {
             &write.inner,
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 9.3.23 Temporal.PlainYearMonth.prototype.toPlainDate ( item )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.toplaindate
+    fn toPlainDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. If item is not an Object, then
+        if (!item.isObject()) {
+            // a. Throw a TypeError exception.
+            return agent.throwException(.type_error, "Item must be an object", .{});
+        }
+        const object = item.asObject();
+
+        // 4. Let calendar be plainYearMonth.[[Calendar]].
+        // 5. Let fields be ISODateToFields(calendar, plainYearMonth.[[ISODate]], year-month).
+        // 6. Let inputFields be ? PrepareCalendarFields(calendar, item, « day », « », « »).
+        // 7. Let mergedFields be CalendarMergeFields(calendar, fields, inputFields).
+        // 8. Let isoDate be ? CalendarDateFromFields(calendar, mergedFields, constrain).
+        var result: temporal_rs.c.PartialDate = .{};
+        const day = try object.get(agent, PropertyKey.from("day"));
+        if (!day.isUndefined()) {
+            result.day = .{
+                .is_ok = true,
+                .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
+            };
+        }
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainYearMonth_to_plain_date(
+                plain_year_month.fields.inner,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = result } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid plain datetime", .{});
+            },
+            error.TypeError => {
+                return agent.throwException(.type_error, "Missing plain datetime fields", .{});
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+
+        // 9. Return ! CreateTemporalDate(isoDate, calendar).
+        return Value.from(
+            createTemporalDate(
+                agent,
+                temporal_rs_plain_date.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 9.3.19 Temporal.PlainYearMonth.prototype.toString ( [ options ] )
