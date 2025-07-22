@@ -20,6 +20,7 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalYearMonth = builtins.createTemporalYearMonth;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
@@ -173,6 +174,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainYearMonth", toPlainYearMonth, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
@@ -416,6 +418,35 @@ pub const prototype = struct {
             &write.inner,
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 3.3.19 Temporal.PlainDate.prototype.toPlainYearMonth ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.toplainyearmonth
+    fn toPlainYearMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Let calendar be plainDate.[[Calendar]].
+        // 4. Let fields be ISODateToFields(calendar, plainDate.[[ISODate]], date).
+        // 5. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, constrain).
+        const temporal_rs_plain_year_month = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_to_plain_year_month(plain_date.fields.inner),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
+
+        // 6. Return ! CreateTemporalYearMonth(isoDate, calendar).
+        return Value.from(
+            createTemporalYearMonth(
+                agent,
+                temporal_rs_plain_year_month.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+
+        // 7. NOTE: The call to CalendarYearMonthFromFields is necessary in order to create a
+        //    PlainYearMonth object with the [[Day]] field of the [[ISODate]] internal slot set
+        //    correctly.
     }
 
     /// 3.3.30 Temporal.PlainDate.prototype.toString ( [ options ] )
