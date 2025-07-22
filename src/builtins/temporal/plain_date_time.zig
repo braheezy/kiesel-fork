@@ -20,6 +20,7 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalDate = builtins.createTemporalDate;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
@@ -215,6 +216,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
@@ -575,6 +577,28 @@ pub const prototype = struct {
             ),
         ) catch unreachable;
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 5.3.39 Temporal.PlainDateTime.prototype.toPlainDate ( )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.toplaindate
+    fn toPlainDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Return ! CreateTemporalDate(plainDateTime.[[ISODateTime]].[[ISODate]],
+        //    plainDateTime.[[Calendar]]).
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(plain_date_time.fields.inner),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+        return Value.from(
+            createTemporalDate(
+                agent,
+                temporal_rs_plain_date.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 5.3.34 Temporal.PlainDateTime.prototype.toString ( [ options ] )
