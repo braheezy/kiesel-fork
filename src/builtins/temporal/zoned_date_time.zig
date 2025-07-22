@@ -1174,7 +1174,7 @@ pub fn toTemporalZonedDateTime(
         //    « time-zone »).
         // d. Let timeZone be fields.[[TimeZone]].
         // e. Let offsetString be fields.[[OffsetString]].
-        const partial_zoned_date_time = try toTemporalPartialZonedDateTime(agent, item.asObject());
+        const partial_zoned_date_time = try toTemporalPartialZonedDateTime(agent, item.asObject(), true);
 
         // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -1304,6 +1304,7 @@ pub fn toTemporalZonedDateTime(
 pub fn toTemporalPartialZonedDateTime(
     agent: *Agent,
     object: *Object,
+    time_zone_required: bool,
 ) Agent.Error!temporal_rs.c.PartialZonedDateTime {
     var result: temporal_rs.c.PartialZonedDateTime = .{
         .date = .{
@@ -1426,11 +1427,18 @@ pub fn toTemporalPartialZonedDateTime(
         };
     }
 
-    const time_zone_value = try object.get(agent, PropertyKey.from("timeZone"));
-    // NOTE: Undefined check is done as part of ToTemporalTimeZoneIdentifier
-    const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
-    errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
-    result.timezone = time_zone;
+    var maybe_temporal_rs_time_zone: ?*temporal_rs.c.TimeZone = null;
+    errdefer if (maybe_temporal_rs_time_zone) |temporal_rs_time_zone| {
+        temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone);
+    };
+
+    const time_zone = try object.get(agent, PropertyKey.from("timeZone"));
+    if (!time_zone.isUndefined()) {
+        maybe_temporal_rs_time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone);
+        result.timezone = maybe_temporal_rs_time_zone.?;
+    } else if (time_zone_required) {
+        return agent.throwException(.type_error, "Missing required 'timeZone' field", .{});
+    }
 
     const year = try object.get(agent, PropertyKey.from("year"));
     if (!year.isUndefined()) {

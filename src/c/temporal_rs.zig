@@ -11,11 +11,13 @@ pub const c = @cImport({
     @cInclude("ErrorKind.h");
     @cInclude("I128Nanoseconds.h");
     @cInclude("Instant.h");
+    @cInclude("OwnedRelativeTo.h");
     @cInclude("PlainDate.h");
     @cInclude("PlainDateTime.h");
     @cInclude("PlainMonthDay.h");
     @cInclude("PlainTime.h");
     @cInclude("PlainYearMonth.h");
+    @cInclude("RelativeTo.h");
     @cInclude("TimeZone.h");
     @cInclude("ZonedDateTime.h");
 });
@@ -64,6 +66,43 @@ pub fn toDiplomatStringView(s: []const u8) c.DiplomatStringView {
 pub fn fromOptional(value: anytype) ?Success(@TypeOf(value)) {
     return success(value);
 }
+
+// Wraps values from a `c.RelativeTo` or `c.OwnedRelativeTo`.
+pub const RelativeTo = union(enum) {
+    none,
+    owned_plain_date: *c.PlainDate,
+    owned_zoned_date_time: *c.ZonedDateTime,
+    borrowed_plain_date: *const c.PlainDate,
+    borrowed_zoned_date_time: *const c.ZonedDateTime,
+
+    pub fn fromOwned(owned: c.OwnedRelativeTo) RelativeTo {
+        if (owned.date) |plain_date| {
+            return .{ .owned_plain_date = plain_date };
+        } else if (owned.zoned) |zoned_date_time| {
+            return .{ .owned_zoned_date_time = zoned_date_time };
+        } else {
+            return .none;
+        }
+    }
+
+    pub fn toRust(self: RelativeTo) c.RelativeTo {
+        return switch (self) {
+            .none => .{ .date = null, .zoned = null },
+            .owned_plain_date => |plain_date| .{ .date = plain_date, .zoned = null },
+            .owned_zoned_date_time => |zoned_date_time| .{ .date = null, .zoned = zoned_date_time },
+            .borrowed_plain_date => |plain_date| .{ .date = plain_date, .zoned = null },
+            .borrowed_zoned_date_time => |zoned_date_time| .{ .date = null, .zoned = zoned_date_time },
+        };
+    }
+
+    pub fn deinit(self: RelativeTo) void {
+        switch (self) {
+            .owned_plain_date => |plain_date| c.temporal_rs_PlainDate_destroy(plain_date),
+            .owned_zoned_date_time => |zoned_date_time| c.temporal_rs_ZonedDateTime_destroy(zoned_date_time),
+            else => {},
+        }
+    }
+};
 
 pub const DiplomatWrite = struct {
     gpa: std.mem.Allocator,

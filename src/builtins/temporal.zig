@@ -15,6 +15,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
+const toTemporalPartialZonedDateTime = builtins.toTemporalPartialZonedDateTime;
 
 comptime {
     const build_options = @import("build-options");
@@ -763,6 +764,164 @@ pub fn validateTemporalUnitValue(
 
     // 6. Throw a RangeError exception.
     return agent.throwException(.range_error, "Invalid value for option '{s}'", .{key});
+}
+
+/// 13.19 GetTemporalRelativeToOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalrelativetooption
+pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!temporal_rs.RelativeTo {
+    // 1. Let value be ? Get(options, "relativeTo").
+    const value = try options.get(agent, PropertyKey.from("relativeTo"));
+
+    // 2. If value is undefined, return the Record { [[PlainRelativeTo]]: undefined,
+    //    [[ZonedRelativeTo]]: undefined }.
+    if (value.isUndefined()) return .none;
+
+    // 3. Let offsetBehaviour be option.
+    // 4. Let matchBehaviour be match-exactly.
+
+    // 5. If value is an Object, then
+    const partial: temporal_rs.c.PartialZonedDateTime = if (value.isObject()) blk: {
+        // a. If value has an [[InitializedTemporalZonedDateTime]] internal slot, then
+        if (value.asObject().is(builtins.temporal.ZonedDateTime)) {
+            // i. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: value }.
+            return .{
+                .borrowed_zoned_date_time = value.asObject().as(builtins.temporal.ZonedDateTime).fields.inner,
+            };
+        }
+
+        // b. If value has an [[InitializedTemporalDate]] internal slot, then
+        if (value.asObject().is(builtins.temporal.PlainDate)) {
+            // i. Return the Record { [[PlainRelativeTo]]: value, [[ZonedRelativeTo]]: undefined }.
+            return .{
+                .borrowed_plain_date = value.asObject().as(builtins.temporal.PlainDate).fields.inner,
+            };
+        }
+
+        // c. If value has an [[InitializedTemporalDateTime]] internal slot, then
+        if (value.asObject().is(builtins.temporal.PlainDateTime)) {
+            // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]], value.[[Calendar]]).
+            const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
+                    value.asObject().as(builtins.temporal.PlainDateTime).fields.inner,
+                ),
+            ) catch unreachable;
+
+            // ii. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
+            return .{ .owned_plain_date = temporal_rs_plain_date.? };
+        }
+
+        // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(value).
+        // e. Let fields be ? PrepareCalendarFields(calendar, value, « year, month, month-code, day
+        //    », « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
+        //    «»).
+        const partial = try toTemporalPartialZonedDateTime(agent, value.asObject(), false);
+
+        // f. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, constrain).
+        // g. Let timeZone be fields.[[TimeZone]].
+        // h. Let offsetString be fields.[[OffsetString]].
+        // i. If offsetString is unset, then
+        // i. Set offsetBehaviour to wall.
+        // j. Let isoDate be result.[[ISODate]].
+        // k. Let time be result.[[Time]].
+        break :blk partial;
+    } else {
+        // 6. Else,
+        // a. If value is not a String, throw a TypeError exception.
+        if (!value.isString()) {
+            return agent.throwException(
+                .type_error,
+                "'relativeTo' option value must be a string or object",
+                .{},
+            );
+        }
+
+        // b. Let result be ? ParseISODateTime(value, « TemporalDateTimeString[+Zoned],
+        //    TemporalDateTimeString[~Zoned] »).
+        // c. Let offsetString be result.[[TimeZone]].[[OffsetString]].
+        // d. Let annotation be result.[[TimeZone]].[[TimeZoneAnnotation]].
+        // e. If annotation is empty, then
+        //     i. Let timeZone be unset.
+        // f. Else,
+        //     i. Let timeZone be ? ToTemporalTimeZoneIdentifier(annotation).
+        //     ii. If result.[[TimeZone]].[[Z]] is true, then
+        //         1. Set offsetBehaviour to exact.
+        //     iii. Else if offsetString is empty, then
+        //         1. Set offsetBehaviour to wall.
+        //     iv. Set matchBehaviour to match-minutes.
+        //     v. If offsetString is not empty, then
+        //         1. Let offsetParseResult be ParseText(StringToCodePoints(offsetString),
+        //            UTCOffset[+SubMinutePrecision]).
+        //         2. Assert: offsetParseResult is a Parse Node.
+        //         3. If offsetParseResult contains more than one MinuteSecond Parse Node, set
+        //            matchBehaviour to match-exactly.
+        // g. Let calendar be result.[[Calendar]].
+        // h. If calendar is empty, set calendar to "iso8601".
+        // i. Set calendar to ? CanonicalizeCalendar(calendar).
+        // j. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // k. Let time be result.[[Time]].
+        const relative_to_utf8 = try value.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(relative_to_utf8);
+        const owned_relative_to = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_OwnedRelativeTo_try_from_str(
+                temporal_rs.toDiplomatStringView(relative_to_utf8),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid date time string", .{});
+            },
+            else => unreachable,
+        };
+        return temporal_rs.RelativeTo.fromOwned(owned_relative_to);
+    };
+
+    // 7. If timeZone is unset, then
+    if (partial.timezone == null) {
+        // a. Let plainDate be ? CreateTemporalDate(isoDate, calendar).
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_from_partial(
+                partial.date,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid plain date", .{});
+            },
+            error.TypeError => {
+                return agent.throwException(.type_error, "Missing plain date field", .{});
+            },
+            else => unreachable,
+        };
+
+        // b. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
+        return .{ .owned_plain_date = temporal_rs_plain_date.? };
+    }
+
+    // 8. If offsetBehaviour is option, then
+    //     a. Let offsetNs be ! ParseDateTimeUTCOffset(offsetString).
+    // 9. Else,
+    //     a. Let offsetNs be 0.
+    // 10. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
+    //     offsetNs, timeZone, compatible, reject, matchBehaviour).
+    // 11. Let zonedRelativeTo be ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+    const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
+            partial,
+            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
+            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.Disambiguation_Compatible } },
+            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.OffsetDisambiguation_Reject } },
+        ),
+    ) catch |err| switch (err) {
+        error.RangeError => {
+            return agent.throwException(.range_error, "Invalid zoned datetime", .{});
+        },
+        error.TypeError => {
+            return agent.throwException(.type_error, "Missing zoned datetime field", .{});
+        },
+        else => unreachable,
+    };
+
+    // 12. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: zonedRelativeTo }.
+    return .{ .owned_zoned_date_time = temporal_rs_zoned_date_time.? };
 }
 
 /// 13.40 ToMonthCode ( argument )

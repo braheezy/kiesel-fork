@@ -20,6 +20,7 @@ const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRelativeToOption = builtins.getTemporalRelativeToOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
@@ -40,6 +41,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 7.2.1 Temporal.Duration.prototype
@@ -131,6 +133,80 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalDuration(agent, temporal_rs_duration.?, new_target),
         );
+    }
+
+    /// 7.2.3 Temporal.Duration.compare ( one, two [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+        const options_value = arguments.get(2);
+
+        // 1. Set one to ? ToTemporalDuration(one).
+        const one = try toTemporalDuration(agent, one_value);
+
+        // 2. Set two to ? ToTemporalDuration(two).
+        const two = try toTemporalDuration(agent, two_value);
+
+        // 3. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 4. Let relativeToRecord be ? GetTemporalRelativeToOption(resolvedOptions).
+        const relative_to = try getTemporalRelativeToOption(agent, options);
+        defer relative_to.deinit();
+
+        // 5. If one.[[Years]] = two.[[Years]], and one.[[Months]] = two.[[Months]], and
+        //    one.[[Weeks]] = two.[[Weeks]], and one.[[Days]] = two.[[Days]], and one.[[Hours]] =
+        //    two.[[Hours]], and one.[[Minutes]] = two.[[Minutes]], and one.[[Seconds]] =
+        //    two.[[Seconds]], and one.[[Milliseconds]] = two.[[Milliseconds]], and
+        //    one.[[Microseconds]] = two.[[Microseconds]], and one.[[Nanoseconds]] =
+        //    two.[[Nanoseconds]], then
+        //     a. Return +0𝔽.
+        // 6. Let zonedRelativeTo be relativeToRecord.[[ZonedRelativeTo]].
+        // 7. Let plainRelativeTo be relativeToRecord.[[PlainRelativeTo]].
+        // 8. Let largestUnit1 be DefaultTemporalLargestUnit(one).
+        // 9. Let largestUnit2 be DefaultTemporalLargestUnit(two).
+        // 10. Let duration1 be ToInternalDurationRecord(one).
+        // 11. Let duration2 be ToInternalDurationRecord(two).
+        // 12. If zonedRelativeTo is not undefined, and either TemporalUnitCategory(largestUnit1)
+        //     or TemporalUnitCategory(largestUnit2) is date, then
+        //     a. Let timeZone be zonedRelativeTo.[[TimeZone]].
+        //     b. Let calendar be zonedRelativeTo.[[Calendar]].
+        //     c. Let after1 be ? AddZonedDateTime(zonedRelativeTo.[[EpochNanoseconds]], timeZone,
+        //        calendar, duration1, constrain).
+        //     d. Let after2 be ? AddZonedDateTime(zonedRelativeTo.[[EpochNanoseconds]], timeZone,
+        //        calendar, duration2, constrain).
+        //     e. If after1 > after2, return 1𝔽.
+        //     f. If after1 < after2, return -1𝔽.
+        //     g. Return +0𝔽.
+        // 13. If IsCalendarUnit(largestUnit1) is true or IsCalendarUnit(largestUnit2) is true, then
+        //     a. If plainRelativeTo is undefined, throw a RangeError exception.
+        //     b. Let days1 be ? DateDurationDays(duration1.[[Date]], plainRelativeTo).
+        //     c. Let days2 be ? DateDurationDays(duration2.[[Date]], plainRelativeTo).
+        // 14. Else,
+        //     a. Let days1 be one.[[Days]].
+        //     b. Let days2 be two.[[Days]].
+        // 15. Let timeDuration1 be ? Add24HourDaysToTimeDuration(duration1.[[Time]], days1).
+        // 16. Let timeDuration2 be ? Add24HourDaysToTimeDuration(duration2.[[Time]], days2).
+        // 17. Return 𝔽(CompareTimeDuration(timeDuration1, timeDuration2)).
+        const result = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_Duration_compare(
+                one.as(Duration).fields.inner,
+                two.as(Duration).fields.inner,
+                relative_to.toRust(),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                // TODO: Improve error message, not sure what this should say
+                return agent.throwException(
+                    .range_error,
+                    "Can't compare durations",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        return Value.from(result);
     }
 
     /// 7.2.2 Temporal.Duration.from ( item )
