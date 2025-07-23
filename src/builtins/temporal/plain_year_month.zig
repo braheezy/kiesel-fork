@@ -21,9 +21,12 @@ const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalDate = builtins.createTemporalDate;
+const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toMonthCode = builtins.toMonthCode;
 
 /// 9.2 Properties of the Temporal.PlainYearMonth Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainyearmonth-constructor
@@ -39,6 +42,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 9.2.1 Temporal.PlainYearMonth.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -116,6 +121,16 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalYearMonth(agent, temporal_rs_plain_year_month.?, new_target),
         );
+    }
+
+    /// 9.2.2 Temporal.PlainYearMonth.from ( item [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Return ? ToTemporalYearMonth(item, options).
+        return Value.from(try toTemporalPlainYearMonth(agent, item, options));
     }
 };
 
@@ -453,6 +468,185 @@ pub const PlainYearMonth = MakeObject(.{
     }.finalizer,
     .tag = .temporal_plain_year_month,
 });
+
+/// 9.5.2 ToTemporalYearMonth ( item [ , options ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalyearmonth
+pub fn toTemporalPlainYearMonth(
+    agent: *Agent,
+    item: Value,
+    maybe_options_value: ?Value,
+) Agent.Error!*Object {
+    // 1. If options is not present, set options to undefined.
+    const options_value: Value = maybe_options_value orelse .undefined;
+
+    // 2. If item is an Object, then
+    const temporal_rs_plain_year_month = if (item.isObject()) blk: {
+        // a. If item has an [[InitializedTemporalYearMonth]] internal slot, then
+        if (item.asObject().is(PlainYearMonth)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalYearMonth(item.[[ISODate]], item.[[Calendar]]).
+            const plain_year_month = item.asObject().as(PlainYearMonth);
+            break :blk temporal_rs.temporalErrorResult(
+                temporal_rs.c.temporal_rs_PlainYearMonth_try_new_with_overflow(
+                    temporal_rs.c.temporal_rs_PlainYearMonth_year(plain_year_month.fields.inner),
+                    temporal_rs.c.temporal_rs_PlainYearMonth_month(plain_year_month.fields.inner),
+                    // TODO: https://github.com/boa-dev/temporal/issues/444
+                    .{ .is_ok = false },
+                    temporal_rs.c.temporal_rs_Calendar_kind(
+                        temporal_rs.c.temporal_rs_PlainYearMonth_calendar(plain_year_month.fields.inner),
+                    ),
+                    temporal_rs.c.ArithmeticOverflow_Constrain,
+                ),
+            ) catch unreachable;
+        }
+
+        // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code », «», «»).
+        const partial = try toTemporalPartialYearMonth(agent, item.asObject());
+
+        // d. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // e. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // f. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, overflow).
+        // g. Return ! CreateTemporalYearMonth(isoDate, calendar).
+        break :blk temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainYearMonth_from_partial(
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(.range_error, "Invalid plain yearmonth", .{});
+            },
+            error.TypeError => {
+                return agent.throwException(.type_error, "Missing plain yearmonth field", .{});
+            },
+            else => unreachable,
+        };
+    } else blk: {
+        // 3. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(
+                .type_error,
+                "Plain yearmonth must be a string or object",
+                .{},
+            );
+        }
+
+        // 4. Let result be ? ParseISODateTime(item, « TemporalYearMonthString »).
+        // 5. Let calendar be result.[[Calendar]].
+        // 6. If calendar is empty, set calendar to "iso8601".
+        // 7. Set calendar to ? CanonicalizeCalendar(calendar).
+        const plain_year_month_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(plain_year_month_utf8);
+        const temporal_rs_plain_year_month = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainYearMonth_from_utf8(
+                temporal_rs.toDiplomatStringView(plain_year_month_utf8),
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => return agent.throwException(
+                .range_error,
+                "Invalid plain yearmonth string",
+                .{},
+            ),
+            else => unreachable,
+        };
+
+        // 8. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 9. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        _ = try getTemporalOverflowOption(agent, options);
+
+        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 11. If ISOYearMonthWithinLimits(isoDate) is false, throw a RangeError exception.
+        // 12. Set result to ISODateToFields(calendar, isoDate, year-month).
+        // 13. NOTE: The following operation is called with constrain regardless of the value of
+        //     overflow, in order for the calendar to store a canonical value in the [[Day]] field
+        //     of the [[ISODate]] internal slot of the result.
+        // 14. Set isoDate to ? CalendarYearMonthFromFields(calendar, result, constrain).
+        // 15. Return ! CreateTemporalYearMonth(isoDate, calendar).
+        break :blk temporal_rs_plain_year_month;
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
+
+    return createTemporalYearMonth(
+        agent,
+        temporal_rs_plain_year_month.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// Custom function to create a PartialDate based on:
+///
+/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
+/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
+fn toTemporalPartialYearMonth(
+    agent: *Agent,
+    object: *Object,
+) Agent.Error!temporal_rs.c.PartialDate {
+    var result: temporal_rs.c.PartialDate = .{
+        .year = .{ .is_ok = false },
+        .month = .{ .is_ok = false },
+        .month_code = .{ .data = null },
+        .day = .{ .is_ok = false },
+        .era = .{ .data = null },
+        .era_year = .{ .is_ok = false },
+        .calendar = undefined,
+    };
+
+    const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, object);
+    result.calendar = calendar;
+
+    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+        const era = try object.get(agent, PropertyKey.from("era"));
+        if (!era.isUndefined()) {
+            const era_string = try era.toString(agent);
+            const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
+            result.era = temporal_rs.toDiplomatStringView(era_utf8);
+        }
+
+        const era_year = try object.get(agent, PropertyKey.from("eraYear"));
+        if (!era_year.isUndefined()) {
+            result.era_year = .{
+                .is_ok = true,
+                .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
+            };
+        }
+    }
+
+    const month = try object.get(agent, PropertyKey.from("month"));
+    if (!month.isUndefined()) {
+        result.month = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try month.toPositiveIntegerWithTruncation(agent)) },
+        };
+    }
+
+    const month_code = try object.get(agent, PropertyKey.from("monthCode"));
+    if (!month_code.isUndefined()) {
+        const month_code_utf8 = try toMonthCode(agent, month_code);
+        result.month_code = temporal_rs.toDiplomatStringView(month_code_utf8);
+    }
+
+    const year = try object.get(agent, PropertyKey.from("year"));
+    if (!year.isUndefined()) {
+        result.year = .{
+            .is_ok = true,
+            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
+        };
+    }
+
+    return result;
+}
 
 /// 9.5.5 CreateTemporalYearMonth ( isoDate, calendar [ , newTarget ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createtemporalyearmonth
