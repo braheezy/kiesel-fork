@@ -42,6 +42,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "compare", compare, 2, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 9.2.1 Temporal.PlainYearMonth.prototype
@@ -120,6 +121,27 @@ pub const constructor = struct {
         errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
         return Value.from(
             try createTemporalYearMonth(agent, temporal_rs_plain_year_month.?, new_target),
+        );
+    }
+
+    /// 9.2.3 Temporal.PlainYearMonth.compare ( one, two )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.compare
+    fn compare(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const one_value = arguments.get(0);
+        const two_value = arguments.get(1);
+
+        // 1. Set one to ? ToTemporalYearMonth(one).
+        const one = try toTemporalPlainYearMonth(agent, one_value, null);
+
+        // 2. Set two to ? ToTemporalYearMonth(two).
+        const two = try toTemporalPlainYearMonth(agent, two_value, null);
+
+        // 3. Return 𝔽(CompareISODate(one.[[ISODate]], two.[[ISODate]])).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_compare(
+                one.as(PlainYearMonth).fields.inner,
+                two.as(PlainYearMonth).fields.inner,
+            ),
         );
     }
 
