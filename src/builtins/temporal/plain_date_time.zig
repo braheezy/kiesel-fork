@@ -831,22 +831,7 @@ pub fn toTemporalPlainDateTime(
 
             // iii. Return ! CreateTemporalDateTime(item.[[ISODateTime]], item.[[Calendar]]).
             const plain_date_time = item.asObject().as(PlainDateTime);
-            break :blk temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_PlainDateTime_try_new(
-                    temporal_rs.c.temporal_rs_PlainDateTime_year(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_month(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_day(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_hour(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_minute(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_second(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_millisecond(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_microsecond(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDateTime_nanosecond(plain_date_time.fields.inner),
-                    temporal_rs.c.temporal_rs_Calendar_kind(
-                        temporal_rs.c.temporal_rs_PlainDateTime_calendar(plain_date_time.fields.inner),
-                    ),
-                ),
-            ) catch unreachable;
+            break :blk temporal_rs.c.temporal_rs_PlainDateTime_clone(plain_date_time.fields.inner);
         }
 
         // b. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then

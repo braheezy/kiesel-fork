@@ -626,16 +626,7 @@ pub fn toTemporalPlainDate(
 
             // iii. Return ! CreateTemporalDate(item.[[ISODate]], item.[[Calendar]]).
             const plain_date = item.asObject().as(PlainDate);
-            break :blk temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_PlainDate_try_new(
-                    temporal_rs.c.temporal_rs_PlainDate_year(plain_date.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDate_month(plain_date.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainDate_day(plain_date.fields.inner),
-                    temporal_rs.c.temporal_rs_Calendar_kind(
-                        temporal_rs.c.temporal_rs_PlainDate_calendar(plain_date.fields.inner),
-                    ),
-                ),
-            ) catch unreachable;
+            break :blk temporal_rs.c.temporal_rs_PlainDate_clone(plain_date.fields.inner);
         }
 
         // b. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then

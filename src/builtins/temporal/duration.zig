@@ -720,20 +720,9 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
         //    item.[[Days]], item.[[Hours]], item.[[Minutes]], item.[[Seconds]],
         //    item.[[Milliseconds]], item.[[Microseconds]], item.[[Nanoseconds]]).
         const duration = item.asObject().as(Duration);
-        const temporal_rs_duration = temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_Duration_try_new(
-                temporal_rs.c.temporal_rs_Duration_years(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_months(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_days(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_hours(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_minutes(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_seconds(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_milliseconds(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_microseconds(duration.fields.inner),
-                temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner),
-            ),
-        ) catch unreachable;
+        const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_clone(
+            duration.fields.inner,
+        );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
         return createTemporalDuration(agent, temporal_rs_duration.?, null);
     }

@@ -513,18 +513,9 @@ pub fn toTemporalPlainYearMonth(
 
             // iii. Return ! CreateTemporalYearMonth(item.[[ISODate]], item.[[Calendar]]).
             const plain_year_month = item.asObject().as(PlainYearMonth);
-            break :blk temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_PlainYearMonth_try_new_with_overflow(
-                    temporal_rs.c.temporal_rs_PlainYearMonth_year(plain_year_month.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainYearMonth_month(plain_year_month.fields.inner),
-                    // TODO: https://github.com/boa-dev/temporal/issues/444
-                    .{ .is_ok = false },
-                    temporal_rs.c.temporal_rs_Calendar_kind(
-                        temporal_rs.c.temporal_rs_PlainYearMonth_calendar(plain_year_month.fields.inner),
-                    ),
-                    temporal_rs.c.ArithmeticOverflow_Constrain,
-                ),
-            ) catch unreachable;
+            break :blk temporal_rs.c.temporal_rs_PlainYearMonth_clone(
+                plain_year_month.fields.inner,
+            );
         }
 
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).

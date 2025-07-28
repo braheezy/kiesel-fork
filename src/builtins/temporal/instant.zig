@@ -528,19 +528,20 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
         //    internal slot, then
         if (item.asObject().is(Instant) or item.asObject().is(builtins.temporal.ZonedDateTime)) {
             // i. Return ! CreateTemporalInstant(item.[[EpochNanoseconds]]).
-            const epoch_nanoseconds = if (item.asObject().is(Instant))
-                temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(
+            const temporal_rs_instant = if (item.asObject().is(Instant))
+                temporal_rs.c.temporal_rs_Instant_clone(
                     item.asObject().as(Instant).fields.inner,
                 )
             else
-                temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(
+                temporal_rs.c.temporal_rs_ZonedDateTime_to_instant(
                     item.asObject().as(builtins.temporal.ZonedDateTime).fields.inner,
                 );
-            const temporal_rs_instant = temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
-            ) catch unreachable;
             errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-            return createTemporalInstant(agent, temporal_rs_instant.?, null);
+            return createTemporalInstant(
+                agent,
+                temporal_rs_instant.?,
+                null,
+            ) catch |err| try noexcept(err);
         }
 
         // b. NOTE: This use of ToPrimitive allows Instant-like objects to be converted.

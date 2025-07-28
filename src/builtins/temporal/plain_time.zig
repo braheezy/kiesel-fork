@@ -439,16 +439,7 @@ pub fn toTemporalPlainTime(
 
             // iii. Return ! CreateTemporalTime(item.[[Time]]).
             const plain_time = item.asObject().as(builtins.temporal.PlainTime);
-            break :blk temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_PlainTime_try_new(
-                    temporal_rs.c.temporal_rs_PlainTime_hour(plain_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainTime_minute(plain_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainTime_millisecond(plain_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainTime_microsecond(plain_time.fields.inner),
-                    temporal_rs.c.temporal_rs_PlainTime_nanosecond(plain_time.fields.inner),
-                ),
-            ) catch unreachable;
+            break :blk temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.fields.inner);
         }
 
         // b. If item has an [[InitializedTemporalDateTime]] internal slot, then

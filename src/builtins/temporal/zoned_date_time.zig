@@ -1142,30 +1142,10 @@ pub fn toTemporalZonedDateTime(
 
             // vi. Return ! CreateTemporalZonedDateTime(item.[[EpochNanoseconds]],
             //     item.[[TimeZone]], item.[[Calendar]]).
-            const epoch_nanoseconds = temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(
-                item.asObject().as(ZonedDateTime).fields.inner,
+            const zoned_date_time = item.asObject().as(ZonedDateTime);
+            break :blk temporal_rs.c.temporal_rs_ZonedDateTime_clone(
+                zoned_date_time.fields.inner,
             );
-            const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(
-                item.asObject().as(ZonedDateTime).fields.inner,
-            );
-            const time_zone = temporal_rs.c.temporal_rs_TimeZone_clone(
-                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
-                    item.asObject().as(ZonedDateTime).fields.inner,
-                ),
-            );
-            errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
-            const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
-                temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
-                    epoch_nanoseconds,
-                    temporal_rs.c.temporal_rs_Calendar_kind(calendar),
-                    time_zone,
-                ),
-            ) catch unreachable;
-            return createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err);
         }
 
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
