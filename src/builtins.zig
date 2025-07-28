@@ -234,6 +234,7 @@ pub const toTemporalPartialZonedDateTime = temporal.zoned_date_time.toTemporalPa
 pub const toTemporalPlainDate = temporal.plain_date.toTemporalPlainDate;
 pub const toTemporalPlainTime = temporal.plain_time.toTemporalPlainTime;
 pub const toTemporalTimeZoneIdentifier = temporal.toTemporalTimeZoneIdentifier;
+pub const toTimeRecordOrMidnight = temporal.plain_time.toTimeRecordOrMidnight;
 pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const typedArrayElementSize = typed_array.typedArrayElementSize;
 pub const typedArrayLength = typed_array.typedArrayLength;

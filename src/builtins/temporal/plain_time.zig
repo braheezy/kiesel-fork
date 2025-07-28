@@ -550,6 +550,19 @@ pub fn toTemporalPlainTime(
     ) catch |err| try noexcept(err);
 }
 
+/// 4.5.7 ToTimeRecordOrMidnight ( item )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totimerecordormidnight
+pub fn toTimeRecordOrMidnight(agent: *Agent, item: Value) Agent.Error!?*temporal_rs.c.PlainTime {
+    // 1. If item is undefined, return MidnightTimeRecord().
+    if (item.isUndefined()) return null;
+
+    // 2. Let plainTime be ? ToTemporalTime(item).
+    const plain_time = try toTemporalPlainTime(agent, item, null);
+
+    // 3. Return plainTime.[[Time]].
+    return temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.as(PlainTime).fields.inner);
+}
+
 /// 4.5.12 ToTemporalTimeRecord ( temporalTimeLike [ , completeness ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-totemporaltimerecord
 fn toTemporalPartialTime(

@@ -21,6 +21,7 @@ const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalMonthDay = builtins.createTemporalMonthDay;
+const createTemporalDateTime = builtins.createTemporalDateTime;
 const createTemporalYearMonth = builtins.createTemporalYearMonth;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
@@ -29,6 +30,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
+const toTimeRecordOrMidnight = builtins.toTimeRecordOrMidnight;
 
 /// 3.2 Properties of the Temporal.PlainDate Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaindate-constructor
@@ -176,6 +178,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toPlainDateTime", toPlainDateTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainMonthDay", toPlainMonthDay, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainYearMonth", toPlainYearMonth, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -422,6 +425,46 @@ pub const prototype = struct {
             &write.inner,
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 3.3.28 Temporal.PlainDate.prototype.toPlainDateTime ( [ temporalTime ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.toplaindatetime
+    fn toPlainDateTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_time = arguments.get(0);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Let time be ? ToTimeRecordOrMidnight(temporalTime).
+        const maybe_time = try toTimeRecordOrMidnight(agent, temporal_time);
+
+        // 4. Let isoDateTime be CombineISODateAndTimeRecord(plainDate.[[ISODate]], time).
+        // 5. Return ? CreateTemporalDateTime(isoDateTime, plainDate.[[Calendar]]).
+        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_to_plain_date_time(
+                plain_date.fields.inner,
+                maybe_time,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                // TODO: Improve error message, not sure what this should say
+                return agent.throwException(
+                    .range_error,
+                    "Can't convert plaindate to plaindatetime",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        return Value.from(
+            createTemporalDateTime(
+                agent,
+                temporal_rs_plain_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 3.3.20 Temporal.PlainDate.prototype.toPlainMonthDay ( )
