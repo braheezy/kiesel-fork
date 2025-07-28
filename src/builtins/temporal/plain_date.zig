@@ -23,6 +23,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalMonthDay = builtins.createTemporalMonthDay;
 const createTemporalDateTime = builtins.createTemporalDateTime;
 const createTemporalYearMonth = builtins.createTemporalYearMonth;
+const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
@@ -30,6 +31,8 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
+const toTemporalPlainTime = builtins.toTemporalPlainTime;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const toTimeRecordOrMidnight = builtins.toTimeRecordOrMidnight;
 
 /// 3.2 Properties of the Temporal.PlainDate Constructor
@@ -182,6 +185,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toPlainMonthDay", toPlainMonthDay, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainYearMonth", toPlainYearMonth, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
@@ -548,6 +552,93 @@ pub const prototype = struct {
             &write.inner,
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 3.3.29 Temporal.PlainDate.prototype.toZonedDateTime ( item )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.tozoneddatetime
+    fn toZonedDateTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. If item is an Object, then
+        const time_zone, const plain_time_value: Value = if (item.isObject()) blk: {
+            // a. Let timeZoneLike be ? Get(item, "timeZone").
+            const time_zone_like = try item.asObject().get(agent, PropertyKey.from("timeZone"));
+
+            // b. If timeZoneLike is undefined, then
+            if (time_zone_like.isUndefined()) {
+                // i. Let timeZone be ? ToTemporalTimeZoneIdentifier(item).
+                const time_zone = try toTemporalTimeZoneIdentifier(agent, item);
+
+                // ii. Let temporalTime be undefined.
+                break :blk .{ time_zone, .undefined };
+            } else {
+                // c. Else,
+                // i. Let timeZone be ? ToTemporalTimeZoneIdentifier(timeZoneLike).
+                const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_like);
+
+                // ii. Let temporalTime be ? Get(item, "plainTime").
+                const plain_time = try item.get(agent, PropertyKey.from("plainTime"));
+
+                break :blk .{ time_zone, plain_time };
+            }
+        } else blk: {
+            // 4. Else,
+            // a. Let timeZone be ? ToTemporalTimeZoneIdentifier(item).
+            const time_zone = try toTemporalTimeZoneIdentifier(agent, item);
+
+            // b. Let temporalTime be undefined.
+            break :blk .{ time_zone, .undefined };
+        };
+
+        // On the stack to prevent the inner temporal_rs PlainTime from being destroyed during GC
+        var plain_time: *Object = undefined;
+        var maybe_time: ?*temporal_rs.c.PlainTime = null;
+
+        // 5. If temporalTime is undefined, then
+        if (plain_time_value.isUndefined()) {
+            // a. Let epochNs be ? GetStartOfDay(timeZone, plainDate.[[ISODate]]).
+            // NOTE: This is handled by passing null to temporal_rs.
+        } else {
+            // 6. Else,
+            // a. Set temporalTime to ? ToTemporalTime(temporalTime).
+            plain_time = try toTemporalPlainTime(agent, plain_time_value, null);
+            maybe_time = plain_time.as(builtins.temporal.PlainTime).fields.inner;
+
+            // b. Let isoDateTime be CombineISODateAndTimeRecord(plainDate.[[ISODate]], temporalTime.[[Time]]).
+            // c. If ISODateTimeWithinLimits(isoDateTime) is false, throw a RangeError exception.
+            // d. Let epochNs be ? GetEpochNanosecondsFor(timeZone, isoDateTime, compatible).
+        }
+
+        // 7. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, plainDate.[[Calendar]]).
+        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_to_zoned_date_time(
+                plain_date.fields.inner,
+                time_zone,
+                maybe_time,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                // TODO: Improve error message, not sure what this should say
+                return agent.throwException(
+                    .range_error,
+                    "Can't convert plaindate to zoneddatetime",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 3.3.33 Temporal.PlainDate.prototype.valueOf ( )
