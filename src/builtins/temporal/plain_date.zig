@@ -173,6 +173,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "daysInMonth", daysInMonth, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInWeek", daysInWeek, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInYear", daysInYear, null, realm);
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "era", era, null, realm);
         try object.defineBuiltinAccessor(agent, "eraYear", eraYear, null, realm);
         try object.defineBuiltinAccessor(agent, "inLeapYear", inLeapYear, null, realm);
@@ -315,6 +316,28 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_days_in_year(plain_date.fields.inner));
+    }
+
+    /// 3.3.27 Temporal.PlainDate.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Set other to ? ToTemporalDate(other).
+        const other = try toTemporalPlainDate(agent, other_value, null);
+
+        // 4. If CompareISODate(plainDate.[[ISODate]], other.[[ISODate]]) ≠ 0, return false.
+        // 5. Return CalendarEquals(plainDate.[[Calendar]], other.[[Calendar]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainDate_equals(
+                plain_date.fields.inner,
+                other.as(PlainDate).fields.inner,
+            ),
+        );
     }
 
     /// 3.3.4 get Temporal.PlainDate.prototype.era
