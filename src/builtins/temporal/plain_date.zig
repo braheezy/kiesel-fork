@@ -28,6 +28,7 @@ const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOp
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
+const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
 
 /// 3.2 Properties of the Temporal.PlainDate Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaindate-constructor
@@ -180,6 +181,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
 
@@ -531,6 +533,35 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 3.3.24 Temporal.PlainDate.prototype.withCalendar ( calendarLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.withcalendar
+    fn withCalendar(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const calendar_like = arguments.get(0);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Let calendar be ? ToTemporalCalendarIdentifier(calendarLike).
+        const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
+
+        // 4. Return ! CreateTemporalDate(plainDate.[[ISODate]], calendar).
+        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDate_with_calendar(
+                plain_date.fields.inner,
+                calendar,
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+        return Value.from(
+            createTemporalDate(
+                agent,
+                temporal_rs_plain_date.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 3.3.6 get Temporal.PlainDate.prototype.year
