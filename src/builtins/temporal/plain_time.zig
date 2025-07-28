@@ -160,6 +160,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "hour", hour, null, realm);
         try object.defineBuiltinAccessor(agent, "microsecond", microsecond, null, realm);
         try object.defineBuiltinAccessor(agent, "millisecond", millisecond, null, realm);
@@ -190,6 +191,28 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 4.3.15 Temporal.PlainTime.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Set other to ? ToTemporalTime(other).
+        const other = try toTemporalPlainTime(agent, other_value, null);
+
+        // 4. If CompareTimeRecord(plainTime.[[Time]], other.[[Time]]) = 0, return true.
+        // 5. Return false.
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainTime_equals(
+                plain_time.fields.inner,
+                other.as(PlainTime).fields.inner,
+            ),
         );
     }
 
