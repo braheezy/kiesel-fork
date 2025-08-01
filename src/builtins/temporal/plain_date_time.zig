@@ -290,16 +290,9 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(CalendarISOToDate(plainDateTime.[[Calendar]],
         //    plainDateTime.[[ISODateTime]].[[ISODate]]).[[DayOfWeek]]).
-        const day_of_week = temporal_rs.temporalErrorResult(
+        return Value.from(
             temporal_rs.c.temporal_rs_PlainDateTime_day_of_week(plain_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            // https://github.com/boa-dev/temporal/blob/531cee14769e8c077c59a1faf67d5465e85f5afa/src/builtins/core/calendar.rs#L406-L407
-            error.RangeError => {
-                return agent.throwException(.internal_error, "Not implemented", .{});
-            },
-            else => unreachable,
-        };
-        return Value.from(day_of_week);
+        );
     }
 
     /// 5.3.17 get Temporal.PlainDateTime.prototype.dayOfYear
@@ -339,16 +332,9 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(CalendarISOToDate(plainDateTime.[[Calendar]],
         //    plainDateTime.[[ISODateTime]].[[ISODate]]).[[DaysInWeek]]).
-        const days_in_week = temporal_rs.temporalErrorResult(
+        return Value.from(
             temporal_rs.c.temporal_rs_PlainDateTime_days_in_week(plain_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            // https://github.com/boa-dev/temporal/blob/531cee14769e8c077c59a1faf67d5465e85f5afa/src/builtins/core/calendar.rs#L442-L443
-            error.RangeError => {
-                return agent.throwException(.internal_error, "Not implemented", .{});
-            },
-            else => unreachable,
-        };
-        return Value.from(days_in_week);
+        );
     }
 
     /// 5.3.22 get Temporal.PlainDateTime.prototype.daysInYear

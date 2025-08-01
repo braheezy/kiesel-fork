@@ -323,13 +323,7 @@ pub const prototype = struct {
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DayOfWeek]]).
         const day_of_week = temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_day_of_week(zoned_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            // https://github.com/boa-dev/temporal/blob/531cee14769e8c077c59a1faf67d5465e85f5afa/src/builtins/core/calendar.rs#L406-L407
-            error.RangeError => {
-                return agent.throwException(.internal_error, "Not implemented", .{});
-            },
-            else => unreachable,
-        };
+        ) catch unreachable;
         return Value.from(day_of_week);
     }
 
@@ -358,13 +352,7 @@ pub const prototype = struct {
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInWeek]]).
         const days_in_week = temporal_rs.temporalErrorResult(
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_week(zoned_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            // https://github.com/boa-dev/temporal/blob/531cee14769e8c077c59a1faf67d5465e85f5afa/src/builtins/core/calendar.rs#L442-L443
-            error.RangeError => {
-                return agent.throwException(.internal_error, "Not implemented", .{});
-            },
-            else => unreachable,
-        };
+        ) catch unreachable;
         return Value.from(days_in_week);
     }
 
@@ -526,13 +514,7 @@ pub const prototype = struct {
                 zoned_date_time.fields.inner,
                 direction,
             ),
-        ) catch |err| switch (err) {
-            // https://github.com/boa-dev/temporal/blob/9a85f6db71cb8a3c9119c79f87e0124b9e510a35/src/tzdb.rs#L686
-            error.GenericError => {
-                return agent.throwException(.internal_error, "Not implemented", .{});
-            },
-            else => unreachable,
-        };
+        ) catch unreachable;
         if (temporal_rs_zoned_date_time == null) return .null;
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
