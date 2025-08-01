@@ -4,7 +4,7 @@
     .fingerprint = 0x61efa220c3b353b6,
     .dependencies = .{
         .build_crab = .{
-            .url = "https://github.com/linusg/build.crab/archive/93851de5631ee0397017253ea789a0a875525098.tar.gz",
+            .url = "git+https://github.com/linusg/build.crab#93851de5631ee0397017253ea789a0a875525098",
             .hash = "build_crab-0.2.0-U0id_8nAAADK9_UWC9arjfPCPRP8uB22pKosub5c6cLB",
         },
     },
