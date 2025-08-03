@@ -22,11 +22,14 @@ const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalDate = builtins.createTemporalDate;
 const createTemporalTime = builtins.createTemporalTime;
+const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -221,6 +224,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainTime", toPlainTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
@@ -707,6 +711,54 @@ pub const prototype = struct {
             ),
         ) catch unreachable;
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 5.3.38 Temporal.PlainDateTime.prototype.toZonedDateTime ( temporalTimeZoneLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.tozoneddatetime
+    fn toZonedDateTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_time_zone_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Let timeZone be ? ToTemporalTimeZoneIdentifier(temporalTimeZoneLike).
+        const time_zone = try toTemporalTimeZoneIdentifier(agent, temporal_time_zone_like);
+
+        // 4. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 5. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        const disambiguation = try getTemporalDisambiguationOption(agent, options);
+
+        // 6. Let epochNs be ? GetEpochNanosecondsFor(timeZone, plainDateTime.[[ISODateTime]], disambiguation).
+        // 7. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, plainDateTime.[[Calendar]]).
+        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_to_zoned_date_time(
+                plain_date_time.fields.inner,
+                time_zone,
+                disambiguation,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                // TODO: Improve error message, not sure what this should say
+                return agent.throwException(
+                    .range_error,
+                    "Can't convert plaindatetime to zoneddatetime",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 5.3.37 Temporal.PlainDateTime.prototype.valueOf ( )
