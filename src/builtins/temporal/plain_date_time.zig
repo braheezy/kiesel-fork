@@ -34,6 +34,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
+const toTimeRecordOrMidnight = builtins.toTimeRecordOrMidnight;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 5.2 Properties of the Temporal.PlainDateTime Constructor
@@ -227,6 +228,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
 
@@ -790,6 +792,45 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 5.3.26 Temporal.PlainDateTime.prototype.withPlainTime ( [ plainTimeLike ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.withplaintime
+    fn withPlainTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const plain_time_like = arguments.get(0);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Let time be ? ToTimeRecordOrMidnight(plainTimeLike).
+        const maybe_time = try toTimeRecordOrMidnight(agent, plain_time_like);
+
+        // 4. Let isoDateTime be CombineISODateAndTimeRecord(plainDateTime.[[ISODateTime]].[[ISODate]], time).
+        // 5. Return ? CreateTemporalDateTime(isoDateTime, plainDateTime.[[Calendar]]).
+        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_with_time(
+                plain_date_time.fields.inner,
+                maybe_time,
+            ),
+        ) catch |err| switch (err) {
+            error.RangeError => {
+                return agent.throwException(
+                    .range_error,
+                    "Temporal.PlainDateTime is out of range",
+                    .{},
+                );
+            },
+            else => unreachable,
+        };
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        return Value.from(
+            createTemporalDateTime(
+                agent,
+                temporal_rs_plain_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 5.3.6 get Temporal.PlainDateTime.prototype.year
