@@ -144,6 +144,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinAccessor(agent, "day", day, null, realm);
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
@@ -201,6 +202,28 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[Day]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(plain_month_day.fields.inner));
+    }
+
+    /// 10.3.7 Temporal.PlainMonthDay.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let plainMonthDay be the this value.
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
+        const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
+
+        // 3. Set other to ? ToTemporalMonthDay(other).
+        const other = try toTemporalPlainMonthDay(agent, other_value, null);
+
+        // 4. If CompareISODate(plainMonthDay.[[ISODate]], other.[[ISODate]]) ≠ 0, return false.
+        // 5. Return CalendarEquals(plainMonthDay.[[Calendar]], other.[[Calendar]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainMonthDay_equals(
+                plain_month_day.fields.inner,
+                other.as(PlainMonthDay).fields.inner,
+            ),
+        );
     }
 
     /// 10.3.4 get Temporal.PlainMonthDay.prototype.monthCode
