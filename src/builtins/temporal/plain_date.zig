@@ -106,17 +106,15 @@ pub const constructor = struct {
         // 8. If IsValidISODate(y, m, d) is false, throw a RangeError exception.
         // 9. Let isoDate be CreateISODateRecord(y, m, d).
         // 10. Return ? CreateTemporalDate(isoDate, calendar, NewTarget).
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_try_new(
                 std.math.lossyCast(i32, iso_year),
                 std.math.lossyCast(u8, iso_month),
                 std.math.lossyCast(u8, iso_day),
                 calendar,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid date", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         std.debug.assert(temporal_rs.c.temporal_rs_PlainDate_is_valid(temporal_rs_plain_date.?));
         return Value.from(
@@ -454,22 +452,13 @@ pub const prototype = struct {
 
         // 4. Let isoDateTime be CombineISODateAndTimeRecord(plainDate.[[ISODate]], time).
         // 5. Return ? CreateTemporalDateTime(isoDateTime, plainDate.[[Calendar]]).
-        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_to_plain_date_time(
                 plain_date.fields.inner,
                 maybe_time,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                // TODO: Improve error message, not sure what this should say
-                return agent.throwException(
-                    .range_error,
-                    "Can't convert plaindate to plaindatetime",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         return Value.from(
             createTemporalDateTime(
@@ -490,9 +479,10 @@ pub const prototype = struct {
         // 3. Let calendar be plainDate.[[Calendar]].
         // 4. Let fields be ISODateToFields(calendar, plainDate.[[ISODate]], date).
         // 5. Let isoDate be ? CalendarMonthDayFromFields(calendar, fields, constrain).
-        const temporal_rs_plain_month_day = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_month_day = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_to_plain_month_day(plain_date.fields.inner),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainMonthDay_destroy(temporal_rs_plain_month_day.?);
 
         // 6. Return ! CreateTemporalMonthDay(isoDate, calendar).
@@ -519,9 +509,10 @@ pub const prototype = struct {
         // 3. Let calendar be plainDate.[[Calendar]].
         // 4. Let fields be ISODateToFields(calendar, plainDate.[[ISODate]], date).
         // 5. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, constrain).
-        const temporal_rs_plain_year_month = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_to_plain_year_month(plain_date.fields.inner),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
 
         // 6. Return ! CreateTemporalYearMonth(isoDate, calendar).
@@ -623,23 +614,14 @@ pub const prototype = struct {
         }
 
         // 7. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, plainDate.[[Calendar]]).
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_to_zoned_date_time(
                 plain_date.fields.inner,
                 time_zone,
                 maybe_time,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                // TODO: Improve error message, not sure what this should say
-                return agent.throwException(
-                    .range_error,
-                    "Can't convert plaindate to zoneddatetime",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
             createTemporalZonedDateTime(
@@ -691,12 +673,13 @@ pub const prototype = struct {
         const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
 
         // 4. Return ! CreateTemporalDate(plainDate.[[ISODate]], calendar).
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_with_calendar(
                 plain_date.fields.inner,
                 calendar,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         return Value.from(
             createTemporalDate(
@@ -815,11 +798,12 @@ pub fn toTemporalPlainDate(
 
             // iv. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], item.[[Calendar]]).
             const zoned_date_time = item.asObject().as(builtins.temporal.ZonedDateTime);
-            break :blk temporal_rs.temporalErrorResult(
+            break :blk try temporal_rs.extractResult(
+                agent,
                 temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
                     zoned_date_time.fields.inner,
                 ),
-            ) catch unreachable;
+            );
         }
 
         // c. If item has an [[InitializedTemporalDateTime]] internal slot, then
@@ -832,11 +816,12 @@ pub fn toTemporalPlainDate(
 
             // iii. Return ! CreateTemporalDate(item.[[ISODateTime]].[[ISODate]], item.[[Calendar]]).
             const plain_date_time = item.asObject().as(builtins.temporal.PlainDateTime);
-            break :blk temporal_rs.temporalErrorResult(
+            break :blk try temporal_rs.extractResult(
+                agent,
                 temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
                     plain_date_time.fields.inner,
                 ),
-            ) catch unreachable;
+            );
         }
 
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
@@ -851,20 +836,13 @@ pub fn toTemporalPlainDate(
 
         // h. Let isoDate be ? CalendarDateFromFields(calendar, fields, overflow).
         // i. Return ! CreateTemporalDate(isoDate, calendar).
-        break :blk temporal_rs.temporalErrorResult(
+        break :blk try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
                 partial_date,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain date", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing plain date field", .{});
-            },
-            else => unreachable,
-        };
+        );
     } else blk: {
         // 3. If item is not a String, throw a TypeError exception.
         if (!item.isString()) {
@@ -881,18 +859,12 @@ pub fn toTemporalPlainDate(
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
         const plain_date_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(plain_date_utf8);
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_from_utf8(
                 temporal_rs.toDiplomatStringView(plain_date_utf8),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(
-                .range_error,
-                "Invalid plain date string",
-                .{},
-            ),
-            else => unreachable,
-        };
+        );
 
         // 8. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);

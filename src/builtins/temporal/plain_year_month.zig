@@ -103,7 +103,8 @@ pub const constructor = struct {
         // 9. If IsValidISODate(y, m, ref) is false, throw a RangeError exception.
         // 10. Let isoDate be CreateISODateRecord(y, m, ref).
         // 11. Return ? CreateTemporalYearMonth(isoDate, calendar, NewTarget).
-        const temporal_rs_plain_year_month = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_try_new_with_overflow(
                 std.math.lossyCast(i32, iso_year),
                 std.math.lossyCast(u8, iso_month),
@@ -114,10 +115,7 @@ pub const constructor = struct {
                 calendar,
                 temporal_rs.c.ArithmeticOverflow_Reject,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid year month", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
         return Value.from(
             try createTemporalYearMonth(agent, temporal_rs_plain_year_month.?, new_target),
@@ -424,20 +422,13 @@ pub const prototype = struct {
                 .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
             };
         }
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_to_plain_date(
                 plain_year_month.fields.inner,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = result } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain datetime", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing plain datetime fields", .{});
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
 
         // 9. Return ! CreateTemporalDate(isoDate, calendar).
@@ -553,20 +544,13 @@ pub fn toTemporalPlainYearMonth(
 
         // f. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, overflow).
         // g. Return ! CreateTemporalYearMonth(isoDate, calendar).
-        break :blk temporal_rs.temporalErrorResult(
+        break :blk try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_from_partial(
                 partial,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain yearmonth", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing plain yearmonth field", .{});
-            },
-            else => unreachable,
-        };
+        );
     } else blk: {
         // 3. If item is not a String, throw a TypeError exception.
         if (!item.isString()) {
@@ -583,18 +567,12 @@ pub fn toTemporalPlainYearMonth(
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
         const plain_year_month_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(plain_year_month_utf8);
-        const temporal_rs_plain_year_month = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_from_utf8(
                 temporal_rs.toDiplomatStringView(plain_year_month_utf8),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(
-                .range_error,
-                "Invalid plain yearmonth string",
-                .{},
-            ),
-            else => unreachable,
-        };
+        );
 
         // 8. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);

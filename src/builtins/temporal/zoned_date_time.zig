@@ -120,14 +120,12 @@ pub const constructor = struct {
         //     a. Set timeZone to FormatOffsetTimeZoneIdentifier(timeZoneParse.[[OffsetMinutes]]).
         const time_zone = try time_zone_value.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(time_zone);
-        const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+        const temporal_rs_time_zone = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
                 temporal_rs.toDiplomatStringView(time_zone),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid time zone", .{}),
-            else => unreachable,
-        };
+        );
         if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
             return agent.throwException(.range_error, "Invalid time zone", .{});
         }
@@ -145,16 +143,14 @@ pub const constructor = struct {
         const calendar = try canonicalizeCalendar(agent, calendar_value.asString());
 
         // 11. Return ? CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar, NewTarget).
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 epoch_nanoseconds,
                 calendar,
                 temporal_rs_time_zone,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid duration", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
             try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, new_target),
@@ -321,9 +317,10 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DayOfWeek]]).
-        const day_of_week = temporal_rs.temporalErrorResult(
+        const day_of_week = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_day_of_week(zoned_date_time.fields.inner),
-        ) catch unreachable;
+        );
         return Value.from(day_of_week);
     }
 
@@ -350,9 +347,10 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInWeek]]).
-        const days_in_week = temporal_rs.temporalErrorResult(
+        const days_in_week = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_week(zoned_date_time.fields.inner),
-        ) catch unreachable;
+        );
         return Value.from(days_in_week);
     }
 
@@ -509,12 +507,13 @@ pub const prototype = struct {
         //     b. Let transition be GetNamedTimeZonePreviousTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
         // 11. If transition is null, return null.
         // 12. Return ! CreateTemporalZonedDateTime(transition, timeZone, zonedDateTime.[[Calendar]]).
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_get_time_zone_transition(
                 zoned_date_time.fields.inner,
                 direction,
             ),
-        ) catch unreachable;
+        );
         if (temporal_rs_zoned_date_time == null) return .null;
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
@@ -555,19 +554,10 @@ pub const prototype = struct {
         // 8. Let tomorrowNs be ? GetStartOfDay(timeZone, tomorrow).
         // 9. Let diff be TimeDurationFromEpochNanosecondsDifference(tomorrowNs, todayNs).
         // 10. Return 𝔽(TotalTimeDuration(diff, hour)).
-        const hours_in_day = temporal_rs.temporalErrorResult(
+        const hours_in_day = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_hours_in_day(zoned_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                // TODO: Improve error message, not sure what this should say
-                return agent.throwException(
-                    .range_error,
-                    "Can't get hours in day for ZonedDateTime",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         return Value.from(hours_in_day);
     }
 
@@ -695,9 +685,10 @@ pub const prototype = struct {
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         // NOTE: I don't think this is actually fallible
         // https://github.com/boa-dev/temporal/blob/34522ae99c9d6e2ac2782162eaf01b36494951ca/src/builtins/core/timezone.rs#L183-L198
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_offset(zoned_date_time.fields.inner, &write.inner),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -711,9 +702,10 @@ pub const prototype = struct {
         // 3. Return 𝔽(GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]])).
         // NOTE: I don't think this is actually fallible
         // https://github.com/boa-dev/temporal/blob/34522ae99c9d6e2ac2782162eaf01b36494951ca/src/builtins/core/timezone.rs#L183-L198
-        const offset_nanoseconds = temporal_rs.temporalErrorResult(
+        const offset_nanoseconds = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time.fields.inner),
-        ) catch unreachable;
+        );
         return Value.from(@as(f64, @floatFromInt(offset_nanoseconds)));
     }
 
@@ -743,19 +735,10 @@ pub const prototype = struct {
         // 5. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
         // 6. Let epochNanoseconds be ? GetStartOfDay(timeZone, isoDateTime.[[ISODate]]).
         // 7. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_start_of_day(zoned_date_time.fields.inner),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                // TODO: Improve error message, not sure what this should say
-                return agent.throwException(
-                    .range_error,
-                    "Can't get start of day for ZonedDateTime",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
             createTemporalZonedDateTime(
@@ -812,7 +795,8 @@ pub const prototype = struct {
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
                 temporal_rs.c.DisplayOffset_Auto,
@@ -821,7 +805,7 @@ pub const prototype = struct {
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -834,7 +818,8 @@ pub const prototype = struct {
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
                 temporal_rs.c.DisplayOffset_Auto,
@@ -843,7 +828,7 @@ pub const prototype = struct {
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -857,11 +842,12 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], zonedDateTime.[[Calendar]]).
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
                 zoned_date_time.fields.inner,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         return Value.from(
             createTemporalDate(
@@ -882,11 +868,12 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalDateTime(isoDateTime, zonedDateTime.[[Calendar]]).
-        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_datetime(
                 zoned_date_time.fields.inner,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         return Value.from(
             createTemporalDateTime(
@@ -907,11 +894,12 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
                 zoned_date_time.fields.inner,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         return Value.from(
             createTemporalTime(
@@ -985,7 +973,8 @@ pub const prototype = struct {
         //     showCalendar, showTimeZone, showOffset, precision.[[Increment]], precision.[[Unit]],
         //     roundingMode).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
                 show_offset,
@@ -1001,7 +990,7 @@ pub const prototype = struct {
                 },
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -1157,22 +1146,15 @@ pub fn toTemporalZonedDateTime(
         // j. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
         // k. Let isoDate be result.[[ISODate]].
         // l. Let time be result.[[Time]].
-        break :blk temporal_rs.temporalErrorResult(
+        break :blk try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
                 partial_zoned_date_time,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_option } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid zoned datetime", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing zoned datetime field", .{});
-            },
-            else => unreachable,
-        };
+        );
     } else blk: {
         // 5. Else,
 
@@ -1223,20 +1205,14 @@ pub fn toTemporalZonedDateTime(
         // r. Let time be result.[[Time]].
         const zoned_date_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(zoned_date_time_utf8);
-        break :blk temporal_rs.temporalErrorResult(
+        break :blk try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_utf8(
                 temporal_rs.toDiplomatStringView(zoned_date_time_utf8),
                 disambiguation,
                 offset_option,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(
-                .range_error,
-                "Invalid zoned datetime string",
-                .{},
-            ),
-            else => unreachable,
-        };
+        );
     };
     errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
 

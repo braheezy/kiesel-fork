@@ -99,7 +99,8 @@ pub const constructor = struct {
         //    throw a RangeError exception.
         // 9. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
         // 10. Return ? CreateTemporalTime(time, NewTarget).
-        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_try_new(
                 std.math.lossyCast(u8, hour),
                 std.math.lossyCast(u8, minute),
@@ -108,10 +109,7 @@ pub const constructor = struct {
                 std.math.lossyCast(u16, microsecond),
                 std.math.lossyCast(u16, nanosecond),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid time", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         return Value.from(
             try createTemporalTime(agent, temporal_rs_plain_time.?, new_target),
@@ -291,13 +289,14 @@ pub const prototype = struct {
 
         // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -310,13 +309,14 @@ pub const prototype = struct {
 
         // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -372,7 +372,8 @@ pub const prototype = struct {
         //     precision.[[Unit]], roundingMode).
         // 12. Return TimeRecordToString(roundResult, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
                 .{
@@ -385,7 +386,7 @@ pub const prototype = struct {
                 },
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -475,11 +476,12 @@ pub fn toTemporalPlainTime(
 
             // iii. Return ! CreateTemporalTime(item.[[ISODateTime]].[[Time]]).
             const plain_date_time = item.asObject().as(builtins.temporal.PlainDateTime);
-            break :blk temporal_rs.temporalErrorResult(
+            break :blk try temporal_rs.extractResult(
+                agent,
                 temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
                     plain_date_time.fields.inner,
                 ),
-            ) catch unreachable;
+            );
         }
 
         // c. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
@@ -494,11 +496,12 @@ pub fn toTemporalPlainTime(
 
             // iv. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
             const zoned_date_time = item.asObject().as(builtins.temporal.ZonedDateTime);
-            break :blk temporal_rs.temporalErrorResult(
+            break :blk try temporal_rs.extractResult(
+                agent,
                 temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
                     zoned_date_time.fields.inner,
                 ),
-            ) catch unreachable;
+            );
         }
 
         // d. Let result be ? ToTemporalTimeRecord(item).
@@ -512,17 +515,13 @@ pub fn toTemporalPlainTime(
 
         // g. Set result to ? RegulateTime(result.[[Hour]], result.[[Minute]], result.[[Second]],
         //    result.[[Millisecond]], result.[[Microsecond]], result.[[Nanosecond]], overflow).
-        break :blk temporal_rs.temporalErrorResult(
+        break :blk try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_from_partial(
                 partial_time,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain time", .{});
-            },
-            else => unreachable,
-        };
+        );
     } else blk: {
         // 3. Else,
 
@@ -542,18 +541,12 @@ pub fn toTemporalPlainTime(
         // e. Set result to parseResult.[[Time]].
         const plain_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(plain_time_utf8);
-        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainTime_from_utf8(
                 temporal_rs.toDiplomatStringView(plain_time_utf8),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(
-                .range_error,
-                "Invalid plain time string",
-                .{},
-            ),
-            else => unreachable,
-        };
+        );
 
         // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);

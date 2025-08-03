@@ -174,14 +174,12 @@ pub fn toTemporalTimeZoneIdentifier(
     // 9. Return timeZoneIdentifierRecord.[[Identifier]].
     const time_zone = try temporal_time_zone_like.asString().toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(time_zone);
-    const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+    const temporal_rs_time_zone = try temporal_rs.extractResult(
+        agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_str(
             temporal_rs.toDiplomatStringView(time_zone),
         ),
-    ) catch |err| switch (err) {
-        error.RangeError => return agent.throwException(.range_error, "Invalid time zone", .{}),
-        else => unreachable,
-    };
+    );
     if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
         return agent.throwException(.range_error, "Invalid time zone", .{});
     }
@@ -194,23 +192,17 @@ pub fn canonicalizeCalendar(
     agent: *Agent,
     id: *const String,
 ) Agent.Error!temporal_rs.c.AnyCalendarKind {
-    const temporal_rs_calendar = blk: {
-        const string = switch (id.slice) {
-            .ascii => |ascii| ascii,
-            .utf16 => break :blk error.RangeError,
-        };
-        break :blk temporal_rs.temporalErrorResult(
-            temporal_rs.c.temporal_rs_Calendar_from_utf8(.{
-                .data = string.ptr,
-                .len = string.len,
-            }),
-        );
-    } catch |err| switch (err) {
-        error.RangeError => {
-            return agent.throwException(.range_error, "Invalid calendar {}", .{id});
-        },
-        else => unreachable,
-    };
+    // 1. Let calendars be AvailableCalendars().
+    // 2. If calendars does not contain the ASCII-lowercase of id, throw a RangeError exception.
+    // 3. Return CanonicalizeUValue("ca", id).
+    const calendar_utf8 = try id.toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(calendar_utf8);
+    const temporal_rs_calendar = try temporal_rs.extractResult(
+        agent,
+        temporal_rs.c.temporal_rs_Calendar_from_utf8(
+            temporal_rs.toDiplomatStringView(calendar_utf8),
+        ),
+    );
     defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar);
     return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
 }
@@ -262,24 +254,7 @@ pub fn toTemporalCalendarIdentifier(
 
     // 3. Let identifier be ? ParseTemporalCalendarString(temporalCalendarLike).
     // 4. Return ? CanonicalizeCalendar(identifier).
-    const calendar_utf8 = try temporal_calendar_like.asString().toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(calendar_utf8);
-    const temporal_rs_calendar = temporal_rs.temporalErrorResult(
-        temporal_rs.c.temporal_rs_Calendar_from_utf8(
-            temporal_rs.toDiplomatStringView(calendar_utf8),
-        ),
-    ) catch |err| switch (err) {
-        error.RangeError => {
-            return agent.throwException(
-                .range_error,
-                "Invalid calendar {}",
-                .{temporal_calendar_like},
-            );
-        },
-        else => unreachable,
-    };
-    defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar.?);
-    return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar.?);
+    return canonicalizeCalendar(agent, temporal_calendar_like.asString());
 }
 
 /// 12.2.9 GetTemporalCalendarIdentifierWithISODefault ( item )
@@ -800,11 +775,12 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // c. If value has an [[InitializedTemporalDateTime]] internal slot, then
         if (value.asObject().is(builtins.temporal.PlainDateTime)) {
             // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]], value.[[Calendar]]).
-            const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+            const temporal_rs_plain_date = try temporal_rs.extractResult(
+                agent,
                 temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
                     value.asObject().as(builtins.temporal.PlainDateTime).fields.inner,
                 ),
-            ) catch unreachable;
+            );
 
             // ii. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
             return .{ .owned_plain_date = temporal_rs_plain_date.? };
@@ -861,36 +837,25 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // k. Let time be result.[[Time]].
         const relative_to_utf8 = try value.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(relative_to_utf8);
-        const owned_relative_to = temporal_rs.temporalErrorResult(
+        const owned_relative_to = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_OwnedRelativeTo_try_from_str(
                 temporal_rs.toDiplomatStringView(relative_to_utf8),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid date time string", .{});
-            },
-            else => unreachable,
-        };
+        );
         return temporal_rs.RelativeTo.fromOwned(owned_relative_to);
     };
 
     // 7. If timeZone is unset, then
     if (partial.timezone == null) {
         // a. Let plainDate be ? CreateTemporalDate(isoDate, calendar).
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
                 partial.date,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain date", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing plain date field", .{});
-            },
-            else => unreachable,
-        };
+        );
 
         // b. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
         return .{ .owned_plain_date = temporal_rs_plain_date.? };
@@ -903,22 +868,15 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     // 10. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
     //     offsetNs, timeZone, compatible, reject, matchBehaviour).
     // 11. Let zonedRelativeTo be ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-    const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+    const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        agent,
         temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
             partial,
             .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
             .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.Disambiguation_Compatible } },
             .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.OffsetDisambiguation_Reject } },
         ),
-    ) catch |err| switch (err) {
-        error.RangeError => {
-            return agent.throwException(.range_error, "Invalid zoned datetime", .{});
-        },
-        error.TypeError => {
-            return agent.throwException(.type_error, "Missing zoned datetime field", .{});
-        },
-        else => unreachable,
-    };
+    );
 
     // 12. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: zonedRelativeTo }.
     return .{ .owned_zoned_date_time = temporal_rs_zoned_date_time.? };
@@ -979,16 +937,12 @@ pub fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 3. Perform ? ParseDateTimeUTCOffset(offset).
     // 4. Return offset.
     const offset_utf8 = try offset.asString().toUtf8(agent.gc_allocator);
-    const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+    const temporal_rs_time_zone = try temporal_rs.extractResult(
+        agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(
             temporal_rs.toDiplomatStringView(offset_utf8),
         ),
-    ) catch |err| switch (err) {
-        error.RangeError => {
-            return agent.throwException(.range_error, "Invalid offset string", .{});
-        },
-        else => unreachable,
-    };
+    );
     defer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
     return offset_utf8;
 }

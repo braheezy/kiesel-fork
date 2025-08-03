@@ -2258,9 +2258,10 @@ pub const prototype = struct {
         const ns = temporal_rs.toI128Nanoseconds(@as(i128, @intFromFloat(time_value)) * 1_000_000);
 
         // 5. Return ! CreateTemporalInstant(ns).
-        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(try createTemporalInstant(agent, temporal_rs_instant.?, null));
     }

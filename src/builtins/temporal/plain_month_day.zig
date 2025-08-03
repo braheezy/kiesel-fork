@@ -97,7 +97,8 @@ pub const constructor = struct {
         // 9. If IsValidISODate(y, m, d) is false, throw a RangeError exception.
         // 10. Let isoDate be CreateISODateRecord(y, m, d).
         // 11. Return ? CreateTemporalMonthDay(isoDate, calendar, NewTarget).
-        const temporal_rs_plain_month_day = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_month_day = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_try_new_with_overflow(
                 std.math.lossyCast(u8, iso_month),
                 std.math.lossyCast(u8, iso_day),
@@ -108,10 +109,7 @@ pub const constructor = struct {
                     .unnamed_0 = .{ .ok = std.math.lossyCast(i32, reference_iso_year) },
                 },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid month day", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainMonthDay_destroy(temporal_rs_plain_month_day.?);
         return Value.from(
             try createTemporalMonthDay(agent, temporal_rs_plain_month_day.?, new_target),
@@ -269,20 +267,13 @@ pub const prototype = struct {
                 .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
             };
         }
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_to_plain_date(
                 plain_month_day.fields.inner,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = result } },
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid plain datetime", .{});
-            },
-            error.TypeError => {
-                return agent.throwException(.type_error, "Missing plain datetime fields", .{});
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
 
         // 9. Return ! CreateTemporalDate(isoDate, calendar).

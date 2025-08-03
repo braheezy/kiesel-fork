@@ -112,7 +112,8 @@ pub const constructor = struct {
         const nanoseconds = if (nanoseconds_value.isUndefined()) 0 else try nanoseconds_value.toIntegerIfIntegral(agent);
 
         // 12. Return ? CreateTemporalDuration(y, mo, w, d, h, m, s, ms, mis, ns, NewTarget).
-        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+        const temporal_rs_duration = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_try_new(
                 std.math.lossyCast(i64, years),
                 std.math.lossyCast(i64, months),
@@ -125,10 +126,7 @@ pub const constructor = struct {
                 microseconds,
                 nanoseconds,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid duration", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
         return Value.from(
             try createTemporalDuration(agent, temporal_rs_duration.?, new_target),
@@ -189,23 +187,14 @@ pub const constructor = struct {
         // 15. Let timeDuration1 be ? Add24HourDaysToTimeDuration(duration1.[[Time]], days1).
         // 16. Let timeDuration2 be ? Add24HourDaysToTimeDuration(duration2.[[Time]], days2).
         // 17. Return 𝔽(CompareTimeDuration(timeDuration1, timeDuration2)).
-        const result = temporal_rs.temporalErrorResult(
+        const result = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_compare(
                 one.as(Duration).fields.inner,
                 two.as(Duration).fields.inner,
                 relative_to.toRust(),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                // TODO: Improve error message, not sure what this should say
-                return agent.throwException(
-                    .range_error,
-                    "Can't compare durations",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         return Value.from(result);
     }
 
@@ -444,13 +433,14 @@ pub const prototype = struct {
 
         // 3. Return TemporalDurationToString(duration, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -463,13 +453,14 @@ pub const prototype = struct {
 
         // 3. Return TemporalDurationToString(duration, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -523,7 +514,8 @@ pub const prototype = struct {
         // 17. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
         // 18. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
                 .{
@@ -536,16 +528,7 @@ pub const prototype = struct {
                 },
                 &write.inner,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid duration string options",
-                    .{},
-                );
-            },
-            else => unreachable,
-        };
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -660,7 +643,8 @@ pub const prototype = struct {
 
         // 24. Return ? CreateTemporalDuration(years, months, weeks, days, hours, minutes, seconds,
         //     milliseconds, microseconds, nanoseconds).
-        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+        const temporal_rs_duration = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_try_new(
                 years_,
                 months_,
@@ -673,12 +657,7 @@ pub const prototype = struct {
                 microseconds_,
                 nanoseconds_,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(.range_error, "Invalid duration", .{});
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
         return Value.from(try createTemporalDuration(agent, temporal_rs_duration.?, null));
     }
@@ -737,14 +716,12 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
         // b. Return ? ParseTemporalDurationString(item).
         const duration_utf8 = try item.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(duration_utf8);
-        const temporal_rs_duration = temporal_rs.temporalErrorResult(
+        const temporal_rs_duration = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Duration_from_utf8(
                 temporal_rs.toDiplomatStringView(duration_utf8),
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => return agent.throwException(.range_error, "Invalid duration string", .{}),
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
         return createTemporalDuration(agent, temporal_rs_duration.?, null);
     }
@@ -766,12 +743,10 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
     // 15. Return ? CreateTemporalDuration(result.[[Years]], result.[[Months]], result.[[Weeks]],
     //     result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
     //     result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]).
-    const temporal_rs_duration = temporal_rs.temporalErrorResult(
+    const temporal_rs_duration = try temporal_rs.extractResult(
+        agent,
         temporal_rs.c.temporal_rs_Duration_from_partial_duration(partial),
-    ) catch |err| switch (err) {
-        error.RangeError => return agent.throwException(.range_error, "Invalid duration", .{}),
-        else => unreachable,
-    };
+    );
     errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
     return createTemporalDuration(agent, temporal_rs_duration.?, null);
 }

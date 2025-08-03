@@ -1,6 +1,9 @@
 const std = @import("std");
 
 const build_options = @import("build-options");
+const execution = @import("../execution.zig");
+
+const Agent = execution.Agent;
 
 pub const c = @cImport({
     if (!build_options.enable_temporal) {
@@ -199,31 +202,26 @@ test DiplomatWrite {
     try std.testing.expectEqualSlices(u8, &.{}, write.array_list.items);
 }
 
-// https://github.com/boa-dev/temporal/blob/main/temporal_capi/src/error.rs
-pub const TemporalError = error{
-    GenericError,
-    TypeError,
-    RangeError,
-    SyntaxError,
-};
-
-/// Convert a Rust `Result<TemporalError, T>` to a Zig `TemporalError!T`.
-pub fn temporalErrorResult(result: anytype) TemporalError!Success(@TypeOf(result)) {
+pub fn extractResult(agent: *Agent, result: anytype) Agent.Error!Success(@TypeOf(result)) {
     if (success(result)) |x| return x;
-    return switch (result.unnamed_0.err.kind) {
-        c.ErrorKind_Generic => error.GenericError,
-        c.ErrorKind_Type => error.TypeError,
-        c.ErrorKind_Range => error.RangeError,
-        c.ErrorKind_Syntax => error.SyntaxError,
-        c.ErrorKind_Assert => @panic("temporal_rs assertion reached"),
+    const message = if (fromOptional(result.unnamed_0.err.msg)) |sv|
+        fromDiplomatStringView(sv)
+    else
+        "";
+    switch (result.unnamed_0.err.kind) {
+        c.ErrorKind_Generic => return agent.throwException(.internal_error, "{s}", .{message}),
+        c.ErrorKind_Type => return agent.throwException(.type_error, "{s}", .{message}),
+        c.ErrorKind_Range => return agent.throwException(.range_error, "{s}", .{message}),
+        c.ErrorKind_Syntax => return agent.throwException(.syntax_error, "{s}", .{message}),
+        c.ErrorKind_Assert => @panic("temporal_rs assertion failed"),
         else => unreachable,
-    };
+    }
 }
 
 /// Converts a "result" value to its "success" type, or returns `null` if the value is an error.
 /// This is `inline` to prevent binary bloat, because each instantiation is expected to be called
 /// only once.
-inline fn success(result: anytype) ?Success(@TypeOf(result)) {
+pub inline fn success(result: anytype) ?Success(@TypeOf(result)) {
     if (!result.is_ok) return null;
     if (Success(@TypeOf(result)) == void) return;
     return result.unnamed_0.ok;

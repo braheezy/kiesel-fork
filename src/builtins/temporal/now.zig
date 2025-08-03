@@ -58,9 +58,10 @@ pub const namespace = struct {
         const ns = systemUTCEpochNanoseconds(agent);
 
         // 2. Return ! CreateTemporalInstant(ns).
-        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             try createTemporalInstant(agent, temporal_rs_instant.?, null),
@@ -76,13 +77,14 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], "iso8601").
-        const temporal_rs_plain_date = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
             // TODO: Create from ns once possible to not lose precision
             temporal_rs.c.temporal_rs_PlainDate_from_epoch_milliseconds(
                 @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
                 time_zone,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         return Value.from(try createTemporalDate(agent, temporal_rs_plain_date.?, null));
     }
@@ -96,13 +98,14 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalDateTime(isoDateTime, "iso8601").
-        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+            agent,
             // TODO: Create from ns once possible to not lose precision
             temporal_rs.c.temporal_rs_PlainDateTime_from_epoch_milliseconds(
                 @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
                 time_zone,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         return Value.from(try createTemporalDateTime(agent, temporal_rs_plain_date_time.?, null));
     }
@@ -116,13 +119,14 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-        const temporal_rs_plain_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_plain_time = try temporal_rs.extractResult(
+            agent,
             // TODO: Create from ns once possible to not lose precision
             temporal_rs.c.temporal_rs_PlainTime_from_epoch_milliseconds(
                 @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
                 time_zone,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         return Value.from(try createTemporalTime(agent, temporal_rs_plain_time.?, null));
     }
@@ -153,13 +157,14 @@ pub const namespace = struct {
         const ns = systemUTCEpochNanoseconds(agent);
 
         // 4. Return ! CreateTemporalZonedDateTime(ns, timeZone, "iso8601").
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 ns,
                 temporal_rs.c.AnyCalendarKind_Iso,
                 time_zone,
             ),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, null));
     }
@@ -203,10 +208,10 @@ pub fn systemDateTime(
 
 fn systemTimeZoneIdentifier() *temporal_rs.c.TimeZone {
     const identifier_str = builtins.systemTimeZoneIdentifier();
-    const temporal_rs_time_zone = temporal_rs.temporalErrorResult(
+    const temporal_rs_time_zone = temporal_rs.success(
         temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
             temporal_rs.toDiplomatStringView(identifier_str),
         ),
-    ) catch unreachable;
+    ).?;
     return temporal_rs_time_zone.?;
 }

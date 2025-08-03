@@ -93,9 +93,10 @@ pub const constructor = struct {
         }
 
         // 4. Return ? CreateTemporalInstant(epochNanoseconds, NewTarget).
-        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
-        ) catch unreachable;
+        );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             try createTemporalInstant(agent, temporal_rs_instant.?, new_target),
@@ -147,18 +148,10 @@ pub const constructor = struct {
         // 3. Let epochNanoseconds be epochMilliseconds × ℤ(10**6).
         // 4. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
         // 5. Return ! CreateTemporalInstant(epochNanoseconds).
-        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_from_epoch_milliseconds(epoch_milliseconds),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid epoch milliseconds {}",
-                    .{epoch_milliseconds_bigint.managed},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
@@ -178,18 +171,10 @@ pub const constructor = struct {
 
         // 2. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
         // 3. Return ! CreateTemporalInstant(epochNanoseconds).
-        const temporal_rs_instant = temporal_rs.temporalErrorResult(
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid epoch nanoseconds {}",
-                    .{epoch_nanoseconds_bigint.managed},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
         return Value.from(
             createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
@@ -299,14 +284,15 @@ pub const prototype = struct {
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
                 null,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -319,14 +305,15 @@ pub const prototype = struct {
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
                 null,
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -394,7 +381,8 @@ pub const prototype = struct {
         // 14. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
         // 15. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.temporalErrorResult(
+        try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
                 maybe_time_zone,
@@ -408,7 +396,7 @@ pub const prototype = struct {
                 },
                 &write.inner,
             ),
-        ) catch unreachable;
+        );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
@@ -426,22 +414,14 @@ pub const prototype = struct {
         errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
 
         // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
-        const temporal_rs_zoned_date_time = temporal_rs.temporalErrorResult(
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(instant.fields.inner),
                 temporal_rs.c.AnyCalendarKind_Iso,
                 time_zone,
             ),
-        ) catch |err| switch (err) {
-            error.RangeError => {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid time zone identifier: {}",
-                    .{time_zone_value},
-                );
-            },
-            else => unreachable,
-        };
+        );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         return Value.from(
             createTemporalZonedDateTime(
@@ -570,14 +550,12 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
     // 11. Return ! CreateTemporalInstant(epochNanoseconds).
     const instant_utf8 = try item.asString().toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(instant_utf8);
-    const temporal_rs_instant = temporal_rs.temporalErrorResult(
+    const temporal_rs_instant = try temporal_rs.extractResult(
+        agent,
         temporal_rs.c.temporal_rs_Instant_from_utf8(
             temporal_rs.toDiplomatStringView(instant_utf8),
         ),
-    ) catch |err| switch (err) {
-        error.RangeError => return agent.throwException(.range_error, "Invalid instant string", .{}),
-        else => unreachable,
-    };
+    );
     errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
     return createTemporalInstant(agent, temporal_rs_instant.?, null);
 }
