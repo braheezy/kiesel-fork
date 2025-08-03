@@ -21,9 +21,12 @@ const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalDate = builtins.createTemporalDate;
+const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const prepareCalendarFields = builtins.prepareCalendarFields;
 
 /// 10.2 Properties of the Temporal.PlainMonthDay Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainmonthday-constructor
@@ -39,6 +42,8 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+
         // 10.2.1 Temporal.PlainMonthDay.prototype
         // https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype
         try object.defineBuiltinPropertyWithAttributes(
@@ -114,6 +119,16 @@ pub const constructor = struct {
         return Value.from(
             try createTemporalMonthDay(agent, temporal_rs_plain_month_day.?, new_target),
         );
+    }
+
+    /// 10.2.2 Temporal.PlainMonthDay.from ( item [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.from
+    fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const item = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Return ? ToTemporalMonthDay(item, options).
+        return Value.from(try toTemporalPlainMonthDay(agent, item, options));
     }
 };
 
@@ -336,6 +351,111 @@ pub const PlainMonthDay = MakeObject(.{
     }.finalizer,
     .tag = .temporal_plain_month_day,
 });
+
+/// 10.5.1 ToTemporalMonthDay ( item [ , options ] )
+/// https://tc39.es/proposal-temporal/#sec-temporal-totemporalmonthday
+pub fn toTemporalPlainMonthDay(
+    agent: *Agent,
+    item: Value,
+    maybe_options_value: ?Value,
+) Agent.Error!*Object {
+    // 1. If options is not present, set options to undefined.
+    const options_value: Value = maybe_options_value orelse .undefined;
+
+    // 2. If item is a Object, then
+    const temporal_rs_plain_month_day = if (item.isObject()) blk: {
+        // a. If item has an [[InitializedTemporalMonthDay]] internal slot, then
+        if (item.asObject().is(PlainMonthDay)) {
+            // i. Let resolvedOptions be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
+            _ = try getTemporalOverflowOption(agent, options);
+
+            // iii. Return ! CreateTemporalMonthDay(item.[[ISODate]], item.[[Calendar]]).
+            const plain_month_day = item.asObject().as(PlainMonthDay);
+            break :blk temporal_rs.c.temporal_rs_PlainMonthDay_clone(plain_month_day.fields.inner);
+        }
+
+        // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
+
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day », «», «»).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            item.asObject(),
+            .initMany(&.{ .year, .month, .month_code, .day }),
+            .none,
+        );
+        const partial = fields.date;
+
+        // d. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // e. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // f. Let isoDate be ? CalendarMonthDayFromFields(calendar, fields, overflow).
+        // g. Return ! CreateTemporalMonthDay(isoDate, calendar).
+        break :blk try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainMonthDay_from_partial(
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+    } else blk: {
+        // 3. If item is not a String, throw a TypeError exception.
+        if (!item.isString()) {
+            return agent.throwException(
+                .type_error,
+                "Plain monthday must be a string or object",
+                .{},
+            );
+        }
+
+        // 4. Let result be ? ParseISODateTime(item, « TemporalMonthDayString »).
+        // 5. Let calendar be result.[[Calendar]].
+        // 6. If calendar is empty, set calendar to "iso8601".
+        // 7. Set calendar to ? CanonicalizeCalendar(calendar).
+        const plain_month_day_utf8 = try item.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(plain_month_day_utf8);
+        const temporal_rs_plain_month_day = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainMonthDay_from_utf8(
+                temporal_rs.toDiplomatStringView(plain_month_day_utf8),
+            ),
+        );
+
+        // 8. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 9. Perform ? GetTemporalOverflowOption(resolvedOptions).
+        _ = try getTemporalOverflowOption(agent, options);
+
+        // 10. If calendar is "iso8601", then
+        //     a. Let referenceISOYear be 1972 (the first ISO 8601 leap year after the epoch).
+        //     b. Let isoDate be CreateISODateRecord(referenceISOYear, result.[[Month]], result.[[Day]]).
+        //     c. Return ! CreateTemporalMonthDay(isoDate, calendar).
+        // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 12. If ISODateWithinLimits(isoDate) is false, throw a RangeError exception.
+        // 13. Set result to ISODateToFields(calendar, isoDate, month-day).
+        // 14. NOTE: The following operation is called with constrain regardless of the value of
+        //     overflow, in order for the calendar to store a canonical value in the [[Year]] field of
+        //     the [[ISODate]] internal slot of the result.
+        // 15. Set isoDate to ? CalendarMonthDayFromFields(calendar, result, constrain).
+        // 16. Return ! CreateTemporalMonthDay(isoDate, calendar).
+        break :blk temporal_rs_plain_month_day;
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainMonthDay_destroy(temporal_rs_plain_month_day.?);
+
+    return createTemporalMonthDay(
+        agent,
+        temporal_rs_plain_month_day.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
 
 /// 10.5.2 CreateTemporalMonthDay ( isoDate, calendar [ , newTarget ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createtemporalmonthday
