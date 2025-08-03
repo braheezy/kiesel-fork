@@ -20,8 +20,8 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const createTemporalMonthDay = builtins.createTemporalMonthDay;
 const createTemporalDateTime = builtins.createTemporalDateTime;
+const createTemporalMonthDay = builtins.createTemporalMonthDay;
 const createTemporalYearMonth = builtins.createTemporalYearMonth;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
@@ -29,7 +29,7 @@ const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
-const toMonthCode = builtins.toMonthCode;
+const prepareCalendarFields = builtins.prepareCalendarFields;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
 const toTemporalPlainTime = builtins.toTemporalPlainTime;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
@@ -825,8 +825,17 @@ pub fn toTemporalPlainDate(
         }
 
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
+
         // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day », «», «»).
-        const partial_date = try toTemporalPartialDate(agent, item.asObject());
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            item.asObject(),
+            .initMany(&.{ .year, .month, .month_code, .day }),
+            .none,
+        );
+        const partial = fields.date;
 
         // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -839,7 +848,7 @@ pub fn toTemporalPlainDate(
         break :blk try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
-                partial_date,
+                partial,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
         );
@@ -883,75 +892,4 @@ pub fn toTemporalPlainDate(
         temporal_rs_plain_date.?,
         null,
     ) catch |err| try noexcept(err);
-}
-
-/// Custom function to create a PartialDate based on:
-///
-/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
-/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
-fn toTemporalPartialDate(
-    agent: *Agent,
-    object: *Object,
-) Agent.Error!temporal_rs.c.PartialDate {
-    var result: temporal_rs.c.PartialDate = .{
-        .year = .{ .is_ok = false },
-        .month = .{ .is_ok = false },
-        .month_code = .{ .data = null },
-        .day = .{ .is_ok = false },
-        .era = .{ .data = null },
-        .era_year = .{ .is_ok = false },
-        .calendar = undefined,
-    };
-
-    const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, object);
-    result.calendar = calendar;
-
-    const day = try object.get(agent, PropertyKey.from("day"));
-    if (!day.isUndefined()) {
-        result.day = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
-        };
-    }
-
-    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
-        const era = try object.get(agent, PropertyKey.from("era"));
-        if (!era.isUndefined()) {
-            const era_string = try era.toString(agent);
-            const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
-            result.era = temporal_rs.toDiplomatStringView(era_utf8);
-        }
-
-        const era_year = try object.get(agent, PropertyKey.from("eraYear"));
-        if (!era_year.isUndefined()) {
-            result.era_year = .{
-                .is_ok = true,
-                .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
-            };
-        }
-    }
-
-    const month = try object.get(agent, PropertyKey.from("month"));
-    if (!month.isUndefined()) {
-        result.month = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try month.toPositiveIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const month_code = try object.get(agent, PropertyKey.from("monthCode"));
-    if (!month_code.isUndefined()) {
-        const month_code_utf8 = try toMonthCode(agent, month_code);
-        result.month_code = temporal_rs.toDiplomatStringView(month_code_utf8);
-    }
-
-    const year = try object.get(agent, PropertyKey.from("year"));
-    if (!year.isUndefined()) {
-        result.year = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    return result;
 }

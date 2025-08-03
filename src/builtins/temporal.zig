@@ -15,7 +15,6 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const toTemporalPartialZonedDateTime = builtins.toTemporalPartialZonedDateTime;
 
 comptime {
     const build_options = @import("build-options");
@@ -205,6 +204,160 @@ pub fn canonicalizeCalendar(
     );
     defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar);
     return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
+}
+
+const FieldName = enum {
+    era,
+    era_year,
+    year,
+    month,
+    month_code,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond,
+    microsecond,
+    nanosecond,
+    offset,
+    time_zone,
+};
+
+const PrepareCalendarFieldsResult = struct {
+    date: temporal_rs.c.PartialDate,
+    time: temporal_rs.c.PartialTime,
+    offset: temporal_rs.c.OptionStringView,
+    timezone: ?*temporal_rs.c.TimeZone,
+};
+
+/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
+/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
+pub fn prepareCalendarFields(
+    agent: *Agent,
+    calendar: temporal_rs.c.AnyCalendarKind,
+    fields: *Object,
+    calendar_and_non_calendar_field_names: std.enums.EnumSet(FieldName),
+    required_field_names: enum {
+        none,
+        partial,
+        time_zone,
+    },
+) Agent.Error!PrepareCalendarFieldsResult {
+    var result: PrepareCalendarFieldsResult = .{
+        .date = .{
+            .year = .{ .is_ok = false },
+            .month = .{ .is_ok = false },
+            .month_code = .{ .data = null },
+            .day = .{ .is_ok = false },
+            .era = .{ .data = null },
+            .era_year = .{ .is_ok = false },
+            .calendar = calendar,
+        },
+        .time = .{
+            .hour = .{ .is_ok = false },
+            .minute = .{ .is_ok = false },
+            .second = .{ .is_ok = false },
+            .millisecond = .{ .is_ok = false },
+            .microsecond = .{ .is_ok = false },
+            .nanosecond = .{ .is_ok = false },
+        },
+        .offset = .{ .is_ok = false },
+        .timezone = null,
+    };
+    errdefer if (result.timezone) |temporal_rs_time_zone| {
+        temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone);
+    };
+
+    var field_names = calendar_and_non_calendar_field_names;
+    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+        field_names.insert(.era);
+        field_names.insert(.era_year);
+    }
+
+    const ordered_field_names: []const FieldName = &.{
+        .day,
+        .era,
+        .era_year,
+        .hour,
+        .microsecond,
+        .millisecond,
+        .minute,
+        .month,
+        .month_code,
+        .nanosecond,
+        .offset,
+        .second,
+        .time_zone,
+        .year,
+    };
+
+    inline for (ordered_field_names) |field_name| {
+        if (field_names.contains(field_name)) {
+            const property_name = switch (field_name) {
+                .era => "era",
+                .era_year => "eraYear",
+                .year => "year",
+                .month => "month",
+                .month_code => "monthCode",
+                .day => "day",
+                .hour => "hour",
+                .minute => "minute",
+                .second => "second",
+                .millisecond => "millisecond",
+                .microsecond => "microsecond",
+                .nanosecond => "nanosecond",
+                .offset => "offset",
+                .time_zone => "timeZone",
+            };
+            const value = try fields.get(agent, PropertyKey.from(property_name));
+            if (!value.isUndefined()) {
+                switch (field_name) {
+                    .era => {
+                        const era_string = try value.toString(agent);
+                        const era = try era_string.toUtf8(agent.gc_allocator);
+                        result.date.era = temporal_rs.toDiplomatStringView(era);
+                    },
+                    .month_code => {
+                        const month_code = try toMonthCode(agent, value);
+                        result.date.month_code = temporal_rs.toDiplomatStringView(month_code);
+                    },
+                    .offset => {
+                        const offset = try toOffsetString(agent, value);
+                        result.offset = .{
+                            .is_ok = true,
+                            .unnamed_0 = .{ .ok = temporal_rs.toDiplomatStringView(offset) },
+                        };
+                    },
+                    .time_zone => {
+                        result.timezone = try toTemporalTimeZoneIdentifier(agent, value);
+                    },
+                    else => {
+                        const result_field_name, const conversion, const T = switch (field_name) {
+                            .era_year => .{ "date", Value.toIntegerWithTruncation, i32 },
+                            .year => .{ "date", Value.toIntegerWithTruncation, i32 },
+                            .month => .{ "date", Value.toPositiveIntegerWithTruncation, u8 },
+                            .day => .{ "date", Value.toPositiveIntegerWithTruncation, u8 },
+                            .hour => .{ "time", Value.toIntegerWithTruncation, u8 },
+                            .minute => .{ "time", Value.toIntegerWithTruncation, u8 },
+                            .second => .{ "time", Value.toIntegerWithTruncation, u8 },
+                            .millisecond => .{ "time", Value.toIntegerWithTruncation, u16 },
+                            .microsecond => .{ "time", Value.toIntegerWithTruncation, u16 },
+                            .nanosecond => .{ "time", Value.toIntegerWithTruncation, u16 },
+                            else => comptime unreachable,
+                        };
+                        @field(@field(result, result_field_name), @tagName(field_name)) = .{
+                            .is_ok = true,
+                            .unnamed_0 = .{ .ok = std.math.lossyCast(T, try conversion(value, agent)) },
+                        };
+                    },
+                }
+            } else if (field_name == .time_zone and required_field_names == .time_zone) {
+                return agent.throwException(.type_error, "Missing required 'timeZone' field", .{});
+            }
+        }
+    }
+
+    return result;
 }
 
 /// 12.2.8 ToTemporalCalendarIdentifier ( temporalCalendarLike )
@@ -787,10 +940,37 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         }
 
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(value).
+        const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, value.asObject());
+
         // e. Let fields be ? PrepareCalendarFields(calendar, value, « year, month, month-code, day
         //    », « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
         //    «»).
-        const partial = try toTemporalPartialZonedDateTime(agent, value.asObject(), false);
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            value.asObject(),
+            .initMany(&.{
+                .year,
+                .month,
+                .month_code,
+                .day,
+                .hour,
+                .minute,
+                .second,
+                .millisecond,
+                .microsecond,
+                .nanosecond,
+                .offset,
+                .time_zone,
+            }),
+            .none,
+        );
+        const partial: temporal_rs.c.PartialZonedDateTime = .{
+            .date = fields.date,
+            .time = fields.time,
+            .timezone = fields.timezone,
+            .offset = fields.offset,
+        };
 
         // f. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, constrain).
         // g. Let timeZone be fields.[[TimeZone]].
@@ -884,7 +1064,7 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
 
 /// 13.40 ToMonthCode ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tomonthcode
-pub fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let monthCode be ? ToPrimitive(argument, string).
     const month_code = try argument.toPrimitive(agent, .string);
 
@@ -925,7 +1105,7 @@ pub fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
 
 /// 13.41 ToOffsetString ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tooffsetstring
-pub fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let offset be ? ToPrimitive(argument, string).
     const offset = try argument.toPrimitive(agent, .string);
 

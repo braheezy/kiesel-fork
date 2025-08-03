@@ -21,9 +21,9 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const createTemporalInstant = builtins.createTemporalInstant;
 const createTemporalDate = builtins.createTemporalDate;
 const createTemporalDateTime = builtins.createTemporalDateTime;
+const createTemporalInstant = builtins.createTemporalInstant;
 const createTemporalTime = builtins.createTemporalTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalDirectionOption = builtins.getTemporalDirectionOption;
@@ -39,9 +39,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
-const toMonthCode = builtins.toMonthCode;
-const toOffsetString = builtins.toOffsetString;
-const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
+const prepareCalendarFields = builtins.prepareCalendarFields;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -1120,12 +1118,39 @@ pub fn toTemporalZonedDateTime(
         }
 
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
+        const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
+
         // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day »,
         //    « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
         //    « time-zone »).
         // d. Let timeZone be fields.[[TimeZone]].
         // e. Let offsetString be fields.[[OffsetString]].
-        const partial_zoned_date_time = try toTemporalPartialZonedDateTime(agent, item.asObject(), true);
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            item.asObject(),
+            .initMany(&.{
+                .year,
+                .month,
+                .month_code,
+                .day,
+                .hour,
+                .minute,
+                .second,
+                .millisecond,
+                .microsecond,
+                .nanosecond,
+                .offset,
+                .time_zone,
+            }),
+            .time_zone,
+        );
+        const partial: temporal_rs.c.PartialZonedDateTime = .{
+            .date = fields.date,
+            .time = fields.time,
+            .offset = fields.offset,
+            .timezone = fields.timezone,
+        };
 
         // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -1149,7 +1174,7 @@ pub fn toTemporalZonedDateTime(
         break :blk try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
-                partial_zoned_date_time,
+                partial,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_option } },
@@ -1233,160 +1258,6 @@ pub fn toTemporalZonedDateTime(
         temporal_rs_zoned_date_time.?,
         null,
     ) catch |err| try noexcept(err);
-}
-
-/// Custom function to create a PartialZonedDateTime based on:
-///
-/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
-/// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
-pub fn toTemporalPartialZonedDateTime(
-    agent: *Agent,
-    object: *Object,
-    time_zone_required: bool,
-) Agent.Error!temporal_rs.c.PartialZonedDateTime {
-    var result: temporal_rs.c.PartialZonedDateTime = .{
-        .date = .{
-            .year = .{ .is_ok = false },
-            .month = .{ .is_ok = false },
-            .month_code = .{ .data = null },
-            .day = .{ .is_ok = false },
-            .era = .{ .data = null },
-            .era_year = .{ .is_ok = false },
-            .calendar = undefined,
-        },
-        .time = .{
-            .hour = .{ .is_ok = false },
-            .minute = .{ .is_ok = false },
-            .second = .{ .is_ok = false },
-            .millisecond = .{ .is_ok = false },
-            .microsecond = .{ .is_ok = false },
-            .nanosecond = .{ .is_ok = false },
-        },
-        .offset = .{ .is_ok = false },
-        .timezone = null,
-    };
-
-    const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, object);
-    result.date.calendar = calendar;
-
-    const day = try object.get(agent, PropertyKey.from("day"));
-    if (!day.isUndefined()) {
-        result.date.day = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
-        };
-    }
-
-    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
-        const era = try object.get(agent, PropertyKey.from("era"));
-        if (!era.isUndefined()) {
-            const era_string = try era.toString(agent);
-            const era_utf8 = try era_string.toUtf8(agent.gc_allocator);
-            result.date.era = temporal_rs.toDiplomatStringView(era_utf8);
-        }
-
-        const era_year = try object.get(agent, PropertyKey.from("eraYear"));
-        if (!era_year.isUndefined()) {
-            result.date.era_year = .{
-                .is_ok = true,
-                .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try era_year.toIntegerWithTruncation(agent)) },
-            };
-        }
-    }
-
-    const hour = try object.get(agent, PropertyKey.from("hour"));
-    if (!hour.isUndefined()) {
-        result.time.hour = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try hour.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const microsecond = try object.get(agent, PropertyKey.from("microsecond"));
-    if (!microsecond.isUndefined()) {
-        result.time.microsecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try microsecond.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const millisecond = try object.get(agent, PropertyKey.from("millisecond"));
-    if (!millisecond.isUndefined()) {
-        result.time.millisecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try millisecond.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const minute = try object.get(agent, PropertyKey.from("minute"));
-    if (!minute.isUndefined()) {
-        result.time.minute = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try minute.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const month = try object.get(agent, PropertyKey.from("month"));
-    if (!month.isUndefined()) {
-        result.date.month = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try month.toPositiveIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const month_code = try object.get(agent, PropertyKey.from("monthCode"));
-    if (!month_code.isUndefined()) {
-        const month_code_utf8 = try toMonthCode(agent, month_code);
-        result.date.month_code = temporal_rs.toDiplomatStringView(month_code_utf8);
-    }
-
-    const nanosecond = try object.get(agent, PropertyKey.from("nanosecond"));
-    if (!nanosecond.isUndefined()) {
-        result.time.nanosecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try nanosecond.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    const offset = try object.get(agent, PropertyKey.from("offset"));
-    if (!offset.isUndefined()) {
-        const offset_utf8 = try toOffsetString(agent, offset);
-        result.offset = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = temporal_rs.toDiplomatStringView(offset_utf8) },
-        };
-    }
-
-    const second = try object.get(agent, PropertyKey.from("second"));
-    if (!second.isUndefined()) {
-        result.time.second = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try second.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    var maybe_temporal_rs_time_zone: ?*temporal_rs.c.TimeZone = null;
-    errdefer if (maybe_temporal_rs_time_zone) |temporal_rs_time_zone| {
-        temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone);
-    };
-
-    const time_zone = try object.get(agent, PropertyKey.from("timeZone"));
-    if (!time_zone.isUndefined()) {
-        maybe_temporal_rs_time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone);
-        result.timezone = maybe_temporal_rs_time_zone.?;
-    } else if (time_zone_required) {
-        return agent.throwException(.type_error, "Missing required 'timeZone' field", .{});
-    }
-
-    const year = try object.get(agent, PropertyKey.from("year"));
-    if (!year.isUndefined()) {
-        result.date.year = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i32, try year.toIntegerWithTruncation(agent)) },
-        };
-    }
-
-    return result;
 }
 
 /// 6.5.3 CreateTemporalZonedDateTime ( epochNanoseconds, timeZone, calendar [ , newTarget ] )
