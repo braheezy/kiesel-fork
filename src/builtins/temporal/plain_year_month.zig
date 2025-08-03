@@ -169,6 +169,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInMonth", daysInMonth, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInYear", daysInYear, null, realm);
+        try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "era", era, null, realm);
         try object.defineBuiltinAccessor(agent, "eraYear", eraYear, null, realm);
         try object.defineBuiltinAccessor(agent, "inLeapYear", inLeapYear, null, realm);
@@ -244,6 +245,28 @@ pub const prototype = struct {
         // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[DaysInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_days_in_year(plain_year_month.fields.inner),
+        );
+    }
+
+    /// 9.3.18 Temporal.PlainYearMonth.prototype.equals ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.equals
+    fn equals(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other_value = arguments.get(0);
+
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Set other to ? ToTemporalYearMonth(other).
+        const other = try toTemporalPlainYearMonth(agent, other_value, null);
+
+        // 4. If CompareISODate(plainYearMonth.[[ISODate]], other.[[ISODate]]) ≠ 0, return false.
+        // 5. Return CalendarEquals(plainYearMonth.[[Calendar]], other.[[Calendar]]).
+        return Value.from(
+            temporal_rs.c.temporal_rs_PlainYearMonth_equals(
+                plain_year_month.fields.inner,
+                other.as(PlainYearMonth).fields.inner,
+            ),
         );
     }
 
