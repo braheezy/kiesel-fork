@@ -29,8 +29,9 @@ const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSe
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
-const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toMonthCode = builtins.toMonthCode;
@@ -228,6 +229,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
@@ -792,6 +794,35 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 5.3.27 Temporal.PlainDateTime.prototype.withCalendar ( calendarLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.withcalendar
+    fn withCalendar(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const calendar_like = arguments.get(0);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Let calendar be ? ToTemporalCalendarIdentifier(calendarLike).
+        const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
+
+        // 4. Return ! CreateTemporalDateTime(plainDateTime.[[ISODateTime]], calendar).
+        const temporal_rs_plain_date_time = temporal_rs.temporalErrorResult(
+            temporal_rs.c.temporal_rs_PlainDateTime_with_calendar(
+                plain_date_time.fields.inner,
+                calendar,
+            ),
+        ) catch unreachable;
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        return Value.from(
+            createTemporalDateTime(
+                agent,
+                temporal_rs_plain_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 5.3.26 Temporal.PlainDateTime.prototype.withPlainTime ( [ plainTimeLike ] )
