@@ -1,6 +1,7 @@
 //! 10.4.2 Array Exotic Objects
 //! https://tc39.es/ecma262/#sec-array-exotic-objects
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const builtins = @import("../builtins.zig");
@@ -36,10 +37,33 @@ const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 const sameValueZero = types.sameValueZero;
 
+const runtime_safety = switch (builtin.mode) {
+    .Debug, .ReleaseSafe => true,
+    .ReleaseFast, .ReleaseSmall => false,
+};
+
 // Non-standard helper to get the length property of an array
 pub fn getArrayLength(array: *const Object) u32 {
-    const value = array.getPropertyValueDirect(PropertyKey.from("length"));
-    return @intFromFloat(value.asNumber().asFloat());
+    // The "length" property is always at index 0 in the shape's properties, so we can access it
+    // without a hashmap lookup. This warrants a sanity check in debug mode :^)
+    if (runtime_safety) {
+        const property_key = array.property_storage.shape.properties.keys()[0];
+        std.debug.assert(property_key.eql(PropertyKey.from("length")));
+        const property_metadata = array.property_storage.shape.properties.values()[0];
+        std.debug.assert(@intFromEnum(property_metadata.index.value) == 0);
+    }
+    const length_value = array.property_storage.values.items[0];
+    return @intFromFloat(length_value.asNumber().asFloat());
+}
+
+pub fn getArrayLengthPropertyMetadata(array: *const Object) Object.Shape.PropertyMetadata {
+    // The "length" property is always at index 0 in the shape's properties, so we can access it
+    // without a hashmap lookup. This warrants a sanity check in debug mode :^)
+    if (runtime_safety) {
+        const property_key = array.property_storage.shape.properties.keys()[0];
+        std.debug.assert(property_key.eql(PropertyKey.from("length")));
+    }
+    return array.property_storage.shape.properties.values()[0];
 }
 
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
@@ -58,9 +82,7 @@ fn defineOwnProperty(
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
-        const length_property_metadata = array.property_storage.shape.properties.get(
-            PropertyKey.from("length"),
-        ).?;
+        const length_property_metadata = getArrayLengthPropertyMetadata(array);
 
         // b. Assert: lengthDesc is not undefined.
         // c. Assert: IsDataDescriptor(lengthDesc) is true.
@@ -70,9 +92,7 @@ fn defineOwnProperty(
 
         // e. Let length be lengthDesc.[[Value]].
         // f. Assert: length is a non-negative integral Number.
-        const length_index = length_property_metadata.index.value;
-        const length_value = array.property_storage.values.items[@intFromEnum(length_index)];
-        const length: u32 = @intFromFloat(length_value.asNumber().asFloat());
+        const length = getArrayLength(array);
 
         // g. Let index be ! ToUint32(P).
         const index: u32 = @intCast(property_key.integer_index);
@@ -98,7 +118,7 @@ fn defineOwnProperty(
             // i. Set lengthDesc.[[Value]] to index + 1𝔽.
             // ii. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", lengthDesc).
             // iii. Assert: succeeded is true.
-            array.property_storage.values.items[@intFromEnum(length_index)] = Value.from(index + 1);
+            array.property_storage.values.items[0] = Value.from(index + 1);
         }
 
         // l. Return true.
@@ -236,9 +256,7 @@ pub fn arraySetLength(
     new_len_desc.value = Value.from(new_len);
 
     // 7. Let oldLenDesc be OrdinaryGetOwnProperty(A, "length").
-    const length_property_metadata = array.property_storage.shape.properties.get(
-        PropertyKey.from("length"),
-    ).?;
+    const length_property_metadata = getArrayLengthPropertyMetadata(array);
 
     // 8. Assert: oldLenDesc is not undefined.
     // 9. Assert: IsDataDescriptor(oldLenDesc) is true.
@@ -247,9 +265,7 @@ pub fn arraySetLength(
     std.debug.assert(!length_property_metadata.attributes.configurable);
 
     // 11. Let oldLen be oldLenDesc.[[Value]].
-    const length_index = length_property_metadata.index.value;
-    const old_len_value = array.property_storage.values.items[@intFromEnum(length_index)];
-    const old_len: u32 = @intFromFloat(old_len_value.asNumber().asFloat());
+    const old_len = getArrayLength(array);
 
     // 12. If newLen ≥ oldLen, then
     if (new_len >= old_len) {

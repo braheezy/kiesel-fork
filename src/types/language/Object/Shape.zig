@@ -67,7 +67,7 @@ pub const PropertyLookupCacheEntry = struct {
     index: PropertyIndex,
 };
 
-const PropertyIndex = union(PropertyType) {
+pub const PropertyIndex = union(PropertyType) {
     pub const Value = enum(u32) { _ };
     pub const Accessor = enum(u32) { _ };
 
@@ -75,7 +75,7 @@ const PropertyIndex = union(PropertyType) {
     accessor: PropertyIndex.Accessor,
 };
 
-const PropertyMetadata = struct {
+pub const PropertyMetadata = struct {
     index: PropertyIndex,
     attributes: Attributes,
 };
