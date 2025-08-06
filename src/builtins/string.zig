@@ -434,7 +434,7 @@ pub fn stringCreate(
             .string_data = value,
         },
 
-        .internal_methods = &.{
+        .internal_methods = .initComptime(.{
             // 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
             .getOwnProperty = getOwnProperty,
 
@@ -443,7 +443,7 @@ pub fn stringCreate(
 
             // 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
             .ownPropertyKeys = ownPropertyKeys,
-        },
+        }),
     });
 
     // 7. Let length be the length of value.

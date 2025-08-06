@@ -697,9 +697,9 @@ pub const prototype = struct {
     pub fn create(agent: *Agent, _: *Realm) std.mem.Allocator.Error!*types.Object {
         return Object.create(agent, .{
             .prototype = null,
-            .internal_methods = &.{
+            .internal_methods = .initComptime(.{
                 .setPrototypeOf = builtins.immutable_prototype.setPrototypeOf,
-            },
+            }),
         });
     }
 

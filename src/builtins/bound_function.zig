@@ -90,10 +90,13 @@ pub fn boundFunctionCreate(
         // 4. Set obj.[[Prototype]] to proto.
         .prototype = prototype,
 
-        .internal_methods = &.{
-            // 5. Set obj.[[Call]] as described in 10.4.1.1.
-            .call = call,
-        },
+        // 5. Set obj.[[Call]] as described in 10.4.1.1.
+        // 6. If IsConstructor(targetFunction) is true, then
+        //     a. Set obj.[[Construct]] as described in 10.4.1.2.
+        .internal_methods = if (Value.from(target_function).isConstructor())
+            .initComptime(.{ .call = call, .construct = construct })
+        else
+            .initComptime(.{ .call = call }),
 
         .fields = .{
             // 7. Set obj.[[BoundTargetFunction]] to targetFunction.
@@ -106,16 +109,6 @@ pub fn boundFunctionCreate(
             .bound_arguments = try agent.gc_allocator.dupe(Value, bound_args),
         },
     });
-
-    // 6. If IsConstructor(targetFunction) is true, then
-    if (Value.from(target_function).isConstructor()) {
-        object.internal_methods = &.{
-            // NOTE: We have to duplicate step 5 to create a static vtable.
-            .call = call,
-            // a. Set obj.[[Construct]] as described in 10.4.1.2.
-            .construct = construct,
-        };
-    }
 
     // 10. Return obj.
     return object;

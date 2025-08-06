@@ -3341,7 +3341,7 @@ pub fn allocateTypedArray(
         // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]], [[ViewedArrayBuffer]],
         //    [[TypedArrayName]], [[ContentType]], [[ByteLength]], [[ByteOffset]], [[ArrayLength]] ».
         // 2. Let A be MakeBasicObject(internalSlotsList).
-        .internal_methods = &.{
+        .internal_methods = .initComptime(.{
             // 3. Set A.[[PreventExtensions]] as specified in 10.4.5.1.
             .preventExtensions = preventExtensions,
 
@@ -3365,7 +3365,7 @@ pub fn allocateTypedArray(
 
             // 10. Set A.[[OwnPropertyKeys]] as specified in 10.4.5.8.
             .ownPropertyKeys = ownPropertyKeys,
-        },
+        }),
 
         // 10. Set A.[[Prototype]] to prototype.
         .prototype = prototype_,

@@ -71,11 +71,8 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        object.internal_methods = try Object.InternalMethods.create(
-            agent.gc_allocator,
-            object.internal_methods,
-            &.{ .set = builtins.@"error".internalSet },
-        );
+        std.debug.assert(object.internal_methods == Object.InternalMethods.default);
+        object.internal_methods = .initComptime(.{ .set = builtins.@"error".internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {

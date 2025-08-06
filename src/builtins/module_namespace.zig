@@ -291,7 +291,7 @@ pub fn moduleNamespaceCreate(
         .prototype = null,
 
         // 4. Set M's essential internal methods to the definitions specified in 10.4.6.
-        .internal_methods = &.{
+        .internal_methods = .initComptime(.{
             .getPrototypeOf = getPrototypeOf,
             .setPrototypeOf = setPrototypeOf,
             .isExtensible = isExtensible,
@@ -303,7 +303,7 @@ pub fn moduleNamespaceCreate(
             .set = set,
             .delete = delete,
             .ownPropertyKeys = ownPropertyKeys,
-        },
+        }),
 
         .fields = .{
             // 5. Set M.[[Module]] to module.

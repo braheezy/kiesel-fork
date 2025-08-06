@@ -125,7 +125,7 @@ const Kiesel = struct {
         const is_htmldda = try kiesel.builtins.Object.create(agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
             .is_htmldda = true,
-            .internal_methods = &.{
+            .internal_methods = .initComptime(.{
                 .call = struct {
                     /// This is required by [test262](https://github.com/tc39/test262/blob/main/INTERPRETING.md#host-defined-functions).
                     ///
@@ -144,7 +144,7 @@ const Kiesel = struct {
                         return .null;
                     }
                 }.call,
-            },
+            }),
         });
         return Value.from(is_htmldda);
     }

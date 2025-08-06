@@ -295,7 +295,7 @@ pub fn createMappedArgumentsObject(
 
     // 3. Let obj be MakeBasicObject(« [[Prototype]], [[Extensible]], [[ParameterMap]] »).
     const object = try Arguments.create(agent, .{
-        .internal_methods = &.{
+        .internal_methods = .initComptime(.{
             // 4. Set obj.[[GetOwnProperty]] as specified in 10.4.4.1.
             .getOwnProperty = getOwnProperty,
 
@@ -310,7 +310,7 @@ pub fn createMappedArgumentsObject(
 
             // 8. Set obj.[[Delete]] as specified in 10.4.4.5.
             .delete = delete,
-        },
+        }),
 
         // 9. Set obj.[[Prototype]] to %Object.prototype%.
         .prototype = try realm.intrinsics.@"%Object.prototype%"(),

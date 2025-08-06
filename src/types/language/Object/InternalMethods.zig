@@ -16,114 +16,115 @@ const Value = types.Value;
 
 const InternalMethods = @This();
 
+pub const GetPrototypeOf = *const fn (agent: *Agent, object: *Object) Agent.Error!?*Object;
+pub const SetPrototypeOf = *const fn (agent: *Agent, object: *Object, prototype: ?*Object) Agent.Error!bool;
+pub const IsExtensible = *const fn (agent: *Agent, object: *Object) Agent.Error!bool;
+pub const PreventExtensions = *const fn (agent: *Agent, object: *Object) Agent.Error!bool;
+pub const GetOwnProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor;
+pub const DefineOwnProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) Agent.Error!bool;
+pub const HasProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool;
+pub const Get = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value;
+pub const Set = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool;
+pub const Delete = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool;
+pub const OwnPropertyKeys = *const fn (agent: *Agent, object: *Object) Agent.Error![]PropertyKey;
+pub const Call = *const fn (agent: *Agent, object: *Object, this_value: Value, arguments: Arguments) Agent.Error!Value;
+pub const Construct = *const fn (agent: *Agent, object: *Object, arguments: Arguments, new_target: *Object) Agent.Error!*Object;
+
 /// [[GetPrototypeOf]]
-getPrototypeOf: *const fn (
-    agent: *Agent,
-    object: *Object,
-) Agent.Error!?*Object = builtins.ordinary.internal_methods.getPrototypeOf,
+getPrototypeOf: GetPrototypeOf,
 
 /// [[SetPrototypeOf]]
-setPrototypeOf: *const fn (
-    agent: *Agent,
-    object: *Object,
-    prototype: ?*Object,
-) Agent.Error!bool = builtins.ordinary.internal_methods.setPrototypeOf,
+setPrototypeOf: SetPrototypeOf,
 
 /// [[IsExtensible]]
-isExtensible: *const fn (
-    agent: *Agent,
-    object: *Object,
-) Agent.Error!bool = builtins.ordinary.internal_methods.isExtensible,
+isExtensible: IsExtensible,
 
 /// [[PreventExtensions]]
-preventExtensions: *const fn (
-    agent: *Agent,
-    object: *Object,
-) Agent.Error!bool = builtins.ordinary.internal_methods.preventExtensions,
+preventExtensions: PreventExtensions,
 
 /// [[GetOwnProperty]]
-getOwnProperty: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-) Agent.Error!?PropertyDescriptor = builtins.ordinary.internal_methods.getOwnProperty,
+getOwnProperty: GetOwnProperty,
 
 /// [[DefineOwnProperty]]
-defineOwnProperty: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-    property_descriptor: PropertyDescriptor,
-) Agent.Error!bool = builtins.ordinary.internal_methods.defineOwnProperty,
+defineOwnProperty: DefineOwnProperty,
 
 /// [[HasProperty]]
-hasProperty: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-) Agent.Error!bool = builtins.ordinary.internal_methods.hasProperty,
+hasProperty: HasProperty,
 
 /// [[Get]]
-get: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-    receiver: Value,
-) Agent.Error!Value = builtins.ordinary.internal_methods.get,
+get: Get,
 
 /// [[Set]]
-set: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-    value: Value,
-    receiver: Value,
-) Agent.Error!bool = builtins.ordinary.internal_methods.set,
+set: Set,
 
 /// [[Delete]]
-delete: *const fn (
-    agent: *Agent,
-    object: *Object,
-    property_key: PropertyKey,
-) Agent.Error!bool = builtins.ordinary.internal_methods.delete,
+delete: Delete,
 
-// [[OwnPropertyKeys]]
-ownPropertyKeys: *const fn (
-    agent: *Agent,
-    object: *Object,
-) Agent.Error![]PropertyKey = builtins.ordinary.internal_methods.ownPropertyKeys,
+/// [[OwnPropertyKeys]]
+ownPropertyKeys: OwnPropertyKeys,
 
-// [[Call]]
-call: ?*const fn (
-    agent: *Agent,
-    object: *Object,
-    this_value: Value,
-    arguments: Arguments,
-) Agent.Error!Value = null,
+/// [[Call]]
+call: ?Call,
 
-// [[Construct]]
-construct: ?*const fn (
-    agent: *Agent,
-    object: *Object,
-    arguments: Arguments,
-    new_target: *Object,
-) Agent.Error!*Object = null,
+/// [[Construct]]
+construct: ?Construct,
 
-pub fn create(
+pub const default: *const InternalMethods = &.{
+    .getPrototypeOf = builtins.ordinary.internal_methods.getPrototypeOf,
+    .setPrototypeOf = builtins.ordinary.internal_methods.setPrototypeOf,
+    .isExtensible = builtins.ordinary.internal_methods.isExtensible,
+    .preventExtensions = builtins.ordinary.internal_methods.preventExtensions,
+    .getOwnProperty = builtins.ordinary.internal_methods.getOwnProperty,
+    .defineOwnProperty = builtins.ordinary.internal_methods.defineOwnProperty,
+    .hasProperty = builtins.ordinary.internal_methods.hasProperty,
+    .get = builtins.ordinary.internal_methods.get,
+    .set = builtins.ordinary.internal_methods.set,
+    .delete = builtins.ordinary.internal_methods.delete,
+    .ownPropertyKeys = builtins.ordinary.internal_methods.ownPropertyKeys,
+    .call = null,
+    .construct = null,
+};
+
+const Overwrites = struct {
+    getPrototypeOf: ?GetPrototypeOf = null,
+    setPrototypeOf: ?SetPrototypeOf = null,
+    isExtensible: ?IsExtensible = null,
+    preventExtensions: ?PreventExtensions = null,
+    getOwnProperty: ?GetOwnProperty = null,
+    defineOwnProperty: ?DefineOwnProperty = null,
+    hasProperty: ?HasProperty = null,
+    get: ?Get = null,
+    set: ?Set = null,
+    delete: ?Delete = null,
+    ownPropertyKeys: ?OwnPropertyKeys = null,
+    call: ?Call = null,
+    construct: ?Construct = null,
+};
+
+pub fn init(
     allocator: std.mem.Allocator,
     initial: *const InternalMethods,
-    to_insert: *const InternalMethods,
+    overwrites: Overwrites,
 ) std.mem.Allocator.Error!*const InternalMethods {
-    const ordinary: *const InternalMethods = &.{};
-    if (initial == ordinary) {
-        return to_insert;
-    }
-    const methods = try allocator.create(InternalMethods);
-    methods.* = initial.*;
-    inline for (comptime std.meta.fieldNames(InternalMethods)) |field_name| {
-        if (@field(to_insert, field_name) != @field(ordinary, field_name)) {
-            @field(methods, field_name) = @field(to_insert, field_name);
+    var internal_methods = try allocator.create(InternalMethods);
+    internal_methods.* = initial.*;
+    inline for (comptime std.meta.fieldNames(Overwrites)) |field_name| {
+        if (@field(overwrites, field_name)) |internal_method| {
+            @field(internal_methods, field_name) = internal_method;
         }
     }
-    return methods;
+    return internal_methods;
+}
+
+pub inline fn initComptime(comptime overwrites: Overwrites) *const InternalMethods {
+    comptime {
+        var internal_methods = default.*;
+        for (std.meta.fieldNames(Overwrites)) |field_name| {
+            if (@field(overwrites, field_name)) |internal_method| {
+                @field(internal_methods, field_name) = internal_method;
+            }
+        }
+        const final = internal_methods;
+        return &final;
+    }
 }

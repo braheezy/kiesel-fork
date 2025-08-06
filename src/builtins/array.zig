@@ -148,9 +148,9 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
         .prototype = prototype_,
 
         // 5. Set A.[[DefineOwnProperty]] as specified in 10.4.2.1.
-        .internal_methods = &.{
+        .internal_methods = .initComptime(.{
             .defineOwnProperty = defineOwnProperty,
-        },
+        }),
     });
 
     // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
