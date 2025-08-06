@@ -61,14 +61,14 @@ fn migrateStorageIfNeeded(
             }
             if (property_descriptor.value_or_accessor.value.__isI32()) {
                 switch (old_storage_type) {
-                    .none, .dense_i32 => break :blk .dense_i32,
-                    else => {},
+                    .none => break :blk .dense_i32,
+                    else => return,
                 }
             }
             if (property_descriptor.value_or_accessor.value.__isF64()) {
                 switch (old_storage_type) {
-                    .none, .dense_i32, .dense_f64 => break :blk .dense_f64,
-                    else => {},
+                    .none, .dense_i32 => break :blk .dense_f64,
+                    else => return,
                 }
             }
             break :blk .dense_value;
@@ -249,7 +249,7 @@ pub fn set(
         },
         .dense_f64 => |*dense_f64| {
             if (index >= dense_f64.items.len) try dense_f64.resize(allocator, index + 1);
-            dense_f64.items[index] = property_descriptor.value_or_accessor.value.__asF64();
+            dense_f64.items[index] = property_descriptor.value_or_accessor.value.__toF64();
         },
         .dense_value => |*dense_value| {
             if (index >= dense_value.items.len) try dense_value.resize(allocator, index + 1);
