@@ -198,10 +198,13 @@ pub fn createDataPropertyDirect(
     property_key: PropertyKey,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    if (self.internal_methods.defineOwnProperty == &builtins.ordinary.internal_methods.defineOwnProperty and
-        self.internal_methods.getOwnProperty == &builtins.ordinary.internal_methods.getOwnProperty and
-        self.internal_methods.isExtensible == &builtins.ordinary.internal_methods.isExtensible)
-    {
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_define_own_property,
+        .ordinary_get_own_property,
+        .ordinary_is_extensible,
+    }));
+
+    if (has_ordinary_internal_methods) {
         // Go directly to the property storage.
         try self.property_storage.set(agent.gc_allocator, property_key, .{
             .value_or_accessor = .{
@@ -230,10 +233,13 @@ pub fn definePropertyDirect(
     property_key: PropertyKey,
     property_descriptor: PropertyStorage.CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
-    if (self.internal_methods.defineOwnProperty == &builtins.ordinary.internal_methods.defineOwnProperty and
-        self.internal_methods.getOwnProperty == &builtins.ordinary.internal_methods.getOwnProperty and
-        self.internal_methods.isExtensible == &builtins.ordinary.internal_methods.isExtensible)
-    {
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_define_own_property,
+        .ordinary_get_own_property,
+        .ordinary_is_extensible,
+    }));
+
+    if (has_ordinary_internal_methods) {
         try self.property_storage.set(
             agent.gc_allocator,
             property_key,

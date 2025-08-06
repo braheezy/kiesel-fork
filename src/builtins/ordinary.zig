@@ -458,9 +458,10 @@ pub fn ordinaryHasProperty(
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool {
-    const has_ordinary_internal_methods =
-        object.internal_methods.getOwnProperty == &getOwnProperty and
-        object.internal_methods.getPrototypeOf == &getPrototypeOf;
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
 
     // OPTIMIZATION: Fast path for ordinary objects
     if (has_ordinary_internal_methods) {
@@ -508,9 +509,10 @@ pub fn ordinaryGet(
     property_key: PropertyKey,
     receiver: Value,
 ) Agent.Error!Value {
-    const has_ordinary_internal_methods =
-        object.internal_methods.getOwnProperty == &getOwnProperty and
-        object.internal_methods.getPrototypeOf == &getPrototypeOf;
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
 
     // OPTIMIZATION: Fast path for ordinary objects
     if (has_ordinary_internal_methods) {
@@ -593,11 +595,12 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    const has_ordinary_internal_methods =
-        object.internal_methods.getOwnProperty == &getOwnProperty and
-        object.internal_methods.getPrototypeOf == &getPrototypeOf and
-        object.internal_methods.isExtensible == &isExtensible and
-        object.internal_methods.defineOwnProperty == &defineOwnProperty;
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
     const receiver_is_self = receiver.isObject() and object == receiver.asObject();
 
     // OPTIMIZATION: Fast path for ordinary objects and regular properties

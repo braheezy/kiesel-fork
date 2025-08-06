@@ -69,6 +69,22 @@ call: ?Call,
 /// [[Construct]]
 construct: ?Construct,
 
+flags: std.enums.EnumSet(Flag),
+
+const Flag = enum {
+    ordinary_get_prototype_of,
+    ordinary_set_prototype_of,
+    ordinary_is_extensible,
+    ordinary_prevent_extensions,
+    ordinary_get_own_property,
+    ordinary_define_own_property,
+    ordinary_has_property,
+    ordinary_get,
+    ordinary_set,
+    ordinary_delete,
+    ordinary_own_property_keys,
+};
+
 pub const default: *const InternalMethods = &.{
     .getPrototypeOf = builtins.ordinary.internal_methods.getPrototypeOf,
     .setPrototypeOf = builtins.ordinary.internal_methods.setPrototypeOf,
@@ -83,6 +99,7 @@ pub const default: *const InternalMethods = &.{
     .ownPropertyKeys = builtins.ordinary.internal_methods.ownPropertyKeys,
     .call = null,
     .construct = null,
+    .flags = .initFull(),
 };
 
 const Overwrites = struct {
@@ -101,6 +118,20 @@ const Overwrites = struct {
     construct: ?Construct = null,
 };
 
+const field_names_to_ordinary_flags = std.StaticStringMap(Flag).initComptime(&.{
+    .{ "getPrototypeOf", .ordinary_get_prototype_of },
+    .{ "setPrototypeOf", .ordinary_set_prototype_of },
+    .{ "isExtensible", .ordinary_is_extensible },
+    .{ "preventExtensions", .ordinary_prevent_extensions },
+    .{ "getOwnProperty", .ordinary_get_own_property },
+    .{ "defineOwnProperty", .ordinary_define_own_property },
+    .{ "hasProperty", .ordinary_has_property },
+    .{ "get", .ordinary_get },
+    .{ "set", .ordinary_set },
+    .{ "delete", .ordinary_delete },
+    .{ "ownPropertyKeys", .ordinary_own_property_keys },
+});
+
 pub fn init(
     allocator: std.mem.Allocator,
     initial: *const InternalMethods,
@@ -111,6 +142,10 @@ pub fn init(
     inline for (comptime std.meta.fieldNames(Overwrites)) |field_name| {
         if (@field(overwrites, field_name)) |internal_method| {
             @field(internal_methods, field_name) = internal_method;
+            if (field_names_to_ordinary_flags.get(field_name)) |flag| {
+                const is_ordinary = @field(default, field_name) == internal_method;
+                internal_methods.flags.setPresent(flag, is_ordinary);
+            }
         }
     }
     return internal_methods;
@@ -122,6 +157,10 @@ pub inline fn initComptime(comptime overwrites: Overwrites) *const InternalMetho
         for (std.meta.fieldNames(Overwrites)) |field_name| {
             if (@field(overwrites, field_name)) |internal_method| {
                 @field(internal_methods, field_name) = internal_method;
+                if (field_names_to_ordinary_flags.get(field_name)) |flag| {
+                    const is_ordinary = @field(default, field_name) == internal_method;
+                    internal_methods.flags.setPresent(flag, is_ordinary);
+                }
             }
         }
         const final = internal_methods;
