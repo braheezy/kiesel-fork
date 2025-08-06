@@ -37,6 +37,8 @@ const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 const sameValueZero = types.sameValueZero;
 
+const array_fast_paths = @import("array_fast_paths.zig");
+
 const runtime_safety = switch (builtin.mode) {
     .Debug, .ReleaseSafe => true,
     .ReleaseFast, .ReleaseSmall => false,
@@ -1408,6 +1410,18 @@ pub const prototype = struct {
         // 4. Let k be 0.
         var k: u53 = 0;
 
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.every(
+            agent,
+            object,
+            len,
+            callback,
+            this_arg,
+        )) |result| switch (result) {
+            .done => |value| return Value.from(value),
+            .continue_slow => |index| k = @intCast(index),
+        };
+
         // 5. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
@@ -1486,6 +1500,18 @@ pub const prototype = struct {
             break :blk @min(relative_end, len_f64);
         };
         const final: u53 = @intFromFloat(final_f64);
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.fill(
+            agent.gc_allocator,
+            object,
+            len,
+            k,
+            final,
+            value,
+        )) |_| {
+            return Value.from(object);
+        }
 
         // 11. Repeat, while k < final,
         while (k < final) : (k += 1) {
@@ -1868,6 +1894,18 @@ pub const prototype = struct {
         // 4. Let k be 0.
         var k: u53 = 0;
 
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.forEach(
+            agent,
+            object,
+            len,
+            callback,
+            this_arg,
+        )) |result| switch (result) {
+            .done => return .undefined,
+            .continue_slow => |index| k = @intCast(index),
+        };
+
         // 5. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
@@ -1932,6 +1970,11 @@ pub const prototype = struct {
         if (k_f64 >= std.math.maxInt(u53)) return Value.from(false);
         var k: u53 = @intFromFloat(k_f64);
 
+        // OPTIMIZATION: Use fast path if applicable
+        if (array_fast_paths.includes(object, len, k, search_element)) |result| {
+            return Value.from(result);
+        }
+
         // 10. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. Let elementK be ? Get(O, ! ToString(𝔽(k))).
@@ -1982,6 +2025,11 @@ pub const prototype = struct {
         const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
         if (k_f64 >= std.math.maxInt(u53)) return Value.from(-1);
         var k: u53 = @intFromFloat(k_f64);
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (array_fast_paths.indexOf(object, len, k, search_element)) |result| {
+            return result;
+        }
 
         // 10. Repeat, while k < len,
         while (k < len) : (k += 1) {
@@ -2105,6 +2153,11 @@ pub const prototype = struct {
             @as(f64, @floatFromInt(len)) + n;
         if (k_f64 < 0) return Value.from(-1);
         var k: u53 = @intFromFloat(k_f64);
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (array_fast_paths.lastIndexOf(object, len, k, search_element)) |result| {
+            return result;
+        }
 
         // 8. Repeat, while k ≥ 0,
         while (k >= 0) : (k -|= 1) {
@@ -2460,6 +2513,11 @@ pub const prototype = struct {
         // 2. Let len be ? LengthOfArrayLike(O).
         const len = try object.lengthOfArrayLike(agent);
 
+        // OPTIMIZATION: Use fast path if applicable
+        if (array_fast_paths.reverse(object, len)) |_| {
+            return Value.from(object);
+        }
+
         // 3. Let middle be floor(len / 2).
         const middle = len / 2;
 
@@ -2703,6 +2761,18 @@ pub const prototype = struct {
 
         // 4. Let k be 0.
         var k: u53 = 0;
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.some(
+            agent,
+            object,
+            len,
+            callback,
+            this_arg,
+        )) |result| switch (result) {
+            .done => |value| return Value.from(value),
+            .continue_slow => |index| k = @intCast(index),
+        };
 
         // 5. Repeat, while k < len,
         while (k < len) : (k += 1) {
@@ -3403,16 +3473,19 @@ pub const prototype = struct {
     }
 };
 
+pub const FindViaPredicateDirection = enum { ascending, descending };
+pub const FindViaPredicateResult = struct { index: Value, value: Value };
+
 /// 23.1.3.12.1 FindViaPredicate ( O, len, direction, predicate, thisArg )
 /// https://tc39.es/ecma262/#sec-findviapredicate
 pub fn findViaPredicate(
     agent: *Agent,
     object: *Object,
     len: u53,
-    comptime direction: enum { ascending, descending },
+    comptime direction: FindViaPredicateDirection,
     predicate: Value,
     this_arg: Value,
-) Agent.Error!struct { index: Value, value: Value } {
+) Agent.Error!FindViaPredicateResult {
     // 1. If IsCallable(predicate) is false, throw a TypeError exception.
     if (!predicate.isCallable()) {
         return agent.throwException(.type_error, "{} is not callable", .{predicate});
@@ -3426,6 +3499,20 @@ pub fn findViaPredicate(
     //        (exclusive), in descending order.
     // 4. For each integer k of indices, do
     var k: ?u53 = if (direction == .ascending) 0 else std.math.sub(u53, len, 1) catch null;
+
+    // OPTIMIZATION: Use fast path if applicable
+    if (try array_fast_paths.findViaPredicate(
+        agent,
+        object,
+        len,
+        direction,
+        predicate,
+        this_arg,
+    )) |result| switch (result) {
+        .done => |value| return value,
+        .continue_slow => |index| k = if (index) |i| @intCast(i) else null,
+    };
+
     // zig fmt: off
     while (
         if (direction == .ascending) k.? < len else k != null

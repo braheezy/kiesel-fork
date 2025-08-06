@@ -42,7 +42,7 @@ fn propertyDescriptorFromValue(value: Value) CompletePropertyDescriptor {
     };
 }
 
-fn migrateStorageIfNeeded(
+pub fn migrateStorageIfNeeded(
     self: *IndexedProperties,
     allocator: std.mem.Allocator,
     index: Index,
@@ -88,7 +88,7 @@ fn migrateStorageIfNeeded(
     }
 }
 
-fn migrateStorage(
+pub fn migrateStorage(
     self: *IndexedProperties,
     allocator: std.mem.Allocator,
     new_storage_type: Storage.Type,
