@@ -1682,9 +1682,9 @@ pub const constructor = struct {
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
-            if (result) |_| {} else |err| {
+            _ = result catch |err| {
                 return Value.from(try promise_capability.rejectPromise(agent, err));
-            }
+            };
         }
 
         // 9. Return ! result.
@@ -1729,9 +1729,9 @@ pub const constructor = struct {
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
-            if (result) |_| {} else |err| {
+            _ = result catch |err| {
                 return Value.from(try promise_capability.rejectPromise(agent, err));
-            }
+            };
         }
 
         // 9. Return ! result.
@@ -1776,9 +1776,9 @@ pub const constructor = struct {
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
-            if (result) |_| {} else |err| {
+            _ = result catch |err| {
                 return Value.from(try promise_capability.rejectPromise(agent, err));
-            }
+            };
         }
 
         // 9. Return ! result.
@@ -1823,9 +1823,9 @@ pub const constructor = struct {
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
-            if (result) |_| {} else |err| {
+            _ = result catch |err| {
                 return Value.from(try promise_capability.rejectPromise(agent, err));
-            }
+            };
         }
 
         // 9. Return ! result.

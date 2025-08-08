@@ -1179,9 +1179,9 @@ pub const prototype = struct {
                 const len = try element.asObject().lengthOfArrayLike(agent);
 
                 // ii. If n + len > 2**53 - 1, throw a TypeError exception.
-                if (std.meta.isError(std.math.add(u53, n, len))) {
+                _ = std.math.add(u53, n, len) catch {
                     return agent.throwException(.type_error, "Maximum array length exceeded", .{});
-                }
+                };
 
                 // iii. Let k be 0.
                 var k: u53 = 0;
@@ -2239,9 +2239,9 @@ pub const prototype = struct {
         const arg_count: u53 = @intCast(arguments.count());
 
         // 4. If len + argCount > 2**53 - 1, throw a TypeError exception.
-        if (std.meta.isError(std.math.add(u53, len, arg_count))) {
+        _ = std.math.add(u53, len, arg_count) catch {
             return agent.throwException(.type_error, "Maximum array length exceeded", .{});
-        }
+        };
 
         // 5. For each element E of items, do
         for (arguments.values) |element| {
@@ -2855,9 +2855,9 @@ pub const prototype = struct {
         };
 
         // 11. If len + itemCount - actualDeleteCount > 2**53 - 1, throw a TypeError exception.
-        if (std.meta.isError(std.math.add(u53, len - actual_delete_count, item_count))) {
+        _ = std.math.add(u53, len - actual_delete_count, item_count) catch {
             return agent.throwException(.type_error, "Maximum array length exceeded", .{});
-        }
+        };
 
         // 12. Let A be ? ArraySpeciesCreate(O, actualDeleteCount).
         const array = try arraySpeciesCreate(agent, object, actual_delete_count);
@@ -3274,9 +3274,9 @@ pub const prototype = struct {
         // 4. If argCount > 0, then
         if (arg_count > 0) {
             // a. If len + argCount > 2**53 - 1, throw a TypeError exception.
-            if (std.meta.isError(std.math.add(u53, len, @intCast(arg_count)))) {
+            _ = std.math.add(u53, len, @intCast(arg_count)) catch {
                 return agent.throwException(.type_error, "Maximum array length exceeded", .{});
-            }
+            };
 
             // b. Let k be len.
             var k = len;
