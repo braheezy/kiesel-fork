@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#a63b1eba8ce552659dc11f4dcbb2f797c004ba62",
-            .hash = "icu4zig-0.1.0-IT7GrJA8AgAlew4LiEeOjrLieoSv8VHSPEgB2XSbcVVV",
+            .url = "git+https://codeberg.org/linusg/icu4zig#441e2f9a07b04908a1624c520d68ef0838e9bc30",
+            .hash = "icu4zig-0.1.0-IT7GrJA8AgCIecMq7IDUl2UIPceXPcKmLaSeXnifOlfK",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -24,8 +24,8 @@
             .hash = "kiesel_runtime-0.1.0-goZjAVAVAQDfuGJOxlhczZIskM3gU2y2mwUFL6T2VTOi",
         },
         .libgc = .{
-            .url = "git+https://github.com/ivmai/bdwgc#88a61fc6f2688d8e1ea94f3f810c23db89a3f30b",
-            .hash = "N-V-__8AAH_yLgBqgBTm4R0v8xAfB3oKkC9cvxUk1pc02B9w",
+            .url = "git+https://github.com/bdwgc/bdwgc#edac9bb74d97137c3e6013745de87e6ee341cb5c",
+            .hash = "N-V-__8AAKjELQDJdyWac7qGYxGFWdUfBnuBrNMzVwY4OlTH",
             .lazy = true,
         },
         .libregexp = .{
@@ -41,8 +41,8 @@
             .hash = "stackinfo-0.1.0-NZ2qTp8bAAD6l36ZqllIVQvCh3EqEpseSt8ku_gI6IdJ",
         },
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#ea889ded3ed6974ef260c12b40a72705531159f9",
-            .hash = "N-V-__8AAFFDNgDMT6DvhJeq2bV71mLcZUaFHKKeDL9h0d3k",
+            .url = "git+https://github.com/boa-dev/temporal#9f17b3c5be0e85c03e2ac656877cb8264c73c07a",
+            .hash = "N-V-__8AAP7VNgAxNhXrraXkdJLiVGwAPSuCuL_oeoAiH1-9",
             .lazy = true,
         },
         .unicode_id = .{

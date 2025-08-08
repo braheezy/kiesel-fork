@@ -5,13 +5,13 @@ edition = "2024"
 
 [dependencies.icu_capi]
 git = "https://github.com/unicode-org/icu4x.git"
-rev = "784404dc954ad5df62f23302acd627a129659548"
+rev = "472e602aeac54f1aa5a58e889cb93f075f565498"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "ea889ded3ed6974ef260c12b40a72705531159f9"
+rev = "9f17b3c5be0e85c03e2ac656877cb8264c73c07a"
 features = ["compiled_data"]
 
 # icu_capi points to a git version of diplomat between releases, which causes duplicate symbol
