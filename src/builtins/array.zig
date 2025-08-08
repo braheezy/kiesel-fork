@@ -2552,7 +2552,7 @@ pub const prototype = struct {
         }
 
         // 4. Let first be ? Get(O, "0").
-        const first = object.get(agent, PropertyKey.from(0));
+        const first = try object.get(agent, PropertyKey.from(0));
 
         // 5. Let k be 1.
         var k: u53 = 1;
