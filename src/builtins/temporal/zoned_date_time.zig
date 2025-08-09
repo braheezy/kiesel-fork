@@ -40,6 +40,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prepareCalendarFields = builtins.prepareCalendarFields;
+const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
 const toTemporalDuration = builtins.toTemporalDuration;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
@@ -237,6 +238,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
 
@@ -1068,6 +1070,37 @@ pub const prototype = struct {
 
         // 6. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 6.3.34 Temporal.ZonedDateTime.prototype.withCalendar ( calendarLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.withcalendar
+    fn withCalendar(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const calendar_like = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let calendar be ? ToTemporalCalendarIdentifier(calendarLike).
+        const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
+
+        // 4. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]],
+        //    zonedDateTime.[[TimeZone]], calendar).
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_with_calendar(
+                zoned_date_time.fields.inner,
+                calendar,
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 6.3.7 get Temporal.ZonedDateTime.prototype.year
