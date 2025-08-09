@@ -548,14 +548,20 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
     // 9. Let epochNanoseconds be GetUTCEpochNanoseconds(balanced).
     // 10. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
     // 11. Return ! CreateTemporalInstant(epochNanoseconds).
-    const instant_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(instant_utf8);
-    const temporal_rs_instant = try temporal_rs.extractResult(
-        agent,
-        temporal_rs.c.temporal_rs_Instant_from_utf8(
-            temporal_rs.toDiplomatStringView(instant_utf8),
+    const temporal_rs_instant = switch (item.asString().slice) {
+        .ascii => |ascii| try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_from_utf8(
+                temporal_rs.toDiplomatStringView(ascii),
+            ),
         ),
-    );
+        .utf16 => |utf16| try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_from_utf16(
+                temporal_rs.toDiplomatString16View(utf16),
+            ),
+        ),
+    };
     errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
     return createTemporalInstant(agent, temporal_rs_instant.?, null);
 }

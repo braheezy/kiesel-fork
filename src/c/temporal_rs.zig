@@ -15,6 +15,9 @@ pub const c = @cImport({
     @cInclude("I128Nanoseconds.h");
     @cInclude("Instant.h");
     @cInclude("OwnedRelativeTo.h");
+    @cInclude("ParsedDate.h");
+    @cInclude("ParsedDateTime.h");
+    @cInclude("ParsedZonedDateTime.h");
     @cInclude("PlainDate.h");
     @cInclude("PlainDateTime.h");
     @cInclude("PlainMonthDay.h");
@@ -62,6 +65,11 @@ pub fn fromDiplomatStringView(sv: c.DiplomatStringView) []const u8 {
 
 /// Convert a Zig slice to a Rust `DiplomatStringView`.
 pub fn toDiplomatStringView(s: []const u8) c.DiplomatStringView {
+    return .{ .data = s.ptr, .len = s.len };
+}
+
+/// Convert a Zig slice to a Rust `DiplomatString16View`.
+pub fn toDiplomatString16View(s: []const u16) c.DiplomatString16View {
     return .{ .data = s.ptr, .len = s.len };
 }
 

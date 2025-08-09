@@ -1057,14 +1057,21 @@ pub fn toTemporalPlainDateTime(
         // 6. Let calendar be result.[[Calendar]].
         // 7. If calendar is empty, set calendar to "iso8601".
         // 8. Set calendar to ? CanonicalizeCalendar(calendar).
-        const plain_date_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(plain_date_time_utf8);
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDateTime_from_utf8(
-                temporal_rs.toDiplomatStringView(plain_date_time_utf8),
+        const parsed_date_time = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDateTime_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDateTime_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
+        defer temporal_rs.c.temporal_rs_ParsedDateTime_destroy(parsed_date_time.?);
 
         // 9. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -1075,7 +1082,10 @@ pub fn toTemporalPlainDateTime(
         // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // 12. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 13. Return ? CreateTemporalDateTime(isoDateTime, calendar).
-        break :blk temporal_rs_plain_date_time;
+        break :blk try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDateTime_from_parsed(parsed_date_time.?),
+        );
     };
     errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
 

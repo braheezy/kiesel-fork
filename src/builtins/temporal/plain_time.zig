@@ -539,14 +539,20 @@ pub fn toTemporalPlainTime(
         //    throw a RangeError exception.
         // d. Assert: parseResult.[[Time]] is not start-of-day.
         // e. Set result to parseResult.[[Time]].
-        const plain_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(plain_time_utf8);
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainTime_from_utf8(
-                temporal_rs.toDiplomatStringView(plain_time_utf8),
+        const temporal_rs_plain_time = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_PlainTime_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_PlainTime_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
 
         // f. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);

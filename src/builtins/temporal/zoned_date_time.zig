@@ -1209,6 +1209,21 @@ pub fn toTemporalZonedDateTime(
         //     ii. Assert: offsetParseResult is a Parse Node.
         //     iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set
         //          matchBehaviour to match-exactly.
+        const parsed_zoned_date_time = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedZonedDateTime_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
+            ),
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedZonedDateTime_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
+        defer temporal_rs.c.temporal_rs_ParsedZonedDateTime_destroy(parsed_zoned_date_time.?);
 
         // m. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -1228,12 +1243,10 @@ pub fn toTemporalZonedDateTime(
 
         // q. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // r. Let time be result.[[Time]].
-        const zoned_date_time_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(zoned_date_time_utf8);
         break :blk try temporal_rs.extractResult(
             agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_from_utf8(
-                temporal_rs.toDiplomatStringView(zoned_date_time_utf8),
+            temporal_rs.c.temporal_rs_ZonedDateTime_from_parsed(
+                parsed_zoned_date_time.?,
                 disambiguation,
                 offset_option,
             ),

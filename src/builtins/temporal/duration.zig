@@ -714,14 +714,20 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
         }
 
         // b. Return ? ParseTemporalDurationString(item).
-        const duration_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(duration_utf8);
-        const temporal_rs_duration = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_Duration_from_utf8(
-                temporal_rs.toDiplomatStringView(duration_utf8),
+        const temporal_rs_duration = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_Duration_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_Duration_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
         return createTemporalDuration(agent, temporal_rs_duration.?, null);
     }

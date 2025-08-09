@@ -574,14 +574,21 @@ pub fn toTemporalPlainYearMonth(
         // 5. Let calendar be result.[[Calendar]].
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
-        const plain_year_month_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(plain_year_month_utf8);
-        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainYearMonth_from_utf8(
-                temporal_rs.toDiplomatStringView(plain_year_month_utf8),
+        const parsed_year_month = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDate_year_month_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDate_year_month_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
+        defer temporal_rs.c.temporal_rs_ParsedDate_destroy(parsed_year_month.?);
 
         // 8. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -597,7 +604,10 @@ pub fn toTemporalPlainYearMonth(
         //     of the [[ISODate]] internal slot of the result.
         // 14. Set isoDate to ? CalendarYearMonthFromFields(calendar, result, constrain).
         // 15. Return ! CreateTemporalYearMonth(isoDate, calendar).
-        break :blk temporal_rs_plain_year_month;
+        break :blk try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainYearMonth_from_parsed(parsed_year_month.?),
+        );
     };
     errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
 

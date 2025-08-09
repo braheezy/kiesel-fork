@@ -866,14 +866,21 @@ pub fn toTemporalPlainDate(
         // 5. Let calendar be result.[[Calendar]].
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
-        const plain_date_utf8 = try item.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(plain_date_utf8);
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDate_from_utf8(
-                temporal_rs.toDiplomatStringView(plain_date_utf8),
+        const parsed_date = switch (item.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDate_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_ParsedDate_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
+        defer temporal_rs.c.temporal_rs_ParsedDate_destroy(parsed_date.?);
 
         // 8. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -883,7 +890,10 @@ pub fn toTemporalPlainDate(
 
         // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // 11. Return ? CreateTemporalDate(isoDate, calendar).
-        break :blk temporal_rs_plain_date;
+        break :blk try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDate_from_parsed(parsed_date.?),
+        );
     };
     errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
 
