@@ -43,6 +43,7 @@ const prepareCalendarFields = builtins.prepareCalendarFields;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
 const toTemporalDuration = builtins.toTemporalDuration;
 const toTemporalPlainTime = builtins.toTemporalPlainTime;
+const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -241,6 +242,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
+        try object.defineBuiltinFunction(agent, "withTimeZone", withTimeZone, 1, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
 
@@ -1142,6 +1144,37 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_with_plain_time(
                 zoned_date_time.fields.inner,
                 maybe_time,
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 6.3.33 Temporal.ZonedDateTime.prototype.withTimeZone ( timeZoneLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.withtimezone
+    fn withTimeZone(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const time_zone_like = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let timeZone be ? ToTemporalTimeZoneIdentifier(timeZoneLike).
+        const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_like);
+
+        // 4. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]], timeZone,
+        //    zonedDateTime.[[Calendar]]).
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_with_timezone(
+                zoned_date_time.fields.inner,
+                time_zone,
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
