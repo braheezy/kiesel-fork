@@ -42,6 +42,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prepareCalendarFields = builtins.prepareCalendarFields;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
 const toTemporalDuration = builtins.toTemporalDuration;
+const toTemporalPlainTime = builtins.toTemporalPlainTime;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -239,6 +240,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
+        try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
 
@@ -1091,6 +1093,55 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_with_calendar(
                 zoned_date_time.fields.inner,
                 calendar,
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 6.3.32 Temporal.ZonedDateTime.prototype.withPlainTime ( [ plainTimeLike ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.withplaintime
+    fn withPlainTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const plain_time_like = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Let timeZone be zonedDateTime.[[TimeZone]].
+        // 4. Let calendar be zonedDateTime.[[Calendar]].
+        // 5. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+
+        // On the stack to prevent the inner temporal_rs PlainTime from being destroyed during GC
+        var plain_time: *Object = undefined;
+        var maybe_time: ?*temporal_rs.c.PlainTime = null;
+
+        // 6. If plainTimeLike is undefined, then
+        if (plain_time_like.isUndefined()) {
+            // a. Let epochNs be ? GetStartOfDay(timeZone, isoDateTime.[[ISODate]]).
+            // NOTE: This is handled by passing null to temporal_rs.
+        } else {
+            // 7. Else,
+            // a. Let plainTime be ? ToTemporalTime(plainTimeLike).
+            plain_time = try toTemporalPlainTime(agent, plain_time_like, null);
+            maybe_time = plain_time.as(builtins.temporal.PlainTime).fields.inner;
+
+            // b. Let resultISODateTime be CombineISODateAndTimeRecord(isoDateTime.[[ISODate]], plainTime.[[Time]]).
+            // c. Let epochNs be ? GetEpochNanosecondsFor(timeZone, resultISODateTime, compatible).
+        }
+
+        // 8. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, calendar).
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_with_plain_time(
+                zoned_date_time.fields.inner,
+                maybe_time,
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
