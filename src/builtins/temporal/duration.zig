@@ -219,6 +219,7 @@ pub const prototype = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "abs", abs, 0, realm);
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinAccessor(agent, "blank", blank, null, realm);
         try object.defineBuiltinAccessor(agent, "days", days, null, realm);
         try object.defineBuiltinAccessor(agent, "hours", hours, null, realm);
@@ -230,6 +231,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "negated", negated, 0, realm);
         try object.defineBuiltinAccessor(agent, "seconds", seconds, null, realm);
         try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -279,6 +281,26 @@ pub const prototype = struct {
                 temporal_rs_duration.?,
                 null,
             ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 7.3.18 Temporal.Duration.prototype.add ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        // 3. Return ? AddDurations(add, duration, other).
+        return Value.from(
+            try addDurations(
+                agent,
+                .add,
+                duration.fields.inner,
+                other,
+            ),
         );
     }
 
@@ -422,6 +444,26 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(DurationSign(duration)).
         return Value.from(temporal_rs.c.temporal_rs_Duration_sign(duration.fields.inner));
+    }
+
+    /// 7.3.19 Temporal.Duration.prototype.subtract ( other )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        // 3. Return ? AddDurations(subtract, duration, other).
+        return Value.from(
+            try addDurations(
+                agent,
+                .subtract,
+                duration.fields.inner,
+                other,
+            ),
+        );
     }
 
     /// 7.3.23 Temporal.Duration.prototype.toJSON ( )
@@ -953,4 +995,49 @@ pub fn createTemporalDuration(
         "%Temporal.Duration.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 7.5.40 AddDurations ( operation, duration, other )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurations
+fn addDurations(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    duration: *const temporal_rs.c.Duration,
+    other_value: Value,
+) Agent.Error!*Object {
+    // 1. Set other to ? ToTemporalDuration(other).
+    const other = try toTemporalDuration(agent, other_value);
+
+    // 2. If operation is subtract, set other to CreateNegatedTemporalDuration(other).
+    // 3. Let largestUnit1 be DefaultTemporalLargestUnit(duration).
+    // 4. Let largestUnit2 be DefaultTemporalLargestUnit(other).
+    // 5. Let largestUnit be LargerOfTwoTemporalUnits(largestUnit1, largestUnit2).
+    // 6. If IsCalendarUnit(largestUnit) is true, throw a RangeError exception.
+    // 7. Let d1 be ToInternalDurationRecordWith24HourDays(duration).
+    // 8. Let d2 be ToInternalDurationRecordWith24HourDays(other).
+    // 9. Let timeResult be ? AddTimeDuration(d1.[[Time]], d2.[[Time]]).
+    // 10. Let result be CombineDateAndTimeDuration(ZeroDateDuration(), timeResult).
+    // 11. Return ? TemporalDurationFromInternal(result, largestUnit).
+    const temporal_rs_duration = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Duration_add(
+                duration,
+                other.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Duration_subtract(
+                duration,
+                other.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(
+        agent,
+        temporal_rs_duration.?,
+        null,
+    ) catch |err| try noexcept(err);
 }

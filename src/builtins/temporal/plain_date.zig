@@ -31,6 +31,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const prepareCalendarFields = builtins.prepareCalendarFields;
 const toTemporalCalendarIdentifier = builtins.toTemporalCalendarIdentifier;
+const toTemporalDuration = builtins.toTemporalDuration;
 const toTemporalPlainTime = builtins.toTemporalPlainTime;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const toTimeRecordOrMidnight = builtins.toTimeRecordOrMidnight;
@@ -164,6 +165,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinAccessor(agent, "day", day, null, realm);
         try object.defineBuiltinAccessor(agent, "dayOfWeek", dayOfWeek, null, realm);
@@ -178,6 +180,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "month", month, null, realm);
         try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainDateTime", toPlainDateTime, 0, realm);
@@ -210,6 +213,28 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 3.3.21 Temporal.PlainDate.prototype.add ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Return ? AddDurationToDate(add, plainDate, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToDate(
+                agent,
+                .add,
+                plain_date.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
         );
     }
 
@@ -402,6 +427,28 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_months_in_year(plain_date.fields.inner));
+    }
+
+    /// 3.3.22 Temporal.PlainDate.prototype.subtract ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. Return ? AddDurationToDate(subtract, plainDate, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToDate(
+                agent,
+                .subtract,
+                plain_date.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
+        );
     }
 
     /// 3.3.32 Temporal.PlainDate.prototype.toJSON ( )
@@ -897,6 +944,57 @@ pub fn toTemporalPlainDate(
     };
     errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
 
+    return createTemporalDate(
+        agent,
+        temporal_rs_plain_date.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// 3.5.14 AddDurationToDate ( operation, temporalDate, temporalDurationLike, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtodate
+pub fn addDurationToDate(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    plain_date: *const temporal_rs.c.PlainDate,
+    temporal_duration_like: Value,
+    options_value: Value,
+) Agent.Error!*Object {
+    // 1. Let calendar be temporalDate.[[Calendar]].
+
+    // 2. Let duration be ? ToTemporalDuration(temporalDurationLike).
+    const duration = try toTemporalDuration(agent, temporal_duration_like);
+
+    // 3. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+    // 4. Let dateDuration be ToDateDurationRecordWithoutTime(duration).
+
+    // 5. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 6. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+    const overflow = try getTemporalOverflowOption(agent, options);
+
+    // 7. Let result be ? CalendarDateAdd(calendar, temporalDate.[[ISODate]], dateDuration, overflow).
+    // 8. Return ! CreateTemporalDate(result, calendar).
+    const temporal_rs_plain_date = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDate_add(
+                plain_date,
+                duration.as(builtins.temporal.Duration).fields.inner,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDate_subtract(
+                plain_date,
+                duration.as(builtins.temporal.Duration).fields.inner,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
     return createTemporalDate(
         agent,
         temporal_rs_plain_date.?,

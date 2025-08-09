@@ -27,6 +27,7 @@ const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOp
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const prepareCalendarFields = builtins.prepareCalendarFields;
+const toTemporalDuration = builtins.toTemporalDuration;
 
 /// 9.2 Properties of the Temporal.PlainYearMonth Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainyearmonth-constructor
@@ -164,6 +165,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInMonth", daysInMonth, null, realm);
         try object.defineBuiltinAccessor(agent, "daysInYear", daysInYear, null, realm);
@@ -174,6 +176,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "month", month, null, realm);
         try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 1, realm);
@@ -200,6 +203,28 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 9.3.14 Temporal.PlainYearMonth.prototype.add ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return ? AddDurationToYearMonth(add, plainYearMonth, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToYearMonth(
+                agent,
+                .add,
+                plain_year_month.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
         );
     }
 
@@ -356,6 +381,28 @@ pub const prototype = struct {
         // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_months_in_year(plain_year_month.fields.inner),
+        );
+    }
+
+    /// 9.3.15 Temporal.PlainYearMonth.prototype.subtract ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. Return ? AddDurationToYearMonth(subtract, plainYearMonth, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToYearMonth(
+                agent,
+                .subtract,
+                plain_year_month.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
         );
     }
 
@@ -644,4 +691,67 @@ pub fn createTemporalYearMonth(
         "%Temporal.PlainYearMonth.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 9.5.8 AddDurationToYearMonth ( operation, yearMonth, temporalDurationLike, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtoyearmonth
+pub fn addDurationToYearMonth(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    plain_year_month: *const temporal_rs.c.PlainYearMonth,
+    temporal_duration_like: Value,
+    options_value: Value,
+) Agent.Error!*Object {
+    // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
+    const duration = try toTemporalDuration(agent, temporal_duration_like);
+
+    // 2. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+
+    // 3. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 4. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+    const overflow = try getTemporalOverflowOption(agent, options);
+
+    // 5. Let sign be DurationSign(duration).
+    // 6. Let calendar be yearMonth.[[Calendar]].
+    // 7. Let fields be ISODateToFields(calendar, yearMonth.[[ISODate]], year-month).
+    // 8. Set fields.[[Day]] to 1.
+    // 9. Let intermediateDate be ? CalendarDateFromFields(calendar, fields, constrain).
+    // 10. If sign < 0, then
+    //     a. Let oneMonthDuration be ! CreateDateDurationRecord(0, 1, 0, 0).
+    //     b. Let nextMonth be ? CalendarDateAdd(calendar, intermediateDate, oneMonthDuration, constrain).
+    //     c. Let date be BalanceISODate(nextMonth.[[Year]], nextMonth.[[Month]], nextMonth.[[Day]] - 1).
+    //     d. Assert: ISODateWithinLimits(date) is true.
+    // 11. Else,
+    //     a. Let date be intermediateDate.
+    // 12. Let durationToAdd be ToDateDurationRecordWithoutTime(duration).
+    // 13. Let addedDate be ? CalendarDateAdd(calendar, date, durationToAdd, overflow).
+    // 14. Let addedDateFields be ISODateToFields(calendar, addedDate, year-month).
+    // 15. Let isoDate be ? CalendarYearMonthFromFields(calendar, addedDateFields, overflow).
+    // 16. Return ! CreateTemporalYearMonth(isoDate, calendar).
+    const temporal_rs_plain_year_month = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainYearMonth_add(
+                plain_year_month,
+                duration.as(builtins.temporal.Duration).fields.inner,
+                overflow,
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainYearMonth_subtract(
+                plain_year_month,
+                duration.as(builtins.temporal.Duration).fields.inner,
+                overflow,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
+    return createTemporalYearMonth(
+        agent,
+        temporal_rs_plain_year_month.?,
+        null,
+    ) catch |err| try noexcept(err);
 }

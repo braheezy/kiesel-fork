@@ -25,6 +25,7 @@ const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toTemporalDuration = builtins.toTemporalDuration;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 4.2 Properties of the Temporal.PlainTime Constructor
@@ -158,6 +159,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
         try object.defineBuiltinAccessor(agent, "hour", hour, null, realm);
         try object.defineBuiltinAccessor(agent, "microsecond", microsecond, null, realm);
@@ -165,6 +167,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "minute", minute, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -189,6 +192,26 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 4.3.9 Temporal.PlainTime.prototype.add ( temporalDurationLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return ? AddDurationToTime(add, plainTime, temporalDurationLike).
+        return Value.from(
+            try addDurationToTime(
+                agent,
+                .add,
+                plain_time.fields.inner,
+                temporal_duration_like,
+            ),
         );
     }
 
@@ -278,6 +301,26 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(plainTime.[[Time]].[[Second]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner));
+    }
+
+    /// 4.3.10 Temporal.PlainTime.prototype.subtract ( temporalDurationLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return ? AddDurationToTime(subtract, plainTime, temporalDurationLike).
+        return Value.from(
+            try addDurationToTime(
+                agent,
+                .subtract,
+                plain_time.fields.inner,
+                temporal_duration_like,
+            ),
+        );
     }
 
     /// 4.3.18 Temporal.PlainTime.prototype.toJSON ( )
@@ -717,4 +760,44 @@ fn toTemporalPartialTime(
 
     // 18. Return result.
     return result;
+}
+
+/// 4.5.18 AddDurationToTime ( operation, temporalTime, temporalDurationLike )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtotime
+fn addDurationToTime(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    plain_time: *const temporal_rs.c.PlainTime,
+    temporal_duration_like: Value,
+) Agent.Error!*Object {
+    // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
+    const duration = try toTemporalDuration(agent, temporal_duration_like);
+
+    // 2. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+    // 3. Let internalDuration be ToInternalDurationRecord(duration).
+    // 4. Let result be AddTime(temporalTime.[[Time]], internalDuration.[[Time]]).
+    const temporal_rs_plain_time = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainTime_add(
+                plain_time,
+                duration.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainTime_subtract(
+                plain_time,
+                duration.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
+
+    // 5. Return ! CreateTemporalTime(result).
+    return createTemporalTime(
+        agent,
+        temporal_rs_plain_time.?,
+        null,
+    ) catch |err| try noexcept(err);
 }

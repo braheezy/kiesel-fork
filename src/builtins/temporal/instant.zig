@@ -27,6 +27,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const toTemporalDuration = builtins.toTemporalDuration;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
@@ -192,9 +193,11 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
         try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -220,6 +223,26 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 8.3.5 Temporal.Instant.prototype.add ( temporalDurationLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return ? AddDurationToInstant(add, instant, temporalDurationLike).
+        return Value.from(
+            try addDurationToInstant(
+                agent,
+                .add,
+                instant.fields.inner,
+                temporal_duration_like,
+            ),
         );
     }
 
@@ -271,6 +294,26 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_Instant_equals(
                 instant.fields.inner,
                 other.as(Instant).fields.inner,
+            ),
+        );
+    }
+
+    /// 8.3.6 Temporal.Instant.prototype.subtract ( temporalDurationLike )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return ? AddDurationToInstant(subtract, instant, temporalDurationLike).
+        return Value.from(
+            try addDurationToInstant(
+                agent,
+                .subtract,
+                instant.fields.inner,
+                temporal_duration_like,
             ),
         );
     }
@@ -564,4 +607,45 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
     };
     errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
     return createTemporalInstant(agent, temporal_rs_instant.?, null);
+}
+
+/// 8.5.10 AddDurationToInstant ( operation, instant, temporalDurationLike )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtoinstant
+fn addDurationToInstant(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    instant: *const temporal_rs.c.Instant,
+    temporal_duration_like: Value,
+) Agent.Error!*Object {
+    // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
+    const duration = try toTemporalDuration(agent, temporal_duration_like);
+
+    // 2. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+    // 3. Let largestUnit be DefaultTemporalLargestUnit(duration).
+    // 4. If TemporalUnitCategory(largestUnit) is date, throw a RangeError exception.
+    // 5. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
+    // 6. Let ns be ? AddInstant(instant.[[EpochNanoseconds]], internalDuration.[[Time]]).
+    // 7. Return ! CreateTemporalInstant(ns).
+    const temporal_rs_instant = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_add(
+                instant,
+                duration.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_subtract(
+                instant,
+                duration.as(builtins.temporal.Duration).fields.inner,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+    return createTemporalInstant(
+        agent,
+        temporal_rs_instant.?,
+        null,
+    ) catch |err| try noexcept(err);
 }

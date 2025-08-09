@@ -40,6 +40,7 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prepareCalendarFields = builtins.prepareCalendarFields;
+const toTemporalDuration = builtins.toTemporalDuration;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 6.2 Properties of the Temporal.ZonedDateTime Constructor
@@ -197,6 +198,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "add", add, 1, realm);
         try object.defineBuiltinAccessor(agent, "calendarId", calendarId, null, realm);
         try object.defineBuiltinAccessor(agent, "day", day, null, realm);
         try object.defineBuiltinAccessor(agent, "dayOfWeek", dayOfWeek, null, realm);
@@ -224,6 +226,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinFunction(agent, "startOfDay", startOfDay, 0, realm);
+        try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
         try object.defineBuiltinFunction(agent, "toInstant", toInstant, 0, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
@@ -256,6 +259,28 @@ pub const prototype = struct {
                 .enumerable = false,
                 .configurable = true,
             },
+        );
+    }
+
+    /// 6.3.35 Temporal.ZonedDateTime.prototype.add ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return ? AddDurationToZonedDateTime(add, zonedDateTime, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToZonedDateTime(
+                agent,
+                .add,
+                zoned_date_time.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
         );
     }
 
@@ -744,6 +769,28 @@ pub const prototype = struct {
                 temporal_rs_zoned_date_time.?,
                 null,
             ) catch |err| try noexcept(err),
+        );
+    }
+
+    /// 6.3.36 Temporal.ZonedDateTime.prototype.subtract ( temporalDurationLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.subtract
+    fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_duration_like = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return ? AddDurationToZonedDateTime(subtract, zonedDateTime, temporalDurationLike, options).
+        return Value.from(
+            try addDurationToZonedDateTime(
+                agent,
+                .subtract,
+                zoned_date_time.fields.inner,
+                temporal_duration_like,
+                options,
+            ),
         );
     }
 
@@ -1299,4 +1346,56 @@ pub fn createTemporalZonedDateTime(
         "%Temporal.ZonedDateTime.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 6.5.10 AddDurationToZonedDateTime ( operation, zonedDateTime, temporalDurationLike, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtozoneddatetime
+pub fn addDurationToZonedDateTime(
+    agent: *Agent,
+    comptime operation: enum { add, subtract },
+    zoned_date_time: *const temporal_rs.c.ZonedDateTime,
+    temporal_duration_like: Value,
+    options_value: Value,
+) Agent.Error!*Object {
+    // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
+    const duration_ = try toTemporalDuration(agent, temporal_duration_like);
+
+    // 2. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+
+    // 3. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 4. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+    const overflow = try getTemporalOverflowOption(agent, options);
+
+    // 5. Let calendar be zonedDateTime.[[Calendar]].
+    // 6. Let timeZone be zonedDateTime.[[TimeZone]].
+    // 7. Let internalDuration be ToInternalDurationRecord(duration).
+    // 8. Let epochNanoseconds be ? AddZonedDateTime(zonedDateTime.[[EpochNanoseconds]], timeZone,
+    //    calendar, internalDuration, overflow).
+    // 9. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+    const temporal_rs_zoned_date_time = switch (operation) {
+        .add => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_add(
+                zoned_date_time,
+                duration_.as(builtins.temporal.Duration).fields.inner,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ),
+        .subtract => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_subtract(
+                zoned_date_time,
+                duration_.as(builtins.temporal.Duration).fields.inner,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+    return createTemporalZonedDateTime(
+        agent,
+        temporal_rs_zoned_date_time.?,
+        null,
+    ) catch |err| try noexcept(err);
 }
