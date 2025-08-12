@@ -3878,7 +3878,7 @@ pub fn codegenScript(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    ctx.contained_in_strict_mode_code = node.scriptIsStrict();
+    ctx.contained_in_strict_mode_code = ctx.contained_in_strict_mode_code or node.scriptIsStrict();
     try codegenStatementList(node.statement_list, executable, ctx);
 }
 
