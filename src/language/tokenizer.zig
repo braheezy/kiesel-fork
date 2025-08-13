@@ -301,10 +301,32 @@ pub const line_terminators = [_][]const u8{
 };
 
 pub fn startsWithLineTerminator(str: []const u8) bool {
-    for (line_terminators) |line_terminator| {
+    // LLVM has a much better time optimizing the single-byte line terminator checks if we inline
+    // this loop.
+    inline for (line_terminators) |line_terminator| {
         if (std.mem.startsWith(u8, str, line_terminator)) return true;
     }
     return false;
+}
+
+/// Used to quickly find candidate positions of line terminators.
+const first_byte_of_line_terminators = &.{ '\n', '\r', "\u{2028}"[0] };
+
+comptime {
+    for (line_terminators) |line_terminator| {
+        std.debug.assert(std.mem.indexOfAny(u8, line_terminator, first_byte_of_line_terminators) == 0);
+    }
+}
+
+fn indexOfFirstLineTerminator(str: []const u8) ?usize {
+    var index: usize = 0;
+    while (std.mem.indexOfAnyPos(u8, str, index, first_byte_of_line_terminators)) |candidate_index| {
+        if (startsWithLineTerminator(str[candidate_index..])) {
+            return candidate_index;
+        }
+        index = candidate_index + 1;
+    }
+    return null;
 }
 
 pub fn containsLineTerminator(str: []const u8) bool {
@@ -335,11 +357,7 @@ fn whitespaceMatcher(str: []const u8) ?usize {
 /// https://tc39.es/ecma262/#sec-comments
 fn commentMatcher(str: []const u8) ?usize {
     if (std.mem.startsWith(u8, str, "//")) {
-        for (line_terminators) |line_terminator| {
-            if (std.mem.indexOf(u8, str, line_terminator)) |index|
-                return index;
-        }
-        return str.len;
+        return indexOfFirstLineTerminator(str) orelse str.len;
     }
     if (std.mem.startsWith(u8, str, "/*")) {
         if (std.mem.indexOf(u8, str, "*/")) |index|
@@ -353,11 +371,7 @@ fn commentMatcher(str: []const u8) ?usize {
 fn hashbangCommentMatcher(str: []const u8) ?usize {
     if (state.tokenizer.offset > 0) return null;
     if (std.mem.startsWith(u8, str, "#!")) {
-        for (line_terminators) |line_terminator| {
-            if (std.mem.indexOf(u8, str, line_terminator)) |index|
-                return index;
-        }
-        return str.len;
+        return indexOfFirstLineTerminator(str) orelse str.len;
     }
     return null;
 }
@@ -549,6 +563,19 @@ pub fn escapeSequenceMatcher(str: []const u8) ?usize {
         },
         else => return 2,
     }
+}
+
+test indexOfFirstLineTerminator {
+    try std.testing.expectEqual(null, indexOfFirstLineTerminator(""));
+    try std.testing.expectEqual(null, indexOfFirstLineTerminator("asdf"));
+    try std.testing.expectEqual(null, indexOfFirstLineTerminator("\u{2027}"));
+    try std.testing.expectEqual(0, indexOfFirstLineTerminator("\r"));
+    try std.testing.expectEqual(0, indexOfFirstLineTerminator("\n"));
+    try std.testing.expectEqual(0, indexOfFirstLineTerminator("\u{2028}"));
+    try std.testing.expectEqual(0, indexOfFirstLineTerminator("\u{2029}"));
+    try std.testing.expectEqual(3, indexOfFirstLineTerminator("   \r"));
+    try std.testing.expectEqual(3, indexOfFirstLineTerminator("\u{2027}\n"));
+    try std.testing.expectEqual(4, indexOfFirstLineTerminator("\u{2027}a\u{2029}"));
 }
 
 test identifierMatcher {
