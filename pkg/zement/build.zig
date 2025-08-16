@@ -10,27 +10,27 @@ pub fn build(b: *std.Build) void {
     const enable_temporal = b.option(bool, "enable-temporal", "Enable Temporal") orelse true;
 
     const features = blk: {
-        var features = std.ArrayList([]const u8).init(b.allocator);
-        defer features.deinit();
+        var features: std.ArrayListUnmanaged([]const u8) = .empty;
+        defer features.deinit(b.allocator);
         if (enable_intl) {
-            features.append("intl") catch @panic("OOM");
+            features.append(b.allocator, "intl") catch @panic("OOM");
         }
         if (enable_temporal) {
-            features.append("temporal") catch @panic("OOM");
+            features.append(b.allocator, "temporal") catch @panic("OOM");
         }
         break :blk (std.mem.join(b.allocator, ",", features.items) catch @panic("OOM"));
     };
 
-    var cargo_args = std.ArrayList([]const u8).init(b.allocator);
-    defer cargo_args.deinit();
-    cargo_args.appendSlice(&.{ "--features", features }) catch @panic("OOM");
+    var cargo_args: std.ArrayListUnmanaged([]const u8) = .empty;
+    defer cargo_args.deinit(b.allocator);
+    cargo_args.appendSlice(b.allocator, &.{ "--features", features }) catch @panic("OOM");
     if (optimize != .Debug) {
-        cargo_args.append("--release") catch @panic("OOM");
+        cargo_args.append(b.allocator, "--release") catch @panic("OOM");
     }
     if (!target.query.isNative()) {
         // Required for cross-compilation, most targets won't be installed.
         // -Z requires nightly so we don't enforce this for native builds.
-        cargo_args.appendSlice(&.{ "-Z", "build-std=std,panic_abort" }) catch @panic("OOM");
+        cargo_args.appendSlice(b.allocator, &.{ "-Z", "build-std=std,panic_abort" }) catch @panic("OOM");
     }
 
     const build_dir = build_crab.addCargoBuild(
