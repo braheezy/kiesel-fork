@@ -3,12 +3,16 @@ name = "zement"
 version = "0.1.0"
 edition = "2024"
 
+# This is pinned to the same commit as the icu4x dependency in icu4zig, which provides the C
+# headers for Zig.
 [dependencies.icu_capi]
 git = "https://github.com/unicode-org/icu4x.git"
 rev = "472e602aeac54f1aa5a58e889cb93f075f565498"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 
+# This is pinned to the same commit as the temporal_rs dependency in the top-level build.zig.zon,
+# which provides the C headers for Zig.
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
 rev = "9f17b3c5be0e85c03e2ac656877cb8264c73c07a"
