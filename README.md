@@ -77,7 +77,7 @@ zig build run   # build and run the binary
 
 These can be set by passing `-D<name>=<value>` to `zig build`.
 
-| Name                | Default                                      | Description                                                                                                                             |
+| Name                | Default                                      | Description                                                                                                                                   |
 | ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `enable-annex-b`    | `true`                                       | Enables support for [ECMA-262 Annex B](https://tc39.es/ecma262/#sec-additional-ecmascript-features-for-web-browsers) language features.       |
 | `enable-intl`       | `true`                                       | Enables support for [ECMA-402 (`Intl`)](https://tc39.es/ecma402/), depends on `cargo`                                                         |
@@ -89,6 +89,7 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal), depends on `cargo` |
 | `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                         |
 | `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                      |
+| `version-string`    | `0.1.0-dev+<commit>`                         | Version string override                                                                                                                       |
 
 ## Usage
 

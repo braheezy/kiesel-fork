@@ -60,16 +60,24 @@ pub fn build(b: *std.Build) void {
 
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
     const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend");
+    const version_string = b.option(
+        []const u8,
+        "version-string",
+        "Version string, read from git by default",
+    ) orelse blk: {
+        const output = b.run(&.{
+            "git",
+            "-C",
+            b.build_root.path orelse ".",
+            "rev-parse",
+            "--short=9",
+            "HEAD",
+        });
+        const output_trimmed = std.mem.trim(u8, output, "\n");
+        break :blk b.fmt("0.1.0-dev+{s}", .{output_trimmed});
+    };
 
-    var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
-    var code: u8 = undefined;
-    if (b.runAllowFail(
-        &.{ "git", "-C", b.build_root.path orelse ".", "rev-parse", "--short=9", "HEAD" },
-        &code,
-        .Ignore,
-    )) |output| {
-        version.build = std.mem.trimRight(u8, output, "\n");
-    } else |_| {}
+    const version = std.SemanticVersion.parse(version_string) catch @panic("Invalid version");
 
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
