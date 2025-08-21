@@ -705,9 +705,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.95"
+version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
+checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
 dependencies = [
  "unicode-ident",
 ]
@@ -776,9 +776,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.104"
+version = "2.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17b6f705963418cdb9927482fa304bc562ece2fdd4f616084c50b7023b435a40"
+checksum = "ede7c438028d4436d71104916910f5bb611972c5cfd7f89b8300a8186e6fada6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -799,7 +799,7 @@ dependencies = [
 [[package]]
 name = "temporal_capi"
 version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=9f17b3c5be0e85c03e2ac656877cb8264c73c07a#9f17b3c5be0e85c03e2ac656877cb8264c73c07a"
+source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
 dependencies = [
  "diplomat",
  "diplomat-runtime",
@@ -813,7 +813,7 @@ dependencies = [
 [[package]]
 name = "temporal_rs"
 version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=9f17b3c5be0e85c03e2ac656877cb8264c73c07a#9f17b3c5be0e85c03e2ac656877cb8264c73c07a"
+source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
 dependencies = [
  "combine",
  "core_maths",
@@ -831,7 +831,7 @@ dependencies = [
 [[package]]
 name = "timezone_provider"
 version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=9f17b3c5be0e85c03e2ac656877cb8264c73c07a#9f17b3c5be0e85c03e2ac656877cb8264c73c07a"
+source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
 dependencies = [
  "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerotrie 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",

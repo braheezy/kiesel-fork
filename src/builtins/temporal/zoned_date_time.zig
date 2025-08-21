@@ -729,12 +729,7 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return 𝔽(GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]])).
-        // NOTE: I don't think this is actually fallible
-        // https://github.com/boa-dev/temporal/blob/34522ae99c9d6e2ac2782162eaf01b36494951ca/src/builtins/core/timezone.rs#L183-L198
-        const offset_nanoseconds = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time.fields.inner),
-        );
+        const offset_nanoseconds = temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time.fields.inner);
         return Value.from(@as(f64, @floatFromInt(offset_nanoseconds)));
     }
 
