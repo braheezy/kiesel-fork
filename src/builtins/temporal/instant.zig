@@ -459,9 +459,8 @@ pub const prototype = struct {
         // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
         const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
             agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
-                temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(instant.fields.inner),
-                temporal_rs.c.AnyCalendarKind_Iso,
+            temporal_rs.c.temporal_rs_Instant_to_zoned_date_time_iso(
+                instant.fields.inner,
                 time_zone,
             ),
         );
