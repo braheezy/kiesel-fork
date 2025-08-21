@@ -8,12 +8,14 @@ const temporal_rs = @import("../c/temporal_rs.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
+const StringParser = utils.StringParser;
 const Value = types.Value;
 
 comptime {
@@ -206,6 +208,73 @@ pub fn canonicalizeCalendar(
     return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
 }
 
+/// 12.2.1 ParseMonthCode ( argument )
+/// https://tc39.es/proposal-temporal/#sec-temporal-parsemonthcode
+/// 12.2.2 CreateMonthCode ( monthNumber, isLeapMonth )
+/// https://tc39.es/proposal-temporal/#sec-temporal-createmonthcode
+fn parseAndCreateMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+    // 1. Let monthCode be ? ToPrimitive(argument, string).
+    const month_code = try argument.toPrimitive(agent, .string);
+
+    // 2. If monthCode is not a String, throw a TypeError exception.
+    if (!month_code.isString()) {
+        return agent.throwException(.type_error, "Month code must be a string", .{});
+    }
+
+    // 3. If ParseText(StringToCodePoints(monthCode), MonthCode) is a List of errors, throw a
+    //    RangeError exception.
+    // 4. Let isLeapMonth be false.
+    // 5. If the length of monthCode is 4, then
+    //     a. Assert: The fourth code unit of monthCode is 0x004C (LATIN CAPITAL LETTER L).
+    //     b. Set isLeapMonth to true.
+    // 6. Let monthCodeDigits be the substring of monthCode from 1 to 3.
+    // 7. Let monthNumber be ℝ(StringToNumber(monthCodeDigits)).
+    // 8. If monthNumber is 0 and isLeapMonth is false, throw a RangeError exception.
+    // 9. Return the Record { [[MonthNumber]]: monthNumber, [[IsLeapMonth]]: isLeapMonth }.
+    const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
+    parseMonthCode(month_code_utf8) catch {
+        return agent.throwException(.range_error, "Invalid month code", .{});
+    };
+    return month_code_utf8;
+}
+
+fn parseMonthCode(string: []const u8) error{InvalidFormat}!void {
+    // MonthCode :::
+    //     M00L
+    //     M0 NonZeroDigit L[opt]
+    //     M NonZeroDigit DecimalDigit L[opt]
+    var parser = StringParser.init(string);
+    if (parser.consume() != 'M') return error.InvalidFormat;
+    const month = parser.consumeDigits(u8, 2) orelse return error.InvalidFormat;
+    if (parser.peek() == 'L')
+        _ = parser.consume() orelse unreachable
+    else if (month == 0)
+        return error.InvalidFormat;
+    // Did we reach the end of the string?
+    if (parser.peek() != null) return error.InvalidFormat;
+}
+
+test parseMonthCode {
+    {
+        const test_cases = [_][]const u8{
+            "M00L", "M01",  "M01L", "M09",  "M09L",
+            "M90",  "M90L", "M99",  "M99L",
+        };
+        for (test_cases) |test_case| {
+            try parseMonthCode(test_case);
+        }
+    }
+    {
+        const test_cases = [_][]const u8{
+            "",     "01",    "01L",  "M00",   "M00l",
+            "M01 ", "M01L ", " M01", " M01L",
+        };
+        for (test_cases) |test_case| {
+            try std.testing.expectError(error.InvalidFormat, parseMonthCode(test_case));
+        }
+    }
+}
+
 const FieldName = enum {
     era,
     era_year,
@@ -318,7 +387,7 @@ pub fn prepareCalendarFields(
                         result.date.era = temporal_rs.toDiplomatStringView(era);
                     },
                     .month_code => {
-                        const month_code = try toMonthCode(agent, value);
+                        const month_code = try parseAndCreateMonthCode(agent, value);
                         result.date.month_code = temporal_rs.toDiplomatStringView(month_code);
                     },
                     .offset => {
@@ -1062,48 +1131,7 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     return .{ .owned_zoned_date_time = temporal_rs_zoned_date_time.? };
 }
 
-/// 13.40 ToMonthCode ( argument )
-/// https://tc39.es/proposal-temporal/#sec-temporal-tomonthcode
-fn toMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
-    // 1. Let monthCode be ? ToPrimitive(argument, string).
-    const month_code = try argument.toPrimitive(agent, .string);
-
-    // 2. If monthCode is not a String, throw a TypeError exception.
-    if (!month_code.isString()) {
-        return agent.throwException(.type_error, "Month code must be a string", .{});
-    }
-
-    const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
-
-    // 3. If the length of monthCode is not 3 or 4, throw a RangeError exception.
-    // 4. If the first code unit of monthCode is not 0x004D (LATIN CAPITAL LETTER M), throw a
-    //    RangeError exception.
-    // 5. If the second code unit of monthCode is not in the inclusive interval from 0x0030 (DIGIT
-    //    ZERO) to 0x0039 (DIGIT NINE), throw a RangeError exception.
-    // 6. If the third code unit of monthCode is not in the inclusive interval from 0x0030 (DIGIT
-    //    ZERO) to 0x0039 (DIGIT NINE), throw a RangeError exception.
-    // 7. If the length of monthCode is 4 and the fourth code unit of monthCode is not 0x004C
-    //    (LATIN CAPITAL LETTER L), throw a RangeError exception.
-    // 8. Let monthCodeDigits be the substring of monthCode from 1 to 3.
-    // 9. Let monthCodeInteger be ℝ(StringToNumber(monthCodeDigits)).
-    // 10. If monthCodeInteger is 0 and the length of monthCode is not 4, throw a RangeError
-    //     exception.
-    const valid =
-        (month_code_utf8.len == 3 or month_code_utf8.len == 4) and
-        month_code_utf8[0] == 'M' and
-        std.ascii.isDigit(month_code_utf8[1]) and
-        std.ascii.isDigit(month_code_utf8[2]) and
-        (month_code_utf8.len != 4 or (month_code_utf8[3] == 'L' and
-            (month_code_utf8[1] != '0' or month_code_utf8[2] != '0')));
-    if (!valid) {
-        return agent.throwException(.range_error, "Invalid month code", .{});
-    }
-
-    // 11. Return monthCode.
-    return month_code_utf8;
-}
-
-/// 13.41 ToOffsetString ( argument )
+/// 13.40 ToOffsetString ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tooffsetstring
 fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let offset be ? ToPrimitive(argument, string).
