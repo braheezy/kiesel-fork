@@ -787,7 +787,7 @@ pub const namespace = struct {
         return .{ hi, lo };
     }
 
-    /// 2 Math.sumPrecise ( items )
+    /// 21.3.2.34 Math.sumPrecise ( items )
     /// https://tc39.es/proposal-math-sum/#sec-math.sumprecise
     fn sumPrecise(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // The implementation for higher precision summation in steps 4 and 7.b.vi.4.b are based on
@@ -802,7 +802,7 @@ pub const namespace = struct {
         // 2. Let iteratorRecord be ? GetIterator(items, SYNC).
         var iterator = try getIterator(agent, items, .sync);
 
-        // 3. Let state be MINUS-ZERO.
+        // 3. Let state be minus-zero.
         var state: enum {
             finite,
             minus_infinity,
@@ -829,30 +829,19 @@ pub const namespace = struct {
         // 5. Let count be 0.
         var count: u53 = 0;
 
-        // 6. Let next be NOT-STARTED.
-        // 7. Repeat, while next is not DONE,
+        // 6. Let next be not-started.
+        // 7. Repeat, while next is not done,
         //    a. Set next to ? IteratorStepValue(iteratorRecord).
-        //    b. If next is not DONE, then
+        //    b. If next is not done, then
         while (try iterator.stepValue(agent)) |next| {
-            // i. Set count to count + 1.
-            // ii. If count ≥ 2**53, then
-            count = std.math.add(u53, count, 1) catch {
-                // 1. Let error be ThrowCompletion(a newly created RangeError object).
-                const @"error" = agent.throwException(
-                    .range_error,
-                    "Maximum number of values exceeded",
-                    .{},
-                );
+            // i. If count ≥ 2**53 - 1, then
+            //     1. NOTE: This step is not expected to be reached in practice and is included
+            //        only so that implementations may rely on inputs being "reasonably sized"
+            //        without violating this specification.
+            //     2. Let error be ThrowCompletion(a newly created RangeError object).
+            //     3. Return ? IteratorClose(iteratorRecord, error).
 
-                // 2. Return ? IteratorClose(iteratorRecord, error).
-                return iterator.close(agent, @as(Agent.Error!Value, @"error"));
-            };
-
-            // iii. NOTE: The above case is not expected to be reached in practice and is included
-            //            only so that implementations may rely on inputs being "reasonably sized"
-            //            without violating this specification.
-
-            // iv. If next is not a Number, then
+            // ii. If next is not a Number, then
             if (!next.isNumber()) {
                 // 1. Let error be ThrowCompletion(a newly created TypeError object).
                 const @"error" = agent.throwException(
@@ -865,31 +854,31 @@ pub const namespace = struct {
                 return iterator.close(agent, @as(Agent.Error!Value, @"error"));
             }
 
-            // v. Let n be next.
+            // iii. Let n be next.
             const n = next.asNumber();
 
-            // vi. If state is not NOT-A-NUMBER, then
+            // iv. If state is not not-a-number, then
             if (state != .not_a_number) {
                 // 1. If n is NaN, then
                 if (n.isNan()) {
-                    // a. Set state to NOT-A-NUMBER.
+                    // a. Set state to not-a-number.
                     state = .not_a_number;
                 }
                 // 2. Else if n is +∞𝔽, then
                 else if (n.isPositiveInf()) {
-                    // a. If state is MINUS-INFINITY, set state to NOT-A-NUMBER.
-                    // b. Else, set state to PLUS-INFINITY.
+                    // a. If state is minus-infinity, set state to not-a-number.
+                    // b. Else, set state to plus-infinity.
                     state = if (state == .minus_infinity) .not_a_number else .plus_infinity;
                 }
                 // 3. Else if n is -∞𝔽, then
                 else if (n.isNegativeInf()) {
-                    // a. If state is PLUS-INFINITY, set state to NOT-A-NUMBER.
-                    // b. Else, set state to MINUS-INFINITY.
+                    // a. If state is plus-infinity, set state to not-a-number.
+                    // b. Else, set state to minus-infinity.
                     state = if (state == .plus_infinity) .not_a_number else .minus_infinity;
                 }
-                // 4. Else if n is not -0𝔽 and state is either MINUS-ZERO or FINITE, then
+                // 4. Else if n is not -0𝔽 and state is either minus-zero or finite, then
                 else if (!n.isNegativeZero() and (state == .minus_zero or state == .finite)) {
-                    // a. Set state to FINITE.
+                    // a. Set state to finite.
                     state = .finite;
 
                     // b. Set sum to sum + ℝ(n).
@@ -923,24 +912,31 @@ pub const namespace = struct {
                     }
                 }
             }
+
+            // v. Set count to count + 1.
+            count += 1;
         }
 
         switch (state) {
-            // 8. If state is NOT-A-NUMBER, return NaN.
+            // 8. If state is not-a-number, return NaN.
             .not_a_number => return .nan,
-            // 9. If state is PLUS-INFINITY, return +∞𝔽.
+
+            // 9. If state is plus-infinity, return +∞𝔽.
             .plus_infinity => return .infinity,
-            // 10. If state is MINUS-INFINITY, return -∞𝔽.
+
+            // 10. If state is minus-infinity, return -∞𝔽.
             .minus_infinity => return .negative_infinity,
-            // 11. If state is MINUS-ZERO, return -0𝔽.
+
+            // 11. If state is minus-zero, return -0𝔽.
             .minus_zero => return Value.from(-0.0),
+
             // 12. Return 𝔽(sum).
-            // 13. NOTE: The value of sum can be computed without arbitrary-precision arithmetic by
-            //           a variety of algorithms. One such is the "Grow-Expansion" algorithm given
-            //           in Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric
-            //           Predicates by Jonathan Richard Shewchuk. A more recent algorithm is given
-            //           in "Fast exact summation using small and large superaccumulators", code for
-            //           which is available at https://gitlab.com/radfordneal/xsum.
+            // NOTE: The value of sum can be computed without arbitrary-precision arithmetic by a
+            //       variety of algorithms. One such is the "Grow-Expansion" algorithm given in
+            //       Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric
+            //       Predicates by Jonathan Richard Shewchuk. A more recent algorithm is given in
+            //       "Fast exact summation using small and large superaccumulators", code for which
+            //       is available at https://gitlab.com/radfordneal/xsum.
             else => {
                 var n = partials.items.len;
                 var hi: f64, var lo: f64 = .{ 0.0, 0.0 };
@@ -1002,7 +998,7 @@ pub const namespace = struct {
         }
     }
 
-    /// 21.3.2.34 Math.tan ( x )
+    /// 21.3.2.35 Math.tan ( x )
     /// https://tc39.es/ecma262/#sec-math.tan
     fn tan(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -1016,7 +1012,7 @@ pub const namespace = struct {
         return Value.from(@tan(n.asFloat()));
     }
 
-    /// 21.3.2.35 Math.tanh ( x )
+    /// 21.3.2.36 Math.tanh ( x )
     /// https://tc39.es/ecma262/#sec-math.tanh
     fn tanh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
@@ -1032,7 +1028,7 @@ pub const namespace = struct {
         return Value.from(std.math.tanh(n.asFloat()));
     }
 
-    /// 21.3.2.36 Math.trunc ( x )
+    /// 21.3.2.37 Math.trunc ( x )
     /// https://tc39.es/ecma262/#sec-math.trunc
     fn trunc(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
