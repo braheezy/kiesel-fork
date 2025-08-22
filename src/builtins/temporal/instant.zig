@@ -395,10 +395,13 @@ pub const prototype = struct {
             .unset,
         );
 
-        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        // 8. Let timeZone be ? Get(resolvedOptions, "timeZone").
+        const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
+
+        // 9. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
         try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
 
-        // 9. If smallestUnit is hour, throw a RangeError exception.
+        // 10. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -406,9 +409,6 @@ pub const prototype = struct {
                 .{},
             );
         }
-
-        // 10. Let timeZone be ? Get(resolvedOptions, "timeZone").
-        const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
         var maybe_time_zone: ?*temporal_rs.c.TimeZone = null;
         defer if (maybe_time_zone) |time_zone| temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);

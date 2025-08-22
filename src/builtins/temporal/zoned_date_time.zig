@@ -999,10 +999,13 @@ pub const prototype = struct {
             .unset,
         );
 
-        // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        // 10. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
+        const show_time_zone = try getTemporalShowTimeZoneNameOption(agent, options);
+
+        // 11. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
         try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
 
-        // 11. If smallestUnit is hour, throw a RangeError exception.
+        // 12. If smallestUnit is hour, throw a RangeError exception.
         if (smallest_unit == temporal_rs.c.Unit_Hour) {
             return agent.throwException(
                 .range_error,
@@ -1010,9 +1013,6 @@ pub const prototype = struct {
                 .{},
             );
         }
-
-        // 12. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
-        const show_time_zone = try getTemporalShowTimeZoneNameOption(agent, options);
 
         // 13. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
         // 14. Return TemporalZonedDateTimeToString(zonedDateTime, precision.[[Precision]],
