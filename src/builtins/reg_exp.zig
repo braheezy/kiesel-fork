@@ -1151,7 +1151,7 @@ pub const prototype = struct {
                 .null;
         } else {
             // 6. Else,
-            // a. If flags contains "u" or flags contains "v", let fullUnicode be true. Otherwise,
+            // a. If flags contains "u" or flags contains "v", let fullUnicode be true; otherwise
             //    let fullUnicode be false.
             const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
                 flags_.indexOf(String.fromLiteral("v"), 0) != null;
@@ -1303,7 +1303,7 @@ pub const prototype = struct {
         // 7. Let flags be ? ToString(? Get(rx, "flags")).
         const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
-        // 8. If flags contains "g", let global be true. Otherwise, let global be false.
+        // 8. If flags contains "g", let global be true; otherwise let global be false.
         const global_ = flags_.indexOf(String.fromLiteral("g"), 0) != null;
 
         // 9. If global is true, then
@@ -1345,8 +1345,8 @@ pub const prototype = struct {
                 // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
                 const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
-                // b. If flags contains "u" or flags contains "v", let fullUnicode be true.
-                //    Otherwise, let fullUnicode be false.
+                // b. If flags contains "u" or flags contains "v", let fullUnicode be true;
+                //    otherwise let fullUnicode be false.
                 const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
                     flags_.indexOf(String.fromLiteral("v"), 0) != null;
 

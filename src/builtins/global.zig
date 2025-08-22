@@ -453,7 +453,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     }
 
     // 11. If S contains a code unit that is not a radix-R digit, let end be the index within S of
-    //     the first such code unit; otherwise, let end be the length of S.
+    //     the first such code unit; otherwise let end be the length of S.
     // 12. Let Z be the substring of S from 0 to end.
     // 13. If Z is empty, return NaN.
     // 14. Let mathInt be the integer value that is represented by Z in radix-R notation, using the
@@ -679,7 +679,7 @@ fn decode(
             // vii. If n = 0, then
             if (byte_sequence_length == 1) {
                 // 1. Let asciiChar be the code unit whose numeric value is B.
-                // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
+                // 2. If preserveEscapeSet contains asciiChar, set S to escape; otherwise set S to
                 //    asciiChar.
                 s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
                     .{ .string = try String.fromUtf16(agent, escape_) }

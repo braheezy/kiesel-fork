@@ -408,7 +408,7 @@ pub const prototype = struct {
         // 11. Else,
         //     a. Let n be an integer for which n / 10**f - x is as close to zero as possible. If
         //        there are two such n, pick the larger n.
-        //     b. If n = 0, let m be "0". Otherwise, let m be the String value consisting of the
+        //     b. If n = 0, let m be "0"; otherwise let m be the String value consisting of the
         //        digits of the decimal representation of n (in order, with no leading zeroes).
         //     c. If f ≠ 0, then
         //         i. Let k be the length of m.

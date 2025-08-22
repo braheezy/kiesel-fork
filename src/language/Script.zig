@@ -295,7 +295,9 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     //     an ordinary object. However, if the global object is a Proxy exotic object it may
     //     exhibit behaviours that cause abnormal terminations in some of the following steps.
 
-    // 12. NOTE: Annex B.3.2.2 adds additional steps at this point.
+    // 12. If the host is a web browser or otherwise supports Block-Level Function Declarations Web
+    //     Legacy Compatibility Semantics, then
+    //     [...]
 
     // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
     var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;

@@ -2346,7 +2346,7 @@ pub const prototype = struct {
 
         // 18. If IsSharedArrayBuffer(srcBuffer) is true, IsSharedArrayBuffer(targetBuffer) is true,
         //     and srcBuffer.[[ArrayBufferData]] is targetBuffer.[[ArrayBufferData]], let
-        //     sameSharedArrayBuffer be true; otherwise, let sameSharedArrayBuffer be false.
+        //     sameSharedArrayBuffer be true; otherwise let sameSharedArrayBuffer be false.
         const same_shared_array_buffer = src_buffer == .shared_array_buffer and
             target_buffer == .shared_array_buffer and
             src_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr ==

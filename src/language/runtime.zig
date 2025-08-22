@@ -472,7 +472,7 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
     // iii. Let evalArg be the first element of argList.
     const eval_arg = arguments[0];
 
-    // iv. If IsStrict(this CallExpression) is true, let strictCaller be true. Otherwise let
+    // iv. If IsStrict(this CallExpression) is true, let strictCaller be true; otherwise let
     //     strictCaller be false.
     const strict_caller = strict;
 
@@ -627,7 +627,12 @@ pub fn blockDeclarationInstantiation(
                 env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
             } else {
                 // ii. Else,
-                // 1. Perform ! env.CreateMutableBinding(dn, false). NOTE: This step is replaced in section B.3.2.6.
+                // 1. If the host is a web browser or otherwise supports Block-Level Function
+                //    Declarations Web Legacy Compatibility Semantics, then
+                //     a. If ! env.HasBinding(dn) is false, then
+                //         i. Perform ! env.CreateMutableBinding(dn, false).
+                // 2. Else,
+                //     a. Perform ! env.CreateMutableBinding(dn, false).
                 env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
             }
         }
@@ -650,7 +655,15 @@ pub fn blockDeclarationInstantiation(
                 .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env),
             };
 
-            // iii. Perform ! env.InitializeBinding(fn, fo). NOTE: This step is replaced in section B.3.2.6.
+            // iii. If the host is a web browser or otherwise supports Block-Level Function
+            //      Declarations Web Legacy Compatibility Semantics, then
+            //     1. If the binding for fn in env is an uninitialized binding, then
+            //         a. Perform ! env.InitializeBinding(fn, fo).
+            //     2. Else,
+            //         a. Assert: d is a FunctionDeclaration.
+            //         b. Perform ! env.SetMutableBinding(fn, fo, false).
+            // iv. Else,
+            //     1. Perform ! env.InitializeBinding(fn, fo).
             env.initializeBinding(
                 agent,
                 function_name,

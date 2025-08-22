@@ -130,7 +130,7 @@ pub fn builtinCallOrConstruct(
 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
     //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
-    //     uninitialized; otherwise, thisArgument provides the this value. argumentsList provides
+    //     uninitialized; otherwise thisArgument provides the this value. argumentsList provides
     //     the named parameters. newTarget provides the NewTarget value.
     // 11. NOTE: If F is defined in this document, “the specification of F” is the behaviour
     //     specified for it via algorithm steps or other means.

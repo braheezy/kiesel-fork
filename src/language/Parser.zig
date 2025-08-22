@@ -2013,7 +2013,11 @@ pub fn acceptBlock(self: *Parser) AcceptError!ast.Block {
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of StatementList contains any duplicate
-    //   entries.
+    //   entries, unless the host is a web browser or otherwise supports Block-Level Function
+    //   Declarations Web Legacy Compatibility Semantics, and both of the following conditions are
+    //   true:
+    //     - IsStrict(this production) is false.
+    //     - The duplicate entries are only bound by FunctionDeclarations.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of StatementList also
     //   occurs in the VarDeclaredNames of StatementList.
     try self.ensureUniqueLexicallyDeclaredNames(
@@ -2335,7 +2339,9 @@ pub fn acceptLabelledStatement(self: *Parser) AcceptError!ast.LabelledStatement 
         return error.UnexpectedToken;
     // TODO: Make this dependent on the `enable-annex-b` build flag
     // LabelledItem : FunctionDeclaration
-    // - It is a Syntax Error if any source text that is strict mode code is matched by this production.
+    // - It is a Syntax Error if any source text is matched by this production, unless that source
+    //   text is non-strict code and the host is a web browser or otherwise supports Labelled
+    //   Function Declarations.
     if (self.state.in_strict_mode and labelled_item == .function_declaration) {
         try self.emitErrorAt(
             location,
@@ -2756,7 +2762,11 @@ pub fn acceptSwitchStatement(self: *Parser) AcceptError!ast.SwitchStatement {
     var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of CaseBlock contains any duplicate
-    //   entries.
+    //   entries, unless the host is a web browser or otherwise supports Block-Level Function
+    //   Declarations Web Legacy Compatibility Semantics, and both of the following conditions are
+    //   true:
+    //     - IsStrict(this production) is false.
+    //     - The duplicate entries are only bound by FunctionDeclarations.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of CaseBlock also occurs
     //   in the VarDeclaredNames of CaseBlock.
     try self.ensureUniqueLexicallyDeclaredNames(
@@ -2884,7 +2894,8 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
         //   the LexicallyDeclaredNames of Block.
         // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
-        //   the VarDeclaredNames of Block.
+        //   the VarDeclaredNames of Block, unless CatchParameter is CatchParameter : BindingIdentifier
+        //   and the host is a web browser or otherwise supports VariableStatements in Catch Blocks.
         try self.ensureUniqueCatchParameterNames(
             bound_names.slice(),
             lexically_declared_names.slice(),

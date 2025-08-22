@@ -252,7 +252,7 @@ pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
 
     // 2. Let ec be the topmost execution context on the execution context stack whose
     //    ScriptOrModule component is not null.
-    // 3. If no such execution context exists, return null. Otherwise, return ec's ScriptOrModule.
+    // 3. If no such execution context exists, return null; otherwise return ec's ScriptOrModule.
     var it = std.mem.reverseIterator(self.execution_context_stack.items);
     while (it.next()) |execution_context| {
         if (execution_context.script_or_module) |script_or_module|

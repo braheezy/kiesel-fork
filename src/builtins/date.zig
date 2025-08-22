@@ -721,7 +721,7 @@ fn formatDateString(
     // 4. Let yv be YearFromTime(tv).
     const year = yearFromTime(time_value);
 
-    // 5. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise, let yearSign be "-".
+    // 5. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise let yearSign be "-".
     const year_sign = if (year >= 0) "" else "-";
 
     // 6. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
@@ -1460,16 +1460,16 @@ pub const prototype = struct {
         // 4. Let y be ? ToNumber(year).
         const year = (try year_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, set t to +0𝔽; otherwise, set t to LocalTime(t).
+        // 5. If t is NaN, set t to +0𝔽; otherwise set t to LocalTime(t).
         time_value = if (std.math.isNan(time_value)) 0 else localTime(time_value);
 
-        // 6. If month is not present, let m be MonthFromTime(t); otherwise, let m be ? ToNumber(month).
+        // 6. If month is not present, let m be MonthFromTime(t); otherwise let m be ? ToNumber(month).
         const month = if (month_value) |month|
             (try month.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(monthFromTime(time_value)));
 
-        // 7. If date is not present, let dt be DateFromTime(t); otherwise, let dt be ? ToNumber(date).
+        // 7. If date is not present, let dt be DateFromTime(t); otherwise let dt be ? ToNumber(date).
         const date = if (date_value) |date|
             (try date.toNumber(agent)).asFloat()
         else
@@ -1827,13 +1827,13 @@ pub const prototype = struct {
         // 5. Let y be ? ToNumber(year).
         const year = (try year_value.toNumber(agent)).asFloat();
 
-        // 6. If month is not present, let m be MonthFromTime(t); otherwise, let m be ? ToNumber(month).
+        // 6. If month is not present, let m be MonthFromTime(t); otherwise let m be ? ToNumber(month).
         const month = if (month_value) |month|
             (try month.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(monthFromTime(time_value)));
 
-        // 7. If date is not present, let dt be DateFromTime(t); otherwise, let dt be ? ToNumber(date).
+        // 7. If date is not present, let dt be DateFromTime(t); otherwise let dt be ? ToNumber(date).
         const date = if (date_value) |date|
             (try date.toNumber(agent)).asFloat()
         else
@@ -2318,7 +2318,7 @@ pub const prototype = struct {
         // 8. Let yv be YearFromTime(tv).
         const year = yearFromTime(time_value);
 
-        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise, let yearSign
+        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise let yearSign
         //    be "-".
         const year_sign = if (year >= 0) "" else "-";
 
@@ -2425,7 +2425,7 @@ pub const prototype = struct {
         // 4. Let y be ? ToNumber(year).
         const year = try year_value.toNumber(agent);
 
-        // 5. If t is NaN, set t to +0𝔽; otherwise, set t to LocalTime(t).
+        // 5. If t is NaN, set t to +0𝔽; otherwise set t to LocalTime(t).
         time_value = if (std.math.isNan(time_value)) 0 else localTime(time_value);
 
         // 6. Let yyyy be MakeFullYear(y).

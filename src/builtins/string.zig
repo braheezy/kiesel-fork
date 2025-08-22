@@ -165,7 +165,7 @@ pub fn getSubstitution(
         blk: {
             // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
-            //    digitCount be 2. Otherwise, let digitCount be 1.
+            //    digitCount be 2; otherwise let digitCount be 1.
             var digit_count: usize = if (template_reminder.length() >= 3 and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))) and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(2)))) 2 else 1;
@@ -1092,7 +1092,7 @@ pub const prototype = struct {
         const num_pos = try position.toNumber(agent);
 
         // 5. Assert: If position is undefined, then numPos is NaN.
-        // 6. If numPos is NaN, let pos be +∞; otherwise, let pos be ! ToIntegerOrInfinity(numPos).
+        // 6. If numPos is NaN, let pos be +∞; otherwise let pos be ! ToIntegerOrInfinity(numPos).
         const pos = if (num_pos.isNan())
             std.math.inf(f64)
         else

@@ -50,7 +50,7 @@ pub fn format(
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )
 /// https://tc39.es/ecma262/#sec-symboldescriptivestring
 pub fn descriptiveString(self: *const Symbol, agent: *Agent) std.mem.Allocator.Error!*const String {
-    // 1. Let desc be sym's [[Description]] value.
+    // 1. Let desc be sym.[[Description]].
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
     const description: *const String = self.description orelse .empty;

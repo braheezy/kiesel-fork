@@ -2899,7 +2899,7 @@ pub const FunctionBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
     pub fn functionBodyContainsUseStrict(self: FunctionBody) bool {
         // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
-        //    true; otherwise, return false.
+        //    true; otherwise return false.
         return self.statement_list.containsDirective("use strict");
     }
 };
@@ -3430,7 +3430,7 @@ pub const Script = struct {
     /// https://tc39.es/ecma262/#sec-scriptisstrict
     pub fn scriptIsStrict(self: Script) bool {
         // 1. If ScriptBody is present and the Directive Prologue of ScriptBody contains a Use
-        //    Strict Directive, return true; otherwise, return false.
+        //    Strict Directive, return true; otherwise return false.
         return self.statement_list.containsDirective("use strict");
     }
 };

@@ -241,10 +241,13 @@ fn evalDeclarationInstantiation(
 
                     // a. If ! thisEnv.HasBinding(name) is true, then
                     if (this_env.hasBinding(agent, name) catch |err| try noexcept(err)) {
-                        // i. Throw a SyntaxError exception.
+                        // i. If the host is a web browser or otherwise supports VariableStatements
+                        //    in Catch Blocks, then
+                        //     i. If thisEnv is not the Environment Record for a Catch clause,
+                        //        throw a SyntaxError exception.
+                        // ii. Else,
+                        //     i. Throw a SyntaxError exception.
                         return agent.throwException(.syntax_error, "idk", .{});
-
-                        // ii. NOTE: Annex B.3.4 defines alternate semantics for the above step.
                     }
 
                     // b. NOTE: A direct eval will not hoist var declaration over a like-named
@@ -362,7 +365,10 @@ fn evalDeclarationInstantiation(
         }
     }
 
-    // 13. NOTE: Annex B.3.2.3 adds additional steps at this point.
+    // 13. If strict is false and the host is a web browser or otherwise supports Block-Level
+    //     Function Declarations Web Legacy Compatibility Semantics, then
+    //     [...]
+
     // 14. NOTE: No abnormal terminations occur after this algorithm step unless varEnv is a Global
     //     Environment Record and the global object is a Proxy exotic object.
 

@@ -1635,7 +1635,7 @@ pub fn codegenEqualityExpression(
             // 5. Let r be ? IsLooselyEqual(rVal, lVal).
             try executable.addInstruction(.is_loosely_equal, {});
 
-            // 6. If r is true, return false. Otherwise, return true.
+            // 6. If r is true, return false; otherwise return true.
             try executable.addInstruction(.logical_not, {});
         },
         .@"===" => {
@@ -1646,7 +1646,7 @@ pub fn codegenEqualityExpression(
             // 5. Let r be IsStrictlyEqual(rVal, lVal).
             try executable.addInstruction(.is_strictly_equal, {});
 
-            // 6. If r is true, return false. Otherwise, return true.
+            // 6. If r is true, return false; otherwise return true.
             try executable.addInstruction(.logical_not, {});
         },
     }
@@ -2672,9 +2672,9 @@ pub fn codegenForStatement(
             try codegenExpressionAndGetValue(expression, executable, ctx);
 
             // 2. If the second Expression is present, let test be the second Expression;
-            //    otherwise, let test be empty.
+            //    otherwise let test be empty.
             // 3. If the third Expression is present, let increment be the third Expression;
-            //    otherwise, let increment be empty.
+            //    otherwise let increment be empty.
             // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
         },
 
@@ -2684,9 +2684,9 @@ pub fn codegenForStatement(
             try codegenVariableStatement(variable_statement, executable, ctx);
 
             // 2. If the first Expression is present, let test be the first Expression;
-            //    otherwise, let test be empty.
+            //    otherwise let test be empty.
             // 3. If the second Expression is present, let increment be the second Expression;
-            //    otherwise, let increment be empty.
+            //    otherwise let increment be empty.
             // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
         },
 
@@ -2718,8 +2718,8 @@ pub fn codegenForStatement(
 
             // TODO: 9. If isConst is false, let perIterationLets be boundNames; otherwise let perIterationLets be a new empty List.
 
-            // 10. If the first Expression is present, let test be the first Expression; otherwise, let test be empty.
-            // 11. If the second Expression is present, let increment be the second Expression; otherwise, let increment be empty.
+            // 10. If the first Expression is present, let test be the first Expression; otherwise let test be empty.
+            // 11. If the second Expression is present, let increment be the second Expression; otherwise let increment be empty.
             // 12. Let bodyResult be Completion(ForBodyEvaluation(test, increment, Statement, perIterationLets, labelSet)).
 
             // 13. Set the running execution context's LexicalEnvironment to oldEnv.

@@ -1013,7 +1013,7 @@ fn executeGreaterThan(self: *Vm) Agent.Error!void {
     // 5. Let r be ? IsLessThan(rVal, lVal, false).
     const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
-    // 6. If r is undefined, return false. Otherwise, return r.
+    // 6. If r is undefined, return false; otherwise return r.
     self.result = Value.from(result orelse false);
 }
 
@@ -1034,7 +1034,7 @@ fn executeGreaterThanEquals(self: *Vm) Agent.Error!void {
     // 5. Let r be ? IsLessThan(lVal, rVal, true).
     const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
-    // 6. If r is either true or undefined, return false. Otherwise, return true.
+    // 6. If r is either true or undefined, return false; otherwise return true.
     self.result = Value.from(!(result orelse true));
 }
 
@@ -1278,7 +1278,7 @@ fn executeLessThan(self: *Vm) Agent.Error!void {
     // 5. Let r be ? IsLessThan(lVal, rVal, true).
     const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
-    // 6. If r is undefined, return false. Otherwise, return r.
+    // 6. If r is undefined, return false; otherwise return r.
     self.result = Value.from(result orelse false);
 }
 
@@ -1299,7 +1299,7 @@ fn executeLessThanEquals(self: *Vm) Agent.Error!void {
     // 5. Let r be ? IsLessThan(rVal, lVal, false).
     const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
-    // 6. If r is either true or undefined, return false. Otherwise, return true.
+    // 6. If r is either true or undefined, return false; otherwise return true.
     self.result = Value.from(!(result orelse true));
 }
 

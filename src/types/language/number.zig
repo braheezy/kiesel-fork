@@ -239,7 +239,7 @@ pub const Number = union(enum) {
 
         // 4. If base is +∞𝔽, then
         if (base.isPositiveInf()) {
-            // a. If exponent > +0𝔽, return +∞𝔽. Otherwise, return +0𝔽.
+            // a. If exponent > +0𝔽, return +∞𝔽; otherwise return +0𝔽.
             if (exponent.asFloat() > 0)
                 return .{ .f64 = std.math.inf(f64) }
             else
@@ -250,14 +250,14 @@ pub const Number = union(enum) {
         if (base.isNegativeInf()) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
-                // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
+                // i. If exponent is an odd integral Number, return -∞𝔽; otherwise return +∞𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
                     return .{ .f64 = std.math.inf(f64) };
             } else {
                 // b. Else,
-                // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
+                // i. If exponent is an odd integral Number, return -0𝔽; otherwise return +0𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
@@ -267,7 +267,7 @@ pub const Number = union(enum) {
 
         // 6. If base is +0𝔽, then
         if (base.isPositiveZero()) {
-            // a. If exponent > +0𝔽, return +0𝔽. Otherwise, return +∞𝔽.
+            // a. If exponent > +0𝔽, return +0𝔽; otherwise return +∞𝔽.
             if (exponent.asFloat() > 0)
                 return .{ .i32 = 0 }
             else
@@ -278,14 +278,14 @@ pub const Number = union(enum) {
         if (base.isNegativeZero()) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
-                // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
+                // i. If exponent is an odd integral Number, return -0𝔽; otherwise return +0𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
                     return .{ .i32 = 0 };
             } else {
                 // b. Else,
-                // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
+                // i. If exponent is an odd integral Number, return -∞𝔽; otherwise return +∞𝔽.
                 if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
@@ -490,7 +490,7 @@ pub const Number = union(enum) {
         // 10. Assert: x and y are finite.
         std.debug.assert(std.math.isFinite(x.asFloat()) and std.math.isFinite(y.asFloat()));
 
-        // 11. If ℝ(x) < ℝ(y), return true. Otherwise, return false.
+        // 11. If ℝ(x) < ℝ(y), return true; otherwise return false.
         return x.asFloat() < y.asFloat();
     }
 

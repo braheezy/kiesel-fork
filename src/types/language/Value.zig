@@ -526,13 +526,10 @@ pub fn typeof(self: Value) *const String {
 
         // 11. Assert: val is an Object.
         .object => blk: {
-            // B.3.6.3 Changes to the typeof Operator
-            // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
+            // 12. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal Slot, then
             if (build_options.enable_annex_b) {
-                // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
+                // a. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
                 if (self.asObject().isHTMLDDA()) break :blk String.fromLiteral("undefined");
-            } else {
-                // 12. NOTE: This step is replaced in section B.3.6.3.
             }
 
             // 13. If val has a [[Call]] internal method, return "function".
@@ -747,14 +744,11 @@ pub fn toBoolean(self: Value) bool {
         else => {},
     }
 
-    // B.3.6.1 Changes to ToBoolean
-    // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-to-boolean
+    // 3. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal Slot, then
     if (build_options.enable_annex_b) {
-        // 3. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
+        // a. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
         //    false.
         if (self.isObject() and self.asObject().isHTMLDDA()) return false;
-    } else {
-        // 3. NOTE: This step is replaced in section B.3.6.1.
     }
 
     // 4. Return true.
@@ -977,7 +971,7 @@ pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
     // 7. If clamped > f + 0.5, return 𝔽(f + 1).
     if (clamped > f + 0.5) return f_int + 1;
 
-    // 8. If f is even, return 𝔽(f). Otherwise, return 𝔽(f + 1).
+    // 8. If f is even, return 𝔽(f); otherwise return 𝔽(f + 1).
     if (f_int % 2 == 0) return f_int else return f_int + 1;
 }
 
@@ -1099,29 +1093,48 @@ pub fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
 pub fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
     return switch (self.type()) {
+        // 1. If argument is either undefined or null, throw a TypeError exception.
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
         .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
+
+        // 2. If argument is a Boolean, return a new Boolean object whose [[BooleanData]] internal
+        //    slot is set to argument. See 20.3 for a description of Boolean objects.
         .boolean => try builtins.Boolean.create(agent, .{
             .fields = .{ .boolean_data = self.asBoolean() },
             .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
         }),
+
+        // 3. If argument is a Number, return a new Number object whose [[NumberData]] internal
+        //    slot is set to argument. See 21.1 for a description of Number objects.
         .number => try builtins.Number.create(agent, .{
             .fields = .{ .number_data = self.asNumber() },
             .prototype = try realm.intrinsics.@"%Number.prototype%"(),
         }),
+
+        // 4. If argument is a String, return a new String object whose [[StringData]] internal
+        //    slot is set to argument. See 22.1 for a description of String objects.
         .string => try stringCreate(
             agent,
             self.asString(),
             try realm.intrinsics.@"%String.prototype%"(),
         ),
+
+        // 5. If argument is a Symbol, return a new Symbol object whose [[SymbolData]] internal
+        //    slot is set to argument. See 20.4 for a description of Symbol objects.
         .symbol => try builtins.Symbol.create(agent, .{
             .fields = .{ .symbol_data = self.asSymbol() },
             .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
         }),
+
+        // 6. If argument is a BigInt, return a new BigInt object whose [[BigIntData]] internal
+        //    slot is set to argument. See 21.2 for a description of BigInt objects.
         .big_int => try builtins.BigInt.create(agent, .{
             .fields = .{ .big_int_data = self.asBigInt() },
             .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
         }),
+
+        // 7. Assert: argument is an Object.
+        // 8. Return argument.
         .object => self.asObject(),
     };
 }
@@ -1186,11 +1199,14 @@ pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
 /// 7.2.1 RequireObjectCoercible ( argument )
 /// https://tc39.es/ecma262/#sec-requireobjectcoercible
 pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}!Value {
-    switch (self.type()) {
-        .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
-        .null => return agent.throwException(.type_error, "Cannot convert null to Object", .{}),
-        else => return self,
-    }
+    return switch (self.type()) {
+        // 1. If argument is either undefined or null, throw a TypeError exception.
+        .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
+        .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
+
+        // 2. Return argument.
+        else => self,
+    };
 }
 
 /// 7.2.2 IsArray ( argument )
@@ -1893,15 +1909,15 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 
         // 4. If x is a String, then
         //     a. If x and y have the same length and the same code units in the same positions,
-        //        return true; otherwise, return false.
+        //        return true; otherwise return false.
         .string => x.asString().eql(y.asString()),
 
         // 5. If x is a Boolean, then
-        //     a. If x and y are both true or both false, return true; otherwise, return false.
+        //     a. If x and y are both true or both false, return true; otherwise return false.
         .boolean => x.asBoolean() == y.asBoolean(),
 
         // 6. NOTE: All other ECMAScript language values are compared by identity.
-        // 7. If x is y, return true; otherwise, return false.
+        // 7. If x is y, return true; otherwise return false.
         .symbol => x.asSymbol() == y.asSymbol(),
         .object => x.asObject() == y.asObject(),
 
@@ -1962,7 +1978,7 @@ pub fn isLessThan(
             if (cx > cy) return false;
         }
 
-        // d. If lx < ly, return true. Otherwise, return false.
+        // d. If lx < ly, return true; otherwise return false.
         return lx < ly;
     } else {
         // 4. Else,
@@ -2042,10 +2058,8 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 3. If x is undefined and y is null, return true.
     if (x.isUndefined() and y.isNull()) return true;
 
-    // B.3.6.2 Changes to IsLooselyEqual
-    // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-aec
+    // 4. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal Slot, then
     if (build_options.enable_annex_b) {
-        // 4. Perform the following steps:
         // a. If x is an Object, x has an [[IsHTMLDDA]] internal slot, and y is either undefined or
         //    null, return true.
         if (x.isObject() and x.asObject().isHTMLDDA() and (y.isUndefined() or y.isNull())) return true;
@@ -2053,8 +2067,6 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
         // b. If x is either undefined or null, y is an Object, and y has an [[IsHTMLDDA]] internal
         //    slot, return true.
         if ((x.isUndefined() or x.isNull()) and y.isObject() and y.asObject().isHTMLDDA()) return true;
-    } else {
-        // 4. NOTE: This step is replaced in section B.3.6.2.
     }
 
     // 5. If x is a Number and y is a String, return ! IsLooselyEqual(x, ! ToNumber(y)).

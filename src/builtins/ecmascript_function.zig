@@ -1110,7 +1110,7 @@ pub fn setFunctionName(
 
             // 2. If name is a Symbol, then
             .symbol => |symbol| blk: {
-                // a. Let description be name's [[Description]] value.
+                // a. Let description be name.[[Description]].
                 const description = symbol.description orelse {
                     // b. If description is undefined, set name to the empty String.
                     break :blk .empty;
@@ -1149,7 +1149,9 @@ pub fn setFunctionName(
 
         // b. If F has an [[InitialName]] internal slot, then
         if (function.is(BuiltinFunction)) {
-            // i. Optionally, set F.[[InitialName]] to name.
+            // i. NOTE: The choice in the following step is made independently each time this
+            //    Abstract Operation is invoked.
+            // ii. Optionally, set F.[[InitialName]] to name.
             function.as(BuiltinFunction).fields.initial_name = name;
         }
     }
@@ -1227,7 +1229,7 @@ fn functionDeclarationInstantiation(
     // 5. Let parameterNames be the BoundNames of formals.
     const parameter_names = cached_ast_values.parameter_names;
 
-    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true. Otherwise, let
+    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; otherwise let
     //    hasDuplicates be false.
     const has_duplicates = cached_ast_values.parameter_names_has_duplicates;
 
@@ -1521,35 +1523,37 @@ fn functionDeclarationInstantiation(
         break :blk var_env;
     };
 
-    // 31. NOTE: Annex B.3.2.1 adds additional steps at this point.
+    // 31. If strict is true, then
+    const lex_env = if (strict) blk: {
+        // a. Let lexEnv be varEnv.
+        break :blk var_env;
+    } else blk: {
+        // 32. Else,
+        // a. If the host is a web browser or otherwise supports Block-Level Function Declarations
+        //    Web Legacy Compatibility Semantics, then
+        //    [...]
 
-    // 32. If strict is false, then
-    const lex_env = if (!strict) blk: {
-        // a. Let lexEnv be NewDeclarativeEnvironment(varEnv).
+        // b. Let lexEnv be NewDeclarativeEnvironment(varEnv).
         const lex_env: Environment = .{
             .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, var_env),
         };
 
-        // b. NOTE: Non-strict functions use a separate Environment Record for top-level lexical
+        // c. NOTE: Non-strict functions use a separate Environment Record for top-level lexical
         //    declarations so that a direct eval can determine whether any var scoped declarations
         //    introduced by the eval code conflict with pre-existing top-level lexically scoped
         //    declarations. This is not needed for strict functions because a strict direct eval
         //    always places all declarations into a new Environment Record.
 
         break :blk lex_env;
-    } else blk: {
-        // 33. Else,
-        // a. Let lexEnv be varEnv.
-        break :blk var_env;
     };
 
-    // 34. Set the LexicalEnvironment of calleeContext to lexEnv.
+    // 33. Set the LexicalEnvironment of calleeContext to lexEnv.
     callee_context.ecmascript_code.lexical_environment = lex_env;
 
-    // 35. Let lexDeclarations be the LexicallyScopedDeclarations of code.
+    // 34. Let lexDeclarations be the LexicallyScopedDeclarations of code.
     const lex_declarations = cached_ast_values.lexically_scoped_declarations;
 
-    // 36. For each element d of lexDeclarations, do
+    // 35. For each element d of lexDeclarations, do
     for (lex_declarations, 0..) |declaration, i| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
         //    declaration, formal parameter, or a var name. Lexically declared names are only
@@ -1571,10 +1575,10 @@ fn functionDeclarationInstantiation(
         }
     }
 
-    // 37. Let privateEnv be the PrivateEnvironment of calleeContext.
+    // 36. Let privateEnv be the PrivateEnvironment of calleeContext.
     const private_env = callee_context.ecmascript_code.private_environment;
 
-    // 38. For each Parse Node f of functionsToInitialize, do
+    // 37. For each Parse Node f of functionsToInitialize, do
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
@@ -1598,5 +1602,5 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
     }
 
-    // 39. Return unused.
+    // 38. Return unused.
 }
