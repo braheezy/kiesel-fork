@@ -318,7 +318,7 @@ pub const constructor = struct {
         const iterable = arguments.get(0);
 
         // 1. Perform ? RequireObjectCoercible(iterable).
-        _ = try iterable.requireObjectCoercible(agent);
+        try iterable.requireObjectCoercible(agent);
 
         // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%).
         // 3. Assert: obj is an extensible ordinary object with no own properties.
@@ -649,8 +649,8 @@ pub const constructor = struct {
         const object = arguments.get(0);
         const prototype_ = arguments.get(1);
 
-        // 1. Set O to ? RequireObjectCoercible(O).
-        _ = try object.requireObjectCoercible(agent);
+        // 1. Perform ? RequireObjectCoercible(O).
+        try object.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
         if (!prototype_.isObject() and !prototype_.isNull()) {
@@ -897,28 +897,31 @@ pub const prototype = struct {
     fn @"set __proto__"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const prototype_ = arguments.get(0);
 
-        // 1. Let O be ? RequireObjectCoercible(this value).
-        const object = try this_value.requireObjectCoercible(agent);
+        // 1. Let O be the this value.
+        const object = this_value;
 
-        // 2. If proto is not an Object and proto is not null, return undefined.
+        // 2. Perform ? RequireObjectCoercible(O).
+        try object.requireObjectCoercible(agent);
+
+        // 3. If proto is not an Object and proto is not null, return undefined.
         if (!prototype_.isObject() and !prototype_.isNull()) return .undefined;
 
-        // 3. If O is not an Object, return undefined.
+        // 4. If O is not an Object, return undefined.
         if (!object.isObject()) return .undefined;
 
-        // 4. Let status be ? O.[[SetPrototypeOf]](proto).
+        // 5. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internal_methods.setPrototypeOf(
             agent,
             object.asObject(),
             if (prototype_.isObject()) prototype_.asObject() else null,
         );
 
-        // 5. If status is false, throw a TypeError exception.
+        // 6. If status is false, throw a TypeError exception.
         if (!status) {
             return agent.throwException(.type_error, "Could not set prototype", .{});
         }
 
-        // 6. Return undefined.
+        // 7. Return undefined.
         return .undefined;
     }
 

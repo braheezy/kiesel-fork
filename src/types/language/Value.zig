@@ -1198,14 +1198,14 @@ pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
 
 /// 7.2.1 RequireObjectCoercible ( argument )
 /// https://tc39.es/ecma262/#sec-requireobjectcoercible
-pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}!Value {
+pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}!void {
     return switch (self.type()) {
         // 1. If argument is either undefined or null, throw a TypeError exception.
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
         .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
 
-        // 2. Return argument.
-        else => self,
+        // 2. Return unused.
+        else => {},
     };
 }
 
@@ -1517,7 +1517,7 @@ pub fn groupBy(
     comptime key_coercion: KeyCoercion,
 ) Agent.Error!GroupByContainer(key_coercion) {
     // 1. Perform ? RequireObjectCoercible(items).
-    _ = try self.requireObjectCoercible(agent);
+    try self.requireObjectCoercible(agent);
 
     // 2. If IsCallable(callback) is false, throw a TypeError exception.
     if (!callback.isCallable()) {

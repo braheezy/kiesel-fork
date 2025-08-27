@@ -794,10 +794,10 @@ pub const namespace = struct {
         // the JavaScript polyfill in the proposal's repository by Kevin Gibbons (bakkot on GitHub).
         // See the polyfill directory in https://github.com/tc39/proposal-math-sum for the licenses.
 
-        const items_ = arguments.get(0);
+        const items = arguments.get(0);
 
         // 1. Perform ? RequireObjectCoercible(items).
-        const items = try items_.requireObjectCoercible(agent);
+        try items.requireObjectCoercible(agent);
 
         // 2. Let iteratorRecord be ? GetIterator(items, SYNC).
         var iterator = try getIterator(agent, items, .sync);
