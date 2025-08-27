@@ -293,11 +293,12 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // 1. Let length be the length of S.
     const length = string.length();
 
-    // 2. Let lastIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
-    var last_index = std.math.lossyCast(
-        usize,
-        try (try reg_exp.object.get(agent, PropertyKey.from("lastIndex"))).toLength(agent),
-    );
+    // 2. Let lastIndex be ℝ(? ToLength(! Get(R, "lastIndex"))).
+    const last_index_value = reg_exp.object.get(
+        agent,
+        PropertyKey.from("lastIndex"),
+    ) catch |err| try noexcept(err);
+    var last_index: usize = @intCast(try last_index_value.toLength(agent));
 
     const re_bytecode = reg_exp.fields.re_bytecode;
     const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(@ptrCast(re_bytecode)));
