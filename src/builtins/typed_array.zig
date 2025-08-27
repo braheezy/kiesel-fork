@@ -2907,22 +2907,18 @@ pub const prototype = struct {
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
         const typed_array = ta.object;
 
-        // 3. Let length be TypedArrayLength(taRecord).
+        // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. Let A be ? TypedArrayCreateSameType(O, « 𝔽(length) »).
-        const new_typed_array = try typedArrayCreateSameType(
-            agent,
-            typed_array,
-            &.{Value.from(len)},
-        );
+        // 4. Let A be ? TypedArrayCreateSameType(O, len).
+        const new_typed_array = try typedArrayCreateSameType(agent, typed_array, len);
 
         // 5. Let k be 0.
         var k: u53 = 0;
 
-        // 6. Repeat, while k < length,
+        // 6. Repeat, while k < len,
         while (k < len) : (k += 1) {
-            // a. Let from be ! ToString(𝔽(length - k - 1)).
+            // a. Let from be ! ToString(𝔽(len - k - 1)).
             const from = PropertyKey.from(len - k - 1);
 
             // b. Let Pk be ! ToString(𝔽(k)).
@@ -2964,12 +2960,8 @@ pub const prototype = struct {
         // 4. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 5. Let A be ? TypedArrayCreateSameType(O, « 𝔽(len) »).
-        const new_typed_array = try typedArrayCreateSameType(
-            agent,
-            typed_array,
-            &.{Value.from(len)},
-        );
+        // 5. Let A be ? TypedArrayCreateSameType(O, len).
+        const new_typed_array = try typedArrayCreateSameType(agent, typed_array, len);
 
         // 6. NOTE: The following closure performs a numeric comparison rather than the string
         //    comparison used in 23.1.3.34.
@@ -3068,12 +3060,8 @@ pub const prototype = struct {
         }
         const actual_index: u53 = @intFromFloat(actual_index_f64);
 
-        // 10. Let A be ? TypedArrayCreateSameType(O, « 𝔽(len) »).
-        const new_typed_array = try typedArrayCreateSameType(
-            agent,
-            typed_array,
-            &.{Value.from(len)},
-        );
+        // 10. Let A be ? TypedArrayCreateSameType(O, len).
+        const new_typed_array = try typedArrayCreateSameType(agent, typed_array, len);
 
         // 11. Let k be 0.
         var k: u53 = 0;
@@ -3165,12 +3153,12 @@ fn typedArrayCreateFromConstructor(
     return new_typed_array;
 }
 
-/// 23.2.4.2 TypedArrayCreateSameType ( exemplar, argumentList )
+/// 23.2.4.2 TypedArrayCreateSameType ( exemplar, length )
 /// https://tc39.es/ecma262/#sec-typedarray-create-same-type
 fn typedArrayCreateSameType(
     agent: *Agent,
     exemplar: *const TypedArray,
-    argument_list: []const Value,
+    length: u53,
 ) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
@@ -3183,13 +3171,18 @@ fn typedArrayCreateSameType(
         },
     };
 
-    // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
-    const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
+    // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, « 𝔽(length) »).
+    const result = try typedArrayCreateFromConstructor(
+        agent,
+        constructor_,
+        &.{Value.from(length)},
+    );
 
-    // 3. Assert: result.[[ContentType]] is exemplar.[[ContentType]].
+    // 3. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
+    // 4. Assert: result.[[ContentType]] is exemplar.[[ContentType]].
     std.debug.assert(result.as(TypedArray).fields.content_type == exemplar.fields.content_type);
 
-    // 4. Return result.
+    // 5. Return result.
     return result;
 }
 
