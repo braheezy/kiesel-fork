@@ -2249,8 +2249,7 @@ pub fn classDefinitionEvaluation(
         break :blk function;
     };
 
-    // FIXME: The spec sets [[SourceText]] after calling ClassDefinitionEvaluation, which doesn't
-    //        work for static blocks. See https://github.com/tc39/ecma262/issues/2669.
+    // 16. Set F.[[SourceText]] to sourceText.
     if (function.is(builtins.ECMAScriptFunction)) {
         function.as(builtins.ECMAScriptFunction).fields.source_text = source_text;
     } else if (function.is(builtins.BuiltinFunction)) {
@@ -2258,10 +2257,10 @@ pub fn classDefinitionEvaluation(
         class_constructor_fields.source_text = source_text;
     } else unreachable;
 
-    // 16. Perform MakeConstructor(F, false, proto).
+    // 17. Perform MakeConstructor(F, false, proto).
     try makeConstructor(agent, function, .{ .writable_prototype = false, .prototype = prototype });
 
-    // 17. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
+    // 18. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {
         if (function.is(builtins.ECMAScriptFunction)) {
             function.as(builtins.ECMAScriptFunction).fields.constructor_kind = .derived;
@@ -2271,7 +2270,7 @@ pub fn classDefinitionEvaluation(
         } else unreachable;
     }
 
-    // 18. Perform ! DefineMethodProperty(proto, "constructor", F, false).
+    // 19. Perform ! DefineMethodProperty(proto, "constructor", F, false).
     _ = defineMethodProperty(
         agent,
         prototype,
@@ -2280,31 +2279,31 @@ pub fn classDefinitionEvaluation(
         false,
     ) catch |err| try noexcept(err);
 
-    // 19. If ClassBody[opt] is not present, let elements be a new empty List.
-    // 20. Else, let elements be the NonConstructorElements of ClassBody.
+    // 20. If ClassBody[opt] is not present, let elements be a new empty List.
+    // 21. Else, let elements be the NonConstructorElements of ClassBody.
     const elements = try class_tail.class_body.nonConstructorElements(agent.gc_allocator);
     defer agent.gc_allocator.free(elements);
 
-    // 21. Let instancePrivateMethods be a new empty List.
+    // 22. Let instancePrivateMethods be a new empty List.
     var instance_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
-    // 22. Let staticPrivateMethods be a new empty List.
+    // 23. Let staticPrivateMethods be a new empty List.
     var static_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
     defer static_private_methods.deinit(agent.gc_allocator);
 
-    // 23. Let instanceFields be a new empty List.
+    // 24. Let instanceFields be a new empty List.
     var instance_fields: std.ArrayListUnmanaged(ClassFieldDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
-    // 24. Let staticElements be a new empty List.
+    // 25. Let staticElements be a new empty List.
     var static_elements: std.ArrayListUnmanaged(union(enum) {
         class_field_definition: ClassFieldDefinition,
         class_static_block_definition: ClassStaticBlockDefinition,
     }) = .empty;
     defer static_elements.deinit(agent.gc_allocator);
 
-    // 25. For each ClassElement e of elements, do
+    // 26. For each ClassElement e of elements, do
     for (elements) |class_element| {
         // a. If IsStatic of e is false, then
         const element_or_error = if (!class_element.isStatic()) blk: {
@@ -2406,16 +2405,16 @@ pub fn classDefinitionEvaluation(
         };
     }
 
-    // 26. Set the running execution context's LexicalEnvironment to env.
+    // 27. Set the running execution context's LexicalEnvironment to env.
     agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
-    // 27. If classBinding is not undefined, then
+    // 28. If classBinding is not undefined, then
     if (class_binding != null) {
         // a. Perform ! classEnv.InitializeBinding(classBinding, F).
         class_env.initializeBinding(class_binding.?, Value.from(function));
     }
 
-    // 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
+    // 29. Set F.[[PrivateMethods]] to instancePrivateMethods.
     if (function.is(builtins.ECMAScriptFunction)) {
         function.as(builtins.ECMAScriptFunction).fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
     } else if (function.is(builtins.BuiltinFunction)) {
@@ -2423,7 +2422,7 @@ pub fn classDefinitionEvaluation(
         class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
-    // 29. Set F.[[Fields]] to instanceFields.
+    // 30. Set F.[[Fields]] to instanceFields.
     if (function.is(builtins.ECMAScriptFunction)) {
         function.as(builtins.ECMAScriptFunction).fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else if (function.is(builtins.BuiltinFunction)) {
@@ -2431,7 +2430,7 @@ pub fn classDefinitionEvaluation(
         class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
-    // 30. For each PrivateElement method of staticPrivateMethods, do
+    // 31. For each PrivateElement method of staticPrivateMethods, do
     for (static_private_methods.items) |method| {
         // a. Perform ! PrivateMethodOrAccessorAdd(F, method).
         function.privateMethodOrAccessorAdd(
@@ -2441,7 +2440,7 @@ pub fn classDefinitionEvaluation(
         ) catch |err| try noexcept(err);
     }
 
-    // 31. For each element elementRecord of staticElements, do
+    // 32. For each element elementRecord of staticElements, do
     for (static_elements.items) |element| {
         const result = switch (element) {
             // a. If elementRecord is a ClassFieldDefinition Record, then
@@ -2472,10 +2471,10 @@ pub fn classDefinitionEvaluation(
         };
     }
 
-    // 32. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
+    // 33. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
     agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
 
-    // 33. Return F.
+    // 34. Return F.
     return function;
 }
 
@@ -2490,20 +2489,23 @@ pub fn bindingClassDeclarationEvaluation(
         // 1. Let className be the StringValue of BindingIdentifier.
         const class_name = try String.fromUtf8(agent, identifier);
 
-        // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
-        // 3. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
+        // 2. Let sourceText be the source text matched by ClassDeclaration.
+        const source_text = class_declaration.source_text;
+
+        // 3. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className,
+        //    className, and sourceText.
         const value = try classDefinitionEvaluation(
             agent,
             class_declaration.class_tail,
             class_name,
             class_name,
-            class_declaration.source_text,
+            source_text,
         );
 
         // 4. Let env be the running execution context's LexicalEnvironment.
         const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
-        // 5. Perform ? InitializeBoundName(className, value, env).
+        // 5. Perform ? InitializeBoundName(className, value, env).
         try initializeBoundName(agent, class_name, Value.from(value), .{ .environment = env });
 
         // 6. Return value.
@@ -2511,16 +2513,17 @@ pub fn bindingClassDeclarationEvaluation(
     }
     // ClassDeclaration : class ClassTail
     else {
-        // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and
-        //    "default".
-        // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
-        // 3. Return value.
+        // 1. Let sourceText be the source text matched by ClassDeclaration.
+        const source_text = class_declaration.source_text;
+
+        // 2. Return ? ClassDefinitionEvaluation of ClassTail with arguments undefined, "default",
+        //    and sourceText.
         return classDefinitionEvaluation(
             agent,
             class_declaration.class_tail,
             null,
             String.fromLiteral("default"),
-            class_declaration.source_text,
+            source_text,
         );
     }
 }

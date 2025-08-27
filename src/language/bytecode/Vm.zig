@@ -424,29 +424,32 @@ fn executeClassDefinitionEvaluation(
         // 1. Let className be the StringValue of BindingIdentifier.
         const class_name = try String.fromUtf8(self.agent, identifier);
 
-        // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
-        // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
-        // 4. Return value.
+        // 2. Let sourceText be the source text matched by ClassExpression.
+        const source_text = class_expression.source_text;
+
+        // 3. Return ? ClassDefinitionEvaluation of ClassTail with arguments className, className,
+        //    and sourceText.
         const value = try classDefinitionEvaluation(
             self.agent,
             class_expression.class_tail,
             class_name,
             class_name,
-            class_expression.source_text,
+            source_text,
         );
         self.result = Value.from(value);
     }
     // ClassExpression : class ClassTail
     else {
-        // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and "".
-        // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
-        // 3. Return value.
+        // 1. Let sourceText be the source text matched by ClassExpression.
+        const source_text = class_expression.source_text;
+
+        // 2. Return ? ClassDefinitionEvaluation of ClassTail with arguments undefined, "", and sourceText.
         const value = try classDefinitionEvaluation(
             self.agent,
             class_expression.class_tail,
             null,
             .empty,
-            class_expression.source_text,
+            source_text,
         );
         self.result = Value.from(value);
     }
