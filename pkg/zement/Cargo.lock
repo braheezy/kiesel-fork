@@ -140,7 +140,7 @@ dependencies = [
  "icu_locale 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
- "ixdtf 0.6.2 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
+ "ixdtf 0.6.2",
  "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "zerovec 0.11.4 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
@@ -585,7 +585,7 @@ dependencies = [
  "icu_locale_core 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "icu_provider 2.0.0 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "icu_time_data",
- "ixdtf 0.6.2 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
+ "ixdtf 0.6.2",
  "serde",
  "tinystr 0.8.1 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
  "writeable 0.6.1 (git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498)",
@@ -601,16 +601,16 @@ source = "git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58
 [[package]]
 name = "ixdtf"
 version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08b741faae9005d3c809ca4b8566d75745c408171b3c6bbb54d2b00d04910c1c"
+source = "git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498#472e602aeac54f1aa5a58e889cb93f075f565498"
 dependencies = [
  "displaydoc",
 ]
 
 [[package]]
 name = "ixdtf"
-version = "0.6.2"
-source = "git+https://github.com/unicode-org/icu4x.git?rev=472e602aeac54f1aa5a58e889cb93f075f565498#472e602aeac54f1aa5a58e889cb93f075f565498"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33ef2d119044a672ceb96e59608dffe8677f29dc6ec48ed693a4b9ac84751e9b"
 dependencies = [
  "displaydoc",
 ]
@@ -723,9 +723,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.9"
+version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809e8dc61f6de73b46c85f4c96486310fe304c434cfa43669d7b40f711150908"
+checksum = "6b9458fa0bfeeac22b5ca447c63aaf45f28439a709ccd244698632f9aa6394d6"
 
 [[package]]
 name = "ryu"
@@ -798,8 +798,8 @@ dependencies = [
 
 [[package]]
 name = "temporal_capi"
-version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
+version = "0.0.14"
+source = "git+https://github.com/boa-dev/temporal.git?rev=df531eb676db3ee9afa46acd9eced170259f619d#df531eb676db3ee9afa46acd9eced170259f619d"
 dependencies = [
  "diplomat",
  "diplomat-runtime",
@@ -812,14 +812,14 @@ dependencies = [
 
 [[package]]
 name = "temporal_rs"
-version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
+version = "0.0.14"
+source = "git+https://github.com/boa-dev/temporal.git?rev=df531eb676db3ee9afa46acd9eced170259f619d#df531eb676db3ee9afa46acd9eced170259f619d"
 dependencies = [
  "combine",
  "core_maths",
  "icu_calendar 2.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "icu_locale 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ixdtf 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ixdtf 0.6.3",
  "jiff-tzdb",
  "num-traits",
  "timezone_provider",
@@ -830,8 +830,8 @@ dependencies = [
 
 [[package]]
 name = "timezone_provider"
-version = "0.0.12"
-source = "git+https://github.com/boa-dev/temporal.git?rev=35cd1af84dd35bad03fdc74a2eb133d2db4abd68#35cd1af84dd35bad03fdc74a2eb133d2db4abd68"
+version = "0.0.14"
+source = "git+https://github.com/boa-dev/temporal.git?rev=df531eb676db3ee9afa46acd9eced170259f619d#df531eb676db3ee9afa46acd9eced170259f619d"
 dependencies = [
  "tinystr 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zerotrie 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
