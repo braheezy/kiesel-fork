@@ -102,6 +102,7 @@ const Kiesel = struct {
         try kiesel_object.defineBuiltinFunction(agent, "evalScript", evalScript, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "isMerlin", isMerlin, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "print", print, 1, realm);
+        try kiesel_object.defineBuiltinFunction(agent, "ptr", ptr, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "readFile", readFile_, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "readLine", readLine, 0, realm);
         try kiesel_object.defineBuiltinFunction(agent, "readStdin", readStdin, 0, realm);
@@ -111,6 +112,21 @@ const Kiesel = struct {
             const gc_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
             try gc_object.defineBuiltinFunction(agent, "collect", collect, 0, realm);
             try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
+        }
+        if (builtin.os.tag == .linux) {
+            try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
+            const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+            inline for (std.meta.fields(std.os.linux.SYS)) |field| {
+                @setEvalBranchQuota(100_000);
+                const name: []const u8 = comptime blk: {
+                    var name: [field.name.len]u8 = undefined;
+                    _ = std.ascii.upperString(&name, field.name);
+                    const final = name;
+                    break :blk &final;
+                };
+                try sysno_object.defineBuiltinProperty(agent, name, Value.from(@as(u53, @intCast(field.value))));
+            }
+            try kiesel_object.defineBuiltinProperty(agent, "Sysno", Value.from(sysno_object));
         }
         return kiesel_object;
     }
@@ -240,6 +256,32 @@ const Kiesel = struct {
         return .undefined;
     }
 
+    fn ptr(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+        const value_ptr: ?*const anyopaque = if (value.isString()) blk: {
+            const string_utf8 = try value.asString().toUtf8(agent.gc_allocator);
+            break :blk string_utf8.ptr;
+        } else if (value.isObject() and value.asObject().is(kiesel.builtins.ArrayBuffer)) blk: {
+            const array_buffer = value.asObject().as(kiesel.builtins.ArrayBuffer);
+            if (array_buffer.fields.array_buffer_data) |data_block| {
+                if (data_block.items.len != 0) {
+                    break :blk data_block.items.ptr;
+                }
+            }
+            break :blk null;
+        } else if (value.isObject() and value.asObject().is(kiesel.builtins.SharedArrayBuffer)) blk: {
+            const array_buffer = value.asObject().as(kiesel.builtins.SharedArrayBuffer);
+            const data_block = array_buffer.fields.array_buffer_data;
+            if (data_block.items.len != 0) {
+                break :blk data_block.items.ptr;
+            }
+            break :blk null;
+        } else {
+            return agent.throwException(.type_error, "Cannot get pointer for value {}", .{value});
+        };
+        return Value.from(std.math.lossyCast(f64, @intFromPtr(value_ptr)));
+    }
+
     fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const path = try arguments.get(0).toString(agent);
         const bytes = readFile(
@@ -333,6 +375,59 @@ const Kiesel = struct {
             );
         };
         return .undefined;
+    }
+
+    fn syscall(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const number_value = try arguments.get(0).toLength(agent);
+        const number = std.meta.intToEnum(std.os.linux.SYS, number_value) catch {
+            return agent.throwException(.range_error, "Invalid syscall number {}", .{number_value});
+        };
+        const result = switch (arguments.count() -| 1) {
+            0 => blk: {
+                break :blk std.os.linux.syscall0(number);
+            },
+            1 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                break :blk std.os.linux.syscall1(number, arg1);
+            },
+            2 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                const arg2 = try arguments.get(2).toLength(agent);
+                break :blk std.os.linux.syscall2(number, arg1, arg2);
+            },
+            3 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                const arg2 = try arguments.get(2).toLength(agent);
+                const arg3 = try arguments.get(3).toLength(agent);
+                break :blk std.os.linux.syscall3(number, arg1, arg2, arg3);
+            },
+            4 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                const arg2 = try arguments.get(2).toLength(agent);
+                const arg3 = try arguments.get(3).toLength(agent);
+                const arg4 = try arguments.get(4).toLength(agent);
+                break :blk std.os.linux.syscall4(number, arg1, arg2, arg3, arg4);
+            },
+            5 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                const arg2 = try arguments.get(2).toLength(agent);
+                const arg3 = try arguments.get(3).toLength(agent);
+                const arg4 = try arguments.get(4).toLength(agent);
+                const arg5 = try arguments.get(5).toLength(agent);
+                break :blk std.os.linux.syscall5(number, arg1, arg2, arg3, arg4, arg5);
+            },
+            6 => blk: {
+                const arg1 = try arguments.get(1).toLength(agent);
+                const arg2 = try arguments.get(2).toLength(agent);
+                const arg3 = try arguments.get(3).toLength(agent);
+                const arg4 = try arguments.get(4).toLength(agent);
+                const arg5 = try arguments.get(5).toLength(agent);
+                const arg6 = try arguments.get(6).toLength(agent);
+                break :blk std.os.linux.syscall6(number, arg1, arg2, arg3, arg4, arg5, arg6);
+            },
+            else => return agent.throwException(.type_error, "Too many syscall arguments", .{}),
+        };
+        return Value.from(std.math.lossyCast(f64, result));
     }
 };
 
