@@ -114,6 +114,7 @@ const Kiesel = struct {
             try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
         }
         if (builtin.os.tag == .linux) {
+            try kiesel_object.defineBuiltinFunction(agent, "asm", @"asm", 1, realm);
             try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
             const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
             inline for (std.meta.fields(std.os.linux.SYS)) |field| {
@@ -129,6 +130,40 @@ const Kiesel = struct {
             try kiesel_object.defineBuiltinProperty(agent, "Sysno", Value.from(sysno_object));
         }
         return kiesel_object;
+    }
+
+    fn @"asm"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const buffer_value = arguments.get(0);
+        if (!buffer_value.isObject()) {
+            return agent.throwException(.type_error, "{} is not an Object", .{buffer_value});
+        }
+        if (!buffer_value.asObject().is(kiesel.builtins.ArrayBuffer) and !buffer_value.asObject().is(kiesel.builtins.SharedArrayBuffer)) {
+            return agent.throwException(.type_error, "{} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
+        }
+        const buffer: kiesel.builtins.array_buffer.ArrayBufferLike = if (buffer_value.asObject().is(kiesel.builtins.ArrayBuffer))
+            .{ .array_buffer = buffer_value.asObject().as(kiesel.builtins.ArrayBuffer) }
+        else
+            .{ .shared_array_buffer = buffer_value.asObject().as(kiesel.builtins.SharedArrayBuffer) };
+        if (kiesel.builtins.isDetachedBuffer(buffer)) {
+            return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
+        }
+        const data = buffer.arrayBufferData().?.items;
+        if (data.len == 0) {
+            return agent.throwException(.type_error, "ArrayBuffer has zero length", .{});
+        }
+        const data_exec = std.posix.mmap(
+            null,
+            data.len,
+            std.posix.PROT.READ | std.posix.PROT.WRITE | std.posix.PROT.EXEC,
+            .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
+            -1,
+            0,
+        ) catch |err| {
+            return agent.throwException(.internal_error, "mmap failed: {s}", .{@errorName(err)});
+        };
+        @memcpy(data_exec, data);
+        @as(*const fn () callconv(.c) void, @ptrCast(data_exec))();
+        return .undefined;
     }
 
     fn collect(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
