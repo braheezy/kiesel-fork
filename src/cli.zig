@@ -423,25 +423,25 @@ const Kiesel = struct {
             },
             1 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
-                break :blk std.os.linux.syscall1(number, arg1);
+                break :blk std.os.linux.syscall1(number, std.math.lossyCast(usize, arg1));
             },
             2 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
                 const arg2 = try arguments.get(2).toLength(agent);
-                break :blk std.os.linux.syscall2(number, arg1, arg2);
+                break :blk std.os.linux.syscall2(number, std.math.lossyCast(usize, arg1), std.math.lossyCast(usize, arg2));
             },
             3 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
                 const arg2 = try arguments.get(2).toLength(agent);
                 const arg3 = try arguments.get(3).toLength(agent);
-                break :blk std.os.linux.syscall3(number, arg1, arg2, arg3);
+                break :blk std.os.linux.syscall3(number, std.math.lossyCast(usize, arg1), std.math.lossyCast(usize, arg2), std.math.lossyCast(usize, arg3));
             },
             4 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
                 const arg2 = try arguments.get(2).toLength(agent);
                 const arg3 = try arguments.get(3).toLength(agent);
                 const arg4 = try arguments.get(4).toLength(agent);
-                break :blk std.os.linux.syscall4(number, arg1, arg2, arg3, arg4);
+                break :blk std.os.linux.syscall4(number, std.math.lossyCast(usize, arg1), std.math.lossyCast(usize, arg2), std.math.lossyCast(usize, arg3), std.math.lossyCast(usize, arg4));
             },
             5 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
@@ -449,7 +449,7 @@ const Kiesel = struct {
                 const arg3 = try arguments.get(3).toLength(agent);
                 const arg4 = try arguments.get(4).toLength(agent);
                 const arg5 = try arguments.get(5).toLength(agent);
-                break :blk std.os.linux.syscall5(number, arg1, arg2, arg3, arg4, arg5);
+                break :blk std.os.linux.syscall5(number, std.math.lossyCast(usize, arg1), std.math.lossyCast(usize, arg2), std.math.lossyCast(usize, arg3), std.math.lossyCast(usize, arg4), std.math.lossyCast(usize, arg5));
             },
             6 => blk: {
                 const arg1 = try arguments.get(1).toLength(agent);
@@ -458,7 +458,7 @@ const Kiesel = struct {
                 const arg4 = try arguments.get(4).toLength(agent);
                 const arg5 = try arguments.get(5).toLength(agent);
                 const arg6 = try arguments.get(6).toLength(agent);
-                break :blk std.os.linux.syscall6(number, arg1, arg2, arg3, arg4, arg5, arg6);
+                break :blk std.os.linux.syscall6(number, std.math.lossyCast(usize, arg1), std.math.lossyCast(usize, arg2), std.math.lossyCast(usize, arg3), std.math.lossyCast(usize, arg4), std.math.lossyCast(usize, arg5), std.math.lossyCast(usize, arg6));
             },
             else => return agent.throwException(.type_error, "Too many syscall arguments", .{}),
         };
