@@ -23,6 +23,7 @@ const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSe
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const toTemporalDuration = builtins.toTemporalDuration;
@@ -176,6 +177,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
 
         // 4.3.1 Temporal.PlainTime.prototype.constructor
         // https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.constructor
@@ -445,6 +447,86 @@ pub const prototype = struct {
             .type_error,
             "Cannot convert Temporal.PlainTime to primitive value",
             .{},
+        );
+    }
+
+    /// 4.3.11 Temporal.PlainTime.prototype.with ( temporalTimeLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_date_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. If ? IsPartialTemporalObject(temporalTimeLike) is false, throw a TypeError exception.
+        if (!try isPartialTemporalObject(agent, temporal_date_like)) {
+            return agent.throwException(
+                .type_error,
+                "Argument must be a partial Temporal object",
+                .{},
+            );
+        }
+
+        // 4. Let partialTime be ? ToTemporalTimeRecord(temporalTimeLike, partial).
+        const record = try toTemporalTimeRecord(
+            agent,
+            temporal_date_like.asObject(),
+            .partial,
+        );
+
+        // 5. If partialTime.[[Hour]] is not undefined, then
+        //     a. Let hour be partialTime.[[Hour]].
+        // 6. Else,
+        //     a. Let hour be plainTime.[[Time]].[[Hour]].
+        // 7. If partialTime.[[Minute]] is not undefined, then
+        //     a. Let minute be partialTime.[[Minute]].
+        // 8. Else,
+        //     a. Let minute be plainTime.[[Time]].[[Minute]].
+        // 9. If partialTime.[[Second]] is not undefined, then
+        //     a. Let second be partialTime.[[Second]].
+        // 10. Else,
+        //     a. Let second be plainTime.[[Time]].[[Second]].
+        // 11. If partialTime.[[Millisecond]] is not undefined, then
+        //     a. Let millisecond be partialTime.[[Millisecond]].
+        // 12. Else,
+        //     a. Let millisecond be plainTime.[[Time]].[[Millisecond]].
+        // 13. If partialTime.[[Microsecond]] is not undefined, then
+        //     a. Let microsecond be partialTime.[[Microsecond]].
+        // 14. Else,
+        //     a. Let microsecond be plainTime.[[Time]].[[Microsecond]].
+        // 15. If partialTime.[[Nanosecond]] is not undefined, then
+        //     a. Let nanosecond be partialTime.[[Nanosecond]].
+        // 16. Else,
+        //     a. Let nanosecond be plainTime.[[Time]].[[Nanosecond]].
+
+        // 17. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 18. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // 19. Let result be ? RegulateTime(hour, minute, second, millisecond, microsecond,
+        //     nanosecond, overflow).
+        const partial = try record.regulate(agent, overflow);
+
+        // 20. Return ! CreateTemporalTime(result).
+        const temporal_rs_plain_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainTime_with(
+                plain_time.fields.inner,
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
+        return Value.from(
+            createTemporalTime(
+                agent,
+                temporal_rs_plain_time.?,
+                null,
+            ) catch |err| try noexcept(err),
         );
     }
 };

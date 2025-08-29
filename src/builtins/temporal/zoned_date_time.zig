@@ -36,6 +36,7 @@ const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOp
 const getTemporalShowOffsetOption = builtins.getTemporalShowOffsetOption;
 const getTemporalShowTimeZoneNameOption = builtins.getTemporalShowTimeZoneNameOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -240,6 +241,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
         try object.defineBuiltinFunction(agent, "withTimeZone", withTimeZone, 1, realm);
@@ -1069,6 +1071,114 @@ pub const prototype = struct {
 
         // 6. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 6.3.31 Temporal.ZonedDateTime.prototype.with ( temporalZonedDateTimeLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_zoned_date_time_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. If ? IsPartialTemporalObject(temporalZonedDateTimeLike) is false, throw a TypeError exception.
+        if (!try isPartialTemporalObject(agent, temporal_zoned_date_time_like)) {
+            return agent.throwException(
+                .type_error,
+                "Argument must be a partial Temporal object",
+                .{},
+            );
+        }
+
+        // 4. Let epochNs be zonedDateTime.[[EpochNanoseconds]].
+        // 5. Let timeZone be zonedDateTime.[[TimeZone]].
+
+        // 6. Let calendar be zonedDateTime.[[Calendar]].
+        const calendar = temporal_rs.c.temporal_rs_Calendar_kind(
+            temporal_rs.c.temporal_rs_ZonedDateTime_calendar(zoned_date_time.fields.inner),
+        );
+
+        // 7. Let offsetNanoseconds be GetOffsetNanosecondsFor(timeZone, epochNs).
+        // 8. Let isoDateTime be GetISODateTimeFor(timeZone, epochNs).
+        // 9. Let fields be ISODateToFields(calendar, isoDateTime.[[ISODate]], date).
+        // 10. Set fields.[[Hour]] to isoDateTime.[[Time]].[[Hour]].
+        // 11. Set fields.[[Minute]] to isoDateTime.[[Time]].[[Minute]].
+        // 12. Set fields.[[Second]] to isoDateTime.[[Time]].[[Second]].
+        // 13. Set fields.[[Millisecond]] to isoDateTime.[[Time]].[[Millisecond]].
+        // 14. Set fields.[[Microsecond]] to isoDateTime.[[Time]].[[Microsecond]].
+        // 15. Set fields.[[Nanosecond]] to isoDateTime.[[Time]].[[Nanosecond]].
+        // 16. Set fields.[[OffsetString]] to FormatUTCOffsetNanoseconds(offsetNanoseconds).
+        // 17. Let partialZonedDateTime be ? PrepareCalendarFields(calendar, temporalZonedDateTimeLike,
+        //     « year, month, month-code, day », « hour, minute, second, millisecond, microsecond,
+        //     nanosecond, offset », partial).
+        // 18. Set fields to CalendarMergeFields(calendar, fields, partialZonedDateTime).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            temporal_zoned_date_time_like.asObject(),
+            .initMany(&.{
+                .year,
+                .month,
+                .month_code,
+                .day,
+                .hour,
+                .minute,
+                .second,
+                .millisecond,
+                .microsecond,
+                .nanosecond,
+                .offset,
+            }),
+            .partial,
+        );
+        const partial: temporal_rs.c.PartialZonedDateTime = .{
+            .date = fields.date,
+            .time = fields.time,
+            .offset = fields.offset,
+        };
+
+        // 19. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 20. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
+        const disambiguation = try getTemporalDisambiguationOption(agent, options);
+
+        // 21. Let offset be ? GetTemporalOffsetOption(resolvedOptions, prefer).
+        const offset_ = try getTemporalOffsetOption(
+            agent,
+            options,
+            temporal_rs.c.OffsetDisambiguation_Prefer,
+        );
+
+        // 22. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // 23. Let dateTimeResult be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
+        // 24. Let newOffsetNanoseconds be ! ParseDateTimeUTCOffset(fields.[[OffsetString]]).
+        // 25. Let epochNanoseconds be ? InterpretISODateTimeOffset(dateTimeResult.[[ISODate]],
+        //     dateTimeResult.[[Time]], option, newOffsetNanoseconds, timeZone, disambiguation,
+        //     offset, match-exactly).
+        // 26. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_with(
+                zoned_date_time.fields.inner,
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_ } },
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        return Value.from(
+            createTemporalZonedDateTime(
+                agent,
+                temporal_rs_zoned_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 6.3.34 Temporal.ZonedDateTime.prototype.withCalendar ( calendarLike )

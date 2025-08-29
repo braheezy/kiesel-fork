@@ -27,6 +27,7 @@ const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const prepareCalendarFields = builtins.prepareCalendarFields;
@@ -194,6 +195,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
         try object.defineBuiltinAccessor(agent, "yearOfWeek", yearOfWeek, null, realm);
@@ -709,6 +711,69 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 3.3.23 Temporal.PlainDate.prototype.with ( temporalDateLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindate.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_date_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let plainDate be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
+        const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
+
+        // 3. If ? IsPartialTemporalObject(temporalDateLike) is false, throw a TypeError exception.
+        if (!try isPartialTemporalObject(agent, temporal_date_like)) {
+            return agent.throwException(
+                .type_error,
+                "Argument must be a partial Temporal object",
+                .{},
+            );
+        }
+
+        // 4. Let calendar be plainDate.[[Calendar]].
+        const calendar = temporal_rs.c.temporal_rs_Calendar_kind(
+            temporal_rs.c.temporal_rs_PlainDate_calendar(plain_date.fields.inner),
+        );
+
+        // 5. Let fields be ISODateToFields(calendar, plainDate.[[ISODate]], date).
+        // 6. Let partialDate be ? PrepareCalendarFields(calendar, temporalDateLike, « year, month,
+        //    month-code, day », « », partial).
+        // 7. Set fields to CalendarMergeFields(calendar, fields, partialDate).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            temporal_date_like.asObject(),
+            .initMany(&.{ .year, .month, .month_code, .day }),
+            .partial,
+        );
+        const partial = fields.date;
+
+        // 8. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 9. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // 10. Let isoDate be ? CalendarDateFromFields(calendar, fields, overflow).
+        // 11. Return ! CreateTemporalDate(isoDate, calendar).
+        const temporal_rs_plain_date = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDate_with(
+                plain_date.fields.inner,
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
+        return Value.from(
+            createTemporalDate(
+                agent,
+                temporal_rs_plain_date.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 3.3.24 Temporal.PlainDate.prototype.withCalendar ( calendarLike )

@@ -312,6 +312,19 @@ pub fn prepareCalendarFields(
         time_zone,
     },
 ) Agent.Error!PrepareCalendarFieldsResult {
+    // 1. Assert: If requiredFieldNames is a List, requiredFieldNames contains zero or one of each
+    //    of the elements of calendarFieldNames and nonCalendarFieldNames.
+    // 2. Let fieldNames be the list-concatenation of calendarFieldNames and nonCalendarFieldNames.
+    // 3. Let extraFieldNames be CalendarExtraFields(calendar, calendarFieldNames).
+    // 4. Set fieldNames to the list-concatenation of fieldNames and extraFieldNames.
+    // 5. Assert: fieldNames contains no duplicate elements.
+    var field_names = calendar_and_non_calendar_field_names;
+    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+        field_names.insert(.era);
+        field_names.insert(.era_year);
+    }
+
+    // 6. Let result be a Calendar Fields Record with all fields equal to unset.
     var result: PrepareCalendarFieldsResult = .{
         .date = .{
             .year = .{ .is_ok = false },
@@ -337,13 +350,13 @@ pub fn prepareCalendarFields(
         temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone);
     };
 
-    var field_names = calendar_and_non_calendar_field_names;
-    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
-        field_names.insert(.era);
-        field_names.insert(.era_year);
-    }
+    // 7. Let any be false.
+    var any = false;
 
-    const ordered_field_names: []const FieldName = &.{
+    // 8. Let sortedPropertyNames be a List whose elements are the values in the Property Key
+    //    column of Table 19 corresponding to the elements of fieldNames, sorted according to
+    //    lexicographic code unit order.
+    const sorted_field_names: []const FieldName = &.{
         .day,
         .era,
         .era_year,
@@ -360,8 +373,12 @@ pub fn prepareCalendarFields(
         .year,
     };
 
-    inline for (ordered_field_names) |field_name| {
+    // 9. For each property name property of sortedPropertyNames, do
+    inline for (sorted_field_names) |field_name| {
         if (field_names.contains(field_name)) {
+            // a. Let key be the value in the Enumeration Key column of Table 19 corresponding to
+            //    the row whose Property Key value is property.
+            // NOTE: We do this the other way around.
             const property_name = switch (field_name) {
                 .era => "era",
                 .era_year => "eraYear",
@@ -378,8 +395,16 @@ pub fn prepareCalendarFields(
                 .offset => "offset",
                 .time_zone => "timeZone",
             };
+
+            // b. Let value be ? Get(fields, property).
             const value = try fields.get(agent, PropertyKey.from(property_name));
+
+            // c. If value is not undefined, then
             if (!value.isUndefined()) {
+                // i. Set any to true.
+                any = true;
+
+                // ii-ix.
                 switch (field_name) {
                     .era => {
                         const era_string = try value.toString(agent);
@@ -421,11 +446,25 @@ pub fn prepareCalendarFields(
                     },
                 }
             } else if (field_name == .time_zone and required_field_names == .time_zone) {
+                // d. Else if requiredFieldNames is a List, then
+                //     i. If requiredFieldNames contains key, then
+                //         1. Throw a TypeError exception.
                 return agent.throwException(.type_error, "Missing required 'timeZone' field", .{});
             }
         }
     }
 
+    // 10. If requiredFieldNames is partial and any is false, then
+    if (required_field_names == .partial and !any) {
+        // a. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "At least one field must be present",
+            .{},
+        );
+    }
+
+    // 11. Return result.
     return result;
 }
 
@@ -1129,6 +1168,42 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
 
     // 12. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: zonedRelativeTo }.
     return .{ .owned_zoned_date_time = temporal_rs_zoned_date_time.? };
+}
+
+/// 13.24 IsPartialTemporalObject ( value )
+/// https://tc39.es/proposal-temporal/#sec-temporal-ispartialtemporalobject
+pub fn isPartialTemporalObject(agent: *Agent, value: Value) Agent.Error!bool {
+    // 1. If value is not an Object, return false.
+    if (!value.isObject()) return false;
+
+    // 2. If value has an [[InitializedTemporalDate]], [[InitializedTemporalDateTime]],
+    //    [[InitializedTemporalMonthDay]], [[InitializedTemporalTime]],
+    //    [[InitializedTemporalYearMonth]], or [[InitializedTemporalZonedDateTime]] internal slot,
+    //    return false.
+    if (value.asObject().is(PlainDate) or
+        value.asObject().is(PlainDateTime) or
+        value.asObject().is(PlainMonthDay) or
+        value.asObject().is(PlainTime) or
+        value.asObject().is(PlainYearMonth) or
+        value.asObject().is(ZonedDateTime))
+    {
+        return false;
+    }
+
+    // 3. Let calendarProperty be ? Get(value, "calendar").
+    const calendar_property = try value.asObject().get(agent, PropertyKey.from("calendar"));
+
+    // 4. If calendarProperty is not undefined, return false.
+    if (!calendar_property.isUndefined()) return false;
+
+    // 5. Let timeZoneProperty be ? Get(value, "timeZone").
+    const time_zone_property = try value.asObject().get(agent, PropertyKey.from("timeZone"));
+
+    // 6. If timeZoneProperty is not undefined, return false.
+    if (!time_zone_property.isUndefined()) return false;
+
+    // 7. Return true.
+    return true;
 }
 
 /// 13.40 ToOffsetString ( argument )

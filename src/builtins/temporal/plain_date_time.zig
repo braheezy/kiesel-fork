@@ -29,6 +29,7 @@ const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const isValidISODate = builtins.isValidISODate;
 const isValidTime = builtins.isValidTime;
 const noexcept = utils.noexcept;
@@ -241,6 +242,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
         try object.defineBuiltinFunction(agent, "withCalendar", withCalendar, 1, realm);
         try object.defineBuiltinFunction(agent, "withPlainTime", withPlainTime, 0, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
@@ -846,6 +848,90 @@ pub const prototype = struct {
 
         // 5. Return 𝔽(result).
         return Value.from(result.unnamed_0.ok);
+    }
+
+    /// 5.3.25 Temporal.PlainDateTime.prototype.with ( temporalDateTimeLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_date_time_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. If ? IsPartialTemporalObject(temporalDateTimeLike) is false, throw a TypeError exception.
+        if (!try isPartialTemporalObject(agent, temporal_date_time_like)) {
+            return agent.throwException(
+                .type_error,
+                "Argument must be a partial Temporal object",
+                .{},
+            );
+        }
+
+        // 4. Let calendar be plainDateTime.[[Calendar]].
+        const calendar = temporal_rs.c.temporal_rs_Calendar_kind(
+            temporal_rs.c.temporal_rs_PlainDateTime_calendar(plain_date_time.fields.inner),
+        );
+
+        // 5. Let fields be ISODateToFields(calendar, plainDateTime.[[ISODateTime]].[[ISODate]], date).
+        // 6. Set fields.[[Hour]] to plainDateTime.[[ISODateTime]].[[Time]].[[Hour]].
+        // 7. Set fields.[[Minute]] to plainDateTime.[[ISODateTime]].[[Time]].[[Minute]].
+        // 8. Set fields.[[Second]] to plainDateTime.[[ISODateTime]].[[Time]].[[Second]].
+        // 9. Set fields.[[Millisecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Millisecond]].
+        // 10. Set fields.[[Microsecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Microsecond]].
+        // 11. Set fields.[[Nanosecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Nanosecond]].
+        // 12. Let partialDateTime be ? PrepareCalendarFields(calendar, temporalDateTimeLike, «
+        //     year, month, month-code, day », « hour, minute, second, millisecond, microsecond,
+        //     nanosecond », partial).
+        // 13. Set fields to CalendarMergeFields(calendar, fields, partialDateTime).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            temporal_date_time_like.asObject(),
+            .initMany(&.{
+                .year,
+                .month,
+                .month_code,
+                .day,
+                .hour,
+                .minute,
+                .second,
+                .millisecond,
+                .microsecond,
+                .nanosecond,
+            }),
+            .partial,
+        );
+        const partial: temporal_rs.c.PartialDateTime = .{
+            .date = fields.date,
+            .time = fields.time,
+        };
+
+        // 14. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 15. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // 16. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
+        // 17. Return ? CreateTemporalDateTime(result, calendar).
+        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDateTime_with(
+                plain_date_time.fields.inner,
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        return Value.from(
+            createTemporalDateTime(
+                agent,
+                temporal_rs_plain_date_time.?,
+                null,
+            ) catch |err| try noexcept(err),
+        );
     }
 
     /// 5.3.27 Temporal.PlainDateTime.prototype.withCalendar ( calendarLike )

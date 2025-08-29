@@ -23,6 +23,7 @@ const createTemporalDate = builtins.createTemporalDate;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const isValidISODate = builtins.isValidISODate;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -186,6 +187,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toPlainDate", toPlainDate, 1, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
+        try object.defineBuiltinFunction(agent, "with", with, 1, realm);
         try object.defineBuiltinAccessor(agent, "year", year, null, realm);
 
         // 9.3.1 Temporal.PlainYearMonth.prototype.constructor
@@ -529,6 +531,69 @@ pub const prototype = struct {
             .type_error,
             "Cannot convert Temporal.PlainYearMonth to primitive value",
             .{},
+        );
+    }
+
+    /// 9.3.13 Temporal.PlainYearMonth.prototype.with ( temporalYearMonthLike [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const temporal_year_month_like = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. Let plainYearMonth be the this value.
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
+
+        // 3. If ? IsPartialTemporalObject(temporalYearMonthLike) is false, throw a TypeError exception.
+        if (!try isPartialTemporalObject(agent, temporal_year_month_like)) {
+            return agent.throwException(
+                .type_error,
+                "Argument must be a partial Temporal object",
+                .{},
+            );
+        }
+
+        // 4. Let calendar be plainYearMonth.[[Calendar]].
+        const calendar = temporal_rs.c.temporal_rs_Calendar_kind(
+            temporal_rs.c.temporal_rs_PlainYearMonth_calendar(plain_year_month.fields.inner),
+        );
+
+        // 5. Let fields be ISODateToFields(calendar, plainYearMonth.[[ISODate]], year-month).
+        // 6. Let partialYearMonth be ? PrepareCalendarFields(calendar, temporalYearMonthLike, «
+        //    year, month, month-code », « », partial).
+        // 7. Set fields to CalendarMergeFields(calendar, fields, partialYearMonth).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            temporal_year_month_like.asObject(),
+            .initMany(&.{ .year, .month, .month_code }),
+            .partial,
+        );
+        const partial = fields.date;
+
+        // 8. Let resolvedOptions be ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 9. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+        const overflow = try getTemporalOverflowOption(agent, options);
+
+        // 10. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, overflow).
+        // 11. Return ! CreateTemporalYearMonth(isoDate, calendar).
+        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainYearMonth_with(
+                plain_year_month.fields.inner,
+                partial,
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
+        return Value.from(
+            createTemporalYearMonth(
+                agent,
+                temporal_rs_plain_year_month.?,
+                null,
+            ) catch |err| try noexcept(err),
         );
     }
 

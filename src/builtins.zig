@@ -178,6 +178,7 @@ pub const installErrorCause = @"error".installErrorCause;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const isFixedLengthArrayBuffer = array_buffer.isFixedLengthArrayBuffer;
+pub const isPartialTemporalObject = temporal.isPartialTemporalObject;
 pub const isTypedArrayOutOfBounds = typed_array.isTypedArrayOutOfBounds;
 pub const isValidISODate = temporal.plain_date.isValidISODate;
 pub const isValidTime = temporal.plain_time.isValidTime;
