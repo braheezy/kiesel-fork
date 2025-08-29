@@ -18,8 +18,12 @@ jobs:
         with:
           version: 0.14.1
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@nightly
+        # Linking with Rust object files started failing, presumably because Zig 0.14 and Rust nightly
+        # are now too far apart in terms of LLVM version. Let's try to unpin this after updating to Zig 0.15.
+        # `error: wasm-ld: Unknown attribute kind (102) (Producer: 'LLVM21.1.0-rust-1.91.0-nightly' Reader: 'LLVM 19.1.7')`
+        uses: https://github.com/dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2025-08-27
           components: "rust-src"
       - name: Install dependencies
         run: |
@@ -128,8 +132,9 @@ jobs:
         with:
           version: 0.14.1
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@nightly
+        uses: https://github.com/dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2025-08-27
           components: "rust-src"
       - name: Install dependencies
         run: |
@@ -218,8 +223,9 @@ jobs:
         with:
           version: 0.14.1
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@nightly
+        uses: https://github.com/dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2025-08-27
           components: "rust-src"
       - name: Install Node.js
         uses: https://github.com/actions/setup-node@v4
