@@ -29,6 +29,8 @@ const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
+const isValidISODate = builtins.isValidISODate;
+const isValidTime = builtins.isValidTime;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const prepareCalendarFields = builtins.prepareCalendarFields;
@@ -131,23 +133,33 @@ pub const constructor = struct {
         const calendar = try canonicalizeCalendar(agent, calendar_value.asString());
 
         // 14. If IsValidISODate(isoYear, isoMonth, isoDay) is false, throw a RangeError exception.
+        if (!isValidISODate(iso_year, iso_month, iso_day)) {
+            return agent.throwException(.range_error, "Invalid ISO date", .{});
+        }
+
         // 15. Let isoDate be CreateISODateRecord(isoYear, isoMonth, isoDay).
-        // 16. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false, throw a RangeError exception.
+
+        // 16. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false,
+        //     throw a RangeError exception.
+        if (!isValidTime(hour, minute, second, millisecond, microsecond, nanosecond)) {
+            return agent.throwException(.range_error, "Invalid time", .{});
+        }
+
         // 17. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
         // 18. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 19. Return ? CreateTemporalDateTime(isoDateTime, calendar, NewTarget).
         const temporal_rs_plain_date_time = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_try_new(
-                std.math.lossyCast(i32, iso_year),
-                std.math.lossyCast(u8, iso_month),
-                std.math.lossyCast(u8, iso_day),
-                std.math.lossyCast(u8, hour),
-                std.math.lossyCast(u8, minute),
-                std.math.lossyCast(u8, second),
-                std.math.lossyCast(u16, millisecond),
-                std.math.lossyCast(u16, microsecond),
-                std.math.lossyCast(u16, nanosecond),
+                @intFromFloat(iso_year),
+                @intFromFloat(iso_month),
+                @intFromFloat(iso_day),
+                @intFromFloat(hour),
+                @intFromFloat(minute),
+                @intFromFloat(second),
+                @intFromFloat(millisecond),
+                @intFromFloat(microsecond),
+                @intFromFloat(nanosecond),
                 calendar,
             ),
         );

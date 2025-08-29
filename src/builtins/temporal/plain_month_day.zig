@@ -24,6 +24,7 @@ const createTemporalDate = builtins.createTemporalDate;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
+const isValidISODate = builtins.isValidISODate;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const prepareCalendarFields = builtins.prepareCalendarFields;
@@ -100,18 +101,22 @@ pub const constructor = struct {
         const reference_iso_year = try reference_iso_year_value.toIntegerWithTruncation(agent);
 
         // 9. If IsValidISODate(y, m, d) is false, throw a RangeError exception.
+        if (!isValidISODate(reference_iso_year, iso_month, iso_day)) {
+            return agent.throwException(.range_error, "Invalid ISO date", .{});
+        }
+
         // 10. Let isoDate be CreateISODateRecord(y, m, d).
         // 11. Return ? CreateTemporalMonthDay(isoDate, calendar, NewTarget).
         const temporal_rs_plain_month_day = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_try_new_with_overflow(
-                std.math.lossyCast(u8, iso_month),
-                std.math.lossyCast(u8, iso_day),
+                @intFromFloat(iso_month),
+                @intFromFloat(iso_day),
                 calendar,
                 temporal_rs.c.ArithmeticOverflow_Reject,
                 .{
                     .is_ok = true,
-                    .unnamed_0 = .{ .ok = std.math.lossyCast(i32, reference_iso_year) },
+                    .unnamed_0 = .{ .ok = @intFromFloat(reference_iso_year) },
                 },
             ),
         );

@@ -105,14 +105,18 @@ pub const constructor = struct {
         const calendar = try canonicalizeCalendar(agent, calendar_value.asString());
 
         // 8. If IsValidISODate(y, m, d) is false, throw a RangeError exception.
+        if (!isValidISODate(iso_year, iso_month, iso_day)) {
+            return agent.throwException(.range_error, "Invalid ISO date", .{});
+        }
+
         // 9. Let isoDate be CreateISODateRecord(y, m, d).
         // 10. Return ? CreateTemporalDate(isoDate, calendar, NewTarget).
         const temporal_rs_plain_date = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_try_new(
-                std.math.lossyCast(i32, iso_year),
-                std.math.lossyCast(u8, iso_month),
-                std.math.lossyCast(u8, iso_day),
+                @intFromFloat(iso_year),
+                @intFromFloat(iso_month),
+                @intFromFloat(iso_day),
                 calendar,
             ),
         );
@@ -949,6 +953,33 @@ pub fn toTemporalPlainDate(
         temporal_rs_plain_date.?,
         null,
     ) catch |err| try noexcept(err);
+}
+
+/// 3.5.7 IsValidISODate ( year, month, day )
+/// https://tc39.es/proposal-temporal/#sec-temporal-isvalidisodate
+pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
+    // 1. If month < 1 or month > 12, then
+    //     a. Return false.
+    if (month < 1 or month > 12) return false;
+
+    const year_int = std.math.lossyCast(std.time.epoch.Year, year);
+    const month_int = std.math.lossyCast(@typeInfo(std.time.epoch.Month).@"enum".tag_type, month);
+
+    // 2. Let daysInMonth be ISODaysInMonth(year, month).
+    const days_in_month = std.time.epoch.getDaysInMonth(
+        if (std.time.epoch.isLeapYear(year_int))
+            .leap
+        else
+            .not_leap,
+        @enumFromInt(month_int),
+    );
+
+    // 3. If day < 1 or day > daysInMonth, then
+    //     a. Return false.
+    if (day < 1 or day > @as(f64, @floatFromInt(days_in_month))) return false;
+
+    // 4. Return true.
+    return true;
 }
 
 /// 3.5.14 AddDurationToDate ( operation, temporalDate, temporalDurationLike, options )

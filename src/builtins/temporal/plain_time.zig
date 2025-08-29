@@ -98,17 +98,21 @@ pub const constructor = struct {
 
         // 8. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false,
         //    throw a RangeError exception.
+        if (!isValidTime(hour, minute, second, millisecond, microsecond, nanosecond)) {
+            return agent.throwException(.range_error, "Invalid time", .{});
+        }
+
         // 9. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
         // 10. Return ? CreateTemporalTime(time, NewTarget).
         const temporal_rs_plain_time = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_try_new(
-                std.math.lossyCast(u8, hour),
-                std.math.lossyCast(u8, minute),
-                std.math.lossyCast(u8, second),
-                std.math.lossyCast(u16, millisecond),
-                std.math.lossyCast(u16, microsecond),
-                std.math.lossyCast(u16, nanosecond),
+                @intFromFloat(hour),
+                @intFromFloat(minute),
+                @intFromFloat(second),
+                @intFromFloat(millisecond),
+                @intFromFloat(microsecond),
+                @intFromFloat(nanosecond),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
@@ -548,7 +552,7 @@ pub fn toTemporalPlainTime(
         }
 
         // d. Let result be ? ToTemporalTimeRecord(item).
-        const partial_time = try toTemporalPartialTime(agent, item.asObject(), .complete);
+        const result = try toTemporalTimeRecord(agent, item.asObject(), .complete);
 
         // e. Let resolvedOptions be ? GetOptionsObject(options).
         const options = try options_value.getOptionsObject(agent);
@@ -558,10 +562,11 @@ pub fn toTemporalPlainTime(
 
         // g. Set result to ? RegulateTime(result.[[Hour]], result.[[Minute]], result.[[Second]],
         //    result.[[Millisecond]], result.[[Microsecond]], result.[[Nanosecond]], overflow).
+        const partial = try result.regulate(agent, overflow);
         break :blk try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_from_partial(
-                partial_time,
+                partial,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
         );
@@ -628,35 +633,184 @@ pub fn toTimeRecordOrMidnight(agent: *Agent, item: Value) Agent.Error!?*temporal
     return temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.as(PlainTime).fields.inner);
 }
 
+/// Table 5: TemporalTimeLike Record Fields
+/// https://tc39.es/proposal-temporal/#table-temporal-temporaltimelike-record-fields
+const TemporalTimeLike = struct {
+    hour: ?f64,
+    minute: ?f64,
+    second: ?f64,
+    millisecond: ?f64,
+    microsecond: ?f64,
+    nanosecond: ?f64,
+
+    /// 4.5.8 RegulateTime ( hour, minute, second, millisecond, microsecond, nanosecond, overflow )
+    /// https://tc39.es/proposal-temporal/#sec-temporal-regulatetime
+    fn regulate(
+        self: TemporalTimeLike,
+        agent: *Agent,
+        overflow: temporal_rs.c.ArithmeticOverflow,
+    ) Agent.Error!temporal_rs.c.PartialTime {
+        var partial: temporal_rs.c.PartialTime = .{};
+
+        // 1. If overflow is constrain, then
+        if (overflow == temporal_rs.c.ArithmeticOverflow_Constrain) {
+            // a. Set hour to the result of clamping hour between 0 and 23.
+            if (self.hour) |hour| {
+                partial.hour = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(hour, 0, 23)) },
+                };
+            }
+
+            // b. Set minute to the result of clamping minute between 0 and 59.
+            if (self.minute) |minute| {
+                partial.minute = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(minute, 0, 59)) },
+                };
+            }
+
+            // c. Set second to the result of clamping second between 0 and 59.
+            if (self.second) |second| {
+                partial.second = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(second, 0, 59)) },
+                };
+            }
+
+            // d. Set millisecond to the result of clamping millisecond between 0 and 999.
+            if (self.millisecond) |millisecond| {
+                partial.millisecond = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(millisecond, 0, 999)) },
+                };
+            }
+
+            // e. Set microsecond to the result of clamping microsecond between 0 and 999.
+            if (self.microsecond) |microsecond| {
+                partial.microsecond = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(microsecond, 0, 999)) },
+                };
+            }
+
+            // f. Set nanosecond to the result of clamping nanosecond between 0 and 999.
+            if (self.nanosecond) |nanosecond| {
+                partial.nanosecond = .{
+                    .is_ok = true,
+                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(nanosecond, 0, 999)) },
+                };
+            }
+        } else {
+            // 2. Else,
+            // a. Assert: overflow is reject.
+            std.debug.assert(overflow == temporal_rs.c.ArithmeticOverflow_Reject);
+
+            // b. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false,
+            //    throw a RangeError exception.
+            if (!isValidTime(
+                self.hour orelse 0,
+                self.minute orelse 0,
+                self.second orelse 0,
+                self.millisecond orelse 0,
+                self.microsecond orelse 0,
+                self.nanosecond orelse 0,
+            )) {
+                return agent.throwException(.range_error, "Invalid time", .{});
+            }
+
+            if (self.hour) |hour| {
+                partial.hour = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(hour) } };
+            }
+            if (self.minute) |minute| {
+                partial.minute = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(minute) } };
+            }
+            if (self.second) |second| {
+                partial.second = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(second) } };
+            }
+            if (self.millisecond) |millisecond| {
+                partial.millisecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(millisecond) } };
+            }
+            if (self.microsecond) |microsecond| {
+                partial.microsecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(microsecond) } };
+            }
+            if (self.nanosecond) |nanosecond| {
+                partial.nanosecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(nanosecond) } };
+            }
+        }
+
+        // 3. Return CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
+        return partial;
+    }
+};
+
+/// 4.5.9 IsValidTime ( hour, minute, second, millisecond, microsecond, nanosecond )
+/// https://tc39.es/proposal-temporal/#sec-temporal-isvalidtime
+pub fn isValidTime(
+    hour: f64,
+    minute: f64,
+    second: f64,
+    millisecond: f64,
+    microsecond: f64,
+    nanosecond: f64,
+) bool {
+    // 1. If hour < 0 or hour > 23, then
+    //     a. Return false.
+    if (hour < 0 or hour > 23) return false;
+
+    // 2. If minute < 0 or minute > 59, then
+    //     a. Return false.
+    if (minute < 0 or minute > 59) return false;
+
+    // 3. If second < 0 or second > 59, then
+    //     a. Return false.
+    if (second < 0 or second > 59) return false;
+
+    // 4. If millisecond < 0 or millisecond > 999, then
+    //     a. Return false.
+    if (millisecond < 0 or millisecond > 999) return false;
+
+    // 5. If microsecond < 0 or microsecond > 999, then
+    //     a. Return false.
+    if (microsecond < 0 or microsecond > 999) return false;
+
+    // 6. If nanosecond < 0 or nanosecond > 999, then
+    //     a. Return false.
+    if (nanosecond < 0 or nanosecond > 999) return false;
+
+    // 7. Return true.
+    return true;
+}
+
 /// 4.5.12 ToTemporalTimeRecord ( temporalTimeLike [ , completeness ] )
 /// https://tc39.es/proposal-temporal/#sec-temporal-totemporaltimerecord
-fn toTemporalPartialTime(
+fn toTemporalTimeRecord(
     agent: *Agent,
     temporal_time_like: *Object,
     completeness: enum { partial, complete },
-) Agent.Error!temporal_rs.c.PartialTime {
+) Agent.Error!TemporalTimeLike {
     // 1. If completeness is not present, set completeness to complete.
 
     // 2. If completeness is complete, then
     //     a. Let result be a new TemporalTimeLike Record with each field set to 0.
     // 3. Else,
     //     a. Let result be a new TemporalTimeLike Record with each field set to unset.
-    var result: temporal_rs.c.PartialTime = switch (completeness) {
+    var result: TemporalTimeLike = switch (completeness) {
         .complete => .{
-            .hour = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
-            .minute = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
-            .second = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
-            .millisecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
-            .microsecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
-            .nanosecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = 0 } },
+            .hour = 0,
+            .minute = 0,
+            .second = 0,
+            .millisecond = 0,
+            .microsecond = 0,
+            .nanosecond = 0,
         },
         .partial => .{
-            .hour = .{ .is_ok = false },
-            .minute = .{ .is_ok = false },
-            .second = .{ .is_ok = false },
-            .millisecond = .{ .is_ok = false },
-            .microsecond = .{ .is_ok = false },
-            .nanosecond = .{ .is_ok = false },
+            .hour = null,
+            .minute = null,
+            .second = null,
+            .millisecond = null,
+            .microsecond = null,
+            .nanosecond = null,
         },
     };
 
@@ -669,10 +823,7 @@ fn toTemporalPartialTime(
     // 6. If hour is not undefined, then
     if (!hour.isUndefined()) {
         // a. Set result.[[Hour]] to ? ToIntegerWithTruncation(hour).
-        result.hour = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try hour.toIntegerWithTruncation(agent)) },
-        };
+        result.hour = try hour.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
@@ -684,10 +835,7 @@ fn toTemporalPartialTime(
     // 8. If microsecond is not undefined, then
     if (!microsecond.isUndefined()) {
         // a. Set result.[[Microsecond]] to ? ToIntegerWithTruncation(microsecond).
-        result.microsecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try microsecond.toIntegerWithTruncation(agent)) },
-        };
+        result.microsecond = try microsecond.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
@@ -699,10 +847,7 @@ fn toTemporalPartialTime(
     // 10. If millisecond is not undefined, then
     if (!millisecond.isUndefined()) {
         // a. Set result.[[Millisecond]] to ? ToIntegerWithTruncation(millisecond).
-        result.millisecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try millisecond.toIntegerWithTruncation(agent)) },
-        };
+        result.millisecond = try millisecond.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
@@ -714,10 +859,7 @@ fn toTemporalPartialTime(
     // 12. If minute is not undefined, then
     if (!minute.isUndefined()) {
         // a. Set result.[[Minute]] to ? ToIntegerWithTruncation(minute).
-        result.minute = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try minute.toIntegerWithTruncation(agent)) },
-        };
+        result.minute = try minute.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
@@ -729,10 +871,7 @@ fn toTemporalPartialTime(
     // 14. If nanosecond is not undefined, then
     if (!nanosecond.isUndefined()) {
         // a. Set result.[[Nanosecond]] to ? ToIntegerWithTruncation(nanosecond).
-        result.nanosecond = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u16, try nanosecond.toIntegerWithTruncation(agent)) },
-        };
+        result.nanosecond = try nanosecond.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
@@ -744,10 +883,7 @@ fn toTemporalPartialTime(
     // 16. If second is not undefined, then
     if (!second.isUndefined()) {
         // a. Set result.[[Second]] to ? ToIntegerWithTruncation(second).
-        result.second = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try second.toIntegerWithTruncation(agent)) },
-        };
+        result.second = try second.toIntegerWithTruncation(agent);
 
         // b. Set any to true.
         any = true;
