@@ -14,7 +14,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -459,26 +458,30 @@ pub const prototype = struct {
             // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Item must be an object", .{});
         }
-        const object = item.asObject();
 
         // 4. Let calendar be plainYearMonth.[[Calendar]].
+        const calendar = temporal_rs.c.temporal_rs_Calendar_kind(
+            temporal_rs.c.temporal_rs_PlainYearMonth_calendar(plain_year_month.fields.inner),
+        );
+
         // 5. Let fields be ISODateToFields(calendar, plainYearMonth.[[ISODate]], year-month).
         // 6. Let inputFields be ? PrepareCalendarFields(calendar, item, « day », « », « »).
         // 7. Let mergedFields be CalendarMergeFields(calendar, fields, inputFields).
+        const fields = try prepareCalendarFields(
+            agent,
+            calendar,
+            item.asObject(),
+            .initOne(.day),
+            .none,
+        );
+        const partial = fields.date;
+
         // 8. Let isoDate be ? CalendarDateFromFields(calendar, mergedFields, constrain).
-        var result: temporal_rs.c.PartialDate = .{};
-        const day = try object.get(agent, PropertyKey.from("day"));
-        if (!day.isUndefined()) {
-            result.day = .{
-                .is_ok = true,
-                .unnamed_0 = .{ .ok = std.math.lossyCast(u8, try day.toPositiveIntegerWithTruncation(agent)) },
-            };
-        }
         const temporal_rs_plain_date = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_to_plain_date(
                 plain_year_month.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = result } },
+                .{ .is_ok = true, .unnamed_0 = .{ .ok = partial } },
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
