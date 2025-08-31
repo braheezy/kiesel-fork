@@ -66,16 +66,15 @@ pub fn build(b: *std.Build) void {
         "version-string",
         "Version string, read from git by default",
     ) orelse blk: {
-        const output = b.run(&.{
-            "git",
-            "-C",
-            b.build_root.path orelse ".",
-            "rev-parse",
-            "--short=9",
-            "HEAD",
-        });
-        const output_trimmed = std.mem.trim(u8, output, "\n");
-        break :blk b.fmt("0.1.0-dev+{s}", .{output_trimmed});
+        const base_version: []const u8 = "0.1.0";
+        var code: u8 = undefined;
+        const output = b.runAllowFail(
+            &.{ "git", "-C", b.build_root.path orelse ".", "rev-parse", "--short=9", "HEAD" },
+            &code,
+            .Ignore,
+        ) catch break :blk base_version;
+        const git_revision = std.mem.trim(u8, output, "\n");
+        break :blk b.fmt("{s}-dev+{s}", .{ base_version, git_revision });
     };
 
     const version = std.SemanticVersion.parse(version_string) catch @panic("Invalid version");
