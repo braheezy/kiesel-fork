@@ -36,10 +36,10 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const str = try arguments.get(1).toString(agent);
         const bytes = try str.toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(bytes);
-        const file: std.fs.File = .{ .handle = REPRL_DWFD };
-        var file_writer = file.writer(&.{});
-        const writer = &file_writer.interface;
-        writer.print("{s}\n", .{bytes}) catch {};
+        var index: usize = 0;
+        while (index < bytes.len) {
+            index += std.posix.write(REPRL_DWFD, bytes[index..]) catch break;
+        }
     }
     return .undefined;
 }
