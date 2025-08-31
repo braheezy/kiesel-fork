@@ -24,15 +24,8 @@ pub fn init(
     return .{ .symbol = symbol };
 }
 
-pub fn format(
-    self: PrivateName,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = fmt;
-    _ = options;
-    try writer.print("{}", .{self.symbol.description.?});
+pub fn format(self: PrivateName, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    try writer.print("#{f}", .{self.symbol.description.?.fmtUnquoted()});
 }
 
 pub fn hash(self: PrivateName) u64 {

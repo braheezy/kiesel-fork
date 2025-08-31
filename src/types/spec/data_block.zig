@@ -7,7 +7,7 @@ const execution = @import("../../execution.zig");
 
 const Agent = execution.Agent;
 
-pub const DataBlock = std.ArrayListUnmanaged(u8);
+pub const DataBlock = std.ArrayList(u8);
 
 /// Arbitrary size limit (32 GiB)
 pub const data_block_max_byte_length = 1024 * 1024 * 1024 * 32;
@@ -21,17 +21,17 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
     // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
     //       done in other engines (and tested by test262)
     if (size > data_block_max_byte_length) {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     }
 
     const size_casted = std.math.cast(usize, size) orelse {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
     // 2. Let db be a new Data Block value consisting of size bytes. If it is impossible to create
     //    such a Data Block, throw a RangeError exception.
     var data_block = DataBlock.initCapacity(agent.gc_allocator, size_casted) catch {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
     // 3. Set all of the bytes of db to 0.
@@ -48,17 +48,17 @@ pub fn createSharedByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock
     // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
     //       done in other engines (and tested by test262)
     if (size > data_block_max_byte_length) {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     }
 
     const size_casted = std.math.cast(usize, size) orelse {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
     // 1. Let db be a new Shared Data Block value consisting of size bytes. If it is impossible to
     //    create such a Shared Data Block, throw a RangeError exception.
     var data_block = DataBlock.initCapacity(agent.gc_allocator, size_casted) catch {
-        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
     // 2. Let execution be the [[CandidateExecution]] field of the surrounding agent's Agent Record.

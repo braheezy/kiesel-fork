@@ -16,7 +16,7 @@ const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 
-const LocaleList = std.ArrayListUnmanaged(icu4zig.Locale);
+const LocaleList = std.ArrayList(icu4zig.Locale);
 
 /// https://unicode.org/reports/tr35/#Unicode_locale_identifier
 /// type = alphanum{3,8} (sep alphanum{3,8})*
@@ -219,8 +219,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             const canonicalized_tag = icu4zig.Locale.fromString(try tag.toUtf8(agent.gc_allocator)) catch {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier '{}'",
-                    .{tag},
+                    "Invalid locale identifier '{f}'",
+                    .{tag.fmtUnquoted()},
                 );
             };
 

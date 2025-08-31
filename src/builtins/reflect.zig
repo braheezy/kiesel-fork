@@ -60,7 +60,7 @@ pub const namespace = struct {
 
         // 1. If IsCallable(target) is false, throw a TypeError exception.
         if (!target.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{target});
+            return agent.throwException(.type_error, "{f} is not callable", .{target});
         }
 
         // 2. Let args be ? CreateListFromArrayLike(argumentsList).
@@ -80,7 +80,7 @@ pub const namespace = struct {
 
         // 1. If IsConstructor(target) is false, throw a TypeError exception.
         if (!target.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{target});
+            return agent.throwException(.type_error, "{f} is not a constructor", .{target});
         }
 
         // 2. If newTarget is not present, set newTarget to target.
@@ -89,7 +89,7 @@ pub const namespace = struct {
         }
         // 3. Else if IsConstructor(newTarget) is false, throw a TypeError exception.
         else if (!new_target.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{new_target});
+            return agent.throwException(.type_error, "{f} is not a constructor", .{new_target});
         }
 
         // 4. Let args be ? CreateListFromArrayLike(argumentsList).
@@ -108,7 +108,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -136,7 +136,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -158,7 +158,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -185,7 +185,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -212,7 +212,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[GetPrototypeOf]]().
@@ -232,7 +232,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -251,7 +251,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[IsExtensible]]().
@@ -267,7 +267,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
@@ -294,7 +294,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[PreventExtensions]]().
@@ -312,7 +312,7 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. Let key be ? ToPropertyKey(propertyKey).
@@ -342,12 +342,12 @@ pub const namespace = struct {
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{target});
+            return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
         if (!prototype.isObject() and !prototype.isNull()) {
-            return agent.throwException(.type_error, "{} is not an Object or null", .{prototype});
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{prototype});
         }
 
         // 3. Return ? target.[[SetPrototypeOf]](proto).

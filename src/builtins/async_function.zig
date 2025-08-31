@@ -67,7 +67,7 @@ pub const constructor = struct {
             agent,
             constructor_,
             new_target,
-            .@"async",
+            .async,
             parameter_args,
             body_arg,
         ));
@@ -247,7 +247,7 @@ pub fn asyncBlockStart(
 
 /// 27.7.5.3 Await ( value )
 /// https://tc39.es/ecma262/#await
-pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
+pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     const realm = agent.currentRealm();
     // 1. Let asyncContext be the running execution context.
     const async_context = agent.runningExecutionContext();

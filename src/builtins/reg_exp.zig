@@ -50,7 +50,7 @@ export fn lre_check_timeout(_: ?*anyopaque) c_int {
 }
 
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
-    const lre_opaque = @as(*LreOpaque, @alignCast(@ptrCast(@"opaque".?)));
+    const lre_opaque = @as(*LreOpaque, @ptrCast(@alignCast(@"opaque".?)));
     const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
         var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
         old_mem.len = if (build_options.enable_libgc)
@@ -184,7 +184,7 @@ pub fn regExpInitialize(
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
     const parsed_flags = ParsedFlags.from(try f.toUtf8(agent.gc_allocator)) orelse {
-        return agent.throwException(.syntax_error, "Invalid RegExp flags '{}'", .{f});
+        return agent.throwException(.syntax_error, "Invalid RegExp flags '{f}'", .{f.fmtUnquoted()});
     };
 
     // TODO: 11. If u is true or v is true, then
@@ -396,11 +396,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     match = .{ .start_index = last_index, .end_index = end_index };
 
     // 25. Let indices be a new empty List.
-    var indices: std.ArrayListUnmanaged(?Match) = .empty;
+    var indices: std.ArrayList(?Match) = .empty;
     defer indices.deinit(agent.gc_allocator);
 
     // 26. Let groupNames be a new empty List.
-    var group_names: std.ArrayListUnmanaged(?[]const u8) = .empty;
+    var group_names: std.ArrayList(?[]const u8) = .empty;
     defer group_names.deinit(agent.gc_allocator);
 
     // 27. Append match to indices.
@@ -794,7 +794,7 @@ pub const constructor = struct {
 
         // 1. If S is not a String, throw a TypeError exception.
         if (!string_value.isString()) {
-            return agent.throwException(.type_error, "{} is not a string", .{string_value});
+            return agent.throwException(.type_error, "{f} is not a string", .{string_value});
         }
         const string = string_value.asString();
 
@@ -1002,12 +1002,12 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
         // 3. Let codeUnits be a new empty List.
-        var code_units = try std.ArrayListUnmanaged(u8).initCapacity(agent.gc_allocator, 8);
+        var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
 
         // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
         // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to codeUnits.
@@ -1072,7 +1072,7 @@ pub const prototype = struct {
     fn regExpHasFlag(agent: *Agent, reg_exp_value: Value, flag: c_int) Agent.Error!Value {
         // 1. If R is not an Object, throw a TypeError exception.
         if (!reg_exp_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{reg_exp_value});
         }
         const reg_exp = reg_exp_value.asObject();
 
@@ -1133,7 +1133,7 @@ pub const prototype = struct {
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1220,7 +1220,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1282,7 +1282,7 @@ pub const prototype = struct {
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1314,7 +1314,7 @@ pub const prototype = struct {
         }
 
         // 10. Let results be a new empty List.
-        var results: std.ArrayListUnmanaged(*Object) = .empty;
+        var results: std.ArrayList(*Object) = .empty;
         defer results.deinit(agent.gc_allocator);
 
         // 11. Let done be false.
@@ -1393,7 +1393,7 @@ pub const prototype = struct {
             );
 
             // g. Let captures be a new empty List.
-            var captures = try std.ArrayListUnmanaged(?*const String).initCapacity(
+            var captures = try std.ArrayList(?*const String).initCapacity(
                 agent.gc_allocator,
                 @intCast(n_captures),
             );
@@ -1432,7 +1432,7 @@ pub const prototype = struct {
             const replacement_string = if (functional_replace) blk: {
                 // i. Let replacerArgs be the list-concatenation of « matched », captures, and
                 //    « 𝔽(position), S ».
-                var replacer_args = try std.ArrayListUnmanaged(Value).initCapacity(
+                var replacer_args = try std.ArrayList(Value).initCapacity(
                     agent.gc_allocator,
                     captures.items.len + 3 + @intFromBool(!named_captures.isUndefined()),
                 );
@@ -1519,7 +1519,7 @@ pub const prototype = struct {
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1560,7 +1560,7 @@ pub const prototype = struct {
         // Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1619,7 +1619,7 @@ pub const prototype = struct {
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1803,7 +1803,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1823,7 +1823,7 @@ pub const prototype = struct {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const reg_exp = this_value.asObject();
 
@@ -1882,7 +1882,7 @@ pub const prototype = struct {
             if (!flags_.isUndefined()) {
                 return agent.throwException(
                     .type_error,
-                    "Flags must be undefined when pattern is a RegExp object, got {}",
+                    "Flags must be undefined when pattern is a RegExp object, got {f}",
                     .{flags_},
                 );
             }

@@ -40,7 +40,7 @@ loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 /// [[HostDefined]]
 host_defined: SafePointer,
 
-pub fn print(self: Script, writer: anytype) @TypeOf(writer).Error!void {
+pub fn print(self: Script, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try ast_printing.printScript(self.ecmascript_code, writer, 0);
 }
 
@@ -142,12 +142,12 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
 fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
     // 1. Let lexNames be the LexicallyDeclaredNames of script.
-    var lexical_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var lexical_names: std.ArrayList(ast.Identifier) = .empty;
     defer lexical_names.deinit(agent.gc_allocator);
     try script.collectLexicallyDeclaredNames(agent.gc_allocator, &lexical_names);
 
     // 2. Let varNames be the VarDeclaredNames of script.
-    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var var_names: std.ArrayList(ast.Identifier) = .empty;
     defer var_names.deinit(agent.gc_allocator);
     try script.collectVarDeclaredNames(agent.gc_allocator, &var_names);
 
@@ -159,8 +159,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
-                "Global environment already has a lexical declaration '{}'",
-                .{name},
+                "Global environment already has a lexical declaration '{f}'",
+                .{name.fmtUnquoted()},
             );
         }
 
@@ -175,8 +175,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         if (has_restricted_global) {
             return agent.throwException(
                 .syntax_error,
-                "Global object already has a non-configurable property '{}'",
-                .{name},
+                "Global object already has a non-configurable property '{f}'",
+                .{name.fmtUnquoted()},
             );
         }
     }
@@ -189,19 +189,19 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
-                "Global environment already has a lexical declaration '{}'",
-                .{name},
+                "Global environment already has a lexical declaration '{f}'",
+                .{name.fmtUnquoted()},
             );
         }
     }
 
     // 5. Let varDeclarations be the VarScopedDeclarations of script.
-    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
     defer var_declarations.deinit(agent.gc_allocator);
     try script.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
     // 6. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
     defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 7. Let declaredFunctionNames be a new empty List.
@@ -234,8 +234,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                 if (!function_definable) {
                     return agent.throwException(
                         .type_error,
-                        "Cannot declare '{}' in global environment",
-                        .{function_name},
+                        "Cannot declare '{f}' in global environment",
+                        .{function_name.fmtUnquoted()},
                     );
                 }
 
@@ -253,7 +253,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     var declared_var_names: String.HashMapUnmanaged(void) = .empty;
     defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
     // 10. For each element d of varDeclarations, do
@@ -276,8 +276,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                     if (!var_name_definable) {
                         return agent.throwException(
                             .type_error,
-                            "Cannot declare '{}' in global environment",
-                            .{var_name},
+                            "Cannot declare '{f}' in global environment",
+                            .{var_name.fmtUnquoted()},
                         );
                     }
 
@@ -300,7 +300,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     //     [...]
 
     // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
-    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
     defer lex_declarations.deinit(agent.gc_allocator);
     try script.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 

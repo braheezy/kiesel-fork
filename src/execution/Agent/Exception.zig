@@ -1,4 +1,3 @@
-const builtin = @import("builtin");
 const std = @import("std");
 
 const execution = @import("../../execution.zig");
@@ -20,23 +19,18 @@ pub const StackFrame = struct {
     origin: ExecutionContext.Origin,
 };
 
-pub fn format(
-    self: Exception,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = options;
-    if (comptime std.mem.eql(u8, fmt, "pretty")) {
-        return prettyPrintException(self, writer) catch |err| {
-            // NOTE: When targeting Windows the error set contains error.Unexpected (from the
-            //       `std.io.tty.Config.setColor()` calls), which `std.fmt.formatType()`
-            //       doesn't include in its error set.
-            if (builtin.os.tag == .windows) switch (err) {
-                error.Unexpected => {},
-                else => |e| return e,
-            } else return err;
-        };
-    }
-    @compileError("Exception formatting without {pretty} is not implemented");
+pub fn format(_: Exception, _: *std.Io.Writer) std.Io.Writer.Error!void {
+    @compileError("Plain exception formatting is not implemented, use 'fmtPretty()'");
+}
+
+pub fn formatPretty(self: Exception, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    return prettyPrintException(self, writer) catch |err| switch (err) {
+        // From `std.Io.tty.Config.setColor()`
+        error.Unexpected => {},
+        error.WriteFailed => return error.WriteFailed,
+    };
+}
+
+pub fn fmtPretty(self: Exception) std.fmt.Alt(Exception, formatPretty) {
+    return .{ .data = self };
 }

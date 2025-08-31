@@ -29,15 +29,17 @@ pub const std_options: std.Options = .{
     // No std.posix.getrandom() on UEFI
     .cryptoRandomSeed = struct {
         fn cryptoRandomSeed(buffer: []u8) void {
-            var rng: *std.os.uefi.protocol.Rng = undefined;
-            const status = std.os.uefi.system_table.boot_services.?.locateProtocol(
-                &std.os.uefi.protocol.Rng.guid,
+            const rng = std.os.uefi.system_table.boot_services.?.locateProtocol(
+                std.os.uefi.protocol.Rng,
                 null,
-                @ptrCast(&rng),
-            );
-            // Might return .not_found, e.g. in QEMU without virtio-rng
-            if (status != .success) return;
-            _ = rng.getRNG(null, buffer.len, buffer.ptr);
+            ) catch {
+                // No random bytes for you
+                return;
+            } orelse {
+                // Might return null, e.g. in QEMU without virtio-rng
+                return;
+            };
+            rng.getRNG(null, buffer) catch {};
         }
     }.cryptoRandomSeed,
 
@@ -45,45 +47,82 @@ pub const std_options: std.Options = .{
     .crypto_always_getrandom = true,
 };
 
-const WriterContext = struct {
+pub const Writer = struct {
     console_out: *std.os.uefi.protocol.SimpleTextOutput,
-    attribute: usize,
+    attribute: std.os.uefi.protocol.SimpleTextOutput.Attribute,
+    interface: std.Io.Writer,
+
+    pub fn init(
+        buffer: []u8,
+        console_out: *std.os.uefi.protocol.SimpleTextOutput,
+        attribute: std.os.uefi.protocol.SimpleTextOutput.Attribute,
+    ) Writer {
+        return .{
+            .console_out = console_out,
+            .attribute = attribute,
+            .interface = .{
+                .vtable = &.{
+                    .drain = drain,
+                },
+                .buffer = buffer,
+            },
+        };
+    }
+
+    const WriteError =
+        std.os.uefi.protocol.SimpleTextOutput.SetAttributeError ||
+        std.os.uefi.protocol.SimpleTextOutput.OutputStringError;
+
+    fn write(self: Writer, bytes: []const u8) WriteError!usize {
+        try self.console_out.setAttribute(self.attribute);
+        for (bytes) |c| {
+            if (c == '\n') {
+                _ = try self.console_out.outputString(&.{ '\r', 0 });
+            }
+            _ = try self.console_out.outputString(&.{ c, 0 });
+        }
+        return bytes.len;
+    }
+
+    fn drain(io_writer: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
+        const writer: *Writer = @alignCast(@fieldParentPtr("interface", io_writer));
+        const buffered = io_writer.buffered();
+        if (buffered.len != 0) {
+            const n = writer.write(buffered) catch return error.WriteFailed;
+            return io_writer.consume(n);
+        }
+        for (data[0 .. data.len - 1]) |buf| {
+            if (buf.len == 0) continue;
+            const n = writer.write(buf) catch return error.WriteFailed;
+            return io_writer.consume(n);
+        }
+        const pattern = data[data.len - 1];
+        if (pattern.len == 0 or splat == 0) return 0;
+        const n = writer.write(pattern) catch return error.WriteFailed;
+        return io_writer.consume(n);
+    }
 };
 
-fn writeFn(context: *const anyopaque, bytes: []const u8) anyerror!usize {
-    const writer_context: *const WriterContext = @alignCast(@ptrCast(context));
-    const console_out = writer_context.console_out;
-    _ = console_out.setAttribute(writer_context.attribute);
-    for (bytes) |c| {
-        if (c == '\n') {
-            _ = console_out.outputString(@ptrCast(&[2]u16{ '\r', 0 }));
-        }
-        _ = console_out.outputString(@ptrCast(&[2]u16{ c, 0 }));
-    }
-    return bytes.len;
-}
+const Error =
+    std.mem.Allocator.Error ||
+    std.Io.Writer.Error ||
+    std.os.uefi.Error;
 
-pub fn main() std.os.uefi.Status {
+fn mainWithErrorHandling() Error!void {
     const allocator = std.os.uefi.pool_allocator;
 
     const console_out = std.os.uefi.system_table.con_out.?;
-    _ = console_out.reset(true);
-    _ = console_out.clearScreen();
+    try console_out.reset(true);
+    try console_out.clearScreen();
+    try console_out.enableCursor(true);
 
-    const stdout: std.io.AnyWriter = .{
-        .context = &WriterContext{
-            .console_out = console_out,
-            .attribute = 0x7, // white
-        },
-        .writeFn = writeFn,
-    };
-    const stderr: std.io.AnyWriter = .{
-        .context = &WriterContext{
-            .console_out = console_out,
-            .attribute = 0x4, // red
-        },
-        .writeFn = writeFn,
-    };
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer: Writer = .init(&stdout_buffer, console_out, .{ .foreground = .white });
+    const stdout = &stdout_writer.interface;
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer: Writer = .init(&stderr_buffer, console_out, .{ .foreground = .red });
+    const stderr = &stderr_writer.interface;
 
     const platform: Agent.Platform = .{
         .gc_allocator = allocator,
@@ -97,29 +136,26 @@ pub fn main() std.os.uefi.Status {
         .currentTimeNs = std.time.nanoTimestamp,
     };
     defer platform.deinit();
-    var agent = Agent.init(&platform, .{}) catch |err| switch (err) {
-        error.OutOfMemory => return .out_of_resources,
-    };
+    var agent = try Agent.init(&platform, .{});
     defer agent.deinit();
 
     Realm.initializeHostDefinedRealm(&agent, .{}) catch |err| switch (err) {
-        error.OutOfMemory => return .out_of_resources,
+        error.OutOfMemory => return error.OutOfMemory,
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
 
-    kiesel_runtime.addBindings(&agent, realm, realm.global_object) catch |err| switch (err) {
-        error.OutOfMemory => return .out_of_resources,
-    };
+    try kiesel_runtime.addBindings(&agent, realm, realm.global_object);
 
-    stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\n", .{
+    try stdout.print("Kiesel {[kiesel]f} [Zig {[zig]f}] on uefi\n", .{
         .kiesel = kiesel.version,
         .zig = builtin.zig_version,
-    }) catch unreachable;
-    stdout.print("{[vendor]s}, 0x{[revision]x}\n", .{
+    });
+    try stdout.print("{[vendor]f}, 0x{[revision]x}\n", .{
         .vendor = std.unicode.fmtUtf16Le(std.mem.span(std.os.uefi.system_table.firmware_vendor)),
         .revision = std.os.uefi.system_table.firmware_revision,
-    }) catch unreachable;
+    });
+    try stdout.flush();
 
     var editor = Editor.init(allocator, .{});
     defer editor.deinit();
@@ -128,7 +164,8 @@ pub fn main() std.os.uefi.Status {
         const source_text = editor.getLine("> ") catch |err| switch (err) {
             error.Eof => break,
             else => {
-                stderr.print("Error: {!}\n", .{err}) catch unreachable;
+                try stderr.print("Error: {t}\n", .{err});
+                try stderr.flush();
                 continue;
             },
         };
@@ -144,37 +181,47 @@ pub fn main() std.os.uefi.Status {
             .diagnostics = &diagnostics,
             .file_name = "repl",
         }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
             error.ParseError => {
                 const parse_error = diagnostics.errors.items[0];
-                stderr.print(
-                    "{}\n",
-                    .{fmtParseErrorHint(parse_error, source_text)},
-                ) catch unreachable;
-                const syntax_error = agent.createErrorObject(
+                const syntax_error = try agent.createErrorObject(
                     .syntax_error,
-                    "{}",
+                    "{f}",
                     .{fmtParseError(parse_error)},
-                ) catch return .out_of_resources;
+                );
                 const exception: Agent.Exception = .{
                     .value = Value.from(syntax_error),
                     .stack_trace = &.{},
                 };
-                stderr.print("{pretty}\n", .{exception}) catch unreachable;
+                try stderr.print("{f}\n{f}\n", .{
+                    fmtParseErrorHint(parse_error, source_text),
+                    exception.fmtPretty(),
+                });
+                try stderr.flush();
                 continue;
             },
-            error.OutOfMemory => return .out_of_resources,
         };
 
         if (script.evaluate()) |result| {
-            stdout.print("{pretty}\n", .{result}) catch unreachable;
+            try stdout.print("{f}\n", .{result});
+            try stdout.flush();
         } else |err| switch (err) {
-            error.OutOfMemory => return .out_of_resources,
+            error.OutOfMemory => return error.OutOfMemory,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                stderr.print("{pretty}\n", .{exception}) catch unreachable;
+                try stderr.print("{f}\n", .{exception.fmtPretty()});
+                try stderr.flush();
             },
         }
     }
+}
 
+pub fn main() std.os.uefi.Status {
+    // By having a main function with a much broader error set we can 'try' away all the errors and
+    // then possibly turn them into UEFI-specific status codes here.
+    mainWithErrorHandling() catch |err| switch (err) {
+        error.OutOfMemory => return .out_of_resources,
+        else => {},
+    };
     return .success;
 }

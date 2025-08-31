@@ -130,7 +130,7 @@ pub const constructor = struct {
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{adder});
+            return agent.throwException(.type_error, "{f} is not callable", .{adder});
         }
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
@@ -295,7 +295,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         const iterable_keys = try map.fields.registerIterator(agent.gc_allocator);
@@ -443,7 +443,7 @@ pub const prototype = struct {
 };
 
 const MapData = Value.ArrayHashMapUnmanaged(Value, sameValue);
-const IterableKeys = std.ArrayListUnmanaged(?Value);
+const IterableKeys = std.ArrayList(?Value);
 
 /// 24.1.4 Properties of Map Instances
 /// https://tc39.es/ecma262/#sec-properties-of-map-instances

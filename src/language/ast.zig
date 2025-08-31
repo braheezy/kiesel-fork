@@ -44,7 +44,7 @@ pub const LexicallyScopedDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: LexicallyScopedDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration : export default AssignmentExpression ;
@@ -572,7 +572,7 @@ pub const TemplateLiteral = struct {
         allocator: std.mem.Allocator,
         raw: bool,
     ) std.mem.Allocator.Error![]const *const String {
-        var template_strings: std.ArrayListUnmanaged(*const String) = .empty;
+        var template_strings: std.ArrayList(*const String) = .empty;
         for (self.spans) |span| switch (span) {
             .text => try template_strings.append(
                 allocator,
@@ -884,7 +884,7 @@ pub const Statement = union(enum) {
     pub fn collectVarDeclaredNames(
         self: Statement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
@@ -925,7 +925,7 @@ pub const Statement = union(enum) {
     pub fn collectVarScopedDeclarations(
         self: Statement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
@@ -984,7 +984,7 @@ pub const Declaration = union(enum) {
     pub fn collectBoundNames(
         self: Declaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             inline else => |node| try node.collectBoundNames(allocator, bound_names),
@@ -1004,7 +1004,7 @@ pub const HoistableDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: HoistableDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             inline else => |node| try node.collectBoundNames(allocator, bound_names),
@@ -1052,7 +1052,7 @@ pub const StatementList = struct {
     pub fn collectLexicallyDeclaredNames(
         self: StatementList,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the LexicallyDeclaredNames of StatementList.
@@ -1068,7 +1068,7 @@ pub const StatementList = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: StatementList,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the LexicallyScopedDeclarations of StatementList.
@@ -1084,7 +1084,7 @@ pub const StatementList = struct {
     pub fn collectVarDeclaredNames(
         self: StatementList,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the VarDeclaredNames of StatementList.
@@ -1102,7 +1102,7 @@ pub const StatementList = struct {
     pub fn collectVarScopedDeclarations(
         self: StatementList,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the VarScopedDeclarations of StatementList.
@@ -1120,7 +1120,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementList,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the TopLevelLexicallyDeclaredNames of StatementList.
@@ -1136,7 +1136,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementList,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelLexicallyScopedDeclarations of StatementList.
@@ -1152,7 +1152,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelVarDeclaredNames(
         self: StatementList,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the TopLevelVarDeclaredNames of StatementList.
@@ -1192,7 +1192,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelVarScopedDeclarations(
         self: StatementList,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelVarScopedDeclarations of StatementList.
@@ -1261,7 +1261,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectLexicallyDeclaredNames(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1289,7 +1289,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectLexicallyScopedDeclarations(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1319,7 +1319,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectVarDeclaredNames(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             .statement => |statement| try statement.collectVarDeclaredNames(allocator, var_declared_names),
@@ -1332,7 +1332,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectVarScopedDeclarations(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             .statement => |statement| try statement.collectVarScopedDeclarations(allocator, var_scoped_declarations),
@@ -1345,7 +1345,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1372,7 +1372,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementListItem,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
@@ -1416,7 +1416,7 @@ pub const LexicalDeclaration = struct {
     pub fn collectBoundNames(
         self: LexicalDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return the BoundNames of BindingList.
@@ -1452,7 +1452,7 @@ pub const BindingList = struct {
     pub fn collectBoundNames(
         self: BindingList,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingList : BindingList , LexicalBinding
         // 1. Let names1 be the BoundNames of BindingList.
@@ -1480,7 +1480,7 @@ pub const LexicalBinding = union(enum) {
     pub fn collectBoundNames(
         self: LexicalBinding,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // LexicalBinding : BindingIdentifier Initializer[opt]
@@ -1511,7 +1511,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectVarDeclaredNames(
         self: VariableDeclarationList,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // VariableStatement : var VariableDeclarationList ;
         // 1. Return the BoundNames of VariableDeclarationList.
@@ -1523,7 +1523,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectBoundNames(
         self: VariableDeclarationList,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
@@ -1541,7 +1541,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectVarScopedDeclarations(
         self: VariableDeclarationList,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
@@ -1571,7 +1571,7 @@ pub const VariableDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: VariableDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // VariableDeclaration : BindingIdentifier Initializer[opt]
@@ -1598,7 +1598,7 @@ pub const BindingPattern = union(enum) {
     pub fn collectBoundNames(
         self: BindingPattern,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ObjectBindingPattern : { }
@@ -1680,7 +1680,7 @@ pub const BindingProperty = union(enum) {
     pub fn collectBoundNames(
         self: BindingProperty,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingProperty : PropertyName : BindingElement
         // 1. Return the BoundNames of BindingElement.
@@ -1723,7 +1723,7 @@ pub const BindingElement = union(enum) {
     pub fn collectBoundNames(
         self: BindingElement,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // BindingElement : BindingPattern Initializer[opt]
         // 1. Return the BoundNames of BindingPattern.
@@ -1773,7 +1773,7 @@ pub const SingleNameBinding = struct {
     pub fn collectBoundNames(
         self: SingleNameBinding,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // SingleNameBinding : BindingIdentifier Initializer[opt]
         // 1. Return the BoundNames of BindingIdentifier.
@@ -1791,7 +1791,7 @@ pub const BindingRestElement = union(enum) {
     pub fn collectBoundNames(
         self: BindingRestElement,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
@@ -1829,7 +1829,7 @@ pub const IfStatement = struct {
     pub fn collectVarDeclaredNames(
         self: IfStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
@@ -1848,7 +1848,7 @@ pub const IfStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: IfStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
@@ -1881,7 +1881,7 @@ pub const DoWhileStatement = struct {
     pub fn collectVarDeclaredNames(
         self: DoWhileStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarDeclaredNames of Statement.
@@ -1893,7 +1893,7 @@ pub const DoWhileStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: DoWhileStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarScopedDeclarations of Statement.
@@ -1911,7 +1911,7 @@ pub const WhileStatement = struct {
     pub fn collectVarDeclaredNames(
         self: WhileStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
@@ -1923,7 +1923,7 @@ pub const WhileStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: WhileStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
@@ -1949,7 +1949,7 @@ pub const ForStatement = struct {
     pub fn collectVarDeclaredNames(
         self: ForStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
@@ -1973,7 +1973,7 @@ pub const ForStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: ForStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
@@ -2017,7 +2017,7 @@ pub const ForInOfStatement = struct {
     pub fn collectVarDeclaredNames(
         self: ForInOfStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
@@ -2048,7 +2048,7 @@ pub const ForInOfStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: ForInOfStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
@@ -2106,7 +2106,7 @@ pub const ForBinding = union(enum) {
     pub fn collectBoundNames(
         self: ForBinding,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
@@ -2140,7 +2140,7 @@ pub const WithStatement = struct {
     pub fn collectVarDeclaredNames(
         self: WithStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
@@ -2152,7 +2152,7 @@ pub const WithStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: WithStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
@@ -2170,7 +2170,7 @@ pub const SwitchStatement = struct {
     pub fn collectVarDeclaredNames(
         self: SwitchStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarDeclaredNames of CaseBlock.
@@ -2182,7 +2182,7 @@ pub const SwitchStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: SwitchStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarScopedDeclarations of CaseBlock.
@@ -2204,7 +2204,7 @@ pub const CaseBlock = struct {
     pub fn collectLexicallyDeclaredNames(
         self: CaseBlock,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2229,7 +2229,7 @@ pub const CaseBlock = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: CaseBlock,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2254,7 +2254,7 @@ pub const CaseBlock = struct {
     pub fn collectVarDeclaredNames(
         self: CaseBlock,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2279,7 +2279,7 @@ pub const CaseBlock = struct {
     pub fn collectVarScopedDeclarations(
         self: CaseBlock,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
@@ -2310,7 +2310,7 @@ pub const CaseClause = struct {
     pub fn collectLexicallyDeclaredNames(
         self: CaseClause,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementListopt
         // 1. If the StatementList is present, return the LexicallyDeclaredNames of StatementList.
@@ -2323,7 +2323,7 @@ pub const CaseClause = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: CaseClause,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
@@ -2336,7 +2336,7 @@ pub const CaseClause = struct {
     pub fn collectVarDeclaredNames(
         self: CaseClause,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
@@ -2349,7 +2349,7 @@ pub const CaseClause = struct {
     pub fn collectVarScopedDeclarations(
         self: CaseClause,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
@@ -2367,7 +2367,7 @@ pub const DefaultClause = struct {
     pub fn collectLexicallyDeclaredNames(
         self: DefaultClause,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementListopt
         // 1. If the StatementList is present, return the LexicallyDeclaredNames of StatementList.
@@ -2380,7 +2380,7 @@ pub const DefaultClause = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: DefaultClause,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
@@ -2393,7 +2393,7 @@ pub const DefaultClause = struct {
     pub fn collectVarDeclaredNames(
         self: DefaultClause,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
@@ -2406,7 +2406,7 @@ pub const DefaultClause = struct {
     pub fn collectVarScopedDeclarations(
         self: DefaultClause,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
@@ -2437,7 +2437,7 @@ pub const LabelledStatement = struct {
     pub fn collectLexicallyDeclaredNames(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the LexicallyDeclaredNames of LabelledItem.
@@ -2460,7 +2460,7 @@ pub const LabelledStatement = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         //  LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the LexicallyScopedDeclarations of LabelledItem.
@@ -2485,7 +2485,7 @@ pub const LabelledStatement = struct {
     pub fn collectVarDeclaredNames(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             // LabelledStatement : LabelIdentifier : LabelledItem
@@ -2506,7 +2506,7 @@ pub const LabelledStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             //  LabelledStatement : LabelIdentifier : LabelledItem
@@ -2527,7 +2527,7 @@ pub const LabelledStatement = struct {
     pub fn collectTopLevelVarDeclaredNames(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarDeclaredNames of LabelledItem.
@@ -2558,7 +2558,7 @@ pub const LabelledStatement = struct {
     pub fn collectTopLevelVarScopedDeclarations(
         self: LabelledStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarScopedDeclarations of LabelledItem.
@@ -2604,7 +2604,7 @@ pub const TryStatement = struct {
     pub fn collectVarDeclaredNames(
         self: TryStatement,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let names1 be the VarDeclaredNames of Block.
@@ -2635,7 +2635,7 @@ pub const TryStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: TryStatement,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let declarations1 be the VarScopedDeclarations of Block.
@@ -2672,7 +2672,7 @@ pub const CatchParameter = union(enum) {
     pub fn collectBoundNames(
         self: CatchParameter,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
@@ -2696,7 +2696,7 @@ pub const FormalParameters = struct {
     pub fn collectBoundNames(
         self: FormalParameters,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // FormalParameterList : FormalParameterList , FormalParameter
         // 1. Let names1 be the BoundNames of FormalParameterList.
@@ -2797,7 +2797,7 @@ pub const FunctionDeclaration = struct {
     pub fn collectBoundNames(
         self: FunctionDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
@@ -2830,7 +2830,7 @@ pub const FunctionBody = struct {
     pub const Type = enum {
         normal,
         generator,
-        @"async",
+        async,
         async_generator,
     };
 
@@ -2844,7 +2844,7 @@ pub const FunctionBody = struct {
     pub fn collectLexicallyDeclaredNames(
         self: FunctionBody,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
@@ -2858,7 +2858,7 @@ pub const FunctionBody = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: FunctionBody,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
@@ -2872,7 +2872,7 @@ pub const FunctionBody = struct {
     pub fn collectVarDeclaredNames(
         self: FunctionBody,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
@@ -2886,7 +2886,7 @@ pub const FunctionBody = struct {
     pub fn collectVarScopedDeclarations(
         self: FunctionBody,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
@@ -2918,7 +2918,7 @@ pub const MethodDefinition = struct {
         get,
         set,
         generator,
-        @"async",
+        async,
         async_generator,
     };
 
@@ -2927,7 +2927,7 @@ pub const MethodDefinition = struct {
         get: FunctionExpression,
         set: FunctionExpression,
         generator: GeneratorExpression,
-        @"async": AsyncFunctionExpression,
+        async: AsyncFunctionExpression,
         async_generator: AsyncGeneratorExpression,
     };
 
@@ -2947,7 +2947,7 @@ pub const GeneratorDeclaration = struct {
     pub fn collectBoundNames(
         self: GeneratorDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
@@ -2991,7 +2991,7 @@ pub const AsyncGeneratorDeclaration = struct {
     pub fn collectBoundNames(
         self: AsyncGeneratorDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
@@ -3030,7 +3030,7 @@ pub const ClassDeclaration = struct {
     pub fn collectBoundNames(
         self: ClassDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassDeclaration : class BindingIdentifier ClassTail
         // 1. Return the BoundNames of BindingIdentifier.
@@ -3101,7 +3101,7 @@ pub const ClassBody = struct {
         // 2. If the ClassElementKind of ClassElement is non-constructor-method, then
         //     a. Append ClassElement to the end of list.
         // 3. Return list.
-        var class_elements = try std.ArrayListUnmanaged(ClassElement).initCapacity(
+        var class_elements = try std.ArrayList(ClassElement).initCapacity(
             allocator,
             self.class_element_list.items.len,
         );
@@ -3123,7 +3123,7 @@ pub const ClassBody = struct {
         // 1. Let names1 be the PrivateBoundIdentifiers of ClassElementList.
         // 2. Let names2 be the PrivateBoundIdentifiers of ClassElement.
         // 3. Return the list-concatenation of names1 and names2.
-        var private_bound_identifiers: std.ArrayListUnmanaged(PrivateIdentifier) = .empty;
+        var private_bound_identifiers: std.ArrayList(PrivateIdentifier) = .empty;
         for (self.class_element_list.items) |class_element| {
             switch (class_element) {
                 // ClassElement :
@@ -3290,7 +3290,7 @@ pub const ClassStaticBlock = struct {
     pub fn collectLexicallyDeclaredNames(
         self: ClassStaticBlock,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassStaticBlockStatementList : [empty]
         // 1. Return a new empty List.
@@ -3304,7 +3304,7 @@ pub const ClassStaticBlock = struct {
     pub fn collectVarDeclaredNames(
         self: ClassStaticBlock,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ClassStaticBlockStatementList : [empty]
         // 1. Return a new empty List.
@@ -3326,7 +3326,7 @@ pub const AsyncFunctionDeclaration = struct {
     pub fn collectBoundNames(
         self: AsyncFunctionDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
@@ -3375,7 +3375,7 @@ pub const Script = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: Script,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
@@ -3389,7 +3389,7 @@ pub const Script = struct {
     pub fn collectLexicallyDeclaredNames(
         self: Script,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
@@ -3403,7 +3403,7 @@ pub const Script = struct {
     pub fn collectVarDeclaredNames(
         self: Script,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
@@ -3417,7 +3417,7 @@ pub const Script = struct {
     pub fn collectVarScopedDeclarations(
         self: Script,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
@@ -3455,7 +3455,7 @@ pub const Module = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: Module,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3471,7 +3471,7 @@ pub const Module = struct {
     pub fn collectVarScopedDeclarations(
         self: Module,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         try self.module_item_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
     }
@@ -3491,7 +3491,7 @@ pub const Module = struct {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let requests be the ModuleRequests of ModuleItemList.
         // 2. Let additionalRequests be the ModuleRequests of ModuleItem.
-        var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+        var module_requests: std.ArrayList(ModuleRequest) = .empty;
         defer module_requests.deinit(allocator);
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem : StatementListItem
@@ -3524,7 +3524,7 @@ pub const Module = struct {
     pub fn collectImportEntries(
         self: Module,
         allocator: std.mem.Allocator,
-        import_entries: *std.ArrayListUnmanaged(ImportEntry),
+        import_entries: *std.ArrayList(ImportEntry),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3542,7 +3542,7 @@ pub const Module = struct {
             .import_declaration => |import_declaration| {
                 //  ImportDeclaration : import ImportClause FromClause WithClause[opt] ;
                 if (import_declaration.import_clause) |import_clause| {
-                    var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+                    var module_requests: std.ArrayList(ModuleRequest) = .empty;
                     defer module_requests.deinit(allocator);
                     try import_declaration.collectModuleRequests(allocator, &module_requests);
 
@@ -3568,7 +3568,7 @@ pub const Module = struct {
     pub fn collectExportEntries(
         self: Module,
         allocator: std.mem.Allocator,
-        export_entries: *std.ArrayListUnmanaged(ExportEntry),
+        export_entries: *std.ArrayList(ExportEntry),
     ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
@@ -3586,7 +3586,7 @@ pub const Module = struct {
             .export_declaration => |export_declaration| switch (export_declaration) {
                 // ExportDeclaration : export ExportFromClause FromClause WithClause[opt] ;
                 .export_from => |export_from| {
-                    var module_requests: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+                    var module_requests: std.ArrayList(ModuleRequest) = .empty;
                     defer module_requests.deinit(allocator);
                     try export_declaration.collectModuleRequests(allocator, &module_requests);
 
@@ -3613,7 +3613,7 @@ pub const Module = struct {
                     // 1. Let entries be a new empty List.
 
                     // 2. Let names be the BoundNames of VariableStatement.
-                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    var names: std.ArrayList(Identifier) = .empty;
                     defer names.deinit(allocator);
                     try variable_statement.variable_declaration_list.collectBoundNames(allocator, &names);
                     try export_entries.ensureUnusedCapacity(allocator, names.items.len);
@@ -3640,7 +3640,7 @@ pub const Module = struct {
                     // 1. Let entries be a new empty List.
 
                     // 2. Let names be the BoundNames of Declaration.
-                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    var names: std.ArrayList(Identifier) = .empty;
                     defer names.deinit(allocator);
                     try declaration.collectBoundNames(allocator, &names);
                     try export_entries.ensureUnusedCapacity(allocator, names.items.len);
@@ -3665,7 +3665,7 @@ pub const Module = struct {
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
                     // 1. Let names be the BoundNames of HoistableDeclaration.
-                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    var names: std.ArrayList(Identifier) = .empty;
                     defer names.deinit(allocator);
                     try hoistable_declaration.collectBoundNames(allocator, &names);
 
@@ -3688,7 +3688,7 @@ pub const Module = struct {
                 // ExportDeclaration : export default ClassDeclaration
                 .default_class_declaration => |class_declaration| {
                     // 1. Let names be the BoundNames of ClassDeclaration.
-                    var names: std.ArrayListUnmanaged(Identifier) = .empty;
+                    var names: std.ArrayList(Identifier) = .empty;
                     defer names.deinit(allocator);
                     try class_declaration.collectBoundNames(allocator, &names);
 
@@ -3736,7 +3736,7 @@ pub const ModuleItemList = struct {
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItemList,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let names1 be the LexicallyDeclaredNames of ModuleItemList.
@@ -3752,7 +3752,7 @@ pub const ModuleItemList = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: ModuleItemList,
         allocator: std.mem.Allocator,
-        lexically_scoped_declarations: *std.ArrayListUnmanaged(LexicallyScopedDeclaration),
+        lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         for (self.items) |item| switch (item) {
             .statement_list_item => |statement_list_item| {
@@ -3809,7 +3809,7 @@ pub const ModuleItemList = struct {
     pub fn collectVarDeclaredNames(
         self: ModuleItemList,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let names1 be the VarDeclaredNames of ModuleItemList.
@@ -3825,7 +3825,7 @@ pub const ModuleItemList = struct {
     pub fn collectVarScopedDeclarations(
         self: ModuleItemList,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let declarations1 be the VarScopedDeclarations of ModuleItemList.
@@ -3848,7 +3848,7 @@ pub const ModuleItem = union(enum) {
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItem,
         allocator: std.mem.Allocator,
-        lexically_declared_names: *std.ArrayListUnmanaged(Identifier),
+        lexically_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
@@ -3879,7 +3879,7 @@ pub const ModuleItem = union(enum) {
     pub fn collectVarDeclaredNames(
         self: ModuleItem,
         allocator: std.mem.Allocator,
-        var_declared_names: *std.ArrayListUnmanaged(Identifier),
+        var_declared_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
@@ -3910,7 +3910,7 @@ pub const ModuleItem = union(enum) {
     pub fn collectVarScopedDeclarations(
         self: ModuleItem,
         allocator: std.mem.Allocator,
-        var_scoped_declarations: *std.ArrayListUnmanaged(VarScopedDeclaration),
+        var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ModuleItem : ImportDeclaration
@@ -3954,7 +3954,7 @@ pub const ImportDeclaration = struct {
     pub fn collectBoundNames(
         self: ImportDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportDeclaration : import ImportClause FromClause ;
         // 1. Return the BoundNames of ImportClause.
@@ -3970,7 +3970,7 @@ pub const ImportDeclaration = struct {
     pub fn collectModuleRequests(
         self: ImportDeclaration,
         allocator: std.mem.Allocator,
-        module_requests: *std.ArrayListUnmanaged(ModuleRequest),
+        module_requests: *std.ArrayList(ModuleRequest),
     ) std.mem.Allocator.Error!void {
         // ImportDeclaration : import ImportClause FromClause ;
         // 1. Let specifier be the SV of FromClause.
@@ -4029,7 +4029,7 @@ pub const ImportClause = union(enum) {
     pub fn collectBoundNames(
         self: ImportClause,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportClause : ImportedDefaultBinding , NameSpaceImport
         // 1. Let names1 be the BoundNames of ImportedDefaultBinding.
@@ -4059,7 +4059,7 @@ pub const ImportClause = union(enum) {
     pub fn collectImportEntriesForModule(
         self: ImportClause,
         allocator: std.mem.Allocator,
-        import_entries: *std.ArrayListUnmanaged(ImportEntry),
+        import_entries: *std.ArrayList(ImportEntry),
         module: ModuleRequest,
     ) std.mem.Allocator.Error!void {
         switch (self) {
@@ -4200,7 +4200,7 @@ pub const ImportsList = struct {
     pub fn collectBoundNames(
         self: ImportsList,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // NamedImports : { }
         // 1. Return a new empty List.
@@ -4224,7 +4224,7 @@ pub const ImportSpecifier = struct {
     pub fn collectBoundNames(
         self: ImportSpecifier,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         // ImportSpecifier : ModuleExportName as ImportedBinding
         // 1. Return the BoundNames of ImportedBinding.
@@ -4265,7 +4265,7 @@ pub const WithClause = struct {
         // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of StringLiteral }.
         // 3. Let rest be WithClauseToAttributes of WithEntries.
         // 4. Return the list-concatenation of « entry » and rest.
-        var attributes: std.ArrayListUnmanaged(ImportAttribute) = .empty;
+        var attributes: std.ArrayList(ImportAttribute) = .empty;
         try attributes.ensureUnusedCapacity(allocator, self.items.len);
         for (self.items) |item| {
             const key = switch (item.key) {
@@ -4319,7 +4319,7 @@ pub const ExportDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: ExportDeclaration,
         allocator: std.mem.Allocator,
-        bound_names: *std.ArrayListUnmanaged(Identifier),
+        bound_names: *std.ArrayList(Identifier),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration :
@@ -4344,7 +4344,7 @@ pub const ExportDeclaration = union(enum) {
             // ExportDeclaration : export default HoistableDeclaration
             .default_hoistable_declaration => |hoistable_declaration| {
                 // 1. Let declarationNames be the BoundNames of HoistableDeclaration.
-                var declaration_names: std.ArrayListUnmanaged(Identifier) = .empty;
+                var declaration_names: std.ArrayList(Identifier) = .empty;
                 defer declaration_names.deinit(allocator);
                 try hoistable_declaration.collectBoundNames(allocator, &declaration_names);
 
@@ -4361,7 +4361,7 @@ pub const ExportDeclaration = union(enum) {
             // ExportDeclaration : export default ClassDeclaration
             .default_class_declaration => |class_declaration| {
                 // 1. Let declarationNames be the BoundNames of ClassDeclaration.
-                var declaration_names: std.ArrayListUnmanaged(Identifier) = .empty;
+                var declaration_names: std.ArrayList(Identifier) = .empty;
                 defer declaration_names.deinit(allocator);
                 try class_declaration.collectBoundNames(allocator, &declaration_names);
 
@@ -4388,7 +4388,7 @@ pub const ExportDeclaration = union(enum) {
     pub fn collectModuleRequests(
         self: ExportDeclaration,
         allocator: std.mem.Allocator,
-        module_requests: *std.ArrayListUnmanaged(ModuleRequest),
+        module_requests: *std.ArrayList(ModuleRequest),
     ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration : export ExportFromClause FromClause ;
@@ -4446,7 +4446,7 @@ pub const ExportFromClause = union(enum) {
     pub fn collectExportEntriesForModule(
         self: ExportFromClause,
         allocator: std.mem.Allocator,
-        export_entries: *std.ArrayListUnmanaged(ExportEntry),
+        export_entries: *std.ArrayList(ExportEntry),
         module: ?ModuleRequest,
     ) std.mem.Allocator.Error!void {
         switch (self) {
@@ -4508,7 +4508,7 @@ pub const NamedExports = struct {
     pub fn collectExportEntriesForModule(
         self: NamedExports,
         allocator: std.mem.Allocator,
-        export_entries: *std.ArrayListUnmanaged(ExportEntry),
+        export_entries: *std.ArrayList(ExportEntry),
         module: ?ModuleRequest,
     ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier

@@ -32,17 +32,10 @@ pub fn deinit(self: *const Symbol, allocator: std.mem.Allocator) void {
     allocator.destroy(self);
 }
 
-pub fn format(
-    self: *const Symbol,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = fmt;
-    _ = options;
+pub fn format(self: *const Symbol, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try writer.writeAll("Symbol(");
     if (self.description) |description| {
-        try writer.print("\"{}\"", .{description});
+        try writer.print("{f}", .{description});
     }
     try writer.writeAll(")");
 }
@@ -71,6 +64,6 @@ test format {
     };
     for (test_cases) |test_case| {
         const symbol, const expected = test_case;
-        try std.testing.expectFmt(expected, "{}", .{symbol});
+        try std.testing.expectFmt(expected, "{f}", .{symbol});
     }
 }

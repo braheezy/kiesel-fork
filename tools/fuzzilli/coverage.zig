@@ -38,14 +38,20 @@ pub fn __sanitizer_cov_reset_edgeguards() void {
 
 export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void {
     @disableInstrumentation();
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
 
     // Avoid duplicate initialization
     if (start == stop or start[0] != 0) return;
 
     if (__edges_start != null or __edges_stop != null) {
         stderr.writeAll("Coverage instrumentation is only supported for a single module\n") catch {};
+        stderr.flush() catch {};
         std.c._exit(-1);
     }
 
@@ -57,7 +63,7 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
     if (shm_key == null) {
         stdout.writeAll("[COV] no shared memory bitmap available, skipping\n") catch {};
         const ptr = std.heap.page_allocator.alloc(u8, SHM_SIZE) catch @panic("OOM");
-        __shmem = @alignCast(@ptrCast(ptr));
+        __shmem = @ptrCast(@alignCast(ptr));
     } else {
         const fd = std.c.shm_open(
             shm_key.?,
@@ -67,7 +73,8 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
         defer _ = std.c.close(fd);
         if (fd <= -1) {
             const err: std.c.E = @enumFromInt(std.c._errno().*);
-            stderr.print("Failed to open shared memory region: {s}\n", .{@tagName(err)}) catch {};
+            stderr.print("Failed to open shared memory region: {t}\n", .{err}) catch {};
+            stderr.flush() catch {};
             std.c._exit(-1);
         }
 
@@ -81,18 +88,20 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
         );
         if (ptr == std.c.MAP_FAILED) {
             stderr.writeAll("Failed to mmap shared memory region\n") catch {};
+            stderr.flush() catch {};
             std.c._exit(-1);
         }
-        __shmem = @alignCast(@ptrCast(ptr));
+        __shmem = @ptrCast(@alignCast(ptr));
     }
 
     __sanitizer_cov_reset_edgeguards();
 
     __shmem.num_edges = @intCast(stop - start);
     stdout.print(
-        "[COV] edge counters initialized. Shared memory: {s} with {} edges\n",
+        "[COV] edge counters initialized. Shared memory: {s} with {d} edges\n",
         .{ shm_key orelse "(null)", __shmem.num_edges },
     ) catch {};
+    stdout.flush() catch {};
 }
 
 export fn __sanitizer_cov_trace_pc_guard(guard: *u32) void {

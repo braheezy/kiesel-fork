@@ -39,7 +39,7 @@ pub fn allocator(self: *GcAllocator) std.mem.Allocator {
 }
 
 fn getHeader(ptr: [*]u8) *[*]u8 {
-    return @alignCast(@ptrCast(ptr - @sizeOf(usize)));
+    return @ptrCast(@alignCast(ptr - @sizeOf(usize)));
 }
 
 fn alignedAlloc(self: *GcAllocator, len: usize, alignment: std.mem.Alignment) ?[*]u8 {

@@ -65,16 +65,16 @@ context: ?*ExecutionContext,
 import_meta: ?*Object,
 
 /// [[ImportEntries]]
-import_entries: std.ArrayListUnmanaged(ImportEntry),
+import_entries: std.ArrayList(ImportEntry),
 
 /// [[LocalExportEntries]]
-local_export_entries: std.ArrayListUnmanaged(ExportEntry),
+local_export_entries: std.ArrayList(ExportEntry),
 
 /// [[IndirectExportEntries]]
-indirect_export_entries: std.ArrayListUnmanaged(ExportEntry),
+indirect_export_entries: std.ArrayList(ExportEntry),
 
 /// [[StarExportEntries]]
-star_export_entries: std.ArrayListUnmanaged(ExportEntry),
+star_export_entries: std.ArrayList(ExportEntry),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -89,7 +89,7 @@ evaluation_error: ?Agent.Exception,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.ArrayListUnmanaged(ModuleRequest),
+requested_modules: std.ArrayList(ModuleRequest),
 
 /// [[LoadedModules]]
 loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
@@ -111,7 +111,7 @@ async_evaluation_order: union(enum) {
 top_level_capability: ?PromiseCapability,
 
 /// [[AsyncParentModules]]
-async_parent_modules: std.ArrayListUnmanaged(*SourceTextModule),
+async_parent_modules: std.ArrayList(*SourceTextModule),
 
 /// [[PendingAsyncDependencies]]
 pending_async_dependencies: ?usize,
@@ -160,7 +160,7 @@ pub const ExportEntry = struct {
     local_name: ?[]const u8,
 };
 
-pub fn print(self: SourceTextModule, writer: anytype) @TypeOf(writer).Error!void {
+pub fn print(self: SourceTextModule, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try ast_printing.printModule(self.ecmascript_code, writer, 0);
 }
 
@@ -234,8 +234,8 @@ fn innerModuleLoading(
                 // 1. Let error be ThrowCompletion(a newly created SyntaxError object).
                 const @"error" = agent.throwException(
                     .syntax_error,
-                    "Import attribute '{}' is not supported",
-                    .{unsupported},
+                    "Import attribute '{f}' is not supported",
+                    .{unsupported.fmtUnquoted()},
                 );
 
                 // 2. Perform ContinueModuleLoading(state, error).
@@ -343,7 +343,7 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     });
 
     // 2. Let stack be a new empty List.
-    var stack: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    var stack: std.ArrayList(*SourceTextModule) = .empty;
     defer stack.deinit(agent.gc_allocator);
 
     // 3. Let result be Completion(InnerModuleLinking(module, stack, 0)).
@@ -384,7 +384,7 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
 fn innerModuleLinking(
     agent: *Agent,
     abstract_module: Module,
-    stack: *std.ArrayListUnmanaged(*SourceTextModule),
+    stack: *std.ArrayList(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
@@ -506,7 +506,7 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, options);
 
     // 3. Let requestedModules be the ModuleRequests of body.
-    var requested_modules: std.ArrayListUnmanaged(ModuleRequest) = .empty;
+    var requested_modules: std.ArrayList(ModuleRequest) = .empty;
     {
         const tmp = try body.moduleRequests(agent.gc_allocator);
         defer agent.gc_allocator.free(tmp);
@@ -514,23 +514,23 @@ pub fn parse(
     }
 
     // 4. Let importEntries be the ImportEntries of body.
-    var import_entries: std.ArrayListUnmanaged(ImportEntry) = .empty;
+    var import_entries: std.ArrayList(ImportEntry) = .empty;
     try body.collectImportEntries(agent.gc_allocator, &import_entries);
 
     // 5. Let importedBoundNames be ImportedLocalNames(importEntries).
     // NOTE: This is lazily done with a for loop below.
 
     // 6. Let indirectExportEntries be a new empty List.
-    var indirect_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
+    var indirect_export_entries: std.ArrayList(ExportEntry) = .empty;
 
     // 7. Let localExportEntries be a new empty List.
-    var local_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
+    var local_export_entries: std.ArrayList(ExportEntry) = .empty;
 
     // 8. Let starExportEntries be a new empty List.
-    var star_export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
+    var star_export_entries: std.ArrayList(ExportEntry) = .empty;
 
     // 9. Let exportEntries be the ExportEntries of body.
-    var export_entries: std.ArrayListUnmanaged(ExportEntry) = .empty;
+    var export_entries: std.ArrayList(ExportEntry) = .empty;
     defer export_entries.deinit(agent.gc_allocator);
     try body.collectExportEntries(agent.gc_allocator, &export_entries);
 
@@ -595,7 +595,7 @@ pub fn parse(
     }
 
     // 11. Let async be body Contains await.
-    const @"async" = body.hasTla();
+    const async = body.hasTla();
 
     // 12. Return Source Text Module Record {
     //       [[Realm]]: realm, [[Environment]]: empty, [[Namespace]]: empty, [[CycleRoot]]: empty,
@@ -613,7 +613,7 @@ pub fn parse(
         .environment = null,
         .namespace = null,
         .cycle_root = null,
-        .has_tla = @"async",
+        .has_tla = async,
         .async_evaluation_order = .unset,
         .top_level_capability = null,
         .async_parent_modules = .empty,
@@ -668,7 +668,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
     }
 
     // 5. Let stack be a new empty List.
-    var stack: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    var stack: std.ArrayList(*SourceTextModule) = .empty;
     defer stack.deinit(agent.gc_allocator);
 
     // 6. Let capability be ! NewPromiseCapability(%Promise%).
@@ -759,7 +759,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 fn innerModuleEvaluation(
     agent: *Agent,
     abstract_module: Module,
-    stack: *std.ArrayListUnmanaged(*SourceTextModule),
+    stack: *std.ArrayList(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
@@ -1022,7 +1022,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
 fn gatherAvailableAncestors(
     agent: *Agent,
     module: *SourceTextModule,
-    exec_list: *std.ArrayListUnmanaged(*SourceTextModule),
+    exec_list: *std.ArrayList(*SourceTextModule),
 ) std.mem.Allocator.Error!void {
     // 1. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
     for (module.async_parent_modules.items) |m| {
@@ -1105,7 +1105,7 @@ fn asyncModuleExecutionFulfilled(
     }
 
     // 8. Let execList be a new empty List.
-    var exec_list: std.ArrayListUnmanaged(*SourceTextModule) = .empty;
+    var exec_list: std.ArrayList(*SourceTextModule) = .empty;
     defer exec_list.deinit(agent.gc_allocator);
 
     // 9. Perform GatherAvailableAncestors(module, execList).
@@ -1272,7 +1272,7 @@ pub fn getExportedNames(
     try export_star_set.putNoClobber(agent.gc_allocator, export_star_set_key, {});
 
     // 5. Let exportedNames be a new empty List.
-    var exported_names: std.ArrayListUnmanaged([]const u8) = .empty;
+    var exported_names: std.ArrayList([]const u8) = .empty;
 
     // 6. For each ExportEntry Record e of module.[[LocalExportEntries]], do
     for (self.local_export_entries.items) |export_entry| {
@@ -1493,8 +1493,8 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         if (maybe_resolution) |resolution| switch (resolution) {
             .ambiguous => return agent.throwException(
                 .syntax_error,
-                "Ambiguous star export '{s}' in module '{}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier },
+                "Ambiguous star export '{s}' in module '{f}'",
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtUnquoted() },
             ),
 
             // d. Assert: resolution is a ResolvedBinding Record.
@@ -1502,8 +1502,8 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         } else {
             return agent.throwException(
                 .syntax_error,
-                "No export named '{s}' in module '{}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier },
+                "No export named '{s}' in module '{f}'",
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtUnquoted() },
             );
         }
     }
@@ -1563,15 +1563,15 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             const resolution = if (maybe_resolution) |resolution| switch (resolution) {
                 .ambiguous => return agent.throwException(
                     .syntax_error,
-                    "Ambiguous star export '{s}' in module '{}'",
-                    .{ import_name.string, import_entry.module_request.specifier },
+                    "Ambiguous star export '{s}' in module '{f}'",
+                    .{ import_name.string, import_entry.module_request.specifier.fmtUnquoted() },
                 ),
                 .resolved_binding => |resolved_binding| resolved_binding,
             } else {
                 return agent.throwException(
                     .syntax_error,
-                    "No export named '{s}' in module '{}'",
-                    .{ import_name.string, import_entry.module_request.specifier },
+                    "No export named '{s}' in module '{f}'",
+                    .{ import_name.string, import_entry.module_request.specifier.fmtUnquoted() },
                 );
             };
 
@@ -1643,7 +1643,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     const code = self.ecmascript_code;
 
     // 19. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
     defer var_declarations.deinit(agent.gc_allocator);
     try code.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
@@ -1651,7 +1651,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     var declared_var_names: String.HashMapUnmanaged(void) = .empty;
     defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
     // 21. For each element d of varDeclarations, do
@@ -1683,7 +1683,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     }
 
     // 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
     defer lex_declarations.deinit(agent.gc_allocator);
     try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 

@@ -217,7 +217,7 @@ pub const constructor = struct {
 
         // 1. If sym is not a Symbol, throw a TypeError exception.
         if (!symbol.isSymbol()) {
-            return agent.throwException(.type_error, "{} is not a Symbol", .{symbol});
+            return agent.throwException(.type_error, "{f} is not a Symbol", .{symbol});
         }
 
         // 2. Return KeyForSymbol(sym).

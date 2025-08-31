@@ -60,7 +60,7 @@ pub const constructor = struct {
 
         // 2. If IsCallable(cleanupCallback) is false, throw a TypeError exception.
         if (!cleanup_callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{cleanup_callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{cleanup_callback});
         }
 
         // 4. Let fn be the active function object.
@@ -141,7 +141,7 @@ pub const prototype = struct {
         if (!target.canBeHeldWeakly(agent)) {
             return agent.throwException(
                 .type_error,
-                "Value {} cannot be held weakly",
+                "Value {f} cannot be held weakly",
                 .{target},
             );
         }
@@ -161,7 +161,7 @@ pub const prototype = struct {
             if (!unregister_token.isUndefined()) {
                 return agent.throwException(
                     .type_error,
-                    "Value {} cannot be held weakly",
+                    "Value {f} cannot be held weakly",
                     .{unregister_token},
                 );
             }
@@ -234,7 +234,7 @@ pub const prototype = struct {
         if (!unregister_token.canBeHeldWeakly(agent)) {
             return agent.throwException(
                 .type_error,
-                "Value {} cannot be held weakly",
+                "Value {f} cannot be held weakly",
                 .{unregister_token},
             );
         }
@@ -330,7 +330,7 @@ pub const FinalizationRegistry = MakeObject(.{
         cleanup_callback: JobCallback,
 
         /// [[Cells]]
-        cells: std.ArrayListUnmanaged(*Cell),
+        cells: std.ArrayList(*Cell),
     },
     .tag = .finalization_registry,
 });

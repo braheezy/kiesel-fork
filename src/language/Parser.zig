@@ -42,7 +42,7 @@ state: struct {
     call_expression_forbidden: bool = false,
     arguments_object_needed: bool = false,
 } = .{},
-identifier_stack: std.ArrayListUnmanaged(ast.Identifier),
+identifier_stack: std.ArrayList(ast.Identifier),
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -59,17 +59,12 @@ pub const Options = struct {
     file_name: ?[]const u8 = null,
 };
 
-pub fn fmtParseError(parse_error: ptk.Error) std.fmt.Formatter(formatParseError) {
+pub fn fmtParseError(parse_error: ptk.Error) std.fmt.Alt(ptk.Error, formatParseError) {
     return .{ .data = parse_error };
 }
 
-fn formatParseError(
-    parse_error: ptk.Error,
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
-    try writer.print("{s} ({s}:{}:{})", .{
+fn formatParseError(parse_error: ptk.Error, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    try writer.print("{s} ({s}:{d}:{d})", .{
         parse_error.message,
         parse_error.location.source orelse "<unknown>",
         parse_error.location.line,
@@ -80,16 +75,13 @@ fn formatParseError(
 pub fn fmtParseErrorHint(
     parse_error: ptk.Error,
     source_text: []const u8,
-) std.fmt.Formatter(formatParseErrorHint) {
+) std.fmt.Alt(ParseErrorHintData, formatParseErrorHint) {
     return .{ .data = .{ parse_error, source_text } };
 }
 
-fn formatParseErrorHint(
-    data: struct { ptk.Error, []const u8 },
-    comptime _: []const u8,
-    _: std.fmt.FormatOptions,
-    writer: anytype,
-) !void {
+const ParseErrorHintData = struct { ptk.Error, []const u8 };
+
+fn formatParseErrorHint(data: ParseErrorHintData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     const parse_error, const source_text = data;
     // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
     //       doesn't matter, and LS/PS are rare enough to not matter for now.
@@ -144,7 +136,7 @@ fn getPrecedenceAndAssociativity(
         .typeof,
         .void,
         .delete,
-        .@"await",
+        .await,
         => .{ 14, null },
         .@"**" => .{ 13, .right_to_left },
         .@"*",
@@ -297,7 +289,7 @@ pub fn parseNode(
         return error.ParseError;
     } else if (parser.core.peek()) |maybe_next_token| {
         if (maybe_next_token) |next_token| {
-            try parser.emitError("Unexpected token '{s}'", .{@tagName(next_token.type)});
+            try parser.emitError("Unexpected token '{t}'", .{next_token.type});
             return error.ParseError;
         }
     } else |_| {
@@ -385,7 +377,7 @@ fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const
             }
         }
     } else {
-        std.debug.assert(token.type == .yield or token.type == .@"await");
+        std.debug.assert(token.type == .yield or token.type == .await);
     }
     return string_value;
 }
@@ -664,7 +656,7 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
     if (self.core.peek() catch null) |next_token| {
         if (next_token.type == .@"=>") return error.UnexpectedToken;
         if (std.mem.eql(u8, token.text, "async")) {
@@ -709,7 +701,7 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
                 );
             }
         },
-        .@"await" => {
+        .await => {
             // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
             if (self.state.in_module) {
                 try self.emitErrorAt(
@@ -729,7 +721,7 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
     const string_value = try self.unescapeIdentifier(token);
 
     switch (token.type) {
@@ -776,7 +768,7 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
                 );
             }
         },
-        .@"await" => {
+        .await => {
             // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
             if (self.state.in_module) {
                 try self.emitErrorAt(
@@ -804,7 +796,7 @@ pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) Accept
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
 
     // Avoid needless validation if this is not the beginning of a labelled statement, otherwise
     // we'd have to drop the errors after finding the colon is missing.
@@ -845,7 +837,7 @@ pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) Accept
                 );
             }
         },
-        .@"await" => {
+        .await => {
             // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
             if (self.state.in_module) {
                 try self.emitErrorAt(
@@ -876,7 +868,7 @@ pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier 
         return error.UnexpectedToken;
     }
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
     return self.unescapeIdentifier(token);
 }
 
@@ -892,7 +884,7 @@ pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression 
             _ = self.core.accept(RuleSet.is(.this)) catch unreachable;
             break :blk .this;
         },
-        .identifier, .yield, .@"await" => if (self.acceptIdentifierReference()) |identifier_reference|
+        .identifier, .yield, .await => if (self.acceptIdentifierReference()) |identifier_reference|
             .{ .identifier_reference = identifier_reference }
         else |_| if (self.acceptArrowFunction()) |arrow_function|
             .{ .arrow_function = arrow_function }
@@ -1153,7 +1145,7 @@ pub fn acceptArguments(self: *Parser) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var arguments: std.ArrayListUnmanaged(ast.Argument) = .empty;
+    var arguments: std.ArrayList(ast.Argument) = .empty;
     errdefer arguments.deinit(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"("));
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
@@ -1303,7 +1295,7 @@ pub fn acceptArrayLiteral(self: *Parser) AcceptError!ast.ArrayLiteral {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"["));
-    var elements: std.ArrayListUnmanaged(ast.ArrayLiteral.Element) = .empty;
+    var elements: std.ArrayList(ast.ArrayLiteral.Element) = .empty;
     errdefer elements.deinit(self.allocator);
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
@@ -1336,7 +1328,7 @@ pub fn acceptPropertyDefinitionList(self: *Parser) AcceptError!ast.PropertyDefin
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var property_definitions: std.ArrayListUnmanaged(ast.PropertyDefinition) = .empty;
+    var property_definitions: std.ArrayList(ast.PropertyDefinition) = .empty;
     errdefer property_definitions.deinit(self.allocator);
     var has_proto_setter = false;
     while (self.acceptPropertyDefinition(&has_proto_setter)) |property_definition| {
@@ -1748,7 +1740,7 @@ pub fn acceptSequenceExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var expressions: std.ArrayListUnmanaged(ast.Expression) = .empty;
+    var expressions: std.ArrayList(ast.Expression) = .empty;
     errdefer expressions.deinit(self.allocator);
     while (self.core.accept(RuleSet.is(.@","))) |_| {
         const expression = try self.acceptExpression(.{});
@@ -1879,7 +1871,8 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
     outer: while (true) {
         next_token = try self.core.peek() orelse break;
         while (next_token.type == .template or next_token.type == .template_head) {
-            expression = .{ .tagged_template = try self.acceptTaggedTemplate(expression) };
+            const copy = expression; // PRO footgun (https://github.com/ziglang/zig/issues/5973)
+            expression = .{ .tagged_template = try self.acceptTaggedTemplate(copy) };
             next_token = try self.core.peek() orelse break :outer;
         }
 
@@ -2037,7 +2030,7 @@ pub fn acceptStatementList(self: *Parser, ctx: AcceptContext) AcceptError!ast.St
     defer tmp.restore();
     var look_for_use_strict = ctx.update_strict_mode and !self.state.in_strict_mode;
 
-    var statement_list_items: std.ArrayListUnmanaged(ast.StatementListItem) = .empty;
+    var statement_list_items: std.ArrayList(ast.StatementListItem) = .empty;
     errdefer statement_list_items.deinit(self.allocator);
     while (self.acceptStatementListItem()) |statement_list_item| {
         try statement_list_items.append(self.allocator, statement_list_item);
@@ -2088,7 +2081,7 @@ pub fn acceptBindingList(self: *Parser) AcceptError!ast.BindingList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var lexical_bindings: std.ArrayListUnmanaged(ast.LexicalBinding) = .empty;
+    var lexical_bindings: std.ArrayList(ast.LexicalBinding) = .empty;
     errdefer lexical_bindings.deinit(self.allocator);
     while (self.acceptLexicalBinding()) |lexical_binding| {
         try lexical_bindings.append(self.allocator, lexical_binding);
@@ -2143,7 +2136,7 @@ pub fn acceptVariableDeclarationList(self: *Parser) AcceptError!ast.VariableDecl
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var variable_declarations: std.ArrayListUnmanaged(ast.VariableDeclaration) = .empty;
+    var variable_declarations: std.ArrayList(ast.VariableDeclaration) = .empty;
     errdefer variable_declarations.deinit(self.allocator);
     while (self.acceptVariableDeclaration()) |variable_declaration| {
         try variable_declarations.append(self.allocator, variable_declaration);
@@ -2197,7 +2190,7 @@ pub fn acceptObjectBindingPattern(self: *Parser) AcceptError!ast.ObjectBindingPa
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var properties: std.ArrayListUnmanaged(ast.ObjectBindingPattern.Property) = .empty;
+    var properties: std.ArrayList(ast.ObjectBindingPattern.Property) = .empty;
     _ = try self.core.accept(RuleSet.is(.@"{"));
     while (true) {
         if (self.acceptBindingProperty()) |binding_property| {
@@ -2216,7 +2209,7 @@ pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPatt
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var elements: std.ArrayListUnmanaged(ast.ArrayBindingPattern.Element) = .empty;
+    var elements: std.ArrayList(ast.ArrayBindingPattern.Element) = .empty;
     _ = try self.core.accept(RuleSet.is(.@"["));
     while (true) {
         if (self.acceptBindingElement()) |binding_element| {
@@ -2444,7 +2437,7 @@ fn acceptIfStatementFunctionDeclaration(self: *Parser) AcceptError!*ast.Statemen
         },
     };
 
-    var statement_list_items: std.ArrayListUnmanaged(ast.StatementListItem) = .empty;
+    var statement_list_items: std.ArrayList(ast.StatementListItem) = .empty;
     errdefer statement_list_items.deinit(self.allocator);
     try statement_list_items.append(self.allocator, .{ .declaration = declaration });
 
@@ -2545,7 +2538,7 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"for"));
-    const maybe_await_token = self.core.accept(RuleSet.is(.@"await")) catch null;
+    const maybe_await_token = self.core.accept(RuleSet.is(.await)) catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const initializer_location = (try self.peekToken()).location;
     const initializer: ast.ForInOfStatement.Initializer = if (self.core.accept(RuleSet.is(.@"var"))) |_|
@@ -2783,7 +2776,7 @@ pub fn acceptCaseBlock(self: *Parser) AcceptError!ast.CaseBlock {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    var case_block_items: std.ArrayListUnmanaged(ast.CaseBlock.Item) = .empty;
+    var case_block_items: std.ArrayList(ast.CaseBlock.Item) = .empty;
     errdefer case_block_items.deinit(self.allocator);
     var has_default_clause = false;
     while (self.acceptCaseBlockItem(has_default_clause)) |case_block_item| {
@@ -2942,7 +2935,7 @@ pub fn acceptFormalParameters(self: *Parser) AcceptError!ast.FormalParameters {
     const tmp2 = temporaryChange(&self.state.arguments_object_needed, false);
     defer tmp2.restore();
 
-    var formal_parameters_items: std.ArrayListUnmanaged(ast.FormalParameters.Item) = .empty;
+    var formal_parameters_items: std.ArrayList(ast.FormalParameters.Item) = .empty;
     errdefer formal_parameters_items.deinit(self.allocator);
     while (true) {
         if (self.acceptBindingRestElement()) |binding_rest_element| {
@@ -3059,7 +3052,7 @@ pub fn acceptFunctionBody(
     defer tmp1.restore();
 
     const tmp2 = temporaryChange(&self.state.in_async_function_body, switch (@"type") {
-        .@"async", .async_generator => true,
+        .async, .async_generator => true,
         else => false,
     });
     defer tmp2.restore();
@@ -3116,7 +3109,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     if (self.acceptBindingIdentifier()) |binding_identifier| {
         // We need to do this after consuming the identifier token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - binding_identifier.len;
-        var formal_parameters_items = try std.ArrayListUnmanaged(ast.FormalParameters.Item).initCapacity(
+        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
@@ -3245,7 +3238,7 @@ pub fn acceptMethodDefinition(
                     })
                 else |_| {
                     return acceptMethodDefinition(self, .{
-                        .method_type = .@"async",
+                        .method_type = .async,
                         .start_offset = start_offset,
                     });
                 }
@@ -3262,7 +3255,7 @@ pub fn acceptMethodDefinition(
     const function_body_type: ast.FunctionBody.Type = switch (if (parsed) |p| p.method_type else .method) {
         .method, .get, .set => .normal,
         .generator => .generator,
-        .@"async" => .@"async",
+        .async => .async,
         .async_generator => .async_generator,
     };
     const function_body = try self.acceptFunctionBody(function_body_type);
@@ -3572,7 +3565,7 @@ fn acceptClassElementList(self: *Parser) AcceptError!ast.ClassElementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var class_elements: std.ArrayListUnmanaged(ast.ClassElement) = .empty;
+    var class_elements: std.ArrayList(ast.ClassElement) = .empty;
     errdefer class_elements.deinit(self.allocator);
     while (self.acceptClassElement()) |class_element|
         try class_elements.append(self.allocator, class_element)
@@ -3709,7 +3702,7 @@ fn acceptTemplateLiteral(self: *Parser) AcceptError!ast.TemplateLiteral {
     const tmp = temporaryChange(&tokenizer_.state.parsing_template_literal, true);
     defer tmp.restore();
 
-    var spans: std.ArrayListUnmanaged(ast.TemplateLiteral.Span) = .empty;
+    var spans: std.ArrayList(ast.TemplateLiteral.Span) = .empty;
     errdefer spans.deinit(self.allocator);
     if (self.core.accept(RuleSet.is(.template))) |template| {
         try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template.text) });
@@ -3751,7 +3744,7 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body = try self.acceptFunctionBody(.@"async");
+    const function_body = try self.acceptFunctionBody(.async);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         if (binding_identifier != null) {
@@ -3793,7 +3786,7 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body = try self.acceptFunctionBody(.@"async");
+    const function_body = try self.acceptFunctionBody(.async);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         if (binding_identifier != null) {
@@ -3826,10 +3819,10 @@ pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.@"await"));
+    _ = try self.core.accept(RuleSet.is(.await));
     const expression = try self.allocator.create(ast.Expression);
     errdefer self.allocator.destroy(expression);
-    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@"await") + 1 };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.await) + 1 };
     expression.* = try self.acceptExpression(ctx);
     return .{ .expression = expression };
 }
@@ -3847,7 +3840,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
     if (self.acceptBindingIdentifier()) |binding_identifier| {
-        var formal_parameters_items = try std.ArrayListUnmanaged(ast.FormalParameters.Item).initCapacity(
+        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
@@ -3875,7 +3868,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
-        const function_body = try self.acceptFunctionBody(.@"async");
+        const function_body = try self.acceptFunctionBody(.async);
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
@@ -3890,7 +3883,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         items[0] = .{ .statement = statement };
         const statement_list: ast.StatementList = .{ .items = items };
         break :blk .{
-            .type = .@"async",
+            .type = .async,
             .statement_list = statement_list,
             .strict = self.state.in_strict_mode,
             .arguments_object_needed = false,
@@ -3988,7 +3981,7 @@ pub fn acceptModuleItemList(self: *Parser) AcceptError!ast.ModuleItemList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var module_items: std.ArrayListUnmanaged(ast.ModuleItem) = .empty;
+    var module_items: std.ArrayList(ast.ModuleItem) = .empty;
     errdefer module_items.deinit(self.allocator);
     while (self.acceptModuleItem()) |module_item|
         try module_items.append(self.allocator, module_item)
@@ -4087,7 +4080,7 @@ pub fn acceptImportsList(self: *Parser) AcceptError!ast.ImportsList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var import_specifiers: std.ArrayListUnmanaged(ast.ImportSpecifier) = .empty;
+    var import_specifiers: std.ArrayList(ast.ImportSpecifier) = .empty;
     errdefer import_specifiers.deinit(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
     while (self.acceptImportSpecifier()) |import_specifier| {
@@ -4122,7 +4115,7 @@ pub fn acceptWithClause(self: *Parser) AcceptError!ast.WithClause {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.with));
-    var with_clause_items: std.ArrayListUnmanaged(ast.WithClause.Item) = .empty;
+    var with_clause_items: std.ArrayList(ast.WithClause.Item) = .empty;
     errdefer with_clause_items.deinit(self.allocator);
     var seen_keys: String.HashMapUnmanaged(void) = .empty;
     defer seen_keys.deinit(self.allocator);
@@ -4152,7 +4145,11 @@ pub fn acceptWithClauseItem(
     // b such that a.[[Key]] is b.[[Key]].
     const gop = try seen_keys.getOrPut(self.allocator, key_string);
     if (gop.found_existing) {
-        try self.emitErrorAt(location, "Duplicate import attribute '{}'", .{key_string});
+        try self.emitErrorAt(
+            location,
+            "Duplicate import attribute '{f}'",
+            .{key_string.fmtUnquoted()},
+        );
         return error.UnexpectedToken;
     }
     _ = try self.core.accept(RuleSet.is(.@":"));
@@ -4244,7 +4241,7 @@ pub fn acceptExportsList(self: *Parser) AcceptError!ast.ExportsList {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    var export_specifiers: std.ArrayListUnmanaged(ast.ExportSpecifier) = .empty;
+    var export_specifiers: std.ArrayList(ast.ExportSpecifier) = .empty;
     errdefer export_specifiers.deinit(self.allocator);
     while (self.acceptExportSpecifier()) |export_specifier| {
         try export_specifiers.append(self.allocator, export_specifier);

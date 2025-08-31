@@ -311,7 +311,7 @@ fn serializeJSONProperty(
 /// https://tc39.es/ecma262/#sec-quotejsonstring
 fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!*const String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
-    var product: std.ArrayListUnmanaged(u8) = .empty;
+    var product: std.ArrayList(u8) = .empty;
     try product.append(agent.gc_allocator, '"');
 
     // 2. For each code point C of StringToCodePoints(value), do
@@ -411,7 +411,7 @@ fn serializeJSONObject(
     defer if (state.property_list == null) keys.deinit(agent.gc_allocator);
 
     // 7. Let partial be a new empty List.
-    var partial = try std.ArrayListUnmanaged([]const u8).initCapacity(agent.gc_allocator, keys.count());
+    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, keys.count());
     defer partial.deinit(agent.gc_allocator);
 
     // 8. For each element P of K, do
@@ -433,14 +433,14 @@ fn serializeJSONObject(
             // iv. Set member to the string-concatenation of member and strP.
             const member = try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "{}:{s}{}",
+                "{f}:{s}{f}",
                 .{
-                    try quoteJSONString(
+                    (try quoteJSONString(
                         agent,
                         (try property_key.toStringOrSymbol(agent)).string,
-                    ),
+                    )).fmtUnquoted(),
                     if (!state.gap.isEmpty()) " " else "",
-                    str_property.?,
+                    str_property.?.fmtUnquoted(),
                 },
             );
 
@@ -473,7 +473,7 @@ fn serializeJSONObject(
             // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
-            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{}", .{state.indent});
+            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{f}", .{state.indent.fmtUnquoted()});
 
             // ii. Let properties be the String value formed by concatenating all the element
             //     Strings of partial with each adjacent pair of Strings separated with separator.
@@ -485,8 +485,8 @@ fn serializeJSONObject(
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and "}".
             break :blk String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "{{\n{}{s}\n{s}}}",
-                .{ state.indent, properties, step_back },
+                "{{\n{f}{s}\n{f}}}",
+                .{ state.indent.fmtUnquoted(), properties, step_back.fmtUnquoted() },
             ));
         }
     };
@@ -527,7 +527,7 @@ fn serializeJSONArray(
     const len = try value.lengthOfArrayLike(agent);
 
     // 5. Let partial be a new empty List.
-    var partial = try std.ArrayListUnmanaged([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
     defer partial.deinit(agent.gc_allocator);
 
     // 7. Let index be 0.
@@ -582,8 +582,8 @@ fn serializeJSONArray(
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
             const separator = try std.fmt.allocPrint(
                 agent.gc_allocator,
-                ",\n{s}",
-                .{state.indent},
+                ",\n{f}",
+                .{state.indent.fmtUnquoted()},
             );
 
             // ii. Let properties be the String value formed by concatenating all the element
@@ -596,8 +596,8 @@ fn serializeJSONArray(
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and "]".
             break :blk try String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "[\n{s}{s}\n{s}]",
-                .{ state.indent, properties, step_back },
+                "[\n{f}{s}\n{f}]",
+                .{ state.indent.fmtUnquoted(), properties, step_back.fmtUnquoted() },
             ));
         }
     };

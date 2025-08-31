@@ -118,15 +118,8 @@ tag: Object.Tag,
 internal_methods: *const InternalMethods,
 property_storage: PropertyStorage,
 
-pub fn format(
-    self: *const Object,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
+pub fn format(self: *const Object, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     _ = self;
-    _ = fmt;
-    _ = options;
     // TODO: Print the actual object type.
     try writer.writeAll("[object Object]");
 }
@@ -139,7 +132,7 @@ pub fn is(self: *const Object, comptime T: type) bool {
 pub fn as(self: *const Object, comptime T: type) *T {
     std.debug.assert(self.is(T));
     // Casting alignment is safe because we allocate objects as *T
-    return @constCast(@alignCast(@fieldParentPtr("object", self)));
+    return @alignCast(@constCast(@fieldParentPtr("object", self)));
 }
 
 pub fn prototype(self: *const Object) ?*Object {
@@ -499,11 +492,7 @@ pub fn ordinaryToPrimitive(self: *Object, agent: *Agent, hint: PreferredType) Ag
     }
 
     // 4. Throw a TypeError exception.
-    return agent.throwException(
-        .type_error,
-        "Could not convert object to {s}",
-        .{@tagName(hint)},
-    );
+    return agent.throwException(.type_error, "Could not convert object to {t}", .{hint});
 }
 
 /// 7.2.5 IsExtensible ( O )
@@ -811,7 +800,7 @@ pub fn speciesConstructor(self: *Object, agent: *Agent, default_constructor: *Ob
 
     // 3. If C is not an Object, throw a TypeError exception.
     if (!constructor.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{constructor});
+        return agent.throwException(.type_error, "{f} is not an Object", .{constructor});
     }
 
     // 4. Let S be ? Get(C, %Symbol.species%).
@@ -840,13 +829,13 @@ pub fn enumerableOwnProperties(
     self: *Object,
     agent: *Agent,
     comptime kind: PropertyKind,
-) Agent.Error!std.ArrayListUnmanaged(Value) {
+) Agent.Error!std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
     const own_keys = try self.internal_methods.ownPropertyKeys(agent, self);
     defer agent.gc_allocator.free(own_keys);
 
     // 2. Let results be a new empty List.
-    var results: std.ArrayListUnmanaged(Value) = .empty;
+    var results: std.ArrayList(Value) = .empty;
 
     // 3. For each element key of ownKeys, do
     for (own_keys) |key| {
@@ -1012,7 +1001,7 @@ pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, 
     if (entry != null) {
         return agent.throwException(
             .type_error,
-            "Private element '#{}' already exists",
+            "Private element '{f}' already exists",
             .{private_name},
         );
     }
@@ -1045,7 +1034,7 @@ pub fn privateMethodOrAccessorAdd(
     if (entry != null) {
         return agent.throwException(
             .type_error,
-            "Private element '#{}' already exists",
+            "Private element '{f}' already exists",
             .{private_name},
         );
     }
@@ -1064,7 +1053,7 @@ pub fn privateGet(self: *Object, agent: *Agent, private_name: PrivateName) Agent
         // 2. If entry is empty, throw a TypeError exception.
         return agent.throwException(
             .type_error,
-            "Private element '#{}' doesn't exist",
+            "Private element '{f}' doesn't exist",
             .{private_name},
         );
     };
@@ -1082,7 +1071,7 @@ pub fn privateGet(self: *Object, agent: *Agent, private_name: PrivateName) Agent
             const getter = get_and_set.get orelse {
                 return agent.throwException(
                     .type_error,
-                    "Private element '#{}' has not getter",
+                    "Private element '{f}' has no getter",
                     .{private_name},
                 );
             };
@@ -1101,7 +1090,7 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
         // 2. If entry is empty, throw a TypeError exception.
         return agent.throwException(
             .type_error,
-            "Private element '#{}' doesn't exist",
+            "Private element '{f}' doesn't exist",
             .{private_name},
         );
     };
@@ -1118,7 +1107,7 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
             // a. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,
-                "Private element '#{}' is a method and cannot be set",
+                "Private element '{f}' is a method and cannot be set",
                 .{private_name},
             );
         },
@@ -1131,7 +1120,7 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
             const setter = get_and_set.set orelse {
                 return agent.throwException(
                     .type_error,
-                    "Private element '#{}' has not setter",
+                    "Private element '{f}' has no setter",
                     .{private_name},
                 );
             };
@@ -1330,6 +1319,6 @@ test "format" {
     };
     for (test_cases) |test_case| {
         const object, const expected = test_case;
-        try std.testing.expectFmt(expected, "{}", .{object});
+        try std.testing.expectFmt(expected, "{f}", .{object});
     }
 }

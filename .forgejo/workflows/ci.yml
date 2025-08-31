@@ -12,11 +12,11 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - name: Check out Kiesel
-        uses: https://github.com/actions/checkout@v4
+        uses: https://github.com/actions/checkout@v5
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - name: Install Rust
         # Linking with Rust object files started failing, presumably because Zig 0.14 and Rust nightly
         # are now too far apart in terms of LLVM version. Let's try to unpin this after updating to Zig 0.15.
@@ -126,11 +126,11 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - name: Check out Kiesel
-        uses: https://github.com/actions/checkout@v4
+        uses: https://github.com/actions/checkout@v5
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
@@ -169,11 +169,11 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - name: Check out Kiesel
-        uses: https://github.com/actions/checkout@v4
+        uses: https://github.com/actions/checkout@v5
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - name: Check formatting
         run: |
           zig fmt --check .
@@ -189,11 +189,11 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - name: Check out Kiesel
-        uses: https://github.com/actions/checkout@v4
+        uses: https://github.com/actions/checkout@v5
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
@@ -211,7 +211,7 @@ jobs:
       TEST262_COMMIT: b947715fdda79a420b253821c1cc52272a77222d
     steps:
       - name: Check out Kiesel
-        uses: https://github.com/actions/checkout@v4
+        uses: https://github.com/actions/checkout@v5
       - name: Check out test262
         run: |
           # NOTE: We can't do this with actions/checkout since it assumes the repo is also on codeberg.org
@@ -221,7 +221,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:

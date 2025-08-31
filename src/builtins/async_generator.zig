@@ -19,7 +19,7 @@ const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
-const @"await" = builtins.@"await";
+const await = builtins.await;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -272,7 +272,7 @@ pub const AsyncGenerator = MakeObject(.{
         async_generator_context: *ExecutionContext,
 
         /// [[AsyncGeneratorQueue]]
-        async_generator_queue: std.ArrayListUnmanaged(AsyncGeneratorRequest),
+        async_generator_queue: std.ArrayList(AsyncGeneratorRequest),
 
         // Non-standard
         evaluation_state: struct {
@@ -560,7 +560,7 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
     if (resumption_value.type != .@"return") return resumption_value;
 
     // 2. Let awaited be Completion(Await(resumptionValue.[[Value]])).
-    const awaited = @"await"(agent, resumption_value.value.?);
+    const awaited = await(agent, resumption_value.value.?);
 
     // 3. If awaited is a throw completion, return ? awaited.
     const awaited_value = awaited catch |err| switch (err) {

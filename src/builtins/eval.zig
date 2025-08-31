@@ -58,7 +58,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
+            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -193,12 +193,12 @@ fn evalDeclarationInstantiation(
     strict: bool,
 ) Agent.Error!void {
     // 1. Let varNames be the VarDeclaredNames of body.
-    var var_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var var_names: std.ArrayList(ast.Identifier) = .empty;
     defer var_names.deinit(agent.gc_allocator);
     try body.collectVarDeclaredNames(agent.gc_allocator, &var_names);
 
     // 2. Let varDeclarations be the VarScopedDeclarations of body.
-    var var_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
     defer var_declarations.deinit(agent.gc_allocator);
     try body.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
 
@@ -214,8 +214,8 @@ fn evalDeclarationInstantiation(
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
                     return agent.throwException(
                         .syntax_error,
-                        "Global environment already has a lexical declaration '{}'",
-                        .{name},
+                        "Global environment already has a lexical declaration '{f}'",
+                        .{name.fmtUnquoted()},
                     );
                 }
 
@@ -263,7 +263,7 @@ fn evalDeclarationInstantiation(
     // TODO: 4-7.
 
     // 8. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
     defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 9. Let declaredFunctionNames be a new empty List.
@@ -301,8 +301,8 @@ fn evalDeclarationInstantiation(
                     if (!function_definable) {
                         return agent.throwException(
                             .type_error,
-                            "Cannot declare '{}' in global environment",
-                            .{function_name},
+                            "Cannot declare '{f}' in global environment",
+                            .{function_name.fmtUnquoted()},
                         );
                     }
                 }
@@ -321,7 +321,7 @@ fn evalDeclarationInstantiation(
     var declared_var_names: String.HashMapUnmanaged(void) = .empty;
     defer declared_var_names.deinit(agent.gc_allocator);
 
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
     // 12. For each element d of varDeclarations, do
@@ -349,8 +349,8 @@ fn evalDeclarationInstantiation(
                         if (!var_name_definable) {
                             return agent.throwException(
                                 .type_error,
-                                "Cannot declare '{}' in global environment",
-                                .{var_name},
+                                "Cannot declare '{f}' in global environment",
+                                .{var_name.fmtUnquoted()},
                             );
                         }
                     }
@@ -373,7 +373,7 @@ fn evalDeclarationInstantiation(
     //     Environment Record and the global object is a Proxy exotic object.
 
     // 15. Let lexDeclarations be the LexicallyScopedDeclarations of body.
-    var lex_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
     defer lex_declarations.deinit(agent.gc_allocator);
     try body.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
 

@@ -30,7 +30,7 @@ pub const Instruction = union(enum(u8)) {
     /// Spread value into an array.
     array_spread_value,
     /// Store Await() as the result value.
-    @"await",
+    await,
     // Store ApplyStringOrNumericBinaryOperator() as the result value.
     // These are split up to save on decoding time and avoid a switch in the fast path.
     binary_operator_add,

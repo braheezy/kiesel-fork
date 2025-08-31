@@ -366,8 +366,8 @@ pub const prototype = struct {
                 const locale = icu4zig.Locale.fromString(code_utf8) catch {
                     return agent.throwException(
                         .range_error,
-                        "Invalid language '{}'",
-                        .{code},
+                        "Invalid language '{f}'",
+                        .{code.fmtUnquoted()},
                     );
                 };
                 break :blk try locale_display_names_formatter.of(agent.gc_allocator, locale);
@@ -385,15 +385,15 @@ pub const prototype = struct {
                     error.OutOfMemory => return error.OutOfMemory,
                     error.Subtag => return agent.throwException(
                         .range_error,
-                        "Invalid region '{}'",
-                        .{code},
+                        "Invalid region '{f}'",
+                        .{code.fmtUnquoted()},
                     ),
                 };
             },
             else => return agent.throwException(
                 .internal_error,
-                "Unsupported Intl.DisplayNames type '{s}'",
-                .{@tagName(display_names.fields.type)},
+                "Unsupported Intl.DisplayNames type '{t}'",
+                .{display_names.fields.type},
             ),
         };
         if (value.len == 0) return .undefined;

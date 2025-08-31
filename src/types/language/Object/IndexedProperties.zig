@@ -27,9 +27,9 @@ pub const Storage = union(Type) {
     };
 
     none,
-    dense_i32: std.ArrayListUnmanaged(i32),
-    dense_f64: std.ArrayListUnmanaged(f64),
-    dense_value: std.ArrayListUnmanaged(Value),
+    dense_i32: std.ArrayList(i32),
+    dense_f64: std.ArrayList(f64),
+    dense_value: std.ArrayList(Value),
     sparse: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor),
 };
 
@@ -108,7 +108,7 @@ pub fn migrateStorage(
             break :blk .none;
         },
         .dense_i32 => blk: {
-            const dense_i32: std.ArrayListUnmanaged(i32) = .empty;
+            const dense_i32: std.ArrayList(i32) = .empty;
             switch (self.storage) {
                 .none => {},
                 .dense_i32, .dense_f64, .dense_value, .sparse => unreachable,
@@ -116,7 +116,7 @@ pub fn migrateStorage(
             break :blk .{ .dense_i32 = dense_i32 };
         },
         .dense_f64 => blk: {
-            var dense_f64: std.ArrayListUnmanaged(f64) = .empty;
+            var dense_f64: std.ArrayList(f64) = .empty;
             switch (self.storage) {
                 .none => {},
                 .dense_i32 => |*dense_i32| {
@@ -131,7 +131,7 @@ pub fn migrateStorage(
             break :blk .{ .dense_f64 = dense_f64 };
         },
         .dense_value => blk: {
-            var dense_value: std.ArrayListUnmanaged(Value) = .empty;
+            var dense_value: std.ArrayList(Value) = .empty;
             switch (self.storage) {
                 .none => {},
                 .dense_i32 => |*dense_i32| {

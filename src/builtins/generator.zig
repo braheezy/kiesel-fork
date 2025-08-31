@@ -18,7 +18,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
 const asyncGeneratorYield = builtins.asyncGeneratorYield;
-const @"await" = builtins.@"await";
+const await = builtins.await;
 const createIteratorResultObject = types.createIteratorResultObject;
 
 /// 27.5.1 The %GeneratorPrototype% Object
@@ -397,7 +397,7 @@ pub fn generatorResumeAbrupt(
 pub const GeneratorKind = enum {
     non_generator,
     sync,
-    @"async",
+    async,
 };
 
 /// 27.5.3.5 GetGeneratorKind ( )
@@ -412,7 +412,7 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
         .unset => .non_generator,
 
         // 4. If generator has an [[AsyncGeneratorState]] internal slot, return async.
-        .async_generator => .@"async",
+        .async_generator => .async,
 
         // 5. Else, return sync.
         .generator => .sync,
@@ -457,7 +457,7 @@ pub fn yield(agent: *Agent, value: Value) Agent.Error!Completion {
 
     switch (generator_kind) {
         // 2. If generatorKind is async, return ? AsyncGeneratorYield(? Await(value)).
-        .@"async" => return asyncGeneratorYield(agent, try @"await"(agent, value)),
+        .async => return asyncGeneratorYield(agent, try await(agent, value)),
 
         // 3. Otherwise, return ? GeneratorYield(CreateIteratorResultObject(value, false)).
         .sync => return generatorYield(agent, try createIteratorResultObject(agent, value, false)),

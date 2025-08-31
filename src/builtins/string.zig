@@ -356,7 +356,7 @@ fn ownPropertyKeys(
     const len = str.length();
 
     // 1. Let keys be a new empty List.
-    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.property_storage.count() + len,
     );
@@ -605,7 +605,7 @@ pub const constructor = struct {
             if (next_code_point.asFloat() < 0 or next_code_point.asFloat() > 0x10FFFF) {
                 return agent.throwException(
                     .range_error,
-                    "Invalid code point {}",
+                    "Invalid code point {f}",
                     .{next_code_point},
                 );
             }
@@ -1572,7 +1572,7 @@ pub const prototype = struct {
         const advance_by = @max(1, search_length);
 
         // 10. Let matchPositions be a new empty List.
-        var match_positions: std.ArrayListUnmanaged(usize) = .empty;
+        var match_positions: std.ArrayList(usize) = .empty;
         defer match_positions.deinit(agent.gc_allocator);
 
         // 11. Let position be StringIndexOf(string, searchString, 0).
@@ -1853,7 +1853,7 @@ pub const prototype = struct {
         }
 
         // 12. Let substrings be a new empty List.
-        var substrings: std.ArrayListUnmanaged(*const types.String) = .empty;
+        var substrings: std.ArrayList(*const types.String) = .empty;
         defer substrings.deinit(agent.gc_allocator);
 
         // 13. Let i be 0.
@@ -2330,20 +2330,20 @@ pub const prototype = struct {
             // - the code unit 0x0022 (QUOTATION MARK)
             return types.String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]}</{[tag]s}>",
+                "<{[tag]s} {[attribute]s}=\"{[value]f}\">{[string]f}</{[tag]s}>",
                 .{
-                    .string = string,
+                    .string = string.fmtUnquoted(),
                     .tag = tag,
                     .attribute = attr.name,
-                    .value = value_string_escaped,
+                    .value = value_string_escaped.fmtUnquoted(),
                 },
             ));
         }
 
         return types.String.fromUtf8(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
-            "<{[tag]s}>{[string]}</{[tag]s}>",
-            .{ .string = string, .tag = tag },
+            "<{[tag]s}>{[string]f}</{[tag]s}>",
+            .{ .string = string.fmtUnquoted(), .tag = tag },
         ));
     }
 

@@ -327,7 +327,7 @@ pub fn createMappedArgumentsObject(
     });
 
     // 12. Let parameterNames be the BoundNames of formals.
-    var parameter_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var parameter_names: std.ArrayList(ast.Identifier) = .empty;
     defer parameter_names.deinit(agent.gc_allocator);
     try formals.collectBoundNames(agent.gc_allocator, &parameter_names);
 

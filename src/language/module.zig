@@ -543,7 +543,7 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
         defer agent.gc_allocator.free(exported_names);
 
         // b. Let unambiguousNames be a new empty List.
-        var unambiguous_names: std.ArrayListUnmanaged([]const u8) = .empty;
+        var unambiguous_names: std.ArrayList([]const u8) = .empty;
         defer unambiguous_names.deinit(agent.gc_allocator);
 
         // c. For each element name of exportedNames, do

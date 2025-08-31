@@ -6,9 +6,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Stop people from trying to build with an outdated Zig compiler
-    if (builtin.zig_version.order(.{ .major = 0, .minor = 14, .patch = 0 }) == .lt) {
+    if (builtin.zig_version.order(.{ .major = 0, .minor = 15, .patch = 1 }) == .lt) {
         std.debug.print("\n    {s}\n    {s}\n\n", .{
-            "Zig version 0.14 is required, found " ++ builtin.zig_version_string ++ ".",
+            "Zig version 0.15.1 is required, found " ++ builtin.zig_version_string ++ ".",
             "Please \u{1B}]8;;https://ziglang.org/download/\u{1B}\\download\u{1B}]8;;\u{1B}\\ or otherwise install a newer build and try again.",
         });
         std.process.exit(1);
@@ -59,7 +59,8 @@ pub fn build(b: *std.Build) void {
     ) orelse true;
 
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
-    const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend");
+    // Defaults to true for now as the self-hosted backend in 0.15 fails with a linker error.
+    const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend") orelse true;
     const version_string = b.option(
         []const u8,
         "version-string",
@@ -123,7 +124,7 @@ pub fn build(b: *std.Build) void {
 
     if (enable_libgc) {
         const cflags_extra: []const u8 = blk: {
-            var cflags: std.ArrayListUnmanaged([]const u8) = .empty;
+            var cflags: std.ArrayList([]const u8) = .empty;
             defer cflags.deinit(b.allocator);
             cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR") catch @panic("OOM");
             if (optimize != .Debug) {
@@ -201,7 +202,6 @@ pub fn build(b: *std.Build) void {
                 .strip = strip,
             }),
             .use_llvm = use_llvm,
-            .use_lld = use_llvm,
         }),
         else => b.addExecutable(.{
             .name = "kiesel",
@@ -230,7 +230,6 @@ pub fn build(b: *std.Build) void {
                 break :blk module;
             },
             .use_llvm = use_llvm,
-            .use_lld = use_llvm,
         }),
     };
 
@@ -263,6 +262,7 @@ pub fn build(b: *std.Build) void {
 
     const unit_tests = b.addTest(.{
         .root_module = kiesel,
+        .use_llvm = use_llvm,
     });
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
@@ -295,7 +295,6 @@ pub fn build(b: *std.Build) void {
             .strip = strip,
         }),
         .use_llvm = use_llvm,
-        .use_lld = use_llvm,
     });
     fuzzilli.sanitize_coverage_trace_pc_guard = true;
 

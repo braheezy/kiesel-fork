@@ -67,7 +67,7 @@ const TokenType = enum {
     @"||",
     @"||=",
     @"~",
-    @"await",
+    await,
     @"break",
     case,
     @"catch",
@@ -194,7 +194,7 @@ const patterns = .{
     Pattern.create(.@"|=", ptk.matchers.literal("|=")),
     Pattern.create(.@"|", ptk.matchers.literal("|")),
     Pattern.create(.@"~", ptk.matchers.literal("~")),
-    Pattern.create(.@"await", ptk.matchers.literal("await")),
+    Pattern.create(.await, ptk.matchers.literal("await")),
     Pattern.create(.@"break", ptk.matchers.literal("break")),
     Pattern.create(.case, ptk.matchers.literal("case")),
     Pattern.create(.@"catch", ptk.matchers.literal("catch")),
@@ -259,8 +259,8 @@ comptime {
             if (pattern.type == token_type) continue :token_types;
         }
         @compileError(@ptrCast(std.fmt.comptimePrint(
-            "No pattern found for TokenType.@\"{s}\"",
-            .{@tagName(token_type)},
+            "No pattern found for TokenType.@\"{t}\"",
+            .{token_type},
         )));
     }
 }

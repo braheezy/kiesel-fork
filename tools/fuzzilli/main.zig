@@ -37,7 +37,9 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const bytes = try str.toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(bytes);
         const file: std.fs.File = .{ .handle = REPRL_DWFD };
-        file.writer().print("{s}\n", .{bytes}) catch {};
+        var file_writer = file.writer(&.{});
+        const writer = &file_writer.interface;
+        writer.print("{s}\n", .{bytes}) catch {};
     }
     return .undefined;
 }

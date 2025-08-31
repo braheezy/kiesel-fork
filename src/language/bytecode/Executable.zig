@@ -16,12 +16,12 @@ const sameValue = types.sameValue;
 const Executable = @This();
 
 allocator: std.mem.Allocator,
-instructions: std.ArrayListUnmanaged(u8),
+instructions: std.ArrayList(u8),
 constants: Value.ArrayHashMapUnmanaged(void, sameValue),
 identifiers: String.ArrayHashMapUnmanaged(void),
-ast_nodes: std.ArrayListUnmanaged(AstNode),
-environment_lookup_cache: std.ArrayListUnmanaged(?Environment.LookupCacheEntry),
-property_lookup_cache: std.ArrayListUnmanaged(?Object.Shape.PropertyLookupCacheEntry),
+ast_nodes: std.ArrayList(AstNode),
+environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
+property_lookup_cache: std.ArrayList(?Object.Shape.PropertyLookupCacheEntry),
 
 // NOTE: In most cases instructions know which AST node they refer to, so this can be an untagged
 // enum. If there can be more than one type we store that information separately.
@@ -56,7 +56,7 @@ fn Index(comptime name: []const u8, comptime BackingType: type) type {
             });
         }
 
-        pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
             try writer.print(name ++ "({d})", .{@intFromEnum(self)});
         }
     };
@@ -208,7 +208,9 @@ pub fn addInstructionDeferred(
     };
 }
 
-pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
+const PrettyPrintError = std.Io.Writer.Error || std.Io.tty.Config.SetColorError;
+
+pub fn print(self: Executable, writer: *std.Io.Writer, tty_config: std.Io.tty.Config) PrettyPrintError!void {
     const instruction_count = blk: {
         var n: usize = 0;
         var iterator = InstructionIterator.init(self.instructions.items);
@@ -224,27 +226,27 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
     });
     var iterator = InstructionIterator.init(self.instructions.items);
     while (iterator.next()) |instruction| {
-        try writer.print("{:>[1]}: ", .{
+        try writer.print("{d:>[1]}: ", .{
             iterator.instruction_index,
             @as(usize, @intCast(std.fmt.count("{d}", .{self.instructions.items.len}))),
         });
         try tty_config.setColor(writer, .bold);
-        try writer.writeAll(@tagName(instruction));
+        try writer.print("{t}", .{instruction});
         try tty_config.setColor(writer, .reset);
         switch (instruction) {
             inline else => |payload, comptime_instruction| {
                 switch (comptime_instruction) {
                     .evaluate_property_access_with_identifier_key => {
-                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
                     },
                     .load_constant, .store_constant => {
-                        try writer.print(" {pretty}", .{self.getConstant(payload)});
+                        try writer.print(" {f}", .{self.getConstant(payload).fmtPretty()});
                     },
                     .resolve_binding, .resolve_binding_direct => {
-                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
                     },
                     .typeof_identifier => {
-                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
                     },
                     .has_private_element,
                     .initialize_bound_name,
@@ -252,7 +254,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     .make_private_reference_direct,
                     .resolve_private_identifier,
                     => {
-                        try writer.print(" \"{s}\"", .{self.getIdentifier(payload)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload)});
                     },
                     else => {},
                 }
@@ -261,7 +263,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     .@"enum" => |info| {
                         // Only indices are allowed as standalone payloads
                         comptime std.debug.assert(!info.is_exhaustive);
-                        try writer.print(" (index: {})", .{payload});
+                        try writer.print(" (index: {f})", .{payload});
                     },
                     .@"struct" => |info| {
                         comptime std.debug.assert(!info.is_tuple);
@@ -272,9 +274,9 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                             const value = @field(payload, field.name);
                             if (@typeInfo(field.type) == .@"enum" and @typeInfo(field.type).@"enum".is_exhaustive) {
                                 // Omit type name of exhaustive enums
-                                try writer.print("{s}", .{@tagName(value)});
+                                try writer.print("{t}", .{value});
                             } else {
-                                try writer.print("{}", .{value});
+                                try writer.print("{any}", .{value});
                             }
                         }
                         try writer.writeAll(")");

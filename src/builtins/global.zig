@@ -555,13 +555,17 @@ fn encode(
 
     // OPTIMIZATION: If the string is ASCII we don't have to handle unpaired surrogates.
     if (string.slice == .ascii) {
-        var buffer: std.ArrayListUnmanaged(u8) = .empty;
-        try std.Uri.Component.percentEncode(buffer.writer(agent.gc_allocator), string.slice.ascii, struct {
+        var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
+        defer allocating_writer.deinit();
+        const writer = &allocating_writer.writer;
+        std.Uri.Component.percentEncode(writer, string.slice.ascii, struct {
             fn isValidChar(c: u8) bool {
                 return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
             }
-        }.isValidChar);
-        return String.fromAscii(agent, try buffer.toOwnedSlice(agent.gc_allocator));
+        }.isValidChar) catch |err| switch (err) {
+            error.WriteFailed => return error.OutOfMemory,
+        };
+        return String.fromAscii(agent, try allocating_writer.toOwnedSlice());
     }
 
     // 1. Let len be the length of string.
@@ -811,8 +815,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 break :blk .{
                     .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        "%{}",
-                        .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
+                        "%{X}",
+                        .{&.{@as(u8, @intCast(c))}},
                     )),
                 };
             } else {
@@ -825,8 +829,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 break :blk .{
                     .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
-                        "%u{}",
-                        .{std.fmt.fmtSliceHexUpper(&bytes)},
+                        "%u{X}",
+                        .{&bytes},
                     )),
                 };
             }

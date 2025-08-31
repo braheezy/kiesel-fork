@@ -77,8 +77,8 @@ pub fn getBindingValue(
     if (!binding.initialized) {
         return agent.throwException(
             .reference_error,
-            "Binding for '{}' is not initialized",
-            .{name},
+            "Binding for '{f}' is not initialized",
+            .{name.fmtUnquoted()},
         );
     }
 

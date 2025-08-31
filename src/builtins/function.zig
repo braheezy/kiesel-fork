@@ -95,7 +95,7 @@ pub fn createDynamicFunction(
     comptime kind: enum {
         normal,
         generator,
-        @"async",
+        async,
         async_generator,
     },
     parameter_args: []const Value,
@@ -111,7 +111,7 @@ pub fn createDynamicFunction(
     comptime var expr_sym: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
-        .@"async" => ast.AsyncFunctionExpression,
+        .async => ast.AsyncFunctionExpression,
         .async_generator => ast.AsyncGeneratorExpression,
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
@@ -179,7 +179,7 @@ pub fn createDynamicFunction(
         },
 
         // 4. Else if kind is async, then
-        .@"async" => {
+        .async => {
             // a. Let prefix be "async function".
             prefix = "async function";
 
@@ -193,7 +193,7 @@ pub fn createDynamicFunction(
             // c. Let bodySym be the grammar symbol AsyncFunctionBody.
             body_sym.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
-                    return parser.acceptFunctionBody(.@"async");
+                    return parser.acceptFunctionBody(.async);
                 }
             }.accept;
 
@@ -245,7 +245,7 @@ pub fn createDynamicFunction(
     const arg_count = parameter_args.len;
 
     // 7. Let parameterStrings be a new empty List.
-    var parameter_strings = try std.ArrayListUnmanaged(*const String).initCapacity(
+    var parameter_strings = try std.ArrayList(*const String).initCapacity(
         agent.gc_allocator,
         parameter_args.len,
     );
@@ -290,8 +290,8 @@ pub fn createDynamicFunction(
     //     0x000A (LINE FEED).
     const body_parse_string = try std.fmt.allocPrint(
         agent.gc_allocator,
-        "\n{}\n",
-        .{body_string},
+        "\n{f}\n",
+        .{body_string.fmtUnquoted()},
     );
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
@@ -317,7 +317,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 18. If parameters is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
+            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -330,7 +330,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 20. If body is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
+            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -350,7 +350,7 @@ pub fn createDynamicFunction(
         error.ParseError => {
             // 24. If expr is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
+            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
         },
     };
 
@@ -433,7 +433,7 @@ pub fn createDynamicFunction(
 
         // 33. NOTE: Functions whose kind is async are not constructable and do not have a
         //           [[Construct]] internal method or a "prototype" property.
-        .@"async" => {},
+        .async => {},
     }
 
     // 34. Return F.
@@ -491,7 +491,7 @@ pub const prototype = struct {
 
         // 2. If IsCallable(func) is false, throw a TypeError exception.
         if (!func.isCallable()) {
-            return agent.throwException(.type_error, "{} is not a function", .{func});
+            return agent.throwException(.type_error, "{f} is not a function", .{func});
         }
 
         // 3. If argArray is either undefined or null, then
@@ -520,7 +520,7 @@ pub const prototype = struct {
 
         // 2. If IsCallable(Target) is false, throw a TypeError exception.
         if (!target.isCallable()) {
-            return agent.throwException(.type_error, "{} is not a function", .{target});
+            return agent.throwException(.type_error, "{f} is not a function", .{target});
         }
 
         // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
@@ -592,7 +592,7 @@ pub const prototype = struct {
 
         // 2. If IsCallable(func) is false, throw a TypeError exception.
         if (!func.isCallable()) {
-            return agent.throwException(.type_error, "{} is not a function", .{func});
+            return agent.throwException(.type_error, "{f} is not a function", .{func});
         }
 
         // 3. Perform PrepareForTailCall().
@@ -632,8 +632,8 @@ pub const prototype = struct {
             const name: *const String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "function {}() {{ [native code] }}",
-                .{name},
+                "function {f}() {{ [native code] }}",
+                .{name.fmtUnquoted()},
             );
             return Value.from(try String.fromAscii(agent, source_text));
         }
@@ -644,7 +644,7 @@ pub const prototype = struct {
         if (func.isCallable()) return Value.from("function () { [native code] }");
 
         // 5. Throw a TypeError exception.
-        return agent.throwException(.type_error, "{} is not a function", .{func});
+        return agent.throwException(.type_error, "{f} is not a function", .{func});
     }
 
     /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( V )

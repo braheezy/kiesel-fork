@@ -41,13 +41,13 @@ var module_cache: ModuleRequest.HashMapUnmanaged(Module) = .empty;
 
 // Python REPL my beloved 🐍
 const repl_preamble = std.fmt.comptimePrint(
-    \\Kiesel {[kiesel]} [Zig {[zig]}] on {[os]s}
+    \\Kiesel {[kiesel]f} [Zig {[zig]f}] on {[os]t}
     \\Use {[eof]s} to exit.
     \\
 , .{
     .kiesel = kiesel.version,
     .zig = builtin.zig_version,
-    .os = @tagName(builtin.os.tag),
+    .os = builtin.os.tag,
     .eof = if (builtin.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
 });
 
@@ -135,10 +135,10 @@ const Kiesel = struct {
     fn @"asm"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const buffer_value = arguments.get(0);
         if (!buffer_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{buffer_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{buffer_value});
         }
         if (!buffer_value.asObject().is(kiesel.builtins.ArrayBuffer) and !buffer_value.asObject().is(kiesel.builtins.SharedArrayBuffer)) {
-            return agent.throwException(.type_error, "{} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
+            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
         }
         const buffer: kiesel.builtins.array_buffer.ArrayBufferLike = if (buffer_value.asObject().is(kiesel.builtins.ArrayBuffer))
             .{ .array_buffer = buffer_value.asObject().as(kiesel.builtins.ArrayBuffer) }
@@ -159,7 +159,7 @@ const Kiesel = struct {
             -1,
             0,
         ) catch |err| {
-            return agent.throwException(.internal_error, "mmap failed: {s}", .{@errorName(err)});
+            return agent.throwException(.internal_error, "mmap failed: {t}", .{err});
         };
         @memcpy(data_exec, data);
         @as(*const fn () callconv(.c) void, @ptrCast(data_exec))();
@@ -253,7 +253,7 @@ const Kiesel = struct {
                 const parse_error = diagnostics.errors.items[0];
 
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
-                return agent.throwException(.syntax_error, "{}", .{fmtParseError(parse_error)});
+                return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
             },
         };
 
@@ -285,9 +285,10 @@ const Kiesel = struct {
         const pretty = try options.getOption(agent, "pretty", .boolean, null, false);
         const end = if (newline) "\n" else "";
         if (pretty)
-            stdout.print("{pretty}{s}", .{ value, end }) catch {}
+            stdout.print("{f}{s}", .{ value.fmtPretty(), end }) catch {}
         else
-            stdout.print("{}{s}", .{ try value.toString(agent), end }) catch {};
+            stdout.print("{f}{s}", .{ (try value.toString(agent)).fmtUnquoted(), end }) catch {};
+        stdout.flush() catch {};
         return .undefined;
     }
 
@@ -312,7 +313,7 @@ const Kiesel = struct {
             }
             break :blk null;
         } else {
-            return agent.throwException(.type_error, "Cannot get pointer for value {}", .{value});
+            return agent.throwException(.type_error, "Cannot get pointer for value {f}", .{value});
         };
         return Value.from(std.math.lossyCast(f64, @intFromPtr(value_ptr)));
     }
@@ -326,8 +327,8 @@ const Kiesel = struct {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
                 .type_error,
-                "Error while reading file: {s}",
-                .{@errorName(err)},
+                "Error while reading file: {t}",
+                .{err},
             ),
         };
         if (!std.unicode.utf8ValidateSlice(bytes)) {
@@ -337,34 +338,40 @@ const Kiesel = struct {
     }
 
     fn readLine(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        const stdin = std.io.getStdIn().reader();
-        const bytes = stdin.readUntilDelimiterOrEofAlloc(
-            agent.gc_allocator,
-            '\n',
-            std.math.maxInt(usize),
-        ) catch |err| {
+        var stdin_buf: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+        const stdin = &stdin_reader.interface;
+
+        var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
+        defer allocating_writer.deinit();
+        const writer = &allocating_writer.writer;
+
+        _ = stdin.streamDelimiterEnding(writer, '\n') catch |err| {
             return agent.throwException(
                 .type_error,
-                "Error while reading from stdin: {s}",
-                .{@errorName(err)},
+                "Error while reading from stdin: {t}",
+                .{err},
             );
-        } orelse "";
-        if (!std.unicode.utf8ValidateSlice(bytes)) {
+        };
+        if (!std.unicode.utf8ValidateSlice(allocating_writer.written())) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(try String.fromUtf8(agent, bytes));
+        return Value.from(try String.fromUtf8(agent, try allocating_writer.toOwnedSlice()));
     }
 
     fn readStdin(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        const stdin = std.io.getStdIn().reader();
-        const bytes = stdin.readAllAlloc(
+        var stdin_buf: [1024]u8 = undefined;
+        var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+        const stdin = &stdin_reader.interface;
+
+        const bytes = stdin.allocRemaining(
             agent.gc_allocator,
-            std.math.maxInt(usize),
+            .unlimited,
         ) catch |err| {
             return agent.throwException(
                 .type_error,
-                "Error while reading from stdin: {s}",
-                .{@errorName(err)},
+                "Error while reading from stdin: {t}",
+                .{err},
             );
         };
         if (!std.unicode.utf8ValidateSlice(bytes)) {
@@ -395,19 +402,11 @@ const Kiesel = struct {
             try path.toUtf8(agent.gc_allocator),
             .{},
         ) catch |err| {
-            return agent.throwException(
-                .type_error,
-                "Error while opening file: {s}",
-                .{@errorName(err)},
-            );
+            return agent.throwException(.type_error, "Error while opening file: {t}", .{err});
         };
         defer file.close();
         file.writeAll(try contents.toUtf8(agent.gc_allocator)) catch |err| {
-            return agent.throwException(
-                .type_error,
-                "Error while writing file: {s}",
-                .{@errorName(err)},
-            );
+            return agent.throwException(.type_error, "Error while writing file: {t}", .{err});
         };
         return .undefined;
     }
@@ -415,7 +414,7 @@ const Kiesel = struct {
     fn syscall(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number_value = try arguments.get(0).toLength(agent);
         const number = std.meta.intToEnum(std.os.linux.SYS, number_value) catch {
-            return agent.throwException(.range_error, "Invalid syscall number {}", .{number_value});
+            return agent.throwException(.range_error, "Invalid syscall number {d}", .{number_value});
         };
         const result = switch (arguments.count() -| 1) {
             0 => blk: {
@@ -512,17 +511,20 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     const script_or_module = parse_result catch |err| switch (err) {
         error.ParseError => {
             const parse_error = diagnostics.errors.items[0];
-            try stderr.print("{}\n", .{fmtParseErrorHint(parse_error, source_text)});
             const syntax_error = try agent.createErrorObject(
                 .syntax_error,
-                "{}",
+                "{f}",
                 .{fmtParseError(parse_error)},
             );
             const exception: Agent.Exception = .{
                 .value = Value.from(syntax_error),
                 .stack_trace = &.{},
             };
-            try stderr.print("{pretty}\n", .{exception});
+            try stderr.print("{f}\n{f}\n", .{
+                fmtParseErrorHint(parse_error, source_text),
+                exception.fmtPretty(),
+            });
+            try stderr.flush();
             return error.AlreadyReported;
         },
         error.OutOfMemory => return error.OutOfMemory,
@@ -533,6 +535,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
             .script => |script| try script.print(stdout),
             .module => |module| try module.source_text_module.print(stdout),
         }
+        try stdout.flush();
     }
 
     defer {
@@ -546,14 +549,15 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 const operation = entry.value_ptr.*;
                 switch (operation) {
                     .reject => stderr.print(
-                        "A promise was rejected without any handlers: {pretty}\n",
-                        .{Value.from(&promise.object)},
+                        "A promise was rejected without any handlers: {f}\n",
+                        .{Value.from(&promise.object).fmtPretty()},
                     ) catch {},
                     .handle => stderr.print(
-                        "A handler was added to an already rejected promise: {pretty}\n",
-                        .{Value.from(&promise.object)},
+                        "A handler was added to an already rejected promise: {f}\n",
+                        .{Value.from(&promise.object).fmtPretty()},
                     ) catch {},
                 }
+                stderr.flush() catch {};
             }
         }
         tracked_promise_rejections.clearAndFree(agent.gc_allocator);
@@ -610,17 +614,19 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     } catch |err| switch (err) {
         error.OutOfMemory => {
             try stderr.writeAll("Out of memory\n");
+            try stderr.flush();
             return error.AlreadyReported;
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            try stderr.print("{pretty}\n", .{exception});
+            try stderr.print("{f}\n", .{exception.fmtPretty()});
+            try stderr.flush();
             return error.AlreadyReported;
         },
     };
 }
 
-const ReadFileError = std.mem.Allocator.Error || std.fs.File.OpenError || std.fs.File.ReadError;
+const ReadFileError = std.fs.File.OpenError || std.Io.Reader.LimitedAllocError;
 
 fn readFile(
     allocator: std.mem.Allocator,
@@ -628,7 +634,9 @@ fn readFile(
 ) ReadFileError![]const u8 {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
-    return file.readToEndAlloc(allocator, std.math.maxInt(usize));
+    var file_reader = file.reader(&.{});
+    const reader = &file_reader.interface;
+    return reader.allocRemaining(allocator, .unlimited);
 }
 
 const GetHistoryPathError =
@@ -656,24 +664,24 @@ fn getHistoryPath(allocator: std.mem.Allocator) GetHistoryPathError![]const u8 {
 }
 
 fn printValueDebugInfo(
-    writer: anytype,
-    tty_config: std.io.tty.Config,
+    writer: *std.Io.Writer,
+    tty_config: std.Io.tty.Config,
     value: Value,
-) @TypeOf(writer).Error!void {
+) (std.Io.Writer.Error || std.Io.tty.Config.SetColorError)!void {
     // Porffor REPL my beloved 💜
     try tty_config.setColor(writer, .blue);
     switch (value.type()) {
-        .number => try writer.print(" (type: {s})", .{@tagName(value.asNumber())}),
-        .string => try writer.print(" (ptr: 0x{x}, type: {s})", .{
+        .number => try writer.print(" (type: {t})", .{value.asNumber()}),
+        .string => try writer.print(" (ptr: 0x{x}, type: {t})", .{
             @intFromPtr(value.asString()),
-            @tagName(value.asString().slice),
+            value.asString().slice,
         }),
         .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
-        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {s}, tag: {s})", .{
+        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
             @intFromPtr(value.asObject()),
             @intFromPtr(value.asObject().property_storage.shape),
-            @tagName(value.asObject().property_storage.indexed_properties.storage),
-            @tagName(value.asObject().tag),
+            value.asObject().property_storage.indexed_properties.storage,
+            value.asObject().tag,
         }),
         else => {},
     }
@@ -686,9 +694,12 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
 }) !void {
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
     try stdout.writeAll(repl_preamble);
+    try stdout.flush();
 
     var editor = Editor.init(allocator, .{});
     defer editor.deinit();
@@ -721,7 +732,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                         .end = tokenizer.offset,
                     },
                     switch (token.type) {
-                        .@"await",
+                        .await,
                         .@"break",
                         .@"catch",
                         .class,
@@ -783,8 +794,14 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(allocator) else "";
     defer if (builtin.os.tag != .wasi) allocator.free(history_path);
 
-    if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
-    defer if (builtin.os.tag != .wasi) editor.saveHistory(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
+    if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch {
+        try stdout.writeAll("Failed to load history\n");
+        try stdout.flush();
+    };
+    defer if (builtin.os.tag != .wasi) editor.saveHistory(history_path) catch {
+        stdout.writeAll("Failed to save history\n") catch {};
+        stdout.flush() catch {};
+    };
 
     while (true) {
         const source_text = editor.getLine("> ") catch |err| switch (err) {
@@ -809,22 +826,28 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
             error.AlreadyReported => continue,
             else => return err,
         };
-        try stdout.print("{pretty}", .{result});
+        try stdout.print("{f}", .{result.fmtPretty()});
         if (options.debug) {
             const tty_config = realm.agent.platform.tty_config;
             try printValueDebugInfo(stdout, tty_config, result);
         }
         try stdout.writeAll("\n");
+        try stdout.flush();
     }
 }
 
 pub fn main() !u8 {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    defer _ = debug_allocator.deinit();
+    const allocator = debug_allocator.allocator();
 
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
 
     const Options = struct {
         command: ?[]const u8 = null,
@@ -871,24 +894,28 @@ pub fn main() !u8 {
     const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
 
     if (parsed_args.options.version) {
-        try stdout.print("kiesel {}\n", .{kiesel.version});
+        try stdout.print("kiesel {f}\n", .{kiesel.version});
         if (kiesel.build_options.enable_libgc) {
-            try stdout.print("libgc {}\n", .{kiesel.gc.libgc_version});
+            try stdout.print("libgc {f}\n", .{kiesel.gc.libgc_version});
         }
-        try stdout.print("zig {}\n", .{builtin.zig_version});
+        try stdout.print("zig {f}\n", .{builtin.zig_version});
+        try stderr.flush();
         return 0;
     }
     if (parsed_args.options.help) {
         try args.printHelp(Options, "kiesel", stdout);
+        try stderr.flush();
         return 0;
     }
     if (parsed_args.options.module) {
         if (path_arg == null) {
             try stderr.writeAll("-m/--module option must not be used in REPL mode\n");
+            try stderr.flush();
             return 1;
         }
         if (parsed_args.options.command != null) {
             try stderr.writeAll("-m/--module option must not be used with -c/--command\n");
+            try stderr.flush();
             return 1;
         }
     }
@@ -988,8 +1015,8 @@ pub fn main() !u8 {
             const source_text = readFile(agent_.gc_allocator, module_path) catch |err| {
                 return agent_.throwException(
                     .internal_error,
-                    "Failed to import '{}': {s}",
-                    .{ module_request.specifier, @errorName(err) },
+                    "Failed to import '{f}': {t}",
+                    .{ module_request.specifier.fmtUnquoted(), err },
                 );
             };
             defer agent_.gc_allocator.free(source_text);
@@ -1005,8 +1032,8 @@ pub fn main() !u8 {
                     }
                     return agent_.throwException(
                         .internal_error,
-                        "Failed to import '{}' with unknown module type '{}'",
-                        .{ module_request.specifier, import_attribute.value },
+                        "Failed to import '{f}' with unknown module type '{f}'",
+                        .{ module_request.specifier.fmtUnquoted(), import_attribute.value.fmtUnquoted() },
                     );
                 }
             }
@@ -1029,7 +1056,7 @@ pub fn main() !u8 {
                     const parse_error = diagnostics.errors.items[0];
                     return agent_.throwException(
                         .syntax_error,
-                        "{}",
+                        "{f}",
                         .{fmtParseError(parse_error)},
                     );
                 },
@@ -1078,8 +1105,10 @@ pub fn main() !u8 {
             error.AlreadyReported => return 1,
             else => return err,
         };
-        if (parsed_args.options.@"print-result")
-            try stdout.print("{pretty}\n", .{result});
+        if (parsed_args.options.@"print-result") {
+            try stdout.print("{f}\n", .{result.fmtPretty()});
+            try stdout.flush();
+        }
     } else if (parsed_args.options.command) |source_text| {
         const result = run(allocator, realm, source_text, .{
             .base_dir = cwd,
@@ -1090,8 +1119,10 @@ pub fn main() !u8 {
             error.AlreadyReported => return 1,
             else => return err,
         };
-        if (parsed_args.options.@"print-result")
-            try stdout.print("{pretty}\n", .{result});
+        if (parsed_args.options.@"print-result") {
+            try stdout.print("{f}\n", .{result.fmtPretty()});
+            try stdout.flush();
+        }
     } else {
         try repl(allocator, realm, .{
             .base_dir = cwd,

@@ -13,9 +13,9 @@ const Platform = @This();
 
 gc_allocator: std.mem.Allocator,
 gc_allocator_atomic: std.mem.Allocator,
-stdout: std.io.AnyWriter,
-stderr: std.io.AnyWriter,
-tty_config: std.io.tty.Config,
+stdout: *std.Io.Writer,
+stderr: *std.Io.Writer,
+tty_config: std.Io.tty.Config,
 stack_info: ?stackinfo.StackInfo,
 default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
 currentTimeMs: *const fn () i64,
@@ -40,9 +40,9 @@ const has_std_time_nanotimestamp = switch (builtin.os.tag) {
 const State = struct {
     gc_allocator: if (build_options.enable_libgc) GcAllocator else void,
     gc_allocator_atomic: if (build_options.enable_libgc) GcAllocator else void,
-
-    // `any()` captures a pointer to the writer, so these have to stick around.
+    stdout_buffer: if (has_fd_t) [1024]u8 else void,
     stdout_writer: if (has_fd_t) std.fs.File.Writer else void,
+    stderr_buffer: if (has_fd_t) [1024]u8 else void,
     stderr_writer: if (has_fd_t) std.fs.File.Writer else void,
 };
 
@@ -55,8 +55,10 @@ pub fn default() Platform {
     state = .{
         .gc_allocator = if (@FieldType(State, "gc_allocator") != void) .init(.normal),
         .gc_allocator_atomic = if (@FieldType(State, "gc_allocator_atomic") != void) .init(.atomic),
-        .stdout_writer = std.io.getStdOut().writer(),
-        .stderr_writer = std.io.getStdErr().writer(),
+        .stdout_buffer = undefined,
+        .stdout_writer = std.fs.File.stdout().writer(&state.stdout_buffer),
+        .stderr_buffer = undefined,
+        .stderr_writer = std.fs.File.stderr().writer(&state.stderr_buffer),
     };
     return .{
         .gc_allocator = if (@FieldType(State, "gc_allocator") != void)
@@ -67,9 +69,9 @@ pub fn default() Platform {
             state.gc_allocator_atomic.allocator()
         else
             std.heap.page_allocator,
-        .stdout = state.stdout_writer.any(),
-        .stderr = state.stderr_writer.any(),
-        .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
+        .stdout = &state.stdout_writer.interface,
+        .stderr = &state.stderr_writer.interface,
+        .tty_config = .detect(.stdout()),
         .stack_info = stackinfo.StackInfo.init() catch null,
         .default_locale = if (build_options.enable_intl)
             icu4zig.Locale.unknown()

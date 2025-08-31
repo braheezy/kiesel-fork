@@ -208,7 +208,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -328,7 +328,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -346,7 +346,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{predicate},
             );
 
@@ -394,7 +394,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -412,7 +412,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{predicate},
             );
 
@@ -497,7 +497,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -515,7 +515,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{predicate},
             );
 
@@ -563,7 +563,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -581,7 +581,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{mapper},
             );
 
@@ -706,7 +706,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -724,7 +724,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{procedure},
             );
 
@@ -767,7 +767,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -785,7 +785,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{mapper},
             );
 
@@ -866,7 +866,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -884,7 +884,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{reducer},
             );
 
@@ -952,7 +952,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -970,7 +970,7 @@ pub const prototype = struct {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{predicate},
             );
 
@@ -1018,7 +1018,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -1134,7 +1134,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
@@ -1142,7 +1142,7 @@ pub const prototype = struct {
         var iterated = try getIteratorDirect(agent, object);
 
         // 4. Let items be a new empty List.
-        var items: std.ArrayListUnmanaged(Value) = .empty;
+        var items: std.ArrayList(Value) = .empty;
         defer items.deinit(agent.gc_allocator);
 
         // 5. Repeat,

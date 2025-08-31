@@ -194,7 +194,7 @@ pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) 
 
     // 5. If IsConstructor(constructor) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
-        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+        return agent.throwException(.type_error, "{f} is not a constructor", .{constructor});
     }
 
     // 6. Return ? Construct(constructor, argList).
@@ -239,12 +239,12 @@ pub fn evaluateCall(
 
     // 4. If func is not an Object, throw a TypeError exception.
     if (!function.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{function});
+        return agent.throwException(.type_error, "{f} is not an Object", .{function});
     }
 
     // 5. If IsCallable(func) is false, throw a TypeError exception.
     if (!function.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{function});
+        return agent.throwException(.type_error, "{f} is not callable", .{function});
     }
 
     // 6. If tailPosition is true, perform PrepareForTailCall().
@@ -315,7 +315,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
     };
 
     // 10. Let attributes be a new empty List.
-    var attributes: std.ArrayListUnmanaged(ImportAttribute) = .empty;
+    var attributes: std.ArrayList(ImportAttribute) = .empty;
 
     // 11. If options is not undefined, then
     if (!options.isUndefined()) {
@@ -390,8 +390,8 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                     if (!value.isString()) {
                         const @"error" = try agent.createErrorObject(
                             .type_error,
-                            "Import attribute '{}' value is not a string",
-                            .{key.asString()},
+                            "Import attribute '{f}' value is not a string",
+                            .{key.asString().fmtUnquoted()},
                         );
 
                         // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly
@@ -420,8 +420,8 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
         if (try allImportAttributesSupported(agent, attributes.items)) |unsupported| {
             const @"error" = try agent.createErrorObject(
                 .type_error,
-                "Import attribute '{}' is not supported",
-                .{unsupported},
+                "Import attribute '{f}' is not supported",
+                .{unsupported.fmtUnquoted()},
             );
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
@@ -599,7 +599,7 @@ pub fn blockDeclarationInstantiation(
     std.debug.assert(env == .declarative_environment);
 
     // 1. let declarations be the LexicallyScopedDeclarations of code.
-    var declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+    var declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
     defer declarations.deinit(agent.gc_allocator);
     switch (code) {
         .statement_list => |node| try node.collectLexicallyScopedDeclarations(agent.gc_allocator, &declarations),
@@ -609,7 +609,7 @@ pub fn blockDeclarationInstantiation(
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
     const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
     // 3. For each element d of declarations, do
@@ -1262,7 +1262,7 @@ pub fn methodDefinitionEvaluation(
         },
 
         // AsyncMethod : async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
-        .@"async" => |async_function_expression| {
+        .async => |async_function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
             const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
                 .{ .private_name = private_name }
@@ -2096,7 +2096,7 @@ pub fn classDefinitionEvaluation(
         // g. Else if IsConstructor(superclass) is false, then
         else if (!superclass.isConstructor()) {
             // i. Throw a TypeError exception.
-            return agent.throwException(.type_error, "{} is not a constructor", .{superclass});
+            return agent.throwException(.type_error, "{f} is not a constructor", .{superclass});
         } else {
             // h. Else,
             // i. Let protoParent be ? Get(superclass, "prototype").
@@ -2107,7 +2107,7 @@ pub fn classDefinitionEvaluation(
             if (!prototype_parent_value.isObject() and !prototype_parent_value.isNull()) {
                 return agent.throwException(
                     .type_error,
-                    "{} is not an Object or null",
+                    "{f} is not an Object or null",
                     .{prototype_parent_value},
                 );
             }
@@ -2171,7 +2171,7 @@ pub fn classDefinitionEvaluation(
                     if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
                         return agent_.throwException(
                             .type_error,
-                            "{} is not a constructor",
+                            "{f} is not a constructor",
                             .{
                                 if (prototype_function == null)
                                     Value.undefined
@@ -2285,19 +2285,19 @@ pub fn classDefinitionEvaluation(
     defer agent.gc_allocator.free(elements);
 
     // 22. Let instancePrivateMethods be a new empty List.
-    var instance_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
+    var instance_private_methods: std.ArrayList(PrivateMethodDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
     // 23. Let staticPrivateMethods be a new empty List.
-    var static_private_methods: std.ArrayListUnmanaged(PrivateMethodDefinition) = .empty;
+    var static_private_methods: std.ArrayList(PrivateMethodDefinition) = .empty;
     defer static_private_methods.deinit(agent.gc_allocator);
 
     // 24. Let instanceFields be a new empty List.
-    var instance_fields: std.ArrayListUnmanaged(ClassFieldDefinition) = .empty;
+    var instance_fields: std.ArrayList(ClassFieldDefinition) = .empty;
     // Converted to owned slice, no `deinit()` needed
 
     // 25. Let staticElements be a new empty List.
-    var static_elements: std.ArrayListUnmanaged(union(enum) {
+    var static_elements: std.ArrayList(union(enum) {
         class_field_definition: ClassFieldDefinition,
         class_static_block_definition: ClassStaticBlockDefinition,
     }) = .empty;

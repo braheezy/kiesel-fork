@@ -853,7 +853,7 @@ pub const prototype = struct {
             error.Overflow;
         result catch return agent.throwException(
             .range_error,
-            "Cannot resize buffer to size {}",
+            "Cannot resize buffer to size {d}",
             .{new_byte_length},
         );
         if (new_byte_length > current_byte_length) {

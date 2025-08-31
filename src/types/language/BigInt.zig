@@ -13,16 +13,8 @@ const BigInt = @This();
 
 managed: std.math.big.int.Managed,
 
-pub fn format(
-    self: *const BigInt,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = fmt;
-    _ = options;
-    try writer.print("{}", .{self.managed});
-    try writer.writeAll("n");
+pub fn format(self: *const BigInt, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    try writer.print("{f}n", .{self.managed});
 }
 
 pub fn from(allocator: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!*const BigInt {
@@ -43,7 +35,7 @@ pub fn deinit(self: *const BigInt, allocator: std.mem.Allocator) void {
 }
 
 pub fn asFloat(self: *const BigInt) f64 {
-    return self.managed.toFloat(f64);
+    return self.managed.toFloat(f64, .nearest_even)[0];
 }
 
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
@@ -167,7 +159,7 @@ pub fn leftShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!
         &x.managed,
         y.managed.toInt(usize) catch return agent.throwException(
             .internal_error,
-            "Cannot left-shift BigInt by more than {} bits",
+            "Cannot left-shift BigInt by more than {d} bits",
             .{std.math.maxInt(usize)},
         ),
     );
@@ -183,7 +175,7 @@ pub fn signedRightShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent
         &x.managed,
         y.managed.toInt(usize) catch return agent.throwException(
             .internal_error,
-            "Cannot right-shift BigInt by more than {} bits",
+            "Cannot right-shift BigInt by more than {d} bits",
             .{std.math.maxInt(usize)},
         ),
     );
@@ -270,6 +262,6 @@ test format {
         const value, const expected = test_case;
         const big_int = try from(std.testing.allocator, value);
         defer big_int.deinit(std.testing.allocator);
-        try std.testing.expectFmt(expected, "{}", .{big_int});
+        try std.testing.expectFmt(expected, "{f}", .{big_int});
     }
 }

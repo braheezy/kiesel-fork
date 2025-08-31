@@ -104,7 +104,7 @@ pub const constructor = struct {
         if (!temporal_rs.c.temporal_rs_I128Nanoseconds_is_valid(epoch_nanoseconds)) {
             return agent.throwException(
                 .range_error,
-                "Invalid epoch nanoseconds {}",
+                "Invalid epoch nanoseconds {f}",
                 .{epoch_nanoseconds_bigint.managed},
             );
         }

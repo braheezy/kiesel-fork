@@ -53,18 +53,19 @@ pub const Slice = union(enum) {
 slice: Slice,
 hash: u64,
 
-pub fn format(
-    self: *const String,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = fmt;
-    _ = options;
+pub fn format(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    try writer.print("\"{f}\"", .{self.fmtUnquoted()});
+}
+
+pub fn formatUnquoted(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     switch (self.slice) {
-        .ascii => |ascii| try writer.writeAll(ascii),
-        .utf16 => |utf16| try writer.print("{}", .{std.unicode.fmtUtf16Le(utf16)}),
+        .ascii => |ascii| try writer.print("{s}", .{ascii}),
+        .utf16 => |utf16| try writer.print("{f}", .{std.unicode.fmtUtf16Le(utf16)}),
     }
+}
+
+pub fn fmtUnquoted(self: *const String) std.fmt.Alt(*const String, formatUnquoted) {
+    return .{ .data = self };
 }
 
 pub fn fromLiteral(comptime utf8: []const u8) *const String {
@@ -167,7 +168,7 @@ pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocat
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
             allocator,
-            "{}",
+            "{f}",
             .{std.unicode.fmtUtf16Le(utf16)},
         ),
     };
@@ -661,12 +662,12 @@ pub fn ArrayHashMapUnmanaged(comptime V: type) type {
 
 test format {
     const test_cases = [_]struct { *const String, []const u8 }{
-        .{ empty, "" },
-        .{ fromLiteral("foo"), "foo" },
-        .{ fromLiteral("123"), "123" },
+        .{ empty, "\"\"" },
+        .{ fromLiteral("foo"), "\"foo\"" },
+        .{ fromLiteral("123"), "\"123\"" },
     };
     for (test_cases) |test_case| {
         const string, const expected = test_case;
-        try std.testing.expectFmt(expected, "{}", .{string});
+        try std.testing.expectFmt(expected, "{f}", .{string});
     }
 }

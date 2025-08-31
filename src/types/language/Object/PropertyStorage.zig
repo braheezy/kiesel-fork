@@ -15,8 +15,8 @@ const Value = types.Value;
 const PropertyStorage = @This();
 
 shape: *Object.Shape,
-values: std.ArrayListUnmanaged(Value),
-accessors: std.ArrayListUnmanaged(Accessor),
+values: std.ArrayList(Value),
+accessors: std.ArrayList(Accessor),
 indexed_properties: Object.IndexedProperties,
 lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
 

@@ -133,41 +133,41 @@ pub const ECMAScriptFunction = MakeObject(.{
         ) std.mem.Allocator.Error!*const CachedAstValues {
             if (self.cached_ast_values) |cached_ast_values| return cached_ast_values;
 
-            var parameter_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            var parameter_names_utf8: std.ArrayList(ast.Identifier) = .empty;
             defer parameter_names_utf8.deinit(agent.gc_allocator);
             try self.formal_parameters.collectBoundNames(agent.gc_allocator, &parameter_names_utf8);
-            var parameter_names: std.ArrayListUnmanaged(*const String) = .empty;
+            var parameter_names: std.ArrayList(*const String) = .empty;
             try parameter_names.ensureTotalCapacity(agent.gc_allocator, parameter_names_utf8.items.len);
             for (parameter_names_utf8.items) |name_utf8| {
                 const name = try String.fromUtf8(agent, name_utf8);
                 parameter_names.appendAssumeCapacity(name);
             }
 
-            var var_declared_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            var var_declared_names_utf8: std.ArrayList(ast.Identifier) = .empty;
             defer var_declared_names_utf8.deinit(agent.gc_allocator);
             try self.ecmascript_code.collectVarDeclaredNames(agent.gc_allocator, &var_declared_names_utf8);
-            var var_declared_names: std.ArrayListUnmanaged(*const String) = .empty;
+            var var_declared_names: std.ArrayList(*const String) = .empty;
             try var_declared_names.ensureTotalCapacity(agent.gc_allocator, var_declared_names_utf8.items.len);
             for (var_declared_names_utf8.items) |name_utf8| {
                 const name = try String.fromUtf8(agent, name_utf8);
                 var_declared_names.appendAssumeCapacity(name);
             }
 
-            var lexically_declared_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+            var lexically_declared_names: std.ArrayList(ast.Identifier) = .empty;
             try self.ecmascript_code.collectLexicallyDeclaredNames(agent.gc_allocator, &lexically_declared_names);
 
-            var var_scoped_declarations: std.ArrayListUnmanaged(ast.VarScopedDeclaration) = .empty;
+            var var_scoped_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
             try self.ecmascript_code.collectVarScopedDeclarations(agent.gc_allocator, &var_scoped_declarations);
 
-            var lexically_scoped_declarations: std.ArrayListUnmanaged(ast.LexicallyScopedDeclaration) = .empty;
+            var lexically_scoped_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
             try self.ecmascript_code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexically_scoped_declarations);
 
-            var lexically_scoped_declarations_bound_names: std.ArrayListUnmanaged([]const *const String) = .empty;
+            var lexically_scoped_declarations_bound_names: std.ArrayList([]const *const String) = .empty;
             for (lexically_scoped_declarations.items) |declaration| {
-                var bound_names_utf8: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+                var bound_names_utf8: std.ArrayList(ast.Identifier) = .empty;
                 defer bound_names_utf8.deinit(agent.gc_allocator);
                 try declaration.collectBoundNames(agent.gc_allocator, &bound_names_utf8);
-                var bound_names: std.ArrayListUnmanaged(*const String) = .empty;
+                var bound_names: std.ArrayList(*const String) = .empty;
                 try bound_names.ensureTotalCapacity(agent.gc_allocator, bound_names_utf8.items.len);
                 for (bound_names_utf8.items) |name_utf8| {
                     const name = try String.fromUtf8(agent, name_utf8);
@@ -278,7 +278,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             }
 
             const executable = self.cached_arguments_executable orelse blk: {
-                var elements = try std.ArrayListUnmanaged(ast.ArrayBindingPattern.Element).initCapacity(
+                var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
                     agent.gc_allocator,
                     self.formal_parameters.items.len,
                 );
@@ -338,7 +338,9 @@ pub const ECMAScriptFunction = MakeObject(.{
                 std.mem.bytesAsValue(Executable.ConstantIndex, executable.instructions.items[2..]).* = index;
 
                 if (agent.options.debug.print_bytecode) {
-                    executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
+                    const stdout = agent.platform.stdout;
+                    executable.print(stdout, agent.platform.tty_config) catch {};
+                    stdout.flush() catch {};
                 }
 
                 self.cached_arguments_executable = executable;
@@ -374,7 +376,9 @@ pub const ECMAScriptFunction = MakeObject(.{
                 };
 
                 if (agent.options.debug.print_bytecode) {
-                    executable.print(agent.platform.stdout, agent.platform.tty_config) catch {};
+                    const stdout = agent.platform.stdout;
+                    executable.print(stdout, agent.platform.tty_config) catch {};
+                    stdout.flush() catch {};
                 }
 
                 self.cached_body_executable = executable;
@@ -418,7 +422,7 @@ fn call(
     if (function.fields.is_class_constructor) {
         // a. Let error be a newly created TypeError object.
         // b. NOTE: error is created in calleeContext with F's associated Realm Record.
-        const err = agent.throwException(.type_error, "{} is not callable", .{object});
+        const err = agent.throwException(.type_error, "{f} is not callable", .{object});
 
         // c. Remove calleeContext from the execution context stack and restore callerContext as
         //    the running execution context.
@@ -575,7 +579,7 @@ pub fn ordinaryCallEvaluateBody(
         // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments functionObject and argumentsList.
         // AsyncConciseBody : ExpressionBody
         // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments functionObject and argumentsList.
-        .@"async" => evaluateAsyncFunctionBody(agent, function, arguments_list),
+        .async => evaluateAsyncFunctionBody(agent, function, arguments_list),
     };
 }
 
@@ -1253,7 +1257,7 @@ fn functionDeclarationInstantiation(
     defer function_names.deinit(agent.gc_allocator);
 
     // 13. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayListUnmanaged(ast.HoistableDeclaration) = .empty;
+    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
     defer functions_to_initialize.deinit(agent.gc_allocator);
 
     // 14. For each element d of varDeclarations, in reverse List order, do
@@ -1423,7 +1427,7 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
-        var parameter_bindings: std.ArrayListUnmanaged(*const String) = .empty;
+        var parameter_bindings: std.ArrayList(*const String) = .empty;
         try parameter_bindings.ensureTotalCapacity(agent.gc_allocator, parameter_names.len + 1);
         parameter_bindings.appendSliceAssumeCapacity(parameter_names);
         parameter_bindings.appendAssumeCapacity(String.fromLiteral("arguments"));

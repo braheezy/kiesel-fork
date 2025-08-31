@@ -313,7 +313,7 @@ pub fn fulfillPromise(
 pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!PromiseCapability {
     // 1. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor_.isConstructor()) {
-        return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
+        return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
     }
 
     // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions
@@ -388,14 +388,14 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{resolving_functions.resolve});
+        return agent.throwException(.type_error, "{f} is not callable", .{resolving_functions.resolve});
     }
 
     // 8. If IsCallable(resolvingFunctions.[[Reject]]) is false, throw a TypeError exception.
     if (!resolving_functions.reject.isCallable()) {
         return agent.throwException(
             .type_error,
-            "{} is not callable",
+            "{f} is not callable",
             .{resolving_functions.reject},
         );
     }
@@ -702,7 +702,7 @@ fn getPromiseResolve(agent: *Agent, promise_constructor: *Object) Agent.Error!*O
 
     // 2. If IsCallable(promiseResolve) is false, throw a TypeError exception.
     if (!promise_resolve.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{promise_resolve});
+        return agent.throwException(.type_error, "{f} is not callable", .{promise_resolve});
     }
 
     // 3. Return promiseResolve.
@@ -723,7 +723,7 @@ fn performPromiseAll(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
-    var values = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
@@ -776,7 +776,7 @@ fn performPromiseAll(
             index: usize,
 
             /// [[Values]]
-            values: *std.ArrayListUnmanaged(Value),
+            values: *std.ArrayList(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -894,7 +894,7 @@ fn performPromiseAllSettled(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
-    var values = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
@@ -948,7 +948,7 @@ fn performPromiseAllSettled(
             index: usize,
 
             /// [[Values]]
-            values: *std.ArrayListUnmanaged(Value),
+            values: *std.ArrayList(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -1196,7 +1196,7 @@ fn performPromiseAny(
     promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let errors be a new empty List.
-    var errors = try agent.gc_allocator.create(std.ArrayListUnmanaged(Value));
+    var errors = try agent.gc_allocator.create(std.ArrayList(Value));
     errors.* = .empty;
 
     // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
@@ -1264,7 +1264,7 @@ fn performPromiseAny(
             index: usize,
 
             /// [[Errors]]
-            errors: *std.ArrayListUnmanaged(Value),
+            errors: *std.ArrayList(Value),
 
             /// [[Capability]]
             capability: PromiseCapability,
@@ -1586,7 +1586,7 @@ pub const constructor = struct {
 
         // 2. If IsCallable(executor) is false, throw a TypeError exception.
         if (!executor.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{executor});
+            return agent.throwException(.type_error, "{f} is not callable", .{executor});
         }
 
         // 3. Let promise be ? OrdinaryCreateFromConstructor(NewTarget, "%Promise.prototype%",
@@ -1860,7 +1860,7 @@ pub const constructor = struct {
 
         // 2. If C is not an Object, throw a TypeError exception.
         if (!constructor_.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{constructor_});
+            return agent.throwException(.type_error, "{f} is not an Object", .{constructor_});
         }
 
         // 3. Return ? PromiseResolve(C, x).
@@ -1878,7 +1878,7 @@ pub const constructor = struct {
 
         // 2. If C is not an Object, throw a TypeError exception.
         if (!constructor_.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{constructor_});
+            return agent.throwException(.type_error, "{f} is not an Object", .{constructor_});
         }
 
         // 3. Let promiseCapability be ? NewPromiseCapability(C).
@@ -2022,7 +2022,7 @@ pub const prototype = struct {
 
         // 2. If promise is not an Object, throw a TypeError exception.
         if (!promise.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{promise});
+            return agent.throwException(.type_error, "{f} is not an Object", .{promise});
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
@@ -2194,7 +2194,7 @@ pub const prototype = struct {
 
         // 2. If IsPromise(promise) is false, throw a TypeError exception.
         if (!promise.isPromise()) {
-            return agent.throwException(.type_error, "{} is not a Promise", .{promise});
+            return agent.throwException(.type_error, "{f} is not a Promise", .{promise});
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
@@ -2234,10 +2234,10 @@ pub const Promise = MakeObject(.{
         promise_result: Value,
 
         /// [[PromiseFulfillReactions]]
-        promise_fulfill_reactions: std.ArrayListUnmanaged(PromiseReaction),
+        promise_fulfill_reactions: std.ArrayList(PromiseReaction),
 
         /// [[PromiseRejectReactions]]
-        promise_reject_reactions: std.ArrayListUnmanaged(PromiseReaction),
+        promise_reject_reactions: std.ArrayList(PromiseReaction),
 
         /// [[PromiseIsHandled]]
         promise_is_handled: bool,

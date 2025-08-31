@@ -47,7 +47,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     const object = if (!object_value.isObject()) {
         return agent.throwException(
             .type_error,
-            "{} is not an Object",
+            "{f} is not an Object",
             .{object_value},
         );
     } else object_value.asObject();
@@ -203,7 +203,7 @@ pub const constructor = struct {
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{adder});
+            return agent.throwException(.type_error, "{f} is not callable", .{adder});
         }
 
         // 7. Let iteratorRecord be ? GetIterator(iterable, sync).
@@ -381,7 +381,7 @@ pub const prototype = struct {
 
         // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
         if (setDataSize(object.fields.set_data) <= other_rec.size) {
-            var indexes_to_remove: std.ArrayListUnmanaged(usize) = .empty;
+            var indexes_to_remove: std.ArrayList(usize) = .empty;
             defer indexes_to_remove.deinit(agent.gc_allocator);
 
             // a. Let thisSize be the number of elements in O.[[SetData]].
@@ -479,7 +479,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let entries be S.[[SetData]].
@@ -948,7 +948,7 @@ pub const prototype = struct {
 };
 
 const SetData = Value.ArrayHashMapUnmanaged(void, sameValue);
-const IterableValues = std.ArrayListUnmanaged(?Value);
+const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.5 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances

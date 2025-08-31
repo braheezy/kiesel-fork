@@ -2,30 +2,30 @@
     .name = .kiesel,
     .version = "0.1.0",
     .fingerprint = 0x411228af4a775b43,
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .any_pointer = .{
             .url = "git+https://github.com/ikskuh/any-pointer#0f9725a324d48239d1d7e07b7f270b0a87be576a",
             .hash = "N-V-__8AABtBAABwSNNZpjUoWFLYSZZXjKgv9hKsDuZq64Zk",
         },
         .args = .{
-            .url = "git+https://github.com/ikskuh/zig-args#9425b94c103a031777fdd272c555ce93a7dea581",
-            .hash = "args-0.0.0-CiLiqv_NAAC97fGpk9hS2K681jkiqPsWP6w3ucb_ctGH",
+            .url = "git+https://github.com/ikskuh/zig-args#8ae26b44a884ff20dca98ee84c098e8f8e94902f",
+            .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#441e2f9a07b04908a1624c520d68ef0838e9bc30",
-            .hash = "icu4zig-0.1.0-IT7GrJA8AgCIecMq7IDUl2UIPceXPcKmLaSeXnifOlfK",
+            .url = "git+https://codeberg.org/linusg/icu4zig#49e79003c54e1fdd0eb184a41c721e83140b5547",
+            .hash = "icu4zig-0.1.0-IT7GrJU9AgCOD64kuNuFV1I0-Puypn28gDJYfHRFq1Pb",
             .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#ab0f87360f3bf7a4c18acf65ab06182364793a4c",
-            .hash = "kiesel_runtime-0.1.0-goZjAVAVAQDfuGJOxlhczZIskM3gU2y2mwUFL6T2VTOi",
+            .url = "git+https://codeberg.org/kiesel-js/runtime#9e14c88869edfa19fa44682fc71f0303672e3e78",
+            .hash = "kiesel_runtime-0.1.0-goZjAbQWAQD3fBASVjhQWhMng6gdXPeu-QSWsetVT6Ea",
         },
         .libgc = .{
-            .url = "git+https://github.com/bdwgc/bdwgc#edac9bb74d97137c3e6013745de87e6ee341cb5c",
-            .hash = "N-V-__8AAKjELQDJdyWac7qGYxGFWdUfBnuBrNMzVwY4OlTH",
+            .url = "git+https://github.com/bdwgc/bdwgc#6d068ea3fa8191f252a8ca4910e0bd3cbb877d0f",
+            .hash = "N-V-__8AAErMLQAwjbOfoyLuc13gMqoO5Th7H6d6MkA9X6Uy",
             .lazy = true,
         },
         .libregexp = .{
@@ -33,12 +33,13 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "git+https://github.com/ikskuh/parser-toolkit#c1a466b8df22cab7d665f44c645fb44f0aaf5077",
-            .hash = "parser_toolkit-0.1.0-baYGPXNCEwCoVvgTA29nOamiDp5yOC76lUaayy5Z2bYh",
+            // FIXME: Points to https://github.com/ikskuh/parser-toolkit/pull/17, update when merged
+            .url = "git+https://github.com/ikskuh/parser-toolkit#c9d66dec48ae2928a82ab13045c606bf9ce5b9fc",
+            .hash = "parser_toolkit-0.1.0-baYGPUVCEwBaVmu09ORh0lLlVjRaJ489TdSIdTa_8VWg",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linusg/zig-stackinfo#b9e94aa7f6a778d704a2989df6267223446eb762",
-            .hash = "stackinfo-0.1.0-NZ2qTp8bAAD6l36ZqllIVQvCh3EqEpseSt8ku_gI6IdJ",
+            .url = "git+https://codeberg.org/linusg/zig-stackinfo#ea846c001fe7f48eabcdd00f0080f7fbf9587a5d",
+            .hash = "stackinfo-0.1.0-NZ2qTrYbAAD8N_vxX5I_UpaF-L6L900lTDTqL87WkGl_",
         },
         .temporal_rs = .{
             .url = "git+https://github.com/boa-dev/temporal#df531eb676db3ee9afa46acd9eced170259f619d",
@@ -46,16 +47,17 @@
             .lazy = true,
         },
         .unicode_id = .{
-            .url = "git+https://codeberg.org/injuly/unicode-id#ab463d6fe5dae906ac112c1361a7436bd1c9cda9",
-            .hash = "unicode_id-0.0.1-MsAuU1OBAQDvOQJbtbcLiuTJfsoWQTnC7NCTCG4wBY26",
+            // FIXME: Points to https://codeberg.org/injuly/unicode-id/pulls/5, update when merged
+            .url = "git+https://codeberg.org/injuly/unicode-id#ae2ff41f138da95ee18405c4f43e58a778d239a0",
+            .hash = "unicode_id-0.0.1-MsAuU--AAQA7sBff4d_BdDMvNLOvb50BOZXDlQaJCiWm",
         },
         .zement = .{
             .path = "./pkg/zement",
             .lazy = true,
         },
         .zigline = .{
-            .url = "git+https://github.com/alimpfard/zigline#6754712c7bcc3f5f374ff72d5053a88b5fea1a2b",
-            .hash = "zigline-0.1.0-6llsB38XAgB6gEzKaxzqxWFxmFubm2yR7-dW3-_IAY87",
+            .url = "git+https://github.com/alimpfard/zigline#6efbccf8498da64ab10eaa2c8bf91f1aa052598e",
+            .hash = "zigline-0.1.0-6llsB7wlAgATRbg9N7rreJ2htoOfII5I5Cz0DgiQ9zZh",
         },
     },
     .paths = .{

@@ -392,7 +392,7 @@ fn ownPropertyKeys(
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
 
     // 2. Let keys be a new empty List.
-    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.property_storage.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
             @as(usize, @intCast(typedArrayLength(ta)))
@@ -764,7 +764,7 @@ pub const constructor = struct {
 
         // 2. If IsConstructor(C) is false, throw a TypeError exception.
         if (!constructor_.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
+            return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
         }
 
         // 3. If mapper is undefined, then
@@ -775,7 +775,7 @@ pub const constructor = struct {
             // 4. Else,
             // a. If IsCallable(mapper) is false, throw a TypeError exception.
             if (!mapper.isCallable()) {
-                return agent.throwException(.type_error, "{} is not callable", .{mapper});
+                return agent.throwException(.type_error, "{f} is not callable", .{mapper});
             }
 
             // b. Let mapping be true.
@@ -901,7 +901,7 @@ pub const constructor = struct {
 
         // 3. If IsConstructor(C) is false, throw a TypeError exception.
         if (!constructor_.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
+            return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
         }
 
         // 4. Let newObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
@@ -1289,7 +1289,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -1426,11 +1426,11 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. Let kept be a new empty List.
-        var kept: std.ArrayListUnmanaged(Value) = .empty;
+        var kept: std.ArrayList(Value) = .empty;
         defer kept.deinit(agent.gc_allocator);
 
         // 6. Let captured be 0.
@@ -1619,7 +1619,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -1930,7 +1930,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(len) »).
@@ -1984,7 +1984,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -2056,7 +2056,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -2233,7 +2233,7 @@ pub const prototype = struct {
         {
             return agent.throwException(
                 .range_error,
-                "Offset {} and source length {} are out of range for target length {}",
+                "Offset {d} and source length {d} are out of range for target length {d}",
                 .{ target_offset, src_length, target_length },
             );
         }
@@ -2330,7 +2330,7 @@ pub const prototype = struct {
         {
             return agent.throwException(
                 .range_error,
-                "Offset {} and source length {} are out of range for target length {}",
+                "Offset {d} and source length {d} are out of range for target length {d}",
                 .{ target_offset, src_length, target_length },
             );
         }
@@ -2662,7 +2662,7 @@ pub const prototype = struct {
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -2701,7 +2701,7 @@ pub const prototype = struct {
         // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
         if (!comparator.isUndefined() and !comparator.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{comparator});
+            return agent.throwException(.type_error, "{f} is not callable", .{comparator});
         }
 
         // 2. Let obj be the this value.
@@ -2948,7 +2948,7 @@ pub const prototype = struct {
         // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
         if (!comparator.isUndefined() and !comparator.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{comparator});
+            return agent.throwException(.type_error, "{f} is not callable", .{comparator});
         }
 
         // 2. Let O be the this value.
@@ -3054,7 +3054,7 @@ pub const prototype = struct {
         if (!isValidIntegerIndex(typed_array, actual_index_f64)) {
             return agent.throwException(
                 .range_error,
-                "Invalid index {d} for typed array of length {}",
+                "Invalid index {d} for typed array of length {d}",
                 .{ actual_index_f64, len },
             );
         }
@@ -3143,8 +3143,8 @@ fn typedArrayCreateFromConstructor(
         if (@as(f64, @floatFromInt(length)) < argument_list[0].asNumber().asFloat()) {
             return agent.throwException(
                 .type_error,
-                "Typed array must have at least length {}, got {}",
-                .{ length, argument_list[0] },
+                "Typed array must have at least length {d}, got {d}",
+                .{ argument_list[0].asNumber().asFloat(), length },
             );
         }
     }
@@ -3445,7 +3445,7 @@ fn initializeTypedArrayFromTypedArray(
     const byte_length = std.math.mul(u53, element_size, element_length) catch {
         return agent.throwException(
             .range_error,
-            "Invalid typed array length {}",
+            "Invalid typed array length {d}",
             .{element_length},
         );
     };
@@ -3570,7 +3570,7 @@ fn initializeTypedArrayFromArrayBuffer(
     if (@mod(offset, element_size) != 0) {
         return agent.throwException(
             .range_error,
-            "Offset must be multiple of {}, got {}",
+            "Offset must be multiple of {d}, got {d}",
             .{ element_size, offset },
         );
     }
@@ -3596,7 +3596,7 @@ fn initializeTypedArrayFromArrayBuffer(
         if (offset > buffer_byte_length) {
             return agent.throwException(
                 .range_error,
-                "Offset must not exceed buffer byte length {}, got {}",
+                "Offset must not exceed buffer byte length {d}, got {d}",
                 .{ buffer_byte_length, offset },
             );
         }
@@ -3614,7 +3614,7 @@ fn initializeTypedArrayFromArrayBuffer(
             if (@mod(buffer_byte_length, element_size) != 0) {
                 return agent.throwException(
                     .range_error,
-                    "Buffer byte length must be multiple of {}, got {}",
+                    "Buffer byte length must be multiple of {d}, got {d}",
                     .{ element_size, buffer_byte_length },
                 );
             }
@@ -3624,7 +3624,7 @@ fn initializeTypedArrayFromArrayBuffer(
                 // iii. If newByteLength < 0, throw a RangeError exception.
                 return agent.throwException(
                     .range_error,
-                    "Offset must not exceed buffer byte length {}, got {}",
+                    "Offset must not exceed buffer byte length {d}, got {d}",
                     .{ buffer_byte_length, offset },
                 );
             };
@@ -3634,7 +3634,7 @@ fn initializeTypedArrayFromArrayBuffer(
             const new_byte_length = std.math.mul(u53, new_length, element_size) catch {
                 return agent.throwException(
                     .range_error,
-                    "Invalid typed array length {}",
+                    "Invalid typed array length {d}",
                     .{new_length},
                 );
             };
@@ -3647,7 +3647,7 @@ fn initializeTypedArrayFromArrayBuffer(
             {
                 return agent.throwException(
                     .range_error,
-                    "Offset {} and byte length {} are out of range for buffer byte length {}",
+                    "Offset {d} and byte length {d} are out of range for buffer byte length {d}",
                     .{ offset, new_byte_length, buffer_byte_length },
                 );
             }
@@ -3760,7 +3760,7 @@ fn allocateTypedArrayBuffer(
     const byte_length = std.math.mul(u53, element_size, length) catch {
         return agent.throwException(
             .range_error,
-            "Invalid typed array length {}",
+            "Invalid typed array length {d}",
             .{length},
         );
     };
@@ -4109,7 +4109,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 1. If string is not a String, throw a TypeError exception.
             if (!string_value.isString()) {
-                return agent.throwException(.type_error, "{} is not a string", .{string_value});
+                return agent.throwException(.type_error, "{f} is not a string", .{string_value});
             }
             const string = string_value.asString();
 
@@ -4127,7 +4127,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     if (alphabet_value.asString().eql(String.fromLiteral("base64"))) break :blk .base64;
                     if (alphabet_value.asString().eql(String.fromLiteral("base64url"))) break :blk .base64url;
                 }
-                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet_value});
+                return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
             // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
@@ -4145,7 +4145,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 }
                 return agent.throwException(
                     .type_error,
-                    "Invalid lastChunkHandling {}",
+                    "Invalid lastChunkHandling {f}",
                     .{last_chunk_handling_value},
                 );
             };
@@ -4185,7 +4185,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 1. If string is not a String, throw a TypeError exception.
             if (!string_value.isString()) {
-                return agent.throwException(.type_error, "{} is not a string", .{string_value});
+                return agent.throwException(.type_error, "{f} is not a string", .{string_value});
             }
             const string = string_value.asString();
 
@@ -4271,13 +4271,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
+            // 6. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
             const alphabet: Alphabet = blk: {
                 if (alphabet_value.isUndefined()) break :blk .base64;
                 if (alphabet_value.isString()) {
                     if (alphabet_value.asString().eql(String.fromLiteral("base64"))) break :blk .base64;
                     if (alphabet_value.asString().eql(String.fromLiteral("base64url"))) break :blk .base64url;
                 }
-                return agent.throwException(.type_error, "Invalid alphabet {}", .{alphabet_value});
+                return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
             // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
@@ -4329,8 +4330,8 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 6. Return out.
             return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "{}",
-                .{std.fmt.fmtSliceHexLower(to_encode)},
+                "{x}",
+                .{to_encode},
             )));
         }
     };

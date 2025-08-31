@@ -252,7 +252,7 @@ fn ownPropertyKeys(
     defer agent.gc_allocator.free(symbol_keys);
 
     // 3. Return the list-concatenation of exports and symbolKeys.
-    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         exports.len + symbol_keys.len,
     );

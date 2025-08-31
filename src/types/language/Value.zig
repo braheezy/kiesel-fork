@@ -364,34 +364,29 @@ pub const nan: Value = from(std.math.nan(f64));
 pub const infinity: Value = from(std.math.inf(f64));
 pub const negative_infinity: Value = from(-std.math.inf(f64));
 
-pub fn format(
-    self: Value,
-    comptime fmt: []const u8,
-    options: std.fmt.FormatOptions,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
-    _ = options;
-    if (comptime std.mem.eql(u8, fmt, "pretty")) {
-        return prettyPrintValue(self, writer) catch |err| {
-            // NOTE: When targeting Windows the error set contains error.Unexpected (from the
-            //       `std.io.tty.Config.setColor()` calls), which `std.fmt.formatType()`
-            //       doesn't include in its error set.
-            if (builtin.os.tag == .windows) switch (err) {
-                error.Unexpected => {},
-                else => |e| return e,
-            } else return err;
-        };
-    }
+pub fn format(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     switch (self.type()) {
         .undefined => try writer.writeAll("undefined"),
         .null => try writer.writeAll("null"),
         .boolean => try writer.writeAll(if (self.asBoolean()) "true" else "false"),
-        .string => try writer.print("\"{}\"", .{self.asString()}),
-        .symbol => try writer.print("{}", .{self.asSymbol()}),
-        .number => try writer.print("{}", .{self.asNumber()}),
-        .big_int => try writer.print("{}", .{self.asBigInt()}),
-        .object => try writer.print("{}", .{self.asObject()}),
+        .string => try writer.print("{f}", .{self.asString()}),
+        .symbol => try writer.print("{f}", .{self.asSymbol()}),
+        .number => try writer.print("{f}", .{self.asNumber()}),
+        .big_int => try writer.print("{f}", .{self.asBigInt()}),
+        .object => try writer.print("{f}", .{self.asObject()}),
     }
+}
+
+pub fn formatPretty(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    return prettyPrintValue(self, writer) catch |err| switch (err) {
+        // From `std.Io.tty.Config.setColor()`
+        error.Unexpected => {},
+        error.WriteFailed => return error.WriteFailed,
+    };
+}
+
+pub fn fmtPretty(self: Value) std.fmt.Alt(Value, formatPretty) {
+    return .{ .data = self };
 }
 
 pub inline fn from(value: anytype) Value {
@@ -546,7 +541,7 @@ pub fn typeof(self: Value) *const String {
 pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDescriptor {
     // 1. If Obj is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{self});
+        return agent.throwException(.type_error, "{f} is not an Object", .{self});
     }
 
     // 2. Let desc be a new Property Descriptor that initially has no fields.
@@ -623,7 +618,7 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
         // b. If IsCallable(getter) is false and getter is not undefined, throw a TypeError
         //    exception.
         if (!getter.isCallable() and !getter.isUndefined()) {
-            return agent.throwException(.type_error, "{} is not callable", .{getter});
+            return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
         // c. Set desc.[[Get]] to getter.
@@ -641,7 +636,7 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
         // b. If IsCallable(setter) is false and setter is not undefined, throw a TypeError
         //    exception.
         if (!setter.isCallable() and !setter.isUndefined()) {
-            return agent.throwException(.type_error, "{} is not callable", .{setter});
+            return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
         // c. Set desc.[[Set]] to setter.
@@ -1305,7 +1300,7 @@ pub fn getMethod(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Er
 
     // 3. If IsCallable(func) is false, throw a TypeError exception.
     if (!function.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{self});
+        return agent.throwException(.type_error, "{f} is not callable", .{self});
     }
 
     // 4. Return func.
@@ -1324,7 +1319,7 @@ pub fn call(
 
     // 2. If IsCallable(F) is false, throw a TypeError exception.
     if (!self.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{self});
+        return agent.throwException(.type_error, "{f} is not callable", .{self});
     }
 
     // 3. Return ? F.[[Call]](V, argumentsList).
@@ -1369,7 +1364,7 @@ pub fn createListFromArrayLike(
 
     // 2. If obj is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{self});
+        return agent.throwException(.type_error, "{f} is not an Object", .{self});
     }
 
     // 3. Let len be ? LengthOfArrayLike(obj).
@@ -1377,7 +1372,7 @@ pub fn createListFromArrayLike(
 
     // 4. Let list be a new empty List.
     if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-    var list = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, @intCast(len));
+    var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(len));
     defer list.deinit(agent.gc_allocator);
 
     // 5. Let index be 0.
@@ -1399,7 +1394,7 @@ pub fn createListFromArrayLike(
         }) {
             return agent.throwException(
                 .type_error,
-                "Array element {} must be a string or symbol",
+                "Array element {f} must be a string or symbol",
                 .{next},
             );
         }
@@ -1491,7 +1486,7 @@ fn addValueToKeyedGroup(
     } else {
         // 2. Let group be the Record { [[Key]]: key, [[Elements]]: « value » }.
         // 3. Append group to groups.
-        var group: std.ArrayListUnmanaged(Value) = .empty;
+        var group: std.ArrayList(Value) = .empty;
         try group.append(agent.gc_allocator, value);
         try groups.putNoClobber(agent.gc_allocator, key, group);
 
@@ -1503,8 +1498,8 @@ const KeyCoercion = enum { property, collection };
 
 fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     return switch (key_coercion) {
-        .property => PropertyKey.ArrayHashMapUnmanaged(std.ArrayListUnmanaged(Value)),
-        .collection => Value.ArrayHashMapUnmanaged(std.ArrayListUnmanaged(Value), sameValue),
+        .property => PropertyKey.ArrayHashMapUnmanaged(std.ArrayList(Value)),
+        .collection => Value.ArrayHashMapUnmanaged(std.ArrayList(Value), sameValue),
     };
 }
 
@@ -1521,7 +1516,7 @@ pub fn groupBy(
 
     // 2. If IsCallable(callback) is false, throw a TypeError exception.
     if (!callback.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{callback});
+        return agent.throwException(.type_error, "{f} is not callable", .{callback});
     }
 
     // 3. Let groups be a new empty List.
@@ -1601,7 +1596,7 @@ pub fn setterThatIgnoresPrototypeProperties(
     // 1. If thisValue is not an Object, then
     if (!self.isObject()) {
         // a. Throw a TypeError exception.
-        return agent.throwException(.type_error, "{} is not an Object", .{self});
+        return agent.throwException(.type_error, "{f} is not an Object", .{self});
     }
     const this_value = self.asObject();
 
@@ -1610,9 +1605,10 @@ pub fn setterThatIgnoresPrototypeProperties(
         // a. NOTE: Throwing here emulates assignment to a non-writable data property on the home
         //    object in strict mode code.
         // b. Throw a TypeError exception.
+        // TODO: Implement nicer PropertyKey formatting
         return agent.throwException(
             .type_error,
-            "Cannot set property '{}' on object",
+            "Cannot set property '{any}' on object",
             .{property_key},
         );
     }
@@ -1673,12 +1669,12 @@ pub fn requireInternalSlot(
 
     // 1. If O is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{self});
+        return agent.throwException(.type_error, "{f} is not an Object", .{self});
     }
 
     // 2. If O does not have an internalSlot internal slot, throw a TypeError exception.
     if (!self.asObject().is(T)) {
-        return agent.throwException(.type_error, "{} is not a {s} object", .{ self, name });
+        return agent.throwException(.type_error, "{f} is not a {s} object", .{ self, name });
     }
 
     // 3. Return unused.
@@ -1712,7 +1708,7 @@ pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error
 
     // 4. If IsCallable(target) is false, throw a TypeError exception.
     if (!target.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{target});
+        return agent.throwException(.type_error, "{f} is not callable", .{target});
     }
 
     // 5. Return ? OrdinaryHasInstance(target, V).
@@ -2273,7 +2269,7 @@ pub fn toPositiveIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f
 
     // 2. If integer ≤ 0, throw a RangeError exception.
     if (integer <= 0) {
-        return agent.throwException(.range_error, "{} is not a positive number", .{self});
+        return agent.throwException(.range_error, "{f} is not a positive number", .{self});
     }
 
     // 3. Return integer.
@@ -2288,7 +2284,7 @@ pub fn toIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {
 
     // 2. If number is NaN, +∞𝔽 or -∞𝔽, throw a RangeError exception.
     if (!number.isFinite()) {
-        return agent.throwException(.range_error, "{} is not a finite number", .{self});
+        return agent.throwException(.range_error, "{f} is not a finite number", .{self});
     }
 
     // 3. Return truncate(ℝ(number)).
@@ -2303,7 +2299,7 @@ pub fn toIntegerIfIntegral(self: Value, agent: *Agent) Agent.Error!f64 {
 
     // 2. If number is not an integral Number, throw a RangeError exception.
     if (!number.isIntegral()) {
-        return agent.throwException(.range_error, "{} is not an integral number", .{self});
+        return agent.throwException(.range_error, "{f} is not an integral number", .{self});
     }
 
     // 3. Return ℝ(number).
@@ -2361,7 +2357,7 @@ test format {
     };
     for (test_cases) |test_case| {
         const value, const expected = test_case;
-        try std.testing.expectFmt(expected, "{}", .{value});
+        try std.testing.expectFmt(expected, "{f}", .{value});
     }
 }
 

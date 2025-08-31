@@ -180,7 +180,7 @@ fn getViewValue(
     if (if (std.math.add(u53, get_index, element_size)) |x| x > view_size else |_| true) {
         return agent.throwException(
             .range_error,
-            "Cannot get element of size {} at index {}",
+            "Cannot get element of size {d} at index {d}",
             .{ element_size, get_index },
         );
     }
@@ -255,7 +255,7 @@ fn setViewValue(
     if (if (std.math.add(u53, get_index, element_size)) |x| x > view_size else |_| true) {
         return agent.throwException(
             .range_error,
-            "Cannot set element of size {} at index {}",
+            "Cannot set element of size {d} at index {d}",
             .{ element_size, get_index },
         );
     }
@@ -322,10 +322,10 @@ pub const constructor = struct {
 
         // 2. Perform ? RequireInternalSlot(buffer, [[ArrayBufferData]]).
         if (!buffer_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{buffer_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{buffer_value});
         }
         if (!buffer_value.asObject().is(builtins.ArrayBuffer) and !buffer_value.asObject().is(builtins.SharedArrayBuffer)) {
-            return agent.throwException(.type_error, "{} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
+            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
         }
         const buffer: ArrayBufferLike = if (buffer_value.asObject().is(builtins.ArrayBuffer))
             .{ .array_buffer = buffer_value.asObject().as(builtins.ArrayBuffer) }

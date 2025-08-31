@@ -18,10 +18,10 @@ pub const Context = struct {
     contained_in_strict_mode_code: bool,
     environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
     property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
-    continue_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
-    break_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex),
-    labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
-    labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayListUnmanaged(DeferredInstructionIndex)),
+    continue_jumps: std.ArrayList(DeferredInstructionIndex),
+    break_jumps: std.ArrayList(DeferredInstructionIndex),
+    labelled_continue_jumps: std.StringHashMapUnmanaged(*std.ArrayList(DeferredInstructionIndex)),
+    labelled_break_jumps: std.StringHashMapUnmanaged(*std.ArrayList(DeferredInstructionIndex)),
     current_label: ?[]const u8,
     fuse_get_value: bool = false,
 
@@ -1028,7 +1028,7 @@ pub fn codegenArguments(
 ) Executable.Error!Instruction.Arguments {
     // Arguments : ( )
     // 1. Return a new empty List.
-    var spread_indices: std.ArrayListUnmanaged(usize) = .empty;
+    var spread_indices: std.ArrayList(usize) = .empty;
     defer spread_indices.deinit(executable.allocator);
     for (node, 0..) |argument, i| switch (argument) {
         // ArgumentList : AssignmentExpression
@@ -2817,7 +2817,7 @@ pub fn codegenForInOfStatement(
         .for_declaration => .lexical_binding,
     };
     const iterator_kind: IteratorKind = switch (node.type) {
-        .async_of => .@"async",
+        .async_of => .async,
         else => .sync,
     };
     const break_jump = try forInOfHeadEvaluation(
@@ -2881,7 +2881,7 @@ fn forInOfHeadEvaluation(
         // b. If iterationKind is async-iterate, let iteratorKind be async.
         // c. Else, let iteratorKind be sync.
         const iterator_kind: IteratorKind = if (iteration_kind == .async_iterate)
-            .@"async"
+            .async
         else
             .sync;
 
@@ -2948,7 +2948,7 @@ fn forInOfBodyEvaluation(
     });
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
-    if (iterator_kind == .@"async") try executable.addInstruction(.@"await", {});
+    if (iterator_kind == .async) try executable.addInstruction(.await, {});
 
     // TODO: c. If nextResult is not an Object, throw a TypeError exception.
 
@@ -3039,7 +3039,7 @@ fn forInOfBodyEvaluation(
                     },
                 },
             };
-            var items: std.ArrayListUnmanaged(ast.LexicalBinding) = .empty;
+            var items: std.ArrayList(ast.LexicalBinding) = .empty;
             try items.append(executable.allocator, lexical_binding);
             break :blk .{
                 .type = lhs.for_declaration.type,
@@ -3312,7 +3312,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
 
     try executable.addInstruction(.load, {}); // Save input value
 
-    var consequent_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
+    var consequent_jumps: std.ArrayList(DeferredInstructionIndex) = .empty;
     defer consequent_jumps.deinit(executable.allocator);
 
     var has_default_clause = false;
@@ -3443,7 +3443,7 @@ pub fn codegenLabelledStatement(
     const tmp = temporaryChange(&ctx.current_label, label);
     defer tmp.restore();
 
-    var labelled_continue_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
+    var labelled_continue_jumps: std.ArrayList(DeferredInstructionIndex) = .empty;
     defer labelled_continue_jumps.deinit(executable.allocator);
     try ctx.labelled_continue_jumps.putNoClobber(executable.allocator, label, &labelled_continue_jumps);
     defer {
@@ -3451,7 +3451,7 @@ pub fn codegenLabelledStatement(
         std.debug.assert(removed);
     }
 
-    var labelled_break_jumps: std.ArrayListUnmanaged(DeferredInstructionIndex) = .empty;
+    var labelled_break_jumps: std.ArrayList(DeferredInstructionIndex) = .empty;
     defer labelled_break_jumps.deinit(executable.allocator);
     try ctx.labelled_break_jumps.putNoClobber(executable.allocator, label, &labelled_break_jumps);
     defer {
@@ -3709,7 +3709,7 @@ pub fn codegenMethodDefinition(
         .ast_node = try executable.addAstNode(switch (node.method) {
             .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
             .generator => |generator_expression| .{ .generator_expression = generator_expression },
-            .@"async" => |async_function_expression| .{ .async_function_expression = async_function_expression },
+            .async => |async_function_expression| .{ .async_function_expression = async_function_expression },
             .async_generator => |async_generator_expression| .{ .async_generator_expression = async_generator_expression },
         }),
         .type = node.method,
@@ -3856,7 +3856,7 @@ pub fn codegenAwaitExpression(
     try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
 
     // 3. Return ? Await(value).
-    try executable.addInstruction(.@"await", {});
+    try executable.addInstruction(.await, {});
 }
 
 /// 15.9.5 Runtime Semantics: Evaluation

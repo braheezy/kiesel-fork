@@ -825,7 +825,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
         if (!(try digits_value.toString(agent)).eql(String.fromLiteral("auto"))) {
             return agent.throwException(
                 .range_error,
-                "Invalid fractionalSecondDigits option {}",
+                "Invalid fractionalSecondDigits option {f}",
                 .{digits_value},
             );
         }
@@ -841,8 +841,8 @@ pub fn getTemporalFractionalSecondDigitsOption(
     if (!digits_value.asNumber().isFinite()) {
         return agent.throwException(
             .range_error,
-            "Invalid fractionalSecondDigits option {}",
-            .{digits_value},
+            "Invalid fractionalSecondDigits option {f}",
+            .{digits_value.asNumber()},
         );
     }
 
@@ -853,7 +853,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
     if (digit_count < 0 or digit_count > 9) {
         return agent.throwException(
             .range_error,
-            "Invalid fractionalSecondDigits option {}",
+            "Invalid fractionalSecondDigits option {f}",
             .{digits_value},
         );
     }

@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
     const enable_temporal = b.option(bool, "enable-temporal", "Enable Temporal") orelse true;
 
     const features = blk: {
-        var features: std.ArrayListUnmanaged([]const u8) = .empty;
+        var features: std.ArrayList([]const u8) = .empty;
         defer features.deinit(b.allocator);
         if (enable_intl) {
             features.append(b.allocator, "intl") catch @panic("OOM");
@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) void {
         break :blk (std.mem.join(b.allocator, ",", features.items) catch @panic("OOM"));
     };
 
-    var cargo_args: std.ArrayListUnmanaged([]const u8) = .empty;
+    var cargo_args: std.ArrayList([]const u8) = .empty;
     defer cargo_args.deinit(b.allocator);
     cargo_args.appendSlice(b.allocator, &.{ "--features", features }) catch @panic("OOM");
     if (optimize != .Debug) {

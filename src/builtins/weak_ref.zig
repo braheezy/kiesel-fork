@@ -60,7 +60,7 @@ pub const constructor = struct {
         if (!target.canBeHeldWeakly(agent)) {
             return agent.throwException(
                 .type_error,
-                "Value {} cannot be held weakly",
+                "Value {f} cannot be held weakly",
                 .{target},
             );
         }

@@ -83,17 +83,17 @@ pub fn createDateTimeFormat(
 
     // 7. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
     //    "best fit").
-    const calendar = try options.getOption(agent, "calendar", .string, null, null);
+    const maybe_calendar = try options.getOption(agent, "calendar", .string, null, null);
 
     // 8. If calendar is not undefined, then
-    if (calendar != null) {
+    if (maybe_calendar) |calendar| {
         // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
         //    RangeError exception.
-        if (!matchUnicodeLocaleIdentifierType(try calendar.?.toUtf8(agent.gc_allocator))) {
+        if (!matchUnicodeLocaleIdentifierType(try calendar.toUtf8(agent.gc_allocator))) {
             return agent.throwException(
                 .range_error,
-                "Invalid locale identifier type '{}'",
-                .{calendar.?},
+                "Invalid locale identifier type '{f}'",
+                .{calendar.fmtUnquoted()},
             );
         }
     }
@@ -101,17 +101,17 @@ pub fn createDateTimeFormat(
     // TODO: 9. Set opt.[[ca]] to calendar.
 
     // 10. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty, undefined).
-    const numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
+    const maybe_numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
 
     // 11. If numberingSystem is not undefined, then
-    if (numbering_system != null) {
+    if (maybe_numbering_system) |numbering_system| {
         // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw a
         //    RangeError exception.
-        if (!matchUnicodeLocaleIdentifierType(try numbering_system.?.toUtf8(agent.gc_allocator))) {
+        if (!matchUnicodeLocaleIdentifierType(try numbering_system.toUtf8(agent.gc_allocator))) {
             return agent.throwException(
                 .range_error,
-                "Invalid locale identifier type '{}'",
-                .{numbering_system.?},
+                "Invalid locale identifier type '{f}'",
+                .{numbering_system.fmtUnquoted()},
             );
         }
     }
@@ -154,11 +154,11 @@ pub fn createDateTimeFormat(
         .calendar = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
             try String.fromAscii(agent, ca)
         else
-            calendar orelse String.fromLiteral("gregory"),
+            maybe_calendar orelse String.fromLiteral("gregory"),
         .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
             try String.fromAscii(agent, nu)
         else
-            numbering_system orelse String.fromLiteral("latn"),
+            maybe_numbering_system orelse String.fromLiteral("latn"),
     };
 
     // 18. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
@@ -760,11 +760,7 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
         x,
     ) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return agent.throwException(
-            .internal_error,
-            "Unhandled ICU4X error: {s}",
-            .{@errorName(err)},
-        ),
+        else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
     };
     return Value.from(try String.fromUtf8(agent, result));
 }

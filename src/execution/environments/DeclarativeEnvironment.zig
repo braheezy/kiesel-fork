@@ -127,7 +127,11 @@ pub fn setMutableBinding(
     const binding = maybe_binding orelse {
         // a. If S is true, throw a ReferenceError exception.
         if (strict) {
-            return agent.throwException(.reference_error, "'{}' is not defined", .{name});
+            return agent.throwException(
+                .reference_error,
+                "'{f}' is not defined",
+                .{name.fmtUnquoted()},
+            );
         }
 
         // b. Perform ! envRec.CreateMutableBinding(N, true).
@@ -148,8 +152,8 @@ pub fn setMutableBinding(
         // a. Throw a ReferenceError exception.
         return agent.throwException(
             .reference_error,
-            "Binding for '{}' is not initialized",
-            .{name},
+            "Binding for '{f}' is not initialized",
+            .{name.fmtUnquoted()},
         );
     }
 
@@ -164,8 +168,8 @@ pub fn setMutableBinding(
         if (final_strict) {
             return agent.throwException(
                 .type_error,
-                "Binding for '{}' is immutable",
-                .{name},
+                "Binding for '{f}' is immutable",
+                .{name.fmtUnquoted()},
             );
         }
     }
@@ -188,8 +192,8 @@ pub fn getBindingValue(
     if (!binding.initialized) {
         return agent.throwException(
             .reference_error,
-            "Binding for '{}' is not initialized",
-            .{name},
+            "Binding for '{f}' is not initialized",
+            .{name.fmtUnquoted()},
         );
     }
 

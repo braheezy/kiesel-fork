@@ -476,7 +476,7 @@ pub const namespace = struct {
     /// https://tc39.es/ecma262/#sec-math.hypot
     fn hypot(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayListUnmanaged(Number).initCapacity(agent.gc_allocator, arguments.count());
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit(agent.gc_allocator);
 
         // 2. For each element arg of args, do
@@ -608,7 +608,7 @@ pub const namespace = struct {
     /// https://tc39.es/ecma262/#sec-math.max
     fn max(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayListUnmanaged(Number).initCapacity(agent.gc_allocator, arguments.count());
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit(agent.gc_allocator);
 
         // 2. For each element arg of args, do
@@ -646,7 +646,7 @@ pub const namespace = struct {
     /// https://tc39.es/ecma262/#sec-math.min
     fn min(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayListUnmanaged(Number).initCapacity(agent.gc_allocator, arguments.count());
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit(agent.gc_allocator);
 
         // 2. For each element arg of args, do
@@ -817,7 +817,7 @@ pub const namespace = struct {
         var stack_fallback = std.heap.stackFallback(@sizeOf(f64) * initial_partials_count, agent.gc_allocator);
         const allocator = stack_fallback.get();
 
-        var partials = try std.ArrayListUnmanaged(f64).initCapacity(allocator, initial_partials_count);
+        var partials = try std.ArrayList(f64).initCapacity(allocator, initial_partials_count);
         defer partials.deinit(allocator);
         var overflow: f64 = 0.0;
 

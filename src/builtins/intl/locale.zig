@@ -37,8 +37,9 @@ fn updateLanguageId(
     // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
     //    throw a RangeError exception.
     if (maybe_language) |language| {
-        new_tag.setLanguage(try language.toUtf8(agent.gc_allocator)) catch {
-            return agent.throwException(.range_error, "Invalid language subtag '{}'", .{language});
+        const value = try language.toUtf8(agent.gc_allocator);
+        new_tag.setLanguage(value) catch {
+            return agent.throwException(.range_error, "Invalid language subtag '{s}'", .{value});
         };
     }
 
@@ -49,8 +50,9 @@ fn updateLanguageId(
     if (maybe_script) |script| {
         // a. If script cannot be matched by the unicode_script_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        new_tag.setScript(try script.toUtf8(agent.gc_allocator)) catch {
-            return agent.throwException(.range_error, "Invalid script subtag '{}'", .{script});
+        const value = try script.toUtf8(agent.gc_allocator);
+        new_tag.setScript(value) catch {
+            return agent.throwException(.range_error, "Invalid script subtag '{s}'", .{value});
         };
     }
 
@@ -61,8 +63,9 @@ fn updateLanguageId(
     if (maybe_region) |region| {
         // a. If region cannot be matched by the unicode_region_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        new_tag.setRegion(try region.toUtf8(agent.gc_allocator)) catch {
-            return agent.throwException(.range_error, "Invalid region subtag '{}'", .{region});
+        const value = try region.toUtf8(agent.gc_allocator);
+        new_tag.setRegion(value) catch {
+            return agent.throwException(.range_error, "Invalid region subtag '{s}'", .{value});
         };
     }
 
@@ -155,7 +158,7 @@ pub const constructor = struct {
         var tag = icu4zig.Locale.fromString(try tag_string.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(
                 .range_error,
-                "Invalid locale identifier '{}'",
+                "Invalid locale identifier {f}",
                 .{tag_string},
             );
         };
@@ -186,7 +189,7 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("ca", value) catch {
-                return agent.throwException(.range_error, "Invalid u-ca subtag '{}'", .{calendar});
+                return agent.throwException(.range_error, "Invalid u-ca subtag '{s}'", .{value});
             };
         }
 
@@ -214,7 +217,7 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("co", value) catch {
-                return agent.throwException(.range_error, "Invalid u-co subtag '{}'", .{collation});
+                return agent.throwException(.range_error, "Invalid u-co subtag '{s}'", .{value});
             };
         }
 
@@ -291,11 +294,7 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("nu", value) catch {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid u-nu subtag '{}'",
-                    .{numbering_system},
-                );
+                return agent.throwException(.range_error, "Invalid u-nu subtag '{s}'", .{value});
             };
         }
 

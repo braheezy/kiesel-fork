@@ -83,7 +83,7 @@ pub fn MakeObject(
                 finalizer_data.* = .{ .data = {} };
                 gc.registerFinalizer(self, finalizer_data, struct {
                     fn finalizer(ptr: *anyopaque, _: *void) void {
-                        const self_: *Self = @alignCast(@ptrCast(ptr));
+                        const self_: *Self = @ptrCast(@alignCast(ptr));
                         options.finalizer.?(&self_.object);
                     }
                 }.finalizer);

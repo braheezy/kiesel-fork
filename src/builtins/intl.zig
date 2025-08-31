@@ -206,7 +206,7 @@ pub const namespace = struct {
         } else {
             // 8. Else,
             // a. Throw a RangeError exception.
-            return agent.throwException(.range_error, "Invalid key '{}'", .{key});
+            return agent.throwException(.range_error, "Invalid key '{f}'", .{key.fmtUnquoted()});
         }
 
         // 9. Return CreateArrayFromList( list ).

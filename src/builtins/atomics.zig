@@ -94,7 +94,7 @@ fn validateAtomicAccess(
     if (access_index >= length) {
         return agent.throwException(
             .range_error,
-            "Invalid index {} for typed array with length {}",
+            "Invalid index {d} for typed array with length {d}",
             .{ access_index, length },
         );
     }
@@ -150,7 +150,7 @@ fn revalidateAtomicAccess(
     if (byte_index_in_buffer >= @intFromEnum(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
-            "Invalid index {} for buffer with byte length {}",
+            "Invalid index {d} for buffer with byte length {d}",
             .{ byte_index_in_buffer, @intFromEnum(ta.cached_buffer_byte_length) },
         );
     }
@@ -162,7 +162,7 @@ fn revalidateAtomicAccess(
 /// https://tc39.es/ecma262/#sec-dowait
 fn doWait(
     agent: *Agent,
-    mode: enum { sync, @"async" },
+    mode: enum { sync, async },
     typed_array_value: Value,
     index: Value,
     value: Value,
@@ -294,7 +294,7 @@ fn doWait(
     }
 
     // 21. If t = 0 and mode is async, then
-    if (t == 0 and mode == .@"async") {
+    if (t == 0 and mode == .async) {
         // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
         //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
         //    Promise jobs.
@@ -729,7 +729,7 @@ pub const namespace = struct {
 
         // 1. If N is neither undefined nor an integral Number, throw a TypeError exception.
         if (!n.isUndefined() and !(n.isNumber() and n.asNumber().isIntegral())) {
-            return agent.throwException(.type_error, "{} is not an integral number", .{n});
+            return agent.throwException(.type_error, "{f} is not an integral number", .{n});
         }
 
         // 2. If the execution environment of the ECMAScript implementation supports signaling to
@@ -837,7 +837,7 @@ pub const namespace = struct {
         const timeout = arguments.get(3);
 
         // 1. Return ? DoWait(async, typedArray, index, value, timeout).
-        return doWait(agent, .@"async", typed_array, index, value, timeout);
+        return doWait(agent, .async, typed_array, index, value, timeout);
     }
 
     /// 25.4.16 Atomics.xor ( typedArray, index, value )

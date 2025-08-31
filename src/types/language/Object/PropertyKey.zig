@@ -107,7 +107,7 @@ pub const PropertyKey = union(enum) {
             .integer_index => |integer_index| Value.from(
                 try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    "{}",
+                    "{d}",
                     .{integer_index},
                 )),
             ),
@@ -126,7 +126,7 @@ pub const PropertyKey = union(enum) {
             .integer_index => |integer_index| .{
                 .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    "{}",
+                    "{d}",
                     .{integer_index},
                 )),
             },

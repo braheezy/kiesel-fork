@@ -8,7 +8,7 @@ const String = types.String;
 
 const Builder = @This();
 
-segments: std.ArrayListUnmanaged(Segment),
+segments: std.ArrayList(Segment),
 
 pub const Segment = union(enum) {
     string: *const String,
@@ -88,7 +88,7 @@ fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
         if (!segment.isAscii()) break false;
     } else true;
     if (is_ascii) {
-        var result: std.ArrayListUnmanaged(u8) = .empty;
+        var result: std.ArrayList(u8) = .empty;
         for (self.segments.items) |segment| switch (segment) {
             .string => |string| switch (string.slice) {
                 .ascii => |ascii| try result.appendSlice(allocator, ascii),
@@ -100,7 +100,7 @@ fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
         };
         return .{ .ascii = try result.toOwnedSlice(allocator) };
     } else {
-        var result: std.ArrayListUnmanaged(u16) = .empty;
+        var result: std.ArrayList(u16) = .empty;
         for (self.segments.items) |segment| switch (segment) {
             .string => |string| switch (string.slice) {
                 .ascii => |ascii| for (ascii) |c| try result.append(allocator, c),

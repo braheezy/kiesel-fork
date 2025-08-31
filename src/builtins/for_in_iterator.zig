@@ -164,7 +164,7 @@ pub const ForInIterator = MakeObject(.{
             visited_keys: PropertyKey.ArrayHashMapUnmanaged(void),
 
             /// [[RemainingKeys]]
-            remaining_keys: std.ArrayListUnmanaged(PropertyKey),
+            remaining_keys: std.ArrayList(PropertyKey),
         },
         completed,
     },

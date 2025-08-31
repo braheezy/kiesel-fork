@@ -38,8 +38,8 @@ exception: ?Exception = null,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
-execution_context_stack: std.ArrayListUnmanaged(*ExecutionContext),
-queued_jobs: std.ArrayListUnmanaged(QueuedJob),
+execution_context_stack: std.ArrayList(*ExecutionContext),
+queued_jobs: std.ArrayList(QueuedJob),
 empty_shape: *Object.Shape,
 string_cache: String.Cache,
 platform: *const Platform,
@@ -206,7 +206,7 @@ pub fn throwException(
 /// Capture stack frames for an exception, skipping the Realm's root execution context and the
 /// script or module execution context if present.
 pub fn captureStackTrace(self: *Agent) std.mem.Allocator.Error!Exception.StackTrace {
-    var stack_trace: std.ArrayListUnmanaged(Exception.StackFrame) = .empty;
+    var stack_trace: std.ArrayList(Exception.StackFrame) = .empty;
     errdefer stack_trace.deinit(self.gc_allocator);
     for (self.execution_context_stack.items) |execution_context| {
         switch (execution_context.origin) {

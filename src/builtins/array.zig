@@ -23,7 +23,7 @@ const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const asyncFunctionStart = builtins.asyncFunctionStart;
-const @"await" = builtins.@"await";
+const await = builtins.await;
 const createArrayIterator = builtins.createArrayIterator;
 const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -215,7 +215,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
 
     // 7. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor_.isConstructor()) {
-        return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
+        return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
@@ -315,7 +315,7 @@ pub fn arraySetLength(
     //     in descending numeric index order, do
     var sparse_indices = switch (array.property_storage.indexed_properties.storage) {
         .sparse => |sparse| blk: {
-            var indices: std.ArrayListUnmanaged(u32) = .empty;
+            var indices: std.ArrayList(u32) = .empty;
             try indices.ensureTotalCapacity(agent.gc_allocator, sparse.size);
             var it = sparse.keyIterator();
             while (it.next()) |index| indices.appendAssumeCapacity(index.*);
@@ -522,7 +522,7 @@ pub const constructor = struct {
             // 3. Else,
             // a. If IsCallable(mapper) is false, throw a TypeError exception.
             if (!mapper.isCallable()) {
-                return agent.throwException(.type_error, "{} is not callable", .{mapper});
+                return agent.throwException(.type_error, "{f} is not callable", .{mapper});
             }
 
             // b. Let mapping be true.
@@ -707,7 +707,7 @@ pub const constructor = struct {
                     // b. Else,
                     // i. If IsCallable(mapper) is false, throw a TypeError exception.
                     if (!mapper.isCallable()) {
-                        return agent_.throwException(.type_error, "{} is not callable", .{mapper});
+                        return agent_.throwException(.type_error, "{f} is not callable", .{mapper});
                     }
 
                     // ii. Let mapping be true.
@@ -789,11 +789,11 @@ pub const constructor = struct {
                         );
 
                         // 4. Set nextResult to ? Await(nextResult).
-                        next_result_value = try @"await"(agent_, next_result_value);
+                        next_result_value = try await(agent_, next_result_value);
 
                         // 5. If nextResult is not an Object, throw a TypeError exception.
                         if (!next_result_value.isObject()) {
-                            return agent_.throwException(.type_error, "{} is not an object", .{next_result_value});
+                            return agent_.throwException(.type_error, "{f} is not an Object", .{next_result_value});
                         }
                         const next_result = next_result_value.asObject();
 
@@ -831,7 +831,7 @@ pub const constructor = struct {
                             };
 
                             // c. Set mappedValue to Await(mappedValue).
-                            mapped_value = @"await"(agent_, mapped_value) catch |err| switch (err) {
+                            mapped_value = await(agent_, mapped_value) catch |err| switch (err) {
                                 error.OutOfMemory => return error.OutOfMemory,
                                 error.ExceptionThrown => {
                                     // d. IfAbruptCloseAsyncIterator(mappedValue, iteratorRecord).
@@ -893,7 +893,7 @@ pub const constructor = struct {
                         var k_value = try array_like.get(agent_, property_key);
 
                         // 3. Set kValue to ? Await(kValue).
-                        k_value = try @"await"(agent_, k_value);
+                        k_value = try await(agent_, k_value);
 
                         // 4. If mapping is true, then
                         const mapped_value = if (mapping) blk: {
@@ -905,7 +905,7 @@ pub const constructor = struct {
                             );
 
                             // b. Set mappedValue to ? Await(mappedValue).
-                            mapped_value = try @"await"(agent_, mapped_value);
+                            mapped_value = try await(agent_, mapped_value);
 
                             break :blk mapped_value;
                         } else blk: {
@@ -1404,7 +1404,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let k be 0.
@@ -1542,7 +1542,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, 0).
@@ -1852,7 +1852,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(mapperFunction) is false, throw a TypeError exception.
         if (!mapper_function.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{mapper_function});
+            return agent.throwException(.type_error, "{f} is not callable", .{mapper_function});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, 0).
@@ -1888,7 +1888,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let k be 0.
@@ -2198,7 +2198,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, len).
@@ -2326,7 +2326,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -2422,7 +2422,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -2756,7 +2756,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
         if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback});
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
         // 4. Let k be 0.
@@ -2813,7 +2813,7 @@ pub const prototype = struct {
         // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
         if (!comparator.isUndefined() and !comparator.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{comparator});
+            return agent.throwException(.type_error, "{f} is not callable", .{comparator});
         }
 
         // 2. Let obj be ? ToObject(this value).
@@ -3146,7 +3146,7 @@ pub const prototype = struct {
         // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
         if (!comparator.isUndefined() and !comparator.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{comparator});
+            return agent.throwException(.type_error, "{f} is not callable", .{comparator});
         }
 
         // 2. Let O be ? ToObject(this value).
@@ -3488,7 +3488,7 @@ pub fn findViaPredicate(
 ) Agent.Error!FindViaPredicateResult {
     // 1. If IsCallable(predicate) is false, throw a TypeError exception.
     if (!predicate.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{predicate});
+        return agent.throwException(.type_error, "{f} is not callable", .{predicate});
     }
 
     // 2. If direction is ascending, then
@@ -3580,7 +3580,7 @@ pub fn sortIndexedProperties(
     comptime holes: enum { skip_holes, read_through_holes },
 ) Agent.Error![]const Value {
     // 1. Let items be a new empty List.
-    var items: std.ArrayListUnmanaged(Value) = .empty;
+    var items: std.ArrayList(Value) = .empty;
 
     // 2. Let k be 0.
     var k: u53 = 0;

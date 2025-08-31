@@ -42,7 +42,7 @@ pub fn registerFinalizer(
         object,
         struct {
             fn func(object_: ?*anyopaque, client_data: ?*anyopaque) callconv(.c) void {
-                const finalizer_data_: @TypeOf(finalizer_data) = @alignCast(@ptrCast(client_data));
+                const finalizer_data_: @TypeOf(finalizer_data) = @ptrCast(@alignCast(client_data));
                 finalizer(object_.?, &finalizer_data_.data);
                 if (finalizer_data_.nextFinalizerFunc) |nextFinalizerFunc| {
                     nextFinalizerFunc(object_, finalizer_data_.next_finalizer_data);

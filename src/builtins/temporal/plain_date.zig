@@ -1032,10 +1032,7 @@ pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
 
     // 2. Let daysInMonth be ISODaysInMonth(year, month).
     const days_in_month = std.time.epoch.getDaysInMonth(
-        if (std.time.epoch.isLeapYear(year_int))
-            .leap
-        else
-            .not_leap,
+        year_int,
         @enumFromInt(month_int),
     );
 

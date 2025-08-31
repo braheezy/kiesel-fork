@@ -22,7 +22,7 @@ const String = types.String;
 const Value = types.Value;
 const applyStringOrNumericBinaryOperator = runtime.applyStringOrNumericBinaryOperator;
 const arrayCreate = builtins.arrayCreate;
-const @"await" = builtins.@"await";
+const await = builtins.await;
 const bindingClassDeclarationEvaluation = runtime.bindingClassDeclarationEvaluation;
 const blockDeclarationInstantiation = runtime.blockDeclarationInstantiation;
 const classDefinitionEvaluation = runtime.classDefinitionEvaluation;
@@ -58,19 +58,19 @@ const Vm = @This();
 agent: *Agent,
 executable: *const Executable,
 ip: usize,
-stack: std.ArrayListUnmanaged(Value),
-iterator_stack: std.ArrayListUnmanaged(Iterator),
-lexical_environment_stack: std.ArrayListUnmanaged(Environment),
-reference_stack: std.ArrayListUnmanaged(Reference),
-exception_jump_target_stack: std.ArrayListUnmanaged(usize),
-function_arguments: std.ArrayListUnmanaged(Value),
+stack: std.ArrayList(Value),
+iterator_stack: std.ArrayList(Iterator),
+lexical_environment_stack: std.ArrayList(Environment),
+reference_stack: std.ArrayList(Reference),
+exception_jump_target_stack: std.ArrayList(usize),
+function_arguments: std.ArrayList(Value),
 result: ?Value = null,
 exception: ?Agent.Exception = null,
 cached_this_value: ?Value = null,
 
 pub fn init(agent: *Agent, executable: *const Executable) std.mem.Allocator.Error!Vm {
-    const stack = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, 32);
-    const function_arguments = try std.ArrayListUnmanaged(Value).initCapacity(agent.gc_allocator, 8);
+    const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
+    const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
     return .{
         .agent = agent,
         .executable = executable,
@@ -190,7 +190,7 @@ fn executeArraySpreadValue(self: *Vm) Agent.Error!void {
 
 fn executeAwait(self: *Vm) Agent.Error!void {
     const value = self.result.?;
-    self.result = try @"await"(self.agent, value);
+    self.result = try await(self.agent, value);
 }
 
 fn executeBinaryOperatorAdd(self: *Vm) Agent.Error!void {
@@ -468,7 +468,7 @@ fn executeCreateCatchBindings(
     // 2. Let catchEnv be NewDeclarativeEnvironment(oldEnv).
     const catch_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
 
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(self.agent.gc_allocator);
     try catch_parameter.collectBoundNames(self.agent.gc_allocator, &bound_names);
 
@@ -849,11 +849,7 @@ fn executeEvaluateSuperCall(self: *Vm, args: Instruction.Arguments) Agent.Error!
 
     // 5. If IsConstructor(func) is false, throw a TypeError exception.
     if (!function.isConstructor()) {
-        return self.agent.throwException(
-            .type_error,
-            "{} is not a constructor",
-            .{function},
-        );
+        return self.agent.throwException(.type_error, "{f} is not a constructor", .{function});
     }
 
     // 6. Let result be ? Construct(func, argList, newTarget).
@@ -892,7 +888,7 @@ fn executeForDeclarationBindingInstantiation(
 
     // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
     // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
-    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(self.agent.gc_allocator);
     try lexical_declaration.collectBoundNames(self.agent.gc_allocator, &bound_names);
 
@@ -1452,7 +1448,7 @@ fn executeObjectDefineMethod(
             @field(function_or_class, switch (@"type") {
                 .method, .get, .set => "function_expression",
                 .generator => "generator_expression",
-                .@"async" => "async_function_expression",
+                .async => "async_function_expression",
                 .async_generator => "async_generator_expression",
             }),
         ),
@@ -1571,14 +1567,14 @@ fn executeResolveBindingDirect(
     if (lookup_cache_entry.*) |cache| {
         for (0..cache.distance) |_| {
             env = env.outerEnv() orelse {
-                return self.agent.throwException(.reference_error, "'{}' is not defined", .{name});
+                return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtUnquoted()});
             };
         }
     } else {
         var distance: usize = 0;
         while (!try env.hasBinding(self.agent, name)) {
             env = env.outerEnv() orelse {
-                return self.agent.throwException(.reference_error, "'{}' is not defined", .{name});
+                return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtUnquoted()});
             };
             distance += 1;
         }
@@ -1784,7 +1780,7 @@ fn executeInstruction(
         .array_set_length => self.executeArraySetLength(payload.length),
         .array_set_value_direct => self.executeArraySetValueDirect(payload.index),
         .array_spread_value => self.executeArraySpreadValue(),
-        .@"await" => self.executeAwait(),
+        .await => self.executeAwait(),
         .binary_operator_add => self.executeBinaryOperatorAdd(),
         .binary_operator_sub => self.executeBinaryOperatorSub(),
         .binary_operator_mul => self.executeBinaryOperatorMul(),

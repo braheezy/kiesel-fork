@@ -19,14 +19,7 @@ pub const Number = union(enum) {
     // i32 internally.
     i32: i32,
 
-    pub fn format(
-        self: Number,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) @TypeOf(writer).Error!void {
-        _ = fmt;
-        _ = options;
+    pub fn format(self: Number, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (self) {
             .f64 => |x| {
                 if (std.math.isNan(x)) {
@@ -164,8 +157,7 @@ pub const Number = union(enum) {
                         \\fjcvtzs w0, d1
                         : [ret] "={w0}" (-> i32),
                         : [number] "{d1}" (x),
-                        : "cc"
-                    );
+                        : .{});
                 }
 
                 // Excerpt from Value.toInt32()
@@ -610,10 +602,11 @@ pub const Number = union(enum) {
 
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
         if (self.asFloat() < 0) {
+            const negated_string = try self.unaryMinus().toString(agent, radix);
             return String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "-{}",
-                .{try self.unaryMinus().toString(agent, radix)},
+                "-{f}",
+                .{negated_string.fmtUnquoted()},
             ));
         }
 
@@ -632,9 +625,13 @@ pub const Number = union(enum) {
                 break :blk try std.mem.replaceOwned(u8, agent.gc_allocator, tmp, "e", "e+");
             },
             .i32 => |x| blk: {
-                var array_list: std.ArrayListUnmanaged(u8) = .empty;
-                try std.fmt.formatInt(x, radix, .lower, .{}, array_list.writer(agent.gc_allocator));
-                break :blk try array_list.toOwnedSlice(agent.gc_allocator);
+                var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
+                defer allocating_writer.deinit();
+                const writer = &allocating_writer.writer;
+                writer.printInt(x, radix, .lower, .{}) catch |err| switch (err) {
+                    error.WriteFailed => return error.OutOfMemory,
+                };
+                break :blk try allocating_writer.toOwnedSlice();
             },
         });
     }
@@ -653,6 +650,6 @@ test "format" {
     };
     for (test_cases) |test_case| {
         const number, const expected = test_case;
-        try std.testing.expectFmt(expected, "{}", .{number});
+        try std.testing.expectFmt(expected, "{f}", .{number});
     }
 }

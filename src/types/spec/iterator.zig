@@ -11,7 +11,7 @@ const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
-const @"await" = builtins.@"await";
+const await = builtins.await;
 const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -56,7 +56,7 @@ pub const Iterator = struct {
             self.done = true;
 
             // b. Throw a TypeError exception.
-            return agent.throwException(.type_error, "{} is not an Object", .{result});
+            return agent.throwException(.type_error, "{f} is not an Object", .{result});
         }
 
         // 6. Return result.
@@ -170,7 +170,7 @@ pub const Iterator = struct {
 
         // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
         if (!inner_result_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{inner_result_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{inner_result_value});
         }
 
         // 8. Return ? completion.
@@ -207,7 +207,7 @@ pub const Iterator = struct {
 
             // d. If innerResult is a normal completion, set innerResult to
             //    Completion(Await(innerResult.[[Value]])).
-            break :blk if (inner_result) |value_| @"await"(agent, value_) else |err| err;
+            break :blk if (inner_result) |value_| await(agent, value_) else |err| err;
         } else |err| err;
 
         // 5. If completion is a throw completion, return ? completion.
@@ -221,7 +221,7 @@ pub const Iterator = struct {
 
         // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
         if (!inner_result_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{inner_result_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{inner_result_value});
         }
 
         // 8. Return ? completion.
@@ -232,7 +232,7 @@ pub const Iterator = struct {
     /// https://tc39.es/ecma262/#sec-iteratortolist
     pub fn toList(self: *Iterator, agent: *Agent) Agent.Error![]const Value {
         // 1. Let values be a new empty List.
-        var values: std.ArrayListUnmanaged(Value) = .empty;
+        var values: std.ArrayList(Value) = .empty;
         errdefer values.deinit(agent.gc_allocator);
 
         // 2. Repeat,
@@ -273,14 +273,14 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agen
 
     // 2. If iterator is not an Object, throw a TypeError exception.
     if (!iterator.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{iterator});
+        return agent.throwException(.type_error, "{f} is not an Object", .{iterator});
     }
 
     // 3. Return ? GetIteratorDirect(iterator).
     return getIteratorDirect(agent, iterator.asObject());
 }
 
-pub const IteratorKind = enum { sync, @"async" };
+pub const IteratorKind = enum { sync, async };
 
 /// 7.4.4 GetIterator ( obj, kind )
 /// https://tc39.es/ecma262/#sec-getiterator
@@ -290,7 +290,7 @@ pub fn getIterator(
     kind: IteratorKind,
 ) Agent.Error!Iterator {
     // 1. If kind is async, then
-    const method = (if (kind == .@"async") blk: {
+    const method = (if (kind == .async) blk: {
         // a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
         const method = try object.getMethod(
             agent,
@@ -351,14 +351,14 @@ pub fn getIteratorFlattenable(
         switch (primitive_handling) {
             // a. If primitiveHandling is reject-primitives, throw a TypeError exception.
             .reject_primitives => {
-                return agent.throwException(.type_error, "{} is not an Object", .{object});
+                return agent.throwException(.type_error, "{f} is not an Object", .{object});
             },
 
             // b. Assert: primitiveHandling is iterate-string-primitives.
             .iterate_string_primitives => {
                 // c. If obj is not a String, throw a TypeError exception.
                 if (!object.isString()) {
-                    return agent.throwException(.type_error, "{} is not a string", .{object});
+                    return agent.throwException(.type_error, "{f} is not a string", .{object});
                 }
             },
         }
@@ -382,7 +382,7 @@ pub fn getIteratorFlattenable(
 
     // 5. If iterator is not an Object, throw a TypeError exception.
     if (!iterator.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{iterator});
+        return agent.throwException(.type_error, "{f} is not an Object", .{iterator});
     }
 
     // 6. Return ? GetIteratorDirect(iterator).

@@ -160,7 +160,7 @@ pub const constructor = struct {
 
         // 1. If O is not an Object and O is not null, throw a TypeError exception.
         if (!object.isObject() and !object.isNull()) {
-            return agent.throwException(.type_error, "{} is not an Object or null", .{object});
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{object});
         }
 
         // 2. Let obj be OrdinaryObjectCreate(O).
@@ -187,7 +187,7 @@ pub const constructor = struct {
 
         // 1. If O is not an Object, throw a TypeError exception.
         if (!object.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{object});
+            return agent.throwException(.type_error, "{f} is not an Object", .{object});
         }
 
         // 2. Return ? ObjectDefineProperties(O, Properties).
@@ -214,7 +214,7 @@ pub const constructor = struct {
         };
 
         // 3. Let descriptors be a new empty List.
-        var descriptors: std.ArrayListUnmanaged(Property) = .empty;
+        var descriptors: std.ArrayList(Property) = .empty;
         defer descriptors.deinit(agent.gc_allocator);
 
         // 4. For each element nextKey of keys, do
@@ -261,7 +261,7 @@ pub const constructor = struct {
 
         // 1. If O is not an Object, throw a TypeError exception.
         if (!object.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{object});
+            return agent.throwException(.type_error, "{f} is not an Object", .{object});
         }
 
         // 2. Let key be ? ToPropertyKey(P).
@@ -473,7 +473,7 @@ pub const constructor = struct {
         defer agent.gc_allocator.free(keys_);
 
         // 3. Let nameList be a new empty List.
-        var name_list: std.ArrayListUnmanaged(PropertyKey) = .empty;
+        var name_list: std.ArrayList(PropertyKey) = .empty;
 
         // 4. For each element nextKey of keys, do
         for (keys_) |next_key| {
@@ -654,7 +654,7 @@ pub const constructor = struct {
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
         if (!prototype_.isObject() and !prototype_.isNull()) {
-            return agent.throwException(.type_error, "{} is not an Object or null", .{prototype_});
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{prototype_});
         }
 
         // 3. If O is not an Object, return O.
@@ -936,7 +936,7 @@ pub const prototype = struct {
 
         // 2. If IsCallable(getter) is false, throw a TypeError exception.
         if (!getter.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{getter});
+            return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
         // 3. Let desc be PropertyDescriptor {
@@ -969,7 +969,7 @@ pub const prototype = struct {
 
         // 2. If IsCallable(setter) is false, throw a TypeError exception.
         if (!setter.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{setter});
+            return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
         // 3. Let desc be PropertyDescriptor {

@@ -82,7 +82,7 @@ pub const constructor = struct {
         if (!adder.isCallable()) {
             return agent.throwException(
                 .type_error,
-                "{} is not callable",
+                "{f} is not callable",
                 .{adder},
             );
         }
@@ -154,7 +154,7 @@ pub const prototype = struct {
         if (!value.canBeHeldWeakly(agent)) {
             return agent.throwException(
                 .type_error,
-                "Value {} cannot be held weakly",
+                "Value {f} cannot be held weakly",
                 .{value},
             );
         }

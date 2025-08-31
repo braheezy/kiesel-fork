@@ -2,26 +2,26 @@ const std = @import("std");
 
 const ast = @import("ast.zig");
 
-fn printIndentation(writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+fn printIndentation(writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     for (0..indentation) |_| try writer.print("  ", .{});
 }
 
-fn print(string: []const u8, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+fn print(string: []const u8, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try printIndentation(writer, indentation);
     try writer.print("{s}\n", .{string});
 }
 
-pub fn printPrivateIdentifier(node: ast.PrivateIdentifier, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printPrivateIdentifier(node: ast.PrivateIdentifier, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("PrivateIdentifier", writer, indentation);
     try print(node, writer, indentation + 1);
 }
 
-pub fn printIdentifierReference(node: ast.IdentifierReference, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printIdentifierReference(node: ast.IdentifierReference, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("IdentifierReference", writer, indentation);
     try print(node, writer, indentation + 1);
 }
 
-pub fn printPrimaryExpression(node: ast.PrimaryExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printPrimaryExpression(node: ast.PrimaryExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
     switch (node) {
         .this => try print("this", writer, indentation),
@@ -41,7 +41,7 @@ pub fn printPrimaryExpression(node: ast.PrimaryExpression, writer: anytype, inde
     }
 }
 
-pub fn printMemberExpression(node: ast.MemberExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printMemberExpression(node: ast.MemberExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("MemberExpression", writer, indentation);
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
@@ -53,7 +53,7 @@ pub fn printMemberExpression(node: ast.MemberExpression, writer: anytype, indent
     }
 }
 
-pub fn printSuperProperty(node: ast.SuperProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printSuperProperty(node: ast.SuperProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("SuperProperty", writer, indentation);
     switch (node) {
         .expression => |expression| try printExpression(expression.*, writer, indentation + 1),
@@ -61,7 +61,7 @@ pub fn printSuperProperty(node: ast.SuperProperty, writer: anytype, indentation:
     }
 }
 
-pub fn printMetaProperty(node: ast.MetaProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printMetaProperty(node: ast.MetaProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("MetaProperty", writer, indentation);
     switch (node) {
         .new_target => try print("new.target", writer, indentation + 1),
@@ -69,7 +69,7 @@ pub fn printMetaProperty(node: ast.MetaProperty, writer: anytype, indentation: u
     }
 }
 
-pub fn printNewExpression(node: ast.NewExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printNewExpression(node: ast.NewExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("NewExpression", writer, indentation);
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
@@ -77,7 +77,7 @@ pub fn printNewExpression(node: ast.NewExpression, writer: anytype, indentation:
     try printArguments(node.arguments, writer, indentation + 2);
 }
 
-pub fn printCallExpression(node: ast.CallExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printCallExpression(node: ast.CallExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("CallExpression", writer, indentation);
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
@@ -85,18 +85,18 @@ pub fn printCallExpression(node: ast.CallExpression, writer: anytype, indentatio
     try printArguments(node.arguments, writer, indentation + 2);
 }
 
-pub fn printSuperCall(node: ast.SuperCall, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printSuperCall(node: ast.SuperCall, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("SuperCall", writer, indentation);
     try printArguments(node.arguments, writer, indentation + 1);
 }
 
-pub fn printImportCall(node: ast.ImportCall, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printImportCall(node: ast.ImportCall, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ImportCall", writer, indentation);
     try printExpression(node.specifier_expression.*, writer, indentation + 1);
     if (node.options_expression) |options_expression| try printExpression(options_expression.*, writer, indentation + 1);
 }
 
-pub fn printArguments(node: ast.Arguments, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printArguments(node: ast.Arguments, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     for (node) |argument| switch (argument) {
         .expression => |expression| try printExpression(expression, writer, indentation),
         .spread => |expression| {
@@ -106,7 +106,7 @@ pub fn printArguments(node: ast.Arguments, writer: anytype, indentation: usize) 
     };
 }
 
-pub fn printOptionalExpression(node: ast.OptionalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printOptionalExpression(node: ast.OptionalExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("OptionalExpression", writer, indentation);
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
@@ -122,7 +122,7 @@ pub fn printOptionalExpression(node: ast.OptionalExpression, writer: anytype, in
     }
 }
 
-pub fn printLiteral(node: ast.Literal, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printLiteral(node: ast.Literal, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Literal", writer, indentation);
     switch (node) {
         .null => try print("null", writer, indentation + 1),
@@ -132,7 +132,7 @@ pub fn printLiteral(node: ast.Literal, writer: anytype, indentation: usize) @Typ
     }
 }
 
-pub fn printArrayLiteral(node: ast.ArrayLiteral, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printArrayLiteral(node: ast.ArrayLiteral, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ArrayLiteral", writer, indentation);
     for (node.element_list) |element| switch (element) {
         .elision => try print("<elision>", writer, indentation + 1),
@@ -144,19 +144,19 @@ pub fn printArrayLiteral(node: ast.ArrayLiteral, writer: anytype, indentation: u
     };
 }
 
-pub fn printObjectLiteral(node: ast.ObjectLiteral, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printObjectLiteral(node: ast.ObjectLiteral, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ObjectLiteral", writer, indentation);
     try printPropertyDefinitionList(node.property_definition_list, writer, indentation + 1);
 }
 
-pub fn printPropertyDefinitionList(node: ast.PropertyDefinitionList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printPropertyDefinitionList(node: ast.PropertyDefinitionList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'PropertyDefinitionList' here, it's implied and only adds nesting.
     for (node.items) |property_definition| {
         try printPropertyDefinition(property_definition, writer, indentation);
     }
 }
 
-pub fn printPropertyDefinition(node: ast.PropertyDefinition, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printPropertyDefinition(node: ast.PropertyDefinition, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
     switch (node) {
         .spread => |expression| {
@@ -178,7 +178,7 @@ pub fn printPropertyDefinition(node: ast.PropertyDefinition, writer: anytype, in
     }
 }
 
-pub fn printPropertyName(node: ast.PropertyName, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printPropertyName(node: ast.PropertyName, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("PropertyName", writer, indentation);
     switch (node) {
         .literal_property_name => |literal| switch (literal) {
@@ -190,7 +190,7 @@ pub fn printPropertyName(node: ast.PropertyName, writer: anytype, indentation: u
     }
 }
 
-pub fn printRegularExpressionLiteral(node: ast.RegularExpressionLiteral, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printRegularExpressionLiteral(node: ast.RegularExpressionLiteral, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("RegularExpressionLiteral", writer, indentation);
     try print("pattern:", writer, indentation + 1);
     try print(node.pattern, writer, indentation + 2);
@@ -198,7 +198,7 @@ pub fn printRegularExpressionLiteral(node: ast.RegularExpressionLiteral, writer:
     try print(node.flags, writer, indentation + 2);
 }
 
-pub fn printTemplateLiteral(node: ast.TemplateLiteral, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printTemplateLiteral(node: ast.TemplateLiteral, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("TemplateLiteral", writer, indentation);
     for (node.spans) |span| switch (span) {
         .expression => |expression| try printExpression(expression, writer, indentation + 1),
@@ -206,7 +206,7 @@ pub fn printTemplateLiteral(node: ast.TemplateLiteral, writer: anytype, indentat
     };
 }
 
-pub fn printUpdateExpression(node: ast.UpdateExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printUpdateExpression(node: ast.UpdateExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("UpdateExpression", writer, indentation);
     try print("type:", writer, indentation + 1);
     try print(@tagName(node.type), writer, indentation + 2);
@@ -216,7 +216,7 @@ pub fn printUpdateExpression(node: ast.UpdateExpression, writer: anytype, indent
     try printExpression(node.expression.*, writer, indentation + 2);
 }
 
-pub fn printUnaryExpression(node: ast.UnaryExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printUnaryExpression(node: ast.UnaryExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("UnaryExpression", writer, indentation);
     try print("operator:", writer, indentation + 1);
     try print(@tagName(node.operator), writer, indentation + 2);
@@ -224,14 +224,14 @@ pub fn printUnaryExpression(node: ast.UnaryExpression, writer: anytype, indentat
     try printExpression(node.expression.*, writer, indentation + 2);
 }
 
-pub fn printBinaryExpression(node: ast.BinaryExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBinaryExpression(node: ast.BinaryExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BinaryExpression", writer, indentation);
     try printExpression(node.lhs_expression.*, writer, indentation + 1);
     try print(@tagName(node.operator), writer, indentation + 1);
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }
 
-pub fn printRelationalExpression(node: ast.RelationalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printRelationalExpression(node: ast.RelationalExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("RelationalExpression", writer, indentation);
     switch (node.lhs) {
         .expression => |lhs_expression| try printExpression(lhs_expression.*, writer, indentation + 1),
@@ -241,21 +241,21 @@ pub fn printRelationalExpression(node: ast.RelationalExpression, writer: anytype
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }
 
-pub fn printEqualityExpression(node: ast.EqualityExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printEqualityExpression(node: ast.EqualityExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("EqualityExpression", writer, indentation);
     try printExpression(node.lhs_expression.*, writer, indentation + 1);
     try print(@tagName(node.operator), writer, indentation + 1);
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }
 
-pub fn printLogicalExpression(node: ast.LogicalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printLogicalExpression(node: ast.LogicalExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("LogicalExpression", writer, indentation);
     try printExpression(node.lhs_expression.*, writer, indentation + 1);
     try print(@tagName(node.operator), writer, indentation + 1);
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }
 
-pub fn printConditionalExpression(node: ast.ConditionalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printConditionalExpression(node: ast.ConditionalExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ConditionalExpression", writer, indentation);
     try print("test:", writer, indentation + 1);
     try printExpression(node.test_expression.*, writer, indentation + 2);
@@ -265,37 +265,37 @@ pub fn printConditionalExpression(node: ast.ConditionalExpression, writer: anyty
     try printExpression(node.alternate_expression.*, writer, indentation + 2);
 }
 
-pub fn printAssignmentExpression(node: ast.AssignmentExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAssignmentExpression(node: ast.AssignmentExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AssignmentExpression", writer, indentation);
     try printExpression(node.lhs_expression.*, writer, indentation + 1);
     try print(@tagName(node.operator), writer, indentation + 1);
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }
 
-pub fn printSequenceExpression(node: ast.SequenceExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printSequenceExpression(node: ast.SequenceExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("SequenceExpression", writer, indentation);
     for (node.expressions) |expression| {
         try printExpression(expression, writer, indentation + 1);
     }
 }
 
-pub fn printAwaitExpression(node: ast.AwaitExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAwaitExpression(node: ast.AwaitExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AwaitExpression", writer, indentation);
     try printExpression(node.expression.*, writer, indentation + 1);
 }
 
-pub fn printYieldExpression(node: ast.YieldExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printYieldExpression(node: ast.YieldExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("YieldExpression", writer, indentation);
     if (node.expression) |expression| try printExpression(expression.*, writer, indentation + 1);
 }
 
-pub fn printTaggedTemplate(node: ast.TaggedTemplate, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printTaggedTemplate(node: ast.TaggedTemplate, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("TaggedTemplate", writer, indentation);
     try printExpression(node.expression.*, writer, indentation + 1);
     try printTemplateLiteral(node.template_literal, writer, indentation + 1);
 }
 
-pub fn printExpression(node: ast.Expression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExpression(node: ast.Expression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Expression", writer, indentation);
     switch (node) {
         .primary_expression => |x| try printPrimaryExpression(x, writer, indentation + 1),
@@ -323,7 +323,7 @@ pub fn printExpression(node: ast.Expression, writer: anytype, indentation: usize
     }
 }
 
-pub fn printStatement(node: ast.Statement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printStatement(node: ast.Statement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Statement", writer, indentation);
     switch (node) {
         .block_statement => |x| try printBlockStatement(x, writer, indentation + 1),
@@ -343,7 +343,7 @@ pub fn printStatement(node: ast.Statement, writer: anytype, indentation: usize) 
     }
 }
 
-pub fn printDeclaration(node: ast.Declaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printDeclaration(node: ast.Declaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Declaration", writer, indentation);
     switch (node) {
         .hoistable_declaration => |x| try printHoistableDeclaration(x, writer, indentation + 1),
@@ -352,7 +352,7 @@ pub fn printDeclaration(node: ast.Declaration, writer: anytype, indentation: usi
     }
 }
 
-pub fn printHoistableDeclaration(node: ast.HoistableDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printHoistableDeclaration(node: ast.HoistableDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'HoistableDeclaration' here, it's implied and only adds nesting.
     switch (node) {
         .function_declaration => |x| try printFunctionDeclaration(x, writer, indentation + 1),
@@ -362,7 +362,7 @@ pub fn printHoistableDeclaration(node: ast.HoistableDeclaration, writer: anytype
     }
 }
 
-pub fn printBreakableStatement(node: ast.BreakableStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBreakableStatement(node: ast.BreakableStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'BreakableStatement' here, it's implied and only adds nesting.
     switch (node) {
         .iteration_statement => |x| try printIterationStatement(x, writer, indentation),
@@ -370,24 +370,24 @@ pub fn printBreakableStatement(node: ast.BreakableStatement, writer: anytype, in
     }
 }
 
-pub fn printBlockStatement(node: ast.BlockStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBlockStatement(node: ast.BlockStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'BlockStatement' here, it's implied and only adds nesting.
     try printBlock(node.block, writer, indentation);
 }
 
-pub fn printBlock(node: ast.Block, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBlock(node: ast.Block, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Block", writer, indentation);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
-pub fn printStatementList(node: ast.StatementList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printStatementList(node: ast.StatementList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'StatementList' here, it's implied and only adds nesting.
     for (node.items) |item| {
         try printStatementListItem(item, writer, indentation);
     }
 }
 
-pub fn printStatementListItem(node: ast.StatementListItem, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printStatementListItem(node: ast.StatementListItem, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
     switch (node) {
         .statement => |statement| try printStatement(statement.*, writer, indentation),
@@ -395,20 +395,20 @@ pub fn printStatementListItem(node: ast.StatementListItem, writer: anytype, inde
     }
 }
 
-pub fn printLexicalDeclaration(node: ast.LexicalDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printLexicalDeclaration(node: ast.LexicalDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("LexicalDeclaration", writer, indentation);
     try print(@tagName(node.type), writer, indentation + 1);
     try printBindingList(node.binding_list, writer, indentation + 1);
 }
 
-pub fn printBindingList(node: ast.BindingList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingList(node: ast.BindingList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'BindingList' here, it's implied and only adds nesting.
     for (node.items) |lexical_binding| {
         try printLexicalBinding(lexical_binding, writer, indentation);
     }
 }
 
-pub fn printLexicalBinding(node: ast.LexicalBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printLexicalBinding(node: ast.LexicalBinding, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("LexicalBinding", writer, indentation);
     switch (node) {
         .binding_identifier => |binding_identifier| {
@@ -422,19 +422,19 @@ pub fn printLexicalBinding(node: ast.LexicalBinding, writer: anytype, indentatio
     }
 }
 
-pub fn printVariableStatement(node: ast.VariableStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printVariableStatement(node: ast.VariableStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("VariableStatement", writer, indentation);
     try printVariableDeclarationList(node.variable_declaration_list, writer, indentation + 1);
 }
 
-pub fn printVariableDeclarationList(node: ast.VariableDeclarationList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printVariableDeclarationList(node: ast.VariableDeclarationList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'VariableDeclarationList' here, it's implied and only adds nesting.
     for (node.items) |variable_declaration| {
         try printVariableDeclaration(variable_declaration, writer, indentation);
     }
 }
 
-pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("VariableDeclaration", writer, indentation);
     switch (node) {
         .binding_identifier => |binding_identifier| {
@@ -448,7 +448,7 @@ pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: anytype, 
     }
 }
 
-pub fn printBindingPattern(node: ast.BindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingPattern(node: ast.BindingPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BindingPattern", writer, indentation);
     switch (node) {
         .object_binding_pattern => |object_binding_pattern| try printObjectBindingPattern(object_binding_pattern, writer, indentation + 1),
@@ -456,7 +456,7 @@ pub fn printBindingPattern(node: ast.BindingPattern, writer: anytype, indentatio
     }
 }
 
-pub fn printObjectBindingPattern(node: ast.ObjectBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printObjectBindingPattern(node: ast.ObjectBindingPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ObjectBindingPattern", writer, indentation);
     for (node.properties) |element| switch (element) {
         .binding_property => |binding_property| try printBindingProperty(binding_property, writer, indentation + 1),
@@ -464,7 +464,7 @@ pub fn printObjectBindingPattern(node: ast.ObjectBindingPattern, writer: anytype
     };
 }
 
-pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ArrayBindingPattern", writer, indentation);
     for (node.elements) |element| switch (element) {
         .elision => try print("<elision>", writer, indentation + 1),
@@ -473,12 +473,12 @@ pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: anytype, 
     };
 }
 
-pub fn printBindingRestProperty(node: ast.BindingRestProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingRestProperty(node: ast.BindingRestProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BindingRestProperty", writer, indentation);
     try print(node.binding_identifier, writer, indentation + 1);
 }
 
-pub fn printBindingProperty(node: ast.BindingProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingProperty(node: ast.BindingProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BindingProperty", writer, indentation);
     switch (node) {
         .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
@@ -489,7 +489,7 @@ pub fn printBindingProperty(node: ast.BindingProperty, writer: anytype, indentat
     }
 }
 
-pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingElement(node: ast.BindingElement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BindingElement", writer, indentation);
     switch (node) {
         .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
@@ -503,7 +503,7 @@ pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentatio
     }
 }
 
-pub fn printSingleNameBinding(node: ast.SingleNameBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printSingleNameBinding(node: ast.SingleNameBinding, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("SingleNameBinding", writer, indentation);
     try print(node.binding_identifier, writer, indentation + 1);
     if (node.initializer) |initializer| {
@@ -512,7 +512,7 @@ pub fn printSingleNameBinding(node: ast.SingleNameBinding, writer: anytype, inde
     }
 }
 
-pub fn printBindingRestElement(node: ast.BindingRestElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBindingRestElement(node: ast.BindingRestElement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BindingRestElement", writer, indentation);
     switch (node) {
         .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
@@ -520,12 +520,12 @@ pub fn printBindingRestElement(node: ast.BindingRestElement, writer: anytype, in
     }
 }
 
-pub fn printExpressionStatement(node: ast.ExpressionStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExpressionStatement(node: ast.ExpressionStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ExpressionStatement' here, it's implied and only adds nesting.
     try printExpression(node.expression, writer, indentation);
 }
 
-pub fn printIfStatement(node: ast.IfStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printIfStatement(node: ast.IfStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("IfStatement", writer, indentation);
     try print("test:", writer, indentation + 1);
     try printExpression(node.test_expression, writer, indentation + 2);
@@ -537,7 +537,7 @@ pub fn printIfStatement(node: ast.IfStatement, writer: anytype, indentation: usi
     }
 }
 
-pub fn printIterationStatement(node: ast.IterationStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printIterationStatement(node: ast.IterationStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
     switch (node) {
         .do_while_statement => |x| try printDoWhileStatement(x, writer, indentation),
@@ -547,7 +547,7 @@ pub fn printIterationStatement(node: ast.IterationStatement, writer: anytype, in
     }
 }
 
-pub fn printDoWhileStatement(node: ast.DoWhileStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printDoWhileStatement(node: ast.DoWhileStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("DoWhileStatement", writer, indentation);
     try print("consequent:", writer, indentation + 1);
     try printStatement(node.consequent_statement.*, writer, indentation + 2);
@@ -555,7 +555,7 @@ pub fn printDoWhileStatement(node: ast.DoWhileStatement, writer: anytype, indent
     try printExpression(node.test_expression, writer, indentation + 2);
 }
 
-pub fn printWhileStatement(node: ast.WhileStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printWhileStatement(node: ast.WhileStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("WhileStatement", writer, indentation);
     try print("test:", writer, indentation + 1);
     try printExpression(node.test_expression, writer, indentation + 2);
@@ -563,7 +563,7 @@ pub fn printWhileStatement(node: ast.WhileStatement, writer: anytype, indentatio
     try printStatement(node.consequent_statement.*, writer, indentation + 2);
 }
 
-pub fn printForStatement(node: ast.ForStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printForStatement(node: ast.ForStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ForStatement", writer, indentation);
     if (node.initializer) |initializer| {
         try print("initializer:", writer, indentation + 1);
@@ -585,7 +585,7 @@ pub fn printForStatement(node: ast.ForStatement, writer: anytype, indentation: u
     try printStatement(node.consequent_statement.*, writer, indentation + 2);
 }
 
-pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ForInOfStatement", writer, indentation);
     switch (node.initializer) {
         .expression => |expression| try printExpression(expression, writer, indentation + 1),
@@ -600,13 +600,13 @@ pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: anytype, indent
     try printStatement(node.consequent_statement.*, writer, indentation + 1);
 }
 
-pub fn printForDeclaration(node: ast.ForDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printForDeclaration(node: ast.ForDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ForDeclaration", writer, indentation);
     try print(@tagName(node.type), writer, indentation + 1);
     try printForBinding(node.for_binding, writer, indentation + 1);
 }
 
-pub fn printForBinding(node: ast.ForBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printForBinding(node: ast.ForBinding, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ForBinding' here, it's implied and only adds nesting.
     switch (node) {
         .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
@@ -614,34 +614,34 @@ pub fn printForBinding(node: ast.ForBinding, writer: anytype, indentation: usize
     }
 }
 
-pub fn printContinueStatement(node: ast.ContinueStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printContinueStatement(node: ast.ContinueStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ContinueStatement", writer, indentation);
     if (node.label) |label| try print(label, writer, indentation + 1);
 }
 
-pub fn printBreakStatement(node: ast.BreakStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printBreakStatement(node: ast.BreakStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("BreakStatement", writer, indentation);
     if (node.label) |label| try print(label, writer, indentation + 1);
 }
 
-pub fn printReturnStatement(node: ast.ReturnStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printReturnStatement(node: ast.ReturnStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ReturnStatement", writer, indentation);
     if (node.expression) |expression| try printExpression(expression, writer, indentation + 1);
 }
 
-pub fn printWithStatement(node: ast.WithStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printWithStatement(node: ast.WithStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("WithStatement", writer, indentation);
     try printExpression(node.expression, writer, indentation + 1);
     try printStatement(node.statement.*, writer, indentation + 1);
 }
 
-pub fn printSwitchStatement(node: ast.SwitchStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printSwitchStatement(node: ast.SwitchStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("SwitchStatement", writer, indentation);
     try printExpression(node.expression, writer, indentation + 1);
     try printCaseBlock(node.case_block, writer, indentation + 1);
 }
 
-pub fn printCaseBlock(node: ast.CaseBlock, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printCaseBlock(node: ast.CaseBlock, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'CaseBlock' here, it's implied and only adds nesting.
     for (node.items) |item| switch (item) {
         .case_clause => |case_clause| try printCaseClause(case_clause, writer, indentation),
@@ -649,18 +649,18 @@ pub fn printCaseBlock(node: ast.CaseBlock, writer: anytype, indentation: usize) 
     };
 }
 
-pub fn printCaseClause(node: ast.CaseClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printCaseClause(node: ast.CaseClause, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("CaseClause", writer, indentation);
     try printExpression(node.expression, writer, indentation + 1);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
-pub fn printDefaultClause(node: ast.DefaultClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printDefaultClause(node: ast.DefaultClause, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("DefaultClause", writer, indentation);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
-pub fn printLabelledStatement(node: ast.LabelledStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printLabelledStatement(node: ast.LabelledStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("LabelledStatement", writer, indentation);
     try print(node.label_identifier, writer, indentation + 1);
     switch (node.labelled_item) {
@@ -669,12 +669,12 @@ pub fn printLabelledStatement(node: ast.LabelledStatement, writer: anytype, inde
     }
 }
 
-pub fn printThrowStatement(node: ast.ThrowStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printThrowStatement(node: ast.ThrowStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ThrowStatement", writer, indentation);
     try printExpression(node.expression, writer, indentation + 1);
 }
 
-pub fn printTryStatement(node: ast.TryStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printTryStatement(node: ast.TryStatement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("TryStatement", writer, indentation);
     try print("try:", writer, indentation + 1);
     try printBlock(node.try_block, writer, indentation + 2);
@@ -691,7 +691,7 @@ pub fn printTryStatement(node: ast.TryStatement, writer: anytype, indentation: u
     }
 }
 
-pub fn printCatchParameter(node: ast.CatchParameter, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printCatchParameter(node: ast.CatchParameter, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("CatchParameter", writer, indentation);
     switch (node) {
         .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
@@ -699,7 +699,7 @@ pub fn printCatchParameter(node: ast.CatchParameter, writer: anytype, indentatio
     }
 }
 
-pub fn printFormalParameters(node: ast.FormalParameters, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFormalParameters(node: ast.FormalParameters, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'FormalParameters' here, it's implied and only adds nesting.
     for (node.items) |item| {
         switch (item) {
@@ -709,17 +709,17 @@ pub fn printFormalParameters(node: ast.FormalParameters, writer: anytype, indent
     }
 }
 
-pub fn printFunctionRestParameter(node: ast.FunctionRestParameter, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFunctionRestParameter(node: ast.FunctionRestParameter, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("FunctionRestParameter", writer, indentation);
     try printBindingRestElement(node.binding_rest_element, writer, indentation + 1);
 }
 
-pub fn printFormalParameter(node: ast.FormalParameter, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFormalParameter(node: ast.FormalParameter, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("FormalParameter", writer, indentation);
     try printBindingElement(node.binding_element, writer, indentation + 1);
 }
 
-pub fn printFunctionDeclaration(node: ast.FunctionDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFunctionDeclaration(node: ast.FunctionDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("FunctionDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -729,7 +729,7 @@ pub fn printFunctionDeclaration(node: ast.FunctionDeclaration, writer: anytype, 
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printFunctionExpression(node: ast.FunctionExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFunctionExpression(node: ast.FunctionExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("FunctionExpression", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -739,12 +739,12 @@ pub fn printFunctionExpression(node: ast.FunctionExpression, writer: anytype, in
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printFunctionBody(node: ast.FunctionBody, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFunctionBody(node: ast.FunctionBody, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'FunctionBody' here, it's implied and only adds nesting.
     try printStatementList(node.statement_list, writer, indentation);
 }
 
-pub fn printArrowFunction(node: ast.ArrowFunction, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printArrowFunction(node: ast.ArrowFunction, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ArrowFunction", writer, indentation);
     try print("formal_parameters:", writer, indentation + 1);
     try printFormalParameters(node.formal_parameters, writer, indentation + 2);
@@ -752,7 +752,7 @@ pub fn printArrowFunction(node: ast.ArrowFunction, writer: anytype, indentation:
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printMethodDefinition(node: ast.MethodDefinition, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printMethodDefinition(node: ast.MethodDefinition, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("MethodDefinition", writer, indentation);
     try print("type:", writer, indentation + 1);
     try print(@tagName(std.meta.activeTag(node.method)), writer, indentation + 2);
@@ -760,12 +760,12 @@ pub fn printMethodDefinition(node: ast.MethodDefinition, writer: anytype, indent
     switch (node.method) {
         .method, .get, .set => |x| try printFunctionExpression(x, writer, indentation + 1),
         .generator => |x| try printGeneratorExpression(x, writer, indentation + 1),
-        .@"async" => |x| try printAsyncFunctionExpression(x, writer, indentation + 1),
+        .async => |x| try printAsyncFunctionExpression(x, writer, indentation + 1),
         .async_generator => |x| try printAsyncGeneratorExpression(x, writer, indentation + 1),
     }
 }
 
-pub fn printGeneratorDeclaration(node: ast.GeneratorDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printGeneratorDeclaration(node: ast.GeneratorDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("GeneratorDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -775,7 +775,7 @@ pub fn printGeneratorDeclaration(node: ast.GeneratorDeclaration, writer: anytype
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printGeneratorExpression(node: ast.GeneratorExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printGeneratorExpression(node: ast.GeneratorExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("GeneratorExpression", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -785,7 +785,7 @@ pub fn printGeneratorExpression(node: ast.GeneratorExpression, writer: anytype, 
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printAsyncGeneratorDeclaration(node: ast.AsyncGeneratorDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAsyncGeneratorDeclaration(node: ast.AsyncGeneratorDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AsyncGeneratorDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -795,7 +795,7 @@ pub fn printAsyncGeneratorDeclaration(node: ast.AsyncGeneratorDeclaration, write
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printAsyncGeneratorExpression(node: ast.AsyncGeneratorExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAsyncGeneratorExpression(node: ast.AsyncGeneratorExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AsyncGeneratorExpression", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -805,21 +805,21 @@ pub fn printAsyncGeneratorExpression(node: ast.AsyncGeneratorExpression, writer:
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printClassDeclaration(node: ast.ClassDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassDeclaration(node: ast.ClassDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ClassDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
     try printClassTail(node.class_tail, writer, indentation + 1);
 }
 
-pub fn printClassExpression(node: ast.ClassExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassExpression(node: ast.ClassExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ClassExpression", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
     try printClassTail(node.class_tail, writer, indentation + 1);
 }
 
-pub fn printClassTail(node: ast.ClassTail, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassTail(node: ast.ClassTail, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ClassTail' here, it's implied and only adds nesting.
     if (node.class_heritage) |class_heritage| {
         try print("extends:", writer, indentation);
@@ -828,19 +828,19 @@ pub fn printClassTail(node: ast.ClassTail, writer: anytype, indentation: usize) 
     try printClassBody(node.class_body, writer, indentation);
 }
 
-pub fn printClassBody(node: ast.ClassBody, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassBody(node: ast.ClassBody, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ClassBody' here, it's implied and only adds nesting.
     try printClassElementList(node.class_element_list, writer, indentation);
 }
 
-pub fn printClassElementList(node: ast.ClassElementList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassElementList(node: ast.ClassElementList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ClassElementList' here, it's implied and only adds nesting.
     for (node.items) |item| {
         try printClassElement(item, writer, indentation);
     }
 }
 
-pub fn printClassElement(node: ast.ClassElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassElement(node: ast.ClassElement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ClassElement' here, it's implied and only adds nesting.
     switch (node) {
         .empty_statement => try print("empty", writer, indentation),
@@ -852,25 +852,25 @@ pub fn printClassElement(node: ast.ClassElement, writer: anytype, indentation: u
     }
 }
 
-pub fn printFieldDefinition(node: ast.FieldDefinition, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printFieldDefinition(node: ast.FieldDefinition, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("FieldDefinition", writer, indentation);
     try printClassElementName(node.class_element_name, writer, indentation + 1);
     if (node.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
 }
 
-pub fn printClassElementName(node: ast.ClassElementName, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassElementName(node: ast.ClassElementName, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     switch (node) {
         .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 1),
         .property_name => |property_name| try printPropertyName(property_name, writer, indentation),
     }
 }
 
-pub fn printClassStaticBlock(node: ast.ClassStaticBlock, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printClassStaticBlock(node: ast.ClassStaticBlock, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ClassStaticBlock", writer, indentation);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
-pub fn printAsyncFunctionDeclaration(node: ast.AsyncFunctionDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAsyncFunctionDeclaration(node: ast.AsyncFunctionDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AsyncFunctionDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -880,7 +880,7 @@ pub fn printAsyncFunctionDeclaration(node: ast.AsyncFunctionDeclaration, writer:
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printAsyncFunctionExpression(node: ast.AsyncFunctionExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAsyncFunctionExpression(node: ast.AsyncFunctionExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AsyncFunctionExpression", writer, indentation);
     try print("identifier:", writer, indentation + 1);
     if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
@@ -890,7 +890,7 @@ pub fn printAsyncFunctionExpression(node: ast.AsyncFunctionExpression, writer: a
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printAsyncArrowFunction(node: ast.AsyncArrowFunction, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printAsyncArrowFunction(node: ast.AsyncArrowFunction, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("AsyncArrowFunction", writer, indentation);
     try print("formal_parameters:", writer, indentation + 1);
     try printFormalParameters(node.formal_parameters, writer, indentation + 2);
@@ -898,26 +898,26 @@ pub fn printAsyncArrowFunction(node: ast.AsyncArrowFunction, writer: anytype, in
     try printFunctionBody(node.function_body, writer, indentation + 2);
 }
 
-pub fn printScript(node: ast.Script, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printScript(node: ast.Script, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Script", writer, indentation);
     try print("strict:", writer, indentation + 1);
     try print(if (node.scriptIsStrict()) "true" else "false", writer, indentation + 2);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
-pub fn printModule(node: ast.Module, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printModule(node: ast.Module, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("Module", writer, indentation);
     try printModuleItemList(node.module_item_list, writer, indentation + 1);
 }
 
-pub fn printModuleItemList(node: ast.ModuleItemList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printModuleItemList(node: ast.ModuleItemList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ModuleItemList' here, it's implied and only adds nesting.
     for (node.items) |item| {
         try printModuleItem(item, writer, indentation);
     }
 }
 
-pub fn printModuleItem(node: ast.ModuleItem, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printModuleItem(node: ast.ModuleItem, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
     switch (node) {
         .import_declaration => |x| try printImportDeclaration(x, writer, indentation),
@@ -926,7 +926,7 @@ pub fn printModuleItem(node: ast.ModuleItem, writer: anytype, indentation: usize
     }
 }
 
-pub fn printModuleExportName(node: ast.ModuleExportName, writer: anytype) @TypeOf(writer).Error!void {
+pub fn printModuleExportName(node: ast.ModuleExportName, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     // NOTE: These are always printed inline, so no newline or indentation are added.
     switch (node) {
         .identifier => |identifier| try writer.writeAll(identifier),
@@ -934,14 +934,14 @@ pub fn printModuleExportName(node: ast.ModuleExportName, writer: anytype) @TypeO
     }
 }
 
-pub fn printImportDeclaration(node: ast.ImportDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printImportDeclaration(node: ast.ImportDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ImportDeclaration", writer, indentation);
     if (node.import_clause) |import_clause| try printImportClause(import_clause, writer, indentation + 1);
     try print(node.module_specifier.text, writer, indentation + 1);
     if (node.with_clause) |with_clause| try printWithClause(with_clause, writer, indentation + 1);
 }
 
-pub fn printImportClause(node: ast.ImportClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printImportClause(node: ast.ImportClause, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ImportClause", writer, indentation);
     switch (node) {
         .imported_default_binding => |imported_default_binding| {
@@ -966,7 +966,7 @@ pub fn printImportClause(node: ast.ImportClause, writer: anytype, indentation: u
     }
 }
 
-pub fn printImportsList(node: ast.ImportsList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printImportsList(node: ast.ImportsList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ImportsList", writer, indentation);
     for (node.items) |import_specifier| {
         if (import_specifier.module_export_name) |module_export_name| {
@@ -980,7 +980,7 @@ pub fn printImportsList(node: ast.ImportsList, writer: anytype, indentation: usi
     }
 }
 
-pub fn printWithClause(node: ast.WithClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printWithClause(node: ast.WithClause, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("WithClause", writer, indentation);
     for (node.items) |item| {
         const key = switch (item.key) {
@@ -992,7 +992,7 @@ pub fn printWithClause(node: ast.WithClause, writer: anytype, indentation: usize
     }
 }
 
-pub fn printExportDeclaration(node: ast.ExportDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExportDeclaration(node: ast.ExportDeclaration, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("ExportDeclaration", writer, indentation);
     switch (node) {
         .default_hoistable_declaration,
@@ -1017,7 +1017,7 @@ pub fn printExportDeclaration(node: ast.ExportDeclaration, writer: anytype, inde
     }
 }
 
-pub fn printExportFromClause(node: ast.ExportFromClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExportFromClause(node: ast.ExportFromClause, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ExportFromClause' here, it's implied and only adds nesting.
     switch (node) {
         .star => try print("*", writer, indentation),
@@ -1031,19 +1031,19 @@ pub fn printExportFromClause(node: ast.ExportFromClause, writer: anytype, indent
     }
 }
 
-pub fn printNamedExports(node: ast.NamedExports, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printNamedExports(node: ast.NamedExports, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     try print("NamedExports", writer, indentation);
     try printExportsList(node.exports_list, writer, indentation + 1);
 }
 
-pub fn printExportsList(node: ast.ExportsList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExportsList(node: ast.ExportsList, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ExportsList' here, it's implied and only adds nesting.
     for (node.items) |item| {
         try printExportSpecifier(item, writer, indentation);
     }
 }
 
-pub fn printExportSpecifier(node: ast.ExportSpecifier, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+pub fn printExportSpecifier(node: ast.ExportSpecifier, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
     // Omit printing 'ExportSpecifier' here, it's implied and only adds nesting.
     try printIndentation(writer, indentation);
     try printModuleExportName(node.name, writer);

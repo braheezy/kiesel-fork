@@ -350,7 +350,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
     var iterator = try getIterator(agent, iterable, .sync);
 
     // 3. Let list be a new empty List.
-    var list: std.ArrayListUnmanaged([]const u8) = .empty;
+    var list: std.ArrayList([]const u8) = .empty;
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).

@@ -818,7 +818,7 @@ pub fn ordinaryOwnPropertyKeys(
     object: *Object,
 ) std.mem.Allocator.Error![]PropertyKey {
     // 1. Let keys be a new empty List.
-    var keys = try std.ArrayListUnmanaged(PropertyKey).initCapacity(
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
         allocator,
         object.property_storage.count(),
     );

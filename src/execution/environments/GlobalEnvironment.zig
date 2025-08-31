@@ -52,7 +52,11 @@ pub fn createMutableBinding(
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
-        return agent.throwException(.type_error, "Binding for '{}' already exists", .{name});
+        return agent.throwException(
+            .type_error,
+            "Binding for '{f}' already exists",
+            .{name.fmtUnquoted()},
+        );
     }
 
     // 3. Return ! DclRec.CreateMutableBinding(N, D).
@@ -70,7 +74,11 @@ pub fn createImmutableBinding(
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
-        return agent.throwException(.type_error, "Binding for '{}' already exists", .{name});
+        return agent.throwException(
+            .type_error,
+            "Binding for '{f}' already exists",
+            .{name.fmtUnquoted()},
+        );
     }
 
     // 3. Return ! DclRec.CreateImmutableBinding(N, S).

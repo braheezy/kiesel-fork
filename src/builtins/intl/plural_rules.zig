@@ -227,7 +227,7 @@ pub const prototype = struct {
             );
             defer plural_rules_.deinit();
             const plural_categories = plural_rules_.categories();
-            var array_list: std.ArrayListUnmanaged(Value) = .empty;
+            var array_list: std.ArrayList(Value) = .empty;
             if (plural_categories.zero) try array_list.append(agent.gc_allocator, Value.from("zero"));
             if (plural_categories.one) try array_list.append(agent.gc_allocator, Value.from("one"));
             if (plural_categories.two) try array_list.append(agent.gc_allocator, Value.from("two"));

@@ -117,7 +117,7 @@ pub const RelativeTo = union(enum) {
 
 pub const DiplomatWrite = struct {
     gpa: std.mem.Allocator,
-    array_list: std.ArrayListUnmanaged(u8),
+    array_list: std.ArrayList(u8),
     inner: c.DiplomatWrite,
 
     pub fn init(gpa: std.mem.Allocator) DiplomatWrite {

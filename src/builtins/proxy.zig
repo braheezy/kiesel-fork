@@ -54,7 +54,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     if (!handler_prototype.isObject() and !handler_prototype.isNull()) {
         return agent.throwException(
             .type_error,
-            "{} is not an Object or null",
+            "{f} is not an Object or null",
             .{handler_prototype},
         );
     }
@@ -847,11 +847,11 @@ fn ownPropertyKeys(
     defer agent.gc_allocator.free(target_keys);
 
     // 14. Let targetConfigurableKeys be a new empty List.
-    var target_configurable_keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
+    var target_configurable_keys: std.ArrayList(PropertyKey) = .empty;
     defer target_configurable_keys.deinit(agent.gc_allocator);
 
     // 15. Let targetNonconfigurableKeys be a new empty List.
-    var target_nonconfigurable_keys: std.ArrayListUnmanaged(PropertyKey) = .empty;
+    var target_nonconfigurable_keys: std.ArrayList(PropertyKey) = .empty;
     defer target_nonconfigurable_keys.deinit(agent.gc_allocator);
 
     // 16. For each element key of targetKeys, do
@@ -1036,12 +1036,12 @@ pub fn validateNonRevokedProxy(agent: *Agent, proxy: *Proxy) error{ExceptionThro
 fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Object {
     // 1. If target is not an Object, throw a TypeError exception.
     if (!target.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{target});
+        return agent.throwException(.type_error, "{f} is not an Object", .{target});
     }
 
     // 2. If handler is not an Object, throw a TypeError exception.
     if (!handler.isObject()) {
-        return agent.throwException(.type_error, "{} is not an Object", .{handler});
+        return agent.throwException(.type_error, "{f} is not an Object", .{handler});
     }
 
     // 3. Let P be MakeBasicObject(« [[ProxyHandler]], [[ProxyTarget]] »).

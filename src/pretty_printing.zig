@@ -1,4 +1,3 @@
-const builtin = @import("builtin");
 const std = @import("std");
 
 const temporal_rs = @import("c/temporal_rs.zig");
@@ -24,7 +23,7 @@ const weakRefDeref = builtins.weakRefDeref;
 const State = struct {
     seen_objects: std.AutoHashMapUnmanaged(*const Object, usize),
     print_in_progress: bool,
-    tty_config: std.io.tty.Config,
+    tty_config: std.Io.tty.Config,
 };
 
 var fba_buf: [64 * 1024]u8 = undefined;
@@ -43,17 +42,12 @@ fn asciiString(ascii: []const u8) *const String {
     return string;
 }
 
-fn PrettyPrintError(comptime Writer: type) type {
-    return Writer.Error || if (builtin.os.tag == .windows)
-        std.os.windows.SetConsoleTextAttributeError
-    else
-        error{};
-}
+const PrettyPrintError = std.Io.Writer.Error || std.Io.tty.Config.SetColorError;
 
 fn prettyPrintArray(
     array: *const builtins.Array,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const length = getArrayLength(&array.object);
     const tty_config = state.tty_config;
 
@@ -65,7 +59,7 @@ fn prettyPrintArray(
         if (array.object.property_storage.indexed_properties.get(@intCast(i))) |property_descriptor| {
             switch (property_descriptor.value_or_accessor) {
                 .value => |value| {
-                    try writer.print("{pretty}", .{value});
+                    try writer.print("{f}", .{value.fmtPretty()});
                 },
                 .accessor => {
                     try tty_config.setColor(writer, .dim);
@@ -88,17 +82,17 @@ fn prettyPrintArray(
 
 fn prettyPrintArrayBuffer(
     array_buffer: *const builtins.ArrayBuffer,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("ArrayBuffer(");
     try tty_config.setColor(writer, .reset);
     if (array_buffer.fields.array_buffer_data) |data| {
-        try writer.print("byteLength: {pretty}", .{Value.from(@as(u53, @intCast(data.items.len)))});
+        try writer.print("byteLength: {f}", .{Value.from(@as(u53, @intCast(data.items.len))).fmtPretty()});
         if (array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
-            try writer.print(", maxByteLength: {pretty}", .{Value.from(max_byte_length)});
+            try writer.print(", maxByteLength: {f}", .{Value.from(max_byte_length).fmtPretty()});
         }
         if (data.items.len != 0) {
             try writer.writeAll(", data: ");
@@ -126,8 +120,8 @@ fn prettyPrintArrayBuffer(
 
 fn prettyPrintArrayIterator(
     array_iterator: *const builtins.ArrayIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -135,7 +129,7 @@ fn prettyPrintArrayIterator(
     try tty_config.setColor(writer, .reset);
     switch (array_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.iterated_array_like)});
+            try writer.print("{f}", .{Value.from(state_.iterated_array_like).fmtPretty()});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -150,8 +144,8 @@ fn prettyPrintArrayIterator(
 
 fn prettyPrintAsyncGenerator(
     async_generator: *const builtins.AsyncGenerator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -196,8 +190,8 @@ fn prettyPrintAsyncGenerator(
 
 fn prettyPrintDataView(
     date: *const builtins.DataView,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const viewed_array_buffer = date.fields.viewed_array_buffer;
     const byte_length = date.fields.byte_length;
     const byte_offset = date.fields.byte_offset;
@@ -206,12 +200,12 @@ fn prettyPrintDataView(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("DataView(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("arrayBuffer: {pretty}", .{Value.from(viewed_array_buffer.object())});
+    try writer.print("arrayBuffer: {f}", .{Value.from(viewed_array_buffer.object()).fmtPretty()});
     if (byte_length != .auto) {
-        try writer.print(", byteLength: {pretty}", .{Value.from(@intFromEnum(byte_length))});
+        try writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty()});
     }
     if (byte_offset != 0) {
-        try writer.print(", byteOffset: {pretty}", .{Value.from(byte_offset)});
+        try writer.print(", byteOffset: {f}", .{Value.from(byte_offset).fmtPretty()});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -220,20 +214,20 @@ fn prettyPrintDataView(
 
 fn prettyPrintDate(
     date: *const builtins.Date,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const date_value = date.fields.date_value;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Date(");
     if (!std.math.isNan(date_value)) {
-        try writer.print("{pretty}", .{
+        try writer.print("{f}", .{
             Value.from(asciiString(std.fmt.allocPrint(
                 arena.allocator(),
-                "{}",
+                "{f}",
                 .{fmtToDateString(date_value)},
-            ) catch return)),
+            ) catch return)).fmtPretty(),
         });
     } else {
         try tty_config.setColor(writer, .dim);
@@ -247,24 +241,23 @@ fn prettyPrintDate(
 
 fn prettyPrintError(
     @"error": *const builtins.Error,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const error_data = @"error".fields.error_data;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .red);
-    if (error_data.message.isEmpty()) {
-        try writer.print("{}", .{error_data.name});
-    } else {
-        try writer.print("{}: {}", .{ error_data.name, error_data.message });
+    try writer.print("{f}", .{error_data.name.fmtUnquoted()});
+    if (!error_data.message.isEmpty()) {
+        try writer.print(": {f}", .{error_data.message.fmtUnquoted()});
     }
     try tty_config.setColor(writer, .reset);
 }
 
 fn prettyPrintFinalizationRegistry(
     _: *const builtins.FinalizationRegistry,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -274,8 +267,8 @@ fn prettyPrintFinalizationRegistry(
 
 fn prettyPrintGenerator(
     generator: *const builtins.Generator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -314,8 +307,8 @@ fn prettyPrintGenerator(
 
 fn prettyPrintIterator(
     _: *const builtins.Iterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -325,8 +318,8 @@ fn prettyPrintIterator(
 
 fn prettyPrintIteratorHelper(
     iterator_helper: *const builtins.IteratorHelper,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -334,7 +327,7 @@ fn prettyPrintIteratorHelper(
     try tty_config.setColor(writer, .reset);
     switch (iterator_helper.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.underlying_iterator.iterator)});
+            try writer.print("{f}", .{Value.from(state_.underlying_iterator.iterator).fmtPretty()});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -349,8 +342,8 @@ fn prettyPrintIteratorHelper(
 
 fn prettyPrintMap(
     map: *const builtins.Map,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const map_data = map.fields.map_data;
     const tty_config = state.tty_config;
 
@@ -359,7 +352,7 @@ fn prettyPrintMap(
     try tty_config.setColor(writer, .reset);
     var it = map_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{pretty} → {pretty}", .{ entry.key_ptr.*, entry.value_ptr.* });
+        try writer.print("{f} → {f}", .{ entry.key_ptr.fmtPretty(), entry.value_ptr.fmtPretty() });
         if (it.index < map_data.count()) {
             try writer.writeAll(", ");
         }
@@ -371,8 +364,8 @@ fn prettyPrintMap(
 
 fn prettyPrintMapIterator(
     map_iterator: *const builtins.MapIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -380,7 +373,7 @@ fn prettyPrintMapIterator(
     try tty_config.setColor(writer, .reset);
     switch (map_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(&state_.map.object)});
+            try writer.print("{f}", .{Value.from(&state_.map.object).fmtPretty()});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -395,8 +388,8 @@ fn prettyPrintMapIterator(
 
 fn prettyPrintPromise(
     promise: *const builtins.Promise,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const promise_state = promise.fields.promise_state;
     const tty_config = state.tty_config;
 
@@ -415,14 +408,14 @@ fn prettyPrintPromise(
             try tty_config.setColor(writer, .green);
             try writer.writeAll("<fulfilled>");
             try tty_config.setColor(writer, .reset);
-            try writer.print(", result: {pretty}", .{promise.fields.promise_result});
+            try writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
         },
         .rejected => {
             try writer.writeAll("state: ");
             try tty_config.setColor(writer, .red);
             try writer.writeAll("<rejected>");
             try tty_config.setColor(writer, .reset);
-            try writer.print(", result: {pretty}", .{promise.fields.promise_result});
+            try writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
         },
     }
     try tty_config.setColor(writer, .white);
@@ -432,8 +425,8 @@ fn prettyPrintPromise(
 
 fn prettyPrintProxy(
     proxy: *const builtins.Proxy,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const proxy_target = proxy.fields.proxy_target;
     const proxy_handler = proxy.fields.proxy_handler;
     const tty_config = state.tty_config;
@@ -442,10 +435,10 @@ fn prettyPrintProxy(
     try writer.writeAll("Proxy(");
     try tty_config.setColor(writer, .reset);
     if (proxy_target != null and proxy_handler != null) {
-        try writer.print(
-            "target: {pretty}, handler: {pretty}",
-            .{ Value.from(proxy_target.?), Value.from(proxy_handler.?) },
-        );
+        try writer.print("target: {f}, handler: {f}", .{
+            Value.from(proxy_target.?).fmtPretty(),
+            Value.from(proxy_handler.?).fmtPretty(),
+        });
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<revoked>");
@@ -458,8 +451,8 @@ fn prettyPrintProxy(
 
 fn prettyPrintRegExp(
     reg_exp: *const builtins.RegExp,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const original_source = reg_exp.fields.original_source;
     const original_flags = reg_exp.fields.original_flags;
     const tty_config = state.tty_config;
@@ -467,7 +460,7 @@ fn prettyPrintRegExp(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("RegExp(");
     try tty_config.setColor(writer, .green);
-    try writer.print("/{s}/{s}", .{ original_source, original_flags });
+    try writer.print("/{f}/{f}", .{ original_source.fmtUnquoted(), original_flags.fmtUnquoted() });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -475,8 +468,8 @@ fn prettyPrintRegExp(
 
 fn prettyPrintRegExpStringIterator(
     reg_exp_string_iterator: *const builtins.RegExpStringIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -484,9 +477,9 @@ fn prettyPrintRegExpStringIterator(
     try tty_config.setColor(writer, .reset);
     switch (reg_exp_string_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}, {pretty}", .{
-                Value.from(state_.iterating_reg_exp),
-                Value.from(state_.iterated_string),
+            try writer.print("{f}, {f}", .{
+                Value.from(state_.iterating_reg_exp).fmtPretty(),
+                Value.from(state_.iterated_string).fmtPretty(),
             });
         },
         .completed => {
@@ -502,8 +495,8 @@ fn prettyPrintRegExpStringIterator(
 
 fn prettyPrintSet(
     set: *const builtins.Set,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const set_data = set.fields.set_data;
     const tty_config = state.tty_config;
 
@@ -512,7 +505,7 @@ fn prettyPrintSet(
     try tty_config.setColor(writer, .reset);
     var it = set_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{pretty}", .{entry.key_ptr.*});
+        try writer.print("{f}", .{entry.key_ptr.fmtPretty()});
         if (it.index < set_data.count()) {
             try writer.writeAll(", ");
         }
@@ -524,8 +517,8 @@ fn prettyPrintSet(
 
 fn prettyPrintSetIterator(
     set_iterator: *const builtins.SetIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -533,7 +526,7 @@ fn prettyPrintSetIterator(
     try tty_config.setColor(writer, .reset);
     switch (set_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(&state_.set.object)});
+            try writer.print("{f}", .{Value.from(&state_.set.object).fmtPretty()});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -548,17 +541,17 @@ fn prettyPrintSetIterator(
 
 fn prettyPrintSharedArrayBuffer(
     shared_array_buffer: *const builtins.SharedArrayBuffer,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("SharedArrayBuffer(");
     try tty_config.setColor(writer, .reset);
     const data = shared_array_buffer.fields.array_buffer_data;
-    try writer.print("byteLength: {pretty}", .{Value.from(@as(u53, @intCast(data.items.len)))});
+    try writer.print("byteLength: {f}", .{Value.from(@as(u53, @intCast(data.items.len))).fmtPretty()});
     if (shared_array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
-        try writer.print(", maxByteLength: {pretty}", .{Value.from(max_byte_length)});
+        try writer.print(", maxByteLength: {f}", .{Value.from(max_byte_length).fmtPretty()});
     }
     if (data.items.len != 0) {
         try writer.writeAll(", data: ");
@@ -581,8 +574,8 @@ fn prettyPrintSharedArrayBuffer(
 
 fn prettyPrintStringIterator(
     string_iterator: *const builtins.StringIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -590,7 +583,7 @@ fn prettyPrintStringIterator(
     try tty_config.setColor(writer, .reset);
     switch (string_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.string)});
+            try writer.print("{f}", .{Value.from(state_.string).fmtPretty()});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -603,7 +596,7 @@ fn prettyPrintStringIterator(
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
+fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.Io.Writer) !void {
     const element_type = typed_array.fields.element_type;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
     const tty_config = state.tty_config;
@@ -615,7 +608,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
         const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
-        try writer.print("length: {pretty}", .{Value.from(array_length)});
+        try writer.print("length: {f}", .{Value.from(array_length).fmtPretty()});
         if (data.items.len != 0) {
             try writer.writeAll(", data: ");
             try tty_config.setColor(writer, .white);
@@ -636,7 +629,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                         else
                             Value.from(value);
                         if (i != 0) try writer.writeAll(", ");
-                        try writer.print("{pretty}", .{numeric});
+                        try writer.print("{f}", .{numeric.fmtPretty()});
                     }
                 },
             }
@@ -647,7 +640,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
         }
     } else {
         // Underlying ArrayBuffer has been detached, mirror behavior of .length getter
-        try writer.print("length: {pretty}", .{Value.from(0)});
+        try writer.print("length: {f}", .{Value.from(0).fmtPretty()});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -656,7 +649,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
 
 fn prettyPrintWeakMap(
     map: *const builtins.WeakMap,
-    writer: anytype,
+    writer: *std.Io.Writer,
 ) !void {
     const weak_map_data = map.fields.weak_map_data;
     const tty_config = state.tty_config;
@@ -666,7 +659,7 @@ fn prettyPrintWeakMap(
     try tty_config.setColor(writer, .reset);
     var it = weak_map_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{pretty} → {pretty}", .{ entry.key_ptr.*.get(), entry.value_ptr.* });
+        try writer.print("{f} → {f}", .{ entry.key_ptr.get().fmtPretty(), entry.value_ptr.fmtPretty() });
         if (it.index < weak_map_data.count()) {
             try writer.writeAll(", ");
         }
@@ -676,7 +669,7 @@ fn prettyPrintWeakMap(
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: anytype) !void {
+fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: *std.Io.Writer) !void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -688,7 +681,7 @@ fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: anytype) !void 
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void {
+fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: *std.Io.Writer) !void {
     const weak_set_data = weak_set.fields.weak_set_data;
     const tty_config = state.tty_config;
 
@@ -697,7 +690,7 @@ fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void 
     try tty_config.setColor(writer, .reset);
     var it = weak_set_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{pretty}", .{entry.key_ptr.*.get()});
+        try writer.print("{f}", .{entry.key_ptr.get().fmtPretty()});
         if (it.index < weak_set_data.count()) {
             try writer.writeAll(", ");
         }
@@ -709,14 +702,14 @@ fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void 
 
 fn prettyPrintWrapForValidIterator(
     wrap_for_valid_iterator: *const builtins.WrapForValidIterator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%WrapForValidIterator%(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator)});
+    try writer.print("{f}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator).fmtPretty()});
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -724,8 +717,8 @@ fn prettyPrintWrapForValidIterator(
 
 fn prettyPrintIntlCollator(
     intl_collator: *const builtins.intl.Collator,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_collator.fields.locale;
     const tty_config = state.tty_config;
 
@@ -734,15 +727,15 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Collator(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, usage: {pretty}, sensitivity: {pretty}, ignorePunctuation: " ++
-        "{pretty}, collation: {pretty}, numeric: {pretty}, caseFirst: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.usage),
-        Value.from(resolved_options.sensitivity),
-        Value.from(resolved_options.ignore_punctuation),
-        Value.from(resolved_options.collation),
-        Value.from(resolved_options.numeric),
-        Value.from(resolved_options.case_first),
+    try writer.print("{f}, usage: {f}, sensitivity: {f}, ignorePunctuation: " ++
+        "{f}, collation: {f}, numeric: {f}, caseFirst: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.usage).fmtPretty(),
+        Value.from(resolved_options.sensitivity).fmtPretty(),
+        Value.from(resolved_options.ignore_punctuation).fmtPretty(),
+        Value.from(resolved_options.collation).fmtPretty(),
+        Value.from(resolved_options.numeric).fmtPretty(),
+        Value.from(resolved_options.case_first).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -751,8 +744,8 @@ fn prettyPrintIntlCollator(
 
 fn prettyPrintIntlDateTimeFormat(
     intl_date_time_format: *const builtins.intl.DateTimeFormat,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_date_time_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -761,17 +754,17 @@ fn prettyPrintIntlDateTimeFormat(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.DisplayNames(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, calendar: {pretty}, numberingSystem: {pretty}, timeZone: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.calendar),
-        Value.from(resolved_options.numbering_system),
-        Value.from(resolved_options.time_zone),
+    try writer.print("{f}, calendar: {f}, numberingSystem: {f}, timeZone: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.calendar).fmtPretty(),
+        Value.from(resolved_options.numbering_system).fmtPretty(),
+        Value.from(resolved_options.time_zone).fmtPretty(),
     });
     if (resolved_options.date_style) |date_style| {
-        try writer.print(", dateStyle: {pretty}", .{Value.from(date_style)});
+        try writer.print(", dateStyle: {f}", .{Value.from(date_style).fmtPretty()});
     }
     if (resolved_options.time_style) |time_style| {
-        try writer.print(", timeStyle: {pretty}", .{Value.from(time_style)});
+        try writer.print(", timeStyle: {f}", .{Value.from(time_style).fmtPretty()});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -780,8 +773,8 @@ fn prettyPrintIntlDateTimeFormat(
 
 fn prettyPrintIntlDisplayNames(
     intl_display_names: *const builtins.intl.DisplayNames,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_display_names.fields.locale;
     const tty_config = state.tty_config;
 
@@ -791,19 +784,19 @@ fn prettyPrintIntlDisplayNames(
     try writer.writeAll("Intl.DisplayNames(");
     try tty_config.setColor(writer, .reset);
     if (intl_display_names.fields.type == .language) {
-        try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}, languageDisplay: {pretty}", .{
-            Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-            Value.from(resolved_options.style),
-            Value.from(resolved_options.type),
-            Value.from(resolved_options.fallback),
-            Value.from(resolved_options.language_display),
+        try writer.print("{f}, style: {f}, type: {f}, fallback: {f}, languageDisplay: {f}", .{
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+            Value.from(resolved_options.style).fmtPretty(),
+            Value.from(resolved_options.type).fmtPretty(),
+            Value.from(resolved_options.fallback).fmtPretty(),
+            Value.from(resolved_options.language_display).fmtPretty(),
         });
     } else {
-        try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}", .{
-            Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-            Value.from(resolved_options.style),
-            Value.from(resolved_options.type),
-            Value.from(resolved_options.fallback),
+        try writer.print("{f}, style: {f}, type: {f}, fallback: {f}", .{
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+            Value.from(resolved_options.style).fmtPretty(),
+            Value.from(resolved_options.type).fmtPretty(),
+            Value.from(resolved_options.fallback).fmtPretty(),
         });
     }
     try tty_config.setColor(writer, .white);
@@ -813,8 +806,8 @@ fn prettyPrintIntlDisplayNames(
 
 fn prettyPrintIntlDurationFormat(
     intl_duration_format: *const builtins.intl.DurationFormat,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_duration_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -823,39 +816,39 @@ fn prettyPrintIntlDurationFormat(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.DurationFormat(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, numberingSystem: {pretty}, style: {pretty}, years: {pretty}, " ++
-        "yearsDisplay: {pretty}, months: {pretty}, monthsDisplay: {pretty}, weeks: {pretty}, " ++
-        "weeksDisplay: {pretty}, days: {pretty}, daysDisplay: {pretty}, hours: {pretty}, " ++
-        "hoursDisplay: {pretty}, minutes: {pretty}, minutesDisplay: {pretty}, seconds: {pretty}, " ++
-        "secondsDisplay: {pretty}, milliseconds: {pretty}, millisecondsDisplay: {pretty}, " ++
-        "microseconds: {pretty}, microsecondsDisplay: {pretty}, nanoseconds: {pretty}, " ++
-        "nanosecondsDisplay: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.numbering_system),
-        Value.from(resolved_options.style),
-        Value.from(resolved_options.years),
-        Value.from(resolved_options.years_display),
-        Value.from(resolved_options.months),
-        Value.from(resolved_options.months_display),
-        Value.from(resolved_options.weeks),
-        Value.from(resolved_options.weeks_display),
-        Value.from(resolved_options.days),
-        Value.from(resolved_options.days_display),
-        Value.from(resolved_options.hours),
-        Value.from(resolved_options.hours_display),
-        Value.from(resolved_options.minutes),
-        Value.from(resolved_options.minutes_display),
-        Value.from(resolved_options.seconds),
-        Value.from(resolved_options.seconds_display),
-        Value.from(resolved_options.milliseconds),
-        Value.from(resolved_options.milliseconds_display),
-        Value.from(resolved_options.microseconds),
-        Value.from(resolved_options.microseconds_display),
-        Value.from(resolved_options.nanoseconds),
-        Value.from(resolved_options.nanoseconds_display),
+    try writer.print("{f}, numberingSystem: {f}, style: {f}, years: {f}, " ++
+        "yearsDisplay: {f}, months: {f}, monthsDisplay: {f}, weeks: {f}, " ++
+        "weeksDisplay: {f}, days: {f}, daysDisplay: {f}, hours: {f}, " ++
+        "hoursDisplay: {f}, minutes: {f}, minutesDisplay: {f}, seconds: {f}, " ++
+        "secondsDisplay: {f}, milliseconds: {f}, millisecondsDisplay: {f}, " ++
+        "microseconds: {f}, microsecondsDisplay: {f}, nanoseconds: {f}, " ++
+        "nanosecondsDisplay: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.numbering_system).fmtPretty(),
+        Value.from(resolved_options.style).fmtPretty(),
+        Value.from(resolved_options.years).fmtPretty(),
+        Value.from(resolved_options.years_display).fmtPretty(),
+        Value.from(resolved_options.months).fmtPretty(),
+        Value.from(resolved_options.months_display).fmtPretty(),
+        Value.from(resolved_options.weeks).fmtPretty(),
+        Value.from(resolved_options.weeks_display).fmtPretty(),
+        Value.from(resolved_options.days).fmtPretty(),
+        Value.from(resolved_options.days_display).fmtPretty(),
+        Value.from(resolved_options.hours).fmtPretty(),
+        Value.from(resolved_options.hours_display).fmtPretty(),
+        Value.from(resolved_options.minutes).fmtPretty(),
+        Value.from(resolved_options.minutes_display).fmtPretty(),
+        Value.from(resolved_options.seconds).fmtPretty(),
+        Value.from(resolved_options.seconds_display).fmtPretty(),
+        Value.from(resolved_options.milliseconds).fmtPretty(),
+        Value.from(resolved_options.milliseconds_display).fmtPretty(),
+        Value.from(resolved_options.microseconds).fmtPretty(),
+        Value.from(resolved_options.microseconds_display).fmtPretty(),
+        Value.from(resolved_options.nanoseconds).fmtPretty(),
+        Value.from(resolved_options.nanoseconds_display).fmtPretty(),
     });
     if (resolved_options.fractional_digits) |fractional_digits| {
-        try writer.print(", fractionalDigits: {pretty}", .{Value.from(fractional_digits)});
+        try writer.print(", fractionalDigits: {f}", .{Value.from(fractional_digits).fmtPretty()});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -864,8 +857,8 @@ fn prettyPrintIntlDurationFormat(
 
 fn prettyPrintIntlListFormat(
     intl_list_format: *const builtins.intl.ListFormat,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_list_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -874,10 +867,10 @@ fn prettyPrintIntlListFormat(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.ListFormat(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, type: {pretty}, style: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.type),
-        Value.from(resolved_options.style),
+    try writer.print("{f}, type: {f}, style: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.type).fmtPretty(),
+        Value.from(resolved_options.style).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -886,16 +879,16 @@ fn prettyPrintIntlListFormat(
 
 fn prettyPrintIntlLocale(
     intl_locale: *const builtins.intl.Locale,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_locale.fields.locale;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Locale(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
+    try writer.print("{f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -904,8 +897,8 @@ fn prettyPrintIntlLocale(
 
 fn prettyPrintIntlPluralRules(
     intl_plural_rules: *const builtins.intl.PluralRules,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_plural_rules.fields.locale;
     const tty_config = state.tty_config;
 
@@ -914,10 +907,10 @@ fn prettyPrintIntlPluralRules(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.PluralRules(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, type: {pretty}, notation: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.type),
-        Value.from(resolved_options.notation),
+    try writer.print("{f}, type: {f}, notation: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.type).fmtPretty(),
+        Value.from(resolved_options.notation).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -926,8 +919,8 @@ fn prettyPrintIntlPluralRules(
 
 fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.intl.Segmenter,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const locale = intl_segmenter.fields.locale;
     const tty_config = state.tty_config;
 
@@ -936,9 +929,9 @@ fn prettyPrintIntlSegmenter(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Segmenter(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, granularity: {pretty}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)),
-        Value.from(resolved_options.granularity),
+    try writer.print("{f}, granularity: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.granularity).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -947,8 +940,8 @@ fn prettyPrintIntlSegmenter(
 
 fn prettyPrintTemporalDuration(
     temporal_duration: *const builtins.temporal.Duration,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const years = temporal_rs.c.temporal_rs_Duration_years(temporal_duration.fields.inner);
@@ -965,17 +958,17 @@ fn prettyPrintTemporalDuration(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.Duration(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
-        Value.from(@as(f64, @floatFromInt(years))),
-        Value.from(@as(f64, @floatFromInt(months))),
-        Value.from(@as(f64, @floatFromInt(weeks))),
-        Value.from(@as(f64, @floatFromInt(days))),
-        Value.from(@as(f64, @floatFromInt(hours))),
-        Value.from(@as(f64, @floatFromInt(minutes))),
-        Value.from(@as(f64, @floatFromInt(seconds))),
-        Value.from(@as(f64, @floatFromInt(milliseconds))),
-        Value.from(microseconds),
-        Value.from(nanoseconds),
+    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
+        Value.from(@as(f64, @floatFromInt(years))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(months))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(weeks))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(days))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(hours))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(minutes))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(seconds))).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(milliseconds))).fmtPretty(),
+        Value.from(microseconds).fmtPretty(),
+        Value.from(nanoseconds).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -984,8 +977,8 @@ fn prettyPrintTemporalDuration(
 
 fn prettyPrintTemporalInstant(
     temporal_instant: *const builtins.temporal.Instant,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
@@ -995,8 +988,8 @@ fn prettyPrintTemporalInstant(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.Instant(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{
-        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
+    try writer.print("{f}", .{
+        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1005,8 +998,8 @@ fn prettyPrintTemporalInstant(
 
 fn prettyPrintTemporalPlainDate(
     temporal_plain_date: *const builtins.temporal.PlainDate,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const iso_year = temporal_rs.c.temporal_rs_PlainDate_iso_year(temporal_plain_date.fields.inner);
@@ -1018,11 +1011,11 @@ fn prettyPrintTemporalPlainDate(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDate(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}", .{
-        Value.from(iso_year),
-        Value.from(iso_month),
-        Value.from(iso_day),
-        Value.from(asciiString(calendar_id)),
+    try writer.print("{f}, {f}, {f}, {f}", .{
+        Value.from(iso_year).fmtPretty(),
+        Value.from(iso_month).fmtPretty(),
+        Value.from(iso_day).fmtPretty(),
+        Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1031,8 +1024,8 @@ fn prettyPrintTemporalPlainDate(
 
 fn prettyPrintTemporalPlainDateTime(
     temporal_plain_date_time: *const builtins.temporal.PlainDateTime,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const iso_year = temporal_rs.c.temporal_rs_PlainDateTime_iso_year(temporal_plain_date_time.fields.inner);
@@ -1050,17 +1043,17 @@ fn prettyPrintTemporalPlainDateTime(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainDateTime(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
-        Value.from(iso_year),
-        Value.from(iso_month),
-        Value.from(iso_day),
-        Value.from(hour),
-        Value.from(minute),
-        Value.from(second),
-        Value.from(millisecond),
-        Value.from(microsecond),
-        Value.from(nanosecond),
-        Value.from(asciiString(calendar_id)),
+    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
+        Value.from(iso_year).fmtPretty(),
+        Value.from(iso_month).fmtPretty(),
+        Value.from(iso_day).fmtPretty(),
+        Value.from(hour).fmtPretty(),
+        Value.from(minute).fmtPretty(),
+        Value.from(second).fmtPretty(),
+        Value.from(millisecond).fmtPretty(),
+        Value.from(microsecond).fmtPretty(),
+        Value.from(nanosecond).fmtPretty(),
+        Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1069,8 +1062,8 @@ fn prettyPrintTemporalPlainDateTime(
 
 fn prettyPrintTemporalPlainMonthDay(
     temporal_plain_month_day: *const builtins.temporal.PlainMonthDay,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const iso_month = temporal_rs.c.temporal_rs_PlainMonthDay_iso_month(temporal_plain_month_day.fields.inner);
@@ -1081,10 +1074,10 @@ fn prettyPrintTemporalPlainMonthDay(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainMonthDay(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}", .{
-        Value.from(iso_month),
-        Value.from(iso_day),
-        Value.from(asciiString(calendar_id)),
+    try writer.print("{f}, {f}, {f}", .{
+        Value.from(iso_month).fmtPretty(),
+        Value.from(iso_day).fmtPretty(),
+        Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1093,8 +1086,8 @@ fn prettyPrintTemporalPlainMonthDay(
 
 fn prettyPrintTemporalPlainTime(
     temporal_plain_time: *const builtins.temporal.PlainTime,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const hour = temporal_rs.c.temporal_rs_PlainTime_hour(temporal_plain_time.fields.inner);
@@ -1107,13 +1100,13 @@ fn prettyPrintTemporalPlainTime(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainTime(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}, {pretty}, {pretty}, {pretty}", .{
-        Value.from(hour),
-        Value.from(minute),
-        Value.from(second),
-        Value.from(millisecond),
-        Value.from(microsecond),
-        Value.from(nanosecond),
+    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}", .{
+        Value.from(hour).fmtPretty(),
+        Value.from(minute).fmtPretty(),
+        Value.from(second).fmtPretty(),
+        Value.from(millisecond).fmtPretty(),
+        Value.from(microsecond).fmtPretty(),
+        Value.from(nanosecond).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1122,8 +1115,8 @@ fn prettyPrintTemporalPlainTime(
 
 fn prettyPrintTemporalPlainYearMonth(
     temporal_plain_year_month: *const builtins.temporal.PlainYearMonth,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const iso_year = temporal_rs.c.temporal_rs_PlainYearMonth_iso_year(temporal_plain_year_month.fields.inner);
@@ -1134,10 +1127,10 @@ fn prettyPrintTemporalPlainYearMonth(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.PlainYearMonth(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}", .{
-        Value.from(iso_year),
-        Value.from(iso_month),
-        Value.from(asciiString(calendar_id)),
+    try writer.print("{f}, {f}, {f}", .{
+        Value.from(iso_year).fmtPretty(),
+        Value.from(iso_month).fmtPretty(),
+        Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1146,8 +1139,8 @@ fn prettyPrintTemporalPlainYearMonth(
 
 fn prettyPrintTemporalZonedDateTime(
     temporal_zoned_date_time: *const builtins.temporal.ZonedDateTime,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
@@ -1163,10 +1156,10 @@ fn prettyPrintTemporalZonedDateTime(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Temporal.ZonedDateTime(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}, {pretty}, {pretty}", .{
-        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return),
-        Value.from(asciiString(time_zone_id)),
-        Value.from(asciiString(calendar_id)),
+    try writer.print("{f}, {f}, {f}", .{
+        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return).fmtPretty(),
+        Value.from(asciiString(time_zone_id)).fmtPretty(),
+        Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1175,8 +1168,8 @@ fn prettyPrintTemporalZonedDateTime(
 
 fn prettyPrintPrimitiveWrapper(
     object: anytype,
-    writer: anytype,
-) PrettyPrintError(@TypeOf(writer))!void {
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
     const T = std.meta.Child(@TypeOf(object));
@@ -1193,13 +1186,13 @@ fn prettyPrintPrimitiveWrapper(
     try writer.writeAll(name);
     try writer.writeAll("(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{value});
+    try writer.print("{f}", .{value.fmtPretty()});
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+fn prettyPrintFunction(object: *const Object, writer: *std.Io.Writer) PrettyPrintError!void {
     const name = object.getPropertyValueDirect(PropertyKey.from("name")).asString();
     const tty_config = state.tty_config;
 
@@ -1210,7 +1203,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
         switch (function_body.type) {
             .normal => try writer.writeAll("fn "),
             .generator => try writer.writeAll("fn* "),
-            .@"async" => try writer.writeAll("async fn "),
+            .async => try writer.writeAll("async fn "),
             .async_generator => try writer.writeAll("async fn* "),
         }
     } else {
@@ -1218,7 +1211,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
     }
     try tty_config.setColor(writer, .reset);
     if (!name.isEmpty()) {
-        try writer.print("{}", .{name});
+        try writer.print("{f}", .{name.fmtUnquoted()});
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<anonymous>");
@@ -1226,7 +1219,7 @@ fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(
     }
 }
 
-fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+fn prettyPrintObject(object: *Object, writer: *std.Io.Writer) PrettyPrintError!void {
     const property_keys = ordinaryOwnPropertyKeys(arena.allocator(), object) catch return;
     const tty_config = state.tty_config;
 
@@ -1247,21 +1240,21 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
             .string => |string| {
                 try writer.writeAll("\"");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{}", .{string});
+                try writer.print("{f}", .{string.fmtUnquoted()});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("\"");
             },
             .symbol => |symbol| {
                 try writer.writeAll("[");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{}", .{symbol});
+                try writer.print("{f}", .{symbol});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("]");
             },
             .integer_index => |integer_index| {
                 try writer.writeAll("\"");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{}", .{integer_index});
+                try writer.print("{d}", .{integer_index});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("\"");
             },
@@ -1270,7 +1263,7 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
 
         switch (property_descriptor.value_or_accessor) {
             .value => |value| {
-                try writer.print("{pretty}", .{value});
+                try writer.print("{f}", .{value.fmtPretty()});
             },
             .accessor => {
                 try tty_config.setColor(writer, .dim);
@@ -1286,7 +1279,7 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
     try tty_config.setColor(writer, .reset);
 }
 
-pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!void {
     const print_in_progress = state.print_in_progress;
     state.print_in_progress = true;
     defer if (!print_in_progress) {
@@ -1301,7 +1294,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         const object = value.asObject();
         if (state.seen_objects.get(object)) |i| {
             try tty_config.setColor(writer, .dim);
-            try writer.print("<ref #{}>", .{i});
+            try writer.print("<ref #{d}>", .{i});
             try tty_config.setColor(writer, .reset);
             return;
         }
@@ -1378,7 +1371,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         return prettyPrintObject(object, writer);
     }
 
-    const color: std.io.tty.Color = switch (value.type()) {
+    const color: std.Io.tty.Color = switch (value.type()) {
         .undefined => .bright_black,
         .null => .yellow,
         .boolean => .blue,
@@ -1389,19 +1382,19 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         .object => unreachable,
     };
     try tty_config.setColor(writer, color);
-    try writer.print("{}", .{value});
+    try writer.print("{f}", .{value});
     try tty_config.setColor(writer, .reset);
 }
 
-pub fn prettyPrintException(exception: Agent.Exception, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+pub fn prettyPrintException(exception: Agent.Exception, writer: *std.Io.Writer) PrettyPrintError!void {
     const tty_config = state.tty_config;
-    try writer.print("Uncaught exception: {pretty}", .{exception.value});
+    try writer.print("Uncaught exception: {f}", .{exception.value.fmtPretty()});
     var it = std.mem.reverseIterator(exception.stack_trace);
     while (it.next()) |stack_frame| {
         try writer.writeAll("\n  at ");
         switch (stack_frame.origin) {
             .function => |function| {
-                try writer.print("{pretty}", .{Value.from(function)});
+                try writer.print("{f}", .{Value.from(function).fmtPretty()});
             },
             .eval => {
                 // Keep this in sync with prettyPrintFunction()

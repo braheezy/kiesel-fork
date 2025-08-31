@@ -172,7 +172,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
-            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const object = this_value.asObject();
 
