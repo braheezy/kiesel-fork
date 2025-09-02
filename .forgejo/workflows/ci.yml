@@ -156,6 +156,7 @@ jobs:
         uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.15.1
+          cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
