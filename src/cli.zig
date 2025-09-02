@@ -899,12 +899,12 @@ pub fn main() !u8 {
             try stdout.print("libgc {f}\n", .{kiesel.gc.libgc_version});
         }
         try stdout.print("zig {f}\n", .{builtin.zig_version});
-        try stderr.flush();
+        try stdout.flush();
         return 0;
     }
     if (parsed_args.options.help) {
         try args.printHelp(Options, "kiesel", stdout);
-        try stderr.flush();
+        try stdout.flush();
         return 0;
     }
     if (parsed_args.options.module) {
