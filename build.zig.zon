@@ -33,13 +33,12 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            // FIXME: Points to https://github.com/ikskuh/parser-toolkit/pull/17, update when merged
-            .url = "git+https://github.com/ikskuh/parser-toolkit#c9d66dec48ae2928a82ab13045c606bf9ce5b9fc",
+            .url = "git+https://github.com/ikskuh/parser-toolkit#62e0a3dca3632bb361df59407b2d7805280ab1b9",
             .hash = "parser_toolkit-0.1.0-baYGPUVCEwBaVmu09ORh0lLlVjRaJ489TdSIdTa_8VWg",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linusg/zig-stackinfo#ea846c001fe7f48eabcdd00f0080f7fbf9587a5d",
-            .hash = "stackinfo-0.1.0-NZ2qTrYbAAD8N_vxX5I_UpaF-L6L900lTDTqL87WkGl_",
+            .url = "git+https://codeberg.org/linusg/zig-stackinfo#ac041f05d74af7102e4b7adaa515c99bb50845c1",
+            .hash = "stackinfo-0.1.0-NZ2qTgAhAABvyn8FufKS9sTqS6DsR3kGs-PE5qIAVUFM",
         },
         .temporal_rs = .{
             .url = "git+https://github.com/boa-dev/temporal#df531eb676db3ee9afa46acd9eced170259f619d",
