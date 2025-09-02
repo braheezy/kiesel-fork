@@ -37,6 +37,18 @@ jobs:
           zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
           zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
+      - name: Build kiesel-freebsd-aarch64
+        run: |
+          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
+      - name: Build kiesel-freebsd-x86
+        run: |
+          zig build -Dtarget=x86-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86
+      - name: Build kiesel-freebsd-x86_64
+        run: |
+          zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
       - name: Build kiesel-linux-aarch64
         run: |
           # Verify building without NaN-boxing on aarch64.
@@ -94,6 +106,18 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-macos-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-x86_64
+      - name: Build kiesel-netbsd-aarch64
+        run: |
+          zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
+      - name: Build kiesel-netbsd-x86
+        run: |
+          zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
+      - name: Build kiesel-netbsd-x86_64
+        run: |
+          zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
       - name: Build kiesel-windows-aarch64.exe
         run: |
           zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe
