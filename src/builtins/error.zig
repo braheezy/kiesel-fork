@@ -19,18 +19,20 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Error",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -57,7 +59,7 @@ pub const constructor = struct {
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%", « [[ErrorData]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const @"error" = try ordinaryCreateFromConstructor(
             Error,
             agent,
             new_target_,
@@ -69,8 +71,8 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        std.debug.assert(object.internal_methods == Object.InternalMethods.default);
-        object.internal_methods = .initComptime(.{ .set = internalSet });
+        std.debug.assert(@"error".object.internal_methods == Object.InternalMethods.default);
+        @"error".object.internal_methods = .initComptime(.{ .set = internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
@@ -78,20 +80,20 @@ pub const constructor = struct {
             const msg = try message.toString(agent);
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-            object.createNonEnumerableDataPropertyOrThrow(
+            @"error".object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            object.as(Error).fields.error_data.message = msg;
+            @"error".fields.error_data.message = msg;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).
-        try installErrorCause(agent, object, options);
+        try installErrorCause(agent, &@"error".object, options);
 
         // 5. Return O.
-        return Value.from(object);
+        return Value.from(&@"error".object);
     }
 
     /// 20.5.2.1 Error.isError ( arg )
@@ -133,9 +135,7 @@ pub fn internalSet(
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -269,13 +269,14 @@ pub const uri_error = struct {
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-            return createBuiltinFunction(
+            const builtin_function = try createBuiltinFunction(
                 agent,
                 .{ .constructor = impl },
                 1,
                 name,
                 .{ .realm = realm, .prototype = try realm.intrinsics.@"%Error%"() },
             );
+            return &builtin_function.object;
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -314,7 +315,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             // 2. Let O be ? OrdinaryCreateFromConstructor(
             //      newTarget, "%NativeError.prototype%", « [[ErrorData]] »
             //    ).
-            const object = try ordinaryCreateFromConstructor(
+            const @"error" = try ordinaryCreateFromConstructor(
                 T,
                 agent,
                 new_target_,
@@ -326,8 +327,8 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             );
 
             // Non-standard
-            std.debug.assert(object.internal_methods == Object.InternalMethods.default);
-            object.internal_methods = .initComptime(.{ .set = internalSet });
+            std.debug.assert(@"error".object.internal_methods == Object.InternalMethods.default);
+            @"error".object.internal_methods = .initComptime(.{ .set = internalSet });
 
             // 3. If message is not undefined, then
             if (!message.isUndefined()) {
@@ -335,20 +336,20 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 const msg = try message.toString(agent);
 
                 // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-                object.createNonEnumerableDataPropertyOrThrow(
+                @"error".object.createNonEnumerableDataPropertyOrThrow(
                     agent,
                     PropertyKey.from("message"),
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
 
-                object.as(T).fields.error_data.message = msg;
+                @"error".fields.error_data.message = msg;
             }
 
             // 4. Perform ? InstallErrorCause(O, options).
-            try installErrorCause(agent, object, options);
+            try installErrorCause(agent, &@"error".object, options);
 
             // 5. Return O.
-            return Value.from(object);
+            return Value.from(&@"error".object);
         }
     };
 }
@@ -358,9 +359,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-            return builtins.Object.create(agent, .{
-                .prototype = try realm.intrinsics.@"%Error.prototype%"(),
-            });
+            return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Error.prototype%"());
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

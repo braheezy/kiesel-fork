@@ -421,7 +421,7 @@ fn evalDeclarationInstantiation(
             try var_env.global_environment.createGlobalFunctionBinding(
                 agent,
                 function_name,
-                Value.from(function_object),
+                Value.from(&function_object.object),
                 true,
             );
         } else {
@@ -448,7 +448,7 @@ fn evalDeclarationInstantiation(
                 var_env.initializeBinding(
                     agent,
                     function_name,
-                    Value.from(function_object),
+                    Value.from(&function_object.object),
                 ) catch |err| try noexcept(err);
             } else {
                 // iii. Else,
@@ -456,7 +456,7 @@ fn evalDeclarationInstantiation(
                 var_env.setMutableBinding(
                     agent,
                     function_name,
-                    Value.from(function_object),
+                    Value.from(&function_object.object),
                     false,
                 ) catch |err| try noexcept(err);
             }

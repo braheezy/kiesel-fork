@@ -137,16 +137,29 @@ const ErrorType = enum {
     // Non-standard internal error
     internal_error,
 
-    pub fn typeName(self: @This()) []const u8 {
+    fn T(self: @This()) type {
         return switch (self) {
-            .aggregate_error => "AggregateError",
-            .eval_error => "EvalError",
-            .range_error => "RangeError",
-            .reference_error => "ReferenceError",
-            .syntax_error => "SyntaxError",
-            .type_error => "TypeError",
-            .uri_error => "URIError",
-            .internal_error => "Error",
+            .aggregate_error => builtins.AggregateError,
+            .eval_error => builtins.EvalError,
+            .range_error => builtins.RangeError,
+            .reference_error => builtins.ReferenceError,
+            .syntax_error => builtins.SyntaxError,
+            .type_error => builtins.TypeError,
+            .uri_error => builtins.URIError,
+            .internal_error => builtins.Error,
+        };
+    }
+
+    fn intrinsicName(self: @This()) []const u8 {
+        return switch (self) {
+            .aggregate_error => "%AggregateError%",
+            .eval_error => "%EvalError%",
+            .range_error => "%RangeError%",
+            .reference_error => "%ReferenceError%",
+            .syntax_error => "%SyntaxError%",
+            .type_error => "%TypeError%",
+            .uri_error => "%URIError%",
+            .internal_error => "%Error%",
         };
     }
 };
@@ -156,11 +169,11 @@ pub fn createErrorObject(
     comptime error_type: ErrorType,
     comptime fmt: []const u8,
     args: anytype,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*error_type.T() {
     const realm = self.currentRealm();
     const constructor = try @field(
         Realm.Intrinsics,
-        "%" ++ error_type.typeName() ++ "%",
+        error_type.intrinsicName(),
     )(&realm.intrinsics);
     const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
     const error_object = constructor.construct(
@@ -168,11 +181,12 @@ pub fn createErrorObject(
         &.{Value.from(try String.fromUtf8(self, message))},
         null,
     ) catch |err| try noexcept(err);
+    const @"error" = error_object.as(error_type.T());
     if (error_type == .internal_error) {
         // We don't have a dedicated type for this, but let's at least adjust the name
-        error_object.as(builtins.Error).fields.error_data.name = String.fromLiteral("InternalError");
+        @"error".fields.error_data.name = String.fromLiteral("InternalError");
     }
-    return error_object;
+    return @"error";
 }
 
 pub fn clearException(self: *Agent) Exception {
@@ -193,7 +207,7 @@ pub fn throwException(
         fmt,
         args,
     )) |error_object|
-        Value.from(error_object)
+        Value.from(&error_object.object)
     else |_|
         Value.from("Out of memory");
     self.exception = .{

@@ -190,7 +190,7 @@ fn mainWithErrorHandling() Error!void {
                     .{fmtParseError(parse_error)},
                 );
                 const exception: Agent.Exception = .{
-                    .value = Value.from(syntax_error),
+                    .value = Value.from(&syntax_error.object),
                     .stack_trace = &.{},
                 };
                 try stderr.print("{f}\n{f}\n", .{

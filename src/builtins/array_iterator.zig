@@ -18,6 +18,7 @@ const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const typedArrayLength = builtins.typedArrayLength;
 
 /// 23.1.5.1 CreateArrayIterator ( array, kind )
@@ -26,7 +27,7 @@ pub fn createArrayIterator(
     agent: *Agent,
     array: *Object,
     comptime kind: Object.PropertyKind,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*ArrayIterator {
     const realm = agent.currentRealm();
 
     // 1. Let iterator be OrdinaryObjectCreate(%ArrayIteratorPrototype%, « [[IteratedArrayLike]],
@@ -55,9 +56,7 @@ pub fn createArrayIterator(
 /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -84,10 +83,7 @@ pub const prototype = struct {
         // 2. If O is not an Object, throw a TypeError exception.
         // 3. If O does not have all of the internal slots of an Array Iterator Instance
         //    (23.1.5.2.3), throw a TypeError exception.
-        if (!this_value.isObject() or !this_value.asObject().is(ArrayIterator)) {
-            return agent.throwException(.type_error, "This value must be an Array Iterator", .{});
-        }
-        const array_iterator = this_value.asObject().as(ArrayIterator);
+        const array_iterator = try this_value.requireInternalSlot(agent, ArrayIterator);
 
         // 5. If array is undefined, return CreateIteratorResultObject(undefined, true).
         if (array_iterator.fields == .completed) {
@@ -104,10 +100,10 @@ pub const prototype = struct {
         const kind = array_iterator.fields.state.array_like_iteration_kind;
 
         // 8. If array has a [[TypedArrayName]] internal slot, then
-        const len = if (array.is(builtins.TypedArray)) blk: {
+        const len = if (array.cast(builtins.TypedArray)) |typed_array| blk: {
             // a. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(array, seq-cst).
             const ta = makeTypedArrayWithBufferWitnessRecord(
-                array.as(builtins.TypedArray),
+                typed_array,
                 .seq_cst,
             );
 
@@ -161,9 +157,8 @@ pub const prototype = struct {
                 std.debug.assert(kind == .@"key+value");
 
                 // ii. Let result be CreateArrayFromList(« indexNumber, elementValue »).
-                break :blk Value.from(
-                    try createArrayFromList(agent, &.{ index_number, element_value }),
-                );
+                const result_array = try createArrayFromList(agent, &.{ index_number, element_value });
+                break :blk Value.from(&result_array.object);
             }
         };
 

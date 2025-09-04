@@ -26,6 +26,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const toTemporalDuration = builtins.toTemporalDuration;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
@@ -33,13 +34,14 @@ const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaintime-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "PlainTime",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -117,9 +119,8 @@ pub const constructor = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
-        return Value.from(
-            try createTemporalTime(agent, temporal_rs_plain_time.?, new_target),
-        );
+        const plain_time = try createTemporalTime(agent, temporal_rs_plain_time.?, new_target);
+        return Value.from(&plain_time.object);
     }
 
     /// 4.2.3 Temporal.PlainTime.compare ( one, two )
@@ -137,8 +138,8 @@ pub const constructor = struct {
         // 3. Return 𝔽(CompareTimeRecord(one.[[Time]], two.[[Time]])).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainTime_compare(
-                one.as(PlainTime).fields.inner,
-                two.as(PlainTime).fields.inner,
+                one.fields.inner,
+                two.fields.inner,
             ),
         );
     }
@@ -150,7 +151,8 @@ pub const constructor = struct {
         const options = arguments.get(1);
 
         // 1. Return ? ToTemporalTime(item, options).
-        return Value.from(try toTemporalPlainTime(agent, item, options));
+        const plain_time = try toTemporalPlainTime(agent, item, options);
+        return Value.from(&plain_time.object);
     }
 };
 
@@ -158,9 +160,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaintime-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -211,14 +211,13 @@ pub const prototype = struct {
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
         // 3. Return ? AddDurationToTime(add, plainTime, temporalDurationLike).
-        return Value.from(
-            try addDurationToTime(
-                agent,
-                .add,
-                plain_time.fields.inner,
-                temporal_duration_like,
-            ),
+        const new_plain_time = try addDurationToTime(
+            agent,
+            .add,
+            plain_time,
+            temporal_duration_like,
         );
+        return Value.from(&new_plain_time.object);
     }
 
     /// 4.3.15 Temporal.PlainTime.prototype.equals ( other )
@@ -238,7 +237,7 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_PlainTime_equals(
                 plain_time.fields.inner,
-                other.as(PlainTime).fields.inner,
+                other.fields.inner,
             ),
         );
     }
@@ -319,14 +318,13 @@ pub const prototype = struct {
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
         // 3. Return ? AddDurationToTime(subtract, plainTime, temporalDurationLike).
-        return Value.from(
-            try addDurationToTime(
-                agent,
-                .subtract,
-                plain_time.fields.inner,
-                temporal_duration_like,
-            ),
+        const new_plain_time = try addDurationToTime(
+            agent,
+            .subtract,
+            plain_time,
+            temporal_duration_like,
         );
+        return Value.from(&new_plain_time.object);
     }
 
     /// 4.3.18 Temporal.PlainTime.prototype.toJSON ( )
@@ -521,13 +519,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
-        return Value.from(
-            createTemporalTime(
-                agent,
-                temporal_rs_plain_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_plain_time = createTemporalTime(
+            agent,
+            temporal_rs_plain_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_plain_time.object);
     }
 };
 
@@ -551,7 +548,7 @@ pub fn createTemporalTime(
     agent: *Agent,
     inner: *temporal_rs.c.PlainTime,
     maybe_new_target: ?*Object,
-) Agent.Error!*Object {
+) Agent.Error!*PlainTime {
     const realm = agent.currentRealm();
 
     // 1. If newTarget is not present, set newTarget to %Temporal.PlainTime%.
@@ -576,14 +573,14 @@ pub fn toTemporalPlainTime(
     agent: *Agent,
     item: Value,
     maybe_options_value: ?Value,
-) Agent.Error!*Object {
+) Agent.Error!*PlainTime {
     // 1. If options is not present, set options to undefined.
     const options_value: Value = maybe_options_value orelse .undefined;
 
     // 2. If item is an Object, then
     const temporal_rs_plain_time = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalTime]] internal slot, then
-        if (item.asObject().is(builtins.temporal.PlainTime)) {
+        if (item.asObject().cast(builtins.temporal.PlainTime)) |plain_time| {
             // i. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
@@ -591,12 +588,11 @@ pub fn toTemporalPlainTime(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iii. Return ! CreateTemporalTime(item.[[Time]]).
-            const plain_time = item.asObject().as(builtins.temporal.PlainTime);
             break :blk temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.fields.inner);
         }
 
         // b. If item has an [[InitializedTemporalDateTime]] internal slot, then
-        if (item.asObject().is(builtins.temporal.PlainDateTime)) {
+        if (item.asObject().cast(builtins.temporal.PlainDateTime)) |plain_date_time| {
             // i. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
@@ -604,7 +600,6 @@ pub fn toTemporalPlainTime(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iii. Return ! CreateTemporalTime(item.[[ISODateTime]].[[Time]]).
-            const plain_date_time = item.asObject().as(builtins.temporal.PlainDateTime);
             break :blk try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
@@ -614,7 +609,7 @@ pub fn toTemporalPlainTime(
         }
 
         // c. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
-        if (item.asObject().is(builtins.temporal.ZonedDateTime)) {
+        if (item.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time| {
             // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
 
             // ii. Let resolvedOptions be ? GetOptionsObject(options).
@@ -624,7 +619,6 @@ pub fn toTemporalPlainTime(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iv. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-            const zoned_date_time = item.asObject().as(builtins.temporal.ZonedDateTime);
             break :blk try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
@@ -712,7 +706,7 @@ pub fn toTimeRecordOrMidnight(agent: *Agent, item: Value) Agent.Error!?*temporal
     const plain_time = try toTemporalPlainTime(agent, item, null);
 
     // 3. Return plainTime.[[Time]].
-    return temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.as(PlainTime).fields.inner);
+    return temporal_rs.c.temporal_rs_PlainTime_clone(plain_time.fields.inner);
 }
 
 /// Table 5: TemporalTimeLike Record Fields
@@ -985,9 +979,9 @@ fn toTemporalTimeRecord(
 fn addDurationToTime(
     agent: *Agent,
     comptime operation: enum { add, subtract },
-    plain_time: *const temporal_rs.c.PlainTime,
+    plain_time: *const PlainTime,
     temporal_duration_like: Value,
-) Agent.Error!*Object {
+) Agent.Error!*PlainTime {
     // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
     const duration = try toTemporalDuration(agent, temporal_duration_like);
 
@@ -998,15 +992,15 @@ fn addDurationToTime(
         .add => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_add(
-                plain_time,
-                duration.as(builtins.temporal.Duration).fields.inner,
+                plain_time.fields.inner,
+                duration.fields.inner,
             ),
         ),
         .subtract => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_subtract(
-                plain_time,
-                duration.as(builtins.temporal.Duration).fields.inner,
+                plain_time.fields.inner,
+                duration.fields.inner,
             ),
         ),
     };

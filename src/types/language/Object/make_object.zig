@@ -51,7 +51,7 @@ pub fn MakeObject(
         fields: Fields,
         object: Object,
 
-        pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!*Object {
+        pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!*Self {
             const self = try agent.gc_allocator.create(Self);
             errdefer agent.gc_allocator.destroy(self);
             self.* = .{
@@ -88,7 +88,7 @@ pub fn MakeObject(
                     }
                 }.finalizer);
             }
-            return &self.object;
+            return self;
         }
     };
 }

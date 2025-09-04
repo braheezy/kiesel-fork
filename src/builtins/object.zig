@@ -30,13 +30,14 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*types.Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Object",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
@@ -83,13 +84,14 @@ pub const constructor = struct {
         // 1. If NewTarget is neither undefined nor the active function object, then
         if (new_target != null and new_target.? != agent.activeFunctionObject()) {
             // a. Return ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
-            return Value.from(try ordinaryCreateFromConstructor(
+            const object = try ordinaryCreateFromConstructor(
                 Object,
                 agent,
                 new_target.?,
                 "%Object.prototype%",
                 {},
-            ));
+            );
+            return Value.from(&object.object);
         }
 
         // 2. If value is either undefined or null, return OrdinaryObjectCreate(%Object.prototype%).
@@ -290,7 +292,8 @@ pub const constructor = struct {
         defer entry_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(entryList).
-        return Value.from(try createArrayFromList(agent, entry_list.items));
+        const array = try createArrayFromList(agent, entry_list.items);
+        return Value.from(&array.object);
     }
 
     /// 20.1.2.6 Object.freeze ( O )
@@ -364,7 +367,7 @@ pub const constructor = struct {
         );
 
         // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).
-        return Value.from(try addEntriesFromIterable(agent, object, iterable, adder));
+        return Value.from(try addEntriesFromIterable(agent, object, iterable, &adder.object));
     }
 
     /// 20.1.2.8 Object.getOwnPropertyDescriptor ( O, P )
@@ -432,13 +435,12 @@ pub const constructor = struct {
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, string)).
         const property_keys = try getOwnPropertyKeys(agent, object, .string);
         defer agent.gc_allocator.free(property_keys);
-        return Value.from(
-            try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
-                    return property_key.toValue(agent_);
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
+            fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
+                return property_key.toValue(agent_);
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 
     /// 20.1.2.11 Object.getOwnPropertySymbols ( O )
@@ -449,13 +451,12 @@ pub const constructor = struct {
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, symbol)).
         const property_keys = try getOwnPropertyKeys(agent, object, .symbol);
         defer agent.gc_allocator.free(property_keys);
-        return Value.from(
-            try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
-                    return property_key.toValue(agent_);
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
+            fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
+                return property_key.toValue(agent_);
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 
     /// 20.1.2.11.1 GetOwnPropertyKeys ( O, type )
@@ -522,7 +523,11 @@ pub const constructor = struct {
             const elements = try createArrayFromList(agent, entry.value_ptr.items);
 
             // b. Perform ! CreateDataPropertyOrThrow(obj, g.[[Key]], elements).
-            try object.createDataPropertyDirect(agent, entry.key_ptr.*, Value.from(elements));
+            try object.createDataPropertyDirect(
+                agent,
+                entry.key_ptr.*,
+                Value.from(&elements.object),
+            );
         }
 
         // 4. Return obj.
@@ -604,7 +609,8 @@ pub const constructor = struct {
         defer key_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keyList).
-        return Value.from(try createArrayFromList(agent, key_list.items));
+        const array = try createArrayFromList(agent, key_list.items);
+        return Value.from(&array.object);
     }
 
     /// 20.1.2.20 Object.preventExtensions ( O )
@@ -687,7 +693,8 @@ pub const constructor = struct {
         defer value_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(valueList).
-        return Value.from(try createArrayFromList(agent, value_list.items));
+        const array = try createArrayFromList(agent, value_list.items);
+        return Value.from(&array.object);
     }
 };
 
@@ -695,12 +702,13 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, _: *Realm) std.mem.Allocator.Error!*types.Object {
-        return Object.create(agent, .{
+        const object = try Object.create(agent, .{
             .prototype = null,
             .internal_methods = .initComptime(.{
                 .setPrototypeOf = builtins.immutable_prototype.setPrototypeOf,
             }),
         });
+        return &object.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {

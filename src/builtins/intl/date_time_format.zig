@@ -36,7 +36,7 @@ pub fn createDateTimeFormat(
     options_value: Value,
     required: enum { date, time, any },
     defaults: enum { date, time, all },
-) Agent.Error!*Object {
+) Agent.Error!*DateTimeFormat {
     const iana_parser = icu4zig.IanaParser.init();
     defer iana_parser.deinit();
 
@@ -162,7 +162,7 @@ pub fn createDateTimeFormat(
     };
 
     // 18. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
-    date_time_format.as(DateTimeFormat).fields.locale = resolved.locale;
+    date_time_format.fields.locale = resolved.locale;
 
     // 19. Let resolvedCalendar be r.[[ca]].
     // 20. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
@@ -187,10 +187,10 @@ pub fn createDateTimeFormat(
         .{ "persian", .persian },
         .{ "roc", .roc },
     });
-    date_time_format.as(DateTimeFormat).fields.calendar = calendar_map.get(resolved.calendar.slice.ascii) orelse .gregorian;
+    date_time_format.fields.calendar = calendar_map.get(resolved.calendar.slice.ascii) orelse .gregorian;
 
     // 21. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
-    date_time_format.as(DateTimeFormat).fields.numbering_system = resolved.numbering_system;
+    date_time_format.fields.numbering_system = resolved.numbering_system;
 
     // TODO: 22-25.
 
@@ -222,7 +222,7 @@ pub fn createDateTimeFormat(
     // TODO: Detect invalid time zone
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
-    date_time_format.as(DateTimeFormat).fields.time_zone = try String.fromAscii(agent, time_zone_string);
+    date_time_format.fields.time_zone = try String.fromAscii(agent, time_zone_string);
 
     // TODO: 32. Let formatOptions be a new Record.
     // TODO: 33. Set formatOptions.[[hourCycle]] to hc.
@@ -352,7 +352,7 @@ pub fn createDateTimeFormat(
         .{ "medium", .medium },
         .{ "short", .short },
     });
-    date_time_format.as(DateTimeFormat).fields.date_style = if (date_style) |s|
+    date_time_format.fields.date_style = if (date_style) |s|
         date_style_map.get(s.slice.ascii).?
     else
         null;
@@ -381,7 +381,7 @@ pub fn createDateTimeFormat(
         .{ "medium", .medium },
         .{ "short", .short },
     });
-    date_time_format.as(DateTimeFormat).fields.time_style = if (time_style) |s|
+    date_time_format.fields.time_style = if (time_style) |s|
         time_style_map.get(s.slice.ascii).?
     else
         null;
@@ -446,13 +446,14 @@ pub fn createDateTimeFormat(
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "DateTimeFormat",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -491,7 +492,7 @@ pub const constructor = struct {
         //    b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
 
         // 4. Return dateTimeFormat.
-        return Value.from(date_time_format);
+        return Value.from(&date_time_format.object);
     }
 };
 
@@ -499,9 +500,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -673,7 +672,7 @@ pub const prototype = struct {
         }
 
         // 5. Return dtf.[[BoundFormat]].
-        return Value.from(date_time_format.fields.bound_format.?);
+        return Value.from(&date_time_format.fields.bound_format.?.object);
     }
 };
 
@@ -715,7 +714,7 @@ pub const DateTimeFormat = MakeObject(.{
         time_style: ?TimeStyle,
 
         /// [[BoundFormat]]
-        bound_format: ?*Object,
+        bound_format: ?*builtins.BuiltinFunction,
 
         pub const ResolvedOptions = struct {
             calendar: *const String,

@@ -346,7 +346,12 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         };
 
         // c. Perform ? CreateGlobalFunctionBinding(env, fn, fo, false).
-        try env.createGlobalFunctionBinding(agent, function_name, Value.from(function_object), false);
+        try env.createGlobalFunctionBinding(
+            agent,
+            function_name,
+            Value.from(&function_object.object),
+            false,
+        );
     }
 
     // 17. For each String vn of declaredVarNames, do

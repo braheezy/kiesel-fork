@@ -53,7 +53,7 @@ realm: *Realm,
 environment: ?Environment,
 
 /// [[Namespace]]
-namespace: ?*Object,
+namespace: ?*builtins.ModuleNamespace,
 
 /// [[ECMAScriptCode]]
 ecmascript_code: ast.Module,
@@ -1006,8 +1006,8 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     _ = try performPromiseThen(
         agent,
         capability.promise.as(builtins.Promise),
-        Value.from(on_fulfilled),
-        Value.from(on_rejected),
+        Value.from(&on_fulfilled.object),
+        Value.from(&on_rejected.object),
         null,
     );
 
@@ -1548,7 +1548,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             env.initializeBinding(
                 agent,
                 local_name,
-                Value.from(namespace),
+                Value.from(&namespace.object),
             ) catch |err| try noexcept(err);
         } else {
             // c. Else,
@@ -1591,7 +1591,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 env.initializeBinding(
                     agent,
                     local_name,
-                    Value.from(namespace),
+                    Value.from(&namespace.object),
                 ) catch |err| try noexcept(err);
             } else {
                 // iv. Else,
@@ -1726,7 +1726,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 env.initializeBinding(
                     agent,
                     name,
-                    Value.from(function_object),
+                    Value.from(&function_object.object),
                 ) catch |err| try noexcept(err);
             }
         }

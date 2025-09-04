@@ -15,14 +15,13 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 22.1.5.1 The %StringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -51,10 +50,7 @@ pub const prototype = struct {
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (!this_value.isObject() or !this_value.asObject().is(StringIterator)) {
-            return agent.throwException(.type_error, "This value must be an Array Iterator", .{});
-        }
-        const string_iterator = this_value.asObject().as(StringIterator);
+        const string_iterator = try this_value.requireInternalSlot(agent, StringIterator);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (string_iterator.fields == .completed) {

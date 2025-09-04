@@ -25,19 +25,21 @@ const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 
 /// 7.2 Properties of the Temporal.Duration Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-duration-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Duration",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -128,9 +130,8 @@ pub const constructor = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
-        return Value.from(
-            try createTemporalDuration(agent, temporal_rs_duration.?, new_target),
-        );
+        const duration = try createTemporalDuration(agent, temporal_rs_duration.?, new_target);
+        return Value.from(&duration.object);
     }
 
     /// 7.2.3 Temporal.Duration.compare ( one, two [ , options ] )
@@ -190,8 +191,8 @@ pub const constructor = struct {
         const result = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_compare(
-                one.as(Duration).fields.inner,
-                two.as(Duration).fields.inner,
+                one.fields.inner,
+                two.fields.inner,
                 relative_to.toRust(),
             ),
         );
@@ -204,7 +205,8 @@ pub const constructor = struct {
         const item = arguments.get(0);
 
         // 1. Return ? ToTemporalDuration(item).
-        return Value.from(try toTemporalDuration(agent, item));
+        const duration = try toTemporalDuration(agent, item);
+        return Value.from(&duration.object);
     }
 };
 
@@ -212,9 +214,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-duration-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -275,13 +275,12 @@ pub const prototype = struct {
         //    abs(duration.[[Microseconds]]), abs(duration.[[Nanoseconds]])).
         const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_abs(duration.fields.inner);
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration);
-        return Value.from(
-            createTemporalDuration(
-                agent,
-                temporal_rs_duration.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_duration = createTemporalDuration(
+            agent,
+            temporal_rs_duration.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.18 Temporal.Duration.prototype.add ( other )
@@ -290,18 +289,12 @@ pub const prototype = struct {
         const other = arguments.get(0);
 
         // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
-        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
         // 3. Return ? AddDurations(add, duration, other).
-        return Value.from(
-            try addDurations(
-                agent,
-                .add,
-                duration.fields.inner,
-                other,
-            ),
-        );
+        const new_duration = try addDurations(agent, .add, duration, other);
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.14 get Temporal.Duration.prototype.blank
@@ -413,13 +406,12 @@ pub const prototype = struct {
         // 3. Return CreateNegatedTemporalDuration(duration).
         const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_negated(duration.fields.inner);
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
-        return Value.from(
-            createTemporalDuration(
-                agent,
-                temporal_rs_duration.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_duration = createTemporalDuration(
+            agent,
+            temporal_rs_duration.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.9 get Temporal.Duration.prototype.seconds
@@ -452,18 +444,17 @@ pub const prototype = struct {
         const other = arguments.get(0);
 
         // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
-        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
         // 3. Return ? AddDurations(subtract, duration, other).
-        return Value.from(
-            try addDurations(
-                agent,
-                .subtract,
-                duration.fields.inner,
-                other,
-            ),
+        const new_duration = try addDurations(
+            agent,
+            .subtract,
+            duration,
+            other,
         );
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.23 Temporal.Duration.prototype.toJSON ( )
@@ -701,7 +692,8 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
-        return Value.from(try createTemporalDuration(agent, temporal_rs_duration.?, null));
+        const new_duration = try createTemporalDuration(agent, temporal_rs_duration.?, null);
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.3 get Temporal.Duration.prototype.years
@@ -734,13 +726,12 @@ pub const Duration = MakeObject(.{
 
 /// 7.5.12 ToTemporalDuration ( item )
 /// https://tc39.es/proposal-temporal/#sec-temporal-totemporalduration
-pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Object {
+pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Duration {
     // 1. If item is an Object and item has an [[InitializedTemporalDuration]] internal slot, then
-    if (item.isObject() and item.asObject().is(Duration)) {
+    if (item.castObject(Duration)) |duration| {
         // a. Return ! CreateTemporalDuration(item.[[Years]], item.[[Months]], item.[[Weeks]],
         //    item.[[Days]], item.[[Hours]], item.[[Minutes]], item.[[Seconds]],
         //    item.[[Milliseconds]], item.[[Microseconds]], item.[[Nanoseconds]]).
-        const duration = item.asObject().as(Duration);
         const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_clone(
             duration.fields.inner,
         );
@@ -965,7 +956,7 @@ pub fn createTemporalDuration(
     agent: *Agent,
     inner: *temporal_rs.c.Duration,
     maybe_new_target: ?*Object,
-) Agent.Error!*Object {
+) Agent.Error!*Duration {
     const realm = agent.currentRealm();
 
     // 1. If IsValidDuration(years, months, weeks, days, hours, minutes, seconds, milliseconds,
@@ -1002,9 +993,9 @@ pub fn createTemporalDuration(
 fn addDurations(
     agent: *Agent,
     comptime operation: enum { add, subtract },
-    duration: *const temporal_rs.c.Duration,
+    duration: *const Duration,
     other_value: Value,
-) Agent.Error!*Object {
+) Agent.Error!*Duration {
     // 1. Set other to ? ToTemporalDuration(other).
     const other = try toTemporalDuration(agent, other_value);
 
@@ -1022,15 +1013,15 @@ fn addDurations(
         .add => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_add(
-                duration,
-                other.as(builtins.temporal.Duration).fields.inner,
+                duration.fields.inner,
+                other.fields.inner,
             ),
         ),
         .subtract => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_subtract(
-                duration,
-                other.as(builtins.temporal.Duration).fields.inner,
+                duration.fields.inner,
+                other.fields.inner,
             ),
         ),
     };

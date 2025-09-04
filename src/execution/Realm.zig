@@ -40,7 +40,7 @@ global_object: *Object,
 global_env: *GlobalEnvironment,
 
 /// [[TemplateMap]]
-template_map: std.AutoHashMapUnmanaged(*ast.TemplateLiteral, *Object),
+template_map: std.AutoHashMapUnmanaged(*ast.TemplateLiteral, *builtins.Array),
 
 /// [[LoadedModules]]
 loaded_modules: ModuleRequest.HashMapUnmanaged(Module),

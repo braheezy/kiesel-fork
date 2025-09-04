@@ -12,7 +12,6 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
-const Object = types.Object;
 const Realm = execution.Realm;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
@@ -34,7 +33,7 @@ realm: *Realm,
 environment: ?Environment,
 
 /// [[Namespace]]
-namespace: ?*Object,
+namespace: ?*builtins.ModuleNamespace,
 
 /// [[HostDefined]]
 host_defined: SafePointer,

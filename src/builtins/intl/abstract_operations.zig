@@ -164,7 +164,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
         (locales.isObject() and locales.asObject().is(builtins.intl.Locale)))
     blk: {
         // a. Let O be CreateArrayFromList(« locales »).
-        break :blk try createArrayFromList(agent, &.{locales});
+        const array = try createArrayFromList(agent, &.{locales});
+        break :blk &array.object;
     } else blk: {
         // 4. Else,
         // a. Let O be ? ToObject(locales).
@@ -202,11 +203,11 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
             // iii. If kValue is an Object and kValue has an [[InitializedLocale]] internal slot,
             //      then
-            const tag = if (k_value.isObject() and k_value.asObject().is(builtins.intl.Locale)) blk: {
+            const tag = if (k_value.castObject(builtins.intl.Locale)) |locale| blk: {
                 // 1. Let tag be kValue.[[Locale]].
                 break :blk try String.fromAscii(
                     agent,
-                    try k_value.asObject().as(builtins.intl.Locale).fields.locale.toString(agent.gc_allocator),
+                    try locale.fields.locale.toString(agent.gc_allocator),
                 );
             } else blk: {
                 // iv. Else,

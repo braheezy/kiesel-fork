@@ -15,18 +15,20 @@ const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "BigInt",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -128,9 +130,7 @@ pub fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.Bi
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -167,10 +167,10 @@ pub const prototype = struct {
         if (value.isBigInt()) return value.asBigInt();
 
         // 2. If value is an Object and value has a [[BigIntData]] internal slot, then
-        if (value.isObject() and value.asObject().is(BigInt)) {
+        if (value.castObject(BigInt)) |big_int| {
             // a. Assert: value.[[BigIntData]] is a BigInt.
             // b. Return value.[[BigIntData]].
-            return value.asObject().as(BigInt).fields.big_int_data;
+            return big_int.fields.big_int_data;
         }
 
         // 3. Throw a TypeError exception.

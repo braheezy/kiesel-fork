@@ -18,19 +18,21 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "FinalizationRegistry",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -86,7 +88,7 @@ pub const constructor = struct {
         );
 
         // 8. Return finalizationRegistry.
-        return Value.from(finalization_registry);
+        return Value.from(&finalization_registry.object);
     }
 };
 
@@ -94,9 +96,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

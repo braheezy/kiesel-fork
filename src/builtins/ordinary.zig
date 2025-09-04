@@ -873,7 +873,8 @@ pub fn ordinaryOwnPropertyKeys(
 }
 
 pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?*Object) std.mem.Allocator.Error!*Object {
-    return ordinaryObjectCreateWithType(builtins.Object, agent, prototype, {});
+    const o = try ordinaryObjectCreateWithType(builtins.Object, agent, prototype, {});
+    return &o.object;
 }
 
 /// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
@@ -883,7 +884,7 @@ pub fn ordinaryObjectCreateWithType(
     agent: *Agent,
     prototype: ?*Object,
     fields: T.Fields,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*T {
     // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
     // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
     //    of internalSlotsList and additionalInternalSlotsList.
@@ -891,7 +892,7 @@ pub fn ordinaryObjectCreateWithType(
     // 3. Let O be MakeBasicObject(internalSlotsList).
     // 4. Set O.[[Prototype]] to proto.
     // 5. Return O.
-    return try T.create(agent, if (T.Fields != void) .{
+    return T.create(agent, if (T.Fields != void) .{
         .prototype = prototype,
         .fields = fields,
     } else .{
@@ -907,7 +908,7 @@ pub fn ordinaryCreateFromConstructor(
     constructor: *Object,
     comptime intrinsic_default_proto: []const u8,
     fields: T.Fields,
-) Agent.Error!*Object {
+) Agent.Error!*T {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
     //    as the [[Prototype]] value of an object.

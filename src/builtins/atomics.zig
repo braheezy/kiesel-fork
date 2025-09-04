@@ -136,7 +136,7 @@ fn revalidateAtomicAccess(
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(typedArray, unordered).
     // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer
     //    is a growable SharedArrayBuffer.
-    const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .unordered);
+    const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .unordered);
 
     // 3. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
     if (isTypedArrayOutOfBounds(ta)) {
@@ -404,9 +404,7 @@ fn atomicReadModifyWrite(
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

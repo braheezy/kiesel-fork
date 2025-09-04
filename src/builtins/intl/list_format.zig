@@ -28,13 +28,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "ListFormat",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -105,7 +106,7 @@ pub const constructor = struct {
             agent.platform.default_locale;
 
         // 9. Set listFormat.[[Locale]] to r.[[Locale]].
-        list_format.as(ListFormat).fields.locale = resolved_locale;
+        list_format.fields.locale = resolved_locale;
 
         // 10. Let type be ? GetOption(options, "type", string, « "conjunction", "disjunction",
         //     "unit" », "conjunction").
@@ -129,7 +130,7 @@ pub const constructor = struct {
             .{ "disjunction", .disjunction },
             .{ "unit", .unit },
         });
-        list_format.as(ListFormat).fields.type = type_map.get(type_.slice.ascii).?;
+        list_format.fields.type = type_map.get(type_.slice.ascii).?;
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
@@ -153,14 +154,14 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "narrow", .narrow },
         });
-        list_format.as(ListFormat).fields.style = style_map.get(style.slice.ascii).?;
+        list_format.fields.style = style_map.get(style.slice.ascii).?;
 
         // TODO: 14. Let resolvedLocaleData be r.[[LocaleData]].
         // TODO: 15. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].
         // TODO: 16. Set listFormat.[[Templates]] to dataLocaleTypes.[[<style>]].
 
         // 17. Return listFormat.
-        return Value.from(list_format);
+        return Value.from(&list_format.object);
     }
 };
 
@@ -168,9 +169,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

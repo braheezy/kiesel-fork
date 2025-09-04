@@ -29,13 +29,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "PluralRules",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -111,7 +112,7 @@ pub const constructor = struct {
             agent.platform.default_locale;
 
         // 9. Set pluralRules.[[Locale]] to r.[[Locale]].
-        plural_rules.as(PluralRules).fields.locale = resolved_locale;
+        plural_rules.fields.locale = resolved_locale;
 
         // 10. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
         const type_ = try options.getOption(
@@ -129,7 +130,7 @@ pub const constructor = struct {
             .{ "cardinal", .cardinal },
             .{ "ordinal", .ordinal },
         });
-        plural_rules.as(PluralRules).fields.type = type_map.get(type_.slice.ascii).?;
+        plural_rules.fields.type = type_map.get(type_.slice.ascii).?;
 
         // 12. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
         //     "engineering", "compact" », "standard").
@@ -155,12 +156,12 @@ pub const constructor = struct {
             .{ "engineering", .engineering },
             .{ "compact", .compact },
         });
-        plural_rules.as(PluralRules).fields.notation = notation_map.get(notation.slice.ascii).?;
+        plural_rules.fields.notation = notation_map.get(notation.slice.ascii).?;
 
         // TODO: 14. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
 
         // 15. Return pluralRules.
-        return Value.from(plural_rules);
+        return Value.from(&plural_rules.object);
     }
 };
 
@@ -168,9 +169,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -270,10 +269,11 @@ pub const prototype = struct {
             PropertyKey.from("notation"),
             Value.from(resolved_options.notation),
         );
+        const plural_categories_array = try createArrayFromList(agent, plural_categories.items);
         try options.createDataPropertyDirect(
             agent,
             PropertyKey.from("pluralCategories"),
-            Value.from(try createArrayFromList(agent, plural_categories.items)),
+            Value.from(&plural_categories_array.object),
         );
 
         // TODO: minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,

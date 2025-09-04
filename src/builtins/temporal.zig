@@ -17,6 +17,7 @@ const Realm = execution.Realm;
 const String = types.String;
 const StringParser = utils.StringParser;
 const Value = types.Value;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 comptime {
     const build_options = @import("build-options");
@@ -44,9 +45,7 @@ pub const ZonedDateTime = zoned_date_time.ZonedDateTime;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -146,12 +145,10 @@ pub fn toTemporalTimeZoneIdentifier(
     // 1. If temporalTimeZoneLike is an Object, then
     if (temporal_time_zone_like.isObject()) {
         // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
-        if (temporal_time_zone_like.asObject().is(ZonedDateTime)) {
+        if (temporal_time_zone_like.asObject().cast(ZonedDateTime)) |zoned_date_time_| {
             // i. Return temporalTimeZoneLike.[[TimeZone]].
             const temporal_rs_time_zone = temporal_rs.c.temporal_rs_TimeZone_clone(
-                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
-                    temporal_time_zone_like.asObject().as(ZonedDateTime).fields.inner,
-                ),
+                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(zoned_date_time_.fields.inner),
             );
             return temporal_rs_time_zone.?;
         }
@@ -1018,28 +1015,28 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     // 5. If value is an Object, then
     const partial: temporal_rs.c.PartialZonedDateTime = if (value.isObject()) blk: {
         // a. If value has an [[InitializedTemporalZonedDateTime]] internal slot, then
-        if (value.asObject().is(builtins.temporal.ZonedDateTime)) {
+        if (value.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time_| {
             // i. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: value }.
             return .{
-                .borrowed_zoned_date_time = value.asObject().as(builtins.temporal.ZonedDateTime).fields.inner,
+                .borrowed_zoned_date_time = zoned_date_time_.fields.inner,
             };
         }
 
         // b. If value has an [[InitializedTemporalDate]] internal slot, then
-        if (value.asObject().is(builtins.temporal.PlainDate)) {
+        if (value.asObject().cast(builtins.temporal.PlainDate)) |plain_date_| {
             // i. Return the Record { [[PlainRelativeTo]]: value, [[ZonedRelativeTo]]: undefined }.
             return .{
-                .borrowed_plain_date = value.asObject().as(builtins.temporal.PlainDate).fields.inner,
+                .borrowed_plain_date = plain_date_.fields.inner,
             };
         }
 
         // c. If value has an [[InitializedTemporalDateTime]] internal slot, then
-        if (value.asObject().is(builtins.temporal.PlainDateTime)) {
+        if (value.asObject().cast(builtins.temporal.PlainDateTime)) |plain_date_time_| {
             // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]], value.[[Calendar]]).
             const temporal_rs_plain_date = try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
-                    value.asObject().as(builtins.temporal.PlainDateTime).fields.inner,
+                    plain_date_time_.fields.inner,
                 ),
             );
 

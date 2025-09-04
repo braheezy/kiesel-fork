@@ -19,18 +19,20 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIteratorDirect = types.getIteratorDirect;
 const getIteratorFlattenable = types.getIteratorFlattenable;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 27.1.3.1 The Iterator Constructor
 /// https://tc39.es/ecma262/#sec-iterator-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Iterator",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -60,15 +62,14 @@ pub const constructor = struct {
         }
 
         // 2. Return ? OrdinaryCreateFromConstructor(NewTarget, "%Iterator.prototype%").
-        return Value.from(
-            try ordinaryCreateFromConstructor(
-                Iterator,
-                agent,
-                new_target.?,
-                "%Iterator.prototype%",
-                {},
-            ),
+        const iterator = try ordinaryCreateFromConstructor(
+            Iterator,
+            agent,
+            new_target.?,
+            "%Iterator.prototype%",
+            {},
         );
+        return Value.from(&iterator.object);
     }
 
     /// 27.1.3.2.1 Iterator.from ( O )
@@ -101,7 +102,7 @@ pub const constructor = struct {
         });
 
         // 6. Return wrapper.
-        return Value.from(wrapper);
+        return Value.from(&wrapper.object);
     }
 };
 
@@ -109,9 +110,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -317,7 +316,7 @@ pub const prototype = struct {
         });
 
         // 13. Return result.
-        return Value.from(result);
+        return Value.from(&result.object);
     }
 
     /// 27.1.4.3 Iterator.prototype.every ( predicate )
@@ -486,7 +485,7 @@ pub const prototype = struct {
         });
 
         // 9. Return result.
-        return Value.from(result);
+        return Value.from(&result.object);
     }
 
     /// 27.1.4.5 Iterator.prototype.find ( predicate )
@@ -695,7 +694,7 @@ pub const prototype = struct {
         });
 
         // 9. Return result.
-        return Value.from(result);
+        return Value.from(&result.object);
     }
 
     /// 27.1.4.7 Iterator.prototype.forEach ( procedure )
@@ -854,7 +853,7 @@ pub const prototype = struct {
         });
 
         // 9. Return result.
-        return Value.from(result);
+        return Value.from(&result.object);
     }
 
     /// 27.1.4.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
@@ -1125,7 +1124,7 @@ pub const prototype = struct {
         });
 
         // 13. Return result.
-        return Value.from(result);
+        return Value.from(&result.object);
     }
 
     /// 27.1.4.12 Iterator.prototype.toArray ( )
@@ -1152,7 +1151,8 @@ pub const prototype = struct {
             // c. Append value to items.
             try items.append(agent.gc_allocator, value);
         }
-        return Value.from(try createArrayFromList(agent, items.items));
+        const array = try createArrayFromList(agent, items.items);
+        return Value.from(&array.object);
     }
 
     /// 27.1.4.13 Iterator.prototype [ %Symbol.iterator% ] ( )

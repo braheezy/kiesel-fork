@@ -15,18 +15,20 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 20.4.2 Properties of the Symbol Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Symbol",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -229,9 +231,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -280,13 +280,11 @@ pub const prototype = struct {
         if (value.isSymbol()) return value.asSymbol();
 
         // 2. If value is an Object and value has a [[SymbolData]] internal slot, then
-        if (value.isObject() and value.asObject().is(Symbol)) {
+        if (value.castObject(Symbol)) |symbol| {
             // a. Let s be value.[[SymbolData]].
             // b. Assert: s is a Symbol.
-            const s = value.asObject().as(Symbol).fields.symbol_data;
-
             // c. Return s.
-            return s;
+            return symbol.fields.symbol_data;
         }
 
         // 3. Throw a TypeError exception.

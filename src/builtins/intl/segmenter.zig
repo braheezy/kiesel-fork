@@ -28,13 +28,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Segmenter",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -100,7 +101,7 @@ pub const constructor = struct {
             agent.platform.default_locale;
 
         // 10. Set segmenter.[[Locale]] to r.[[Locale]].
-        segmenter.as(Segmenter).fields.locale = resolved_locale;
+        segmenter.fields.locale = resolved_locale;
 
         // 11. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
         //     "sentence" », "grapheme").
@@ -124,10 +125,10 @@ pub const constructor = struct {
             .{ "word", .word },
             .{ "sentence", .sentence },
         });
-        segmenter.as(Segmenter).fields.segmenter_granularity = granularity_map.get(granularity.slice.ascii).?;
+        segmenter.fields.segmenter_granularity = granularity_map.get(granularity.slice.ascii).?;
 
         // 13. Return segmenter.
-        return Value.from(segmenter);
+        return Value.from(&segmenter.object);
     }
 };
 
@@ -135,9 +136,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -220,7 +219,8 @@ pub const prototype = struct {
         const string = try string_value.toString(agent);
 
         // 4. Return CreateSegmentsObject(segmenter, string).
-        return Value.from(try createSegmentsObject(agent, segmenter, string));
+        const segments = try createSegmentsObject(agent, segmenter, string);
+        return Value.from(&segments.object);
     }
 };
 

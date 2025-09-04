@@ -17,18 +17,20 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 26.1.2 Properties of the WeakRef Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "WeakRef",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -83,7 +85,7 @@ pub const constructor = struct {
         if (build_options.enable_libgc) {
             // Implements 9.9.3 Execution step 1.a
             // https://tc39.es/ecma262/#sec-weakref-execution
-            const weak_ref_target_ptr = &weak_ref.as(WeakRef).fields.weak_ref_target;
+            const weak_ref_target_ptr = &weak_ref.fields.weak_ref_target;
             const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(*?Value.Weak));
             finalizer_data.* = .{ .data = weak_ref_target_ptr };
             gc.registerFinalizer(weak_ref_target_ptr.*.?.getPtr(), finalizer_data, struct {
@@ -95,7 +97,7 @@ pub const constructor = struct {
         }
 
         // 6. Return weakRef.
-        return Value.from(weak_ref);
+        return Value.from(&weak_ref.object);
     }
 };
 
@@ -103,9 +105,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

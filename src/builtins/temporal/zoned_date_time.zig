@@ -51,13 +51,14 @@ const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-zoneddatetime-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "ZonedDateTime",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -155,9 +156,8 @@ pub const constructor = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, new_target),
-        );
+        const zoned_date_time = try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, new_target);
+        return Value.from(&zoned_date_time.object);
     }
 
     /// 6.2.3 Temporal.ZonedDateTime.compare ( one, two )
@@ -175,8 +175,8 @@ pub const constructor = struct {
         // 3. Return 𝔽(CompareEpochNanoseconds(one.[[EpochNanoseconds]], two.[[EpochNanoseconds]])).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_compare_instant(
-                one.as(ZonedDateTime).fields.inner,
-                two.as(ZonedDateTime).fields.inner,
+                one.fields.inner,
+                two.fields.inner,
             ),
         );
     }
@@ -188,7 +188,8 @@ pub const constructor = struct {
         const options = arguments.get(1);
 
         // 1. Return ? ToTemporalZonedDateTime(item, options).
-        return Value.from(try toTemporalZonedDateTime(agent, item, options));
+        const zoned_date_time = try toTemporalZonedDateTime(agent, item, options);
+        return Value.from(&zoned_date_time.object);
     }
 };
 
@@ -196,9 +197,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-zoneddatetime-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -281,15 +280,14 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return ? AddDurationToZonedDateTime(add, zonedDateTime, temporalDurationLike, options).
-        return Value.from(
-            try addDurationToZonedDateTime(
-                agent,
-                .add,
-                zoned_date_time.fields.inner,
-                temporal_duration_like,
-                options,
-            ),
+        const new_zoned_date_time = try addDurationToZonedDateTime(
+            agent,
+            .add,
+            zoned_date_time,
+            temporal_duration_like,
+            options,
         );
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.3 get Temporal.ZonedDateTime.prototype.calendarId
@@ -447,7 +445,7 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_equals(
                 zoned_date_time.fields.inner,
-                other.as(ZonedDateTime).fields.inner,
+                other.fields.inner,
             ),
         );
     }
@@ -547,13 +545,12 @@ pub const prototype = struct {
         );
         if (temporal_rs_zoned_date_time == null) return .null;
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.11 get Temporal.ZonedDateTime.prototype.hour
@@ -766,13 +763,12 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_start_of_day(zoned_date_time.fields.inner),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.36 Temporal.ZonedDateTime.prototype.subtract ( temporalDurationLike [ , options ] )
@@ -786,15 +782,14 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return ? AddDurationToZonedDateTime(subtract, zonedDateTime, temporalDurationLike, options).
-        return Value.from(
-            try addDurationToZonedDateTime(
-                agent,
-                .subtract,
-                zoned_date_time.fields.inner,
-                temporal_duration_like,
-                options,
-            ),
+        const new_zoned_date_time = try addDurationToZonedDateTime(
+            agent,
+            .subtract,
+            zoned_date_time,
+            temporal_duration_like,
+            options,
         );
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.4 get Temporal.ZonedDateTime.prototype.timeZoneId
@@ -825,13 +820,12 @@ pub const prototype = struct {
             zoned_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(
-            createTemporalInstant(
-                agent,
-                temporal_rs_instant.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const instant = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&instant.object);
     }
 
     /// 6.3.43 Temporal.ZonedDateTime.prototype.toJSON ( )
@@ -897,13 +891,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
-        return Value.from(
-            createTemporalDate(
-                agent,
-                temporal_rs_plain_date.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const plain_date = createTemporalDate(
+            agent,
+            temporal_rs_plain_date.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_date.object);
     }
 
     /// 6.3.50 Temporal.ZonedDateTime.prototype.toPlainDateTime ( )
@@ -923,13 +916,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
-        return Value.from(
-            createTemporalDateTime(
-                agent,
-                temporal_rs_plain_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const plain_date_time = createTemporalDateTime(
+            agent,
+            temporal_rs_plain_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_date_time.object);
     }
 
     /// 6.3.49 Temporal.ZonedDateTime.prototype.toPlainTime ( )
@@ -949,13 +941,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
-        return Value.from(
-            createTemporalTime(
-                agent,
-                temporal_rs_plain_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const plain_time = createTemporalTime(
+            agent,
+            temporal_rs_plain_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_time.object);
     }
 
     /// 6.3.41 Temporal.ZonedDateTime.prototype.toString ( [ options ] )
@@ -1172,13 +1163,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.34 Temporal.ZonedDateTime.prototype.withCalendar ( calendarLike )
@@ -1203,13 +1193,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.32 Temporal.ZonedDateTime.prototype.withPlainTime ( [ plainTimeLike ] )
@@ -1225,40 +1214,35 @@ pub const prototype = struct {
         // 4. Let calendar be zonedDateTime.[[Calendar]].
         // 5. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
 
-        // On the stack to prevent the inner temporal_rs PlainTime from being destroyed during GC
-        var plain_time: *Object = undefined;
-        var maybe_time: ?*temporal_rs.c.PlainTime = null;
-
         // 6. If plainTimeLike is undefined, then
-        if (plain_time_like.isUndefined()) {
+        const maybe_plain_time = if (plain_time_like.isUndefined()) blk: {
             // a. Let epochNs be ? GetStartOfDay(timeZone, isoDateTime.[[ISODate]]).
             // NOTE: This is handled by passing null to temporal_rs.
-        } else {
+            break :blk null;
+        } else blk: {
             // 7. Else,
             // a. Let plainTime be ? ToTemporalTime(plainTimeLike).
-            plain_time = try toTemporalPlainTime(agent, plain_time_like, null);
-            maybe_time = plain_time.as(builtins.temporal.PlainTime).fields.inner;
+            break :blk try toTemporalPlainTime(agent, plain_time_like, null);
 
             // b. Let resultISODateTime be CombineISODateAndTimeRecord(isoDateTime.[[ISODate]], plainTime.[[Time]]).
             // c. Let epochNs be ? GetEpochNanosecondsFor(timeZone, resultISODateTime, compatible).
-        }
+        };
 
         // 8. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, calendar).
         const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_with_plain_time(
                 zoned_date_time.fields.inner,
-                maybe_time,
+                if (maybe_plain_time) |plain_time| plain_time.fields.inner else null,
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.33 Temporal.ZonedDateTime.prototype.withTimeZone ( timeZoneLike )
@@ -1283,13 +1267,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.7 get Temporal.ZonedDateTime.prototype.year
@@ -1347,7 +1330,7 @@ pub fn toTemporalZonedDateTime(
     agent: *Agent,
     item: Value,
     maybe_options_value: ?Value,
-) Agent.Error!*Object {
+) Agent.Error!*ZonedDateTime {
     // 1. If options is not present, set options to undefined.
     const options_value: Value = maybe_options_value orelse .undefined;
 
@@ -1356,7 +1339,7 @@ pub fn toTemporalZonedDateTime(
     // 4. If item is an Object, then
     const temporal_rs_zoned_date_time = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
-        if (item.asObject().is(ZonedDateTime)) {
+        if (item.asObject().cast(ZonedDateTime)) |zoned_date_time| {
             // i. NOTE: The following steps, and similar ones below, read options and perform
             //    independent validation in alphabetical order (GetTemporalDisambiguationOption
             //    reads "disambiguation", GetTemporalOffsetOption reads "offset", and
@@ -1380,7 +1363,6 @@ pub fn toTemporalZonedDateTime(
 
             // vi. Return ! CreateTemporalZonedDateTime(item.[[EpochNanoseconds]],
             //     item.[[TimeZone]], item.[[Calendar]]).
-            const zoned_date_time = item.asObject().as(ZonedDateTime);
             break :blk temporal_rs.c.temporal_rs_ZonedDateTime_clone(
                 zoned_date_time.fields.inner,
             );
@@ -1548,7 +1530,7 @@ pub fn createTemporalZonedDateTime(
     agent: *Agent,
     inner: *temporal_rs.c.ZonedDateTime,
     maybe_new_target: ?*Object,
-) Agent.Error!*Object {
+) Agent.Error!*ZonedDateTime {
     const realm = agent.currentRealm();
 
     // 1. Assert: IsValidEpochNanoseconds(epochNanoseconds) is true.
@@ -1575,10 +1557,10 @@ pub fn createTemporalZonedDateTime(
 pub fn addDurationToZonedDateTime(
     agent: *Agent,
     comptime operation: enum { add, subtract },
-    zoned_date_time: *const temporal_rs.c.ZonedDateTime,
+    zoned_date_time: *const ZonedDateTime,
     temporal_duration_like: Value,
     options_value: Value,
-) Agent.Error!*Object {
+) Agent.Error!*ZonedDateTime {
     // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
     const duration_ = try toTemporalDuration(agent, temporal_duration_like);
 
@@ -1600,16 +1582,16 @@ pub fn addDurationToZonedDateTime(
         .add => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_add(
-                zoned_date_time,
-                duration_.as(builtins.temporal.Duration).fields.inner,
+                zoned_date_time.fields.inner,
+                duration_.fields.inner,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
         ),
         .subtract => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_subtract(
-                zoned_date_time,
-                duration_.as(builtins.temporal.Duration).fields.inner,
+                zoned_date_time.fields.inner,
+                duration_.fields.inner,
                 .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
             ),
         ),

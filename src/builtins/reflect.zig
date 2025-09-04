@@ -14,12 +14,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -278,13 +277,12 @@ pub const namespace = struct {
         defer agent.gc_allocator.free(keys);
 
         // 3. Return CreateArrayFromList(keys).
-        return Value.from(
-            try createArrayFromListMapToValue(agent, PropertyKey, keys, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
-                    return property_key.toValue(agent_);
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, PropertyKey, keys, struct {
+            fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
+                return property_key.toValue(agent_);
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 
     /// 28.1.11 Reflect.preventExtensions ( target )

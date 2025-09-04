@@ -23,6 +23,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
@@ -30,13 +31,14 @@ const promiseResolve = builtins.promiseResolve;
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "AsyncFunction",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -63,14 +65,15 @@ pub const constructor = struct {
         const body_arg = maybe_body_arg orelse Value.from("");
 
         // 3. Return ? CreateDynamicFunction(C, NewTarget, async, parameterArgs, bodyArg).
-        return Value.from(try createDynamicFunction(
+        const ecmascript_function = try createDynamicFunction(
             agent,
             constructor_,
             new_target,
             .async,
             parameter_args,
             body_arg,
-        ));
+        );
+        return Value.from(&ecmascript_function.object);
     }
 };
 
@@ -78,9 +81,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Function.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -253,7 +254,8 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     const async_context = agent.runningExecutionContext();
 
     // 2. Let promise be ? PromiseResolve(%Promise%, value).
-    const promise = try promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value);
+    const promise_object = try promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value);
+    const promise = promise_object.as(builtins.Promise);
 
     const Captures = struct {
         async_context: *ExecutionContext,
@@ -284,14 +286,12 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     }.func;
 
     // 4. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
-    const on_fulfilled = Value.from(
-        try createBuiltinFunction(
-            agent,
-            .{ .function = fulfilled_closure },
-            1,
-            "",
-            .{ .additional_fields = .make(*Captures, captures) },
-        ),
+    const on_fulfilled = try createBuiltinFunction(
+        agent,
+        .{ .function = fulfilled_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
     );
 
     // 5. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
@@ -317,37 +317,35 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     }.func;
 
     // 6. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
-    const on_rejected = Value.from(
-        try createBuiltinFunction(
-            agent,
-            .{ .function = rejected_closure },
-            1,
-            "",
-            .{ .additional_fields = .make(*Captures, captures) },
-        ),
+    const on_rejected = try createBuiltinFunction(
+        agent,
+        .{ .function = rejected_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
     );
 
     // 7. Perform PerformPromiseThen(promise, onFulfilled, onRejected).
     _ = try performPromiseThen(
         agent,
-        promise.as(builtins.Promise),
-        on_fulfilled,
-        on_rejected,
+        promise,
+        Value.from(&on_fulfilled.object),
+        Value.from(&on_rejected.object),
         null,
     );
 
     // TODO: 8-12.
     agent.drainJobQueue();
-    switch (promise.as(builtins.Promise).fields.promise_state) {
-        .pending => return Value.from(promise), // `await properAwait()` :)
+    switch (promise.fields.promise_state) {
+        .pending => return Value.from(&promise.object), // `await properAwait()` :)
         .rejected => {
             agent.exception = .{
-                .value = promise.as(builtins.Promise).fields.promise_result,
+                .value = promise.fields.promise_result,
                 // TODO: Capture stack when rejecting a promise
                 .stack_trace = &.{},
             };
             return error.ExceptionThrown;
         },
-        .fulfilled => return promise.as(builtins.Promise).fields.promise_result,
+        .fulfilled => return promise.fields.promise_result,
     }
 }

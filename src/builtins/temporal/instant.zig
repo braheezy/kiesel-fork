@@ -27,6 +27,7 @@ const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
 const numberToBigInt = builtins.numberToBigInt;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const toTemporalDuration = builtins.toTemporalDuration;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
@@ -35,13 +36,14 @@ const validateTemporalUnitValue = builtins.validateTemporalUnitValue;
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-instant-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Instant",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -99,9 +101,8 @@ pub const constructor = struct {
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(
-            try createTemporalInstant(agent, temporal_rs_instant.?, new_target),
-        );
+        const instant = try createTemporalInstant(agent, temporal_rs_instant.?, new_target);
+        return Value.from(&instant.object);
     }
 
     /// 8.2.5 Temporal.Instant.compare ( one, two )
@@ -118,10 +119,7 @@ pub const constructor = struct {
 
         // 3. Return 𝔽(CompareEpochNanoseconds(one.[[EpochNanoseconds]], two.[[EpochNanoseconds]])).
         return Value.from(
-            temporal_rs.c.temporal_rs_Instant_compare(
-                one.as(Instant).fields.inner,
-                two.as(Instant).fields.inner,
-            ),
+            temporal_rs.c.temporal_rs_Instant_compare(one.fields.inner, two.fields.inner),
         );
     }
 
@@ -131,7 +129,8 @@ pub const constructor = struct {
         const item = arguments.get(0);
 
         // 1. Return ? ToTemporalInstant(item).
-        return Value.from(try toTemporalInstant(agent, item));
+        const instant = try toTemporalInstant(agent, item);
+        return Value.from(&instant.object);
     }
 
     /// 8.2.3 Temporal.Instant.fromEpochMilliseconds ( epochMilliseconds )
@@ -154,9 +153,12 @@ pub const constructor = struct {
             temporal_rs.c.temporal_rs_Instant_from_epoch_milliseconds(epoch_milliseconds),
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(
-            createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
-        );
+        const instant = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&instant.object);
     }
 
     /// 8.2.4 Temporal.Instant.fromEpochNanoseconds ( epochNanoseconds )
@@ -177,9 +179,12 @@ pub const constructor = struct {
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(
-            createTemporalInstant(agent, temporal_rs_instant.?, null) catch |err| try noexcept(err),
-        );
+        const instant = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&instant.object);
     }
 };
 
@@ -187,9 +192,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-instant-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -236,14 +239,13 @@ pub const prototype = struct {
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
         // 3. Return ? AddDurationToInstant(add, instant, temporalDurationLike).
-        return Value.from(
-            try addDurationToInstant(
-                agent,
-                .add,
-                instant.fields.inner,
-                temporal_duration_like,
-            ),
+        const new_instant = try addDurationToInstant(
+            agent,
+            .add,
+            instant,
+            temporal_duration_like,
         );
+        return Value.from(&new_instant.object);
     }
 
     /// 8.3.3 get Temporal.Instant.prototype.epochMilliseconds
@@ -293,7 +295,7 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_Instant_equals(
                 instant.fields.inner,
-                other.as(Instant).fields.inner,
+                other.fields.inner,
             ),
         );
     }
@@ -308,14 +310,13 @@ pub const prototype = struct {
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
         // 3. Return ? AddDurationToInstant(subtract, instant, temporalDurationLike).
-        return Value.from(
-            try addDurationToInstant(
-                agent,
-                .subtract,
-                instant.fields.inner,
-                temporal_duration_like,
-            ),
+        const new_instant = try addDurationToInstant(
+            agent,
+            .subtract,
+            instant,
+            temporal_duration_like,
         );
+        return Value.from(&new_instant.object);
     }
 
     /// 8.3.13 Temporal.Instant.prototype.toJSON ( )
@@ -465,13 +466,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(
-            createTemporalZonedDateTime(
-                agent,
-                temporal_rs_zoned_date_time.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&zoned_date_time.object);
     }
 
     /// 8.3.14 Temporal.Instant.prototype.valueOf ( )
@@ -518,7 +518,7 @@ pub fn createTemporalInstant(
     agent: *Agent,
     inner: *temporal_rs.c.Instant,
     maybe_new_target: ?*Object,
-) Agent.Error!*Object {
+) Agent.Error!*Instant {
     const realm = agent.currentRealm();
 
     // 1. Assert: IsValidEpochNanoseconds(epochNanoseconds) is true.
@@ -541,7 +541,7 @@ pub fn createTemporalInstant(
 
 /// 8.5.3 ToTemporalInstant ( item )
 /// https://tc39.es/proposal-temporal/#sec-temporal-totemporalinstant
-pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
+pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
     var item = item_;
 
     // 1. If item is an Object, then
@@ -550,14 +550,12 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
         //    internal slot, then
         if (item.asObject().is(Instant) or item.asObject().is(builtins.temporal.ZonedDateTime)) {
             // i. Return ! CreateTemporalInstant(item.[[EpochNanoseconds]]).
-            const temporal_rs_instant = if (item.asObject().is(Instant))
-                temporal_rs.c.temporal_rs_Instant_clone(
-                    item.asObject().as(Instant).fields.inner,
-                )
+            const temporal_rs_instant = if (item.asObject().cast(Instant)) |instant|
+                temporal_rs.c.temporal_rs_Instant_clone(instant.fields.inner)
+            else if (item.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time|
+                temporal_rs.c.temporal_rs_ZonedDateTime_to_instant(zoned_date_time.fields.inner)
             else
-                temporal_rs.c.temporal_rs_ZonedDateTime_to_instant(
-                    item.asObject().as(builtins.temporal.ZonedDateTime).fields.inner,
-                );
+                unreachable;
             errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
             return createTemporalInstant(
                 agent,
@@ -613,9 +611,9 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Object {
 fn addDurationToInstant(
     agent: *Agent,
     comptime operation: enum { add, subtract },
-    instant: *const temporal_rs.c.Instant,
+    instant: *const Instant,
     temporal_duration_like: Value,
-) Agent.Error!*Object {
+) Agent.Error!*Instant {
     // 1. Let duration be ? ToTemporalDuration(temporalDurationLike).
     const duration = try toTemporalDuration(agent, temporal_duration_like);
 
@@ -629,15 +627,15 @@ fn addDurationToInstant(
         .add => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_add(
-                instant,
-                duration.as(builtins.temporal.Duration).fields.inner,
+                instant.fields.inner,
+                duration.fields.inner,
             ),
         ),
         .subtract => try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_subtract(
-                instant,
-                duration.as(builtins.temporal.Duration).fields.inner,
+                instant.fields.inner,
+                duration.fields.inner,
             ),
         ),
     };

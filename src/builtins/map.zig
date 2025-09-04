@@ -22,6 +22,7 @@ const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 24.1.1.2 AddEntriesFromIterable ( target, iterable, adder )
 /// https://tc39.es/ecma262/#sec-add-entries-from-iterable
@@ -77,13 +78,14 @@ pub fn addEntriesFromIterable(
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Map",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -123,10 +125,10 @@ pub const constructor = struct {
         );
 
         // 4. If iterable is either undefined or null, return map.
-        if (iterable.isUndefined() or iterable.isNull()) return Value.from(map);
+        if (iterable.isUndefined() or iterable.isNull()) return Value.from(&map.object);
 
         // 5. Let adder be ? Get(map, "set").
-        const adder = try map.get(agent, PropertyKey.from("set"));
+        const adder = try map.object.get(agent, PropertyKey.from("set"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -134,7 +136,7 @@ pub const constructor = struct {
         }
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
-        return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.asObject()));
+        return Value.from(try addEntriesFromIterable(agent, &map.object, iterable, adder.asObject()));
     }
 
     /// 24.1.2.1 Map.groupBy ( items, callback )
@@ -148,11 +150,12 @@ pub const constructor = struct {
         const groups = try items.groupBy(agent, callback, .collection);
 
         // 2. Let map be ! Construct(%Map%).
-        const map = (try realm.intrinsics.@"%Map%"()).construct(
+        const map_object = (try realm.intrinsics.@"%Map%"()).construct(
             agent,
             &.{},
             null,
         ) catch |err| try noexcept(err);
+        const map = map_object.as(Map);
 
         // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
         var it = groups.iterator();
@@ -162,11 +165,15 @@ pub const constructor = struct {
 
             // b. Let entry be the Record { [[Key]]: g.[[Key]], [[Value]]: elements }.
             // c. Append entry to map.[[MapData]].
-            try map.as(Map).fields.map_data.putNoClobber(agent.gc_allocator, entry.key_ptr.*, Value.from(elements));
+            try map.fields.map_data.putNoClobber(
+                agent.gc_allocator,
+                entry.key_ptr.*,
+                Value.from(&elements.object),
+            );
         }
 
         // 4. Return map.
-        return Value.from(map);
+        return Value.from(&map.object);
     }
 
     /// 24.1.2.3 get Map [ %Symbol.species% ]
@@ -181,9 +188,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -280,7 +285,8 @@ pub const prototype = struct {
         const map = this_value;
 
         // 2. Return ? CreateMapIterator(M, key+value).
-        return Value.from(try createMapIterator(agent, map, .@"key+value"));
+        const map_iterator = try createMapIterator(agent, map, .@"key+value");
+        return Value.from(&map_iterator.object);
     }
 
     /// 24.1.3.5 Map.prototype.forEach ( callback [ , thisArg ] )
@@ -381,7 +387,8 @@ pub const prototype = struct {
         const map = this_value;
 
         // 2. Return ? CreateMapIterator(M, key).
-        return Value.from(try createMapIterator(agent, map, .key));
+        const map_iterator = try createMapIterator(agent, map, .key);
+        return Value.from(&map_iterator.object);
     }
 
     /// 24.1.3.9 Map.prototype.set ( key, value )
@@ -438,7 +445,8 @@ pub const prototype = struct {
         const map = this_value;
 
         // 2. Return ? CreateMapIterator(M, value).
-        return Value.from(try createMapIterator(agent, map, .value));
+        const map_iterator = try createMapIterator(agent, map, .value);
+        return Value.from(&map_iterator.object);
     }
 };
 

@@ -27,13 +27,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "DisplayNames",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -135,7 +136,7 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "long", .long },
         });
-        display_names.as(DisplayNames).fields.options.style = style_map.get(style.slice.ascii).?;
+        display_names.fields.options.style = style_map.get(style.slice.ascii).?;
 
         // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
         //     "currency", "calendar", "dateTimeField" », undefined).
@@ -170,7 +171,7 @@ pub const constructor = struct {
             .{ "calendar", .calendar },
             .{ "dateTimeField", .date_time_field },
         });
-        display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.slice.ascii).?;
+        display_names.fields.type = type_map.get(@"type".?.slice.ascii).?;
 
         // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback = try options.getOption(
@@ -191,10 +192,10 @@ pub const constructor = struct {
             .{ "code", .code },
             .{ "none", .none },
         });
-        display_names.as(DisplayNames).fields.options.fallback = fallback_map.get(fallback.slice.ascii).?;
+        display_names.fields.options.fallback = fallback_map.get(fallback.slice.ascii).?;
 
         // 17. Set displayNames.[[Locale]] to r.[[Locale]].
-        display_names.as(DisplayNames).fields.locale = resolved_locale;
+        display_names.fields.locale = resolved_locale;
 
         // 18. Let resolvedLocaleData be r.[[LocaleData]].
         // 19. Let types be resolvedLocaleData.[[types]].
@@ -226,14 +227,14 @@ pub const constructor = struct {
             .{ "dialect", .dialect },
             .{ "standard", .standard },
         });
-        display_names.as(DisplayNames).fields.options.language_display = language_display_map.get(language_display.slice.ascii).?;
+        display_names.fields.options.language_display = language_display_map.get(language_display.slice.ascii).?;
 
         // 25. Let styleFields be typeFields.[[<style>]].
         // 26. Assert: styleFields is a Record (see 12.2.3).
         // 27. Set displayNames.[[Fields]] to styleFields.
 
         // 28. Return displayNames.
-        return Value.from(display_names);
+        return Value.from(&display_names.object);
     }
 };
 
@@ -241,9 +242,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

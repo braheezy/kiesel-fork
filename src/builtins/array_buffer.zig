@@ -22,6 +22,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createByteDataBlock = types.createByteDataBlock;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 const data_block_max_byte_length = types.data_block_max_byte_length;
 
@@ -59,7 +60,7 @@ pub fn allocateArrayBuffer(
     constructor_: *Object,
     byte_length: u64,
     max_byte_length: ?u53,
-) Agent.Error!*Object {
+) Agent.Error!*ArrayBuffer {
     // 1. Let slots be « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
@@ -83,7 +84,7 @@ pub fn allocateArrayBuffer(
     }
 
     // 4. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%ArrayBuffer.prototype%", slots).
-    const object = try ordinaryCreateFromConstructor(
+    const array_buffer = try ordinaryCreateFromConstructor(
         ArrayBuffer,
         agent,
         constructor_,
@@ -96,7 +97,7 @@ pub fn allocateArrayBuffer(
 
     // 6. Set obj.[[ArrayBufferData]] to block.
     // 7. Set obj.[[ArrayBufferByteLength]] to byteLength.
-    object.as(ArrayBuffer).fields.array_buffer_data = block;
+    array_buffer.fields.array_buffer_data = block;
 
     // 8. If allocatingResizableBuffer is true, then
     if (allocating_resizable_buffer) {
@@ -106,11 +107,11 @@ pub fn allocateArrayBuffer(
         //    Implementations may throw if, for example, virtual memory cannot be reserved up front.
 
         // c. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
-        object.as(ArrayBuffer).fields.array_buffer_max_byte_length = max_byte_length.?;
+        array_buffer.fields.array_buffer_max_byte_length = max_byte_length.?;
     }
 
     // 5. Return obj.
-    return object;
+    return array_buffer;
 }
 
 /// 25.1.3.2 ArrayBufferByteLength ( arrayBuffer, order )
@@ -153,7 +154,7 @@ pub fn arrayBufferCopyAndDetach(
     array_buffer_value: Value,
     new_length: Value,
     preserve_resizability: enum { preserve_resizability, fixed_length },
-) Agent.Error!*Object {
+) Agent.Error!*ArrayBuffer {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(arrayBuffer, [[ArrayBufferData]]).
@@ -213,7 +214,7 @@ pub fn arrayBufferCopyAndDetach(
     const from_block = &array_buffer.fields.array_buffer_data.?;
 
     // 12. Let toBlock be newBuffer.[[ArrayBufferData]].
-    const to_block = &new_buffer.as(ArrayBuffer).fields.array_buffer_data.?;
+    const to_block = &new_buffer.fields.array_buffer_data.?;
 
     // 13. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, 0, copyLength).
     copyDataBlockBytes(to_block, 0, from_block, 0, copy_length);
@@ -279,7 +280,7 @@ pub fn cloneArrayBuffer(
     src_buffer: ArrayBufferLike,
     src_byte_offset: u53,
     src_length: u53,
-) Agent.Error!*Object {
+) Agent.Error!*ArrayBuffer {
     const realm = agent.currentRealm();
 
     // 1. Assert: IsDetachedBuffer(srcBuffer) is false.
@@ -297,7 +298,7 @@ pub fn cloneArrayBuffer(
     const src_block = src_buffer.arrayBufferData().?;
 
     // 4. Let targetBlock be targetBuffer.[[ArrayBufferData]].
-    const target_block = &target_buffer.as(ArrayBuffer).fields.array_buffer_data.?;
+    const target_block = &target_buffer.fields.array_buffer_data.?;
 
     // 5. Perform CopyDataBlockBytes(targetBlock, 0, srcBlock, srcByteOffset, srcLength).
     copyDataBlockBytes(target_block, 0, src_block, src_byte_offset, src_length);
@@ -622,13 +623,14 @@ pub fn getModifySetValueInBuffer(
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "ArrayBuffer",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -667,14 +669,13 @@ pub const constructor = struct {
         const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
 
         // 4. Return ? AllocateArrayBuffer(NewTarget, byteLength, requestedMaxByteLength).
-        return Value.from(
-            try allocateArrayBuffer(
-                agent,
-                new_target.?,
-                @intCast(byte_length),
-                requested_max_byte_length,
-            ),
+        const array_buffer = try allocateArrayBuffer(
+            agent,
+            new_target.?,
+            @intCast(byte_length),
+            requested_max_byte_length,
         );
+        return Value.from(&array_buffer.object);
     }
 
     /// 25.1.5.1 ArrayBuffer.isView ( arg )
@@ -702,9 +703,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -988,9 +987,8 @@ pub const prototype = struct {
 
         // 1. Let O be the this value.
         // 2. Return ? ArrayBufferCopyAndDetach(O, newLength, preserve-resizability).
-        return Value.from(
-            try arrayBufferCopyAndDetach(agent, this_value, new_length, .preserve_resizability),
-        );
+        const array_buffer = try arrayBufferCopyAndDetach(agent, this_value, new_length, .preserve_resizability);
+        return Value.from(&array_buffer.object);
     }
 
     /// 25.1.6.9 ArrayBuffer.prototype.transferToFixedLength ( [ newLength ] )
@@ -1000,9 +998,8 @@ pub const prototype = struct {
 
         // 1. Let O be the this value.
         // 2. Return ? ArrayBufferCopyAndDetach(O, newLength, fixed-length).
-        return Value.from(
-            try arrayBufferCopyAndDetach(agent, this_value, new_length, .fixed_length),
-        );
+        const array_buffer = try arrayBufferCopyAndDetach(agent, this_value, new_length, .fixed_length);
+        return Value.from(&array_buffer.object);
     }
 };
 

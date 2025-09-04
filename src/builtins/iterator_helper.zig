@@ -16,14 +16,13 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 27.1.2.1 The %IteratorHelperPrototype% Object
 /// https://tc39.es/ecma262/#sec-%iteratorhelperprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -50,10 +49,7 @@ pub const prototype = struct {
         // 1. Return ? GeneratorResume(this value, undefined, "Iterator Helper").
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (!this_value.isObject() or !this_value.asObject().is(IteratorHelper)) {
-            return agent.throwException(.type_error, "This value must be an Iterator Helper", .{});
-        }
-        const iterator_helper = this_value.asObject().as(IteratorHelper);
+        const iterator_helper = try this_value.requireInternalSlot(agent, IteratorHelper);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (iterator_helper.fields == .completed) {

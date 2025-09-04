@@ -453,6 +453,15 @@ pub fn asObject(self: Value) *Object {
     return self.impl.asObject();
 }
 
+pub fn castObject(self: Value, comptime T: type) ?*T {
+    if (self.isObject()) {
+        if (self.asObject().is(T)) {
+            return self.asObject().as(T);
+        }
+    }
+    return null;
+}
+
 /// Leaks an implementation detail, use with care.
 pub fn __isI32(self: Value) bool {
     return switch (Impl) {
@@ -1094,39 +1103,54 @@ pub fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
 
         // 2. If argument is a Boolean, return a new Boolean object whose [[BooleanData]] internal
         //    slot is set to argument. See 20.3 for a description of Boolean objects.
-        .boolean => try builtins.Boolean.create(agent, .{
-            .fields = .{ .boolean_data = self.asBoolean() },
-            .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
-        }),
+        .boolean => {
+            const boolean = try builtins.Boolean.create(agent, .{
+                .fields = .{ .boolean_data = self.asBoolean() },
+                .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
+            });
+            return &boolean.object;
+        },
 
         // 3. If argument is a Number, return a new Number object whose [[NumberData]] internal
         //    slot is set to argument. See 21.1 for a description of Number objects.
-        .number => try builtins.Number.create(agent, .{
-            .fields = .{ .number_data = self.asNumber() },
-            .prototype = try realm.intrinsics.@"%Number.prototype%"(),
-        }),
+        .number => {
+            const number = try builtins.Number.create(agent, .{
+                .fields = .{ .number_data = self.asNumber() },
+                .prototype = try realm.intrinsics.@"%Number.prototype%"(),
+            });
+            return &number.object;
+        },
 
         // 4. If argument is a String, return a new String object whose [[StringData]] internal
         //    slot is set to argument. See 22.1 for a description of String objects.
-        .string => try stringCreate(
-            agent,
-            self.asString(),
-            try realm.intrinsics.@"%String.prototype%"(),
-        ),
+        .string => {
+            const string = try stringCreate(
+                agent,
+                self.asString(),
+                try realm.intrinsics.@"%String.prototype%"(),
+            );
+            return &string.object;
+        },
 
         // 5. If argument is a Symbol, return a new Symbol object whose [[SymbolData]] internal
         //    slot is set to argument. See 20.4 for a description of Symbol objects.
-        .symbol => try builtins.Symbol.create(agent, .{
-            .fields = .{ .symbol_data = self.asSymbol() },
-            .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
-        }),
+        .symbol => {
+            const symbol = try builtins.Symbol.create(agent, .{
+                .fields = .{ .symbol_data = self.asSymbol() },
+                .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
+            });
+            return &symbol.object;
+        },
 
         // 6. If argument is a BigInt, return a new BigInt object whose [[BigIntData]] internal
         //    slot is set to argument. See 21.2 for a description of BigInt objects.
-        .big_int => try builtins.BigInt.create(agent, .{
-            .fields = .{ .big_int_data = self.asBigInt() },
-            .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
-        }),
+        .big_int => {
+            const big_int = try builtins.BigInt.create(agent, .{
+                .fields = .{ .big_int_data = self.asBigInt() },
+                .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
+            });
+            return &big_int.object;
+        },
 
         // 7. Assert: argument is an Object.
         // 8. Return argument.
@@ -1216,12 +1240,12 @@ pub fn isArray(self: Value, agent: *Agent) error{ExceptionThrown}!bool {
     if (object.is(builtins.Array)) return true;
 
     // 3. If argument is a Proxy exotic object, then
-    if (object.is(builtins.Proxy)) {
+    if (object.cast(builtins.Proxy)) |proxy| {
         // a. Perform ? ValidateNonRevokedProxy(argument).
-        try validateNonRevokedProxy(agent, object.as(builtins.Proxy));
+        try validateNonRevokedProxy(agent, proxy);
 
         // b. Let proxyTarget be argument.[[ProxyTarget]].
-        const proxy_target = object.as(builtins.Proxy).fields.proxy_target.?;
+        const proxy_target = proxy.fields.proxy_target.?;
 
         // c. Return ? IsArray(proxyTarget).
         return from(proxy_target).isArray(agent);
@@ -2166,7 +2190,7 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
 pub fn createArrayFromList(
     agent: *Agent,
     elements: []const Value,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.Array {
     // OPTIMIZATION: We set the right length upfront and set properties directly below to bypass
     //               Array's defineOwnProperty() which does a lot of extra work.
 
@@ -2179,7 +2203,7 @@ pub fn createArrayFromList(
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         // NOTE: This could use createDataPropertyDirect() but since we created the array with the
         //       right length upfront directly setting indexed properties is faster.
-        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+        try array.object.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
             .value_or_accessor = .{
                 .value = element,
             },
@@ -2198,7 +2222,7 @@ pub fn createArrayFromListMapToValue(
     comptime T: type,
     elements: []const T,
     mapFn: fn (*Agent, T) std.mem.Allocator.Error!Value,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.Array {
     // OPTIMIZATION: We set the right length upfront and set properties directly below to bypass
     //               Array's defineOwnProperty() which does a lot of extra work.
 
@@ -2211,7 +2235,7 @@ pub fn createArrayFromListMapToValue(
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         // NOTE: This could use createDataPropertyDirect() but since we created the array with the
         //       right length upfront directly setting indexed properties is faster.
-        try array.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+        try array.object.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
             .value_or_accessor = .{
                 .value = try mapFn(agent, element),
             },
@@ -2341,9 +2365,7 @@ test format {
     var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
     defer managed.deinit();
     const big_int = try BigInt.from(agent.gc_allocator, managed);
-    const object = try builtins.Object.create(&agent, .{
-        .prototype = null,
-    });
+    const object = try ordinaryObjectCreate(&agent, null);
     const test_cases = [_]struct { Value, []const u8 }{
         .{ @"undefined", "undefined" },
         .{ @"null", "null" },

@@ -20,6 +20,7 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 15.1.2 UpdateLanguageId ( tag, options )
 /// https://tc39.es/ecma402/#sec-updatelanguageid
@@ -80,13 +81,14 @@ fn updateLanguageId(
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Locale",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -138,11 +140,11 @@ pub const constructor = struct {
         }
 
         // 8. If tag an is Object and tag has an [[InitializedLocale]] internal slot, then
-        const tag_string = if (tag_value.isObject() and tag_value.asObject().is(Locale)) blk: {
+        const tag_string = if (tag_value.castObject(Locale)) |tag_locale| blk: {
             // a. Let tag be tag.[[Locale]].
             break :blk try String.fromAscii(
                 agent,
-                try tag_value.asObject().as(Locale).fields.locale.toString(agent.gc_allocator),
+                try tag_locale.fields.locale.toString(agent.gc_allocator),
             );
         } else blk: {
             // 9. Else,
@@ -301,7 +303,7 @@ pub const constructor = struct {
         // 30. Set opt.[[nu]] to numberingSystem.
         // NOTE: This is done as part of step 29.a.
 
-        locale.as(Locale).fields = .{
+        locale.fields = .{
             // 31. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
             // 32. Set locale.[[Locale]] to r.[[locale]].
             // 33. Set locale.[[Calendar]] to r.[[ca]].
@@ -319,7 +321,7 @@ pub const constructor = struct {
         };
 
         // 39. Return locale.
-        return Value.from(locale);
+        return Value.from(&locale.object);
     }
 };
 
@@ -327,9 +329,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -499,14 +499,14 @@ pub const prototype = struct {
         _ = locale_expander.maximize(&maximal);
 
         // 4. Return ! Construct(%Intl.Locale%, maximal).
-        const object = ordinaryCreateFromConstructor(
+        const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,
             try realm.intrinsics.@"%Intl.Locale%"(),
             "%Intl.Locale.prototype%",
             .{ .locale = maximal },
         ) catch |err| try noexcept(err);
-        return Value.from(object);
+        return Value.from(&new_locale.object);
     }
 
     /// 15.3.9 Intl.Locale.prototype.minimize ( )
@@ -526,14 +526,14 @@ pub const prototype = struct {
         _ = locale_expander.minimize(&minimal);
 
         // 4. Return ! Construct(%Intl.Locale%, minimal).
-        const object = ordinaryCreateFromConstructor(
+        const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,
             try realm.intrinsics.@"%Intl.Locale%"(),
             "%Intl.Locale.prototype%",
             .{ .locale = minimal },
         ) catch |err| try noexcept(err);
-        return Value.from(object);
+        return Value.from(&new_locale.object);
     }
 
     /// 15.3.10 get Intl.Locale.prototype.numberingSystem

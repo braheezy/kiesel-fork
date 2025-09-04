@@ -192,7 +192,8 @@ fn get(
     // 9. If binding.[[BindingName]] is namespace, then
     if (binding.binding_name == .namespace) {
         // a. Return GetModuleNamespace(targetModule).
-        return Value.from(try getModuleNamespace(agent, target_module));
+        const module_namespace = try getModuleNamespace(agent, target_module);
+        return Value.from(&module_namespace.object);
     }
 
     // 10. Let targetEnv be targetModule.[[Environment]].
@@ -270,7 +271,7 @@ pub fn moduleNamespaceCreate(
     agent: *Agent,
     module: Module,
     exports: []const []const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*ModuleNamespace {
     // 1. Assert: module.[[Namespace]] is empty.
     switch (module) {
         inline else => |m| std.debug.assert(m.namespace == null),
@@ -318,7 +319,7 @@ pub fn moduleNamespaceCreate(
     {
         // 28.3.1 %Symbol.toStringTag%
         // https://tc39.es/ecma262/#sec-%symbol.tostringtag%
-        try namespace.defineBuiltinPropertyWithAttributes(
+        try namespace.object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",
             Value.from("Module"),

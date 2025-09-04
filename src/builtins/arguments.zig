@@ -207,14 +207,14 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
 pub fn createUnmappedArgumentsObject(
     agent: *Agent,
     arguments_list: []const Value,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*Arguments {
     const realm = agent.currentRealm();
 
     // 1. Let len be the number of elements in argumentsList.
     const len = arguments_list.len;
 
     // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%, « [[ParameterMap]] »).
-    const object = try Arguments.create(agent, .{
+    const arguments = try Arguments.create(agent, .{
         .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         .fields = .{
             // 3. Set obj.[[ParameterMap]] to undefined.
@@ -225,7 +225,7 @@ pub fn createUnmappedArgumentsObject(
     // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(@as(u53, @intCast(len))),
         },
@@ -237,7 +237,7 @@ pub fn createUnmappedArgumentsObject(
     for (arguments_list, 0..) |value, index| {
         // a. Let val be argumentsList[index].
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
-        try object.createDataPropertyDirect(
+        try arguments.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
             value,
@@ -249,7 +249,7 @@ pub fn createUnmappedArgumentsObject(
     // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value_or_accessor = .{
             .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         },
@@ -259,7 +259,7 @@ pub fn createUnmappedArgumentsObject(
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
         .value_or_accessor = .{
             .accessor = .{
                 .get = try realm.intrinsics.@"%ThrowTypeError%"(),
@@ -270,7 +270,7 @@ pub fn createUnmappedArgumentsObject(
     });
 
     // 9. Return obj.
-    return object;
+    return arguments;
 }
 
 /// 10.4.4.7 CreateMappedArgumentsObject ( func, formals, argumentsList, env )
@@ -281,7 +281,7 @@ pub fn createMappedArgumentsObject(
     formals: ast.FormalParameters,
     arguments_list: []const Value,
     env: Environment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*Arguments {
     const realm = agent.currentRealm();
 
     // 1. Assert: formals does not contain a rest parameter, any binding patterns, or any
@@ -294,7 +294,7 @@ pub fn createMappedArgumentsObject(
     const len = arguments_list.len;
 
     // 3. Let obj be MakeBasicObject(« [[Prototype]], [[Extensible]], [[ParameterMap]] »).
-    const object = try Arguments.create(agent, .{
+    const arguments = try Arguments.create(agent, .{
         .internal_methods = .initComptime(.{
             // 4. Set obj.[[GetOwnProperty]] as specified in 10.4.4.1.
             .getOwnProperty = getOwnProperty,
@@ -339,7 +339,7 @@ pub fn createMappedArgumentsObject(
     for (arguments_list, 0..) |value, index| {
         // a. Let val be argumentsList[index].
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
-        try object.createDataPropertyDirect(
+        try arguments.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index))),
             value,
@@ -351,7 +351,7 @@ pub fn createMappedArgumentsObject(
     // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(agent, PropertyKey.from("length"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(@as(u53, @intCast(len))),
         },
@@ -362,7 +362,7 @@ pub fn createMappedArgumentsObject(
     var mapped_names: String.HashMapUnmanaged(void) = .empty;
     defer mapped_names.deinit(agent.gc_allocator);
 
-    const map = &object.as(Arguments).fields.parameter_map;
+    const map = &arguments.fields.parameter_map;
     map.items = try agent.gc_allocator.alloc(?*const String, @min(number_of_parameters, len));
     @memset(map.items, null);
 
@@ -399,7 +399,7 @@ pub fn createMappedArgumentsObject(
     // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value_or_accessor = .{
             .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         },
@@ -409,7 +409,7 @@ pub fn createMappedArgumentsObject(
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    try object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
+    try arguments.object.definePropertyDirect(agent, PropertyKey.from("callee"), .{
         .value_or_accessor = .{
             .value = Value.from(function),
         },
@@ -417,7 +417,7 @@ pub fn createMappedArgumentsObject(
     });
 
     // 22. Return obj.
-    return object;
+    return arguments;
 }
 
 const ParameterMap = struct {

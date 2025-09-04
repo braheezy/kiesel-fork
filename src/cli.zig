@@ -134,16 +134,12 @@ const Kiesel = struct {
 
     fn @"asm"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const buffer_value = arguments.get(0);
-        if (!buffer_value.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{buffer_value});
-        }
-        if (!buffer_value.asObject().is(kiesel.builtins.ArrayBuffer) and !buffer_value.asObject().is(kiesel.builtins.SharedArrayBuffer)) {
-            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
-        }
-        const buffer: kiesel.builtins.array_buffer.ArrayBufferLike = if (buffer_value.asObject().is(kiesel.builtins.ArrayBuffer))
-            .{ .array_buffer = buffer_value.asObject().as(kiesel.builtins.ArrayBuffer) }
+        const buffer: kiesel.builtins.array_buffer.ArrayBufferLike = if (buffer_value.castObject(kiesel.builtins.ArrayBuffer)) |array_buffer|
+            .{ .array_buffer = array_buffer }
+        else if (buffer_value.castObject(kiesel.builtins.SharedArrayBuffer)) |shared_array_buffer|
+            .{ .shared_array_buffer = shared_array_buffer }
         else
-            .{ .shared_array_buffer = buffer_value.asObject().as(kiesel.builtins.SharedArrayBuffer) };
+            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
         if (kiesel.builtins.isDetachedBuffer(buffer)) {
             return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
@@ -197,7 +193,7 @@ const Kiesel = struct {
                 }.call,
             }),
         });
-        return Value.from(is_htmldda);
+        return Value.from(&is_htmldda.object);
     }
 
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -209,15 +205,9 @@ const Kiesel = struct {
     }
 
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const array_buffer = arguments.get(0);
-        if (!array_buffer.isObject() or !array_buffer.asObject().is(kiesel.builtins.ArrayBuffer)) {
-            return agent.throwException(.type_error, "Argument must be an ArrayBuffer", .{});
-        }
-        try kiesel.builtins.detachArrayBuffer(
-            agent,
-            array_buffer.asObject().as(kiesel.builtins.ArrayBuffer),
-            null,
-        );
+        const array_buffer_value = arguments.get(0);
+        const array_buffer = try array_buffer_value.requireInternalSlot(agent, kiesel.builtins.ArrayBuffer);
+        try kiesel.builtins.detachArrayBuffer(agent, array_buffer, null);
         return .undefined;
     }
 
@@ -273,7 +263,7 @@ const Kiesel = struct {
             Value.from("[mM][eE][rR][lL][iI][nN]|[rR][uU][hH][rR][-_\\s]*[sS][cC][hH][oO][lL][zZ]"),
             .undefined,
         );
-        const match = try regExpExec(agent, regexp, string);
+        const match = try regExpExec(agent, &regexp.object, string);
         return Value.from(match != null);
     }
 
@@ -517,7 +507,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .{fmtParseError(parse_error)},
             );
             const exception: Agent.Exception = .{
-                .value = Value.from(syntax_error),
+                .value = Value.from(&syntax_error.object),
                 .stack_trace = &.{},
             };
             try stderr.print("{f}\n{f}\n", .{

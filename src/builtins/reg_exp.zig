@@ -108,25 +108,25 @@ pub const ParsedFlags = packed struct(u8) {
 
 /// 22.2.3.1 RegExpCreate ( P, F )
 /// https://tc39.es/ecma262/#sec-regexpcreate
-pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*Object {
+pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*RegExp {
     const realm = agent.currentRealm();
 
     // 1. Let obj be ! RegExpAlloc(%RegExp%).
-    const object = regExpAlloc(
+    const reg_exp = regExpAlloc(
         agent,
         try realm.intrinsics.@"%RegExp%"(),
     ) catch |err| try noexcept(err);
 
     // 2. Return ? RegExpInitialize(obj, P, F).
-    return regExpInitialize(agent, object, pattern, flags);
+    return regExpInitialize(agent, reg_exp, pattern, flags);
 }
 
 /// 22.2.3.2 RegExpAlloc ( newTarget )
 /// https://tc39.es/ecma262/#sec-regexpalloc
-pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
+pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
     // 1. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%RegExp.prototype%",
     //    « [[OriginalSource]], [[OriginalFlags]], [[RegExpRecord]], [[RegExpMatcher]] »).
-    const object = try ordinaryCreateFromConstructor(
+    const reg_exp = try ordinaryCreateFromConstructor(
         RegExp,
         agent,
         new_target,
@@ -141,7 +141,7 @@ pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
     // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor {
     //      [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
+    try reg_exp.object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
         .value_or_accessor = .{
             .value = .undefined,
         },
@@ -153,17 +153,17 @@ pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
     });
 
     // 3. Return obj.
-    return object;
+    return reg_exp;
 }
 
 /// 22.2.3.3 RegExpInitialize ( obj, pattern, flags )
 /// https://tc39.es/ecma262/#sec-regexpinitialize
 pub fn regExpInitialize(
     agent: *Agent,
-    object: *Object,
+    reg_exp: *RegExp,
     pattern: Value,
     flags: Value,
-) Agent.Error!*Object {
+) Agent.Error!*RegExp {
     if (!build_options.enable_libregexp) {
         return agent.throwException(.internal_error, "RegExp support is disabled", .{});
     }
@@ -217,10 +217,10 @@ pub fn regExpInitialize(
     };
 
     // 16. Set obj.[[OriginalSource]] to P.
-    object.as(RegExp).fields.original_source = p;
+    reg_exp.fields.original_source = p;
 
     // 17. Set obj.[[OriginalFlags]] to F.
-    object.as(RegExp).fields.original_flags = f;
+    reg_exp.fields.original_flags = f;
 
     // 18. Let capturingGroupsCount be CountLeftCapturingParensWithin(parseResult).
     // 19. Let rer be the RegExp Record {
@@ -229,13 +229,13 @@ pub fn regExpInitialize(
     //     }.
     // 20. Set obj.[[RegExpRecord]] to rer.
     // 21. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
-    object.as(RegExp).fields.re_bytecode = re_bytecode[0..@intCast(re_bytecode_len)];
+    reg_exp.fields.re_bytecode = re_bytecode[0..@intCast(re_bytecode_len)];
 
     // 22. Perform ? Set(obj, "lastIndex", +0𝔽, true).
-    try object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+    try reg_exp.object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
     // 23. Return obj.
-    return object;
+    return reg_exp;
 }
 
 /// 22.2.7.1 RegExpExec ( R, S )
@@ -383,14 +383,14 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const array = arrayCreate(agent, @intCast(n + 1), null) catch |err| try noexcept(err);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
-    try array.createDataPropertyDirect(
+    try array.object.createDataPropertyDirect(
         agent,
         PropertyKey.from("index"),
         Value.from(@as(u53, @intCast(last_index))),
     );
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
-    try array.createDataPropertyDirect(agent, PropertyKey.from("input"), Value.from(string));
+    try array.object.createDataPropertyDirect(agent, PropertyKey.from("input"), Value.from(string));
 
     // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
     match = .{ .start_index = last_index, .end_index = end_index };
@@ -410,7 +410,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const matched_substr = try getMatchString(agent, string, match);
 
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
-    try array.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(matched_substr));
+    try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(matched_substr));
 
     var group_name_ptr = libregexp.c.lre_get_groupnames(@ptrCast(re_bytecode));
     const has_groups = group_name_ptr != null;
@@ -430,7 +430,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     };
 
     // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    try array.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
+    try array.object.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
@@ -469,7 +469,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         }
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
-        try array.createDataPropertyDirect(
+        try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
             captured_value,
@@ -528,11 +528,15 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         );
 
         // b. Perform ! CreateDataPropertyOrThrow(A, "indices", indicesArray).
-        try array.createDataPropertyDirect(agent, PropertyKey.from("indices"), Value.from(indices_array));
+        try array.object.createDataPropertyDirect(
+            agent,
+            PropertyKey.from("indices"),
+            Value.from(&indices_array.object),
+        );
     }
 
     // 36. Return A.
-    return array;
+    return &array.object;
 }
 
 /// 22.2.7.3 AdvanceStringIndex ( S, index, unicode )
@@ -579,7 +583,7 @@ fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Al
 
 /// 22.2.7.7 GetMatchIndexPair ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchindexpair
-fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*Object {
+fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*builtins.Array {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length());
@@ -602,7 +606,7 @@ fn makeMatchIndicesIndexPairArray(
     indices: []const ?Match,
     group_names: []const ?[]const u8,
     has_groups: bool,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.Array {
     // 1. Let n be the number of elements in indices.
     const n = indices.len;
 
@@ -628,7 +632,7 @@ fn makeMatchIndicesIndexPairArray(
     };
 
     // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    try array.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
+    try array.object.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
 
     // 9. For each integer i such that 0 ≤ i < n, in ascending order, do
     var i: usize = 0;
@@ -639,7 +643,8 @@ fn makeMatchIndicesIndexPairArray(
         // b. If matchIndices is not undefined,
         const match_index_pair: Value = if (match_indices != null) blk: {
             // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
-            break :blk Value.from(try getMatchIndexPair(agent, string, match_indices.?));
+            const match_index_pair = try getMatchIndexPair(agent, string, match_indices.?);
+            break :blk Value.from(&match_index_pair.object);
         } else blk: {
             // c. Else,
             // i. Let matchIndexPair be undefined.
@@ -647,7 +652,7 @@ fn makeMatchIndicesIndexPairArray(
         };
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
-        try array.createDataPropertyDirect(
+        try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
             match_index_pair,
@@ -687,13 +692,14 @@ fn makeMatchIndicesIndexPairArray(
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "RegExp",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -744,13 +750,13 @@ pub const constructor = struct {
         var f: Value = undefined;
 
         // 4. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern.isObject() and pattern.asObject().is(RegExp)) {
+        if (pattern.castObject(RegExp)) |reg_exp| {
             // a. Let P be pattern.[[OriginalSource]].
-            p = Value.from(pattern.asObject().as(RegExp).fields.original_source);
+            p = Value.from(reg_exp.fields.original_source);
 
             // b. If flags is undefined, let F be pattern.[[OriginalFlags]].
             if (flags.isUndefined()) {
-                f = Value.from(pattern.asObject().as(RegExp).fields.original_flags);
+                f = Value.from(reg_exp.fields.original_flags);
             }
             // c. Else, let F be flags.
             else {
@@ -781,10 +787,11 @@ pub const constructor = struct {
         }
 
         // 7. Let O be ? RegExpAlloc(newTarget).
-        const object = try regExpAlloc(agent, constructor_);
+        const reg_exp = try regExpAlloc(agent, constructor_);
 
         // 8. Return ? RegExpInitialize(O, P, F).
-        return Value.from(try regExpInitialize(agent, object, p, f));
+        _ = try regExpInitialize(agent, reg_exp, p, f);
+        return Value.from(&reg_exp.object);
     }
 
     /// 22.2.5.1 RegExp.escape ( S )
@@ -930,9 +937,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1074,23 +1079,22 @@ pub const prototype = struct {
         if (!reg_exp_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{reg_exp_value});
         }
-        const reg_exp = reg_exp_value.asObject();
 
         // 2. If R does not have an [[OriginalFlags]] internal slot, then
-        if (!reg_exp.is(RegExp)) {
+        const reg_exp = reg_exp_value.asObject().cast(RegExp) orelse {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
-            if (reg_exp == try realm.intrinsics.@"%RegExp.prototype%"()) {
+            if (reg_exp_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return .undefined;
             }
 
             // b. Otherwise, throw a TypeError exception.
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
-        }
+        };
 
         // 3. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
+        const re_bytecode = reg_exp.fields.re_bytecode;
         const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
 
         // 4. If flags contains codeUnit, return true.
@@ -1177,14 +1181,14 @@ pub const prototype = struct {
                     if (n == 0) return .null;
 
                     // 2. Return A.
-                    return Value.from(array);
+                    return Value.from(&array.object);
                 } else {
                     // iii. Else,
                     // 1. Let matchStr be ? ToString(? Get(result, "0")).
                     const match_str = try (try result.?.get(agent, PropertyKey.from(0))).toString(agent);
 
                     // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
-                    try array.createDataPropertyDirect(
+                    try array.object.createDataPropertyDirect(
                         agent,
                         PropertyKey.from(n),
                         Value.from(match_str),
@@ -1259,9 +1263,14 @@ pub const prototype = struct {
             flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
         // 13. Return CreateRegExpStringIterator(matcher, S, global, fullUnicode).
-        return Value.from(
-            try createRegExpStringIterator(agent, matcher, string, global_, full_unicode),
+        const reg_exp_string_iterator = try createRegExpStringIterator(
+            agent,
+            matcher,
+            string,
+            global_,
+            full_unicode,
         );
+        return Value.from(&reg_exp_string_iterator.object);
     }
 
     /// 22.2.6.10 get RegExp.prototype.multiline
@@ -1562,27 +1571,25 @@ pub const prototype = struct {
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
-
         // 3. If R does not have an [[OriginalSource]] internal slot, then
-        if (!reg_exp.is(RegExp)) {
+        const reg_exp = this_value.asObject().cast(RegExp) orelse {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return "(?:)".
-            if (reg_exp == try realm.intrinsics.@"%RegExp.prototype%"()) {
+            if (this_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return Value.from("(?:)");
             }
 
             // b. Otherwise, throw a TypeError exception.
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
-        }
+        };
 
         // 4. Assert: R has an [[OriginalFlags]] internal slot.
         // 5. Let src be R.[[OriginalSource]].
-        const src = reg_exp.as(RegExp).fields.original_source;
+        const src = reg_exp.fields.original_source;
 
         // 6. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
+        const re_bytecode = reg_exp.fields.re_bytecode;
         const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
 
         // 7. Return EscapeRegExpPattern(src, flags).
@@ -1667,7 +1674,7 @@ pub const prototype = struct {
             try limit_value.toUint32(agent);
 
         // 14. If lim = 0, return A.
-        if (limit == 0) return Value.from(array);
+        if (limit == 0) return Value.from(&array.object);
 
         // 15. If S is the empty String, then
         if (string.isEmpty()) {
@@ -1675,13 +1682,13 @@ pub const prototype = struct {
             const z = try regExpExec(agent, splitter, string);
 
             // b. If z is not null, return A.
-            if (z != null) return Value.from(array);
+            if (z != null) return Value.from(&array.object);
 
             // c. Perform ! CreateDataPropertyOrThrow(A, "0", S).
-            try array.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(string));
+            try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(string));
 
             // d. Return A.
-            return Value.from(array);
+            return Value.from(&array.object);
         }
 
         // 16. Let size be the length of S.
@@ -1723,7 +1730,7 @@ pub const prototype = struct {
                     const tail = try string.substring(agent, @intCast(p), @intCast(q));
 
                     // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
-                    try array.createDataPropertyDirect(
+                    try array.object.createDataPropertyDirect(
                         agent,
                         PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
                         Value.from(tail),
@@ -1733,7 +1740,7 @@ pub const prototype = struct {
                     length_array += 1;
 
                     // 4. If lengthA = lim, return A.
-                    if (length_array == limit) return Value.from(array);
+                    if (length_array == limit) return Value.from(&array.object);
 
                     // 5. Set p to e.
                     p = e;
@@ -1753,7 +1760,7 @@ pub const prototype = struct {
                         const next_capture = try z.?.get(agent, PropertyKey.from(i));
 
                         // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), nextCapture).
-                        try array.createDataPropertyDirect(
+                        try array.object.createDataPropertyDirect(
                             agent,
                             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
                             next_capture,
@@ -1765,7 +1772,7 @@ pub const prototype = struct {
                         length_array += 1;
 
                         // e. If lengthA = lim, return A.
-                        if (length_array == limit) return Value.from(array);
+                        if (length_array == limit) return Value.from(&array.object);
                     }
 
                     // 10. Set q to p.
@@ -1778,14 +1785,14 @@ pub const prototype = struct {
         const tail = try string.substring(agent, @intCast(p), size);
 
         // 21. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
-        try array.createDataPropertyDirect(
+        try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
             Value.from(tail),
         );
 
         // 22. Return A.
-        return Value.from(array);
+        return Value.from(&array.object);
     }
 
     /// 22.2.6.15 get RegExp.prototype.sticky
@@ -1877,7 +1884,7 @@ pub const prototype = struct {
         var f: Value = undefined;
 
         // 3. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern.isObject() and pattern.asObject().is(RegExp)) {
+        if (pattern.castObject(RegExp)) |pattern_reg_exp| {
             // a. If flags is not undefined, throw a TypeError exception.
             if (!flags_.isUndefined()) {
                 return agent.throwException(
@@ -1888,10 +1895,10 @@ pub const prototype = struct {
             }
 
             // b. Let P be pattern.[[OriginalSource]].
-            p = Value.from(pattern.asObject().as(RegExp).fields.original_source);
+            p = Value.from(pattern_reg_exp.fields.original_source);
 
             // c. Let F be pattern.[[OriginalFlags]].
-            f = Value.from(pattern.asObject().as(RegExp).fields.original_flags);
+            f = Value.from(pattern_reg_exp.fields.original_flags);
         } else {
             // 4. Else,
             // a. Let P be pattern.
@@ -1902,7 +1909,8 @@ pub const prototype = struct {
         }
 
         // 5. Return ? RegExpInitialize(O, P, F).
-        return Value.from(try regExpInitialize(agent, &reg_exp.object, p, f));
+        _ = try regExpInitialize(agent, reg_exp, p, f);
+        return Value.from(&reg_exp.object);
     }
 };
 

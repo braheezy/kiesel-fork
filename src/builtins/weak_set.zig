@@ -19,18 +19,20 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 24.4.2 Properties of the WeakSet Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "WeakSet",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -72,11 +74,11 @@ pub const constructor = struct {
 
         // 4. If iterable is either undefined or null, return set.
         if (iterable.isUndefined() or iterable.isNull()) {
-            return Value.from(set);
+            return Value.from(&set.object);
         }
 
         // 5. Let adder be ? Get(set, "add").
-        const adder = try set.get(agent, PropertyKey.from("add"));
+        const adder = try set.object.get(agent, PropertyKey.from("add"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -95,13 +97,13 @@ pub const constructor = struct {
         //     b. If next is done, return set.
         while (try iterator.stepValue(agent)) |next| {
             // c. Let status be Completion(Call(adder, set, « next »)).
-            _ = adder.callAssumeCallable(agent, Value.from(set), &.{next}) catch |err| {
+            _ = adder.callAssumeCallable(agent, Value.from(&set.object), &.{next}) catch |err| {
                 // d. IfAbruptCloseIterator(status, iteratorRecord).
                 return iterator.close(agent, @as(Agent.Error!Value, err));
             };
         }
 
-        return Value.from(set);
+        return Value.from(&set.object);
     }
 };
 
@@ -109,9 +111,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

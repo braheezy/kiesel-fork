@@ -132,7 +132,7 @@ fn getArguments(self: *Vm, arguments: Instruction.Arguments) Agent.Error![]const
 
 fn executeArrayCreate(self: *Vm, length: u32) Agent.Error!void {
     const array = try arrayCreate(self.agent, length, null);
-    self.result = Value.from(array);
+    self.result = Value.from(&array.object);
 }
 
 fn executeArrayPushValue(self: *Vm) Agent.Error!void {
@@ -497,11 +497,11 @@ fn executeCreateObjectPropertyIterator(self: *Vm) Agent.Error!void {
     const iterator = try createForInIterator(self.agent, object);
 
     // d. Let nextMethod be ! GetV(iterator, "next").
-    const next_method = iterator.get(self.agent, PropertyKey.from("next")) catch |err| try noexcept(err);
+    const next_method = iterator.object.get(self.agent, PropertyKey.from("next")) catch |err| try noexcept(err);
 
     // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
     const iterator_: Iterator = .{
-        .iterator = iterator,
+        .iterator = &iterator.object,
         .next_method = next_method,
         .done = false,
     };
@@ -987,7 +987,8 @@ fn executeGetTemplateObject(
     template_literal_index: Executable.AstNodeIndex,
 ) Agent.Error!void {
     const template_literal = &self.executable.getAstNode(template_literal_index).template_literal;
-    self.result = Value.from(try getTemplateObject(self.agent, template_literal));
+    const template_object = try getTemplateObject(self.agent, template_literal);
+    self.result = Value.from(&template_object.object);
 }
 
 fn executeGetValue(self: *Vm) Agent.Error!void {
@@ -1143,7 +1144,7 @@ fn executeInstantiateArrowFunctionExpression(
         arrow_function,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeInstantiateAsyncArrowFunctionExpression(
@@ -1156,7 +1157,7 @@ fn executeInstantiateAsyncArrowFunctionExpression(
         async_arrow_function,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeInstantiateAsyncFunctionExpression(
@@ -1169,7 +1170,7 @@ fn executeInstantiateAsyncFunctionExpression(
         async_function_expression,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeInstantiateAsyncGeneratorFunctionExpression(
@@ -1182,7 +1183,7 @@ fn executeInstantiateAsyncGeneratorFunctionExpression(
         async_generator_expression,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeInstantiateGeneratorFunctionExpression(
@@ -1195,7 +1196,7 @@ fn executeInstantiateGeneratorFunctionExpression(
         generator_expression,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeInstantiateOrdinaryFunctionExpression(
@@ -1208,7 +1209,7 @@ fn executeInstantiateOrdinaryFunctionExpression(
         function_expression,
         null,
     );
-    self.result = Value.from(closure);
+    self.result = Value.from(&closure.object);
 }
 
 fn executeIsLooselyEqual(self: *Vm) Agent.Error!void {
@@ -1538,7 +1539,8 @@ fn executePutValue(self: *Vm) Agent.Error!void {
 fn executeRegExpCreate(self: *Vm) Agent.Error!void {
     const flags = self.stack.pop().?;
     const pattern = self.stack.pop().?;
-    self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
+    const reg_exp = try builtins.regExpCreate(self.agent, pattern, flags);
+    self.result = Value.from(&reg_exp.object);
 }
 
 fn executeResolveBinding(

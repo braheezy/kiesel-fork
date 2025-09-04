@@ -21,6 +21,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
@@ -43,13 +44,16 @@ pub fn createAsyncFromSyncIterator(
     });
 
     // 3. Let nextMethod be ! Get(asyncIterator, "next").
-    const next_method = async_iterator.get(agent, PropertyKey.from("next")) catch |err| try noexcept(err);
+    const next_method = async_iterator.object.get(
+        agent,
+        PropertyKey.from("next"),
+    ) catch |err| try noexcept(err);
 
     // 4. Let iteratorRecord be the Iterator Record {
     //      [[Iterator]]: asyncIterator, [[NextMethod]]: nextMethod, [[Done]]: false
     //    }.
     const iterator: Iterator = .{
-        .iterator = async_iterator,
+        .iterator = &async_iterator.object,
         .next_method = next_method,
         .done = false,
     };
@@ -62,9 +66,10 @@ pub fn createAsyncFromSyncIterator(
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
-        });
+        return ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
+        );
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -196,7 +201,7 @@ pub const prototype = struct {
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{Value.from(type_error)},
+                &.{Value.from(&type_error.object)},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].
@@ -268,7 +273,7 @@ pub const prototype = struct {
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{Value.from(type_error)},
+                &.{Value.from(&type_error.object)},
             ) catch |err| try noexcept(err);
 
             // h. Return promiseCapability.[[Promise]].
@@ -309,7 +314,7 @@ pub const prototype = struct {
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{Value.from(type_error)},
+                &.{Value.from(&type_error.object)},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].
@@ -402,14 +407,12 @@ fn asyncFromSyncIteratorContinuation(
     }.func;
 
     // 10. Let onFulfilled be CreateBuiltinFunction(unwrap, 1, "", « »).
-    const on_fulfilled = Value.from(
-        try createBuiltinFunction(
-            agent,
-            .{ .function = unwrap },
-            1,
-            "",
-            .{ .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures) },
-        ),
+    const on_fulfilled = try createBuiltinFunction(
+        agent,
+        .{ .function = unwrap },
+        1,
+        "",
+        .{ .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures) },
     );
 
     // 11. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
@@ -417,9 +420,9 @@ fn asyncFromSyncIteratorContinuation(
     //     new "unwrapped" IteratorResult object.
 
     // 12. If done is true, or if closeOnRejection is false, then
-    const on_rejected: Value = if (done or !close_on_rejection) blk: {
+    const maybe_on_rejected = if (done or !close_on_rejection) blk: {
         // a. Let onRejected be undefined.
-        break :blk .undefined;
+        break :blk null;
     } else blk: {
         // 13. Else,
 
@@ -451,14 +454,12 @@ fn asyncFromSyncIteratorContinuation(
         // b. Let onRejected be CreateBuiltinFunction(closeIterator, 1, "", « »).
         // c. NOTE: onRejected is used to close the Iterator when the "value" property of an
         //    IteratorResult object it yields is a rejected promise.
-        break :blk Value.from(
-            try createBuiltinFunction(
-                agent,
-                .{ .function = close_iterator },
-                1,
-                "",
-                .{ .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures) },
-            ),
+        break :blk try createBuiltinFunction(
+            agent,
+            .{ .function = close_iterator },
+            1,
+            "",
+            .{ .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures) },
         );
     };
 
@@ -466,8 +467,8 @@ fn asyncFromSyncIteratorContinuation(
     _ = try performPromiseThen(
         agent,
         value_wrapper.as(builtins.Promise),
-        on_fulfilled,
-        on_rejected,
+        Value.from(&on_fulfilled.object),
+        if (maybe_on_rejected) |on_rejected| Value.from(&on_rejected.object) else .undefined,
         promise_capability,
     );
 

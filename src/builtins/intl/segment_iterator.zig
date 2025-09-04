@@ -25,7 +25,7 @@ pub fn createSegmentIterator(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
     string: *const String,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*SegmentIterator {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[IteratingSegmenter]], [[IteratedString]], [[IteratedStringNextSegmentCodeUnitIndex]] ».
@@ -52,9 +52,7 @@ pub fn createSegmentIterator(
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

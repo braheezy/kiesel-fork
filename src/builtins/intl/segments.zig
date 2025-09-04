@@ -17,6 +17,7 @@ const Value = types.Value;
 const createSegmentDataObject = builtins.intl.createSegmentDataObject;
 const createSegmentIterator = builtins.intl.createSegmentIterator;
 const findBoundary = builtins.intl.findBoundary;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
 
 /// 19.5.1 CreateSegmentsObject ( segmenter, string )
@@ -25,7 +26,7 @@ pub fn createSegmentsObject(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
     string: *const String,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*Segments {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[SegmentsSegmenter]], [[SegmentsString]] ».
@@ -51,9 +52,7 @@ pub fn createSegmentsObject(
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -121,7 +120,8 @@ pub const prototype = struct {
         const string = segments.fields.segments_string;
 
         // 5. Return CreateSegmentIterator(segmenter, string).
-        return Value.from(try createSegmentIterator(agent, segmenter, string));
+        const segment_iterator = try createSegmentIterator(agent, segmenter, string);
+        return Value.from(&segment_iterator.object);
     }
 };
 

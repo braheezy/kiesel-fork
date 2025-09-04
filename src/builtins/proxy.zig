@@ -960,7 +960,7 @@ fn call(
     return Value.from(trap).callAssumeCallable(
         agent,
         Value.from(handler),
-        &.{ Value.from(target), this_argument, Value.from(arg_array) },
+        &.{ Value.from(target), this_argument, Value.from(&arg_array.object) },
     );
 }
 
@@ -1001,7 +1001,7 @@ fn construct(
     const new_obj = try Value.from(trap).callAssumeCallable(
         agent,
         Value.from(handler),
-        &.{ Value.from(target), Value.from(arg_array), Value.from(new_target) },
+        &.{ Value.from(target), Value.from(&arg_array.object), Value.from(new_target) },
     );
 
     // 10. If newObj is not an Object, throw a TypeError exception.
@@ -1033,7 +1033,7 @@ pub fn validateNonRevokedProxy(agent: *Agent, proxy: *Proxy) error{ExceptionThro
 
 /// 10.5.15 ProxyCreate ( target, handler )
 /// https://tc39.es/ecma262/#sec-proxycreate
-fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Object {
+fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Proxy {
     // 1. If target is not an Object, throw a TypeError exception.
     if (!target.isObject()) {
         return agent.throwException(.type_error, "{f} is not an Object", .{target});
@@ -1063,12 +1063,12 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Object
     // 5. If IsCallable(target) is true, then
     if (target.isCallable()) {
         // a. Set P.[[Call]] as specified in 10.5.12.
-        proxy.internal_methods = proxyInternalMethods(true, false);
+        proxy.object.internal_methods = proxyInternalMethods(true, false);
 
         // b. If IsConstructor(target) is true, then
         if (target.isConstructor()) {
             // i. Set P.[[Construct]] as specified in 10.5.13.
-            proxy.internal_methods = proxyInternalMethods(true, true);
+            proxy.object.internal_methods = proxyInternalMethods(true, true);
         }
     }
 
@@ -1101,13 +1101,14 @@ inline fn proxyInternalMethods(
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "Proxy",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1126,7 +1127,8 @@ pub const constructor = struct {
         }
 
         // 2. Return ? ProxyCreate(target, handler).
-        return Value.from(try proxyCreate(agent, target, handler));
+        const proxy = try proxyCreate(agent, target, handler);
+        return Value.from(&proxy.object);
     }
 
     /// 28.2.2.1 Proxy.revocable ( target, handler )
@@ -1183,16 +1185,27 @@ pub const constructor = struct {
         );
 
         // 4. Set revoker.[[RevocableProxy]] to proxy.
-        additional_fields.* = .{ .revocable_proxy = proxy };
+        additional_fields.* = .{ .revocable_proxy = &proxy.object };
 
         // 5. Let result be OrdinaryObjectCreate(%Object.prototype%).
-        const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        const result = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
 
         // 6. Perform ! CreateDataPropertyOrThrow(result, "proxy", proxy).
-        try result.createDataPropertyDirect(agent, PropertyKey.from("proxy"), Value.from(proxy));
+        try result.createDataPropertyDirect(
+            agent,
+            PropertyKey.from("proxy"),
+            Value.from(&proxy.object),
+        );
 
         // 7. Perform ! CreateDataPropertyOrThrow(result, "revoke", revoker).
-        try result.createDataPropertyDirect(agent, PropertyKey.from("revoke"), Value.from(revoker));
+        try result.createDataPropertyDirect(
+            agent,
+            PropertyKey.from("revoke"),
+            Value.from(&revoker.object),
+        );
 
         // 8. Return result.
         return Value.from(result);

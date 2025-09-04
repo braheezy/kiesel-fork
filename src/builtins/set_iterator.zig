@@ -16,6 +16,7 @@ const Set = builtins.Set;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 24.2.5.1 CreateSetIterator ( set, kind )
 /// https://tc39.es/ecma262/#sec-createsetiterator
@@ -23,7 +24,7 @@ pub fn createSetIterator(
     agent: *Agent,
     set_value: Value,
     comptime kind: Object.PropertyKind,
-) Agent.Error!*Object {
+) Agent.Error!*SetIterator {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(set, [[SetData]]).
@@ -43,9 +44,7 @@ pub fn createSetIterator(
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -74,10 +73,7 @@ pub const prototype = struct {
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (!this_value.isObject() or !this_value.asObject().is(SetIterator)) {
-            return agent.throwException(.type_error, "This value must be a Set Iterator", .{});
-        }
-        const set_iterator = this_value.asObject().as(SetIterator);
+        const set_iterator = try this_value.requireInternalSlot(agent, SetIterator);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (set_iterator.fields == .completed) {
@@ -124,10 +120,12 @@ pub const prototype = struct {
             // 1. If kind is key+value, then
             .@"key+value" => {
                 // a. Let result be CreateArrayFromList(« e, e »).
-                const result = Value.from(try createArrayFromList(agent, &.{ value, value }));
+                const result = try createArrayFromList(agent, &.{ value, value });
 
                 // b. Perform ? GeneratorYield(CreateIteratorResultObject(result, false)).
-                return Value.from(try createIteratorResultObject(agent, result, false));
+                return Value.from(
+                    try createIteratorResultObject(agent, Value.from(&result.object), false),
+                );
             },
 
             // 2. Else,

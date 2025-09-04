@@ -27,13 +27,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "Collator",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -95,7 +96,7 @@ pub const constructor = struct {
             .{ "sort", .sort },
             .{ "search", .search },
         });
-        collator.as(Collator).fields.usage = usage_map.get(usage.slice.ascii).?;
+        collator.fields.usage = usage_map.get(usage.slice.ascii).?;
 
         // TODO: 8-9.
 
@@ -157,7 +158,7 @@ pub const constructor = struct {
         } else agent.platform.default_locale;
 
         // 22. Set collator.[[Locale]] to r.[[Locale]].
-        collator.as(Collator).fields.locale = resolved_locale;
+        collator.fields.locale = resolved_locale;
 
         // TODO: 23-28.
 
@@ -192,8 +193,8 @@ pub const constructor = struct {
         });
         if (maybe_sensitivity) |sensitivity| {
             const strength, const case_level = sensitivity_map.get(sensitivity.slice.ascii).?;
-            collator.as(Collator).fields.options.strength = strength;
-            collator.as(Collator).fields.options.case_level = case_level;
+            collator.fields.options.strength = strength;
+            collator.fields.options.case_level = case_level;
         }
 
         // 31. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
@@ -207,11 +208,11 @@ pub const constructor = struct {
             null,
         );
         if (maybe_ignore_punctuation) |ignore_punctuation| {
-            collator.as(Collator).fields.options.max_variable = if (ignore_punctuation) .space else .punctuation;
+            collator.fields.options.max_variable = if (ignore_punctuation) .space else .punctuation;
         }
 
         // 33. Return collator.
-        return Value.from(collator);
+        return Value.from(&collator.object);
     }
 };
 
@@ -219,9 +220,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -374,7 +373,7 @@ pub const prototype = struct {
         }
 
         // 4. Return collator.[[BoundCompare]].
-        return Value.from(collator.fields.bound_compare.?);
+        return Value.from(&collator.fields.bound_compare.?.object);
     }
 };
 
@@ -431,7 +430,7 @@ pub const Collator = MakeObject(.{
         options: icu4zig.Collator.Options,
 
         /// [[BoundCompare]]
-        bound_compare: ?*Object,
+        bound_compare: ?*builtins.BuiltinFunction,
 
         pub const ResolvedOptions = struct {
             usage: *const String,

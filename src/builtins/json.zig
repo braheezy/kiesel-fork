@@ -33,13 +33,13 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
         .array => |x| blk: {
             const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
             for (x.items, 0..) |value_i, i| {
-                try array.createDataPropertyDirect(
+                try array.object.createDataPropertyDirect(
                     agent,
                     PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
                     try convertJsonValue(agent, value_i),
                 );
             }
-            break :blk Value.from(array);
+            break :blk Value.from(&array.object);
         },
         .object => |x| blk: {
             const realm = agent.currentRealm();
@@ -254,14 +254,14 @@ fn serializeJSONProperty(
             value = Value.from(try value.toString(agent));
         }
         // c. Else if value has a [[BooleanData]] internal slot, then
-        else if (value.asObject().is(builtins.Boolean)) {
+        else if (value.asObject().cast(builtins.Boolean)) |boolean| {
             // i. Set value to value.[[BooleanData]].
-            value = Value.from(value.asObject().as(builtins.Boolean).fields.boolean_data);
+            value = Value.from(boolean.fields.boolean_data);
         }
         // d. Else if value has a [[BigIntData]] internal slot, then
-        else if (value.asObject().is(builtins.BigInt)) {
+        else if (value.asObject().cast(builtins.BigInt)) |big_int| {
             // i. Set value to value.[[BigIntData]].
-            value = Value.from(value.asObject().as(builtins.BigInt).fields.big_int_data);
+            value = Value.from(big_int.fields.big_int_data);
         }
     }
 
@@ -614,9 +614,7 @@ fn serializeJSONArray(
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

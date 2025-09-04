@@ -22,18 +22,20 @@ const getIterator = types.getIterator;
 const installErrorCause = builtins.installErrorCause;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 20.5.7.1 The AggregateError Constructor
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "AggregateError",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Error%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -59,7 +61,7 @@ pub const constructor = struct {
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%", « [[ErrorData]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const aggregate_error = try ordinaryCreateFromConstructor(
             AggregateError,
             agent,
             new_target_,
@@ -71,8 +73,8 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        std.debug.assert(object.internal_methods == Object.InternalMethods.default);
-        object.internal_methods = .initComptime(.{ .set = builtins.@"error".internalSet });
+        std.debug.assert(aggregate_error.object.internal_methods == Object.InternalMethods.default);
+        aggregate_error.object.internal_methods = .initComptime(.{ .set = builtins.@"error".internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
@@ -80,17 +82,17 @@ pub const constructor = struct {
             const msg = try message.toString(agent);
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-            object.createNonEnumerableDataPropertyOrThrow(
+            aggregate_error.object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            object.as(builtins.Error).fields.error_data.message = msg;
+            aggregate_error.fields.error_data.message = msg;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).
-        try installErrorCause(agent, object, options);
+        try installErrorCause(agent, &aggregate_error.object, options);
 
         // 5. Let errorsList be ? IteratorToList(? GetIterator(errors, sync)).
         var iterator = try getIterator(agent, errors, .sync);
@@ -101,19 +103,20 @@ pub const constructor = struct {
         //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
         //      [[Value]]: CreateArrayFromList(errorsList)
         //    }).
-        try object.definePropertyDirect(
+        const errors_list_array = try createArrayFromList(agent, errors_list);
+        try aggregate_error.object.definePropertyDirect(
             agent,
             PropertyKey.from("errors"),
             .{
                 .value_or_accessor = .{
-                    .value = Value.from(try createArrayFromList(agent, errors_list)),
+                    .value = Value.from(&errors_list_array.object),
                 },
                 .attributes = .builtin_default,
             },
         );
 
         // 7. Return O.
-        return Value.from(object);
+        return Value.from(&aggregate_error.object);
     }
 };
 
@@ -121,9 +124,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Error.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Error.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

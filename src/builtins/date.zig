@@ -23,7 +23,9 @@ const StringParser = utils.StringParser;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalInstant = builtins.createTemporalInstant;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 const hours_per_day = 24;
 const minutes_per_hour = 60;
@@ -803,13 +805,14 @@ fn formatToDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Err
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             7,
             "Date",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -856,9 +859,9 @@ pub const constructor = struct {
             const value = arguments.get(0);
 
             // b. If value is an Object and value has a [[DateValue]] internal slot, then
-            const time_value = if (value.isObject() and value.asObject().is(Date)) blk_tv: {
+            const time_value = if (value.castObject(Date)) |date| blk_tv: {
                 // i. Let tv be value.[[DateValue]].
-                break :blk_tv value.asObject().as(Date).fields.date_value;
+                break :blk_tv date.fields.date_value;
             } else blk_tv: {
                 // c. Else,
                 // i. Let v be ? ToPrimitive(value).
@@ -920,7 +923,7 @@ pub const constructor = struct {
         };
 
         // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%", « [[DateValue]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const date = try ordinaryCreateFromConstructor(
             Date,
             agent,
             new_target.?,
@@ -932,7 +935,7 @@ pub const constructor = struct {
         );
 
         // 8. Return O.
-        return Value.from(object);
+        return Value.from(&date.object);
     }
 
     /// 21.4.3.1 Date.now ( )
@@ -1000,9 +1003,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -2246,7 +2247,12 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(try createTemporalInstant(agent, temporal_rs_instant.?, null));
+        const instant = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&instant.object);
     }
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )

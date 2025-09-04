@@ -29,13 +29,14 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "DurationFormat",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -152,7 +153,7 @@ pub const constructor = struct {
         };
 
         // 10. Set durationFormat.[[Locale]] to r.[[Locale]].
-        duration_format.as(DurationFormat).fields.locale = resolved.locale;
+        duration_format.fields.locale = resolved.locale;
 
         // TODO: 11. Let resolvedLocaleData be r.[[LocaleData]].
         // 12. Let digitalFormat be resolvedLocaleData.[[DigitalFormat]].
@@ -163,13 +164,13 @@ pub const constructor = struct {
         };
 
         // 13. Set durationFormat.[[HourMinuteSeparator]] to digitalFormat.[[HourMinuteSeparator]].
-        duration_format.as(DurationFormat).fields.hour_minute_separator = digital_format.hour_minute_separator;
+        duration_format.fields.hour_minute_separator = digital_format.hour_minute_separator;
 
         // 14. Set durationFormat.[[MinuteSecondSeparator]] to digitalFormat.[[MinuteSecondSeparator]].
-        duration_format.as(DurationFormat).fields.minute_second_separator = digital_format.minute_second_separator;
+        duration_format.fields.minute_second_separator = digital_format.minute_second_separator;
 
         // 15. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
-        duration_format.as(DurationFormat).fields.numbering_system = resolved.numbering_system;
+        duration_format.fields.numbering_system = resolved.numbering_system;
 
         // 16. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow",
         //     "digital" », "short").
@@ -195,7 +196,7 @@ pub const constructor = struct {
             .{ "narrow", .narrow },
             .{ "digital", .digital },
         });
-        duration_format.as(DurationFormat).fields.style = style_map.get(style.slice.ascii).?;
+        duration_format.fields.style = style_map.get(style.slice.ascii).?;
 
         // 18. Let prevStyle be the empty String.
         var prev_style = String.empty;
@@ -353,7 +354,7 @@ pub const constructor = struct {
             });
 
             // f. Set the value of durationFormat's internal slot whose name is slot to unitOptions.
-            @field(duration_format.as(DurationFormat).fields, slot) = .{
+            @field(duration_format.fields, slot) = .{
                 .style = unit_style_map.get(unit_options.style.slice.ascii).?,
                 .display = unit_display_map.get(unit_options.display.slice.ascii).?,
             };
@@ -371,7 +372,7 @@ pub const constructor = struct {
 
         // 20. Set durationFormat.[[FractionalDigits]] to ? GetNumberOption(options,
         //     "fractionalDigits", 0, 9, undefined).
-        duration_format.as(DurationFormat).fields.fractional_digits = if (try getNumberOption(
+        duration_format.fields.fractional_digits = if (try getNumberOption(
             agent,
             options,
             "fractionalDigits",
@@ -384,7 +385,7 @@ pub const constructor = struct {
             null;
 
         // 21. Return durationFormat.
-        return Value.from(duration_format);
+        return Value.from(&duration_format.object);
     }
 };
 
@@ -392,9 +393,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

@@ -82,7 +82,7 @@ pub fn initializeBoundName(
 pub fn getTemplateObject(
     agent: *Agent,
     template_literal: *ast.TemplateLiteral,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.Array {
     // 1. Let realm be the current Realm Record.
     const realm = agent.currentRealm();
 
@@ -127,7 +127,7 @@ pub fn getTemplateObject(
         // c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
         //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        try template.definePropertyDirect(agent, property_key, .{
+        try template.object.definePropertyDirect(agent, property_key, .{
             .value_or_accessor = .{
                 .value = Value.from(cooked_value),
             },
@@ -144,7 +144,7 @@ pub fn getTemplateObject(
         // e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
         //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
         //    }).
-        try raw_obj.definePropertyDirect(agent, property_key, .{
+        try raw_obj.object.definePropertyDirect(agent, property_key, .{
             .value_or_accessor = .{
                 .value = Value.from(raw_value),
             },
@@ -159,20 +159,20 @@ pub fn getTemplateObject(
     }
 
     // 13. Perform ! SetIntegrityLevel(rawObj, frozen).
-    _ = raw_obj.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
+    _ = raw_obj.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 14. Perform ! DefinePropertyOrThrow(template, "raw", PropertyDescriptor {
     //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //     }).
-    try template.definePropertyDirect(agent, PropertyKey.from("raw"), .{
+    try template.object.definePropertyDirect(agent, PropertyKey.from("raw"), .{
         .value_or_accessor = .{
-            .value = Value.from(raw_obj),
+            .value = Value.from(&raw_obj.object),
         },
         .attributes = .none,
     });
 
     // 15. Perform ! SetIntegrityLevel(template, frozen).
-    _ = template.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
+    _ = template.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
     try realm.template_map.putNoClobber(agent.gc_allocator, template_literal, template);
@@ -332,7 +332,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{Value.from(@"error")},
+                &.{Value.from(&@"error".object)},
             ) catch |err| try noexcept(err);
 
             // ii. Return promiseCapability.[[Promise]].
@@ -360,7 +360,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                 _ = Value.from(promise_capability.reject).callAssumeCallable(
                     agent,
                     .undefined,
-                    &.{Value.from(@"error")},
+                    &.{Value.from(&@"error".object)},
                 ) catch |err| try noexcept(err);
 
                 // 2. Return promiseCapability.[[Promise]].
@@ -399,7 +399,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                         _ = Value.from(promise_capability.reject).callAssumeCallable(
                             agent,
                             .undefined,
-                            &.{Value.from(@"error")},
+                            &.{Value.from(&@"error".object)},
                         ) catch |err| try noexcept(err);
 
                         // ii. Return promiseCapability.[[Promise]].
@@ -429,7 +429,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
-                &.{Value.from(@"error")},
+                &.{Value.from(&@"error".object)},
             ) catch |err| try noexcept(err);
 
             // ii. Return promiseCapability.[[Promise]].
@@ -667,7 +667,7 @@ pub fn blockDeclarationInstantiation(
             env.initializeBinding(
                 agent,
                 function_name,
-                Value.from(function_object),
+                Value.from(&function_object.object),
             ) catch |err| try noexcept(err);
         }
     }
@@ -682,7 +682,7 @@ pub fn instantiateOrdinaryFunctionObject(
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -709,13 +709,13 @@ pub fn instantiateOrdinaryFunctionObject(
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(
             agent,
-            function,
+            &function.object,
             PropertyKey.from(try String.fromUtf8(agent, name)),
             null,
         );
 
         // 5. Perform MakeConstructor(F).
-        try makeConstructor(agent, function, .{});
+        try makeConstructor(agent, &function.object, .{});
 
         // 6. Return F.
         return function;
@@ -741,10 +741,10 @@ pub fn instantiateOrdinaryFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(agent, function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from("default"), null);
 
         // 4. Perform MakeConstructor(F).
-        try makeConstructor(agent, function, .{});
+        try makeConstructor(agent, &function.object, .{});
 
         // 5. Return F.
         return function;
@@ -757,7 +757,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     agent: *Agent,
     function_expression: ast.FunctionExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // FunctionExpression : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -797,13 +797,13 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 10. Perform MakeConstructor(closure).
-        try makeConstructor(agent, closure, .{});
+        try makeConstructor(agent, &closure.object, .{});
 
         // 11. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(&closure.object));
 
         // 12. Return closure.
         return closure;
@@ -839,10 +839,10 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 7. Perform MakeConstructor(closure).
-        try makeConstructor(agent, closure, .{});
+        try makeConstructor(agent, &closure.object, .{});
 
         // 8. Return closure.
         return closure;
@@ -855,7 +855,7 @@ pub fn instantiateArrowFunctionExpression(
     agent: *Agent,
     arrow_function: ast.ArrowFunction,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
@@ -887,7 +887,7 @@ pub fn instantiateArrowFunctionExpression(
     );
 
     // 6. Perform SetFunctionName(closure, name).
-    try setFunctionName(agent, closure, PropertyKey.from(name), null);
+    try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
     // 7. Return closure.
     return closure;
@@ -901,7 +901,7 @@ fn defineMethod(
     property_name: Value,
     object: *Object,
     function_prototype: ?*Object,
-) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: *Object } {
+) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: *builtins.ECMAScriptFunction } {
     const realm = agent.currentRealm();
 
     // 1. Let propKey be ? Evaluation of ClassElementName.
@@ -941,7 +941,7 @@ fn defineMethod(
     );
 
     // 8. Perform MakeMethod(closure, object).
-    makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+    makeMethod(closure, object);
 
     // 9. Return the Record { [[Key]]: propKey, [[Closure]]: closure }.
     return .{ .key = property_key, .closure = closure };
@@ -973,14 +973,14 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 2. Perform SetFunctionName(methodDef.[[Closure]], methodDef.[[Key]]).
-            try setFunctionName(agent, method_def.closure, method_def.key, null);
+            try setFunctionName(agent, &method_def.closure.object, method_def.key, null);
 
             // 3. Return ? DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
             return defineMethodProperty(
                 agent,
                 object,
                 method_def.key,
-                method_def.closure,
+                &method_def.closure.object,
                 enumerable,
             );
         },
@@ -1024,17 +1024,17 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 7. Perform MakeMethod(closure, object).
-            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+            makeMethod(closure, object);
 
             // 8. Perform SetFunctionName(closure, propKey, "get").
-            try setFunctionName(agent, closure, property_key_or_private_name, "get");
+            try setFunctionName(agent, &closure.object, property_key_or_private_name, "get");
 
             switch (property_key_or_private_name) {
                 // 9. If propKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: closure, [[Set]]: undefined }.
                     const private_element: PrivateElement = .{
-                        .accessor = .{ .get = closure, .set = null },
+                        .accessor = .{ .get = &closure.object, .set = null },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
@@ -1044,7 +1044,7 @@ pub fn methodDefinitionEvaluation(
                     //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
                     //    }.
                     const property_descriptor: PropertyDescriptor = .{
-                        .get = closure,
+                        .get = &closure.object,
                         .enumerable = enumerable,
                         .configurable = true,
                     };
@@ -1091,17 +1091,17 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 6. Perform MakeMethod(closure, object).
-            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+            makeMethod(closure, object);
 
             // 7. Perform SetFunctionName(closure, propKey, "set").
-            try setFunctionName(agent, closure, property_key_or_private_name, "set");
+            try setFunctionName(agent, &closure.object, property_key_or_private_name, "set");
 
             switch (property_key_or_private_name) {
                 // 8. If propKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: undefined, [[Set]]: closure }.
                     const private_element: PrivateElement = .{
-                        .accessor = .{ .get = null, .set = closure },
+                        .accessor = .{ .get = null, .set = &closure.object },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
@@ -1111,7 +1111,7 @@ pub fn methodDefinitionEvaluation(
                     //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
                     //    }.
                     const property_descriptor: PropertyDescriptor = .{
-                        .set = closure,
+                        .set = &closure.object,
                         .enumerable = enumerable,
                         .configurable = true,
                     };
@@ -1158,10 +1158,10 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 6. Perform MakeMethod(closure, object).
-            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+            makeMethod(closure, object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(agent, closure, property_key_or_private_name, null);
+            try setFunctionName(agent, &closure.object, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
@@ -1172,7 +1172,7 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype),
                 },
@@ -1188,7 +1188,7 @@ pub fn methodDefinitionEvaluation(
                 agent,
                 object,
                 property_key_or_private_name,
-                closure,
+                &closure.object,
                 enumerable,
             );
         },
@@ -1226,10 +1226,10 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 6. Perform MakeMethod(closure, object).
-            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+            makeMethod(closure, object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(agent, closure, property_key_or_private_name, null);
+            try setFunctionName(agent, &closure.object, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
@@ -1240,7 +1240,7 @@ pub fn methodDefinitionEvaluation(
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype),
                 },
@@ -1256,7 +1256,7 @@ pub fn methodDefinitionEvaluation(
                 agent,
                 object,
                 property_key_or_private_name,
-                closure,
+                &closure.object,
                 enumerable,
             );
         },
@@ -1294,17 +1294,17 @@ pub fn methodDefinitionEvaluation(
             );
 
             // 6. Perform MakeMethod(closure, object).
-            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+            makeMethod(closure, object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(agent, closure, property_key_or_private_name, null);
+            try setFunctionName(agent, &closure.object, property_key_or_private_name, null);
 
             // 8. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             return defineMethodProperty(
                 agent,
                 object,
                 property_key_or_private_name,
-                closure,
+                &closure.object,
                 enumerable,
             );
         },
@@ -1318,7 +1318,7 @@ pub fn instantiateGeneratorFunctionObject(
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1343,7 +1343,7 @@ pub fn instantiateGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(agent, function, PropertyKey.from(name), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1354,7 +1354,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1389,7 +1389,7 @@ pub fn instantiateGeneratorFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(agent, function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from("default"), null);
 
         // 4. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1400,7 +1400,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1422,7 +1422,7 @@ pub fn instantiateGeneratorFunctionExpression(
     agent: *Agent,
     generator_expression: ast.GeneratorExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1462,7 +1462,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1473,7 +1473,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1485,7 +1485,7 @@ pub fn instantiateGeneratorFunctionExpression(
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(&closure.object));
 
         // 13. Return closure.
         return closure;
@@ -1521,7 +1521,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1532,7 +1532,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1555,7 +1555,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
@@ -1580,7 +1580,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(agent, function, PropertyKey.from(name), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1591,7 +1591,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1625,7 +1625,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(agent, function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from("default"), null);
 
         // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1636,7 +1636,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1658,7 +1658,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     agent: *Agent,
     async_generator_expression: ast.AsyncGeneratorExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1698,7 +1698,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1709,7 +1709,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //     }).
-        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1721,7 +1721,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         });
 
         // 12. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(&closure.object));
 
         // 13. Return closure.
         return closure;
@@ -1757,7 +1757,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1768,7 +1768,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
         //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
-        try closure.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+        try closure.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
             .value_or_accessor = .{
                 .value = Value.from(prototype),
             },
@@ -1851,10 +1851,10 @@ fn classFieldDefinitionEvaluation(
         );
 
         // f. Perform MakeMethod(initializer, homeObject).
-        makeMethod(initializer_function.as(builtins.ECMAScriptFunction), home_object);
+        makeMethod(initializer_function, home_object);
 
         // g. Set initializer.[[ClassFieldInitializerName]] to name.
-        initializer_function.as(builtins.ECMAScriptFunction).fields.class_field_initializer_name = name;
+        initializer_function.fields.class_field_initializer_name = name;
 
         break :blk initializer_function;
     } else blk: {
@@ -1864,10 +1864,7 @@ fn classFieldDefinitionEvaluation(
     };
 
     // 4. Return the ClassFieldDefinition Record { [[Name]]: name, [[Initializer]]: initializer }.
-    return .{
-        .name = name,
-        .initializer = if (initializer) |i| i.as(builtins.ECMAScriptFunction) else null,
-    };
+    return .{ .name = name, .initializer = initializer };
 }
 
 /// 15.7.11 Runtime Semantics: ClassStaticBlockDefinitionEvaluation
@@ -1918,10 +1915,10 @@ fn classStaticBlockDefinitionEvaluation(
     );
 
     // 6. Perform MakeMethod(bodyFunction, homeObject).
-    makeMethod(body_function.as(builtins.ECMAScriptFunction), home_object);
+    makeMethod(body_function, home_object);
 
     // 7. Return the ClassStaticBlockDefinition Record { [[BodyFunction]]: bodyFunction }.
-    return .{ .body_function = body_function.as(builtins.ECMAScriptFunction) };
+    return .{ .body_function = body_function };
 }
 
 /// 15.7.13 Runtime Semantics: ClassElementEvaluation
@@ -2187,13 +2184,14 @@ pub fn classDefinitionEvaluation(
                     // v. Else,
                     // 1. NOTE: This branch behaves similarly to constructor() {}.
                     // 2. Let result be ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
-                    break :blk try ordinaryCreateFromConstructor(
+                    const object = try ordinaryCreateFromConstructor(
                         builtins.Object,
                         agent_,
                         new_target.?,
                         "%Object.prototype%",
                         {},
                     );
+                    break :blk &object.object;
                 };
 
                 // vi. Perform ? InitializeInstanceElements(result, F).
@@ -2218,8 +2216,8 @@ pub fn classDefinitionEvaluation(
                 .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
             },
         );
-        try setFunctionName(agent, function, PropertyKey.from(class_name), null);
-        break :blk function;
+        try setFunctionName(agent, &function.object, PropertyKey.from(class_name), null);
+        break :blk &function.object;
     } else blk: {
         // 15. Else,
         // a. Let constructorInfo be ! DefineMethod of constructor with arguments proto and
@@ -2236,24 +2234,19 @@ pub fn classDefinitionEvaluation(
         const function = constructor_info.closure;
 
         // c. Perform MakeClassConstructor(F).
-        makeClassConstructor(function.as(builtins.ECMAScriptFunction));
+        makeClassConstructor(function);
 
         // d. Perform SetFunctionName(F, className).
-        try setFunctionName(
-            agent,
-            function,
-            PropertyKey.from(class_name),
-            null,
-        );
+        try setFunctionName(agent, &function.object, PropertyKey.from(class_name), null);
 
-        break :blk function;
+        break :blk &function.object;
     };
 
     // 16. Set F.[[SourceText]] to sourceText.
-    if (function.is(builtins.ECMAScriptFunction)) {
-        function.as(builtins.ECMAScriptFunction).fields.source_text = source_text;
-    } else if (function.is(builtins.BuiltinFunction)) {
-        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+    if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+        ecmascript_function.fields.source_text = source_text;
+    } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
+        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         class_constructor_fields.source_text = source_text;
     } else unreachable;
 
@@ -2262,10 +2255,10 @@ pub fn classDefinitionEvaluation(
 
     // 18. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {
-        if (function.is(builtins.ECMAScriptFunction)) {
-            function.as(builtins.ECMAScriptFunction).fields.constructor_kind = .derived;
-        } else if (function.is(builtins.BuiltinFunction)) {
-            const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+            ecmascript_function.fields.constructor_kind = .derived;
+        } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
+            const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
             class_constructor_fields.constructor_kind = .derived;
         } else unreachable;
     }
@@ -2415,18 +2408,18 @@ pub fn classDefinitionEvaluation(
     }
 
     // 29. Set F.[[PrivateMethods]] to instancePrivateMethods.
-    if (function.is(builtins.ECMAScriptFunction)) {
-        function.as(builtins.ECMAScriptFunction).fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
-    } else if (function.is(builtins.BuiltinFunction)) {
-        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+    if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+        ecmascript_function.fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
+    } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
+        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
     // 30. Set F.[[Fields]] to instanceFields.
-    if (function.is(builtins.ECMAScriptFunction)) {
-        function.as(builtins.ECMAScriptFunction).fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
-    } else if (function.is(builtins.BuiltinFunction)) {
-        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+    if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+        ecmascript_function.fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
+    } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
+        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
@@ -2535,7 +2528,7 @@ pub fn instantiateAsyncFunctionObject(
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2560,7 +2553,7 @@ pub fn instantiateAsyncFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(agent, function, PropertyKey.from(name), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from(name), null);
 
         // 5. Return F.
         return function;
@@ -2584,7 +2577,7 @@ pub fn instantiateAsyncFunctionObject(
         );
 
         // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(agent, function, PropertyKey.from("default"), null);
+        try setFunctionName(agent, &function.object, PropertyKey.from("default"), null);
 
         // 4. Return F.
         return function;
@@ -2597,7 +2590,7 @@ pub fn instantiateAsyncFunctionExpression(
     agent: *Agent,
     async_function_expression: ast.AsyncFunctionExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // AsyncFunctionExpression : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2637,10 +2630,10 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 10. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(name, Value.from(closure));
+        func_env.initializeBinding(name, Value.from(&closure.object));
 
         // 11. Return closure.
         return closure;
@@ -2676,7 +2669,7 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, closure, PropertyKey.from(name), null);
+        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
         // 7. Return closure.
         return closure;
@@ -2689,7 +2682,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     agent: *Agent,
     async_arrow_function: ast.AsyncArrowFunction,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
@@ -2725,7 +2718,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     );
 
     // 8. Perform SetFunctionName(closure, name).
-    try setFunctionName(agent, closure, PropertyKey.from(name), null);
+    try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
 
     // 9. Return closure.
     return closure;

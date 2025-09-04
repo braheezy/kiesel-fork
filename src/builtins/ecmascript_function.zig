@@ -4,7 +4,6 @@
 const std = @import("std");
 
 const ast = @import("../language/ast.zig");
-const builtin_function = @import("./builtin_function.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
@@ -258,12 +257,11 @@ pub const ECMAScriptFunction = MakeObject(.{
                         },
                         .function_rest_parameter => |function_rest_parameter| blk: {
                             std.debug.assert(function_rest_parameter.binding_rest_element == .binding_identifier);
-                            break :blk Value.from(
-                                try createArrayFromList(
-                                    agent,
-                                    arguments.values[@min(i, arguments.count())..],
-                                ),
+                            const array = try createArrayFromList(
+                                agent,
+                                arguments.values[@min(i, arguments.count())..],
                             );
+                            break :blk Value.from(&array.object);
                         },
                     };
                     if (maybe_environment != null) {
@@ -347,7 +345,7 @@ pub const ECMAScriptFunction = MakeObject(.{
                 break :blk executable;
             };
             const array = try createArrayFromList(agent, arguments.values);
-            executable.constants.keys()[executable.constants.count() - 1] = Value.from(array);
+            executable.constants.keys()[executable.constants.count() - 1] = Value.from(&array.object);
             try executable.constants.reIndex(executable.allocator);
             var vm = try Vm.init(agent, executable);
             defer vm.deinit();
@@ -634,10 +632,10 @@ fn evaluateGeneratorBody(
     );
 
     // 5. Perform GeneratorStart(G, FunctionBody).
-    try generatorStart(agent, generator.as(builtins.Generator), function);
+    try generatorStart(agent, generator, function);
 
     // 6. Return ReturnCompletion(G).
-    return Value.from(generator);
+    return Value.from(&generator.object);
 }
 
 /// 15.6.2 Runtime Semantics: EvaluateAsyncGeneratorBody
@@ -670,10 +668,10 @@ fn evaluateAsyncGeneratorBody(
     );
 
     // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
-    try asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
+    try asyncGeneratorStart(agent, generator, function);
 
     // 6. Return ReturnCompletion(generator).
-    return Value.from(generator);
+    return Value.from(&generator.object);
 }
 
 /// 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody
@@ -740,13 +738,14 @@ fn construct(
     // 3. If kind is base, then
     if (kind == .base) {
         // a. Let thisArgument be ? OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%").
-        this_argument = try ordinaryCreateFromConstructor(
+        const this_argument_object = try ordinaryCreateFromConstructor(
             builtins.Object,
             agent,
             new_target,
             "%Object.prototype%",
             {},
         );
+        this_argument = &this_argument_object.object;
     }
 
     // 4. Let calleeContext be PrepareForOrdinaryCall(F, newTarget).
@@ -828,7 +827,7 @@ pub fn ordinaryFunctionCreate(
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*ECMAScriptFunction {
     // 7. Let Strict be IsStrict(Body).
     const strict = body.strict;
 
@@ -897,7 +896,7 @@ pub fn ordinaryFunctionCreate(
     const len = parameter_list.expectedArgumentCount();
 
     // 22. Perform SetFunctionLength(F, len).
-    try setFunctionLength(agent, function, @floatFromInt(len));
+    try setFunctionLength(agent, &function.object, @floatFromInt(len));
 
     // 23. Return F.
     return function;
@@ -972,14 +971,14 @@ pub fn makeConstructor(
     } else {
         // 2. Else,
         // a. Set F.[[Construct]] to the definition specified in 10.3.2.
-        function.internal_methods = try .init(agent.gc_allocator, function.internal_methods, .{ .construct = builtin_function.construct });
+        function.internal_methods = try .init(agent.gc_allocator, function.internal_methods, .{ .construct = builtins.builtin_function.construct });
     }
 
     // 3. Set F.[[ConstructorKind]] to base.
-    if (function.is(ECMAScriptFunction)) {
-        function.as(ECMAScriptFunction).fields.constructor_kind = .base;
-    } else if (function.is(BuiltinFunction)) {
-        if (function.as(BuiltinFunction).fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+    if (function.cast(ECMAScriptFunction)) |ecmascript_function| {
+        ecmascript_function.fields.constructor_kind = .base;
+    } else if (function.cast(BuiltinFunction)) |builtin_function| {
+        if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
             class_constructor_fields.constructor_kind = .base;
         }
     }
@@ -1136,9 +1135,9 @@ pub fn setFunctionName(
     };
 
     // 4. If F has an [[InitialName]] internal slot, then
-    if (function.is(BuiltinFunction)) {
+    if (function.cast(BuiltinFunction)) |builtin_function| {
         // a. Set F.[[InitialName]] to name.
-        function.as(BuiltinFunction).fields.initial_name = name;
+        builtin_function.fields.initial_name = name;
     }
 
     // 5. If prefix is present, then
@@ -1152,11 +1151,11 @@ pub fn setFunctionName(
         });
 
         // b. If F has an [[InitialName]] internal slot, then
-        if (function.is(BuiltinFunction)) {
+        if (function.cast(BuiltinFunction)) |builtin_function| {
             // i. NOTE: The choice in the following step is made independently each time this
             //    Abstract Operation is invoked.
             // ii. Optionally, set F.[[InitialName]] to name.
-            function.as(BuiltinFunction).fields.initial_name = name;
+            builtin_function.fields.initial_name = name;
         }
     }
 
@@ -1423,7 +1422,7 @@ fn functionDeclarationInstantiation(
         env.initializeBinding(
             agent,
             String.fromLiteral("arguments"),
-            Value.from(arguments_object),
+            Value.from(&arguments_object.object),
         ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
@@ -1601,7 +1600,7 @@ fn functionDeclarationInstantiation(
         var_env.setMutableBinding(
             agent,
             function_name,
-            Value.from(function_object),
+            Value.from(&function_object.object),
             false,
         ) catch |err| try noexcept(err);
     }

@@ -27,19 +27,21 @@ const isPartialTemporalObject = builtins.isPartialTemporalObject;
 const isValidISODate = builtins.isValidISODate;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prepareCalendarFields = builtins.prepareCalendarFields;
 
 /// 10.2 Properties of the Temporal.PlainMonthDay Constructor
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainmonthday-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             2,
             "PlainMonthDay",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -121,9 +123,8 @@ pub const constructor = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainMonthDay_destroy(temporal_rs_plain_month_day.?);
-        return Value.from(
-            try createTemporalMonthDay(agent, temporal_rs_plain_month_day.?, new_target),
-        );
+        const plain_month_day = try createTemporalMonthDay(agent, temporal_rs_plain_month_day.?, new_target);
+        return Value.from(&plain_month_day.object);
     }
 
     /// 10.2.2 Temporal.PlainMonthDay.from ( item [ , options ] )
@@ -133,7 +134,8 @@ pub const constructor = struct {
         const options = arguments.get(1);
 
         // 1. Return ? ToTemporalMonthDay(item, options).
-        return Value.from(try toTemporalPlainMonthDay(agent, item, options));
+        const plain_month_day = try toTemporalPlainMonthDay(agent, item, options);
+        return Value.from(&plain_month_day.object);
     }
 };
 
@@ -141,9 +143,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainmonthday-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -227,7 +227,7 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_PlainMonthDay_equals(
                 plain_month_day.fields.inner,
-                other.as(PlainMonthDay).fields.inner,
+                other.fields.inner,
             ),
         );
     }
@@ -325,13 +325,12 @@ pub const prototype = struct {
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
 
         // 9. Return ! CreateTemporalDate(isoDate, calendar).
-        return Value.from(
-            createTemporalDate(
-                agent,
-                temporal_rs_plain_date.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const plain_date = createTemporalDate(
+            agent,
+            temporal_rs_plain_date.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_date.object);
     }
 
     /// 10.3.8 Temporal.PlainMonthDay.prototype.toString ( [ options ] )
@@ -425,13 +424,12 @@ pub const prototype = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainMonthDay_destroy(temporal_rs_plain_month_day.?);
-        return Value.from(
-            createTemporalMonthDay(
-                agent,
-                temporal_rs_plain_month_day.?,
-                null,
-            ) catch |err| try noexcept(err),
-        );
+        const new_plain_month_day = createTemporalMonthDay(
+            agent,
+            temporal_rs_plain_month_day.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_plain_month_day.object);
     }
 };
 
@@ -455,14 +453,14 @@ pub fn toTemporalPlainMonthDay(
     agent: *Agent,
     item: Value,
     maybe_options_value: ?Value,
-) Agent.Error!*Object {
+) Agent.Error!*PlainMonthDay {
     // 1. If options is not present, set options to undefined.
     const options_value: Value = maybe_options_value orelse .undefined;
 
     // 2. If item is a Object, then
     const temporal_rs_plain_month_day = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalMonthDay]] internal slot, then
-        if (item.asObject().is(PlainMonthDay)) {
+        if (item.asObject().cast(PlainMonthDay)) |plain_month_day| {
             // i. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
@@ -470,7 +468,6 @@ pub fn toTemporalPlainMonthDay(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iii. Return ! CreateTemporalMonthDay(item.[[ISODate]], item.[[Calendar]]).
-            const plain_month_day = item.asObject().as(PlainMonthDay);
             break :blk temporal_rs.c.temporal_rs_PlainMonthDay_clone(plain_month_day.fields.inner);
         }
 
@@ -570,7 +567,7 @@ pub fn createTemporalMonthDay(
     agent: *Agent,
     inner: *temporal_rs.c.PlainMonthDay,
     maybe_new_target: ?*Object,
-) Agent.Error!*Object {
+) Agent.Error!*PlainMonthDay {
     const realm = agent.currentRealm();
 
     // 1. If ISODateWithinLimits(isoDate) is false, throw a RangeError exception.

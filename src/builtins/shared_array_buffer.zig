@@ -22,6 +22,7 @@ const createSharedByteDataBlock = types.createSharedByteDataBlock;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const data_block_max_byte_length = types.data_block_max_byte_length;
 
 /// 25.2.2.1 AllocateSharedArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
@@ -31,7 +32,7 @@ pub fn allocateSharedArrayBuffer(
     constructor_: *Object,
     byte_length: usize,
     max_byte_length: ?u53,
-) Agent.Error!*Object {
+) Agent.Error!*SharedArrayBuffer {
     // 1. Let slots be « [[ArrayBufferData]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingGrowableBuffer
@@ -57,7 +58,7 @@ pub fn allocateSharedArrayBuffer(
     //     a. Append [[ArrayBufferByteLength]] to slots.
 
     // 5. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%SharedArrayBuffer.prototype%", slots).
-    const object = try ordinaryCreateFromConstructor(
+    const shared_array_buffer = try ordinaryCreateFromConstructor(
         SharedArrayBuffer,
         agent,
         constructor_,
@@ -72,7 +73,7 @@ pub fn allocateSharedArrayBuffer(
     // 7. Let block be ? CreateSharedByteDataBlock(allocLength).
     const block = try createSharedByteDataBlock(agent, alloc_length);
 
-    object.as(SharedArrayBuffer).fields = .{
+    shared_array_buffer.fields = .{
         // 8. Set obj.[[ArrayBufferData]] to block.
         .array_buffer_data = block,
 
@@ -87,10 +88,10 @@ pub fn allocateSharedArrayBuffer(
         // b. Let byteLengthBlock be ? CreateSharedByteDataBlock(8).
         // c. Perform SetValueInBuffer(byteLengthBlock, 0, biguint64, ℤ(byteLength), true, seq-cst).
         // d. Set obj.[[ArrayBufferByteLengthData]] to byteLengthBlock.
-        object.as(SharedArrayBuffer).fields.array_buffer_byte_length_data = .init(byte_length);
+        shared_array_buffer.fields.array_buffer_byte_length_data = .init(byte_length);
 
         // e. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
-        object.as(SharedArrayBuffer).fields.array_buffer_max_byte_length = max_byte_length.?;
+        shared_array_buffer.fields.array_buffer_max_byte_length = max_byte_length.?;
     } else {
         // 10. Else,
         // a. Set obj.[[ArrayBufferByteLength]] to byteLength.
@@ -98,20 +99,21 @@ pub fn allocateSharedArrayBuffer(
     }
 
     // 11. Return obj.
-    return object;
+    return shared_array_buffer;
 }
 
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "SharedArrayBuffer",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -149,14 +151,13 @@ pub const constructor = struct {
         const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
 
         // 4. Return ? AllocateSharedArrayBuffer(NewTarget, byteLength, requestedMaxByteLength).
-        return Value.from(
-            try allocateSharedArrayBuffer(
-                agent,
-                new_target.?,
-                @intCast(byte_length),
-                requested_max_byte_length,
-            ),
+        const shared_array_buffer = try allocateSharedArrayBuffer(
+            agent,
+            new_target.?,
+            @intCast(byte_length),
+            requested_max_byte_length,
         );
+        return Value.from(&shared_array_buffer.object);
     }
 
     /// 25.2.4.2 get SharedArrayBuffer [ %Symbol.species% ]
@@ -171,9 +172,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

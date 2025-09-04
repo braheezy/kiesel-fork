@@ -23,13 +23,14 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Number",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -173,7 +174,7 @@ pub const constructor = struct {
         );
 
         // 6. Return O.
-        return Value.from(object);
+        return Value.from(&object.object);
     }
 
     /// 21.1.2.2 Number.isFinite ( number )
@@ -240,12 +241,13 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return Number.create(agent, .{
+        const number = try Number.create(agent, .{
             .fields = .{
                 .number_data = types.Number.from(0),
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+        return &number.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -272,13 +274,11 @@ pub const prototype = struct {
         if (value.isNumber()) return value.asNumber();
 
         // 2. If value is an Object and value has a [[NumberData]] internal slot, then
-        if (value.isObject() and value.asObject().is(Number)) {
+        if (value.castObject(Number)) |number| {
             // a. Let n be value.[[NumberData]].
             // b. Assert: n is a Number.
-            const n = value.asObject().as(Number).fields.number_data;
-
             // c. Return n.
-            return n;
+            return number.fields.number_data;
         }
 
         // 3. Throw a TypeError exception.

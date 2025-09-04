@@ -605,7 +605,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.I
     try writer.print("{s}(", .{element_type.typedArrayName()});
     try tty_config.setColor(writer, .reset);
     if (viewed_array_buffer.arrayBufferData()) |data| {
-        const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+        const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
         try writer.print("length: {f}", .{Value.from(array_length).fmtPretty()});
@@ -1198,8 +1198,8 @@ fn prettyPrintFunction(object: *const Object, writer: *std.Io.Writer) PrettyPrin
 
     try tty_config.setColor(writer, .bold);
     try tty_config.setColor(writer, .blue);
-    if (object.is(builtins.ECMAScriptFunction)) {
-        const function_body = object.as(builtins.ECMAScriptFunction).fields.ecmascript_code;
+    if (object.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+        const function_body = ecmascript_function.fields.ecmascript_code;
         switch (function_body.type) {
             .normal => try writer.writeAll("fn "),
             .generator => try writer.writeAll("fn* "),
@@ -1352,7 +1352,7 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
             .{ builtins.temporal.ZonedDateTime, prettyPrintTemporalZonedDateTime },
         } else .{})) |entry| {
             const T, const prettyPrintFn = entry;
-            if (object.is(T)) return prettyPrintFn(object.as(T), writer);
+            if (object.cast(T)) |ptr| return prettyPrintFn(ptr, writer);
         }
         // NOTE: This needs to go before pretty-printing functions as it has [[Call]] but no name.
         if (build_options.enable_annex_b and object.isHTMLDDA()) {

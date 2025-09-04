@@ -81,8 +81,8 @@ const PromiseReaction = struct {
 };
 
 const ResolvingFunctions = struct {
-    resolve: *Object,
-    reject: *Object,
+    resolve: *builtins.BuiltinFunction,
+    reject: *builtins.BuiltinFunction,
 };
 
 /// 27.2.1.3 CreateResolvingFunctions ( promise )
@@ -137,7 +137,7 @@ pub fn createResolvingFunctions(
                 );
 
                 // b. Perform RejectPromise(promise, selfResolutionError).
-                try rejectPromise(agent_, promise_, Value.from(self_resolution_error));
+                try rejectPromise(agent_, promise_, Value.from(&self_resolution_error.object));
 
                 // c. Return undefined.
                 return .undefined;
@@ -384,7 +384,11 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
     const resolving_functions = &additional_fields.resolving_functions;
 
     // 6. Let promise be ? Construct(C, « executor »).
-    const promise = try constructor_.asObject().construct(agent, &.{Value.from(executor)}, null);
+    const promise = try constructor_.asObject().construct(
+        agent,
+        &.{Value.from(&executor.object)},
+        null,
+    );
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
@@ -650,8 +654,8 @@ pub fn newPromiseResolveThenableJob(
                 then_,
                 Value.from(thenable_),
                 &.{
-                    Value.from(resolving_functions.resolve),
-                    Value.from(resolving_functions.reject),
+                    Value.from(&resolving_functions.resolve.object),
+                    Value.from(&resolving_functions.reject.object),
                 },
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
@@ -662,7 +666,7 @@ pub fn newPromiseResolveThenableJob(
 
                     // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
-                    return Value.from(resolving_functions.reject).callAssumeCallable(
+                    return Value.from(&resolving_functions.reject.object).callAssumeCallable(
                         agent_,
                         .undefined,
                         &.{exception.value},
@@ -750,7 +754,7 @@ fn performPromiseAll(
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
                     agent,
                     .undefined,
-                    &.{Value.from(values_array)},
+                    &.{Value.from(&values_array.object)},
                 );
             }
 
@@ -830,7 +834,7 @@ fn performPromiseAll(
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
-                        &.{Value.from(values_array)},
+                        &.{Value.from(&values_array.object)},
                     );
                 }
 
@@ -876,7 +880,7 @@ fn performPromiseAll(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            &.{ Value.from(on_fulfilled), Value.from(result_capability.reject) },
+            &.{ Value.from(&on_fulfilled.object), Value.from(result_capability.reject) },
         );
 
         // o. Set index to index + 1.
@@ -921,7 +925,7 @@ fn performPromiseAllSettled(
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
                     agent,
                     .undefined,
-                    &.{Value.from(values_array)},
+                    &.{Value.from(&values_array.object)},
                 );
             }
 
@@ -1023,7 +1027,7 @@ fn performPromiseAllSettled(
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
-                        &.{Value.from(values_array)},
+                        &.{Value.from(&values_array.object)},
                     );
                 }
 
@@ -1132,7 +1136,7 @@ fn performPromiseAllSettled(
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
-                        &.{Value.from(values_array)},
+                        &.{Value.from(&values_array.object)},
                     );
                 }
 
@@ -1178,7 +1182,7 @@ fn performPromiseAllSettled(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            &.{ Value.from(on_fulfilled), Value.from(on_rejected) },
+            &.{ Value.from(&on_fulfilled.object), Value.from(&on_rejected.object) },
         );
 
         // x. Set index to index + 1.
@@ -1217,7 +1221,7 @@ fn performPromiseAny(
             // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let error be a newly created AggregateError object.
-                const error_ = try agent.createErrorObject(
+                const @"error" = try agent.createErrorObject(
                     .aggregate_error,
                     "All promises were rejected",
                     .{},
@@ -1227,16 +1231,17 @@ fn performPromiseAny(
                 //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                 //      [[Value]]: CreateArrayFromList(errors)
                 //    }).
-                try error_.definePropertyDirect(agent, PropertyKey.from("errors"), .{
+                const errors_array = try createArrayFromList(agent, errors.items);
+                try @"error".object.definePropertyDirect(agent, PropertyKey.from("errors"), .{
                     .value_or_accessor = .{
-                        .value = Value.from(try createArrayFromList(agent, errors.items)),
+                        .value = Value.from(&errors_array.object),
                     },
                     .attributes = .builtin_default,
                 });
 
                 // 3. Return ThrowCompletion(error).
                 agent.exception = .{
-                    .value = Value.from(error_),
+                    .value = Value.from(&@"error".object),
                     .stack_trace = try agent.captureStackTrace(),
                 };
                 return error.ExceptionThrown;
@@ -1313,7 +1318,7 @@ fn performPromiseAny(
                 // 10. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
                     // a. Let error be a newly created AggregateError object.
-                    const error_ = try agent_.createErrorObject(
+                    const @"error" = try agent_.createErrorObject(
                         .aggregate_error,
                         "All promises were rejected",
                         .{},
@@ -1323,9 +1328,10 @@ fn performPromiseAny(
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
-                    try error_.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
+                    const errors_list = try createArrayFromList(agent_, errors_.items);
+                    try @"error".object.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
                         .value_or_accessor = .{
-                            .value = Value.from(try createArrayFromList(agent_, errors_.items)),
+                            .value = Value.from(&errors_list.object),
                         },
                         .attributes = .builtin_default,
                     });
@@ -1334,7 +1340,7 @@ fn performPromiseAny(
                     return Value.from(promise_capability.reject).callAssumeCallable(
                         agent_,
                         .undefined,
-                        &.{Value.from(error_)},
+                        &.{Value.from(&@"error".object)},
                     );
                 }
 
@@ -1380,7 +1386,7 @@ fn performPromiseAny(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            &.{ Value.from(result_capability.resolve), Value.from(on_rejected) },
+            &.{ Value.from(result_capability.resolve), Value.from(&on_rejected.object) },
         );
 
         // o. Set index to index + 1.
@@ -1540,13 +1546,14 @@ pub fn performPromiseThen(
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Promise",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1616,14 +1623,17 @@ pub const constructor = struct {
         );
 
         // 9. Let resolvingFunctions be CreateResolvingFunctions(promise).
-        const resolving_functions = try createResolvingFunctions(agent, promise.as(Promise));
+        const resolving_functions = try createResolvingFunctions(agent, promise);
 
         // 10. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
         //     resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
             agent,
             .undefined,
-            &.{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
+            &.{
+                Value.from(&resolving_functions.resolve.object),
+                Value.from(&resolving_functions.reject.object),
+            },
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
 
@@ -1632,7 +1642,7 @@ pub const constructor = struct {
                 const exception = agent.clearException();
 
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
-                _ = try Value.from(resolving_functions.reject).callAssumeCallable(
+                _ = try Value.from(&resolving_functions.reject.object).callAssumeCallable(
                     agent,
                     .undefined,
                     &.{exception.value},
@@ -1641,7 +1651,7 @@ pub const constructor = struct {
         };
 
         // 12. Return promise.
-        return Value.from(promise);
+        return Value.from(&promise.object);
     }
 
     /// 27.2.4.1 Promise.all ( iterable )
@@ -1967,9 +1977,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -2097,21 +2105,20 @@ pub const prototype = struct {
                     return Value.from(new_promise).invoke(
                         agent_,
                         PropertyKey.from("then"),
-                        &.{Value.from(value_thunk)},
+                        &.{Value.from(&value_thunk.object)},
                     );
                 }
             }.func;
 
             // b. Let thenFinally be CreateBuiltinFunction(thenFinallyClosure, 1, "", « »).
-            then_finally = Value.from(
-                try createBuiltinFunction(
-                    agent,
-                    .{ .function = then_finally_closure },
-                    1,
-                    "",
-                    .{ .additional_fields = .make(*Captures, captures) },
-                ),
+            const then_finally_function = try createBuiltinFunction(
+                agent,
+                .{ .function = then_finally_closure },
+                1,
+                "",
+                .{ .additional_fields = .make(*Captures, captures) },
             );
+            then_finally = Value.from(&then_finally_function.object);
 
             // c. Let catchFinallyClosure be a new Abstract Closure with parameters (reason) that
             //    captures onFinally and C and performs the following steps when called:
@@ -2161,21 +2168,20 @@ pub const prototype = struct {
                     return Value.from(new_promise).invoke(
                         agent_,
                         PropertyKey.from("then"),
-                        &.{Value.from(thrower)},
+                        &.{Value.from(&thrower.object)},
                     );
                 }
             }.func;
 
             // d. Let catchFinally be CreateBuiltinFunction(catchFinallyClosure, 1, "", « »).
-            catch_finally = Value.from(
-                try createBuiltinFunction(
-                    agent,
-                    .{ .function = catch_finally_closure },
-                    1,
-                    "",
-                    .{ .additional_fields = .make(*Captures, captures) },
-                ),
+            const catch_finally_function = try createBuiltinFunction(
+                agent,
+                .{ .function = catch_finally_closure },
+                1,
+                "",
+                .{ .additional_fields = .make(*Captures, captures) },
             );
+            catch_finally = Value.from(&catch_finally_function.object);
         }
 
         // 7. Return ? Invoke(promise, "then", « thenFinally, catchFinally »).

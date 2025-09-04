@@ -17,6 +17,7 @@ const String = types.String;
 const Value = types.Value;
 const advanceStringIndex = builtins.advanceStringIndex;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const regExpExec = builtins.regExpExec;
 
 /// 22.2.9.1 CreateRegExpStringIterator ( R, S, global, fullUnicode )
@@ -27,7 +28,7 @@ pub fn createRegExpStringIterator(
     string: *const String,
     global: bool,
     full_unicode: bool,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*RegExpStringIterator {
     const realm = agent.currentRealm();
 
     // 1. Let iterator be OrdinaryObjectCreate(%RegExpStringIteratorPrototype%, «
@@ -61,9 +62,7 @@ pub fn createRegExpStringIterator(
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -90,14 +89,7 @@ pub const prototype = struct {
         // 2. If O is not an Object, throw a TypeError exception.
         // 3. If O does not have all of the internal slots of a RegExp String Iterator Object
         //    Instance (see 22.2.9.2.3), throw a TypeError exception.
-        if (!this_value.isObject() or !this_value.asObject().is(RegExpStringIterator)) {
-            return agent.throwException(
-                .type_error,
-                "This value must be a RegExp String Iterator",
-                .{},
-            );
-        }
-        const reg_exp_string_iterator = this_value.asObject().as(RegExpStringIterator);
+        const reg_exp_string_iterator = try this_value.requireInternalSlot(agent, RegExpStringIterator);
 
         // 4. If O.[[Done]] is true, then
         if (reg_exp_string_iterator.fields == .completed) {

@@ -200,12 +200,8 @@ test "isAccessorDescriptor" {
     defer platform.deinit();
     var agent = try Agent.init(&platform, .{});
     defer agent.deinit();
-    const getter = try builtins.Object.create(&agent, .{
-        .prototype = null,
-    });
-    const setter = try builtins.Object.create(&agent, .{
-        .prototype = null,
-    });
+    const getter = try ordinaryObjectCreate(&agent, null);
+    const setter = try ordinaryObjectCreate(&agent, null);
     try std.testing.expect((PropertyDescriptor{ .get = getter }).isAccessorDescriptor());
     try std.testing.expect((PropertyDescriptor{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((PropertyDescriptor{ .get = getter, .set = setter }).isAccessorDescriptor());
@@ -225,9 +221,7 @@ test "isGenericDescriptor" {
     defer platform.deinit();
     var agent = try Agent.init(&platform, .{});
     defer agent.deinit();
-    const setter = try builtins.Object.create(&agent, .{
-        .prototype = null,
-    });
+    const setter = try ordinaryObjectCreate(&agent, null);
     try std.testing.expect((PropertyDescriptor{ .writable = null }).isGenericDescriptor());
     try std.testing.expect(!(PropertyDescriptor{ .set = setter }).isGenericDescriptor());
     try std.testing.expect((PropertyDescriptor{}).isGenericDescriptor());

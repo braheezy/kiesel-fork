@@ -24,6 +24,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
@@ -31,9 +32,7 @@ const promiseResolve = builtins.promiseResolve;
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%AsyncIteratorPrototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -772,14 +771,12 @@ pub fn asyncGeneratorAwaitReturn(
     }.func;
 
     // 12. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
-    const on_fulfilled = Value.from(
-        try createBuiltinFunction(
-            agent,
-            .{ .function = fulfilled_closure },
-            1,
-            "",
-            .{ .additional_fields = .make(*Captures, captures) },
-        ),
+    const on_fulfilled = try createBuiltinFunction(
+        agent,
+        .{ .function = fulfilled_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
     );
 
     // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
@@ -809,22 +806,20 @@ pub fn asyncGeneratorAwaitReturn(
     }.func;
 
     // 14. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
-    const on_rejected = Value.from(
-        try createBuiltinFunction(
-            agent,
-            .{ .function = rejected_closure },
-            1,
-            "",
-            .{ .additional_fields = .make(*Captures, captures) },
-        ),
+    const on_rejected = try createBuiltinFunction(
+        agent,
+        .{ .function = rejected_closure },
+        1,
+        "",
+        .{ .additional_fields = .make(*Captures, captures) },
     );
 
     // 15. Perform PerformPromiseThen(promise, onFulfilled, onRejected).
     _ = try performPromiseThen(
         agent,
         promise.as(builtins.Promise),
-        on_fulfilled,
-        on_rejected,
+        Value.from(&on_fulfilled.object),
+        Value.from(&on_rejected.object),
         null,
     );
 

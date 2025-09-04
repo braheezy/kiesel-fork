@@ -20,14 +20,13 @@ const Vm = bytecode.Vm;
 const asyncGeneratorYield = builtins.asyncGeneratorYield;
 const await = builtins.await;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 27.5.1 The %GeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

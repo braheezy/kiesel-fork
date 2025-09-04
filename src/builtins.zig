@@ -77,6 +77,7 @@ pub const Iterator = iterator.Iterator;
 pub const IteratorHelper = iterator_helper.IteratorHelper;
 pub const Map = map.Map;
 pub const MapIterator = map_iterator.MapIterator;
+pub const ModuleNamespace = module_namespace.ModuleNamespace;
 pub const Number = number.Number;
 pub const Object = object.Object;
 pub const Promise = promise.Promise;

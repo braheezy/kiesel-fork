@@ -296,13 +296,14 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-            return createBuiltinFunction(
+            const builtin_function = try createBuiltinFunction(
                 agent,
                 .{ .function = @field(module, options.name) },
                 options.length,
                 options.name,
                 .{ .realm = realm },
             );
+            return &builtin_function.object;
         }
         pub fn init(_: *Agent, _: *Realm, _: *Object) std.mem.Allocator.Error!void {}
     };

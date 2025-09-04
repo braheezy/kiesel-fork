@@ -21,6 +21,7 @@ const availableCanonicalNumberingSystems = abstract_operations.availableCanonica
 const availableCanonicalUnits = abstract_operations.availableCanonicalUnits;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 comptime {
     const build_options = @import("build-options");
@@ -56,9 +57,7 @@ pub const findBoundary = segmenter.findBoundary;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -153,15 +152,14 @@ pub const namespace = struct {
         defer locale_list.deinit(agent.gc_allocator);
 
         // 2. Return CreateArrayFromList(ll).
-        return Value.from(
-            try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
-                fn mapFn(agent_: *Agent, locale_: icu4zig.Locale) std.mem.Allocator.Error!Value {
-                    return Value.from(
-                        try String.fromAscii(agent_, try locale_.toString(agent_.gc_allocator)),
-                    );
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
+            fn mapFn(agent_: *Agent, locale_: icu4zig.Locale) std.mem.Allocator.Error!Value {
+                return Value.from(
+                    try String.fromAscii(agent_, try locale_.toString(agent_.gc_allocator)),
+                );
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 
     /// 8.3.2 Intl.supportedValuesOf ( key )
@@ -210,12 +208,11 @@ pub const namespace = struct {
         }
 
         // 9. Return CreateArrayFromList( list ).
-        return Value.from(
-            try createArrayFromListMapToValue(agent, *const String, list, struct {
-                fn mapFn(_: *Agent, string: *const String) std.mem.Allocator.Error!Value {
-                    return Value.from(string);
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, *const String, list, struct {
+            fn mapFn(_: *Agent, string: *const String) std.mem.Allocator.Error!Value {
+                return Value.from(string);
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 };

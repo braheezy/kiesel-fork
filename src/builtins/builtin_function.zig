@@ -162,7 +162,7 @@ pub fn createBuiltinFunction(
         prefix: ?[]const u8 = null,
         additional_fields: SafePointer = .null_pointer,
     },
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*BuiltinFunction {
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 
@@ -203,7 +203,7 @@ pub fn createBuiltinFunction(
     });
 
     // 10. Perform SetFunctionLength(func, length).
-    try setFunctionLength(agent, function, @floatFromInt(length));
+    try setFunctionLength(agent, &function.object, @floatFromInt(length));
 
     // 11. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
@@ -214,7 +214,7 @@ pub fn createBuiltinFunction(
     //       ensure it only gets called once. It's the caller's responsibility to install the
     //       function name after the fact.
     if (maybe_name) |name| {
-        try setFunctionName(agent, function, PropertyKey.from(name), args.prefix);
+        try setFunctionName(agent, &function.object, PropertyKey.from(name), args.prefix);
     }
 
     // 13. Return func.

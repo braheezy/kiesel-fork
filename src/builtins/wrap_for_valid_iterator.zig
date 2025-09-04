@@ -13,14 +13,13 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 27.1.3.2.1.1 The %WrapForValidIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

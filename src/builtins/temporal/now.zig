@@ -8,6 +8,7 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -20,13 +21,13 @@ const createTemporalDateTime = builtins.createTemporalDateTime;
 const createTemporalInstant = builtins.createTemporalInstant;
 const createTemporalTime = builtins.createTemporalTime;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
+const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -63,9 +64,12 @@ pub const namespace = struct {
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
         );
         errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
-        return Value.from(
-            try createTemporalInstant(agent, temporal_rs_instant.?, null),
-        );
+        const instant_ = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&instant_.object);
     }
 
     /// 2.2.5 Temporal.Now.plainDateISO ( [ temporalTimeZoneLike ] )
@@ -86,7 +90,12 @@ pub const namespace = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
-        return Value.from(try createTemporalDate(agent, temporal_rs_plain_date.?, null));
+        const plain_date = createTemporalDate(
+            agent,
+            temporal_rs_plain_date.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_date.object);
     }
 
     /// 2.2.3 Temporal.Now.plainDateTimeISO ( [ temporalTimeZoneLike ] )
@@ -107,7 +116,12 @@ pub const namespace = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
-        return Value.from(try createTemporalDateTime(agent, temporal_rs_plain_date_time.?, null));
+        const plain_date_time = createTemporalDateTime(
+            agent,
+            temporal_rs_plain_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_date_time.object);
     }
 
     /// 2.2.6 Temporal.Now.plainTimeISO ( [ temporalTimeZoneLike ] )
@@ -128,7 +142,12 @@ pub const namespace = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
-        return Value.from(try createTemporalTime(agent, temporal_rs_plain_time.?, null));
+        const plain_time = createTemporalTime(
+            agent,
+            temporal_rs_plain_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&plain_time.object);
     }
 
     /// 2.2.1 Temporal.Now.timeZoneId ( )
@@ -166,7 +185,12 @@ pub const namespace = struct {
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
-        return Value.from(try createTemporalZonedDateTime(agent, temporal_rs_zoned_date_time.?, null));
+        const zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&zoned_date_time.object);
     }
 };
 

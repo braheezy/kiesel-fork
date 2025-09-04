@@ -16,13 +16,14 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 
 pub const function = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .function = impl },
             0,
             "",
             .{ .realm = realm },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, _: *Realm, object: *Object) std.mem.Allocator.Error!void {

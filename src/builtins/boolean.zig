@@ -20,13 +20,14 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Boolean",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -52,7 +53,7 @@ pub const constructor = struct {
         if (new_target == null) return Value.from(b);
 
         // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%", « [[BooleanData]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const boolean = try ordinaryCreateFromConstructor(
             Boolean,
             agent,
             new_target.?,
@@ -64,7 +65,7 @@ pub const constructor = struct {
         );
 
         // 5. Return O.
-        return Value.from(object);
+        return Value.from(&boolean.object);
     }
 };
 
@@ -72,12 +73,13 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return Boolean.create(agent, .{
+        const boolean = try Boolean.create(agent, .{
             .fields = .{
                 .boolean_data = false,
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+        return &boolean.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -100,13 +102,11 @@ pub const prototype = struct {
         if (value.isBoolean()) return value.asBoolean();
 
         // 2. If value is an Object and value has a [[BooleanData]] internal slot, then
-        if (value.isObject() and value.asObject().is(Boolean)) {
+        if (value.castObject(Boolean)) |boolean| {
             // a. Let b be value.[[BooleanData]].
             // b. Assert: b is a Boolean.
-            const b = value.asObject().as(Boolean).fields.boolean_data;
-
             // c. Return b.
-            return b;
+            return boolean.fields.boolean_data;
         }
 
         // 3. Throw a TypeError exception.

@@ -79,14 +79,14 @@ pub fn boundFunctionCreate(
     target_function: *Object,
     bound_this: Value,
     bound_args: []const Value,
-) Agent.Error!*Object {
+) Agent.Error!*BoundFunction {
     // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
     const prototype = try target_function.internal_methods.getPrototypeOf(agent, target_function);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
     //    the internal slots listed in Table 31.
     // 3. Let obj be MakeBasicObject(internalSlotsList).
-    const object = try BoundFunction.create(agent, .{
+    const bound_function = try BoundFunction.create(agent, .{
         // 4. Set obj.[[Prototype]] to proto.
         .prototype = prototype,
 
@@ -111,7 +111,7 @@ pub fn boundFunctionCreate(
     });
 
     // 10. Return obj.
-    return object;
+    return bound_function;
 }
 
 /// Table 31: Internal Slots of Bound Function Exotic Objects

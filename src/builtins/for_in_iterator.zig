@@ -15,10 +15,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 14.7.5.10.1 CreateForInIterator ( object )
 /// https://tc39.es/ecma262/#sec-createforiniterator
-pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Error!*Object {
+pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Error!*ForInIterator {
     const realm = agent.currentRealm();
 
     // 1. let iterator be OrdinaryObjectCreate(%ForInIteratorPrototype%, « [[Object]],
@@ -48,9 +49,7 @@ pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Err
 /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

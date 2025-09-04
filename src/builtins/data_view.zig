@@ -23,6 +23,7 @@ const getValueFromBuffer = builtins.getValueFromBuffer;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setValueInBuffer = builtins.setValueInBuffer;
 
 /// 25.3.1.1 DataView With Buffer Witness Records
@@ -284,13 +285,14 @@ fn setViewValue(
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "DataView",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -321,16 +323,13 @@ pub const constructor = struct {
         }
 
         // 2. Perform ? RequireInternalSlot(buffer, [[ArrayBufferData]]).
-        if (!buffer_value.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{buffer_value});
-        }
-        if (!buffer_value.asObject().is(builtins.ArrayBuffer) and !buffer_value.asObject().is(builtins.SharedArrayBuffer)) {
+        const buffer: ArrayBufferLike = if (buffer_value.castObject(builtins.ArrayBuffer)) |array_buffer|
+            .{ .array_buffer = array_buffer }
+        else if (buffer_value.castObject(builtins.SharedArrayBuffer)) |shared_array_buffer|
+            .{ .shared_array_buffer = shared_array_buffer }
+        else {
             return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
-        }
-        const buffer: ArrayBufferLike = if (buffer_value.asObject().is(builtins.ArrayBuffer))
-            .{ .array_buffer = buffer_value.asObject().as(builtins.ArrayBuffer) }
-        else
-            .{ .shared_array_buffer = buffer_value.asObject().as(builtins.SharedArrayBuffer) };
+        };
 
         // 3. Let offset be ? ToIndex(byteOffset).
         const offset = try byte_offset.toIndex(agent);
@@ -389,7 +388,7 @@ pub const constructor = struct {
 
         // 10. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%DataView.prototype%",
         //     « [[DataView]], [[ViewedArrayBuffer]], [[ByteLength]], [[ByteOffset]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const data_view = try ordinaryCreateFromConstructor(
             DataView,
             agent,
             new_target.?,
@@ -435,16 +434,16 @@ pub const constructor = struct {
         }
 
         // 15. Set O.[[ViewedArrayBuffer]] to buffer.
-        object.as(DataView).fields.viewed_array_buffer = buffer;
+        data_view.fields.viewed_array_buffer = buffer;
 
         // 16. Set O.[[ByteLength]] to viewByteLength.
-        object.as(DataView).fields.byte_length = view_byte_length;
+        data_view.fields.byte_length = view_byte_length;
 
         // 17. Set O.[[ByteOffset]] to offset.
-        object.as(DataView).fields.byte_offset = offset;
+        data_view.fields.byte_offset = offset;
 
         // 18. Return O.
-        return Value.from(object);
+        return Value.from(&data_view.object);
     }
 };
 
@@ -452,9 +451,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

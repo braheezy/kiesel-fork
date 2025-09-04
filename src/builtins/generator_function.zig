@@ -14,18 +14,20 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 27.3.1 The GeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-generatorfunction-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "GeneratorFunction",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -52,14 +54,15 @@ pub const constructor = struct {
         const body_arg = maybe_body_arg orelse Value.from("");
 
         // 3. Return ? CreateDynamicFunction(C, NewTarget, generator, parameterArgs, bodyArg).
-        return Value.from(try createDynamicFunction(
+        const ecmascript_function = try createDynamicFunction(
             agent,
             constructor_,
             new_target,
             .generator,
             parameter_args,
             body_arg,
-        ));
+        );
+        return Value.from(&ecmascript_function.object);
     }
 };
 
@@ -67,9 +70,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-generatorfunction-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Function.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

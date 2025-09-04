@@ -133,7 +133,7 @@ fn defineOwnProperty(
 
 /// 10.4.2.2 ArrayCreate ( length [ , proto ] )
 /// https://tc39.es/ecma262/#sec-arraycreate
-pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.Error!*Object {
+pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.Error!*Array {
     const realm = agent.currentRealm();
 
     // 1. If length > 2**32 - 1, throw a RangeError exception.
@@ -158,7 +158,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
     // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    _ = ordinaryDefineOwnProperty(agent, array, PropertyKey.from("length"), .{
+    _ = ordinaryDefineOwnProperty(agent, &array.object, PropertyKey.from("length"), .{
         .value = Value.from(@as(u32, @intCast(length))),
         .writable = true,
         .enumerable = false,
@@ -176,7 +176,10 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
     const is_array = try Value.from(original_array).isArray(agent);
 
     // 2. If isArray is false, return ? ArrayCreate(length).
-    if (!is_array) return arrayCreate(agent, length, null);
+    if (!is_array) {
+        const array = try arrayCreate(agent, length, null);
+        return &array.object;
+    }
 
     // 3. Let C be ? Get(originalArray, "constructor").
     var constructor_ = try original_array.get(agent, PropertyKey.from("constructor"));
@@ -211,7 +214,10 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
     }
 
     // 6. If C is undefined, return ? ArrayCreate(length).
-    if (constructor_.isUndefined()) return arrayCreate(agent, length, null);
+    if (constructor_.isUndefined()) {
+        const array = try arrayCreate(agent, length, null);
+        return &array.object;
+    }
 
     // 7. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor_.isConstructor()) {
@@ -390,13 +396,14 @@ pub fn arraySetLength(
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Array",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -435,7 +442,8 @@ pub const constructor = struct {
         // 4. If numberOfArgs = 0, then
         if (number_of_args == 0) {
             // a. Return ! ArrayCreate(0, proto).
-            return Value.from(arrayCreate(agent, 0, prototype_) catch |err| try noexcept(err));
+            const array = arrayCreate(agent, 0, prototype_) catch |err| try noexcept(err);
+            return Value.from(&array.object);
         }
         // 5. Else if numberOfArgs = 1, then
         else if (number_of_args == 1) {
@@ -450,7 +458,7 @@ pub const constructor = struct {
             // c. If len is not a Number, then
             if (!len.isNumber()) {
                 // i. Perform ! CreateDataPropertyOrThrow(array, "0", len).
-                try array.createDataPropertyDirect(agent, PropertyKey.from(0), len);
+                try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), len);
 
                 // ii. Let intLen be 1𝔽.
                 int_len = 1;
@@ -466,7 +474,7 @@ pub const constructor = struct {
             }
 
             // e. Perform ! Set(array, "length", intLen, true).
-            _ = array.set(
+            _ = array.object.set(
                 agent,
                 PropertyKey.from("length"),
                 Value.from(int_len),
@@ -474,7 +482,7 @@ pub const constructor = struct {
             ) catch |err| try noexcept(err);
 
             // f. Return array.
-            return Value.from(array);
+            return Value.from(&array.object);
         } else {
             // 6. Else,
             // a. Assert: numberOfArgs ≥ 2.
@@ -491,16 +499,16 @@ pub const constructor = struct {
 
                 // ii. Let itemK be values[k].
                 // iii. Perform ! CreateDataPropertyOrThrow(array, Pk, itemK).
-                try array.createDataPropertyDirect(agent, property_key, item_k);
+                try array.object.createDataPropertyDirect(agent, property_key, item_k);
 
                 // iv. Set k to k + 1.
             }
 
             // e. Assert: The mathematical value of array's "length" property is numberOfArgs.
-            std.debug.assert(getArrayLength(array) == @as(u32, @intCast(number_of_args)));
+            std.debug.assert(getArrayLength(&array.object) == @as(u32, @intCast(number_of_args)));
 
             // f. Return array.
-            return Value.from(array);
+            return Value.from(&array.object);
         }
     }
 
@@ -544,7 +552,8 @@ pub const constructor = struct {
             } else blk: {
                 // b. Else,
                 // i. Let A be ! ArrayCreate(0).
-                break :blk try arrayCreate(agent, 0, null);
+                const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+                break :blk &array.object;
             };
 
             // c. Let iteratorRecord be ? GetIteratorFromMethod(items, usingIterator).
@@ -622,7 +631,8 @@ pub const constructor = struct {
         } else blk: {
             // 10. Else,
             // a. Let A be ? ArrayCreate(len).
-            break :blk try arrayCreate(agent, len, null);
+            const array = try arrayCreate(agent, len, null);
+            break :blk &array.object;
         };
 
         // 11. Let k be 0.
@@ -757,7 +767,8 @@ pub const constructor = struct {
                     } else blk: {
                         // ii. Else,
                         // 1. Let A be ! ArrayCreate(0).
-                        break :blk arrayCreate(agent_, 0, null) catch |err| try noexcept(err);
+                        const array = arrayCreate(agent_, 0, null) catch |err| try noexcept(err);
+                        break :blk &array.object;
                     };
 
                     // iii. Let k be 0.
@@ -878,7 +889,8 @@ pub const constructor = struct {
                     } else blk: {
                         // v. Else,
                         // 1. Let A be ? ArrayCreate(len).
-                        break :blk try arrayCreate(agent_, len, null);
+                        const array = try arrayCreate(agent_, len, null);
+                        break :blk &array.object;
                     };
 
                     // vi. Let k be 0.
@@ -969,7 +981,8 @@ pub const constructor = struct {
             } else {
                 // 5. Else,
                 // a. Let A be ? ArrayCreate(len).
-                break :blk try arrayCreate(agent, len, null);
+                const array = try arrayCreate(agent, len, null);
+                break :blk &array.object;
             }
         };
 
@@ -1006,11 +1019,12 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return arrayCreate(
+        const array = arrayCreate(
             agent,
             0,
             try realm.intrinsics.@"%Object.prototype%"(),
         ) catch |err| try noexcept(err);
+        return &array.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1387,7 +1401,8 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return CreateArrayIterator(O, key+value).
-        return Value.from(try createArrayIterator(agent, object, .@"key+value"));
+        const array_iterator = try createArrayIterator(agent, object, .@"key+value");
+        return Value.from(&array_iterator.object);
     }
 
     /// 23.1.3.6 Array.prototype.every ( callback [ , thisArg ] )
@@ -2116,7 +2131,8 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return CreateArrayIterator(O, key).
-        return Value.from(try createArrayIterator(agent, object, .key));
+        const array_iterator = try createArrayIterator(agent, object, .key);
+        return Value.from(&array_iterator.object);
     }
 
     /// 23.1.3.20 Array.prototype.lastIndexOf ( searchElement [ , fromIndex ] )
@@ -3129,13 +3145,13 @@ pub const prototype = struct {
             const from_value = try object.get(agent, from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            try array.createDataPropertyDirect(agent, property_key, from_value);
+            try array.object.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set k to k + 1.
         }
 
         // 6. Return A.
-        return Value.from(array);
+        return Value.from(&array.object);
     }
 
     /// 23.1.3.34 Array.prototype.toSorted ( comparator )
@@ -3185,13 +3201,13 @@ pub const prototype = struct {
         // 8. Repeat, while j < len,
         while (j < len) : (j += 1) {
             // a. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(j)), sortedList[j]).
-            try array.createDataPropertyDirect(agent, PropertyKey.from(j), sorted_list[@intCast(j)]);
+            try array.object.createDataPropertyDirect(agent, PropertyKey.from(j), sorted_list[@intCast(j)]);
 
             // b. Set j to j + 1.
         }
 
         // 9. Return A.
-        return Value.from(array);
+        return Value.from(&array.object);
     }
 
     /// 23.1.3.35 Array.prototype.toSpliced ( start, skipCount, ...items )
@@ -3269,7 +3285,7 @@ pub const prototype = struct {
             const i_value = try object.get(agent, property_key);
 
             // c. Perform ! CreateDataPropertyOrThrow(A, Pi, iValue).
-            try array.createDataPropertyDirect(agent, property_key, i_value);
+            try array.object.createDataPropertyDirect(agent, property_key, i_value);
 
             // d. Set i to i + 1.
         }
@@ -3280,7 +3296,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(i);
 
             // b. Perform ! CreateDataPropertyOrThrow(A, Pi, E).
-            try array.createDataPropertyDirect(agent, property_key, element);
+            try array.object.createDataPropertyDirect(agent, property_key, element);
 
             // c. Set i to i + 1.
             i += 1;
@@ -3301,14 +3317,14 @@ pub const prototype = struct {
             const from_value = try object.get(agent, from);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pi, fromValue).
-            try array.createDataPropertyDirect(agent, property_key, from_value);
+            try array.object.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set i to i + 1.
             // f. Set r to r + 1.
         }
 
         // 19. Return A.
-        return Value.from(array);
+        return Value.from(&array.object);
     }
 
     /// 23.1.3.36 Array.prototype.toString ( )
@@ -3413,7 +3429,8 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return CreateArrayIterator(O, value).
-        return Value.from(try createArrayIterator(agent, object, .value));
+        const array_iterator = try createArrayIterator(agent, object, .value);
+        return Value.from(&array_iterator.object);
     }
 
     /// 23.1.3.39 Array.prototype.with ( index, value )
@@ -3463,13 +3480,13 @@ pub const prototype = struct {
                 try object.get(agent, property_key);
 
             // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
-            try array.createDataPropertyDirect(agent, property_key, from_value);
+            try array.object.createDataPropertyDirect(agent, property_key, from_value);
 
             // e. Set k to k + 1.
         }
 
         // 10. Return A.
-        return Value.from(array);
+        return Value.from(&array.object);
     }
 };
 

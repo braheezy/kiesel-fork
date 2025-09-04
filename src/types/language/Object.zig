@@ -25,6 +25,7 @@ const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
@@ -133,6 +134,10 @@ pub fn as(self: *const Object, comptime T: type) *T {
     std.debug.assert(self.is(T));
     // Casting alignment is safe because we allocate objects as *T
     return @alignCast(@constCast(@fieldParentPtr("object", self)));
+}
+
+pub fn cast(self: *const Object, comptime T: type) ?*T {
+    return if (self.is(T)) self.as(T) else null;
 }
 
 pub fn prototype(self: *const Object) ?*Object {
@@ -310,7 +315,7 @@ pub fn defineBuiltinAccessorWithAttributes(
             function_name,
             .{ .realm = realm },
         );
-    } else null;
+    } else {};
     const setter_function = if (setter) |function| blk: {
         const function_name = std.fmt.comptimePrint("set {s}", .{comptime getFunctionName(name)});
         break :blk try createBuiltinFunction(
@@ -320,7 +325,7 @@ pub fn defineBuiltinAccessorWithAttributes(
             function_name,
             .{ .realm = realm },
         );
-    } else null;
+    } else {};
     const property_key = getPropertyKey(name, agent);
     const attributes_: Object.PropertyStorage.Attributes = .{
         .writable = false,
@@ -334,8 +339,8 @@ pub fn defineBuiltinAccessorWithAttributes(
         .{ .accessor = @enumFromInt(self.property_storage.accessors.items.len) },
     );
     try self.property_storage.accessors.append(agent.gc_allocator, .{
-        .get = getter_function,
-        .set = setter_function,
+        .get = if (@TypeOf(getter_function) != void) &getter_function.object else null,
+        .set = if (@TypeOf(setter_function) != void) &setter_function.object else null,
     });
 }
 
@@ -377,7 +382,7 @@ pub fn defineBuiltinFunctionWithAttributes(
     try self.defineBuiltinPropertyWithAttributes(
         agent,
         name,
-        Value.from(builtin_function),
+        Value.from(&builtin_function.object),
         attributes,
     );
 }
@@ -404,7 +409,7 @@ pub fn defineBuiltinFunctionLazy(
                     function_name,
                     .{ .realm = realm_ },
                 );
-                return Value.from(builtin_function);
+                return Value.from(&builtin_function.object);
             }
         }.initializer,
         realm,
@@ -865,13 +870,13 @@ pub fn enumerableOwnProperties(
                         std.debug.assert(kind == .@"key+value");
 
                         // ii. Let entry be CreateArrayFromList(« key, value »).
-                        const entry = Value.from(try createArrayFromList(
+                        const entry = try createArrayFromList(
                             agent,
                             &.{ try key.toValue(agent), value },
-                        ));
+                        );
 
                         // iii. Append entry to results.
-                        try results.append(agent.gc_allocator, entry);
+                        try results.append(agent.gc_allocator, Value.from(&entry.object));
                     }
                 }
             }
@@ -888,31 +893,31 @@ pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrow
     // 1. If obj has a [[Realm]] internal slot, then
     if (self.internal_methods.call != null) {
         // a. Return obj.[[Realm]].
-        if (self.is(builtins.BuiltinFunction)) {
-            return self.as(builtins.BuiltinFunction).fields.realm;
-        } else if (self.is(builtins.ECMAScriptFunction)) {
-            return self.as(builtins.ECMAScriptFunction).fields.realm;
+        if (self.cast(builtins.BuiltinFunction)) |builtin_function| {
+            return builtin_function.fields.realm;
+        } else if (self.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+            return ecmascript_function.fields.realm;
         } else if (!(self.is(builtins.BoundFunction) or self.is(builtins.Proxy))) {
             @panic("Unhandled function type in getFunctionRealm()");
         }
     }
 
     // 2. If obj is a bound function exotic object, then
-    if (self.is(builtins.BoundFunction)) {
+    if (self.cast(builtins.BoundFunction)) |bound_function| {
         // a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
-        const bound_target_function = self.as(builtins.BoundFunction).fields.bound_target_function;
+        const bound_target_function = bound_function.fields.bound_target_function;
 
         // b. Return ? GetFunctionRealm(boundTargetFunction).
         return bound_target_function.getFunctionRealm(agent);
     }
 
     // 3. If obj is a Proxy exotic object, then
-    if (self.is(builtins.Proxy)) {
+    if (self.cast(builtins.Proxy)) |proxy| {
         // a. Perform ? ValidateNonRevokedProxy(obj).
-        try validateNonRevokedProxy(agent, self.as(builtins.Proxy));
+        try validateNonRevokedProxy(agent, proxy);
 
         // b. Let proxyTarget be obj.[[ProxyTarget]].
-        const proxy_target = self.as(builtins.Proxy).fields.proxy_target.?;
+        const proxy_target = proxy.fields.proxy_target.?;
 
         // c. Assert: proxyTarget is a function object.
         std.debug.assert(proxy_target.internal_methods.call != null);
@@ -1182,10 +1187,10 @@ pub fn initializeInstanceElements(
     constructor: *Object,
 ) Agent.Error!void {
     // 1. Let methods be constructor.[[PrivateMethods]].
-    const methods = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
-        break :blk constructor.as(builtins.ECMAScriptFunction).fields.private_methods;
-    } else if (constructor.is(builtins.BuiltinFunction)) blk: {
-        const class_constructor_fields = constructor.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+    const methods = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
+        break :blk ecmascript_function.fields.private_methods;
+    } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
+        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         break :blk class_constructor_fields.private_methods;
     } else unreachable;
 
@@ -1196,10 +1201,10 @@ pub fn initializeInstanceElements(
     }
 
     // 3. Let fields be constructor.[[Fields]].
-    const fields = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
-        break :blk constructor.as(builtins.ECMAScriptFunction).fields.fields;
-    } else if (constructor.is(builtins.BuiltinFunction)) blk: {
-        const class_constructor_fields = constructor.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+    const fields = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
+        break :blk ecmascript_function.fields.fields;
+    } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
+        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         break :blk class_constructor_fields.fields;
     } else unreachable;
 
@@ -1312,10 +1317,7 @@ test "format" {
     defer agent_.deinit();
 
     const test_cases = [_]struct { *Object, []const u8 }{
-        .{
-            try builtins.Object.create(&agent_, .{ .prototype = null }),
-            "[object Object]",
-        },
+        .{ try ordinaryObjectCreate(&agent_, null), "[object Object]" },
     };
     for (test_cases) |test_case| {
         const object, const expected = test_case;

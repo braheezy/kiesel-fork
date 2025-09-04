@@ -19,18 +19,20 @@ const Value = types.Value;
 const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 24.3.2 Properties of the WeakMap Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             0,
             "WeakMap",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -72,11 +74,11 @@ pub const constructor = struct {
 
         // 4. If iterable is either undefined or null, return map.
         if (iterable.isUndefined() or iterable.isNull()) {
-            return Value.from(map);
+            return Value.from(&map.object);
         }
 
         // 5. Let adder be ? Get(map, "set").
-        const adder = try map.get(agent, PropertyKey.from("set"));
+        const adder = try map.object.get(agent, PropertyKey.from("set"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
@@ -88,7 +90,7 @@ pub const constructor = struct {
         }
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
-        return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.asObject()));
+        return Value.from(try addEntriesFromIterable(agent, &map.object, iterable, adder.asObject()));
     }
 };
 
@@ -96,9 +98,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

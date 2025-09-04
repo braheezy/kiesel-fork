@@ -423,7 +423,7 @@ pub fn stringCreate(
     agent: *Agent,
     value: *const types.String,
     prototype_: *Object,
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!*String {
     // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
     const string = try String.create(agent, .{
         // 2. Set S.[[Prototype]] to prototype.
@@ -452,7 +452,7 @@ pub fn stringCreate(
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    try string.definePropertyDirect(agent, PropertyKey.from("length"), .{
+    try string.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(@as(u53, @intCast(length))),
         },
@@ -501,13 +501,14 @@ fn stringGetOwnProperty(
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "String",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -551,11 +552,12 @@ pub const constructor = struct {
         if (new_target == null) return Value.from(s);
 
         // 4. Return StringCreate(s, ? GetPrototypeFromConstructor(NewTarget, "%String.prototype%")).
-        return Value.from(try stringCreate(
+        const string = try stringCreate(
             agent,
             s,
             try getPrototypeFromConstructor(agent, new_target.?, "%String.prototype%"),
-        ));
+        );
+        return Value.from(&string.object);
     }
 
     /// 22.1.2.1 String.fromCharCode ( ...codeUnits )
@@ -682,7 +684,12 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return stringCreate(agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
+        const string = try stringCreate(
+            agent,
+            .empty,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+        return &string.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -764,13 +771,11 @@ pub const prototype = struct {
         if (value.isString()) return value.asString();
 
         // 2. If value is an Object and value has a [[StringData]] internal slot, then
-        if (value.isObject() and value.asObject().is(String)) {
+        if (value.castObject(String)) |string| {
             // a. Let s be value.[[StringData]].
             // b. Assert: s is a String.
-            const s = value.asObject().as(String).fields.string_data;
-
             // c. Return s.
-            return s;
+            return string.fields.string_data;
         }
 
         // 3. Throw a TypeError exception.
@@ -1220,7 +1225,7 @@ pub const prototype = struct {
         const rx = try regExpCreate(agent, regexp, .undefined);
 
         // 6. Return ? Invoke(rx, %Symbol.match%, « S »).
-        return Value.from(rx).invoke(
+        return Value.from(&rx.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             &.{Value.from(string)},
@@ -1281,7 +1286,7 @@ pub const prototype = struct {
         const rx = try regExpCreate(agent, regexp, Value.from("g"));
 
         // 6. Return ? Invoke(rx, %Symbol.matchAll%, « S »).
-        return Value.from(rx).invoke(
+        return Value.from(&rx.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             &.{Value.from(string)},
@@ -1684,7 +1689,7 @@ pub const prototype = struct {
         const rx = try regExpCreate(agent, regexp, .undefined);
 
         // 6. Return ? Invoke(rx, %Symbol.search%, « string »).
-        return Value.from(rx).invoke(
+        return Value.from(&rx.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             &.{Value.from(string)},
@@ -1802,13 +1807,15 @@ pub const prototype = struct {
         // 7. If lim = 0, then
         if (limit == 0) {
             // a. Return CreateArrayFromList(« »).
-            return Value.from(try createArrayFromList(agent, &.{}));
+            const array = try createArrayFromList(agent, &.{});
+            return Value.from(&array.object);
         }
 
         // 8. If separator is undefined, then
         if (separator_value.isUndefined()) {
             // a. Return CreateArrayFromList(« S »).
-            return Value.from(try createArrayFromList(agent, &.{Value.from(string)}));
+            const array = try createArrayFromList(agent, &.{Value.from(string)});
+            return Value.from(&array.object);
         }
 
         // 9. Let separatorLength be the length of R.
@@ -1829,27 +1836,27 @@ pub const prototype = struct {
             const code_units = try head.toUtf16(agent.gc_allocator);
 
             // e. Return CreateArrayFromList(codeUnits).
-            return Value.from(
-                try createArrayFromListMapToValue(agent, u16, code_units, struct {
-                    fn mapFn(agent_: *Agent, code_unit: u16) std.mem.Allocator.Error!Value {
-                        const code_unit_string = if (code_unit > 0x7F) blk: {
-                            var utf16 = try agent_.gc_allocator.alloc(u16, 1);
-                            utf16[0] = code_unit;
-                            break :blk try types.String.fromUtf16(agent_, utf16);
-                        } else blk: {
-                            var ascii = try agent_.gc_allocator.alloc(u8, 1);
-                            ascii[0] = @intCast(code_unit);
-                            break :blk try types.String.fromAscii(agent_, ascii);
-                        };
-                        return Value.from(code_unit_string);
-                    }
-                }.mapFn),
-            );
+            const array = try createArrayFromListMapToValue(agent, u16, code_units, struct {
+                fn mapFn(agent_: *Agent, code_unit: u16) std.mem.Allocator.Error!Value {
+                    const code_unit_string = if (code_unit > 0x7F) blk: {
+                        var utf16 = try agent_.gc_allocator.alloc(u16, 1);
+                        utf16[0] = code_unit;
+                        break :blk try types.String.fromUtf16(agent_, utf16);
+                    } else blk: {
+                        var ascii = try agent_.gc_allocator.alloc(u8, 1);
+                        ascii[0] = @intCast(code_unit);
+                        break :blk try types.String.fromAscii(agent_, ascii);
+                    };
+                    return Value.from(code_unit_string);
+                }
+            }.mapFn);
+            return Value.from(&array.object);
         }
 
         // 11. If S is the empty String, return CreateArrayFromList(« S »).
         if (separator.isEmpty()) {
-            return Value.from(try createArrayFromList(agent, &.{Value.from(string)}));
+            const array = try createArrayFromList(agent, &.{Value.from(string)});
+            return Value.from(&array.object);
         }
 
         // 12. Let substrings be a new empty List.
@@ -1872,13 +1879,12 @@ pub const prototype = struct {
 
             // c. If the number of elements in substrings is lim, return CreateArrayFromList(substrings).
             if (substrings.items.len == limit) {
-                return Value.from(
-                    try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
-                        fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
-                            return Value.from(string_);
-                        }
-                    }.mapFn),
-                );
+                const array = try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
+                    fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
+                        return Value.from(string_);
+                    }
+                }.mapFn);
+                return Value.from(&array.object);
             }
 
             // d. Set i to j + separatorLength.
@@ -1895,13 +1901,12 @@ pub const prototype = struct {
         try substrings.append(agent.gc_allocator, tail);
 
         // 18. Return CreateArrayFromList(substrings).
-        return Value.from(
-            try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
-                fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
-                    return Value.from(string_);
-                }
-            }.mapFn),
-        );
+        const array = try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
+            fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
+                return Value.from(string_);
+            }
+        }.mapFn);
+        return Value.from(&array.object);
     }
 
     /// 22.1.3.24 String.prototype.startsWith ( searchString [ , position ] )
@@ -2222,12 +2227,13 @@ pub const prototype = struct {
         //    the following steps when called:
         //    [...]
         // 5. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%", %StringIteratorPrototype%).
-        return Value.from(try StringIterator.create(agent, .{
+        const string_iterator = try StringIterator.create(agent, .{
             .prototype = try realm.intrinsics.@"%StringIteratorPrototype%"(),
             .fields = .{
                 .state = .{ .string = string, .position = 0 },
             },
-        }));
+        });
+        return Value.from(&string_iterator.object);
     }
 
     /// B.2.2.1 String.prototype.substr ( start, length )

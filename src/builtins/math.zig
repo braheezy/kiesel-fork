@@ -14,14 +14,13 @@ const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
 const getIterator = types.getIterator;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 21.3.1 Value Properties of the Math Object
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

@@ -42,13 +42,14 @@ fn GrammarSymbol(comptime T: type) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .constructor = impl },
             1,
             "Function",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -75,14 +76,15 @@ pub const constructor = struct {
         const body_arg = maybe_body_arg orelse Value.from("");
 
         // 3. Return ? CreateDynamicFunction(C, NewTarget, normal, parameterArgs, bodyArg).
-        return Value.from(try createDynamicFunction(
+        const ecmascript_function = try createDynamicFunction(
             agent,
             constructor_,
             new_target,
             .normal,
             parameter_args,
             body_arg,
-        ));
+        );
+        return Value.from(&ecmascript_function.object);
     }
 };
 
@@ -100,7 +102,7 @@ pub fn createDynamicFunction(
     },
     parameter_args: []const Value,
     body_arg: Value,
-) Agent.Error!*Object {
+) Agent.Error!*ECMAScriptFunction {
     const realm = agent.currentRealm();
 
     // 1. If newTarget is undefined, set newTarget to constructor.
@@ -376,7 +378,7 @@ pub fn createDynamicFunction(
     );
 
     // 29. Perform SetFunctionName(F, "anonymous").
-    try setFunctionName(agent, function, PropertyKey.from("anonymous"), null);
+    try setFunctionName(agent, &function.object, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
         // 30. If kind is generator, then
@@ -390,7 +392,7 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype_),
                 },
@@ -413,7 +415,7 @@ pub fn createDynamicFunction(
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
-            try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype_),
                 },
@@ -428,7 +430,7 @@ pub fn createDynamicFunction(
         // 32. Else if kind is normal, then
         .normal => {
             // a. Perform MakeConstructor(F).
-            try makeConstructor(agent, function, .{});
+            try makeConstructor(agent, &function.object, .{});
         },
 
         // 33. NOTE: Functions whose kind is async are not constructable and do not have a
@@ -444,13 +446,14 @@ pub fn createDynamicFunction(
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return createBuiltinFunction(
+        const builtin_function = try createBuiltinFunction(
             agent,
             .{ .function = function },
             0,
             "",
             .{ .realm = realm, .prototype = try realm.intrinsics.@"%Object.prototype%"() },
         );
+        return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -566,7 +569,7 @@ pub const prototype = struct {
         }
 
         // 7. Perform SetFunctionLength(F, L).
-        try setFunctionLength(agent, function_, length);
+        try setFunctionLength(agent, &function_.object, length);
 
         // 8. Let targetName be ? Get(Target, "name").
         var target_name = try target.asObject().get(agent, PropertyKey.from("name"));
@@ -575,10 +578,10 @@ pub const prototype = struct {
         if (!target_name.isString()) target_name = Value.from("");
 
         // 10. Perform SetFunctionName(F, targetName, "bound").
-        try setFunctionName(agent, function_, PropertyKey.from(target_name.asString()), "bound");
+        try setFunctionName(agent, &function_.object, PropertyKey.from(target_name.asString()), "bound");
 
         // 11. Return F.
-        return Value.from(function_);
+        return Value.from(&function_.object);
     }
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
@@ -609,15 +612,11 @@ pub const prototype = struct {
         // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
         //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
         //     a. Return CodePointsToString(func.[[SourceText]]).
-        if (func.isObject()) {
-            if (func.asObject().is(ECMAScriptFunction)) {
-                const ecmascript_function = func.asObject().as(ECMAScriptFunction);
-                return Value.from(try String.fromUtf8(agent, ecmascript_function.fields.source_text));
-            } else if (func.asObject().is(BuiltinFunction)) {
-                const builtin_function = func.asObject().as(BuiltinFunction);
-                if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
-                    return Value.from(try String.fromUtf8(agent, class_constructor_fields.source_text));
-                }
+        if (func.castObject(ECMAScriptFunction)) |ecmascript_function| {
+            return Value.from(try String.fromUtf8(agent, ecmascript_function.fields.source_text));
+        } else if (func.castObject(BuiltinFunction)) |builtin_function| {
+            if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+                return Value.from(try String.fromUtf8(agent, class_constructor_fields.source_text));
             }
         }
 
@@ -627,8 +626,7 @@ pub const prototype = struct {
         //    func.[[InitialName]] is a String, the portion of the returned String that would be
         //    matched by NativeFunctionAccessoropt PropertyName must be the value of
         //    func.[[InitialName]].
-        if (func.isObject() and func.asObject().is(BuiltinFunction)) {
-            const builtin_function = func.asObject().as(BuiltinFunction);
+        if (func.castObject(BuiltinFunction)) |builtin_function| {
             const name: *const String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,

@@ -8,7 +8,6 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -318,7 +317,7 @@ fn continueDynamicImport(
     const LinkAndEvaluateClosureCaptures = struct {
         module: Module,
         promise_capability: PromiseCapability,
-        on_rejected: *Object,
+        on_rejected: *builtins.BuiltinFunction,
     };
     const link_and_evaluate_closure_captures = try agent.gc_allocator.create(LinkAndEvaluateClosureCaptures);
     link_and_evaluate_closure_captures.* = .{
@@ -387,7 +386,7 @@ fn continueDynamicImport(
                     _ = Value.from(promise_capability__.resolve).callAssumeCallable(
                         agent__,
                         .undefined,
-                        &.{Value.from(namespace)},
+                        &.{Value.from(&namespace.object)},
                     ) catch |err| try noexcept(err);
 
                     // iii. Return NormalCompletion(undefined).
@@ -408,8 +407,8 @@ fn continueDynamicImport(
             _ = try performPromiseThen(
                 agent_,
                 evaluate_promise,
-                Value.from(on_fulfilled),
-                Value.from(on_rejected_),
+                Value.from(&on_fulfilled.object),
+                Value.from(&on_rejected_.object),
                 null,
             );
 
@@ -431,8 +430,8 @@ fn continueDynamicImport(
     _ = try performPromiseThen(
         agent,
         load_promise,
-        Value.from(link_and_evaluate),
-        Value.from(on_rejected),
+        Value.from(&link_and_evaluate.object),
+        Value.from(&on_rejected.object),
         null,
     );
 
@@ -522,7 +521,10 @@ pub fn allImportAttributesSupported(
 
 /// 16.2.1.12 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
-pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error!*Object {
+pub fn getModuleNamespace(
+    agent: *Agent,
+    module: Module,
+) std.mem.Allocator.Error!*builtins.ModuleNamespace {
     // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
     if (module == .source_text_module) {
         std.debug.assert(switch (module.source_text_module.status) {
