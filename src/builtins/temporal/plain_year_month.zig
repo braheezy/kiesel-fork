@@ -760,9 +760,9 @@ pub fn createTemporalYearMonth(
 
 /// 9.5.8 AddDurationToYearMonth ( operation, yearMonth, temporalDurationLike, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtoyearmonth
-pub fn addDurationToYearMonth(
+fn addDurationToYearMonth(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     plain_year_month: *const PlainYearMonth,
     temporal_duration_like: Value,
     options_value: Value,

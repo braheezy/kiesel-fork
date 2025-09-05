@@ -610,7 +610,7 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtoinstant
 fn addDurationToInstant(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     instant: *const Instant,
     temporal_duration_like: Value,
 ) Agent.Error!*Instant {

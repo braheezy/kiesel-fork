@@ -1232,9 +1232,9 @@ pub fn toTemporalPlainDateTime(
 
 /// 5.5.16 AddDurationToDateTime ( operation, dateTime, temporalDurationLike, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtodatetime
-pub fn addDurationToDateTime(
+fn addDurationToDateTime(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     plain_date_time: *const PlainDateTime,
     temporal_duration_like: Value,
     options_value: Value,

@@ -992,7 +992,7 @@ pub fn createTemporalDuration(
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurations
 fn addDurations(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     duration: *const Duration,
     other_value: Value,
 ) Agent.Error!*Duration {

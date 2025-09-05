@@ -957,9 +957,9 @@ pub fn getTemporalUnitValuedOption(
 pub fn validateTemporalUnitValue(
     agent: *Agent,
     maybe_value: ?temporal_rs.c.Unit,
-    comptime key: []const u8,
-    comptime unit_group: enum { date, time, datetime },
-    comptime extra_values: []const temporal_rs.c.Unit,
+    key: []const u8,
+    unit_group: enum { date, time, datetime },
+    extra_values: []const temporal_rs.c.Unit,
 ) Agent.Error!void {
     // 1. If value is unset, return unused.
     const value = maybe_value orelse return;

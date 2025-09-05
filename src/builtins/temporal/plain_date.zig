@@ -1028,9 +1028,9 @@ pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
 
 /// 3.5.14 AddDurationToDate ( operation, temporalDate, temporalDurationLike, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtodate
-pub fn addDurationToDate(
+fn addDurationToDate(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     plain_date: *const PlainDate,
     temporal_duration_like: Value,
     options_value: Value,

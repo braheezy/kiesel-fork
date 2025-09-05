@@ -978,7 +978,7 @@ fn toTemporalTimeRecord(
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtotime
 fn addDurationToTime(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     plain_time: *const PlainTime,
     temporal_duration_like: Value,
 ) Agent.Error!*PlainTime {

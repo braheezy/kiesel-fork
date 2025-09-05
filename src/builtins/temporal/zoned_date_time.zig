@@ -1554,9 +1554,9 @@ pub fn createTemporalZonedDateTime(
 
 /// 6.5.10 AddDurationToZonedDateTime ( operation, zonedDateTime, temporalDurationLike, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtozoneddatetime
-pub fn addDurationToZonedDateTime(
+fn addDurationToZonedDateTime(
     agent: *Agent,
-    comptime operation: enum { add, subtract },
+    operation: enum { add, subtract },
     zoned_date_time: *const ZonedDateTime,
     temporal_duration_like: Value,
     options_value: Value,
