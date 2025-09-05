@@ -906,21 +906,25 @@ pub fn getTemporalUnitValuedOption(
     //     a. Let defaultValue be undefined.
     // 5. Else,
     //     a. Let defaultValue be default.
-    const default_value = switch (default) {
-        .unset => null,
-        .required => .required,
-    };
-
     // 6. Let value be ? GetOption(options, key, string, allowedStrings, defaultValue).
-    const value = try options.getOption(
-        agent,
-        key,
-        .string,
-        allowed_strings,
-        default_value,
-    ) orelse {
-        // 7. If value is undefined, return unset.
-        return null;
+    const value = switch (default) {
+        .unset => try options.getOption(
+            agent,
+            key,
+            .string,
+            allowed_strings,
+            null,
+        ) orelse {
+            // 7. If value is undefined, return unset.
+            return null;
+        },
+        .required => try options.getOption(
+            agent,
+            key,
+            .string,
+            allowed_strings,
+            .required,
+        ),
     };
 
     // 8. If value is "auto", return auto.

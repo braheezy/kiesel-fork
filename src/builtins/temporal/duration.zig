@@ -235,6 +235,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "total", total, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weeks", weeks, null, realm);
         try object.defineBuiltinFunction(agent, "with", with, 1, realm);
@@ -563,6 +564,97 @@ pub const prototype = struct {
             ),
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 7.3.21 Temporal.Duration.prototype.total ( totalOf )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.total
+    fn total(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const total_of = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. If totalOf is undefined, throw a TypeError exception.
+        if (total_of.isUndefined()) {
+            return agent.throwException(.type_error, "Total must not be undefined", .{});
+        }
+
+        // 4. If totalOf is a String, then
+        const options = if (total_of.isString()) blk: {
+            // a. Let paramString be totalOf.
+
+            // b. Set totalOf to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(totalOf, "unit", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("unit"),
+                Value.from(total_of.asString()),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 5. Else,
+            // a. Set totalOf to ? GetOptionsObject(totalOf).
+            break :blk try total_of.getOptionsObject(agent);
+        };
+
+        // 6. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalRelativeToOption reads "relativeTo").
+
+        // 7. Let relativeToRecord be ? GetTemporalRelativeToOption(totalOf).
+        const relative_to = try getTemporalRelativeToOption(agent, options);
+        defer relative_to.deinit();
+
+        // 8. Let zonedRelativeTo be relativeToRecord.[[ZonedRelativeTo]].
+        // 9. Let plainRelativeTo be relativeToRecord.[[PlainRelativeTo]].
+
+        // 10. Let unit be ? GetTemporalUnitValuedOption(totalOf, "unit", required).
+        const unit = try getTemporalUnitValuedOption(agent, options, "unit", .required);
+
+        // 11. Perform ? ValidateTemporalUnitValue(unit, datetime).
+        try validateTemporalUnitValue(agent, unit, "unit", .datetime, &.{});
+
+        // 12. If zonedRelativeTo is not undefined, then
+        //     a. Let internalDuration be ToInternalDurationRecord(duration).
+        //     b. Let timeZone be zonedRelativeTo.[[TimeZone]].
+        //     c. Let calendar be zonedRelativeTo.[[Calendar]].
+        //     d. Let relativeEpochNs be zonedRelativeTo.[[EpochNanoseconds]].
+        //     e. Let targetEpochNs be ? AddZonedDateTime(relativeEpochNs, timeZone, calendar,
+        //        internalDuration, constrain).
+        //     f. Let total be ? DifferenceZonedDateTimeWithTotal(relativeEpochNs, targetEpochNs,
+        //        timeZone, calendar, unit).
+        // 13. Else if plainRelativeTo is not undefined, then
+        //     a. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
+        //     b. Let targetTime be AddTime(MidnightTimeRecord(), internalDuration.[[Time]]).
+        //     c. Let calendar be plainRelativeTo.[[Calendar]].
+        //     d. Let dateDuration be ! AdjustDateDurationRecord(internalDuration.[[Date]],
+        //        targetTime.[[Days]]).
+        //     e. Let targetDate be ? CalendarDateAdd(calendar, plainRelativeTo.[[ISODate]],
+        //        dateDuration, constrain).
+        //     f. Let isoDateTime be CombineISODateAndTimeRecord(plainRelativeTo.[[ISODate]],
+        //        MidnightTimeRecord()).
+        //     g. Let targetDateTime be CombineISODateAndTimeRecord(targetDate, targetTime).
+        //     h. Let total be ? DifferencePlainDateTimeWithTotal(isoDateTime, targetDateTime,
+        //        calendar, unit).
+        // 14. Else,
+        //     a. Let largestUnit be DefaultTemporalLargestUnit(duration).
+        //     b. If IsCalendarUnit(largestUnit) is true, or IsCalendarUnit(unit) is true, throw a
+        //        RangeError exception.
+        //     c. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
+        //     d. Let total be TotalTimeDuration(internalDuration.[[Time]], unit).
+        // 15. Return 𝔽(total).
+        const result = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Duration_total(
+                duration.fields.inner,
+                unit.?,
+                relative_to.toRust(),
+            ),
+        );
+        return Value.from(result);
     }
 
     /// 7.3.25 Temporal.Duration.prototype.valueOf ( )
