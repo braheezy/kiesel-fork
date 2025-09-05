@@ -20,9 +20,11 @@ const Value = types.Value;
 const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalDate = builtins.createTemporalDate;
+const createTemporalDuration = builtins.createTemporalDuration;
 const createTemporalTime = builtins.createTemporalTime;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDifferenceSettingsWithoutValidation;
 const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
@@ -233,6 +235,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
@@ -240,6 +243,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toPlainTime", toPlainTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "toZonedDateTime", toZonedDateTime, 1, realm);
+        try object.defineBuiltinFunction(agent, "until", until, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinFunction(agent, "with", with, 1, realm);
@@ -591,6 +595,27 @@ pub const prototype = struct {
         );
     }
 
+    /// 5.3.31 Temporal.PlainDateTime.prototype.since ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.since
+    fn since(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Return ? DifferenceTemporalPlainDateTime(since, plainDateTime, other, options).
+        const duration = try differenceTemporalPlainDateTime(
+            agent,
+            .since,
+            plain_date_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
+    }
+
     /// 5.3.29 Temporal.PlainDateTime.prototype.subtract ( temporalDurationLike [ , options ] )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.subtract
     fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
@@ -812,6 +837,27 @@ pub const prototype = struct {
             null,
         ) catch |err| try noexcept(err);
         return Value.from(&zoned_date_time.object);
+    }
+
+    /// 5.3.30 Temporal.PlainDateTime.prototype.until ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.until
+    fn until(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. Return ? DifferenceTemporalPlainDateTime(until, plainDateTime, other, options).
+        const duration = try differenceTemporalPlainDateTime(
+            agent,
+            .until,
+            plain_date_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
     }
 
     /// 5.3.37 Temporal.PlainDateTime.prototype.valueOf ( )
@@ -1226,6 +1272,73 @@ pub fn toTemporalPlainDateTime(
     return createTemporalDateTime(
         agent,
         temporal_rs_plain_date_time.?,
+        null,
+    ) catch |err| try noexcept(err);
+}
+
+/// 5.5.15 DifferenceTemporalPlainDateTime ( operation, dateTime, other, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-differencetemporalplaindatetime
+fn differenceTemporalPlainDateTime(
+    agent: *Agent,
+    operation: enum { since, until },
+    plain_date_time: *const PlainDateTime,
+    other_value: Value,
+    options_value: Value,
+) Agent.Error!*builtins.temporal.Duration {
+    // 1. Set other to ? ToTemporalDateTime(other).
+    const other = try toTemporalPlainDateTime(agent, other_value, null);
+
+    // 2. If CalendarEquals(dateTime.[[Calendar]], other.[[Calendar]]) is false, throw a RangeError
+    //    exception.
+    if (temporal_rs.c.temporal_rs_Calendar_kind(
+        temporal_rs.c.temporal_rs_PlainDateTime_calendar(plain_date_time.fields.inner),
+    ) != temporal_rs.c.temporal_rs_Calendar_kind(
+        temporal_rs.c.temporal_rs_PlainDateTime_calendar(other.fields.inner),
+    )) {
+        return agent.throwException(
+            .range_error,
+            "Difference requires equal calendars",
+            .{},
+        );
+    }
+
+    // 3. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 4. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, datetime, « »,
+    //    nanosecond, day).
+    const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
+
+    // 5. If CompareISODateTime(dateTime.[[ISODateTime]], other.[[ISODateTime]]) = 0, then
+    //     a. Return ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+    // 6. Let internalDuration be ? DifferencePlainDateTimeWithRounding(dateTime.[[ISODateTime]],
+    //    other.[[ISODateTime]], dateTime.[[Calendar]], settings.[[LargestUnit]],
+    //    settings.[[RoundingIncrement]], settings.[[SmallestUnit]], settings.[[RoundingMode]]).
+    // 7. Let result be ! TemporalDurationFromInternal(internalDuration, settings.[[LargestUnit]]).
+    // 8. If operation is since, set result to CreateNegatedTemporalDuration(result).
+    // 9. Return result.
+    const temporal_rs_duration = switch (operation) {
+        .since => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDateTime_since(
+                plain_date_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+        .until => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDateTime_until(
+                plain_date_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(
+        agent,
+        temporal_rs_duration.?,
         null,
     ) catch |err| try noexcept(err);
 }

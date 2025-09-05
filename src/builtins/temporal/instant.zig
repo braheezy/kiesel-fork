@@ -20,7 +20,9 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalDuration = builtins.createTemporalDuration;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
+const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDifferenceSettingsWithoutValidation;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
@@ -200,11 +202,13 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
         try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
+        try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunction(agent, "toZonedDateTimeISO", toZonedDateTimeISO, 1, realm);
+        try object.defineBuiltinFunction(agent, "until", until, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
 
         // 8.3.1 Temporal.Instant.prototype.constructor
@@ -298,6 +302,21 @@ pub const prototype = struct {
                 other.fields.inner,
             ),
         );
+    }
+
+    /// 8.3.8 Temporal.Instant.prototype.since ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.since
+    fn since(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return ? DifferenceTemporalInstant(since, instant, other, options).
+        const duration = try differenceTemporalInstant(agent, .since, instant, other, options);
+        return Value.from(&duration.object);
     }
 
     /// 8.3.6 Temporal.Instant.prototype.subtract ( temporalDurationLike )
@@ -474,6 +493,21 @@ pub const prototype = struct {
         return Value.from(&zoned_date_time.object);
     }
 
+    /// 8.3.7 Temporal.Instant.prototype.until ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.until
+    fn until(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. Return ? DifferenceTemporalInstant(until, instant, other, options).
+        const duration = try differenceTemporalInstant(agent, .until, instant, other, options);
+        return Value.from(&duration.object);
+    }
+
     /// 8.3.14 Temporal.Instant.prototype.valueOf ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.valueof
     fn valueOf(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -604,6 +638,57 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
     };
     errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
     return createTemporalInstant(agent, temporal_rs_instant.?, null);
+}
+
+/// 8.5.9 DifferenceTemporalInstant ( operation, instant, other, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-differencetemporalinstant
+fn differenceTemporalInstant(
+    agent: *Agent,
+    operation: enum { since, until },
+    instant: *const Instant,
+    other_value: Value,
+    options_value: Value,
+) Agent.Error!*builtins.temporal.Duration {
+    // 1. Set other to ? ToTemporalInstant(other).
+    const other = try toTemporalInstant(agent, other_value);
+
+    // 2. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
+    //    nanosecond, second).
+    const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
+
+    // 4. Let internalDuration be DifferenceInstant(instant.[[EpochNanoseconds]],
+    //    other.[[EpochNanoseconds]], settings.[[RoundingIncrement]], settings.[[SmallestUnit]],
+    //    settings.[[RoundingMode]]).
+    // 5. Let result be ! TemporalDurationFromInternal(internalDuration, settings.[[LargestUnit]]).
+    // 6. If operation is since, set result to CreateNegatedTemporalDuration(result).
+    // 7. Return result.
+    const temporal_rs_duration = switch (operation) {
+        .since => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_since(
+                instant.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+        .until => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_until(
+                instant.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(
+        agent,
+        temporal_rs_duration.?,
+        null,
+    ) catch |err| try noexcept(err);
 }
 
 /// 8.5.10 AddDurationToInstant ( operation, instant, temporalDurationLike )

@@ -19,6 +19,8 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createTemporalDuration = builtins.createTemporalDuration;
+const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDifferenceSettingsWithoutValidation;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
@@ -172,10 +174,12 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "minute", minute, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
         try object.defineBuiltinFunction(agent, "toLocaleString", toLocaleString, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "until", until, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinFunction(agent, "with", with, 1, realm);
 
@@ -308,6 +312,27 @@ pub const prototype = struct {
         return Value.from(temporal_rs.c.temporal_rs_PlainTime_second(plain_time.fields.inner));
     }
 
+    /// 4.3.13 Temporal.PlainTime.prototype.since ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.since
+    fn since(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return ? DifferenceTemporalPlainTime(since, plainTime, other, options).
+        const duration = try differenceTemporalPlainTime(
+            agent,
+            .since,
+            plain_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
+    }
+
     /// 4.3.10 Temporal.PlainTime.prototype.subtract ( temporalDurationLike )
     /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.subtract
     fn subtract(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
@@ -435,6 +460,27 @@ pub const prototype = struct {
             ),
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 4.3.12 Temporal.PlainTime.prototype.until ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaintime.prototype.until
+    fn until(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let plainTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
+
+        // 3. Return ? DifferenceTemporalPlainTime(until, plainTime, other, options).
+        const duration = try differenceTemporalPlainTime(
+            agent,
+            .until,
+            plain_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
     }
 
     /// 4.3.19 Temporal.PlainTime.prototype.valueOf ( )
@@ -972,6 +1018,58 @@ fn toTemporalTimeRecord(
 
     // 18. Return result.
     return result;
+}
+
+/// 4.5.17 DifferenceTemporalPlainTime ( operation, temporalTime, other, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-differencetemporalplaintime
+fn differenceTemporalPlainTime(
+    agent: *Agent,
+    operation: enum { since, until },
+    plain_time: *const PlainTime,
+    other_value: Value,
+    options_value: Value,
+) Agent.Error!*builtins.temporal.Duration {
+    // 1. Set other to ? ToTemporalTime(other).
+    const other = try toTemporalPlainTime(agent, other_value, null);
+
+    // 2. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
+    //    nanosecond, hour).
+    const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
+
+    // 4. Let timeDuration be DifferenceTime(temporalTime.[[Time]], other.[[Time]]).
+    // 5. Set timeDuration to ! RoundTimeDuration(timeDuration, settings.[[RoundingIncrement]],
+    //    settings.[[SmallestUnit]], settings.[[RoundingMode]]).
+    // 6. Let duration be CombineDateAndTimeDuration(ZeroDateDuration(), timeDuration).
+    // 7. Let result be ! TemporalDurationFromInternal(duration, settings.[[LargestUnit]]).
+    // 8. If operation is since, set result to CreateNegatedTemporalDuration(result).
+    // 9. Return result.
+    const temporal_rs_duration = switch (operation) {
+        .since => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainTime_since(
+                plain_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+        .until => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainTime_until(
+                plain_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(
+        agent,
+        temporal_rs_duration.?,
+        null,
+    ) catch |err| try noexcept(err);
 }
 
 /// 4.5.18 AddDurationToTime ( operation, temporalTime, temporalDurationLike )

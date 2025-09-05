@@ -162,6 +162,7 @@ pub const getModifySetValueInBuffer = array_buffer.getModifySetValueInBuffer;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const getSubstitution = string.getSubstitution;
 pub const getTemporalCalendarIdentifierWithISODefault = temporal.getTemporalCalendarIdentifierWithISODefault;
+pub const getTemporalDifferenceSettingsWithoutValidation = temporal.getTemporalDifferenceSettingsWithoutValidation;
 pub const getTemporalDirectionOption = temporal.getTemporalDirectionOption;
 pub const getTemporalDisambiguationOption = temporal.getTemporalDisambiguationOption;
 pub const getTemporalFractionalSecondDigitsOption = temporal.getTemporalFractionalSecondDigitsOption;

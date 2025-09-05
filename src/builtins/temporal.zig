@@ -1231,6 +1231,77 @@ fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     return offset_utf8;
 }
 
+/// 13.42 GetDifferenceSettings ( operation, options, unitGroup, disallowedUnits, fallbackSmallestUnit, smallestLargestDefaultUnit )
+/// https://tc39.es/proposal-temporal/#sec-temporal-getdifferencesettings
+pub fn getTemporalDifferenceSettingsWithoutValidation(
+    agent: *Agent,
+    options: *Object,
+) Agent.Error!temporal_rs.c.DifferenceSettings {
+    // 1. NOTE: The following steps read options and perform independent validation in alphabetical
+    //    order.
+
+    // 2. Let largestUnit be ? GetTemporalUnitValuedOption(options, "largestUnit", unset).
+    const maybe_largest_unit = try getTemporalUnitValuedOption(
+        agent,
+        options,
+        "largestUnit",
+        .unset,
+    );
+
+    // 3. Let roundingIncrement be ? GetRoundingIncrementOption(options).
+    const rounding_increment = try getTemporalRoundingIncrementOption(agent, options);
+
+    // 4. Let roundingMode be ? GetRoundingModeOption(options, trunc).
+    const rounding_mode = try getTemporalRoundingModeOption(
+        agent,
+        options,
+        temporal_rs.c.RoundingMode_Trunc,
+    );
+
+    // 5. Let smallestUnit be ? GetTemporalUnitValuedOption(options, "smallestUnit", unset).
+    const maybe_smallest_unit = try getTemporalUnitValuedOption(
+        agent,
+        options,
+        "smallestUnit",
+        .unset,
+    );
+
+    // 6. Perform ? ValidateTemporalUnitValue(largestUnit, unitGroup, « auto »).
+    // 7. If largestUnit is unset, then
+    //     a. Set largestUnit to auto.
+    // 8. If disallowedUnits contains largestUnit, throw a RangeError exception.
+    // 9. If operation is since, then
+    //     a. Set roundingMode to NegateRoundingMode(roundingMode).
+    // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, unitGroup).
+    // 11. If smallestUnit is unset, then
+    //     a. Set smallestUnit to fallbackSmallestUnit.
+    // 12. If disallowedUnits contains smallestUnit, throw a RangeError exception.
+    // 13. Let defaultLargestUnit be LargerOfTwoTemporalUnits(smallestLargestDefaultUnit,
+    //     smallestUnit).
+    // 14. If largestUnit is auto, set largestUnit to defaultLargestUnit.
+    // 15. If LargerOfTwoTemporalUnits(largestUnit, smallestUnit) is not largestUnit, throw a
+    //     RangeError exception.largestUnit
+    // 16. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
+    // 17. If maximum is not unset, perform ? ValidateTemporalRoundingIncrement(roundingIncrement,
+    //     maximum, false).
+    // NOTE: These steps are handled by temporal_rs.
+
+    // 18. Return the Record { [[SmallestUnit]]: smallestUnit, [[LargestUnit]]: largestUnit,
+    //     [[RoundingMode]]: roundingMode, [[RoundingIncrement]]: roundingIncrement,  }.
+    return .{
+        .smallest_unit = if (maybe_smallest_unit) |smallest_unit|
+            .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit } }
+        else
+            .{ .is_ok = false },
+        .largest_unit = if (maybe_largest_unit) |largest_unit|
+            .{ .is_ok = true, .unnamed_0 = .{ .ok = largest_unit } }
+        else
+            .{ .is_ok = false },
+        .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+        .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+    };
+}
+
 /// 14.5.2.3 GetRoundingModeOption ( options, fallback )
 /// https://tc39.es/proposal-temporal/#sec-temporal-getroundingmodeoption
 pub fn getTemporalRoundingModeOption(
@@ -1285,4 +1356,29 @@ pub fn getTemporalRoundingModeOption(
         .{ "halfEven", temporal_rs.c.RoundingMode_HalfEven },
     });
     return rounding_mode_map.get(rounding_mode.slice.ascii).?;
+}
+
+/// 14.5.2.4 GetRoundingIncrementOption ( options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-getroundingincrementoption
+fn getTemporalRoundingIncrementOption(agent: *Agent, options: *Object) Agent.Error!u32 {
+    // 1. Let value be ? Get(options, "roundingIncrement").
+    const value = try options.get(agent, PropertyKey.from("roundingIncrement"));
+
+    // 2. If value is undefined, return 1𝔽.
+    if (value.isUndefined()) return 1;
+
+    // 3. Let integerIncrement be ? ToIntegerWithTruncation(value).
+    const integer_increment = try value.toIntegerWithTruncation(agent);
+
+    // 4. If integerIncrement < 1 or integerIncrement > 10**9, throw a RangeError exception.
+    if (integer_increment < 1 or integer_increment > 1000000000) {
+        return agent.throwException(
+            .range_error,
+            "Invalid value for option 'roundingIncrement'",
+            .{},
+        );
+    }
+
+    // 5. Return integerIncrement.
+    return @intFromFloat(integer_increment);
 }

@@ -23,9 +23,11 @@ const canonicalizeCalendar = builtins.canonicalizeCalendar;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createTemporalDate = builtins.createTemporalDate;
 const createTemporalDateTime = builtins.createTemporalDateTime;
+const createTemporalDuration = builtins.createTemporalDuration;
 const createTemporalInstant = builtins.createTemporalInstant;
 const createTemporalTime = builtins.createTemporalTime;
 const getTemporalCalendarIdentifierWithISODefault = builtins.getTemporalCalendarIdentifierWithISODefault;
+const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDifferenceSettingsWithoutValidation;
 const getTemporalDirectionOption = builtins.getTemporalDirectionOption;
 const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
@@ -228,6 +230,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "offset", offset, null, realm);
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
+        try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "startOfDay", startOfDay, 0, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinAccessor(agent, "timeZoneId", timeZoneId, null, realm);
@@ -238,6 +241,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toPlainDateTime", toPlainDateTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toPlainTime", toPlainTime, 0, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinFunction(agent, "until", until, 1, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinAccessor(agent, "weekOfYear", weekOfYear, null, realm);
         try object.defineBuiltinFunction(agent, "with", with, 1, realm);
@@ -746,6 +750,27 @@ pub const prototype = struct {
         );
     }
 
+    /// 6.3.38 Temporal.ZonedDateTime.prototype.since ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.since
+    fn since(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return ? DifferenceTemporalZonedDateTime(since, zonedDateTime, other, options).
+        const duration = try differenceTemporalZonedDateTime(
+            agent,
+            .since,
+            zoned_date_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
+    }
+
     /// 6.3.45 Temporal.ZonedDateTime.prototype.startOfDay ( )
     /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.startofday
     fn startOfDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
@@ -1031,6 +1056,27 @@ pub const prototype = struct {
             ),
         );
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
+    }
+
+    /// 6.3.37 Temporal.ZonedDateTime.prototype.until ( other [ , options ] )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.until
+    fn until(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const other = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. Return ? DifferenceTemporalZonedDateTime(until, zonedDateTime, other, options).
+        const duration = try differenceTemporalZonedDateTime(
+            agent,
+            .until,
+            zoned_date_time,
+            other,
+            options,
+        );
+        return Value.from(&duration.object);
     }
 
     /// 6.3.44 Temporal.ZonedDateTime.prototype.valueOf ( )
@@ -1550,6 +1596,86 @@ pub fn createTemporalZonedDateTime(
         "%Temporal.ZonedDateTime.prototype%",
         .{ .inner = inner },
     );
+}
+
+/// 6.5.9 DifferenceTemporalZonedDateTime ( operation, zonedDateTime, other, options )
+/// https://tc39.es/proposal-temporal/#sec-temporal-differencetemporalzoneddatetime
+fn differenceTemporalZonedDateTime(
+    agent: *Agent,
+    operation: enum { since, until },
+    zoned_date_time: *const ZonedDateTime,
+    other_value: Value,
+    options_value: Value,
+) Agent.Error!*builtins.temporal.Duration {
+    // 1. Set other to ? ToTemporalZonedDateTime(other).
+    const other = try toTemporalZonedDateTime(agent, other_value, null);
+
+    // 2. If CalendarEquals(zonedDateTime.[[Calendar]], other.[[Calendar]]) is false, then
+    if (temporal_rs.c.temporal_rs_Calendar_kind(
+        temporal_rs.c.temporal_rs_ZonedDateTime_calendar(zoned_date_time.fields.inner),
+    ) != temporal_rs.c.temporal_rs_Calendar_kind(
+        temporal_rs.c.temporal_rs_ZonedDateTime_calendar(other.fields.inner),
+    )) {
+        // a. Throw a RangeError exception.
+        return agent.throwException(
+            .range_error,
+            "Difference requires equal calendars",
+            .{},
+        );
+    }
+
+    // 3. Let resolvedOptions be ? GetOptionsObject(options).
+    const options = try options_value.getOptionsObject(agent);
+
+    // 4. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, datetime, « »,
+    //    nanosecond, hour).
+    const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
+
+    // 5. If TemporalUnitCategory(settings.[[LargestUnit]]) is time, then
+    //     a. Let internalDuration be DifferenceInstant(zonedDateTime.[[EpochNanoseconds]],
+    //        other.[[EpochNanoseconds]], settings.[[RoundingIncrement]], settings.[[SmallestUnit]],
+    //        settings.[[RoundingMode]]).
+    //     b. Let result be ! TemporalDurationFromInternal(internalDuration, settings.[[LargestUnit]]).
+    //     c. If operation is since, set result to CreateNegatedTemporalDuration(result).
+    //     d. Return result.
+    // 6. NOTE: To calculate differences in two different time zones, settings.[[LargestUnit]] must
+    //    be a time unit, because day lengths can vary between time zones due to DST and other UTC
+    //    offset shifts.
+    // 7. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, then
+    //     a. Throw a RangeError exception.
+    // 8. If zonedDateTime.[[EpochNanoseconds]] = other.[[EpochNanoseconds]], then
+    //     a. Return ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+    // 9. Let internalDuration be ? DifferenceZonedDateTimeWithRounding(zonedDateTime.[[EpochNanoseconds]],
+    //    other.[[EpochNanoseconds]], zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]],
+    //    settings.[[LargestUnit]], settings.[[RoundingIncrement]], settings.[[SmallestUnit]],
+    //    settings.[[RoundingMode]]).
+    // 10. Let result be ! TemporalDurationFromInternal(internalDuration, hour).
+    // 11. If operation is since, set result to CreateNegatedTemporalDuration(result).
+    // 12. Return result.
+    const temporal_rs_duration = switch (operation) {
+        .since => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_since(
+                zoned_date_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+        .until => try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_until(
+                zoned_date_time.fields.inner,
+                other.fields.inner,
+                settings,
+            ),
+        ),
+    };
+    errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+    return createTemporalDuration(
+        agent,
+        temporal_rs_duration.?,
+        null,
+    ) catch |err| try noexcept(err);
 }
 
 /// 6.5.10 AddDurationToZonedDateTime ( operation, zonedDateTime, temporalDurationLike, options )
