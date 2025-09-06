@@ -24,6 +24,7 @@ const createTemporalDuration = builtins.createTemporalDuration;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDifferenceSettingsWithoutValidation;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
+const getTemporalRoundingIncrementOption = builtins.getTemporalRoundingIncrementOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
@@ -202,6 +203,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "epochMilliseconds", epochMilliseconds, null, realm);
         try object.defineBuiltinAccessor(agent, "epochNanoseconds", epochNanoseconds, null, realm);
         try object.defineBuiltinFunction(agent, "equals", equals, 1, realm);
+        try object.defineBuiltinFunction(agent, "round", round, 1, realm);
         try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
         try object.defineBuiltinFunction(agent, "toJSON", toJSON, 0, realm);
@@ -302,6 +304,106 @@ pub const prototype = struct {
                 other.fields.inner,
             ),
         );
+    }
+
+    /// 8.3.9 Temporal.Instant.prototype.round ( roundTo )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype.round
+    fn round(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const round_to = arguments.get(0);
+
+        // 1. Let instant be the this value.
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        const instant = try this_value.requireInternalSlot(agent, Instant);
+
+        // 3. If roundTo is undefined, then
+        if (round_to.isUndefined()) {
+            // a. Throw a TypeError exception.
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. If roundTo is a String, then
+        const options = if (round_to.isString()) blk: {
+            // a. Let paramString be roundTo.
+            const param_string = round_to.asString();
+
+            // b. Set roundTo to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(roundTo, "smallestUnit", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("smallestUnit"),
+                Value.from(param_string),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 5. Else,
+            // a. Set roundTo to ? GetOptionsObject(roundTo).
+            break :blk try round_to.getOptionsObject(agent);
+        };
+
+        // 6. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetRoundingIncrementOption reads "roundingIncrement" and
+        //    GetRoundingModeOption reads "roundingMode").
+
+        // 7. Let roundingIncrement be ? GetRoundingIncrementOption(roundTo).
+        const rounding_increment = try getTemporalRoundingIncrementOption(agent, options);
+
+        // 8. Let roundingMode be ? GetRoundingModeOption(roundTo, half-expand).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_HalfExpand,
+        );
+
+        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(roundTo, "smallestUnit", required).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .required,
+        );
+
+        // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
+
+        // 11. If smallestUnit is hour, then
+        //     a. Let maximum be HoursPerDay.
+        // 12. Else if smallestUnit is minute, then
+        //     a. Let maximum be MinutesPerHour × HoursPerDay.
+        // 13. Else if smallestUnit is second, then
+        //     a. Let maximum be SecondsPerMinute × MinutesPerHour × HoursPerDay.
+        // 14. Else if smallestUnit is millisecond, then
+        //     a. Let maximum be ℝ(msPerDay).
+        // 15. Else if smallestUnit is microsecond, then
+        //     a. Let maximum be 10**3 × ℝ(msPerDay).
+        // 16. Else,
+        //     a. Assert: smallestUnit is nanosecond.
+        //     b. Let maximum be nsPerDay.
+        // 17. Perform ? ValidateTemporalRoundingIncrement(roundingIncrement, maximum, true).
+        // 18. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]],
+        //     roundingIncrement, smallestUnit, roundingMode).
+        // 19. Return ! CreateTemporalInstant(roundedNs).
+        const temporal_rs_instant = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Instant_round(
+                instant.fields.inner,
+                .{
+                    .largest_unit = .{ .is_ok = false },
+                    .smallest_unit = .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit.? } },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_Instant_destroy(temporal_rs_instant.?);
+        const new_instant = createTemporalInstant(
+            agent,
+            temporal_rs_instant.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_instant.object);
     }
 
     /// 8.3.8 Temporal.Instant.prototype.since ( other [ , options ] )

@@ -21,6 +21,7 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalRelativeToOption = builtins.getTemporalRelativeToOption;
+const getTemporalRoundingIncrementOption = builtins.getTemporalRoundingIncrementOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
 const noexcept = utils.noexcept;
@@ -229,6 +230,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "months", months, null, realm);
         try object.defineBuiltinAccessor(agent, "nanoseconds", nanoseconds, null, realm);
         try object.defineBuiltinFunction(agent, "negated", negated, 0, realm);
+        try object.defineBuiltinFunction(agent, "round", round, 1, realm);
         try object.defineBuiltinAccessor(agent, "seconds", seconds, null, realm);
         try object.defineBuiltinAccessor(agent, "sign", sign, null, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
@@ -395,6 +397,174 @@ pub const prototype = struct {
 
         // 3. Return 𝔽(duration.[[Nanoseconds]]).
         return Value.from(temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner));
+    }
+
+    /// 7.3.20 Temporal.Duration.prototype.round ( roundTo )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype.round
+    fn round(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const round_to = arguments.get(0);
+
+        // 1. Let duration be the this value.
+        // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
+        const duration = try this_value.requireInternalSlot(agent, Duration);
+
+        // 3. If roundTo is undefined, then
+        if (round_to.isUndefined()) {
+            // a. Throw a TypeError exception.
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. If roundTo is a String, then
+        const options = if (round_to.isString()) blk: {
+            // a. Let paramString be roundTo.
+            const param_string = round_to.asString();
+
+            // b. Set roundTo to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(roundTo, "smallestUnit", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("smallestUnit"),
+                Value.from(param_string),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 5. Else,
+            // a. Set roundTo to ? GetOptionsObject(roundTo).
+            break :blk try round_to.getOptionsObject(agent);
+        };
+
+        // 6. Let smallestUnitPresent be true.
+        // 7. Let largestUnitPresent be true.
+        // 8. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetTemporalRelativeToOption reads "relativeTo",
+        //    GetRoundingIncrementOption reads "roundingIncrement" and GetRoundingModeOption reads
+        //    "roundingMode").
+
+        // 9. Let largestUnit be ? GetTemporalUnitValuedOption(roundTo, "largestUnit", unset).
+        const maybe_largest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "largestUnit",
+            .unset,
+        );
+
+        // 10. Let relativeToRecord be ? GetTemporalRelativeToOption(roundTo).
+        const relative_to = try getTemporalRelativeToOption(agent, options);
+        defer relative_to.deinit();
+
+        // 11. Let zonedRelativeTo be relativeToRecord.[[ZonedRelativeTo]].
+        // 12. Let plainRelativeTo be relativeToRecord.[[PlainRelativeTo]].
+
+        // 13. Let roundingIncrement be ? GetRoundingIncrementOption(roundTo).
+        const rounding_increment = try getTemporalRoundingIncrementOption(agent, options);
+
+        // 14. Let roundingMode be ? GetRoundingModeOption(roundTo, half-expand).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_HalfExpand,
+        );
+
+        // 15. Let smallestUnit be ? GetTemporalUnitValuedOption(roundTo, "smallestUnit", unset).
+        const maybe_smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .unset,
+        );
+
+        // 16. Perform ? ValidateTemporalUnitValue(smallestUnit, datetime).
+        try validateTemporalUnitValue(agent, maybe_smallest_unit, "smallestUnit", .datetime, &.{});
+
+        // 17. If smallestUnit is unset, then
+        //     a. Set smallestUnitPresent to false.
+        //     b. Set smallestUnit to nanosecond.
+        // 18. Let existingLargestUnit be DefaultTemporalLargestUnit(duration).
+        // 19. Let defaultLargestUnit be LargerOfTwoTemporalUnits(existingLargestUnit, smallestUnit).
+        // 20. If largestUnit is unset, then
+        //     a. Set largestUnitPresent to false.
+        //     b. Set largestUnit to defaultLargestUnit.
+        // 21. Else if largestUnit is auto, then
+        //     a. Set largestUnit to defaultLargestUnit.
+        // 22. If smallestUnitPresent is false and largestUnitPresent is false, then
+        //     a. Throw a RangeError exception.
+        // 23. If LargerOfTwoTemporalUnits(largestUnit, smallestUnit) is not largestUnit, throw a
+        //     RangeError exception.
+        // 24. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
+        // 25. If maximum is not unset, perform ? ValidateTemporalRoundingIncrement(
+        //     roundingIncrement, maximum, false).
+        // 26. If roundingIncrement > 1, and largestUnit is not smallestUnit, and
+        //     TemporalUnitCategory(smallestUnit) is date, throw a RangeError exception.
+        // 27. If zonedRelativeTo is not undefined, then
+        //     a. Let internalDuration be ToInternalDurationRecord(duration).
+        //     b. Let timeZone be zonedRelativeTo.[[TimeZone]].
+        //     c. Let calendar be zonedRelativeTo.[[Calendar]].
+        //     d. Let relativeEpochNs be zonedRelativeTo.[[EpochNanoseconds]].
+        //     e. Let targetEpochNs be ? AddZonedDateTime(relativeEpochNs, timeZone, calendar,
+        //        internalDuration, constrain).
+        //     f. Set internalDuration to ? DifferenceZonedDateTimeWithRounding(relativeEpochNs,
+        //        targetEpochNs, timeZone, calendar, largestUnit, roundingIncrement, smallestUnit,
+        //        roundingMode).
+        //     g. If TemporalUnitCategory(largestUnit) is date, set largestUnit to hour.
+        //     h. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
+        // 28. If plainRelativeTo is not undefined, then
+        //     a. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
+        //     b. Let targetTime be AddTime(MidnightTimeRecord(), internalDuration.[[Time]]).
+        //     c. Let calendar be plainRelativeTo.[[Calendar]].
+        //     d. Let dateDuration be ! AdjustDateDurationRecord(internalDuration.[[Date]],
+        //        targetTime.[[Days]]).
+        //     e. Let targetDate be ? CalendarDateAdd(calendar, plainRelativeTo.[[ISODate]],
+        //        dateDuration, constrain).
+        //     f. Let isoDateTime be CombineISODateAndTimeRecord(plainRelativeTo.[[ISODate]],
+        //        MidnightTimeRecord()).
+        //     g. Let targetDateTime be CombineISODateAndTimeRecord(targetDate, targetTime).
+        //     h. Set internalDuration to ? DifferencePlainDateTimeWithRounding(isoDateTime,
+        //        targetDateTime, calendar, largestUnit, roundingIncrement, smallestUnit,
+        //        roundingMode).
+        //     i. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
+        // 29. If IsCalendarUnit(existingLargestUnit) is true, or IsCalendarUnit(largestUnit) is
+        //     true, throw a RangeError exception.
+        // 30. Assert: IsCalendarUnit(smallestUnit) is false.
+        // 31. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
+        // 32. If smallestUnit is day, then
+        //     a. Let fractionalDays be TotalTimeDuration(internalDuration.[[Time]], day).
+        //     b. Let days be RoundNumberToIncrement(fractionalDays, roundingIncrement, roundingMode).
+        //     c. Let dateDuration be ? CreateDateDurationRecord(0, 0, 0, days).
+        //     d. Set internalDuration to CombineDateAndTimeDuration(dateDuration, 0).
+        // 33. Else,
+        //     a. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]],
+        //        roundingIncrement, smallestUnit, roundingMode).
+        //     b. Set internalDuration to CombineDateAndTimeDuration(ZeroDateDuration(), timeDuration).
+        // 34. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
+        const temporal_rs_duration = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_Duration_round(
+                duration.fields.inner,
+                .{
+                    .largest_unit = if (maybe_largest_unit) |largest_unit|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = largest_unit } }
+                    else
+                        .{ .is_ok = false },
+                    .smallest_unit = if (maybe_smallest_unit) |smallest_unit|
+                        .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit } }
+                    else
+                        .{ .is_ok = false },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                },
+                relative_to.toRust(),
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration.?);
+        const new_duration = createTemporalDuration(
+            agent,
+            temporal_rs_duration.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_duration.object);
     }
 
     /// 7.3.16 Temporal.Duration.prototype.negated ( )
@@ -577,12 +747,13 @@ pub const prototype = struct {
 
         // 3. If totalOf is undefined, throw a TypeError exception.
         if (total_of.isUndefined()) {
-            return agent.throwException(.type_error, "Total must not be undefined", .{});
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
         // 4. If totalOf is a String, then
         const options = if (total_of.isString()) blk: {
             // a. Let paramString be totalOf.
+            const param_string = total_of.asString();
 
             // b. Set totalOf to OrdinaryObjectCreate(null).
             const options = try ordinaryObjectCreate(agent, null);
@@ -591,7 +762,7 @@ pub const prototype = struct {
             try options.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("unit"),
-                Value.from(total_of.asString()),
+                Value.from(param_string),
             );
 
             break :blk options;

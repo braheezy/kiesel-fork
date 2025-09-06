@@ -33,6 +33,7 @@ const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOffsetOption = builtins.getTemporalOffsetOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
+const getTemporalRoundingIncrementOption = builtins.getTemporalRoundingIncrementOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const getTemporalShowOffsetOption = builtins.getTemporalShowOffsetOption;
@@ -229,6 +230,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
         try object.defineBuiltinAccessor(agent, "offset", offset, null, realm);
         try object.defineBuiltinAccessor(agent, "offsetNanoseconds", offsetNanoseconds, null, realm);
+        try object.defineBuiltinFunction(agent, "round", round, 1, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "startOfDay", startOfDay, 0, realm);
@@ -505,12 +507,13 @@ pub const prototype = struct {
 
         // 4. If directionParam is undefined, throw a TypeError exception.
         if (direction_param.isUndefined()) {
-            return agent.throwException(.type_error, "Direction must not be undefined", .{});
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
         // 5. If directionParam is a String, then
         const options = if (direction_param.isString()) blk: {
             // a. Let paramString be directionParam.
+            const param_string = direction_param.asString();
 
             // b. Set directionParam to OrdinaryObjectCreate(null).
             const options = try ordinaryObjectCreate(agent, null);
@@ -519,7 +522,7 @@ pub const prototype = struct {
             try options.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("direction"),
-                Value.from(direction_param.asString()),
+                Value.from(param_string),
             );
 
             break :blk options;
@@ -734,6 +737,125 @@ pub const prototype = struct {
         // 3. Return 𝔽(GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]])).
         const offset_nanoseconds = temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time.fields.inner);
         return Value.from(@as(f64, @floatFromInt(offset_nanoseconds)));
+    }
+
+    /// 6.3.39 Temporal.ZonedDateTime.prototype.round ( roundTo )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype.round
+    fn round(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const round_to = arguments.get(0);
+
+        // 1. Let zonedDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
+
+        // 3. If roundTo is undefined, then
+        if (round_to.isUndefined()) {
+            // a. Throw a TypeError exception.
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. If roundTo is a String, then
+        const options = if (round_to.isString()) blk: {
+            // a. Let paramString be roundTo.
+            const param_string = round_to.asString();
+
+            // b. Set roundTo to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(roundTo, "smallestUnit", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("smallestUnit"),
+                Value.from(param_string),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 5. Else,
+            // a. Set roundTo to ? GetOptionsObject(roundTo).
+            break :blk try round_to.getOptionsObject(agent);
+        };
+
+        // 6. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetRoundingIncrementOption reads "roundingIncrement" and
+        //    GetRoundingModeOption reads "roundingMode").
+
+        // 7. Let roundingIncrement be ? GetRoundingIncrementOption(roundTo).
+        const rounding_increment = try getTemporalRoundingIncrementOption(agent, options);
+
+        // 8. Let roundingMode be ? GetRoundingModeOption(roundTo, half-expand).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_HalfExpand,
+        );
+
+        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(roundTo, "smallestUnit", required).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .required,
+        );
+
+        // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, time, « day »).
+        try validateTemporalUnitValue(
+            agent,
+            smallest_unit,
+            "smallestUnit",
+            .time,
+            &.{temporal_rs.c.Unit_Day},
+        );
+
+        // 11. If smallestUnit is day, then
+        //     a. Let maximum be 1.
+        //     b. Let inclusive be true.
+        // 12. Else,
+        //     a. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
+        //     b. Assert: maximum is not unset.
+        //     c. Let inclusive be false.
+        // 13. Perform ? ValidateTemporalRoundingIncrement(roundingIncrement, maximum, inclusive).
+        // 14. If smallestUnit is nanosecond and roundingIncrement = 1, then
+        //     a. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]], zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]]).
+        // 15. Let thisNs be zonedDateTime.[[EpochNanoseconds]].
+        // 16. Let timeZone be zonedDateTime.[[TimeZone]].
+        // 17. Let calendar be zonedDateTime.[[Calendar]].
+        // 18. Let isoDateTime be GetISODateTimeFor(timeZone, thisNs).
+        // 19. If smallestUnit is day, then
+        //     a. Let dateStart be isoDateTime.[[ISODate]].
+        //     b. Let dateEnd be BalanceISODate(dateStart.[[Year]], dateStart.[[Month]], dateStart.[[Day]] + 1).
+        //     c. Let startNs be ? GetStartOfDay(timeZone, dateStart).
+        //     d. Assert: thisNs ≥ startNs.
+        //     e. Let endNs be ? GetStartOfDay(timeZone, dateEnd).
+        //     f. Assert: thisNs < endNs.
+        //     g. Let dayLengthNs be ℝ(endNs - startNs).
+        //     h. Let dayProgressNs be TimeDurationFromEpochNanosecondsDifference(thisNs, startNs).
+        //     i. Let roundedDayNs be ! RoundTimeDurationToIncrement(dayProgressNs, dayLengthNs, roundingMode).
+        //     j. Let epochNanoseconds be AddTimeDurationToEpochNanoseconds(roundedDayNs, startNs).
+        // 20. Else,
+        //     a. Let roundResult be RoundISODateTime(isoDateTime, roundingIncrement, smallestUnit, roundingMode).
+        //     b. Let offsetNanoseconds be GetOffsetNanosecondsFor(timeZone, thisNs).
+        //     c. Let epochNanoseconds be ? InterpretISODateTimeOffset(roundResult.[[ISODate]], roundResult.[[Time]], option, offsetNanoseconds, timeZone, compatible, prefer, match-exactly).
+        // 21. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_ZonedDateTime_round(
+                zoned_date_time.fields.inner,
+                .{
+                    .largest_unit = .{ .is_ok = false },
+                    .smallest_unit = .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit.? } },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
+        const new_zoned_date_time = createTemporalZonedDateTime(
+            agent,
+            temporal_rs_zoned_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_zoned_date_time.object);
     }
 
     /// 6.3.13 get Temporal.ZonedDateTime.prototype.second

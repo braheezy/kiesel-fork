@@ -1360,7 +1360,7 @@ pub fn getTemporalRoundingModeOption(
 
 /// 14.5.2.4 GetRoundingIncrementOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-getroundingincrementoption
-fn getTemporalRoundingIncrementOption(agent: *Agent, options: *Object) Agent.Error!u32 {
+pub fn getTemporalRoundingIncrementOption(agent: *Agent, options: *Object) Agent.Error!u32 {
     // 1. Let value be ? Get(options, "roundingIncrement").
     const value = try options.get(agent, PropertyKey.from("roundingIncrement"));
 

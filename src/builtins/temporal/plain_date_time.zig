@@ -14,6 +14,7 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -28,6 +29,7 @@ const getTemporalDifferenceSettingsWithoutValidation = builtins.getTemporalDiffe
 const getTemporalDisambiguationOption = builtins.getTemporalDisambiguationOption;
 const getTemporalFractionalSecondDigitsOption = builtins.getTemporalFractionalSecondDigitsOption;
 const getTemporalOverflowOption = builtins.getTemporalOverflowOption;
+const getTemporalRoundingIncrementOption = builtins.getTemporalRoundingIncrementOption;
 const getTemporalRoundingModeOption = builtins.getTemporalRoundingModeOption;
 const getTemporalShowCalendarNameOption = builtins.getTemporalShowCalendarNameOption;
 const getTemporalUnitValuedOption = builtins.getTemporalUnitValuedOption;
@@ -234,6 +236,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "monthCode", monthCode, null, realm);
         try object.defineBuiltinAccessor(agent, "monthsInYear", monthsInYear, null, realm);
         try object.defineBuiltinAccessor(agent, "nanosecond", nanosecond, null, realm);
+        try object.defineBuiltinFunction(agent, "round", round, 1, realm);
         try object.defineBuiltinAccessor(agent, "second", second, null, realm);
         try object.defineBuiltinFunction(agent, "since", since, 1, realm);
         try object.defineBuiltinFunction(agent, "subtract", subtract, 1, realm);
@@ -580,6 +583,109 @@ pub const prototype = struct {
         return Value.from(
             temporal_rs.c.temporal_rs_PlainDateTime_nanosecond(plain_date_time.fields.inner),
         );
+    }
+
+    /// 5.3.32 Temporal.PlainDateTime.prototype.round ( roundTo )
+    /// https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype.round
+    fn round(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const round_to = arguments.get(0);
+
+        // 1. Let plainDateTime be the this value.
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
+
+        // 3. If roundTo is undefined, then
+        if (round_to.isUndefined()) {
+            // a. Throw a TypeError exception.
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. If roundTo is a String, then
+        const options = if (round_to.isString()) blk: {
+            // a. Let paramString be roundTo.
+            const param_string = round_to.asString();
+
+            // b. Set roundTo to OrdinaryObjectCreate(null).
+            const options = try ordinaryObjectCreate(agent, null);
+
+            // c. Perform ! CreateDataPropertyOrThrow(roundTo, "smallestUnit", paramString).
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("smallestUnit"),
+                Value.from(param_string),
+            );
+
+            break :blk options;
+        } else blk: {
+            // 5. Else,
+            // a. Set roundTo to ? GetOptionsObject(roundTo).
+            break :blk try round_to.getOptionsObject(agent);
+        };
+
+        // 6. NOTE: The following steps read options and perform independent validation in
+        //    alphabetical order (GetRoundingIncrementOption reads "roundingIncrement" and
+        //    GetRoundingModeOption reads "roundingMode").
+
+        // 7. Let roundingIncrement be ? GetRoundingIncrementOption(roundTo).
+        const rounding_increment = try getTemporalRoundingIncrementOption(agent, options);
+
+        // 8. Let roundingMode be ? GetRoundingModeOption(roundTo, half-expand).
+        const rounding_mode = try getTemporalRoundingModeOption(
+            agent,
+            options,
+            temporal_rs.c.RoundingMode_HalfExpand,
+        );
+
+        // 9. Let smallestUnit be ? GetTemporalUnitValuedOption(roundTo, "smallestUnit", required).
+        const smallest_unit = try getTemporalUnitValuedOption(
+            agent,
+            options,
+            "smallestUnit",
+            .required,
+        );
+
+        // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, time, « day »).
+        try validateTemporalUnitValue(
+            agent,
+            smallest_unit,
+            "smallestUnit",
+            .time,
+            &.{temporal_rs.c.Unit_Day},
+        );
+
+        // 11. If smallestUnit is day, then
+        //     a. Let maximum be 1.
+        //     b. Let inclusive be true.
+        // 12. Else,
+        //     a. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
+        //     b. Assert: maximum is not unset.
+        //     c. Let inclusive be false.
+        // 13. Perform ? ValidateTemporalRoundingIncrement(roundingIncrement, maximum, inclusive).
+        // 14. If smallestUnit is nanosecond and roundingIncrement = 1, then
+        //     a. Return ! CreateTemporalDateTime(plainDateTime.[[ISODateTime]],
+        //        plainDateTime.[[Calendar]]).
+        // 15. Let result be RoundISODateTime(plainDateTime.[[ISODateTime]], roundingIncrement,
+        //     smallestUnit, roundingMode).
+        // 16. Return ? CreateTemporalDateTime(result, plainDateTime.[[Calendar]]).
+        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+            agent,
+            temporal_rs.c.temporal_rs_PlainDateTime_round(
+                plain_date_time.fields.inner,
+                .{
+                    .largest_unit = .{ .is_ok = false },
+                    .smallest_unit = .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit.? } },
+                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                },
+            ),
+        );
+        errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
+        const new_plain_date_time = createTemporalDateTime(
+            agent,
+            temporal_rs_plain_date_time.?,
+            null,
+        ) catch |err| try noexcept(err);
+        return Value.from(&new_plain_date_time.object);
     }
 
     /// 5.3.12 get Temporal.PlainDateTime.prototype.second

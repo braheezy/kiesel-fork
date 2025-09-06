@@ -169,6 +169,7 @@ pub const getTemporalFractionalSecondDigitsOption = temporal.getTemporalFraction
 pub const getTemporalOffsetOption = temporal.getTemporalOffsetOption;
 pub const getTemporalOverflowOption = temporal.getTemporalOverflowOption;
 pub const getTemporalRelativeToOption = temporal.getTemporalRelativeToOption;
+pub const getTemporalRoundingIncrementOption = temporal.getTemporalRoundingIncrementOption;
 pub const getTemporalRoundingModeOption = temporal.getTemporalRoundingModeOption;
 pub const getTemporalShowCalendarNameOption = temporal.getTemporalShowCalendarNameOption;
 pub const getTemporalShowOffsetOption = temporal.getTemporalShowOffsetOption;
