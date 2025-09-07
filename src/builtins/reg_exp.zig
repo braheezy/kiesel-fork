@@ -294,10 +294,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const length = string.length();
 
     // 2. Let lastIndex be ℝ(? ToLength(! Get(R, "lastIndex"))).
-    const last_index_value = reg_exp.object.get(
-        agent,
-        PropertyKey.from("lastIndex"),
-    ) catch |err| try noexcept(err);
+    const last_index_value = reg_exp.object.getPropertyValueDirect(PropertyKey.from("lastIndex"));
     var last_index: usize = @intCast(try last_index_value.toLength(agent));
 
     const re_bytecode = reg_exp.fields.re_bytecode;
@@ -469,10 +466,17 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         }
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
-        try array.object.createDataPropertyDirect(
-            agent,
-            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
-            captured_value,
+        // OPTIMIZATION: Because the array is created with the right length we can set indexed
+        //               properties directly here.
+        try array.object.property_storage.indexed_properties.set(
+            agent.gc_allocator,
+            @intCast(i),
+            .{
+                .value_or_accessor = .{
+                    .value = captured_value,
+                },
+                .attributes = .all,
+            },
         );
 
         // e. If the ith capture of R was defined with a GroupName, then
