@@ -316,7 +316,15 @@ pub fn prepareCalendarFields(
     // 4. Set fieldNames to the list-concatenation of fieldNames and extraFieldNames.
     // 5. Assert: fieldNames contains no duplicate elements.
     var field_names = calendar_and_non_calendar_field_names;
-    if (calendar != temporal_rs.c.AnyCalendarKind_Iso) {
+    // https://tc39.es/proposal-intl-era-monthcode/#sec-temporal-calendarsupportsera
+    const calendar_supports_era = switch (calendar) {
+        temporal_rs.c.AnyCalendarKind_Chinese,
+        temporal_rs.c.AnyCalendarKind_Dangi,
+        temporal_rs.c.AnyCalendarKind_Iso,
+        => false,
+        else => true,
+    };
+    if (calendar_supports_era) {
         field_names.insert(.era);
         field_names.insert(.era_year);
     }
