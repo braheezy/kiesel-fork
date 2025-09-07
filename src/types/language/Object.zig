@@ -201,8 +201,14 @@ pub fn createDataPropertyDirect(
         .ordinary_get_own_property,
         .ordinary_is_extensible,
     }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but only use it for indexed properties and
+    // 'length' so we can use the fast path for everything else.
+    const use_fast_path_for_array =
+        self.is(builtins.Array) and
+        !property_key.isArrayIndex() and
+        !(property_key == .string and property_key.string.eql(String.fromLiteral("length")));
 
-    if (has_ordinary_internal_methods) {
+    if (has_ordinary_internal_methods or use_fast_path_for_array) {
         // Go directly to the property storage.
         try self.property_storage.set(agent.gc_allocator, property_key, .{
             .value_or_accessor = .{
@@ -236,8 +242,14 @@ pub fn definePropertyDirect(
         .ordinary_get_own_property,
         .ordinary_is_extensible,
     }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but only use it for indexed properties and
+    // 'length' so we can use the fast path for everything else.
+    const use_fast_path_for_array =
+        self.is(builtins.Array) and
+        !property_key.isArrayIndex() and
+        !(property_key == .string and property_key.string.eql(String.fromLiteral("length")));
 
-    if (has_ordinary_internal_methods) {
+    if (has_ordinary_internal_methods or use_fast_path_for_array) {
         try self.property_storage.set(
             agent.gc_allocator,
             property_key,
