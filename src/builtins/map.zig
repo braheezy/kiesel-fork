@@ -197,6 +197,8 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "entries", entries, 0, realm);
         try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
         try object.defineBuiltinFunction(agent, "get", get, 1, realm);
+        try object.defineBuiltinFunction(agent, "getOrInsert", getOrInsert, 2, realm);
+        try object.defineBuiltinFunction(agent, "getOrInsertComputed", getOrInsertComputed, 2, realm);
         try object.defineBuiltinFunction(agent, "has", has, 1, realm);
         try object.defineBuiltinFunction(agent, "keys", keys, 0, realm);
         try object.defineBuiltinFunction(agent, "set", set, 2, realm);
@@ -360,6 +362,70 @@ pub const prototype = struct {
 
         // 5. Return undefined.
         return .undefined;
+    }
+
+    /// 1 Map.prototype.getOrInsert ( key, value )
+    /// https://tc39.es/proposal-upsert/#sec-map.prototype.getOrInsert
+    fn getOrInsert(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        var key = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        const gop = try map.fields.map_data.getOrPut(agent.gc_allocator, key);
+        if (gop.found_existing) return gop.value_ptr.*;
+
+        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append p to M.[[MapData]].
+        gop.value_ptr.* = value;
+
+        // 7. Return value.
+        return value;
+    }
+
+    /// 2 Map.prototype.getOrInsertComputed ( key, callback )
+    /// https://tc39.es/proposal-upsert/#sec-map.prototype.getOrInsertComputed
+    fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        var key = arguments.get(0);
+        const callback = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        }
+
+        // 4. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 5. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        if (map.fields.map_data.get(key)) |value| return value;
+
+        // 6. Let value be ? Call(callback, undefined, « key »).
+        const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
+
+        // 7. NOTE: The Map may have been modified during execution of callback.
+        // 8. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
+        //         i. Set p.[[Value]] to value.
+        //         ii. Return value.
+        // 9. Let p be the Record { [[Key]]: key, [[Value]]: value }.
+        // 10. Append p to M.[[MapData]].
+        try map.fields.map_data.put(agent.gc_allocator, key, value);
+
+        // 11. Return value.
+        return value;
     }
 
     /// 24.1.3.7 Map.prototype.has ( key )

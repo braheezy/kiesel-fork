@@ -104,6 +104,8 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "delete", delete, 1, realm);
         try object.defineBuiltinFunction(agent, "get", get, 1, realm);
+        try object.defineBuiltinFunction(agent, "getOrInsert", getOrInsert, 2, realm);
+        try object.defineBuiltinFunction(agent, "getOrInsertComputed", getOrInsertComputed, 2, realm);
         try object.defineBuiltinFunction(agent, "has", has, 1, realm);
         try object.defineBuiltinFunction(agent, "set", set, 2, realm);
 
@@ -174,6 +176,83 @@ pub const prototype = struct {
         return maybe_value orelse .undefined;
     }
 
+    /// 3 WeakMap.prototype.getOrInsert ( key, value )
+    /// https://tc39.es/proposal-upsert/#sec-weakmap.prototype.getOrInsert
+    fn getOrInsert(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const key = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
+        const map = try this_value.requireInternalSlot(agent, WeakMap);
+
+        // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.
+        if (!key.canBeHeldWeakly(agent)) {
+            return agent.throwException(.type_error, "Value {f} cannot be held weakly", .{key});
+        }
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        const weak_map_data = &map.fields.weak_map_data;
+        const weak_key = Value.Weak.init(key);
+        const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
+        if (gop.found_existing) return gop.value_ptr.*;
+
+        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append p to M.[[WeakMapData]].
+        gop.value_ptr.* = value;
+        try registerFinalizer(agent, weak_key, weak_map_data);
+
+        // 7. Return value.
+        return value;
+    }
+
+    /// 4 WeakMap.prototype.getOrInsertComputed ( key, callback )
+    /// https://tc39.es/proposal-upsert/#sec-weakmap.prototype.getOrInsertComputed
+    fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        var key = arguments.get(0);
+        const callback = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
+        const map = try this_value.requireInternalSlot(agent, WeakMap);
+
+        // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.
+        if (!key.canBeHeldWeakly(agent)) {
+            return agent.throwException(.type_error, "Value {f} cannot be held weakly", .{key});
+        }
+
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        }
+
+        // 5. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        const weak_map_data = &map.fields.weak_map_data;
+        const weak_key = Value.Weak.init(key);
+        if (weak_map_data.get(weak_key)) |value| return value;
+
+        // 6. Let value be ? Call(callback, undefined, « key »).
+        const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
+
+        // 7. NOTE: The WeakMap may have been modified during execution of callback.
+        // 8. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
+        //         i. Set p.[[Value]] to value.
+        //         ii. Return value.
+        // 9. Let p be the Record { [[Key]]: key, [[Value]]: value }.
+        // 10. Append p to M.[[WeakMapData]].
+        const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
+        gop.value_ptr.* = value;
+        if (!gop.found_existing) {
+            try registerFinalizer(agent, weak_key, weak_map_data);
+        }
+
+        // 11. Return value.
+        return value;
+    }
+
     /// 24.3.3.4 WeakMap.prototype.has ( key )
     /// https://tc39.es/ecma262/#sec-weakmap.prototype.has
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
@@ -224,21 +303,8 @@ pub const prototype = struct {
         const weak_key = Value.Weak.init(key);
         const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
         gop.value_ptr.* = value;
-        if (build_options.enable_libgc and !gop.found_existing) {
-            // Implements 9.9.3 Execution step 1.c
-            // https://tc39.es/ecma262/#sec-weakref-execution
-            const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(CleanupEntryData));
-            finalizer_data.* = .{ .data = .{
-                .key = weak_key,
-                .weak_map_data = weak_map_data,
-            } };
-            gc.registerFinalizer(weak_key.getPtr(), finalizer_data, struct {
-                pub fn finalizer(_: *anyopaque, data: *CleanupEntryData) void {
-                    // i. Set r.[[Key]] to empty.
-                    // ii. Set r.[[Value]] to empty.
-                    _ = data.weak_map_data.*.remove(data.key);
-                }
-            }.finalizer);
+        if (!gop.found_existing) {
+            try registerFinalizer(agent, weak_key, weak_map_data);
         }
 
         // 7. Return M.
@@ -249,6 +315,28 @@ pub const prototype = struct {
         key: Value.Weak,
         weak_map_data: *WeakMapData,
     };
+
+    /// Implements 9.9.3 Execution step 1.c
+    /// https://tc39.es/ecma262/#sec-weakref-execution
+    fn registerFinalizer(
+        agent: *Agent,
+        weak_key: Value.Weak,
+        weak_map_data: *WeakMapData,
+    ) std.mem.Allocator.Error!void {
+        if (!build_options.enable_libgc) return;
+        const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(CleanupEntryData));
+        finalizer_data.* = .{ .data = .{
+            .key = weak_key,
+            .weak_map_data = weak_map_data,
+        } };
+        gc.registerFinalizer(weak_key.getPtr(), finalizer_data, struct {
+            pub fn finalizer(_: *anyopaque, data: *CleanupEntryData) void {
+                // i. Set r.[[Key]] to empty.
+                // ii. Set r.[[Value]] to empty.
+                _ = data.weak_map_data.*.remove(data.key);
+            }
+        }.finalizer);
+    }
 };
 
 const WeakMapData = Value.Weak.HashMapUnmanaged(Value);
