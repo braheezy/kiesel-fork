@@ -787,7 +787,7 @@ pub const namespace = struct {
     }
 
     /// 21.3.2.34 Math.sumPrecise ( items )
-    /// https://tc39.es/proposal-math-sum/#sec-math.sumprecise
+    /// https://tc39.es/ecma262/#sec-math.sumprecise
     fn sumPrecise(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // The implementation for higher precision summation in steps 4 and 7.b.vi.4.b are based on
         // the JavaScript polyfill in the proposal's repository by Kevin Gibbons (bakkot on GitHub).
