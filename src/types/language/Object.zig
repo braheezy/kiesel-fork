@@ -31,7 +31,7 @@ const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const IndexedProperties = @import("Object/IndexedProperties.zig");
 pub const InternalMethods = @import("Object/InternalMethods.zig");
-pub const PropertyKey = @import("Object/PropertyKey.zig").PropertyKey;
+pub const PropertyKey = @import("Object/property_key.zig").PropertyKey;
 pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 pub const Shape = @import("Object/Shape.zig");
 
