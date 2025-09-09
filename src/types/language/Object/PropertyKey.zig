@@ -9,6 +9,7 @@ const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const isZigString = utils.isZigString;
+const noexcept = utils.noexcept;
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
 /// String, are valid as property keys.
@@ -17,6 +18,16 @@ pub const PropertyKey = union(enum) {
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^53 - 1).
     /// https://tc39.es/ecma262/#integer-index
     pub const IntegerIndex = u53;
+
+    pub const CanonicalNumericIndex = union(enum) {
+        /// An integer index.
+        integer_index: IntegerIndex,
+
+        /// A canonical numeric string, i.e. passing a `ToNumber`/`ToString` roundtrip.
+        ///
+        /// This is used for detection only so the value is omitted.
+        numeric_string,
+    };
 
     string: *const String,
     symbol: *const Symbol,
@@ -56,6 +67,40 @@ pub const PropertyKey = union(enum) {
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^32 - 2).
     pub fn isArrayIndex(self: PropertyKey) bool {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
+    }
+
+    /// 7.1.21 CanonicalNumericIndexString ( argument )
+    /// https://tc39.es/ecma262/#sec-canonicalnumericindexstring
+    pub fn canonicalNumericIndex(
+        self: PropertyKey,
+        agent: *Agent,
+    ) std.mem.Allocator.Error!?CanonicalNumericIndex {
+        switch (self) {
+            // Also handles symbols for simplicity, this makes it possible to use a single if
+            // branch with null unwrapping at the call site.
+            .symbol => return null,
+            .integer_index => |integer_index| return .{ .integer_index = integer_index },
+            .string => |string| {
+                // 1. If argument is "-0", return -0𝔽.
+                // 2. Let n be ! ToNumber(argument).
+                // 3. If ! ToString(n) is argument, return n.
+                // 4. Return undefined.
+                const ascii = switch (string.slice) {
+                    .utf16 => return null,
+                    .ascii => |ascii| ascii,
+                };
+                // Do some manual validation to avoid allocations where possible
+                if (ascii.len == 0) return null;
+                if (std.mem.eql(u8, ascii, "-0") or
+                    std.mem.eql(u8, ascii, "NaN") or
+                    std.mem.eql(u8, ascii, "Infinity") or
+                    std.mem.eql(u8, ascii, "-Infinity")) return .numeric_string;
+                if (!std.ascii.isDigit(ascii[0]) and ascii[0] != '-') return null;
+                const n = Value.from(string).toNumber(agent) catch |err| try noexcept(err);
+                if (string.eql(try n.toString(agent, 10))) return .numeric_string;
+                return null;
+            },
+        }
     }
 
     pub fn hash(self: PropertyKey) u64 {

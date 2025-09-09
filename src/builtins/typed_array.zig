@@ -229,13 +229,9 @@ fn getOwnProperty(
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
-    if (property_key == .integer_index) {
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         // i. Let value be TypedArrayGetElement(O, numericIndex).
-        const value = try typedArrayGetElement(
-            agent,
-            object.as(TypedArray),
-            property_key.integer_index,
-        );
+        const value = try typedArrayGetElement(agent, object.as(TypedArray), numeric_index);
 
         // ii. If value is undefined, return undefined.
         if (value.isUndefined()) return null;
@@ -256,9 +252,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, return IsValidIntegerIndex(O, numericIndex).
-    if (property_key == .integer_index) {
-        const numeric_index: f64 = @floatFromInt(property_key.integer_index);
-
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         return isValidIntegerIndex(object.as(TypedArray), numeric_index);
     }
 
@@ -277,9 +271,7 @@ fn defineOwnProperty(
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
-    if (property_key == .integer_index) {
-        const numeric_index: f64 = @floatFromInt(property_key.integer_index);
-
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         // i. If IsValidIntegerIndex(O, numericIndex) is false, return false.
         if (!isValidIntegerIndex(object.as(TypedArray), numeric_index)) return false;
 
@@ -325,9 +317,9 @@ fn get(
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
-    if (property_key == .integer_index) {
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         // i. Return TypedArrayGetElement(O, numericIndex).
-        return typedArrayGetElement(agent, object.as(TypedArray), property_key.integer_index);
+        return typedArrayGetElement(agent, object.as(TypedArray), numeric_index);
     }
 
     // 2. Return ? OrdinaryGet(O, P, Receiver).
@@ -346,9 +338,7 @@ fn set(
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
-    if (property_key == .integer_index) {
-        const numeric_index: f64 = @floatFromInt(property_key.integer_index);
-
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         // i. If SameValue(O, Receiver) is true, then
         if (receiver.isObject() and object == receiver.asObject()) {
             // 1. Perform ? TypedArraySetElement(O, numericIndex, V).
@@ -372,9 +362,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.All
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
-    if (property_key == .integer_index) {
-        const numeric_index: f64 = @floatFromInt(property_key.integer_index);
-
+    if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
         // i. If IsValidIntegerIndex(O, numericIndex) is false, return true; else return false.
         return !isValidIntegerIndex(object.as(TypedArray), numeric_index);
     }
@@ -602,15 +590,16 @@ fn isTypedArrayFixedLength(typed_array: *const TypedArray) bool {
 
 /// 10.4.5.16 IsValidIntegerIndex ( O, index )
 /// https://tc39.es/ecma262/#sec-isvalidintegerindex
-fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
+fn isValidIntegerIndex(
+    typed_array: *const TypedArray,
+    index: PropertyKey.CanonicalNumericIndex,
+) bool {
     // 1. If IsDetachedBuffer(O.[[ViewedArrayBuffer]]) is true, return false.
     if (isDetachedBuffer(typed_array.fields.viewed_array_buffer)) return false;
 
     // 2. If index is not an integral Number, return false.
-    if (@trunc(index) != index) return false;
-
     // 3. If index is -0𝔽 or index < -0𝔽, return false.
-    if (std.math.isNegativeZero(index) or index < 0) return false;
+    if (index != .integer_index) return false;
 
     // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, unordered).
     // 5. NOTE: Bounds checking is not a synchronizing operation when O's backing buffer is a
@@ -624,7 +613,7 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     const length = typedArrayLength(ta);
 
     // 8. If ℝ(index) ≥ length, return false.
-    if (index >= @as(f64, @floatFromInt(length))) return false;
+    if (index.integer_index >= length) return false;
 
     // 9. Return true.
     return true;
@@ -635,10 +624,10 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
 fn typedArrayGetElement(
     agent: *Agent,
     typed_array: *const TypedArray,
-    index: u53,
+    index: PropertyKey.CanonicalNumericIndex,
 ) std.mem.Allocator.Error!Value {
     // 1. If IsValidIntegerIndex(O, index) is false, return undefined.
-    if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return .undefined;
+    if (!isValidIntegerIndex(typed_array, index)) return .undefined;
 
     // 2. Let offset be O.[[ByteOffset]].
     const offset = typed_array.fields.byte_offset;
@@ -647,7 +636,7 @@ fn typedArrayGetElement(
     const element_size = typedArrayElementSize(typed_array);
 
     // 4. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-    const byte_index_in_buffer = (index * element_size) + offset;
+    const byte_index_in_buffer = (index.integer_index * element_size) + offset;
 
     // 5. Let elementType be TypedArrayElementType(O).
     switch (typed_array.fields.element_type) {
@@ -673,7 +662,12 @@ fn typedArrayGetElement(
 
 /// 10.4.5.18 TypedArraySetElement ( O, index, value )
 /// https://tc39.es/ecma262/#sec-typedarraysetelement
-fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f64, value: Value) Agent.Error!void {
+fn typedArraySetElement(
+    agent: *Agent,
+    typed_array: *const TypedArray,
+    index: PropertyKey.CanonicalNumericIndex,
+    value: Value,
+) Agent.Error!void {
     // 1. If O.[[ContentType]] is bigint, let numValue be ? ToBigInt(value).
     // 2. Otherwise, let numValue be ? ToNumber(value).
     const number_value = if (typed_array.fields.content_type == .bigint)
@@ -690,7 +684,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
         const element_size = typedArrayElementSize(typed_array);
 
         // c. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-        const byte_index_in_buffer = @as(u53, @intFromFloat(index)) * element_size + offset;
+        const byte_index_in_buffer = (index.integer_index * element_size) + offset;
 
         // d. Let elementType be TypedArrayElementType(O).
         switch (typed_array.fields.element_type) {
@@ -2245,10 +2239,10 @@ pub const prototype = struct {
     fn setTypedArrayFromArrayLike(
         agent: *Agent,
         target: *const TypedArray,
-        target_offset: f64,
+        target_offset_f64: f64,
         source: Value,
     ) Agent.Error!void {
-        std.debug.assert(target_offset >= 0);
+        std.debug.assert(target_offset_f64 >= 0);
 
         // 1. Let targetRecord be MakeTypedArrayWithBufferWitnessRecord(target, seq-cst).
         const target_ta = makeTypedArrayWithBufferWitnessRecord(@constCast(target), .seq_cst);
@@ -2268,12 +2262,12 @@ pub const prototype = struct {
         const src_length = try src.lengthOfArrayLike(agent);
 
         // 6. If targetOffset = +∞, throw a RangeError exception.
-        if (target_offset == std.math.inf(f64)) {
+        if (target_offset_f64 == std.math.inf(f64)) {
             return agent.throwException(.range_error, "Offset must not be infinite", .{});
         }
 
         // 7. If srcLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
+        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset_f64))) |x|
             x > target_length
         else |_|
             true)
@@ -2281,9 +2275,11 @@ pub const prototype = struct {
             return agent.throwException(
                 .range_error,
                 "Offset {d} and source length {d} are out of range for target length {d}",
-                .{ target_offset, src_length, target_length },
+                .{ target_offset_f64, src_length, target_length },
             );
         }
+
+        const target_offset: u53 = @intFromFloat(target_offset_f64);
 
         // 8. Let k be 0.
         var k: u53 = 0;
@@ -2297,10 +2293,10 @@ pub const prototype = struct {
             const value = try src.get(agent, property_key);
 
             // c. Let targetIndex be 𝔽(targetOffset + k).
-            const target_index = target_offset + @as(f64, @floatFromInt(k));
+            const target_index = target_offset + k;
 
             // d. Perform ? TypedArraySetElement(target, targetIndex, value).
-            try typedArraySetElement(agent, target, target_index, value);
+            try typedArraySetElement(agent, target, .{ .integer_index = target_index }, value);
 
             // e. Set k to k + 1.
         }
@@ -3100,7 +3096,10 @@ pub const prototype = struct {
             Value.from(try value.toNumber(agent));
 
         // 9. If IsValidIntegerIndex(O, 𝔽(actualIndex)) is false, throw a RangeError exception.
-        if (!isValidIntegerIndex(typed_array, actual_index_f64)) {
+        if (actual_index_f64 < 0 or
+            actual_index_f64 > std.math.maxInt(PropertyKey.IntegerIndex) or
+            !isValidIntegerIndex(typed_array, .{ .integer_index = @intFromFloat(actual_index_f64) }))
+        {
             return agent.throwException(
                 .range_error,
                 "Invalid index {d} for typed array of length {d}",
