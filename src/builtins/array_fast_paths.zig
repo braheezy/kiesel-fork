@@ -137,6 +137,8 @@ pub fn every(
 /// Only applicable to objects that meet the following requirements:
 /// - Dense indexed property storage after migration for the given `value`
 /// - Ordinary internal methods: `[[Set]]`
+/// - If the length is non-zero and the object has no property storage yet the object must be
+///   extensible
 pub fn fill(
     allocator: std.mem.Allocator,
     object: *Object,
@@ -149,6 +151,9 @@ pub fn fill(
     if (!has_ordinary_internal_methods or
         start > std.math.maxInt(Object.IndexedProperties.Index) or
         end > std.math.maxInt(Object.IndexedProperties.Index)) return null;
+    if (len > 0 and
+        object.property_storage.indexed_properties.storage == .none and
+        !object.extensible()) return null;
 
     if (start >= end) return;
     const start_index: usize = @intCast(start);
