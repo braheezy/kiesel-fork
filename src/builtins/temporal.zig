@@ -178,9 +178,6 @@ pub fn toTemporalTimeZoneIdentifier(
             temporal_rs.toDiplomatStringView(time_zone),
         ),
     );
-    if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
-        return agent.throwException(.range_error, "Invalid time zone", .{});
-    }
     return temporal_rs_time_zone.?;
 }
 
@@ -1132,14 +1129,20 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // i. Set calendar to ? CanonicalizeCalendar(calendar).
         // j. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // k. Let time be result.[[Time]].
-        const relative_to_utf8 = try value.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(relative_to_utf8);
-        const owned_relative_to = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_OwnedRelativeTo_try_from_str(
-                temporal_rs.toDiplomatStringView(relative_to_utf8),
+        const owned_relative_to = switch (value.asString().slice) {
+            .ascii => |ascii| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_OwnedRelativeTo_from_utf8(
+                    temporal_rs.toDiplomatStringView(ascii),
+                ),
             ),
-        );
+            .utf16 => |utf16| try temporal_rs.extractResult(
+                agent,
+                temporal_rs.c.temporal_rs_OwnedRelativeTo_from_utf16(
+                    temporal_rs.toDiplomatString16View(utf16),
+                ),
+            ),
+        };
         return temporal_rs.RelativeTo.fromOwned(owned_relative_to);
     };
 

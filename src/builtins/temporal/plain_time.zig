@@ -753,11 +753,8 @@ pub fn toTemporalPlainTime(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iv. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-            break :blk try temporal_rs.extractResult(
-                agent,
-                temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
-                    zoned_date_time.fields.inner,
-                ),
+            break :blk temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
+                zoned_date_time.fields.inner,
             );
         }
 

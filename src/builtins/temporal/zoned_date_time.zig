@@ -133,9 +133,6 @@ pub const constructor = struct {
                 temporal_rs.toDiplomatStringView(time_zone),
             ),
         );
-        if (!temporal_rs.c.temporal_rs_TimeZone_is_valid(temporal_rs_time_zone.?)) {
-            return agent.throwException(.range_error, "Invalid time zone", .{});
-        }
         errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
 
         // 8. If calendar is undefined, set calendar to "iso8601".
@@ -352,11 +349,9 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DayOfWeek]]).
-        const day_of_week = try temporal_rs.extractResult(
-            agent,
+        return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_day_of_week(zoned_date_time.fields.inner),
         );
-        return Value.from(day_of_week);
     }
 
     /// 6.3.20 get Temporal.ZonedDateTime.prototype.dayOfYear
@@ -382,11 +377,9 @@ pub const prototype = struct {
 
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInWeek]]).
-        const days_in_week = try temporal_rs.extractResult(
-            agent,
+        return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_week(zoned_date_time.fields.inner),
         );
-        return Value.from(days_in_week);
     }
 
     /// 6.3.26 get Temporal.ZonedDateTime.prototype.daysInYear
@@ -1031,11 +1024,8 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], zonedDateTime.[[Calendar]]).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
-                zoned_date_time.fields.inner,
-            ),
+        const temporal_rs_plain_date = temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_date(
+            zoned_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         const plain_date = createTemporalDate(
@@ -1056,11 +1046,8 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalDateTime(isoDateTime, zonedDateTime.[[Calendar]]).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_datetime(
-                zoned_date_time.fields.inner,
-            ),
+        const temporal_rs_plain_date_time = temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_datetime(
+            zoned_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         const plain_date_time = createTemporalDateTime(
@@ -1081,11 +1068,8 @@ pub const prototype = struct {
         // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
         //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
-                zoned_date_time.fields.inner,
-            ),
+        const temporal_rs_plain_time = temporal_rs.c.temporal_rs_ZonedDateTime_to_plain_time(
+            zoned_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         const plain_time = createTemporalTime(
@@ -1353,12 +1337,9 @@ pub const prototype = struct {
 
         // 4. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]],
         //    zonedDateTime.[[TimeZone]], calendar).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_ZonedDateTime_with_calendar(
-                zoned_date_time.fields.inner,
-                calendar,
-            ),
+        const temporal_rs_zoned_date_time = temporal_rs.c.temporal_rs_ZonedDateTime_with_calendar(
+            zoned_date_time.fields.inner,
+            calendar,
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
         const new_zoned_date_time = createTemporalZonedDateTime(
