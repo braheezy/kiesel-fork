@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: meow
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
@@ -145,7 +145,7 @@ jobs:
   docs:
     runs-on: meow
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
@@ -189,7 +189,7 @@ jobs:
   lint:
     runs-on: meow
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
@@ -210,7 +210,7 @@ jobs:
   test:
     runs-on: meow
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
@@ -229,7 +229,7 @@ jobs:
   test262:
     runs-on: meow
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
     env:
       # Re-generate `tools/test262/results.json` when updating this
       TEST262_COMMIT: a5e69a1534de88d1eb29b76657d84c8541b72df7
