@@ -252,7 +252,7 @@ jobs:
           toolchain: nightly-2025-09-11
           components: "rust-src"
       - name: Install Node.js
-        uses: https://github.com/actions/setup-node@v4
+        uses: https://github.com/actions/setup-node@v5
       - name: Install dependencies
         run: |
           # NOTE: jq is already installed in the Docker image
