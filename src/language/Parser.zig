@@ -2218,6 +2218,9 @@ pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPatt
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.acceptBindingRestElement()) |binding_rest_element| {
             try elements.append(self.allocator, .{ .binding_rest_element = binding_rest_element });
+            if (self.core.accept(RuleSet.is(.@","))) |token| {
+                try self.emitErrorAt(token.location, "Rest element must not be followed by comma", .{});
+            } else |_| {}
             break;
         } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
             try elements.append(self.allocator, .elision);
@@ -2944,7 +2947,9 @@ pub fn acceptFormalParameters(self: *Parser) AcceptError!ast.FormalParameters {
                 .binding_rest_element = binding_rest_element,
             };
             try formal_parameters_items.append(self.allocator, .{ .function_rest_parameter = function_rest_parameter });
-            _ = self.core.accept(RuleSet.is(.@",")) catch {};
+            if (self.core.accept(RuleSet.is(.@","))) |token| {
+                try self.emitErrorAt(token.location, "Rest parameter must not be followed by comma", .{});
+            } else |_| {}
             break;
         } else |_| if (self.acceptBindingElement()) |binding_element| {
             const formal_parameter: ast.FormalParameter = .{
