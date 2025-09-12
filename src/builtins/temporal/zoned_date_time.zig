@@ -835,10 +835,10 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_round(
                 zoned_date_time.fields.inner,
                 .{
-                    .largest_unit = .{ .is_ok = false },
-                    .smallest_unit = .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit.? } },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
-                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                    .largest_unit = temporal_rs.toUnitOption(null),
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
+                    .increment = temporal_rs.toOption(temporal_rs.c.OptionU32, rounding_increment),
                 },
             ),
         );
@@ -1152,11 +1152,8 @@ pub const prototype = struct {
                 show_calendar,
                 .{
                     .precision = precision,
-                    .smallest_unit = if (smallest_unit) |ok|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
-                    else
-                        .{ .is_ok = false },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
                 },
                 &write.inner,
             ),
@@ -1309,9 +1306,9 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_with(
                 zoned_date_time.fields.inner,
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_ } },
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toDisambiguationOption(disambiguation),
+                temporal_rs.toOffsetDisambiguationOption(offset_),
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
@@ -1575,9 +1572,9 @@ pub fn toTemporalZonedDateTime(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = disambiguation } },
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = offset_option } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
+                temporal_rs.toDisambiguationOption(disambiguation),
+                temporal_rs.toOffsetDisambiguationOption(offset_option),
             ),
         );
     } else blk: {
@@ -1813,7 +1810,7 @@ fn addDurationToZonedDateTime(
             temporal_rs.c.temporal_rs_ZonedDateTime_add(
                 zoned_date_time.fields.inner,
                 duration_.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
         .subtract => try temporal_rs.extractResult(
@@ -1821,7 +1818,7 @@ fn addDurationToZonedDateTime(
             temporal_rs.c.temporal_rs_ZonedDateTime_subtract(
                 zoned_date_time.fields.inner,
                 duration_.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
     };

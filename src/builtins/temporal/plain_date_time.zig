@@ -672,10 +672,10 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainDateTime_round(
                 plain_date_time.fields.inner,
                 .{
-                    .largest_unit = .{ .is_ok = false },
-                    .smallest_unit = .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit.? } },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
-                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                    .largest_unit = temporal_rs.toUnitOption(null),
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
+                    .increment = temporal_rs.toOption(temporal_rs.c.OptionU32, rounding_increment),
                 },
             ),
         );
@@ -894,11 +894,8 @@ pub const prototype = struct {
                 plain_date_time.fields.inner,
                 .{
                     .precision = precision,
-                    .smallest_unit = if (smallest_unit) |ok|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
-                    else
-                        .{ .is_ok = false },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
                 },
                 show_calendar,
                 &write.inner,
@@ -1068,7 +1065,7 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainDateTime_with(
                 plain_date_time.fields.inner,
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
@@ -1321,7 +1318,7 @@ pub fn toTemporalPlainDateTime(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_from_partial(
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
     } else blk: {
@@ -1478,7 +1475,7 @@ fn addDurationToDateTime(
             temporal_rs.c.temporal_rs_PlainDateTime_add(
                 plain_date_time.fields.inner,
                 duration.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
         .subtract => try temporal_rs.extractResult(
@@ -1486,7 +1483,7 @@ fn addDurationToDateTime(
             temporal_rs.c.temporal_rs_PlainDateTime_subtract(
                 plain_date_time.fields.inner,
                 duration.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
     };

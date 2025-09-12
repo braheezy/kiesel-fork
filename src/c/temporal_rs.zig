@@ -74,8 +74,46 @@ pub fn toDiplomatString16View(s: []const u16) c.DiplomatString16View {
 }
 
 /// Convert a Rust `Option<T>` to a Zig `?T`.
-pub fn fromOptional(value: anytype) ?Success(@TypeOf(value)) {
+pub fn fromOption(value: anytype) ?Success(@TypeOf(value)) {
     return success(value);
+}
+
+/// Convert a Zig `?T` to a Rust `Option<T>`.
+pub fn toOption(comptime T: type, maybe_value: ?Success(T)) T {
+    return if (maybe_value) |value|
+        .{ .is_ok = true, .unnamed_0 = .{ .ok = value } }
+    else
+        .{ .is_ok = false };
+}
+
+/// Convert a Zig `?ArithmeticOverflow` to a Rust `Option<ArithmeticOverflow>`.
+pub fn toArithmeticOverflowOption(maybe_value: ?c.RoundingMode) c.ArithmeticOverflow_option {
+    return toOption(c.ArithmeticOverflow_option, maybe_value);
+}
+
+/// Convert a Zig `?Disambiguation` to a Rust `Option<Disambiguation>`.
+pub fn toDisambiguationOption(maybe_value: ?c.Disambiguation) c.Disambiguation_option {
+    return toOption(c.Disambiguation_option, maybe_value);
+}
+
+/// Convert a Zig `?OffsetDisambiguation` to a Rust `Option<OffsetDisambiguation>`.
+pub fn toOffsetDisambiguationOption(maybe_value: ?c.OffsetDisambiguation) c.OffsetDisambiguation_option {
+    return toOption(c.OffsetDisambiguation_option, maybe_value);
+}
+
+/// Convert a Zig `?PartialDate` to a Rust `Option<PartialDate>`.
+pub fn toPartialDateOption(maybe_value: ?c.PartialDate) c.PartialDate_option {
+    return toOption(c.PartialDate_option, maybe_value);
+}
+
+/// Convert a Zig `?RoundingMode` to a Rust `Option<RoundingMode>`.
+pub fn toRoundingModeOption(maybe_value: ?c.RoundingMode) c.RoundingMode_option {
+    return toOption(c.RoundingMode_option, maybe_value);
+}
+
+/// Convert a Zig `?Unit` to a Rust `Option<Unit>`.
+pub fn toUnitOption(maybe_value: ?c.Unit) c.Unit_option {
+    return toOption(c.Unit_option, maybe_value);
 }
 
 // Wraps values from a `c.RelativeTo` or `c.OwnedRelativeTo`.
@@ -212,7 +250,7 @@ test DiplomatWrite {
 
 pub fn extractResult(agent: *Agent, result: anytype) Agent.Error!Success(@TypeOf(result)) {
     if (success(result)) |x| return x;
-    const message = if (fromOptional(result.unnamed_0.err.msg)) |sv|
+    const message = if (fromOption(result.unnamed_0.err.msg)) |sv|
         fromDiplomatStringView(sv)
     else
         "";

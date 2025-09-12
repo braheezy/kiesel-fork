@@ -376,8 +376,8 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainTime_round(
                 plain_time.fields.inner,
                 smallest_unit.?,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = @floatFromInt(rounding_increment) } },
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                temporal_rs.toOption(temporal_rs.c.OptionF64, @floatFromInt(rounding_increment)),
+                temporal_rs.toRoundingModeOption(rounding_mode),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
@@ -538,11 +538,8 @@ pub const prototype = struct {
                 plain_time.fields.inner,
                 .{
                     .precision = precision,
-                    .smallest_unit = if (smallest_unit) |ok|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
-                    else
-                        .{ .is_ok = false },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
                 },
                 &write.inner,
             ),
@@ -649,7 +646,7 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainTime_with(
                 plain_time.fields.inner,
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
@@ -774,7 +771,7 @@ pub fn toTemporalPlainTime(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_from_partial(
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
     } else blk: {
@@ -863,50 +860,50 @@ const TemporalTimeLike = struct {
         if (overflow == temporal_rs.c.ArithmeticOverflow_Constrain) {
             // a. Set hour to the result of clamping hour between 0 and 23.
             if (self.hour) |hour| {
-                partial.hour = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(hour, 0, 23)) },
-                };
+                partial.hour = temporal_rs.toOption(
+                    temporal_rs.c.OptionU8,
+                    @intFromFloat(std.math.clamp(hour, 0, 23)),
+                );
             }
 
             // b. Set minute to the result of clamping minute between 0 and 59.
             if (self.minute) |minute| {
-                partial.minute = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(minute, 0, 59)) },
-                };
+                partial.minute = temporal_rs.toOption(
+                    temporal_rs.c.OptionU8,
+                    @intFromFloat(std.math.clamp(minute, 0, 59)),
+                );
             }
 
             // c. Set second to the result of clamping second between 0 and 59.
             if (self.second) |second| {
-                partial.second = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(second, 0, 59)) },
-                };
+                partial.second = temporal_rs.toOption(
+                    temporal_rs.c.OptionU8,
+                    @intFromFloat(std.math.clamp(second, 0, 59)),
+                );
             }
 
             // d. Set millisecond to the result of clamping millisecond between 0 and 999.
             if (self.millisecond) |millisecond| {
-                partial.millisecond = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(millisecond, 0, 999)) },
-                };
+                partial.millisecond = temporal_rs.toOption(
+                    temporal_rs.c.OptionU16,
+                    @intFromFloat(std.math.clamp(millisecond, 0, 999)),
+                );
             }
 
             // e. Set microsecond to the result of clamping microsecond between 0 and 999.
             if (self.microsecond) |microsecond| {
-                partial.microsecond = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(microsecond, 0, 999)) },
-                };
+                partial.microsecond = temporal_rs.toOption(
+                    temporal_rs.c.OptionU16,
+                    @intFromFloat(std.math.clamp(microsecond, 0, 999)),
+                );
             }
 
             // f. Set nanosecond to the result of clamping nanosecond between 0 and 999.
             if (self.nanosecond) |nanosecond| {
-                partial.nanosecond = .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(std.math.clamp(nanosecond, 0, 999)) },
-                };
+                partial.nanosecond = temporal_rs.toOption(
+                    temporal_rs.c.OptionU16,
+                    @intFromFloat(std.math.clamp(nanosecond, 0, 999)),
+                );
             }
         } else {
             // 2. Else,
@@ -927,22 +924,22 @@ const TemporalTimeLike = struct {
             }
 
             if (self.hour) |hour| {
-                partial.hour = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(hour) } };
+                partial.hour = temporal_rs.toOption(temporal_rs.c.OptionU8, @intFromFloat(hour));
             }
             if (self.minute) |minute| {
-                partial.minute = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(minute) } };
+                partial.minute = temporal_rs.toOption(temporal_rs.c.OptionU8, @intFromFloat(minute));
             }
             if (self.second) |second| {
-                partial.second = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(second) } };
+                partial.second = temporal_rs.toOption(temporal_rs.c.OptionU8, @intFromFloat(second));
             }
             if (self.millisecond) |millisecond| {
-                partial.millisecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(millisecond) } };
+                partial.millisecond = temporal_rs.toOption(temporal_rs.c.OptionU16, @intFromFloat(millisecond));
             }
             if (self.microsecond) |microsecond| {
-                partial.microsecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(microsecond) } };
+                partial.microsecond = temporal_rs.toOption(temporal_rs.c.OptionU16, @intFromFloat(microsecond));
             }
             if (self.nanosecond) |nanosecond| {
-                partial.nanosecond = .{ .is_ok = true, .unnamed_0 = .{ .ok = @intFromFloat(nanosecond) } };
+                partial.nanosecond = temporal_rs.toOption(temporal_rs.c.OptionU16, @intFromFloat(nanosecond));
             }
         }
 

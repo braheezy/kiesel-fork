@@ -796,7 +796,7 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainDate_with(
                 plain_date.fields.inner,
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
@@ -990,7 +990,7 @@ pub fn toTemporalPlainDate(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
     } else blk: {
@@ -1173,7 +1173,7 @@ fn addDurationToDate(
             temporal_rs.c.temporal_rs_PlainDate_add(
                 plain_date.fields.inner,
                 duration.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
         .subtract => try temporal_rs.extractResult(
@@ -1181,7 +1181,7 @@ fn addDurationToDate(
             temporal_rs.c.temporal_rs_PlainDate_subtract(
                 plain_date.fields.inner,
                 duration.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
     };

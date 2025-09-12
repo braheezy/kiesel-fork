@@ -444,7 +444,7 @@ pub const prototype = struct {
         //    "roundingMode").
 
         // 9. Let largestUnit be ? GetTemporalUnitValuedOption(roundTo, "largestUnit", unset).
-        const maybe_largest_unit = try getTemporalUnitValuedOption(
+        const largest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "largestUnit",
@@ -469,7 +469,7 @@ pub const prototype = struct {
         );
 
         // 15. Let smallestUnit be ? GetTemporalUnitValuedOption(roundTo, "smallestUnit", unset).
-        const maybe_smallest_unit = try getTemporalUnitValuedOption(
+        const smallest_unit = try getTemporalUnitValuedOption(
             agent,
             options,
             "smallestUnit",
@@ -477,7 +477,7 @@ pub const prototype = struct {
         );
 
         // 16. Perform ? ValidateTemporalUnitValue(smallestUnit, datetime).
-        try validateTemporalUnitValue(agent, maybe_smallest_unit, "smallestUnit", .datetime, &.{});
+        try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .datetime, &.{});
 
         // 17. If smallestUnit is unset, then
         //     a. Set smallestUnitPresent to false.
@@ -544,16 +544,10 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_Duration_round(
                 duration.fields.inner,
                 .{
-                    .largest_unit = if (maybe_largest_unit) |largest_unit|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = largest_unit } }
-                    else
-                        .{ .is_ok = false },
-                    .smallest_unit = if (maybe_smallest_unit) |smallest_unit|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit } }
-                    else
-                        .{ .is_ok = false },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
-                    .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+                    .largest_unit = temporal_rs.toUnitOption(largest_unit),
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
+                    .increment = temporal_rs.toOption(temporal_rs.c.OptionU32, rounding_increment),
                 },
                 relative_to.toRust(),
             ),
@@ -724,11 +718,8 @@ pub const prototype = struct {
                 duration.fields.inner,
                 .{
                     .precision = precision,
-                    .smallest_unit = if (smallest_unit) |ok|
-                        .{ .is_ok = true, .unnamed_0 = .{ .ok = ok } }
-                    else
-                        .{ .is_ok = false },
-                    .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
                 },
                 &write.inner,
             ),
@@ -871,70 +862,70 @@ pub const prototype = struct {
         //     a. Let years be temporalDurationLike.[[Years]].
         // 5. Else,
         //     a. Let years be duration.[[Years]].
-        const years_ = temporal_rs.fromOptional(temporal_duration_like.years) orelse
+        const years_ = temporal_rs.fromOption(temporal_duration_like.years) orelse
             temporal_rs.c.temporal_rs_Duration_years(duration.fields.inner);
 
         // 6. If temporalDurationLike.[[Months]] is not undefined, then
         //     a. Let months be temporalDurationLike.[[Months]].
         // 7. Else,
         //     a. Let months be duration.[[Months]].
-        const months_ = temporal_rs.fromOptional(temporal_duration_like.months) orelse
+        const months_ = temporal_rs.fromOption(temporal_duration_like.months) orelse
             temporal_rs.c.temporal_rs_Duration_months(duration.fields.inner);
 
         // 8. If temporalDurationLike.[[Weeks]] is not undefined, then
         //     a. Let weeks be temporalDurationLike.[[Weeks]].
         // 9. Else,
         //     a. Let weeks be duration.[[Weeks]].
-        const weeks_ = temporal_rs.fromOptional(temporal_duration_like.weeks) orelse
+        const weeks_ = temporal_rs.fromOption(temporal_duration_like.weeks) orelse
             temporal_rs.c.temporal_rs_Duration_weeks(duration.fields.inner);
 
         // 10. If temporalDurationLike.[[Days]] is not undefined, then
         //     a. Let days be temporalDurationLike.[[Days]].
         // 11. Else,
         //     a. Let days be duration.[[Days]].
-        const days_ = temporal_rs.fromOptional(temporal_duration_like.days) orelse
+        const days_ = temporal_rs.fromOption(temporal_duration_like.days) orelse
             temporal_rs.c.temporal_rs_Duration_days(duration.fields.inner);
 
         // 12. If temporalDurationLike.[[Hours]] is not undefined, then
         //     a. Let hours be temporalDurationLike.[[Hours]].
         // 13. Else,
         //     a. Let hours be duration.[[Hours]].
-        const hours_ = temporal_rs.fromOptional(temporal_duration_like.hours) orelse
+        const hours_ = temporal_rs.fromOption(temporal_duration_like.hours) orelse
             temporal_rs.c.temporal_rs_Duration_hours(duration.fields.inner);
 
         // 14. If temporalDurationLike.[[Minutes]] is not undefined, then
         //     a. Let minutes be temporalDurationLike.[[Minutes]].
         // 15. Else,
         //     a. Let minutes be duration.[[Minutes]].
-        const minutes_ = temporal_rs.fromOptional(temporal_duration_like.minutes) orelse
+        const minutes_ = temporal_rs.fromOption(temporal_duration_like.minutes) orelse
             temporal_rs.c.temporal_rs_Duration_minutes(duration.fields.inner);
 
         // 16. If temporalDurationLike.[[Seconds]] is not undefined, then
         //     a. Let seconds be temporalDurationLike.[[Seconds]].
         // 17. Else,
         //     a. Let seconds be duration.[[Seconds]].
-        const seconds_ = temporal_rs.fromOptional(temporal_duration_like.seconds) orelse
+        const seconds_ = temporal_rs.fromOption(temporal_duration_like.seconds) orelse
             temporal_rs.c.temporal_rs_Duration_seconds(duration.fields.inner);
 
         // 18. If temporalDurationLike.[[Milliseconds]] is not undefined, then
         //     a. Let milliseconds be temporalDurationLike.[[Milliseconds]].
         // 19. Else,
         //     a. Let milliseconds be duration.[[Milliseconds]].
-        const milliseconds_ = temporal_rs.fromOptional(temporal_duration_like.milliseconds) orelse
+        const milliseconds_ = temporal_rs.fromOption(temporal_duration_like.milliseconds) orelse
             temporal_rs.c.temporal_rs_Duration_milliseconds(duration.fields.inner);
 
         // 20. If temporalDurationLike.[[Microseconds]] is not undefined, then
         //     a. Let microseconds be temporalDurationLike.[[Microseconds]].
         // 21. Else,
         //     a. Let microseconds be duration.[[Microseconds]].
-        const microseconds_ = temporal_rs.fromOptional(temporal_duration_like.microseconds) orelse
+        const microseconds_ = temporal_rs.fromOption(temporal_duration_like.microseconds) orelse
             temporal_rs.c.temporal_rs_Duration_microseconds(duration.fields.inner);
 
         // 22. If temporalDurationLike.[[Nanoseconds]] is not undefined, then
         //     a. Let nanoseconds be temporalDurationLike.[[Nanoseconds]].
         // 23. Else,
         //     a. Let nanoseconds be duration.[[Nanoseconds]].
-        const nanoseconds_ = temporal_rs.fromOptional(temporal_duration_like.nanoseconds) orelse
+        const nanoseconds_ = temporal_rs.fromOption(temporal_duration_like.nanoseconds) orelse
             temporal_rs.c.temporal_rs_Duration_nanoseconds(duration.fields.inner);
 
         // 24. Return ? CreateTemporalDuration(years, months, weeks, days, hours, minutes, seconds,
@@ -1068,16 +1059,16 @@ pub fn toTemporalPartialDuration(
 
     // 2. Let result be a new partial Duration Record with each field set to undefined.
     var result: temporal_rs.c.PartialDuration = .{
-        .years = .{ .is_ok = false },
-        .months = .{ .is_ok = false },
-        .weeks = .{ .is_ok = false },
-        .days = .{ .is_ok = false },
-        .hours = .{ .is_ok = false },
-        .minutes = .{ .is_ok = false },
-        .seconds = .{ .is_ok = false },
-        .milliseconds = .{ .is_ok = false },
-        .microseconds = .{ .is_ok = false },
-        .nanoseconds = .{ .is_ok = false },
+        .years = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .months = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .weeks = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .days = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .hours = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .minutes = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .seconds = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .milliseconds = temporal_rs.toOption(temporal_rs.c.OptionI64, null),
+        .microseconds = temporal_rs.toOption(temporal_rs.c.OptionF64, null),
+        .nanoseconds = temporal_rs.toOption(temporal_rs.c.OptionF64, null),
     };
 
     // 3. NOTE: The following steps read properties and perform independent validation in
@@ -1088,10 +1079,10 @@ pub fn toTemporalPartialDuration(
 
     // 5. If days is not undefined, set result.[[Days]] to ? ToIntegerIfIntegral(days).
     if (!days.isUndefined()) {
-        result.days = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try days.toIntegerIfIntegral(agent)) },
-        };
+        result.days = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try days.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 6. Let hours be ? Get(temporalDurationLike, "hours").
@@ -1099,10 +1090,10 @@ pub fn toTemporalPartialDuration(
 
     // 7. If hours is not undefined, set result.[[Hours]] to ? ToIntegerIfIntegral(hours).
     if (!hours.isUndefined()) {
-        result.hours = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try hours.toIntegerIfIntegral(agent)) },
-        };
+        result.hours = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try hours.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 8. Let microseconds be ? Get(temporalDurationLike, "microseconds").
@@ -1110,10 +1101,10 @@ pub fn toTemporalPartialDuration(
 
     // 9. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
     if (!microseconds.isUndefined()) {
-        result.microseconds = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = try microseconds.toIntegerIfIntegral(agent) },
-        };
+        result.microseconds = temporal_rs.toOption(
+            temporal_rs.c.OptionF64,
+            try microseconds.toIntegerIfIntegral(agent),
+        );
     }
 
     // 10. Let milliseconds be ? Get(temporalDurationLike, "milliseconds").

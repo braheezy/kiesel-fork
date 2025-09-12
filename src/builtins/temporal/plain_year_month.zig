@@ -118,10 +118,7 @@ pub const constructor = struct {
             temporal_rs.c.temporal_rs_PlainYearMonth_try_new_with_overflow(
                 @intFromFloat(iso_year),
                 @intFromFloat(iso_month),
-                .{
-                    .is_ok = true,
-                    .unnamed_0 = .{ .ok = @intFromFloat(reference_iso_day) },
-                },
+                temporal_rs.toOption(temporal_rs.c.OptionU8, @intFromFloat(reference_iso_day)),
                 calendar,
                 temporal_rs.c.ArithmeticOverflow_Reject,
             ),
@@ -503,7 +500,7 @@ pub const prototype = struct {
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_to_plain_date(
                 plain_year_month.fields.inner,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = partial } },
+                temporal_rs.toPartialDateOption(partial),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
@@ -624,7 +621,7 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainYearMonth_with(
                 plain_year_month.fields.inner,
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainYearMonth_destroy(temporal_rs_plain_year_month.?);
@@ -715,7 +712,7 @@ pub fn toTemporalPlainYearMonth(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_from_partial(
                 partial,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = overflow } },
+                temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         );
     } else blk: {
