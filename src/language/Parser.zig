@@ -25,6 +25,7 @@ allocator: std.mem.Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
+    in_async_arrow_function_expression: bool = false,
     in_async_function_body: bool = false,
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
@@ -3812,7 +3813,10 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
 }
 
 pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
-    if (!self.state.in_async_function_body and !(self.state.in_module and !self.state.in_function_body)) {
+    if (!(self.state.in_async_function_body or
+        self.state.in_async_arrow_function_expression or
+        (self.state.in_module and !self.state.in_function_body)))
+    {
         return error.UnexpectedToken;
     }
 
@@ -3872,6 +3876,8 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
+        const tmp = temporaryChange(&self.state.in_async_arrow_function_expression, true);
+        defer tmp.restore();
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
