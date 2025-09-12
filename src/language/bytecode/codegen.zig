@@ -282,6 +282,9 @@ fn bindingInitialization(
     // NOTE: RHS value is the result value
     // NOTE: Nothing about this is spec compliant but it works for the majority of cases :^)
     const strict = ctx.contained_in_strict_mode_code;
+    // Codegen as property lookups coerces to objects implicitly but we need to ensure that
+    // destructuring null or undefined with an empty binding pattern still throws.
+    try executable.addInstruction(.to_object, {});
     switch (node) {
         .object_binding_pattern => |object_binding_pattern| {
             for (object_binding_pattern.properties) |element| switch (element) {
