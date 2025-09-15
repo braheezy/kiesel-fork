@@ -192,14 +192,19 @@ pub fn canonicalizeCalendar(
     // 3. Return CanonicalizeUValue("ca", id).
     const calendar_utf8 = try id.toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(calendar_utf8);
-    const temporal_rs_calendar = try temporal_rs.extractResult(
-        agent,
-        temporal_rs.c.temporal_rs_Calendar_from_utf8(
+    _ = std.ascii.lowerString(calendar_utf8, calendar_utf8);
+    const calendar = temporal_rs.fromOption(
+        temporal_rs.c.temporal_rs_AnyCalendarKind_get_for_str(
             temporal_rs.toDiplomatStringView(calendar_utf8),
         ),
-    );
-    defer temporal_rs.c.temporal_rs_Calendar_destroy(temporal_rs_calendar);
-    return temporal_rs.c.temporal_rs_Calendar_kind(temporal_rs_calendar);
+    ) orelse {
+        return agent.throwException(
+            .range_error,
+            "Invalid calendar '{f}'",
+            .{id.fmtUnquoted()},
+        );
+    };
+    return calendar;
 }
 
 /// 12.2.1 ParseMonthCode ( argument )
@@ -517,7 +522,16 @@ pub fn toTemporalCalendarIdentifier(
 
     // 3. Let identifier be ? ParseTemporalCalendarString(temporalCalendarLike).
     // 4. Return ? CanonicalizeCalendar(identifier).
-    return canonicalizeCalendar(agent, temporal_calendar_like.asString());
+    const calendar_utf8 = try temporal_calendar_like.asString().toUtf8(agent.gc_allocator);
+    defer agent.gc_allocator.free(calendar_utf8);
+    const calendar = temporal_rs.fromOption(
+        temporal_rs.c.temporal_rs_AnyCalendarKind_parse_temporal_calendar_string(
+            temporal_rs.toDiplomatStringView(calendar_utf8),
+        ),
+    ) orelse {
+        return agent.throwException(.range_error, "Invalid calendar string", .{});
+    };
+    return calendar;
 }
 
 /// 12.2.9 GetTemporalCalendarIdentifierWithISODefault ( item )

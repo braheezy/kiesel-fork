@@ -9,6 +9,7 @@ pub const c = @cImport({
     if (!build_options.enable_temporal) {
         @compileError("temporal not enabled");
     }
+    @cInclude("AnyCalendarKind.h");
     @cInclude("Calendar.h");
     @cInclude("Duration.h");
     @cInclude("ErrorKind.h");
