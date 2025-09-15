@@ -183,7 +183,7 @@ pub const constructor = struct {
         if (maybe_calendar) |calendar| {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            var value = try calendar.toUtf8(agent.gc_allocator);
+            var value: []const u8 = try calendar.toUtf8(agent.gc_allocator);
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {
@@ -211,7 +211,7 @@ pub const constructor = struct {
         if (maybe_collation) |collation| {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            var value = try collation.toUtf8(agent.gc_allocator);
+            var value: []const u8 = try collation.toUtf8(agent.gc_allocator);
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {
@@ -288,7 +288,7 @@ pub const constructor = struct {
         if (maybe_numbering_system) |numbering_system| {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
-            var value = try numbering_system.toUtf8(agent.gc_allocator);
+            var value: []const u8 = try numbering_system.toUtf8(agent.gc_allocator);
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {

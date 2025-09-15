@@ -163,7 +163,7 @@ pub fn length(self: *const String) usize {
     };
 }
 
-pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
+pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
     return switch (self.slice) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
@@ -174,7 +174,7 @@ pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocat
     };
 }
 
-pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u16 {
+pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u16 {
     return switch (self.slice) {
         .ascii => |ascii| blk: {
             const utf16 = try allocator.alloc(u16, ascii.len);
