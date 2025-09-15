@@ -204,7 +204,7 @@ pub const prototype = struct {
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[Day]]).
-        return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(plain_month_day.fields.inner));
+        return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_day(plain_month_day.fields.inner));
     }
 
     /// 10.3.7 Temporal.PlainMonthDay.prototype.equals ( other )
