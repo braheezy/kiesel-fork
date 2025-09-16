@@ -821,12 +821,9 @@ pub const prototype = struct {
         const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
 
         // 4. Return ! CreateTemporalDate(plainDate.[[ISODate]], calendar).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDate_with_calendar(
-                plain_date.fields.inner,
-                calendar,
-            ),
+        const temporal_rs_plain_date = temporal_rs.c.temporal_rs_PlainDate_with_calendar(
+            plain_date.fields.inner,
+            calendar,
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         const new_plain_date = createTemporalDate(
@@ -957,11 +954,8 @@ pub fn toTemporalPlainDate(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iii. Return ! CreateTemporalDate(item.[[ISODateTime]].[[ISODate]], item.[[Calendar]]).
-            break :blk try temporal_rs.extractResult(
-                agent,
-                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
-                    plain_date_time.fields.inner,
-                ),
+            break :blk temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
+                plain_date_time.fields.inner,
             );
         }
 

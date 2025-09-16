@@ -806,7 +806,7 @@ dependencies = [
 [[package]]
 name = "temporal_capi"
 version = "0.0.16"
-source = "git+https://github.com/boa-dev/temporal.git?rev=4b9c5f9b249ebab5ee083f518c91d7668351d177#4b9c5f9b249ebab5ee083f518c91d7668351d177"
+source = "git+https://github.com/boa-dev/temporal.git?rev=f80164a493f5a2840e5a7e6280a8b20590bcdf1c#f80164a493f5a2840e5a7e6280a8b20590bcdf1c"
 dependencies = [
  "diplomat",
  "diplomat-runtime",
@@ -821,7 +821,7 @@ dependencies = [
 [[package]]
 name = "temporal_rs"
 version = "0.0.16"
-source = "git+https://github.com/boa-dev/temporal.git?rev=4b9c5f9b249ebab5ee083f518c91d7668351d177#4b9c5f9b249ebab5ee083f518c91d7668351d177"
+source = "git+https://github.com/boa-dev/temporal.git?rev=f80164a493f5a2840e5a7e6280a8b20590bcdf1c#f80164a493f5a2840e5a7e6280a8b20590bcdf1c"
 dependencies = [
  "core_maths",
  "icu_calendar 2.0.5",
@@ -836,7 +836,7 @@ dependencies = [
 [[package]]
 name = "timezone_provider"
 version = "0.0.16"
-source = "git+https://github.com/boa-dev/temporal.git?rev=4b9c5f9b249ebab5ee083f518c91d7668351d177#4b9c5f9b249ebab5ee083f518c91d7668351d177"
+source = "git+https://github.com/boa-dev/temporal.git?rev=f80164a493f5a2840e5a7e6280a8b20590bcdf1c#f80164a493f5a2840e5a7e6280a8b20590bcdf1c"
 dependencies = [
  "combine",
  "jiff-tzdb",

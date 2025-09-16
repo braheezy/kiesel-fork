@@ -141,16 +141,13 @@ pub const namespace = struct {
 pub fn toTemporalTimeZoneIdentifier(
     agent: *Agent,
     temporal_time_zone_like: Value,
-) Agent.Error!*temporal_rs.c.TimeZone {
+) Agent.Error!temporal_rs.c.TimeZone {
     // 1. If temporalTimeZoneLike is an Object, then
     if (temporal_time_zone_like.isObject()) {
         // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
         if (temporal_time_zone_like.asObject().cast(ZonedDateTime)) |zoned_date_time_| {
             // i. Return temporalTimeZoneLike.[[TimeZone]].
-            const temporal_rs_time_zone = temporal_rs.c.temporal_rs_TimeZone_clone(
-                temporal_rs.c.temporal_rs_ZonedDateTime_timezone(zoned_date_time_.fields.inner),
-            );
-            return temporal_rs_time_zone.?;
+            return temporal_rs.c.temporal_rs_ZonedDateTime_timezone(zoned_date_time_.fields.inner);
         }
     }
 
@@ -172,13 +169,12 @@ pub fn toTemporalTimeZoneIdentifier(
     // 9. Return timeZoneIdentifierRecord.[[Identifier]].
     const time_zone = try temporal_time_zone_like.asString().toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(time_zone);
-    const temporal_rs_time_zone = try temporal_rs.extractResult(
+    return temporal_rs.extractResult(
         agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_str(
             temporal_rs.toDiplomatStringView(time_zone),
         ),
     );
-    return temporal_rs_time_zone.?;
 }
 
 /// 12.1.1 CanonicalizeCalendar ( id )
@@ -295,7 +291,7 @@ const PrepareCalendarFieldsResult = struct {
     date: temporal_rs.c.PartialDate,
     time: temporal_rs.c.PartialTime,
     offset: temporal_rs.c.OptionStringView,
-    timezone: ?*temporal_rs.c.TimeZone,
+    timezone: temporal_rs.c.TimeZone_option,
 };
 
 /// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
@@ -334,27 +330,24 @@ pub fn prepareCalendarFields(
     // 6. Let result be a Calendar Fields Record with all fields equal to unset.
     var result: PrepareCalendarFieldsResult = .{
         .date = .{
-            .year = .{ .is_ok = false },
-            .month = .{ .is_ok = false },
+            .year = temporal_rs.toOption(temporal_rs.c.OptionI32, null),
+            .month = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
             .month_code = .{ .data = null },
-            .day = .{ .is_ok = false },
+            .day = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
             .era = .{ .data = null },
-            .era_year = .{ .is_ok = false },
+            .era_year = temporal_rs.toOption(temporal_rs.c.OptionI32, null),
             .calendar = calendar,
         },
         .time = .{
-            .hour = .{ .is_ok = false },
-            .minute = .{ .is_ok = false },
-            .second = .{ .is_ok = false },
-            .millisecond = .{ .is_ok = false },
-            .microsecond = .{ .is_ok = false },
-            .nanosecond = .{ .is_ok = false },
+            .hour = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
+            .minute = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
+            .second = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
+            .millisecond = temporal_rs.toOption(temporal_rs.c.OptionU16, null),
+            .microsecond = temporal_rs.toOption(temporal_rs.c.OptionU16, null),
+            .nanosecond = temporal_rs.toOption(temporal_rs.c.OptionU16, null),
         },
-        .offset = .{ .is_ok = false },
-        .timezone = null,
-    };
-    errdefer if (result.timezone) |temporal_rs_time_zone| {
-        temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone);
+        .offset = temporal_rs.toOption(temporal_rs.c.OptionStringView, null),
+        .timezone = temporal_rs.toTimeZoneOption(null),
     };
 
     // 7. Let any be false.
@@ -424,13 +417,15 @@ pub fn prepareCalendarFields(
                     },
                     .offset => {
                         const offset = try toOffsetString(agent, value);
-                        result.offset = .{
-                            .is_ok = true,
-                            .unnamed_0 = .{ .ok = temporal_rs.toDiplomatStringView(offset) },
-                        };
+                        result.offset = temporal_rs.toOption(
+                            temporal_rs.c.OptionStringView,
+                            temporal_rs.toDiplomatStringView(offset),
+                        );
                     },
                     .time_zone => {
-                        result.timezone = try toTemporalTimeZoneIdentifier(agent, value);
+                        result.timezone = temporal_rs.toTimeZoneOption(
+                            try toTemporalTimeZoneIdentifier(agent, value),
+                        );
                     },
                     else => {
                         const result_field_name, const conversion, const T = switch (field_name) {
@@ -831,7 +826,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
     if (digits_value.isUndefined()) {
         return .{
             .is_minute = false,
-            .precision = .{ .is_ok = false },
+            .precision = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
         };
     }
 
@@ -849,7 +844,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
         // b. Return auto.
         return .{
             .is_minute = false,
-            .precision = .{ .is_ok = false },
+            .precision = temporal_rs.toOption(temporal_rs.c.OptionU8, null),
         };
     }
 
@@ -877,10 +872,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
     // 7. Return digitCount.
     return .{
         .is_minute = false,
-        .precision = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = @intFromFloat(digit_count) },
-        },
+        .precision = temporal_rs.toOption(temporal_rs.c.OptionU8, @intFromFloat(digit_count)),
     };
 }
 
@@ -1056,11 +1048,8 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // c. If value has an [[InitializedTemporalDateTime]] internal slot, then
         if (value.asObject().cast(builtins.temporal.PlainDateTime)) |plain_date_time_| {
             // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]], value.[[Calendar]]).
-            const temporal_rs_plain_date = try temporal_rs.extractResult(
-                agent,
-                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
-                    plain_date_time_.fields.inner,
-                ),
+            const temporal_rs_plain_date = temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
+                plain_date_time_.fields.inner,
             );
 
             // ii. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
@@ -1161,13 +1150,13 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     };
 
     // 7. If timeZone is unset, then
-    if (partial.timezone == null) {
+    if (!partial.timezone.is_ok) {
         // a. Let plainDate be ? CreateTemporalDate(isoDate, calendar).
         const temporal_rs_plain_date = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
                 partial.date,
-                .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
+                temporal_rs.toArithmeticOverflowOption(temporal_rs.c.ArithmeticOverflow_Constrain),
             ),
         );
 
@@ -1186,9 +1175,9 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         agent,
         temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
             partial,
-            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.ArithmeticOverflow_Constrain } },
-            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.Disambiguation_Compatible } },
-            .{ .is_ok = true, .unnamed_0 = .{ .ok = temporal_rs.c.OffsetDisambiguation_Reject } },
+            temporal_rs.toArithmeticOverflowOption(temporal_rs.c.ArithmeticOverflow_Constrain),
+            temporal_rs.toDisambiguationOption(temporal_rs.c.Disambiguation_Compatible),
+            temporal_rs.toOffsetDisambiguationOption(temporal_rs.c.OffsetDisambiguation_Reject),
         ),
     );
 
@@ -1246,13 +1235,12 @@ fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 3. Perform ? ParseDateTimeUTCOffset(offset).
     // 4. Return offset.
     const offset_utf8 = try offset.asString().toUtf8(agent.gc_allocator);
-    const temporal_rs_time_zone = try temporal_rs.extractResult(
+    _ = try temporal_rs.extractResult(
         agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(
             temporal_rs.toDiplomatStringView(offset_utf8),
         ),
     );
-    defer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
     return offset_utf8;
 }
 
@@ -1266,7 +1254,7 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     //    order.
 
     // 2. Let largestUnit be ? GetTemporalUnitValuedOption(options, "largestUnit", unset).
-    const maybe_largest_unit = try getTemporalUnitValuedOption(
+    const largest_unit = try getTemporalUnitValuedOption(
         agent,
         options,
         "largestUnit",
@@ -1284,7 +1272,7 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     );
 
     // 5. Let smallestUnit be ? GetTemporalUnitValuedOption(options, "smallestUnit", unset).
-    const maybe_smallest_unit = try getTemporalUnitValuedOption(
+    const smallest_unit = try getTemporalUnitValuedOption(
         agent,
         options,
         "smallestUnit",
@@ -1314,16 +1302,10 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     // 18. Return the Record { [[SmallestUnit]]: smallestUnit, [[LargestUnit]]: largestUnit,
     //     [[RoundingMode]]: roundingMode, [[RoundingIncrement]]: roundingIncrement,  }.
     return .{
-        .smallest_unit = if (maybe_smallest_unit) |smallest_unit|
-            .{ .is_ok = true, .unnamed_0 = .{ .ok = smallest_unit } }
-        else
-            .{ .is_ok = false },
-        .largest_unit = if (maybe_largest_unit) |largest_unit|
-            .{ .is_ok = true, .unnamed_0 = .{ .ok = largest_unit } }
-        else
-            .{ .is_ok = false },
-        .rounding_mode = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_mode } },
-        .increment = .{ .is_ok = true, .unnamed_0 = .{ .ok = rounding_increment } },
+        .largest_unit = temporal_rs.toUnitOption(largest_unit),
+        .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+        .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
+        .increment = temporal_rs.toOption(temporal_rs.c.OptionU32, rounding_increment),
     };
 }
 

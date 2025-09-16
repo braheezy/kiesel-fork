@@ -1112,10 +1112,10 @@ pub fn toTemporalPartialDuration(
 
     // 11. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
     if (!milliseconds.isUndefined()) {
-        result.milliseconds = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try milliseconds.toIntegerIfIntegral(agent)) },
-        };
+        result.milliseconds = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try milliseconds.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 12. Let minutes be ? Get(temporalDurationLike, "minutes").
@@ -1123,10 +1123,10 @@ pub fn toTemporalPartialDuration(
 
     // 13. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(minutes).
     if (!minutes.isUndefined()) {
-        result.minutes = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try minutes.toIntegerIfIntegral(agent)) },
-        };
+        result.minutes = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try minutes.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 14. Let months be ? Get(temporalDurationLike, "months").
@@ -1134,10 +1134,10 @@ pub fn toTemporalPartialDuration(
 
     // 15. If months is not undefined, set result.[[Months]] to ? ToIntegerIfIntegral(months).
     if (!months.isUndefined()) {
-        result.months = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try months.toIntegerIfIntegral(agent)) },
-        };
+        result.months = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try months.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 16. Let nanoseconds be ? Get(temporalDurationLike, "nanoseconds").
@@ -1145,10 +1145,10 @@ pub fn toTemporalPartialDuration(
 
     // 17. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
     if (!nanoseconds.isUndefined()) {
-        result.nanoseconds = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = try nanoseconds.toIntegerIfIntegral(agent) },
-        };
+        result.nanoseconds = temporal_rs.toOption(
+            temporal_rs.c.OptionF64,
+            try nanoseconds.toIntegerIfIntegral(agent),
+        );
     }
 
     // 18. Let seconds be ? Get(temporalDurationLike, "seconds").
@@ -1156,10 +1156,10 @@ pub fn toTemporalPartialDuration(
 
     // 19. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(seconds).
     if (!seconds.isUndefined()) {
-        result.seconds = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try seconds.toIntegerIfIntegral(agent)) },
-        };
+        result.seconds = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try seconds.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 20. Let weeks be ? Get(temporalDurationLike, "weeks").
@@ -1167,10 +1167,10 @@ pub fn toTemporalPartialDuration(
 
     // 21. If weeks is not undefined, set result.[[Weeks]] to ? ToIntegerIfIntegral(weeks).
     if (!weeks.isUndefined()) {
-        result.weeks = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try weeks.toIntegerIfIntegral(agent)) },
-        };
+        result.weeks = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try weeks.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 22. Let years be ? Get(temporalDurationLike, "years").
@@ -1178,10 +1178,10 @@ pub fn toTemporalPartialDuration(
 
     // 23. If years is not undefined, set result.[[Years]] to ? ToIntegerIfIntegral(years).
     if (!years.isUndefined()) {
-        result.years = .{
-            .is_ok = true,
-            .unnamed_0 = .{ .ok = std.math.lossyCast(i64, try years.toIntegerIfIntegral(agent)) },
-        };
+        result.years = temporal_rs.toOption(
+            temporal_rs.c.OptionI64,
+            std.math.lossyCast(i64, try years.toIntegerIfIntegral(agent)),
+        );
     }
 
     // 24. If years is undefined, and months is undefined, and weeks is undefined, and days is

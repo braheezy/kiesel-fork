@@ -125,15 +125,14 @@ pub const constructor = struct {
         //     c. Set timeZone to identifierRecord.[[Identifier]].
         // 7. Else,
         //     a. Set timeZone to FormatOffsetTimeZoneIdentifier(timeZoneParse.[[OffsetMinutes]]).
-        const time_zone = try time_zone_value.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(time_zone);
-        const temporal_rs_time_zone = try temporal_rs.extractResult(
+        const time_zone_utf8 = try time_zone_value.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(time_zone_utf8);
+        const time_zone = try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
-                temporal_rs.toDiplomatStringView(time_zone),
+                temporal_rs.toDiplomatStringView(time_zone_utf8),
             ),
         );
-        errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(temporal_rs_time_zone.?);
 
         // 8. If calendar is undefined, set calendar to "iso8601".
         if (calendar_value.isUndefined()) calendar_value = Value.from("iso8601");
@@ -152,7 +151,7 @@ pub const constructor = struct {
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 epoch_nanoseconds,
                 calendar,
-                temporal_rs_time_zone,
+                time_zone,
             ),
         );
         errdefer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(temporal_rs_zoned_date_time.?);
@@ -940,11 +939,11 @@ pub const prototype = struct {
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return zonedDateTime.[[TimeZone]].
-        const temporal_rs_time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
+        const time_zone = temporal_rs.c.temporal_rs_ZonedDateTime_timezone(
             zoned_date_time.fields.inner,
         );
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.c.temporal_rs_TimeZone_identifier(temporal_rs_time_zone.?, &write.inner);
+        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 

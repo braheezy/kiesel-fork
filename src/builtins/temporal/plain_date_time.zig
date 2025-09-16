@@ -796,9 +796,8 @@ pub const prototype = struct {
 
         // 3. Return ! CreateTemporalDate(plainDateTime.[[ISODateTime]].[[ISODate]],
         //    plainDateTime.[[Calendar]]).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(plain_date_time.fields.inner),
+        const temporal_rs_plain_date = temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
+            plain_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         const plain_date = createTemporalDate(
@@ -817,9 +816,8 @@ pub const prototype = struct {
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
         // 3. Return ! CreateTemporalTime(plainDateTime.[[ISODateTime]].[[Time]]).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(plain_date_time.fields.inner),
+        const temporal_rs_plain_time = temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
+            plain_date_time.fields.inner,
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         const plain_time = createTemporalTime(
@@ -1090,12 +1088,9 @@ pub const prototype = struct {
         const calendar = try toTemporalCalendarIdentifier(agent, calendar_like);
 
         // 4. Return ! CreateTemporalDateTime(plainDateTime.[[ISODateTime]], calendar).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
-            agent,
-            temporal_rs.c.temporal_rs_PlainDateTime_with_calendar(
-                plain_date_time.fields.inner,
-                calendar,
-            ),
+        const temporal_rs_plain_date_time = temporal_rs.c.temporal_rs_PlainDateTime_with_calendar(
+            plain_date_time.fields.inner,
+            calendar,
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         const new_plain_date_time = createTemporalDateTime(

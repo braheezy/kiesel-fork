@@ -375,9 +375,12 @@ pub const prototype = struct {
             agent,
             temporal_rs.c.temporal_rs_PlainTime_round(
                 plain_time.fields.inner,
-                smallest_unit.?,
-                temporal_rs.toOption(temporal_rs.c.OptionF64, @floatFromInt(rounding_increment)),
-                temporal_rs.toRoundingModeOption(rounding_mode),
+                .{
+                    .largest_unit = temporal_rs.toUnitOption(null),
+                    .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
+                    .rounding_mode = temporal_rs.toRoundingModeOption(rounding_mode),
+                    .increment = temporal_rs.toOption(temporal_rs.c.OptionU32, rounding_increment),
+                },
             ),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
@@ -731,11 +734,8 @@ pub fn toTemporalPlainTime(
             _ = try getTemporalOverflowOption(agent, options);
 
             // iii. Return ! CreateTemporalTime(item.[[ISODateTime]].[[Time]]).
-            break :blk try temporal_rs.extractResult(
-                agent,
-                temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
-                    plain_date_time.fields.inner,
-                ),
+            break :blk temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
+                plain_date_time.fields.inner,
             );
         }
 

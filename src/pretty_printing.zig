@@ -1002,9 +1002,9 @@ fn prettyPrintTemporalPlainDate(
 ) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
-    const iso_year = temporal_rs.c.temporal_rs_PlainDate_iso_year(temporal_plain_date.fields.inner);
-    const iso_month = temporal_rs.c.temporal_rs_PlainDate_iso_month(temporal_plain_date.fields.inner);
-    const iso_day = temporal_rs.c.temporal_rs_PlainDate_iso_day(temporal_plain_date.fields.inner);
+    const year = temporal_rs.c.temporal_rs_PlainDate_year(temporal_plain_date.fields.inner);
+    const month = temporal_rs.c.temporal_rs_PlainDate_month(temporal_plain_date.fields.inner);
+    const day = temporal_rs.c.temporal_rs_PlainDate_day(temporal_plain_date.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(temporal_plain_date.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
@@ -1012,9 +1012,9 @@ fn prettyPrintTemporalPlainDate(
     try writer.writeAll("Temporal.PlainDate(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}, {f}, {f}, {f}", .{
-        Value.from(iso_year).fmtPretty(),
-        Value.from(iso_month).fmtPretty(),
-        Value.from(iso_day).fmtPretty(),
+        Value.from(year).fmtPretty(),
+        Value.from(month).fmtPretty(),
+        Value.from(day).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
@@ -1028,9 +1028,9 @@ fn prettyPrintTemporalPlainDateTime(
 ) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
-    const iso_year = temporal_rs.c.temporal_rs_PlainDateTime_iso_year(temporal_plain_date_time.fields.inner);
-    const iso_month = temporal_rs.c.temporal_rs_PlainDateTime_iso_month(temporal_plain_date_time.fields.inner);
-    const iso_day = temporal_rs.c.temporal_rs_PlainDateTime_iso_day(temporal_plain_date_time.fields.inner);
+    const year = temporal_rs.c.temporal_rs_PlainDateTime_year(temporal_plain_date_time.fields.inner);
+    const month = temporal_rs.c.temporal_rs_PlainDateTime_month(temporal_plain_date_time.fields.inner);
+    const day = temporal_rs.c.temporal_rs_PlainDateTime_day(temporal_plain_date_time.fields.inner);
     const hour = temporal_rs.c.temporal_rs_PlainDateTime_hour(temporal_plain_date_time.fields.inner);
     const minute = temporal_rs.c.temporal_rs_PlainDateTime_minute(temporal_plain_date_time.fields.inner);
     const second = temporal_rs.c.temporal_rs_PlainDateTime_second(temporal_plain_date_time.fields.inner);
@@ -1044,9 +1044,9 @@ fn prettyPrintTemporalPlainDateTime(
     try writer.writeAll("Temporal.PlainDateTime(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
-        Value.from(iso_year).fmtPretty(),
-        Value.from(iso_month).fmtPretty(),
-        Value.from(iso_day).fmtPretty(),
+        Value.from(year).fmtPretty(),
+        Value.from(month).fmtPretty(),
+        Value.from(day).fmtPretty(),
         Value.from(hour).fmtPretty(),
         Value.from(minute).fmtPretty(),
         Value.from(second).fmtPretty(),
@@ -1066,8 +1066,10 @@ fn prettyPrintTemporalPlainMonthDay(
 ) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
-    const iso_month = temporal_rs.c.temporal_rs_PlainMonthDay_iso_month(temporal_plain_month_day.fields.inner);
-    const iso_day = temporal_rs.c.temporal_rs_PlainMonthDay_iso_day(temporal_plain_month_day.fields.inner);
+    var write = temporal_rs.DiplomatWrite.init(arena.allocator());
+    temporal_rs.c.temporal_rs_PlainMonthDay_month_code(temporal_plain_month_day.fields.inner, &write.inner);
+    const month_code = write.toOwnedSlice() catch return;
+    const day = temporal_rs.c.temporal_rs_PlainMonthDay_day(temporal_plain_month_day.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainMonthDay_calendar(temporal_plain_month_day.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
@@ -1075,8 +1077,8 @@ fn prettyPrintTemporalPlainMonthDay(
     try writer.writeAll("Temporal.PlainMonthDay(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}, {f}, {f}", .{
-        Value.from(iso_month).fmtPretty(),
-        Value.from(iso_day).fmtPretty(),
+        Value.from(asciiString(month_code)).fmtPretty(),
+        Value.from(day).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
@@ -1119,8 +1121,8 @@ fn prettyPrintTemporalPlainYearMonth(
 ) PrettyPrintError!void {
     const tty_config = state.tty_config;
 
-    const iso_year = temporal_rs.c.temporal_rs_PlainYearMonth_iso_year(temporal_plain_year_month.fields.inner);
-    const iso_month = temporal_rs.c.temporal_rs_PlainYearMonth_iso_month(temporal_plain_year_month.fields.inner);
+    const year = temporal_rs.c.temporal_rs_PlainYearMonth_year(temporal_plain_year_month.fields.inner);
+    const month = temporal_rs.c.temporal_rs_PlainYearMonth_month(temporal_plain_year_month.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainYearMonth_calendar(temporal_plain_year_month.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
@@ -1128,8 +1130,8 @@ fn prettyPrintTemporalPlainYearMonth(
     try writer.writeAll("Temporal.PlainYearMonth(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}, {f}, {f}", .{
-        Value.from(iso_year).fmtPretty(),
-        Value.from(iso_month).fmtPretty(),
+        Value.from(year).fmtPretty(),
+        Value.from(month).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);

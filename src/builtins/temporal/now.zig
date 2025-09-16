@@ -212,7 +212,7 @@ pub fn systemUTCEpochNanoseconds(agent: *Agent) temporal_rs.c.I128Nanoseconds {
 pub fn systemDateTime(
     agent: *Agent,
     temporal_time_zone_like: Value,
-) Agent.Error!struct { *const temporal_rs.c.TimeZone, temporal_rs.c.I128Nanoseconds } {
+) Agent.Error!struct { temporal_rs.c.TimeZone, temporal_rs.c.I128Nanoseconds } {
     // 1. If temporalTimeZoneLike is undefined, then
     const time_zone = if (temporal_time_zone_like.isUndefined()) blk: {
         // a. Let timeZone be SystemTimeZoneIdentifier().
@@ -230,12 +230,11 @@ pub fn systemDateTime(
     return .{ time_zone, epoch_ns };
 }
 
-fn systemTimeZoneIdentifier() *temporal_rs.c.TimeZone {
+fn systemTimeZoneIdentifier() temporal_rs.c.TimeZone {
     const identifier_str = builtins.systemTimeZoneIdentifier();
-    const temporal_rs_time_zone = temporal_rs.success(
+    return temporal_rs.success(
         temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
             temporal_rs.toDiplomatStringView(identifier_str),
         ),
     ).?;
-    return temporal_rs_time_zone.?;
 }

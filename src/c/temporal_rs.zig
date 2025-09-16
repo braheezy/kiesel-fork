@@ -30,9 +30,9 @@ pub const c = @cImport({
 });
 
 pub const to_string_rounding_options_auto: c.ToStringRoundingOptions = .{
-    .precision = .{ .is_minute = false, .precision = .{ .is_ok = false } },
-    .smallest_unit = .{ .is_ok = false },
-    .rounding_mode = .{ .is_ok = false },
+    .precision = .{ .is_minute = false, .precision = toOption(c.OptionU8, null) },
+    .smallest_unit = toUnitOption(null),
+    .rounding_mode = toRoundingModeOption(null),
 };
 
 const u64_high_bit_mask: u64 = 1 << 63;
@@ -110,6 +110,11 @@ pub fn toPartialDateOption(maybe_value: ?c.PartialDate) c.PartialDate_option {
 /// Convert a Zig `?RoundingMode` to a Rust `Option<RoundingMode>`.
 pub fn toRoundingModeOption(maybe_value: ?c.RoundingMode) c.RoundingMode_option {
     return toOption(c.RoundingMode_option, maybe_value);
+}
+
+/// Convert a Zig `?TimeZone` to a Rust `Option<TimeZone>`.
+pub fn toTimeZoneOption(maybe_value: ?c.TimeZone) c.TimeZone_option {
+    return toOption(c.TimeZone_option, maybe_value);
 }
 
 /// Convert a Zig `?Unit` to a Rust `Option<Unit>`.

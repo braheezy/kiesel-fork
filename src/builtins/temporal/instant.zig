@@ -453,7 +453,7 @@ pub const prototype = struct {
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
-                null,
+                temporal_rs.toTimeZoneOption(null),
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
@@ -474,7 +474,7 @@ pub const prototype = struct {
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
-                null,
+                temporal_rs.toTimeZoneOption(null),
                 temporal_rs.to_string_rounding_options_auto,
                 &write.inner,
             ),
@@ -532,13 +532,12 @@ pub const prototype = struct {
             );
         }
 
-        var maybe_time_zone: ?*temporal_rs.c.TimeZone = null;
-        defer if (maybe_time_zone) |time_zone| temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
+        var time_zone: ?temporal_rs.c.TimeZone = null;
 
         // 11. If timeZone is not undefined, then
         if (!time_zone_value.isUndefined()) {
             // a. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
-            maybe_time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
+            time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
         }
 
         // 12. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
@@ -550,7 +549,7 @@ pub const prototype = struct {
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
-                maybe_time_zone,
+                temporal_rs.toTimeZoneOption(time_zone),
                 .{
                     .precision = precision,
                     .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
@@ -573,7 +572,6 @@ pub const prototype = struct {
 
         // 3. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
         const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
-        errdefer temporal_rs.c.temporal_rs_TimeZone_destroy(time_zone);
 
         // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
         const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
