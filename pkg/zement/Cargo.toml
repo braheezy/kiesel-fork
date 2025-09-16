@@ -7,7 +7,7 @@ edition = "2024"
 # headers for Zig.
 [dependencies.icu_capi]
 git = "https://github.com/unicode-org/icu4x.git"
-rev = "472e602aeac54f1aa5a58e889cb93f075f565498"
+rev = "5e1909f7edd8b3baf4672e1cae88f64261bee716"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 

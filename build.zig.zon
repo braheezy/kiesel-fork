@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#49e79003c54e1fdd0eb184a41c721e83140b5547",
-            .hash = "icu4zig-0.1.0-IT7GrJU9AgCOD64kuNuFV1I0-Puypn28gDJYfHRFq1Pb",
+            .url = "git+https://codeberg.org/linusg/icu4zig#36e078a3987780b45db0a4926ce5b89758ad62c7",
+            .hash = "icu4zig-0.1.0-IT7GrJU9AgC8OHUvUluazcYTTceibFBSKC3dQip-vFJf",
             .lazy = true,
         },
         .kiesel_runtime = .{
