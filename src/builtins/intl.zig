@@ -19,7 +19,6 @@ const Value = types.Value;
 const availableCalendars = abstract_operations.availableCalendars;
 const availableCanonicalNumberingSystems = abstract_operations.availableCanonicalNumberingSystems;
 const availableCanonicalUnits = abstract_operations.availableCanonicalUnits;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -50,6 +49,7 @@ pub const SegmentIterator = segment_iterator.SegmentIterator;
 pub const Segmenter = segmenter.Segmenter;
 pub const Segments = segments.Segments;
 
+pub const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 pub const createSegmentDataObject = segment_iterator.createSegmentDataObject;
 pub const createSegmentIterator = segment_iterator.createSegmentIterator;
 pub const createSegmentsObject = segments.createSegmentsObject;

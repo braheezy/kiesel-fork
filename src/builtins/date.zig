@@ -2179,7 +2179,46 @@ pub const prototype = struct {
         this_value: Value,
         arguments: Arguments,
     ) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleDateStringIntl(agent, this_value, arguments);
+        }
         return toDateString_(agent, this_value, arguments);
+    }
+
+    /// 20.4.2 Date.prototype.toLocaleDateString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-date.prototype.tolocaledatestring
+    fn toLocaleDateStringIntl(
+        agent: *Agent,
+        this_value: Value,
+        arguments: Arguments,
+    ) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let x be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If x is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
+        //    date, date).
+        const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
+            agent,
+            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            locales,
+            options,
+            .date,
+            .date,
+        );
+
+        // 6. Return ! FormatDateTime(dateFormat, x).
+        return builtins.intl.date_time_format.formatDateTime(agent, date_format, time_value);
     }
 
     /// 21.4.4.39 Date.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
@@ -2189,7 +2228,46 @@ pub const prototype = struct {
         this_value: Value,
         arguments: Arguments,
     ) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleStringIntl(agent, this_value, arguments);
+        }
         return toString(agent, this_value, arguments);
+    }
+
+    /// 20.4.1 Date.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-date.prototype.tolocalestring
+    fn toLocaleStringIntl(
+        agent: *Agent,
+        this_value: Value,
+        arguments: Arguments,
+    ) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let x be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If x is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
+        //    any, all).
+        const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
+            agent,
+            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            locales,
+            options,
+            .any,
+            .all,
+        );
+
+        // 6. Return ! FormatDateTime(dateFormat, x).
+        return builtins.intl.date_time_format.formatDateTime(agent, date_format, time_value);
     }
 
     /// 21.4.4.40 Date.prototype.toLocaleTimeString ( [ reserved1 [ , reserved2 ] ] )
@@ -2199,7 +2277,46 @@ pub const prototype = struct {
         this_value: Value,
         arguments: Arguments,
     ) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleTimeStringIntl(agent, this_value, arguments);
+        }
         return toTimeString(agent, this_value, arguments);
+    }
+
+    /// 20.4.3 Date.prototype.toLocaleTimeString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-date.prototype.tolocaletimestring
+    fn toLocaleTimeStringIntl(
+        agent: *Agent,
+        this_value: Value,
+        arguments: Arguments,
+    ) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let x be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If x is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
+        //    time, time).
+        const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
+            agent,
+            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            locales,
+            options,
+            .time,
+            .time,
+        );
+
+        // 6. Return ! FormatDateTime(dateFormat, x).
+        return builtins.intl.date_time_format.formatDateTime(agent, date_format, time_value);
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )

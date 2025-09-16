@@ -3,9 +3,6 @@
 
 const std = @import("std");
 
-const icu4zig = @import("icu4zig");
-
-const build_options = @import("build-options");
 const execution = @import("../../execution.zig");
 const language = @import("../../language.zig");
 
@@ -446,7 +443,7 @@ pub fn codeUnitAt(self: *const String, index: usize) u16 {
     };
 }
 
-pub fn toLowerCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
+pub fn toLowerCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
     switch (self.slice) {
         .ascii => |ascii| {
@@ -457,18 +454,6 @@ pub fn toLowerCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*
             return fromAscii(agent, output);
         },
         .utf16 => |utf16| {
-            if (build_options.enable_intl) {
-                // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
-                //       handled correctly here.
-                const utf8 = try self.toUtf8(agent.gc_allocator);
-                defer agent.gc_allocator.free(utf8);
-                const case_mapper = icu4zig.CaseMapper.init();
-                defer case_mapper.deinit();
-                const locale = icu4zig.Locale.unknown();
-                defer locale.deinit();
-                const utf8_lowercase = try case_mapper.lowercase(agent.gc_allocator, utf8, locale);
-                return fromUtf8(agent, utf8_lowercase);
-            }
             const output = try agent.gc_allocator.alloc(u16, utf16.len);
             for (utf16, 0..) |c, i| {
                 output[i] = if (c < 128) std.ascii.toLower(@intCast(c)) else c;
@@ -478,7 +463,7 @@ pub fn toLowerCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*
     }
 }
 
-pub fn toUpperCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
+pub fn toUpperCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
     switch (self.slice) {
         .ascii => |ascii| {
@@ -489,18 +474,6 @@ pub fn toUpperCase(self: *const String, agent: *Agent) std.mem.Allocator.Error!*
             return fromAscii(agent, output);
         },
         .utf16 => |utf16| {
-            if (build_options.enable_intl) {
-                // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
-                //       handled correctly here.
-                const utf8 = try self.toUtf8(agent.gc_allocator);
-                defer agent.gc_allocator.free(utf8);
-                const case_mapper = icu4zig.CaseMapper.init();
-                defer case_mapper.deinit();
-                const locale = icu4zig.Locale.unknown();
-                defer locale.deinit();
-                const utf8_uppercase = try case_mapper.uppercase(agent.gc_allocator, utf8, locale);
-                return fromUtf8(agent, utf8_uppercase);
-            }
             const output = try agent.gc_allocator.alloc(u16, utf16.len);
             for (utf16, 0..) |c, i| {
                 output[i] = if (c < 128) std.ascii.toUpper(@intCast(c)) else c;

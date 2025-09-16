@@ -4,6 +4,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const ordinary = @import("ordinary.zig");
@@ -3067,7 +3068,11 @@ pub const prototype = struct {
 
     /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleStringIntl(agent, this_value, arguments);
+        }
+
         // 1. Let array be ? ToObject(this value).
         const array = try this_value.toObject(agent);
 
@@ -3105,6 +3110,62 @@ pub const prototype = struct {
                     agent,
                     PropertyKey.from("toLocaleString"),
                     &.{},
+                )).toString(agent);
+
+                // ii. Set R to the string-concatenation of R and S.
+                result.appendStringAssumeCapacity(string);
+            }
+
+            // d. Set k to k + 1.
+        }
+
+        // 7. Return R.
+        return Value.from(try result.build(agent));
+    }
+
+    /// 20.5.1 Array.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-array.prototype.tolocalestring
+    fn toLocaleStringIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let array be ? ToObject(this value).
+        const array = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(array).
+        const len = try array.lengthOfArrayLike(agent);
+
+        // OPTIMIZATION: If the array is empty the result will be an empty string
+        if (len == 0) return Value.from(String.empty);
+
+        // 3. Let separator be the implementation-defined list-separator String value appropriate
+        //    for the host environment's current locale (such as ", ").
+        const separator = String.fromLiteral(", ");
+
+        // 4. Let R be the empty String.
+        // NOTE: This allocates the maximum needed capacity upfront
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
+        defer result.deinit(agent.gc_allocator);
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. If k > 0, set R to the string-concatenation of R and separator.
+            if (k > 0) result.appendStringAssumeCapacity(separator);
+
+            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
+            const element = try array.get(agent, PropertyKey.from(k));
+
+            // c. If element is neither undefined nor null, then
+            if (!element.isUndefined() and !element.isNull()) {
+                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales, options »)).
+                const string = try (try element.invoke(
+                    agent,
+                    PropertyKey.from("toLocaleString"),
+                    &.{ locales, options },
                 )).toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.

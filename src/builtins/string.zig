@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const icu4zig = @import("icu4zig");
+
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -1158,6 +1160,10 @@ pub const prototype = struct {
     /// 22.1.3.12 String.prototype.localeCompare ( that [ , reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.localecompare
     fn localeCompare(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return localeCompareIntl(agent, this_value, arguments);
+        }
+
         const that = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -1190,6 +1196,42 @@ pub const prototype = struct {
             .gt => Value.from(1),
             .eq => Value.from(0),
         };
+    }
+
+    /// 20.1.1 String.prototype.localeCompare ( that [ , locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-String.prototype.localeCompare
+    fn localeCompareIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const that = arguments.get(0);
+        const locales = arguments.get(1);
+        const options = arguments.get(2);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = this_value;
+        try object.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let thatValue be ? ToString(that).
+        const that_value = try that.toString(agent);
+
+        const realm = agent.currentRealm();
+
+        // 4. Let collator be ? Construct(%Intl.Collator%, « locales, options »).
+        const collator_constructor = try realm.intrinsics.@"%Intl.Collator%"();
+        const collator = try collator_constructor.construct(
+            agent,
+            &.{ locales, options },
+            null,
+        );
+
+        // 5. Return CompareStrings(collator, S, thatValue).
+        return builtins.intl.collator.compareStrings(
+            agent.gc_allocator,
+            collator.as(builtins.intl.Collator),
+            string,
+            that_value,
+        );
     }
 
     /// 22.1.3.13 String.prototype.match ( regexp )
@@ -2015,22 +2057,102 @@ pub const prototype = struct {
 
     /// 22.1.3.26 String.prototype.toLocaleLowerCase ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolocalelowercase
-    fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn toLocaleLowerCase(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleLowerCaseIntl(agent, this_value, arguments);
+        }
+        return toLowerCase(agent, this_value, arguments);
+    }
+
+    /// 20.1.2 String.prototype.toLocaleLowerCase ( [ locales ] )
+    /// https://tc39.es/ecma402/#sup-string.prototype.tolocalelowercase
+    fn toLocaleLowerCaseIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const locales = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
         const object = this_value;
         try object.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
         const string = try object.toString(agent);
-        const lower = try string.toLowerCase(agent);
-        return Value.from(lower);
+
+        // 3. Return ? TransformCase(S, locales, lower).
+        return Value.from(try transformCase(agent, string, locales, .lower));
+    }
+
+    /// 20.1.2.1 TransformCase ( S, locales, targetCase )
+    /// https://tc39.es/ecma402/#sec-transform-case
+    fn transformCase(
+        agent: *Agent,
+        string: *const types.String,
+        locales: Value,
+        target_case: enum { lower, upper },
+    ) Agent.Error!*const types.String {
+        // 1. Let requestedLocales be ? CanonicalizeLocaleList(locales).
+        const requested_locales = try builtins.intl.canonicalizeLocaleList(agent, locales);
+
+        // 2. If requestedLocales is not an empty List, then
+        //     a. Let requestedLocale be requestedLocales[0].
+        // 3. Else,
+        //     a. Let requestedLocale be DefaultLocale().
+        const resolved_locale = if (requested_locales.items.len != 0)
+            requested_locales.items[0]
+        else
+            agent.platform.default_locale;
+
+        // 4. Let availableLocales be an Available Locales List which includes the language tags
+        //    for which the Unicode Character Database contains language-sensitive case mappings.
+        //    If the implementation supports additional locale-sensitive case mappings,
+        //    availableLocales should also include their corresponding language tags.
+        // 5. Let match be LookupMatchingLocaleByPrefix(availableLocales, « requestedLocale »).
+        // 6. If match is not undefined, let locale be match.[[locale]]; else let locale be "und".
+        // 7. Let codePoints be StringToCodePoints(S).
+        // 8. If targetCase is lower, then
+        //     a. Let newCodePoints be a List whose elements are the result of a lowercase
+        //        transformation of codePoints according to an implementation-derived algorithm
+        //        using locale or the Unicode Default Case Conversion algorithm.
+        // 9. Else,
+        //     a. Assert: targetCase is upper.
+        //     b. Let newCodePoints be a List whose elements are the result of an uppercase
+        //        transformation of codePoints according to an implementation-derived algorithm
+        //        using locale or the Unicode Default Case Conversion algorithm.
+        // 10. Return CodePointsToString(newCodePoints).
+        // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
+        //       correctly here.
+        const utf8 = try string.toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(utf8);
+        const case_mapper = icu4zig.CaseMapper.init();
+        defer case_mapper.deinit();
+        const utf8_transformed = switch (target_case) {
+            .lower => try case_mapper.lowercase(agent.gc_allocator, utf8, resolved_locale),
+            .upper => try case_mapper.uppercase(agent.gc_allocator, utf8, resolved_locale),
+        };
+        return types.String.fromUtf8(agent, utf8_transformed);
     }
 
     /// 22.1.3.27 String.prototype.toLocaleUpperCase ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolocaleuppercase
-    fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn toLocaleUpperCase(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleUpperCaseIntl(agent, this_value, arguments);
+        }
+        return toUpperCase(agent, this_value, arguments);
+    }
+
+    /// 20.1.3 String.prototype.toLocaleUpperCase ( [ locales ] )
+    /// https://tc39.es/ecma402/#sup-string.prototype.tolocaleuppercase
+    fn toLocaleUpperCaseIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const locales = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
         const object = this_value;
         try object.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
         const string = try object.toString(agent);
-        const lower = try string.toUpperCase(agent);
-        return Value.from(lower);
+
+        // 3. Return ? TransformCase(S, locales, upper).
+        return Value.from(try transformCase(agent, string, locales, .upper));
     }
 
     /// 22.1.3.28 String.prototype.toLowerCase ( )
@@ -2049,7 +2171,21 @@ pub const prototype = struct {
         // 5. Let lowerText be toLowercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 6. Let L be CodePointsToString(lowerText).
-        const lower = try string.toLowerCase(agent);
+        const lower = if (build_options.enable_intl) blk: {
+            // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
+            //       correctly here.
+            const utf8 = try string.toUtf8(agent.gc_allocator);
+            defer agent.gc_allocator.free(utf8);
+            const case_mapper = icu4zig.CaseMapper.init();
+            defer case_mapper.deinit();
+            const locale = icu4zig.Locale.unknown();
+            defer locale.deinit();
+            const utf8_lowercase = try case_mapper.lowercase(agent.gc_allocator, utf8, locale);
+            break :blk try types.String.fromUtf8(agent, utf8_lowercase);
+        } else blk: {
+            // NOTE: Without Intl enabled we can't do what the spec asks for, fall back to ASCII.
+            break :blk try string.toLowerCaseAscii(agent);
+        };
 
         // 7. Return L.
         return Value.from(lower);
@@ -2080,7 +2216,21 @@ pub const prototype = struct {
         // 5. Let upperText be toUppercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 6. Let U be CodePointsToString(upperText).
-        const upper = try string.toUpperCase(agent);
+        const upper = if (build_options.enable_intl) blk: {
+            // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
+            //       correctly here.
+            const utf8 = try string.toUtf8(agent.gc_allocator);
+            defer agent.gc_allocator.free(utf8);
+            const case_mapper = icu4zig.CaseMapper.init();
+            defer case_mapper.deinit();
+            const locale = icu4zig.Locale.unknown();
+            defer locale.deinit();
+            const utf8_uppercase = try case_mapper.uppercase(agent.gc_allocator, utf8, locale);
+            break :blk try types.String.fromUtf8(agent, utf8_uppercase);
+        } else blk: {
+            // NOTE: Without Intl enabled we can't do what the spec asks for, fall back to ASCII.
+            break :blk try string.toUpperCaseAscii(agent);
+        };
 
         // 7. Return U.
         return Value.from(upper);
