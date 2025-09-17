@@ -2,6 +2,18 @@ const std = @import("std");
 
 const build_crab = @import("build_crab");
 
+/// Helper to determine if a target query is considered "native" for the purpose of Rust
+/// cross-compilation. `std.Target.Query.isNative()` considers the CPU model as well, but since
+/// that's not included when translating to a rust target we should limit the check to arch, OS,
+/// and ABI. This allows building with `-Dcpu=baseline` and no explicit `-Dtarget` without
+/// forcing the use of Rust nightly for `-Zbuild-std`.
+fn targetQueryIsNativeish(query: std.Target.Query) bool {
+    return query.cpu_arch == null and
+        query.os_tag == null and
+        query.abi == null and
+        query.ofmt == null;
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -27,7 +39,7 @@ pub fn build(b: *std.Build) void {
     if (optimize != .Debug) {
         cargo_args.append(b.allocator, "--release") catch @panic("OOM");
     }
-    if (!target.query.isNative()) {
+    if (!targetQueryIsNativeish(target.query)) {
         // Required for cross-compilation, most targets won't be installed.
         // -Z requires nightly so we don't enforce this for native builds.
         cargo_args.appendSlice(b.allocator, &.{ "-Z", "build-std=std,panic_abort" }) catch @panic("OOM");
