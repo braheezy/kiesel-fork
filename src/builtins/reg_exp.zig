@@ -324,7 +324,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
-    const result = if (last_index > length) 0 else libregexp.c.lre_exec(
+    const ret = if (last_index > length) 0 else libregexp.c.lre_exec(
         @ptrCast(captures_list),
         @ptrCast(re_bytecode),
         buf.ptr,
@@ -338,8 +338,15 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         &@"opaque",
     );
 
-    if (result < 0) return error.OutOfMemory;
-    if (result == 0) {
+    if (ret < 0) {
+        const reason = switch (ret) {
+            libregexp.c.LRE_RET_MEMORY_ERROR => "Out of memory",
+            libregexp.c.LRE_RET_TIMEOUT => "Timeout exceeded",
+            else => unreachable,
+        };
+        return agent.throwException(.internal_error, "Failed to execute RegExp: {s}", .{reason});
+    }
+    if (ret == 0) {
         if (last_index > length or (re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) != 0) {
             try reg_exp.object.set(
                 agent,
