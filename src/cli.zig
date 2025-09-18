@@ -653,6 +653,30 @@ fn getHistoryPath(allocator: std.mem.Allocator) GetHistoryPathError![]const u8 {
     return history_path;
 }
 
+fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    var buffer: [8][]const u8 = undefined;
+    var enabled_features: std.ArrayList([]const u8) = .initBuffer(&buffer);
+    if (kiesel.build_options.enable_annex_b) enabled_features.appendAssumeCapacity("annex_b");
+    if (kiesel.build_options.enable_intl) enabled_features.appendAssumeCapacity("intl");
+    if (kiesel.build_options.enable_legacy) enabled_features.appendAssumeCapacity("legacy");
+    if (kiesel.build_options.enable_libgc) enabled_features.appendAssumeCapacity("libgc");
+    if (kiesel.build_options.enable_libregexp) enabled_features.appendAssumeCapacity("libregexp");
+    if (kiesel.build_options.enable_nan_boxing) enabled_features.appendAssumeCapacity("nan_boxing");
+    if (kiesel.build_options.enable_runtime) enabled_features.appendAssumeCapacity("runtime");
+    if (kiesel.build_options.enable_temporal) enabled_features.appendAssumeCapacity("temporal");
+
+    try writer.print("Kiesel {f}\n\n", .{kiesel.version});
+    try writer.print("Zig version        {s}\n", .{builtin.zig_version_string});
+    try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
+    try writer.print("Optimize mode      {t}\n", .{builtin.mode});
+    try writer.writeAll("Enabled features   ");
+    for (enabled_features.items, 0..) |feature, i| {
+        if (i != 0) try writer.writeByte(' ');
+        try writer.writeAll(feature);
+    }
+    try writer.writeByte('\n');
+}
+
 fn printValueDebugInfo(
     writer: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
@@ -884,11 +908,7 @@ pub fn main() !u8 {
     const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
 
     if (parsed_args.options.version) {
-        try stdout.print("kiesel {f}\n", .{kiesel.version});
-        if (kiesel.build_options.enable_libgc) {
-            try stdout.print("libgc {f}\n", .{kiesel.gc.libgc_version});
-        }
-        try stdout.print("zig {f}\n", .{builtin.zig_version});
+        try printVersionInfo(stdout);
         try stdout.flush();
         return 0;
     }
