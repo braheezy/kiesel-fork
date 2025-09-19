@@ -201,7 +201,7 @@ fn getViewValue(
         is_little_endian,
     );
     return if (@"type".isBigIntElementType())
-        Value.from(try BigInt.from(agent.gc_allocator, value))
+        Value.from(try BigInt.fromValue(agent, value))
     else
         Value.from(value);
 }

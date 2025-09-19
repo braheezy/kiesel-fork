@@ -13,25 +13,54 @@ const BigInt = @This();
 
 managed: std.math.big.int.Managed,
 
+pub const zero = fromLiteral(0);
+pub const one = fromLiteral(1);
+
 pub fn format(self: *const BigInt, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try writer.print("{f}n", .{self.managed});
 }
 
-pub fn from(allocator: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!*const BigInt {
-    var managed = switch (@TypeOf(value)) {
-        std.math.big.int.Managed => value,
-        else => try std.math.big.int.Managed.initSet(allocator, value),
+pub fn fromLiteral(comptime value: anytype) *const BigInt {
+    const managed: std.math.big.int.Managed = comptime blk: {
+        var limbs: [std.math.big.int.calcLimbLen(value)]std.math.big.Limb = undefined;
+        var managed = std.math.big.int.Mutable.init(&limbs, value).toManaged(undefined);
+        const limbs_final = limbs;
+        managed.limbs = @constCast(&limbs_final);
+        break :blk managed;
     };
-    errdefer if (@TypeOf(value) != std.math.big.int.Managed) managed.deinit();
-    const self = try allocator.create(BigInt);
-    self.* = .{ .managed = managed };
-    return self;
+    const big_int: *const BigInt = comptime &.{ .managed = managed };
+    return big_int;
 }
 
-/// For tests not using the GC allocator.
-pub fn deinit(self: *const BigInt, allocator: std.mem.Allocator) void {
-    @constCast(self).managed.deinit();
-    allocator.destroy(self);
+pub fn fromManaged(agent: *Agent, managed: std.math.big.int.Managed) std.mem.Allocator.Error!*const BigInt {
+    const big_int = try agent.gc_allocator.create(BigInt);
+    big_int.* = .{ .managed = managed };
+    return big_int;
+}
+
+pub fn fromValue(agent: *Agent, value: anytype) std.mem.Allocator.Error!*const BigInt {
+    var managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, value);
+    errdefer managed.deinit();
+    const big_int = try agent.gc_allocator.create(BigInt);
+    big_int.* = .{ .managed = managed };
+    return big_int;
+}
+
+const FromStringError =
+    std.mem.Allocator.Error ||
+    error{ InvalidBase, InvalidCharacter };
+
+pub fn fromString(
+    agent: *Agent,
+    base: u8,
+    value: []const u8,
+) FromStringError!*const BigInt {
+    var managed = try std.math.big.int.Managed.init(agent.gc_allocator);
+    errdefer managed.deinit();
+    try managed.setString(base, value);
+    const big_int = try agent.gc_allocator.create(BigInt);
+    big_int.* = .{ .managed = managed };
+    return big_int;
 }
 
 pub fn asFloat(self: *const BigInt) f64 {
@@ -47,26 +76,22 @@ pub fn unaryMinus(x: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*cons
     // 2. Return -x.
     var result = try x.managed.clone();
     result.negate();
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.2 BigInt::bitwiseNOT ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseNOT
 pub fn bitwiseNOT(self: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
-    const one = agent.pre_allocated.one;
-
     // 1. Return -x - 1ℤ.
     var result = try self.managed.clone();
     result.negate();
     try result.sub(&result, &one.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.3 BigInt::exponentiate ( base, exponent )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-exponentiate
 pub fn exponentiate(base: *const BigInt, agent: *Agent, exponent: *const BigInt) Agent.Error!*const BigInt {
-    const one = agent.pre_allocated.one;
-
     // 1. If exponent < 0ℤ, throw a RangeError exception.
     if (!exponent.managed.isPositive() and !exponent.managed.eqlZero()) {
         return agent.throwException(.range_error, "Exponent must be positive", .{});
@@ -85,7 +110,7 @@ pub fn exponentiate(base: *const BigInt, agent: *Agent, exponent: *const BigInt)
         try result.mul(&result, &base.managed);
         try exponent_cloned.sub(&exponent_cloned, &one.managed);
     }
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.4 BigInt::multiply ( x, y )
@@ -94,7 +119,7 @@ pub fn multiply(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Alloc
     // 1. Return x × y.
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.mul(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.5 BigInt::divide ( x, y )
@@ -108,7 +133,7 @@ pub fn divide(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!*co
     var quotient = try std.math.big.int.Managed.init(agent.gc_allocator);
     var r = try std.math.big.int.Managed.init(agent.gc_allocator);
     try quotient.divTrunc(&r, &x.managed, &y.managed);
-    return from(agent.gc_allocator, quotient);
+    return fromManaged(agent, quotient);
 }
 
 /// 6.1.6.2.6 BigInt::remainder ( n, d )
@@ -127,7 +152,7 @@ pub fn remainder(n: *const BigInt, agent: *Agent, d: *const BigInt) Agent.Error!
     defer quotient.deinit();
     var r = try std.math.big.int.Managed.init(agent.gc_allocator);
     try quotient.divTrunc(&r, &n.managed, &d.managed);
-    return from(agent.gc_allocator, r);
+    return fromManaged(agent, r);
 }
 
 /// 6.1.6.2.7 BigInt::add ( x, y )
@@ -136,7 +161,7 @@ pub fn add(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.
     // 1. Return x + y.
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.add(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.8 BigInt::subtract ( x, y )
@@ -145,7 +170,7 @@ pub fn subtract(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Alloc
     // 1. Return x - y.
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.sub(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.9 BigInt::leftShift ( x, y )
@@ -163,7 +188,7 @@ pub fn leftShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!
             .{std.math.maxInt(usize)},
         ),
     );
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
@@ -179,7 +204,7 @@ pub fn signedRightShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent
             .{std.math.maxInt(usize)},
         ),
     );
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.11 BigInt::unsignedRightShift ( x, y )
@@ -213,7 +238,7 @@ pub fn bitwiseAND(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
     // 1. Return BigIntBitwiseOp(&, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitAnd(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
@@ -222,7 +247,7 @@ pub fn bitwiseXOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
     // 1. Return BigIntBitwiseOp(^, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitXor(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
@@ -231,7 +256,7 @@ pub fn bitwiseOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allo
     // 1. Return BigIntBitwiseOp(|, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitOr(&x.managed, &y.managed);
-    return from(agent.gc_allocator, result);
+    return fromManaged(agent, result);
 }
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
@@ -252,16 +277,14 @@ pub fn toString(
 }
 
 test format {
-    const test_cases = [_]struct { i64, []const u8 }{
-        .{ 0, "0n" },
-        .{ 123, "123n" },
-        .{ -42, "-42n" },
-        .{ 9223372036854775807, "9223372036854775807n" },
+    const test_cases = [_]struct { *const BigInt, []const u8 }{
+        .{ zero, "0n" },
+        .{ fromLiteral(123), "123n" },
+        .{ fromLiteral(-42), "-42n" },
+        .{ fromLiteral(9223372036854775807), "9223372036854775807n" },
     };
     for (test_cases) |test_case| {
-        const value, const expected = test_case;
-        const big_int = try from(std.testing.allocator, value);
-        defer big_int.deinit(std.testing.allocator);
+        const big_int, const expected = test_case;
         try std.testing.expectFmt(expected, "{f}", .{big_int});
     }
 }

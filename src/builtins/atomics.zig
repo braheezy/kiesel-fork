@@ -194,7 +194,7 @@ fn doWait(
     // 6. If arrayTypeName is "BigInt64Array", let v be ? ToBigInt64(value).
     // 7. Else, let v be ? ToInt32(value).
     const v = if (typed_array.fields.element_type == .bigint64)
-        Value.from(try BigInt.from(agent.gc_allocator, try value.toBigInt64(agent)))
+        Value.from(try BigInt.fromValue(agent, try value.toBigInt64(agent)))
     else
         Value.from(try value.toInt32(agent));
 
@@ -262,7 +262,7 @@ fn doWait(
                 null,
             );
             break :blk if (@"type".isBigIntElementType())
-                Value.from(try BigInt.from(agent.gc_allocator, w))
+                Value.from(try BigInt.fromValue(agent, w))
             else
                 Value.from(w);
         },
@@ -395,7 +395,7 @@ fn atomicReadModifyWrite(
                 op,
             );
             return if (@"type".isBigIntElementType())
-                Value.from(try BigInt.from(agent.gc_allocator, modified_value))
+                Value.from(try BigInt.fromValue(agent, modified_value))
             else
                 Value.from(modified_value);
         },
@@ -573,7 +573,7 @@ pub const namespace = struct {
                     is_little_endian,
                 );
                 return if (@"type".isBigIntElementType())
-                    Value.from(try BigInt.from(agent.gc_allocator, value))
+                    Value.from(try BigInt.fromValue(agent, value))
                 else
                     Value.from(value);
             },
@@ -650,7 +650,7 @@ pub const namespace = struct {
                     null,
                 );
                 return if (@"type".isBigIntElementType())
-                    Value.from(try BigInt.from(agent.gc_allocator, value))
+                    Value.from(try BigInt.fromValue(agent, value))
                 else
                     Value.from(value);
             },

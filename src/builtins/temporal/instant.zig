@@ -280,8 +280,7 @@ pub const prototype = struct {
         const ns = temporal_rs.fromI128Nanoseconds(
             temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(instant.fields.inner),
         );
-        const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
-        return Value.from(try BigInt.from(agent.gc_allocator, managed));
+        return Value.from(try BigInt.fromValue(agent, ns));
     }
 
     /// 8.3.10 Temporal.Instant.prototype.equals ( other )

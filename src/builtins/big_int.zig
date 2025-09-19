@@ -81,7 +81,7 @@ pub const constructor = struct {
         // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise return ℤ(mod).
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int.managed, .signed, @intCast(bits));
-        return Value.from(try types.BigInt.from(agent.gc_allocator, result));
+        return Value.from(try types.BigInt.fromManaged(agent, result));
     }
 
     /// 21.2.2.2 BigInt.asUintN ( bits, bigint )
@@ -99,7 +99,7 @@ pub const constructor = struct {
         // 3. Return ℤ(ℝ(bigint) modulo 2**bits).
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int.managed, .unsigned, @intCast(bits));
-        return Value.from(try types.BigInt.from(agent.gc_allocator, result));
+        return Value.from(try types.BigInt.fromManaged(agent, result));
     }
 };
 
@@ -116,14 +116,10 @@ pub fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.Bi
     }
 
     // 2. Return ℤ(ℝ(number)).
-    const string = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{number.asFloat()});
-    defer agent.gc_allocator.free(string);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
-    result.setString(10, string) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidBase, error.InvalidCharacter => unreachable,
-    };
-    return types.BigInt.from(agent.gc_allocator, result);
+    var mutable = result.toMutable();
+    _ = mutable.setFloat(number.asFloat(), .nearest_even);
+    return types.BigInt.fromManaged(agent, mutable.toManaged(agent.gc_allocator));
 }
 
 /// 21.2.3 Properties of the BigInt Prototype Object

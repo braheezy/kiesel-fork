@@ -653,7 +653,7 @@ fn typedArrayGetElement(
                 null,
             );
             return if (@"type".isBigIntElementType())
-                Value.from(try BigInt.from(agent.gc_allocator, value))
+                Value.from(try BigInt.fromValue(agent, value))
             else
                 Value.from(value);
         },
@@ -2479,7 +2479,7 @@ pub const prototype = struct {
                             null,
                         );
                         break :value if (@"type".isBigIntElementType())
-                            Value.from(try BigInt.from(agent.gc_allocator, value))
+                            Value.from(try BigInt.fromValue(agent, value))
                         else
                             Value.from(value);
                     },
@@ -3547,7 +3547,7 @@ fn initializeTypedArrayFromTypedArray(
                         null,
                     );
                     break :value if (@"type".isBigIntElementType())
-                        Value.from(try BigInt.from(agent.gc_allocator, value))
+                        Value.from(try BigInt.fromValue(agent, value))
                     else
                         Value.from(value);
                 },

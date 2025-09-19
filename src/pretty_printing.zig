@@ -37,9 +37,17 @@ pub var state: State = .{
 
 fn asciiString(ascii: []const u8) *const String {
     const slice: String.Slice = .{ .ascii = ascii };
-    const string = arena.allocator().create(String) catch return String.fromLiteral("<OOM>");
+    const string = arena.allocator().create(String) catch unreachable;
     string.* = .{ .slice = slice, .hash = slice.hash() };
     return string;
+}
+
+fn bigInt(value: anytype) *const BigInt {
+    var managed = std.math.big.int.Managed.initSet(arena.allocator(), value) catch unreachable;
+    errdefer managed.deinit();
+    const big_int = arena.allocator().create(BigInt) catch unreachable;
+    big_int.* = .{ .managed = managed };
+    return big_int;
 }
 
 const PrettyPrintError = std.Io.Writer.Error || std.Io.tty.Config.SetColorError;
@@ -625,7 +633,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.I
                         );
                         const value = std.mem.bytesAsValue(@"type".type(), bytes).*;
                         const numeric = if (@"type".isBigIntElementType())
-                            Value.from(BigInt.from(arena.allocator(), value) catch return)
+                            Value.from(bigInt(value))
                         else
                             Value.from(value);
                         if (i != 0) try writer.writeAll(", ");
@@ -989,7 +997,7 @@ fn prettyPrintTemporalInstant(
     try writer.writeAll("Temporal.Instant(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}", .{
-        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return).fmtPretty(),
+        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -1159,7 +1167,7 @@ fn prettyPrintTemporalZonedDateTime(
     try writer.writeAll("Temporal.ZonedDateTime(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{f}, {f}, {f}", .{
-        Value.from(BigInt.from(arena.allocator(), epoch_nanoseconds) catch return).fmtPretty(),
+        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
         Value.from(asciiString(time_zone_id)).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });

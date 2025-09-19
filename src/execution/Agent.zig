@@ -10,7 +10,6 @@ const pretty_printing = @import("../pretty_printing.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
-const BigInt = types.BigInt;
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
 const HostHooks = @import("HostHooks.zig");
@@ -30,10 +29,6 @@ const Agent = @This();
 gc_allocator: std.mem.Allocator,
 gc_allocator_atomic: std.mem.Allocator,
 options: Options,
-pre_allocated: struct {
-    zero: *const BigInt,
-    one: *const BigInt,
-},
 exception: ?Exception = null,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
@@ -76,10 +71,6 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
         .gc_allocator = platform.gc_allocator,
         .gc_allocator_atomic = platform.gc_allocator_atomic,
         .options = options,
-        .pre_allocated = .{
-            .zero = try BigInt.from(platform.gc_allocator, 0),
-            .one = try BigInt.from(platform.gc_allocator, 1),
-        },
         .well_known_symbols = try .init(platform.gc_allocator),
         .global_symbol_registry = .empty,
         .host_hooks = .{},
@@ -92,8 +83,6 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
 }
 
 pub fn deinit(self: *Agent) void {
-    self.pre_allocated.zero.deinit(self.gc_allocator);
-    self.pre_allocated.one.deinit(self.gc_allocator);
     self.well_known_symbols.deinit(self.gc_allocator);
     self.global_symbol_registry.deinit(self.gc_allocator);
     self.execution_context_stack.deinit(self.gc_allocator);

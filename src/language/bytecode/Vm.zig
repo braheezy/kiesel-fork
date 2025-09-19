@@ -537,7 +537,7 @@ fn executeDecrement(self: *Vm) Agent.Error!void {
         return;
     }
 
-    self.result = Value.from(try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one));
+    self.result = Value.from(try value.asBigInt().subtract(self.agent, .one));
 }
 
 /// 13.5.1.2 Runtime Semantics: Evaluation
@@ -1102,7 +1102,7 @@ fn executeIncrement(self: *Vm) Agent.Error!void {
         return;
     }
 
-    self.result = Value.from(try value.asBigInt().add(self.agent, self.agent.pre_allocated.one));
+    self.result = Value.from(try value.asBigInt().add(self.agent, .one));
 }
 
 fn executeInitializeBoundName(

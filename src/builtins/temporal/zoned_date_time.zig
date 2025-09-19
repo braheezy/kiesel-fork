@@ -421,8 +421,7 @@ pub const prototype = struct {
         const ns = temporal_rs.fromI128Nanoseconds(
             temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(zoned_date_time.fields.inner),
         );
-        const managed = try std.math.big.int.Managed.initSet(agent.gc_allocator, ns);
-        return Value.from(try BigInt.from(agent.gc_allocator, managed));
+        return Value.from(try BigInt.fromValue(agent, ns));
     }
 
     /// 6.3.40 Temporal.ZonedDateTime.prototype.equals ( other )

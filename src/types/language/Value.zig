@@ -995,9 +995,9 @@ pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
 
         // Return 1n if prim is true and 0n if prim is false.
         .boolean => if (primitive.asBoolean())
-            agent.pre_allocated.one
+            .one
         else
-            agent.pre_allocated.zero,
+            .zero,
 
         // Return prim.
         .big_int => primitive.asBigInt(),
@@ -1839,7 +1839,7 @@ pub fn stringToBigInt(
     // TODO: Implement the proper string parsing grammar!
     const trimmed_string = try (try string.trim(agent, .@"start+end")).toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(trimmed_string);
-    if (trimmed_string.len == 0) return try types.BigInt.from(agent.gc_allocator, 0);
+    if (trimmed_string.len == 0) return .zero;
     // Unlike std.fmt.parseFloat() and std.fmt.parseInt() with base 0, std.math.big.int.Managed.setString()
     // doesn't like the prefix so we have to cut it off manually.
     const base: u8, const value = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
@@ -1857,13 +1857,11 @@ pub fn stringToBigInt(
     } else blk: {
         break :blk .{ 10, trimmed_string };
     };
-    var result = try std.math.big.int.Managed.init(agent.gc_allocator);
-    result.setString(base, value) catch |err| switch (err) {
+    return BigInt.fromString(agent, base, value) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return BigInt.from(agent.gc_allocator, result);
 }
 
 /// 7.2.8 SameType ( x, y )
@@ -2362,9 +2360,7 @@ test format {
     defer agent.deinit();
     const symbol_without_description: Symbol = .{ .description = null };
     const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };
-    var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
-    defer managed.deinit();
-    const big_int = try BigInt.from(agent.gc_allocator, managed);
+    const big_int = BigInt.fromLiteral(123);
     const object = try ordinaryObjectCreate(&agent, null);
     const test_cases = [_]struct { Value, []const u8 }{
         .{ @"undefined", "undefined" },
@@ -2455,8 +2451,7 @@ test from {
         try std.testing.expectEqual(value.asSymbol(), symbol);
     }
     {
-        const big_int = try BigInt.from(std.testing.allocator, 123);
-        defer big_int.deinit(std.testing.allocator);
+        const big_int = BigInt.fromLiteral(123);
         const value = Value.from(big_int);
         try std.testing.expect(value.isBigInt());
         try std.testing.expectEqual(value.asBigInt(), big_int);
