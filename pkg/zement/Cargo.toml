@@ -15,7 +15,7 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 # which provides the C headers for Zig.
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "f80164a493f5a2840e5a7e6280a8b20590bcdf1c"
+rev = "1f6b8930c83907d1f98774c4cdffa7aee89debd1"
 features = ["compiled_data"]
 
 # icu_capi points to a git version of diplomat between releases, which causes duplicate symbol

@@ -83,11 +83,7 @@ pub const namespace = struct {
         // 2. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], "iso8601").
         const temporal_rs_plain_date = try temporal_rs.extractResult(
             agent,
-            // TODO: Create from ns once possible to not lose precision
-            temporal_rs.c.temporal_rs_PlainDate_from_epoch_milliseconds(
-                @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
-                time_zone,
-            ),
+            temporal_rs.c.temporal_rs_PlainDate_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDate_destroy(temporal_rs_plain_date.?);
         const plain_date = createTemporalDate(
@@ -109,11 +105,7 @@ pub const namespace = struct {
         // 2. Return ! CreateTemporalDateTime(isoDateTime, "iso8601").
         const temporal_rs_plain_date_time = try temporal_rs.extractResult(
             agent,
-            // TODO: Create from ns once possible to not lose precision
-            temporal_rs.c.temporal_rs_PlainDateTime_from_epoch_milliseconds(
-                @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
-                time_zone,
-            ),
+            temporal_rs.c.temporal_rs_PlainDateTime_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
         errdefer temporal_rs.c.temporal_rs_PlainDateTime_destroy(temporal_rs_plain_date_time.?);
         const plain_date_time = createTemporalDateTime(
@@ -135,11 +127,7 @@ pub const namespace = struct {
         // 2. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
         const temporal_rs_plain_time = try temporal_rs.extractResult(
             agent,
-            // TODO: Create from ns once possible to not lose precision
-            temporal_rs.c.temporal_rs_PlainTime_from_epoch_milliseconds(
-                @intCast(@divTrunc(temporal_rs.fromI128Nanoseconds(epoch_ns), 1_000_000)),
-                time_zone,
-            ),
+            temporal_rs.c.temporal_rs_PlainTime_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
         errdefer temporal_rs.c.temporal_rs_PlainTime_destroy(temporal_rs_plain_time.?);
         const plain_time = createTemporalTime(
