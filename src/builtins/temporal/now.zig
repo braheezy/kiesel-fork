@@ -23,6 +23,7 @@ const createTemporalTime = builtins.createTemporalTime;
 const createTemporalZonedDateTime = builtins.createTemporalZonedDateTime;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 const toTemporalTimeZoneIdentifier = builtins.toTemporalTimeZoneIdentifier;
 
 pub const namespace = struct {
@@ -142,7 +143,10 @@ pub const namespace = struct {
     /// https://tc39.es/proposal-temporal/#sec-temporal.now.timezoneid
     fn timeZoneId(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // 1. Return SystemTimeZoneIdentifier().
-        return Value.from(try String.fromAscii(agent, builtins.systemTimeZoneIdentifier()));
+        const time_zone = systemTimeZoneIdentifier(agent.platform);
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
+        return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
     }
 
     /// 2.2.4 Temporal.Now.zonedDateTimeISO ( [ temporalTimeZoneLike ] )
@@ -153,7 +157,7 @@ pub const namespace = struct {
         // 1. If temporalTimeZoneLike is undefined, then
         const time_zone = if (temporal_time_zone_like.isUndefined()) blk: {
             // a. Let timeZone be SystemTimeZoneIdentifier().
-            break :blk systemTimeZoneIdentifier();
+            break :blk systemTimeZoneIdentifier(agent.platform);
         } else blk: {
             // 2. Else,
             // a. Let timeZone be ? ToTemporalTimeZoneIdentifier(temporalTimeZoneLike).
@@ -204,7 +208,7 @@ pub fn systemDateTime(
     // 1. If temporalTimeZoneLike is undefined, then
     const time_zone = if (temporal_time_zone_like.isUndefined()) blk: {
         // a. Let timeZone be SystemTimeZoneIdentifier().
-        break :blk systemTimeZoneIdentifier();
+        break :blk systemTimeZoneIdentifier(agent.platform);
     } else blk: {
         // 2. Else,
         // a. Let timeZone be ? ToTemporalTimeZoneIdentifier(temporalTimeZoneLike).
@@ -216,13 +220,4 @@ pub fn systemDateTime(
 
     // 4. Return GetISODateTimeFor(timeZone, epochNs).
     return .{ time_zone, epoch_ns };
-}
-
-fn systemTimeZoneIdentifier() temporal_rs.c.TimeZone {
-    const identifier_str = builtins.systemTimeZoneIdentifier();
-    return temporal_rs.success(
-        temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
-            temporal_rs.toDiplomatStringView(identifier_str),
-        ),
-    ).?;
 }

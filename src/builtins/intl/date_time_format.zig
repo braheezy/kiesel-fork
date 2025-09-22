@@ -4,6 +4,7 @@
 const std = @import("std");
 
 const icu4zig = @import("icu4zig");
+const temporal_rs = @import("../../c/temporal_rs.zig");
 
 const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
@@ -200,7 +201,11 @@ pub fn createDateTimeFormat(
     // 27. If timeZone is undefined, then
     const time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
-        break :blk systemTimeZoneIdentifier();
+        const time_zone = systemTimeZoneIdentifier(agent.platform);
+        if (@TypeOf(time_zone) == void) break :blk "UTC";
+        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
+        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
+        break :blk try write.toOwnedSlice();
     } else blk: {
         // 28. Else,
         // a. Set timeZone to ? ToString(timeZone).

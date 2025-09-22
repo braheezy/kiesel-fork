@@ -310,42 +310,42 @@ pub fn msFromTime(t: f64) Millisecond {
 
 /// 21.4.1.21 GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
 /// https://tc39.es/ecma262/#sec-getnamedtimezoneoffsetnanoseconds
-pub fn getNamedTimeZoneOffsetNanoseconds(time_zone_identifier: []const u8, _: f64) i32 {
-    // 1. Assert: timeZoneIdentifier is "UTC".
-    std.debug.assert(std.mem.eql(u8, time_zone_identifier, "UTC"));
-
-    // 2. Return 0.
+pub fn getNamedTimeZoneOffsetNanoseconds(time_zone: temporal_rs.c.TimeZone, _: f64) i64 {
+    // TODO: Implement named time zone offset resolution
+    _ = time_zone;
     return 0;
 }
 
 /// 21.4.1.24 SystemTimeZoneIdentifier ( )
 /// https://tc39.es/ecma262/#sec-systemtimezoneidentifier
-pub fn systemTimeZoneIdentifier() []const u8 {
+pub fn systemTimeZoneIdentifier(platform: *const Agent.Platform) Agent.Platform.TimeZone {
     // 1. If the implementation only supports the UTC time zone, return "UTC".
     // 2. Let systemTimeZoneString be the String representing the host environment's current time
     //    zone, either a primary time zone identifier or an offset time zone identifier.
     // 3. Return systemTimeZoneString.
-    return "UTC";
+    return platform.default_time_zone;
 }
 
 /// 21.4.1.25 LocalTime ( t )
 /// https://tc39.es/ecma262/#sec-localtime
-pub fn localTime(t: f64) f64 {
+pub fn localTime(platform: *const Agent.Platform, t: f64) f64 {
     // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
-    const system_time_zone_identifier = systemTimeZoneIdentifier();
+    const time_zone = systemTimeZoneIdentifier(platform);
 
     // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
-    const offset_ns = if (false) {
+    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+        break :blk 0;
+    } else if (isTimeZoneOffsetString(time_zone)) blk: {
         // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
-        unreachable;
+        break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(t) × 10**6)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, t * 10e6);
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, t * 1_000_000);
     };
 
     // 4. Let offsetMs be truncate(offsetNs / 10**6).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
 
     // 5. Return t + 𝔽(offsetMs).
     return t + offset_ms;
@@ -353,19 +353,27 @@ pub fn localTime(t: f64) f64 {
 
 /// 21.4.1.26 UTC ( t )
 /// https://tc39.es/ecma262/#sec-utc-t
-pub fn utc(t: f64) f64 {
+pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
     // 1. If t is not finite, return NaN.
     if (!std.math.isFinite(t)) return std.math.nan(f64);
 
     // 2. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
-    const system_time_zone_identifier = systemTimeZoneIdentifier();
+    const time_zone = systemTimeZoneIdentifier(platform);
 
-    // TODO: 3-4
-    _ = system_time_zone_identifier;
-    const offset_ns: i32 = 0;
+    // 3. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
+    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+        break :blk 0;
+    } else if (isTimeZoneOffsetString(time_zone)) blk: {
+        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        break :blk parseTimeZoneOffsetString(time_zone);
+    } else blk: {
+        // 4. Else,
+        // TODO: Implement named time zone offset resolution
+        break :blk 0;
+    };
 
     // 5. Let offsetMs be truncate(offsetNs / 10**6).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
 
     // 6. Return t - 𝔽(offsetMs).
     return t - offset_ms;
@@ -678,6 +686,19 @@ pub fn parseOtherString(string: []const u8) error{InvalidFormat}!f64 {
     return timeClip(time_value + offset_ms);
 }
 
+/// 21.4.1.33.1 IsTimeZoneOffsetString ( offsetString )
+/// https://tc39.es/ecma262/#sec-istimezoneoffsetstring
+fn isTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) bool {
+    return !time_zone.is_iana_id;
+}
+
+/// 21.4.1.33.2 ParseTimeZoneOffsetString ( offsetString )
+/// https://tc39.es/ecma262/#sec-parsetimezoneoffsetstring
+fn parseTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) i64 {
+    std.debug.assert(!time_zone.is_iana_id);
+    return @as(i64, @intCast(time_zone.offset_minutes)) * std.time.ns_per_min;
+}
+
 pub fn fmtTimeString(time_value: f64) std.fmt.Alt(f64, formatTimeString) {
     return .{ .data = time_value };
 }
@@ -728,28 +749,41 @@ fn formatDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error
     try writer.print("{s} {s} {d:0>2} {s}{s}", .{ weekday, month, day_, year_sign, padded_year });
 }
 
-pub fn fmtTimeZoneString(time_value: f64) std.fmt.Alt(f64, formatTimeZoneString) {
-    return .{ .data = time_value };
+pub fn fmtTimeZoneString(
+    platform: *const Agent.Platform,
+    time_value: f64,
+) std.fmt.Alt(FormatTimeZoneStringData, formatTimeZoneString) {
+    return .{ .data = .{ .platform = platform, .time_value = time_value } };
 }
+
+const FormatTimeZoneStringData = struct {
+    platform: *const Agent.Platform,
+    time_value: f64,
+};
 
 /// 21.4.4.41.3 TimeZoneString ( tv )
 /// https://tc39.es/ecma262/#sec-timezoneestring
-pub fn formatTimeZoneString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    const platform = data.platform;
+    const time_value = data.time_value;
+
     // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
-    const system_time_zone_identifier = systemTimeZoneIdentifier();
+    const time_zone = systemTimeZoneIdentifier(platform);
 
     // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
-    const offset_ns = if (false) {
+    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+        break :blk 0;
+    } else if (isTimeZoneOffsetString(time_zone)) blk: {
         // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
-        unreachable;
+        break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(tv) × 10**6)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, time_value * 10e6);
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, time_value * 1_000_000);
     };
 
     // 4. Let offset be 𝔽(truncate(offsetNs / 10**6)).
-    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
+    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
 
     // 5. If offset is +0𝔽 or offset > +0𝔽, then
     //     a. Let offsetSign be "+".
@@ -770,19 +804,30 @@ pub fn formatTimeZoneString(time_value: f64, writer: *std.Io.Writer) std.Io.Writ
     //    string-concatenation of the code unit 0x0020 (SPACE), the code unit 0x0028 (LEFT
     //    PARENTHESIS), an implementation-defined timezone name, and the code unit 0x0029 (RIGHT
     //    PARENTHESIS).
-    const tz_name = " (UTC)";
+    const tz_name = if (offset == 0) " (GMT)" else "";
 
     // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMin, and tzName.
     try writer.print("{c}{d:0>2}{d:0>2}{s}", .{ offset_sign, offset_hour, offset_min, tz_name });
 }
 
-pub fn fmtToDateString(time_value: f64) std.fmt.Alt(f64, formatToDateString) {
-    return .{ .data = time_value };
+pub fn fmtToDateString(
+    platform: *const Agent.Platform,
+    time_value: f64,
+) std.fmt.Alt(FormatToDateStringData, formatToDateString) {
+    return .{ .data = .{ .platform = platform, .time_value = time_value } };
 }
+
+const FormatToDateStringData = struct {
+    platform: *const Agent.Platform,
+    time_value: f64,
+};
 
 /// 21.4.4.41.4 ToDateString ( tv )
 /// https://tc39.es/ecma262/#sec-todatestring
-fn formatToDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+fn formatToDateString(data: FormatToDateStringData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    const platform = data.platform;
+    const time_value = data.time_value;
+
     // 1. If tv is NaN, return "Invalid Date".
     if (std.math.isNan(time_value)) {
         try writer.writeAll("Invalid Date");
@@ -790,14 +835,14 @@ fn formatToDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Err
     }
 
     // 2. Let t be LocalTime(tv).
-    const t = localTime(time_value);
+    const t = localTime(platform, time_value);
 
     // 3. Return the string-concatenation of DateString(t), the code unit 0x0020 (SPACE),
     //    TimeString(t), and TimeZoneString(tv).
     try writer.print("{f} {f}{f}", .{
         fmtDateString(t),
         fmtTimeString(t),
-        fmtTimeZoneString(time_value),
+        fmtTimeZoneString(platform, time_value),
     });
 }
 
@@ -842,7 +887,7 @@ pub const constructor = struct {
             return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{f}",
-                .{fmtToDateString(now_)},
+                .{fmtToDateString(agent.platform, now_)},
             )));
         }
 
@@ -919,7 +964,7 @@ pub const constructor = struct {
             );
 
             // k. Let dv be TimeClip(UTC(finalDate)).
-            break :blk timeClip(utc(final_date));
+            break :blk timeClip(utc(agent.platform, final_date));
         };
 
         // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%", « [[DateValue]] »).
@@ -1100,7 +1145,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return DateFromTime(LocalTime(t)).
-        return Value.from(dateFromTime(localTime(time_value)));
+        return Value.from(dateFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.3 Date.prototype.getDay ( )
@@ -1117,7 +1162,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return WeekDay(LocalTime(t)).
-        return Value.from(weekDay(localTime(time_value)));
+        return Value.from(weekDay(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.4 Date.prototype.getFullYear ( )
@@ -1134,7 +1179,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return YearFromTime(LocalTime(t)).
-        return Value.from(yearFromTime(localTime(time_value)));
+        return Value.from(yearFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.5 Date.prototype.getHours ( )
@@ -1151,7 +1196,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return HourFromTime(LocalTime(t)).
-        return Value.from(hourFromTime(localTime(time_value)));
+        return Value.from(hourFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.6 Date.prototype.getMilliseconds ( )
@@ -1168,7 +1213,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return msFromTime(LocalTime(t)).
-        return Value.from(msFromTime(localTime(time_value)));
+        return Value.from(msFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.7 Date.prototype.getMinutes ( )
@@ -1185,7 +1230,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return MinFromTime(LocalTime(t)).
-        return Value.from(minFromTime(localTime(time_value)));
+        return Value.from(minFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.8 Date.prototype.getMonth ( )
@@ -1202,7 +1247,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return MonthFromTime(LocalTime(t)).
-        return Value.from(monthFromTime(localTime(time_value)));
+        return Value.from(monthFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.9 Date.prototype.getSeconds ( )
@@ -1219,7 +1264,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return SecFromTime(LocalTime(t)).
-        return Value.from(secFromTime(localTime(time_value)));
+        return Value.from(secFromTime(localTime(agent.platform, time_value)));
     }
 
     /// 21.4.4.10 Date.prototype.getTime ( )
@@ -1247,7 +1292,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return (t - LocalTime(t)) / msPerMinute.
-        return Value.from((time_value - localTime(time_value)) / std.time.ms_per_min);
+        return Value.from((time_value - localTime(agent.platform, time_value)) / std.time.ms_per_min);
     }
 
     /// 21.4.4.12 Date.prototype.getUTCDate ( )
@@ -1405,7 +1450,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 6. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 7. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
         const new_date = makeDate(
@@ -1418,7 +1463,7 @@ pub const prototype = struct {
         );
 
         // 8. Let u be TimeClip(UTC(newDate)).
-        const date_value_utc = timeClip(utc(new_date));
+        const date_value_utc = timeClip(utc(agent.platform, new_date));
 
         // 9. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1445,7 +1490,7 @@ pub const prototype = struct {
         const year = (try year_value.toNumber(agent)).asFloat();
 
         // 5. If t is NaN, set t to +0𝔽; otherwise set t to LocalTime(t).
-        time_value = if (std.math.isNan(time_value)) 0 else localTime(time_value);
+        time_value = if (std.math.isNan(time_value)) 0 else localTime(agent.platform, time_value);
 
         // 6. If month is not present, let m be MonthFromTime(t); otherwise let m be ? ToNumber(month).
         const month = if (month_value) |month|
@@ -1463,7 +1508,7 @@ pub const prototype = struct {
         const new_date = makeDate(makeDay(year, month, date), timeWithinDay(time_value));
 
         // 9. Let u be TimeClip(UTC(newDate)).
-        const date_value_utc = timeClip(utc(new_date));
+        const date_value_utc = timeClip(utc(agent.platform, new_date));
 
         // 10. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1512,7 +1557,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 9. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 10. If min is not present, let m be MinFromTime(t).
         if (minute_value == null) minute = @floatFromInt(minFromTime(time_value));
@@ -1527,7 +1572,7 @@ pub const prototype = struct {
         const date = makeDate(day(time_value), makeTime(hour, minute, second, millisecond));
 
         // 14. Let u be TimeClip(UTC(date)).
-        const date_value_utc = timeClip(utc(date));
+        const date_value_utc = timeClip(utc(agent.platform, date));
 
         // 15. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1555,7 +1600,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 6. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 7. Let time be MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms).
         const time = makeTime(
@@ -1566,7 +1611,7 @@ pub const prototype = struct {
         );
 
         // 8. Let u be TimeClip(UTC(MakeDate(Day(t), time))).
-        const date_value_utc = timeClip(utc(makeDate(day(time_value), time)));
+        const date_value_utc = timeClip(utc(agent.platform, makeDate(day(time_value), time)));
 
         // 9. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1608,7 +1653,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 8. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 9. If sec is not present, let s be SecFromTime(t).
         if (second_value == null) second = @floatFromInt(secFromTime(time_value));
@@ -1623,7 +1668,7 @@ pub const prototype = struct {
         );
 
         // 12. Let u be TimeClip(UTC(date)).
-        const date_value_utc = timeClip(utc(date));
+        const date_value_utc = timeClip(utc(agent.platform, date));
 
         // 13. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1658,7 +1703,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 7. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 8. If date is not present, let dt be DateFromTime(t).
         if (date_value == null) date = @floatFromInt(dateFromTime(time_value));
@@ -1670,7 +1715,7 @@ pub const prototype = struct {
         );
 
         // 10. Let u be TimeClip(UTC(newDate)).
-        const date_value_utc = timeClip(utc(new_date));
+        const date_value_utc = timeClip(utc(agent.platform, new_date));
 
         // 11. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -1705,7 +1750,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 7. Set t to LocalTime(t).
-        time_value = localTime(time_value);
+        time_value = localTime(agent.platform, time_value);
 
         // 8. If ms is not present, let milli be msFromTime(t).
         if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
@@ -1722,7 +1767,7 @@ pub const prototype = struct {
         );
 
         // 10. Let u be TimeClip(UTC(date)).
-        const date_value_utc = timeClip(utc(date));
+        const date_value_utc = timeClip(utc(agent.platform, date));
 
         // 11. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
@@ -2075,7 +2120,7 @@ pub const prototype = struct {
         );
 
         // 9. Let v be TimeClip(date).
-        const date_value = timeClip(utc(date));
+        const date_value = timeClip(utc(agent.platform, date));
 
         // 10. Set dateObject.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
@@ -2098,7 +2143,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
 
         // 5. Let t be LocalTime(tv).
-        const t = localTime(time_value);
+        const t = localTime(agent.platform, time_value);
 
         // 6. Return DateString(t).
         return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -2333,7 +2378,7 @@ pub const prototype = struct {
         return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{f}",
-            .{fmtToDateString(time_value)},
+            .{fmtToDateString(agent.platform, time_value)},
         )));
     }
 
@@ -2386,7 +2431,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
 
         // 5. Let t be LocalTime(tv).
-        const t = localTime(time_value);
+        const t = localTime(agent.platform, time_value);
 
         // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
         return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -2394,7 +2439,7 @@ pub const prototype = struct {
             "{f}{f}",
             .{
                 fmtTimeString(t),
-                fmtTimeZoneString(time_value),
+                fmtTimeZoneString(agent.platform, time_value),
             },
         )));
     }
@@ -2513,7 +2558,7 @@ pub const prototype = struct {
         if (std.math.isNan(time_value)) return .nan;
 
         // 5. Return YearFromTime(LocalTime(t)) - 1900𝔽.
-        return Value.from(yearFromTime(localTime(time_value)) - 1900);
+        return Value.from(yearFromTime(localTime(agent.platform, time_value)) - 1900);
     }
 
     /// B.2.3.2 Date.prototype.setYear ( year )
@@ -2532,7 +2577,7 @@ pub const prototype = struct {
         const year = try year_value.toNumber(agent);
 
         // 5. If t is NaN, set t to +0𝔽; otherwise set t to LocalTime(t).
-        time_value = if (std.math.isNan(time_value)) 0 else localTime(time_value);
+        time_value = if (std.math.isNan(time_value)) 0 else localTime(agent.platform, time_value);
 
         // 6. Let yyyy be MakeFullYear(y).
         const full_year = makeFullYear(year.asFloat());
@@ -2548,7 +2593,7 @@ pub const prototype = struct {
         const date = makeDate(day_, timeWithinDay(time_value));
 
         // 9. Let u be TimeClip(UTC(date)).
-        const date_value_utc = timeClip(utc(date));
+        const date_value_utc = timeClip(utc(agent.platform, date));
 
         // 10. Set dateObject.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;

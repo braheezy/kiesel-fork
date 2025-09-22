@@ -63,7 +63,7 @@ pub const QueuedJob = struct {
 };
 
 pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator.Error!Agent {
-    pretty_printing.state.tty_config = platform.tty_config;
+    pretty_printing.state.platform = platform;
     return .{
         // TODO: Do we want to remove these aliases? In that case you'd have to type out
         //       `agent.platform.gc_allocator.alloc()` every time, or we remove both levels of

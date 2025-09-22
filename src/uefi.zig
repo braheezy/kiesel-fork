@@ -132,6 +132,7 @@ fn mainWithErrorHandling() Error!void {
         .tty_config = .no_color,
         .stack_info = null,
         .default_locale = {},
+        .default_time_zone = {},
         .currentTimeMs = std.time.milliTimestamp,
         .currentTimeNs = std.time.nanoTimestamp,
     };

@@ -3,6 +3,7 @@ const std = @import("std");
 
 const icu4zig = @import("icu4zig");
 const stackinfo = @import("stackinfo");
+const temporal_rs = @import("../../c/temporal_rs.zig");
 
 const build_options = @import("build-options");
 const gc = @import("../../gc.zig");
@@ -17,9 +18,13 @@ stdout: *std.Io.Writer,
 stderr: *std.Io.Writer,
 tty_config: std.Io.tty.Config,
 stack_info: ?stackinfo.StackInfo,
-default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
+default_locale: Locale,
+default_time_zone: TimeZone,
 currentTimeMs: *const fn () i64,
 currentTimeNs: *const fn () i128,
+
+pub const Locale = if (build_options.enable_intl) icu4zig.Locale else void;
+pub const TimeZone = if (build_options.enable_temporal) temporal_rs.c.TimeZone else void;
 
 /// Whether `fd_t` is defined
 const has_fd_t = std.posix.system.fd_t != void;
@@ -73,14 +78,13 @@ pub fn default() Platform {
         .stderr = &state.stderr_writer.interface,
         .tty_config = .detect(.stdout()),
         .stack_info = stackinfo.StackInfo.init() catch null,
-        .default_locale = if (build_options.enable_intl)
-            icu4zig.Locale.unknown()
-        else {},
+        .default_locale = if (Locale != void) icu4zig.Locale.unknown(),
+        .default_time_zone = if (TimeZone != void) temporal_rs.c.temporal_rs_TimeZone_utc(),
         .currentTimeMs = std.time.milliTimestamp,
         .currentTimeNs = std.time.nanoTimestamp,
     };
 }
 
 pub fn deinit(self: Platform) void {
-    if (build_options.enable_intl) self.default_locale.deinit();
+    if (Locale != void) self.default_locale.deinit();
 }
