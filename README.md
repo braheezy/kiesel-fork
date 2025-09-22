@@ -110,6 +110,10 @@ Options:
   -h, --help                               Print help text and exit
 ```
 
+## Packages
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/kiesel.svg)](https://repology.org/project/kiesel/versions)
+
 ## Links
 
 - [Website](https://kiesel.dev)
