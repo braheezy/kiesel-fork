@@ -3881,6 +3881,38 @@ pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.E
     return buffer.arrayBufferData().?.items[@intCast(byte_offset)..@intCast(byte_offset + len)];
 }
 
+/// 9 SetUint8ArrayBytes ( into, bytes )
+/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-writeuint8arraybytes
+fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void {
+    std.debug.assert(into.fields.element_type == .uint8);
+
+    // 1. Let offset be into.[[ByteOffset]].
+    const offset = into.fields.byte_offset;
+
+    // 2. Let len be the length of bytes.
+    // 3. Let index be 0.
+    // 4. Repeat, while index < len,
+    for (bytes, 0..) |byte, index| {
+        // a. Let byte be bytes[index].
+        // b. Let byteIndexInBuffer be index + offset.
+        const byte_index_in_buffer = @as(u53, @intCast(index)) + offset;
+
+        // c. Perform SetValueInBuffer(into.[[ViewedArrayBuffer]], byteIndexInBuffer, uint8, 𝔽(byte), true, unordered).
+        setValueInBuffer(
+            agent,
+            into.fields.viewed_array_buffer,
+            byte_index_in_buffer,
+            .uint8,
+            Value.from(byte),
+            true,
+            .unordered,
+            null,
+        ) catch unreachable;
+
+        // d. Set index to index + 1.
+    }
+}
+
 const Alphabet = enum {
     base64,
     base64url,
@@ -3892,6 +3924,12 @@ const LastChunkHandling = enum {
     stop_before_partial,
 };
 
+const FromBase64Result = struct {
+    read: usize,
+    bytes: []const u8,
+    @"error": ?*builtins.SyntaxError,
+};
+
 /// 10.3 FromBase64 ( string, alphabet, lastChunkHandling [ , maxLength ] )
 /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-frombase64
 fn fromBase64Impl(
@@ -3899,18 +3937,41 @@ fn fromBase64Impl(
     string: *const String,
     alphabet: Alphabet,
     last_chunk_handling: LastChunkHandling,
-) Agent.Error!struct {
-    read: usize,
-    bytes: []const u8,
-} {
-    // 1-10.
-    // NOTE: This doesn't pass all tests. std.base64 has an awful API so I didn't bother.
+    maybe_max_length: ?u53,
+) std.mem.Allocator.Error!FromBase64Result {
+    // 1. If maxLength is not present, then
+    //     a. Let maxLength be 2**53 - 1.
+    //     b. NOTE: Because the input is a string, the length of strings is limited to 2**53 - 1
+    //        characters, and the output requires no more bytes than the input has characters, this
+    //        limit can never be reached. However, it is editorially convenient to use a finite
+    //        value here.
+    const max_length = maybe_max_length orelse std.math.maxInt(u53);
+
+    // 2. NOTE: The order of validation and decoding in the algorithm below is not observable.
+    //    Implementations are encouraged to perform them in whatever order is most efficient,
+    //    possibly interleaving validation with decoding, as long as the behaviour is observably
+    //    equivalent.
+
+    // 3. If maxLength is 0, then
+    if (max_length == 0) {
+        // a. Return the Record { [[Read]]: 0, [[Bytes]]: « », [[Error]]: none }.
+        return .{ .read = 0, .bytes = &.{}, .@"error" = null };
+    }
+
+    // 4-10.
+    // NOTE: This doesn't pass all tests. std.base64 has an awful API so I didn't bother with
+    //       supporting partial decoding.
     const bytes = switch (string.slice) {
         .ascii => |ascii| switch (last_chunk_handling) {
             .loose => if (std.mem.indexOfScalar(u8, ascii, '=')) |end| blk: {
                 for (ascii[end..]) |c| {
                     if (c != '=') {
-                        return agent.throwException(.syntax_error, "Invalid base64 string", .{});
+                        const @"error" = try agent.createErrorObject(
+                            .syntax_error,
+                            "Invalid base64 string",
+                            .{},
+                        );
+                        return .{ .read = 0, .bytes = &.{}, .@"error" = @"error" };
                     }
                 }
                 break :blk ascii[0..end];
@@ -3918,7 +3979,14 @@ fn fromBase64Impl(
             .strict => ascii,
             .stop_before_partial => ascii[0 .. ascii.len - (ascii.len % 4)],
         },
-        .utf16 => return agent.throwException(.syntax_error, "Invalid base64 string", .{}),
+        .utf16 => {
+            const @"error" = try agent.createErrorObject(
+                .syntax_error,
+                "Invalid base64 string",
+                .{},
+            );
+            return .{ .read = 0, .bytes = &.{}, .@"error" = @"error" };
+        },
     };
     // NOTE: For some reason urlSafeBase64DecoderWithIgnore() doesn't set the pad char so we do this manually.
     const decoder = std.base64.Base64DecoderWithIgnore.init(
@@ -3931,30 +3999,100 @@ fn fromBase64Impl(
     );
     const buf = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(bytes.len) catch unreachable);
     const buf_len = decoder.decode(buf, bytes) catch {
-        return agent.throwException(.syntax_error, "Invalid base64 string", .{});
+        const @"error" = try agent.createErrorObject(
+            .syntax_error,
+            "Invalid base64 string",
+            .{},
+        );
+        return .{ .read = 0, .bytes = &.{}, .@"error" = @"error" };
     };
-    return .{ .read = bytes.len, .bytes = buf[0..buf_len] };
+    return .{ .read = bytes.len, .bytes = buf[0..buf_len], .@"error" = null };
 }
+
+const FromHexResult = struct {
+    read: usize,
+    bytes: []const u8,
+    @"error": ?*builtins.SyntaxError,
+};
 
 /// 10.4 FromHex ( string [ , maxLength ] )
 /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-fromhex
-fn fromHexImpl(agent: *Agent, string: *const String) Agent.Error!struct {
-    read: usize,
-    bytes: []const u8,
-} {
-    // 1-7.
-    const bytes = switch (string.slice) {
-        .ascii => |ascii| ascii,
-        .utf16 => return agent.throwException(.syntax_error, "Invalid hex string", .{}),
+fn fromHexImpl(
+    agent: *Agent,
+    string: *const String,
+    maybe_max_length: ?u53,
+) std.mem.Allocator.Error!FromHexResult {
+    // 1. If maxLength is not present, let maxLength be 2**53 - 1.
+    const max_length = maybe_max_length orelse std.math.maxInt(u53);
+
+    // 2. Let length be the length of string.
+    const length = string.length();
+
+    // 3. Let bytes be « ».
+
+    // 4. Let read be 0.
+    var read: usize = 0;
+
+    // 5. If length modulo 2 is not 0, then
+    if (length % 2 != 0) {
+        // a. Let error be a new SyntaxError exception.
+        const @"error" = try agent.createErrorObject(
+            .syntax_error,
+            "Invalid hex string, length must be a multiple of two",
+            .{},
+        );
+
+        // b. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+        return .{ .read = read, .bytes = &.{}, .@"error" = @"error" };
+    }
+
+    var bytes: std.ArrayList(u8) = try .initCapacity(agent.gc_allocator, length / 2);
+    var it = string.codeUnitIterator();
+
+    // 6. Repeat, while read < length and the length of bytes < maxLength,
+    while (read < length and bytes.items.len < max_length) {
+        // a. Let hexits be the substring of string from read to read + 2.
+        const hexits: [2]u8 = .{
+            std.math.lossyCast(u8, it.next().?),
+            std.math.lossyCast(u8, it.next().?),
+        };
+
+        // b. If hexits contains any code units which are not in "0123456789abcdefABCDEF", then
+        if (!std.ascii.isHex(hexits[0]) or !std.ascii.isHex(hexits[1])) {
+            // i. Let error be a new SyntaxError exception.
+            const @"error" = try agent.createErrorObject(
+                .syntax_error,
+                "Invalid hex string, characters must be hex digits",
+                .{},
+            );
+
+            // ii. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+            return .{
+                .read = read,
+                .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
+                .@"error" = @"error",
+            };
+        }
+
+        // c. Set read to read + 2.
+        read += 2;
+
+        // d. Let byte be the integer value represented by hexits in base-16 notation, using the
+        //    letters A-F and a-f for digits with values 10 through 15.
+        const hi = std.fmt.charToDigit(hexits[0], 16) catch unreachable;
+        const lo = std.fmt.charToDigit(hexits[1], 16) catch unreachable;
+        const byte = (hi << 4) | lo;
+
+        // e. Append byte to bytes.
+        bytes.appendAssumeCapacity(byte);
+    }
+
+    // 7. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: none }.
+    return .{
+        .read = read,
+        .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
+        .@"error" = null,
     };
-    const buf = try agent.gc_allocator.alloc(u8, bytes.len / 2);
-    _ = std.fmt.hexToBytes(buf, bytes) catch |err| switch (err) {
-        error.InvalidLength, error.InvalidCharacter => {
-            return agent.throwException(.syntax_error, "Invalid hex string", .{});
-        },
-        error.NoSpaceLeft => unreachable,
-    };
-    return .{ .read = bytes.len, .bytes = buf };
 }
 
 /// 23.2.6 Properties of the TypedArray Constructors
@@ -4201,9 +4339,17 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             };
 
             // 9. Let result be FromBase64(string, alphabet, lastChunkHandling).
+            const result = try fromBase64Impl(agent, string, alphabet, last_chunk_handling, null);
+
             // 10. If result.[[Error]] is not none, then
-            //     a. Throw result.[[Error]].
-            const result = try fromBase64Impl(agent, string, alphabet, last_chunk_handling);
+            if (result.@"error") |@"error"| {
+                // a. Throw result.[[Error]].
+                agent.exception = .{
+                    .value = Value.from(&@"error".object),
+                    .stack_trace = agent.captureStackTrace() catch &.{},
+                };
+                return error.ExceptionThrown;
+            }
 
             // 11. Let resultLength be the length of result.[[Bytes]].
             const result_length: u53 = @intCast(result.bytes.len);
@@ -4240,9 +4386,17 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             const string = string_value.asString();
 
             // 2. Let result be FromHex(string).
+            const result = try fromHexImpl(agent, string, null);
+
             // 3. If result.[[Error]] is not none, then
-            //     a. Throw result.[[Error]].
-            const result = try fromHexImpl(agent, string);
+            if (result.@"error") |@"error"| {
+                // a. Throw result.[[Error]].
+                agent.exception = .{
+                    .value = Value.from(&@"error".object),
+                    .stack_trace = agent.captureStackTrace() catch &.{},
+                };
+                return error.ExceptionThrown;
+            }
 
             // 4. Let resultLength be the length of result.[[Bytes]].
             const result_length: u53 = @intCast(result.bytes.len);
@@ -4298,13 +4452,217 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             );
 
             if (element_type == .uint8) {
+                try object.defineBuiltinFunction(agent, "setFromBase64", setFromBase64, 1, realm);
+                try object.defineBuiltinFunction(agent, "setFromHex", setFromHex, 1, realm);
                 try object.defineBuiltinFunction(agent, "toBase64", toBase64, 0, realm);
                 try object.defineBuiltinFunction(agent, "toHex", toHex, 0, realm);
             }
         }
 
-        // 1 Uint8Array.prototype.toBase64 ( [ options ] )
-        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
+        /// 4 Uint8Array.prototype.setFromBase64 ( string [ , options ] )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.setfrombase64
+        fn setFromBase64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+            const realm = agent.currentRealm();
+            const string_value = arguments.get(0);
+            const options_value = arguments.get(1);
+
+            // 1. Let into be the this value.
+            // 2. Perform ? ValidateUint8Array(into).
+            const into = try validateUint8Array(agent, this_value);
+
+            // 3. If string is not a String, throw a TypeError exception.
+            if (!string_value.isString()) {
+                return agent.throwException(.type_error, "Argument must be a string", .{});
+            }
+            const string = string_value.asString();
+
+            // 4. Let opts be ? GetOptionsObject(options).
+            const options = try options_value.getOptionsObject(agent);
+
+            // 5. Let alphabet be ? Get(opts, "alphabet").
+            var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
+
+            // 6. If alphabet is undefined, set alphabet to "base64".
+            // 7. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
+            const alphabet: Alphabet = blk: {
+                if (alphabet_value.isUndefined()) break :blk .base64;
+                if (alphabet_value.isString()) {
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64"))) break :blk .base64;
+                    if (alphabet_value.asString().eql(String.fromLiteral("base64url"))) break :blk .base64url;
+                }
+                return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
+            };
+
+            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
+
+            // 9. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
+            // 10. If lastChunkHandling is not one of "loose", "strict", or "stop-before-partial",
+            //     throw a TypeError exception.
+            const last_chunk_handling: LastChunkHandling = blk: {
+                if (last_chunk_handling_value.isUndefined()) break :blk .loose;
+                if (last_chunk_handling_value.isString()) {
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("loose"))) break :blk .loose;
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("strict"))) break :blk .strict;
+                    if (last_chunk_handling_value.asString().eql(String.fromLiteral("stop-before-partial"))) break :blk .stop_before_partial;
+                }
+                return agent.throwException(
+                    .type_error,
+                    "Invalid lastChunkHandling {f}",
+                    .{last_chunk_handling_value},
+                );
+            };
+
+            // 11. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(into, seq-cst).
+            const ta = makeTypedArrayWithBufferWitnessRecord(into, .seq_cst);
+
+            // 12. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+            if (isTypedArrayOutOfBounds(ta)) {
+                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+            }
+
+            // 13. Let byteLength be TypedArrayLength(taRecord).
+            const byte_length = typedArrayLength(ta);
+
+            // 14. Let result be FromBase64(string, alphabet, lastChunkHandling, byteLength).
+            const result = try fromBase64Impl(
+                agent,
+                string,
+                alphabet,
+                last_chunk_handling,
+                byte_length,
+            );
+
+            // 15. Let bytes be result.[[Bytes]].
+            const bytes = result.bytes;
+
+            // 16. Let written be the length of bytes.
+            const written = bytes.len;
+
+            // 17. NOTE: FromBase64 does not invoke any user code, so the ArrayBuffer backing into
+            //     cannot have been detached or shrunk.
+
+            // 18. Assert: written ≤ byteLength.
+            std.debug.assert(written <= byte_length);
+
+            // 19. Perform SetUint8ArrayBytes(into, bytes).
+            setUint8ArrayBytes(agent, into, bytes);
+
+            // 20. If result.[[Error]] is not none, then
+            if (result.@"error") |@"error"| {
+                // a. Throw result.[[Error]].
+                agent.exception = .{
+                    .value = Value.from(&@"error".object),
+                    .stack_trace = agent.captureStackTrace() catch &.{},
+                };
+                return error.ExceptionThrown;
+            }
+
+            // 21. Let resultObject be OrdinaryObjectCreate(%Object.prototype%).
+            const result_object = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%Object.prototype%"(),
+            );
+
+            // 22. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            try result_object.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("read"),
+                Value.from(@as(u53, @intCast(result.read))),
+            );
+
+            // 23. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            try result_object.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("written"),
+                Value.from(@as(u53, @intCast(written))),
+            );
+
+            // 24. Return resultObject.
+            return Value.from(result_object);
+        }
+
+        /// 6 Uint8Array.prototype.setFromHex ( string )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.setfromhex
+        fn setFromHex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+            const realm = agent.currentRealm();
+            const string_value = arguments.get(0);
+
+            // 1. Let into be the this value.
+            // 2. Perform ? ValidateUint8Array(into).
+            const into = try validateUint8Array(agent, this_value);
+
+            // 3. If string is not a String, throw a TypeError exception.
+            if (!string_value.isString()) {
+                return agent.throwException(.type_error, "{f} is not a string", .{string_value});
+            }
+            const string = string_value.asString();
+
+            // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(into, seq-cst).
+            const ta = makeTypedArrayWithBufferWitnessRecord(into, .seq_cst);
+
+            // 5. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+            if (isTypedArrayOutOfBounds(ta)) {
+                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+            }
+
+            // 6. Let byteLength be TypedArrayLength(taRecord).
+            const byte_length = typedArrayLength(ta);
+
+            // 7. Let result be FromHex(string, byteLength).
+            const result = try fromHexImpl(agent, string, byte_length);
+
+            // 8. Let bytes be result.[[Bytes]].
+            const bytes = result.bytes;
+
+            // 9. Let written be the length of bytes.
+            const written = bytes.len;
+
+            // 10. NOTE: FromHex does not invoke any user code, so the ArrayBuffer backing into
+            //     cannot have been detached or shrunk.
+
+            // 11. Assert: written ≤ byteLength.
+            std.debug.assert(written <= byte_length);
+
+            // 12. Perform SetUint8ArrayBytes(into, bytes).
+            setUint8ArrayBytes(agent, into, bytes);
+
+            // 13. If result.[[Error]] is not none, then
+            if (result.@"error") |@"error"| {
+                // a. Throw result.[[Error]].
+                agent.exception = .{
+                    .value = Value.from(&@"error".object),
+                    .stack_trace = agent.captureStackTrace() catch &.{},
+                };
+                return error.ExceptionThrown;
+            }
+
+            // 14. Let resultObject be OrdinaryObjectCreate(%Object.prototype%).
+            const result_object = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%Object.prototype%"(),
+            );
+
+            // 15. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            try result_object.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("read"),
+                Value.from(@as(u53, @intCast(result.read))),
+            );
+
+            // 16. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            try result_object.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("written"),
+                Value.from(@as(u53, @intCast(written))),
+            );
+
+            // 17. Return resultObject.
+            return Value.from(result_object);
+        }
+
+        /// 1 Uint8Array.prototype.toBase64 ( [ options ] )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
         fn toBase64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
             const options_value = arguments.get(0);
 
@@ -4360,8 +4718,8 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             return Value.from(try String.fromAscii(agent, out_ascii));
         }
 
-        // 2 Uint8Array.prototype.toHex ( )
-        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tohex
+        /// 2 Uint8Array.prototype.toHex ( )
+        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tohex
         fn toHex(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
             // 1. Let O be the this value.
             // 2. Perform ? ValidateUint8Array(O).
