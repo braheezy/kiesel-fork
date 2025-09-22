@@ -8,6 +8,9 @@ pub const utils = @import("utils.zig");
 
 pub const version = build_options.version;
 
+// Needed by the CLI
+pub const temporal_rs = @import("c/temporal_rs.zig");
+
 test {
     _ = builtins;
     _ = execution;

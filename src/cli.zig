@@ -5,6 +5,7 @@ const args = @import("args");
 const icu4zig = @import("icu4zig");
 const kiesel = @import("kiesel");
 const kiesel_runtime = @import("kiesel-runtime");
+const temporal_rs = kiesel.temporal_rs;
 
 const Editor = @import("zigline").Editor;
 
@@ -956,6 +957,20 @@ pub fn main() !u8 {
             if (icu4zig.Locale.fromString(lang_trimmed)) |locale|
                 platform.default_locale = locale
             else |_| {}
+        } else |_| {}
+    }
+
+    if (kiesel.build_options.enable_temporal) {
+        if (std.process.getEnvVarOwned(allocator, "TZ")) |tz| {
+            defer allocator.free(tz);
+            const string_view = temporal_rs.toDiplomatStringView(tz);
+            if (temporal_rs.success(
+                temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(string_view),
+            ) orelse temporal_rs.success(
+                temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(string_view),
+            )) |time_zone| {
+                platform.default_time_zone = time_zone;
+            }
         } else |_| {}
     }
 
