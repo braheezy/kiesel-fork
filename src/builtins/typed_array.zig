@@ -3848,8 +3848,8 @@ pub fn validateUint8Array(agent: *Agent, value: Value) error{ExceptionThrown}!*T
     return typed_array;
 }
 
-/// 8 GetUint8ArrayBytes ( ta )
-/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-getuint8arraybytes
+/// 23.3.3.2 GetUint8ArrayBytes ( ta )
+/// https://tc39.es/ecma262/#sec-getuint8arraybytes
 pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.Error![]const u8 {
     std.debug.assert(typed_array.fields.element_type == .uint8);
 
@@ -3881,15 +3881,15 @@ pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.E
     return buffer.arrayBufferData().?.items[@intCast(byte_offset)..@intCast(byte_offset + len)];
 }
 
-/// 9 SetUint8ArrayBytes ( into, bytes )
-/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-writeuint8arraybytes
+/// 23.3.3.3 SetUint8ArrayBytes ( into, bytes )
+/// https://tc39.es/ecma262/#sec-setuint8arraybytes
 fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void {
     std.debug.assert(into.fields.element_type == .uint8);
 
     // 1. Let offset be into.[[ByteOffset]].
     const offset = into.fields.byte_offset;
 
-    // 2. Let len be the length of bytes.
+    // 2. Let len be the number of elements in bytes.
     // 3. Let index be 0.
     // 4. Repeat, while index < len,
     for (bytes, 0..) |byte, index| {
@@ -3911,6 +3911,8 @@ fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void 
 
         // d. Set index to index + 1.
     }
+
+    // 5. Return unused.
 }
 
 const Alphabet = enum {
@@ -3930,8 +3932,8 @@ const FromBase64Result = struct {
     @"error": ?*builtins.SyntaxError,
 };
 
-/// 10.3 FromBase64 ( string, alphabet, lastChunkHandling [ , maxLength ] )
-/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-frombase64
+/// 23.3.3.7 FromBase64 ( string, alphabet, lastChunkHandling [ , maxLength ] )
+/// https://tc39.es/ecma262/#sec-frombase64
 fn fromBase64Impl(
     agent: *Agent,
     string: *const String,
@@ -3940,21 +3942,20 @@ fn fromBase64Impl(
     maybe_max_length: ?u53,
 ) std.mem.Allocator.Error!FromBase64Result {
     // 1. If maxLength is not present, then
-    //     a. Let maxLength be 2**53 - 1.
-    //     b. NOTE: Because the input is a string, the length of strings is limited to 2**53 - 1
+    //     a. Set maxLength to 2**53 - 1.
+    //     b. NOTE: Because the input is a String, the length of Strings is limited to 2**53 - 1
     //        characters, and the output requires no more bytes than the input has characters, this
     //        limit can never be reached. However, it is editorially convenient to use a finite
-    //        value here.
+    //        value for maxLength.
     const max_length = maybe_max_length orelse std.math.maxInt(u53);
 
     // 2. NOTE: The order of validation and decoding in the algorithm below is not observable.
     //    Implementations are encouraged to perform them in whatever order is most efficient,
-    //    possibly interleaving validation with decoding, as long as the behaviour is observably
-    //    equivalent.
+    //    possibly interleaving validation with decoding.
 
-    // 3. If maxLength is 0, then
+    // 3. If maxLength = 0, then
     if (max_length == 0) {
-        // a. Return the Record { [[Read]]: 0, [[Bytes]]: « », [[Error]]: none }.
+        // a. Return the Record { [[Read]]: 0, [[Bytes]]: « », [[Error]]: none }.
         return .{ .read = 0, .bytes = &.{}, .@"error" = null };
     }
 
@@ -4015,41 +4016,41 @@ const FromHexResult = struct {
     @"error": ?*builtins.SyntaxError,
 };
 
-/// 10.4 FromHex ( string [ , maxLength ] )
-/// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-fromhex
+/// 23.3.3.8 FromHex ( string [ , maxLength ] )
+/// https://tc39.es/ecma262/#sec-fromhex
 fn fromHexImpl(
     agent: *Agent,
     string: *const String,
     maybe_max_length: ?u53,
 ) std.mem.Allocator.Error!FromHexResult {
-    // 1. If maxLength is not present, let maxLength be 2**53 - 1.
+    // 1. If maxLength is not present, set maxLength to 2**53 - 1.
     const max_length = maybe_max_length orelse std.math.maxInt(u53);
 
     // 2. Let length be the length of string.
     const length = string.length();
 
-    // 3. Let bytes be « ».
+    // 3. Let bytes be a new empty List.
 
     // 4. Let read be 0.
     var read: usize = 0;
 
-    // 5. If length modulo 2 is not 0, then
+    // 5. If length modulo 2 ≠ 0, then
     if (length % 2 != 0) {
-        // a. Let error be a new SyntaxError exception.
+        // a. Let error be a newly created SyntaxError object.
         const @"error" = try agent.createErrorObject(
             .syntax_error,
             "Invalid hex string, length must be a multiple of two",
             .{},
         );
 
-        // b. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+        // b. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
         return .{ .read = read, .bytes = &.{}, .@"error" = @"error" };
     }
 
     var bytes: std.ArrayList(u8) = try .initCapacity(agent.gc_allocator, length / 2);
     var it = string.codeUnitIterator();
 
-    // 6. Repeat, while read < length and the length of bytes < maxLength,
+    // 6. Repeat, while read < length and the number of elements in bytes < maxLength,
     while (read < length and bytes.items.len < max_length) {
         // a. Let hexits be the substring of string from read to read + 2.
         const hexits: [2]u8 = .{
@@ -4059,14 +4060,14 @@ fn fromHexImpl(
 
         // b. If hexits contains any code units which are not in "0123456789abcdefABCDEF", then
         if (!std.ascii.isHex(hexits[0]) or !std.ascii.isHex(hexits[1])) {
-            // i. Let error be a new SyntaxError exception.
+            // i. Let error be a newly created SyntaxError object.
             const @"error" = try agent.createErrorObject(
                 .syntax_error,
                 "Invalid hex string, characters must be hex digits",
                 .{},
             );
 
-            // ii. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+            // ii. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
             return .{
                 .read = read,
                 .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
@@ -4078,7 +4079,7 @@ fn fromHexImpl(
         read += 2;
 
         // d. Let byte be the integer value represented by hexits in base-16 notation, using the
-        //    letters A-F and a-f for digits with values 10 through 15.
+        //    letters A through F and a through f for digits with values 10 through 15.
         const hi = std.fmt.charToDigit(hexits[0], 16) catch unreachable;
         const lo = std.fmt.charToDigit(hexits[1], 16) catch unreachable;
         const byte = (hi << 4) | lo;
@@ -4087,7 +4088,7 @@ fn fromHexImpl(
         bytes.appendAssumeCapacity(byte);
     }
 
-    // 7. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: none }.
+    // 7. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: none }.
     return .{
         .read = read,
         .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
@@ -4288,8 +4289,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
         }
 
-        /// 3 Uint8Array.fromBase64 ( string [ , options ] )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
+        /// 23.3.1.1 Uint8Array.fromBase64 ( string [ , options ] )
+        /// https://tc39.es/ecma262/#sec-uint8array.frombase64
         fn fromBase64(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const realm = agent.currentRealm();
             const string_value = arguments.get(0);
@@ -4301,10 +4302,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 2. Let opts be ? GetOptionsObject(options).
+            // 2. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 3. Let alphabet be ? Get(opts, "alphabet").
+            // 3. Let alphabet be ? Get(opts, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 4. If alphabet is undefined, set alphabet to "base64".
@@ -4318,7 +4319,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4343,7 +4344,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 10. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Throw result.[[Error]].
+                // a. Return ThrowCompletion(result.[[Error]]).
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4351,10 +4352,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return error.ExceptionThrown;
             }
 
-            // 11. Let resultLength be the length of result.[[Bytes]].
+            // 11. Let resultLength be the number of elements in result.[[Bytes]].
             const result_length: u53 = @intCast(result.bytes.len);
 
-            // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //     "%Uint8Array.prototype%", resultLength).
             const typed_array = try allocateTypedArray(
                 agent,
@@ -4364,17 +4365,19 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 result_length,
             );
 
-            // 13. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
+            // 13. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
+            //     elements in result.[[Bytes]].
+            // 14. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
             //     the value at the corresponding index of result.[[Bytes]].
             const block = typed_array.fields.viewed_array_buffer.arrayBufferData().?;
             @memcpy(block.items, result.bytes);
 
-            // 14. Return ta.
+            // 15. Return ta.
             return Value.from(&typed_array.object);
         }
 
-        /// 5 Uint8Array.fromHex ( string )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.fromhex
+        /// 23.3.1.2 Uint8Array.fromHex ( string )
+        /// https://tc39.es/ecma262/#sec-uint8array.fromhex
         fn fromHex(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const realm = agent.currentRealm();
             const string_value = arguments.get(0);
@@ -4390,7 +4393,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 3. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Throw result.[[Error]].
+                // a. Return ThrowCompletion(result.[[Error]]).
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4398,10 +4401,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return error.ExceptionThrown;
             }
 
-            // 4. Let resultLength be the length of result.[[Bytes]].
+            // 4. Let resultLength be the number of elements in result.[[Bytes]].
             const result_length: u53 = @intCast(result.bytes.len);
 
-            // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //    "%Uint8Array.prototype%", resultLength).
             const typed_array = try allocateTypedArray(
                 agent,
@@ -4411,12 +4414,14 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 result_length,
             );
 
-            // 6. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
+            // 6. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
+            //    elements in result.[[Bytes]].
+            // 7. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
             //    the value at the corresponding index of result.[[Bytes]].
             const block = typed_array.fields.viewed_array_buffer.arrayBufferData().?;
             @memcpy(block.items, result.bytes);
 
-            // 7. Return ta.
+            // 8. Return ta.
             return Value.from(&typed_array.object);
         }
     };
@@ -4459,15 +4464,15 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
         }
 
-        /// 4 Uint8Array.prototype.setFromBase64 ( string [ , options ] )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.setfrombase64
+        /// 23.3.2.1 Uint8Array.prototype.setFromBase64 ( string [ , options ] )
+        /// https://tc39.es/ecma262/#sec-uint8array.prototype.setfrombase64
         fn setFromBase64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
             const realm = agent.currentRealm();
             const string_value = arguments.get(0);
             const options_value = arguments.get(1);
 
             // 1. Let into be the this value.
-            // 2. Perform ? ValidateUint8Array(into).
+            // 2. Perform ? ValidateUint8Array(into).
             const into = try validateUint8Array(agent, this_value);
 
             // 3. If string is not a String, throw a TypeError exception.
@@ -4476,10 +4481,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 4. Let opts be ? GetOptionsObject(options).
+            // 4. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 5. Let alphabet be ? Get(opts, "alphabet").
+            // 5. Let alphabet be ? Get(opts, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 6. If alphabet is undefined, set alphabet to "base64".
@@ -4493,7 +4498,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 9. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4536,7 +4541,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 15. Let bytes be result.[[Bytes]].
             const bytes = result.bytes;
 
-            // 16. Let written be the length of bytes.
+            // 16. Let written be the number of elements in bytes.
             const written = bytes.len;
 
             // 17. NOTE: FromBase64 does not invoke any user code, so the ArrayBuffer backing into
@@ -4550,7 +4555,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 20. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Throw result.[[Error]].
+                // a. Return ThrowCompletion(result.[[Error]]).
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4564,14 +4569,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 try realm.intrinsics.@"%Object.prototype%"(),
             );
 
-            // 22. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            // 22. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("read"),
                 Value.from(@as(u53, @intCast(result.read))),
             );
 
-            // 23. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            // 23. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("written"),
@@ -4582,14 +4587,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             return Value.from(result_object);
         }
 
-        /// 6 Uint8Array.prototype.setFromHex ( string )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.setfromhex
+        /// 23.3.2.2 Uint8Array.prototype.setFromHex ( string )
+        /// https://tc39.es/ecma262/#sec-uint8array.prototype.setfromhex
         fn setFromHex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
             const realm = agent.currentRealm();
             const string_value = arguments.get(0);
 
             // 1. Let into be the this value.
-            // 2. Perform ? ValidateUint8Array(into).
+            // 2. Perform ? ValidateUint8Array(into).
             const into = try validateUint8Array(agent, this_value);
 
             // 3. If string is not a String, throw a TypeError exception.
@@ -4615,7 +4620,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 8. Let bytes be result.[[Bytes]].
             const bytes = result.bytes;
 
-            // 9. Let written be the length of bytes.
+            // 9. Let written be the number of elements in bytes.
             const written = bytes.len;
 
             // 10. NOTE: FromHex does not invoke any user code, so the ArrayBuffer backing into
@@ -4629,7 +4634,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 13. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Throw result.[[Error]].
+                // a. Return ThrowCompletion(result.[[Error]]).
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4643,14 +4648,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 try realm.intrinsics.@"%Object.prototype%"(),
             );
 
-            // 15. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            // 15. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("read"),
                 Value.from(@as(u53, @intCast(result.read))),
             );
 
-            // 16. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            // 16. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("written"),
@@ -4661,19 +4666,19 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             return Value.from(result_object);
         }
 
-        /// 1 Uint8Array.prototype.toBase64 ( [ options ] )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
+        /// 23.3.2.3 Uint8Array.prototype.toBase64 ( [ options ] )
+        /// https://tc39.es/ecma262/#sec-uint8array.prototype.tobase64
         fn toBase64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
             const options_value = arguments.get(0);
 
             // 1. Let O be the this value.
-            // 2. Perform ? ValidateUint8Array(O).
+            // 2. Perform ? ValidateUint8Array(O).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let opts be ? GetOptionsObject(options).
+            // 3. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 4. Let alphabet be ? Get(opts, "alphabet").
+            // 4. Let alphabet be ? Get(opts, "alphabet").
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
@@ -4690,7 +4695,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
             const omit_padding = (try options.get(agent, PropertyKey.from("omitPadding"))).toBoolean();
 
-            // 8. Let toEncode be ? GetUint8ArrayBytes(O).
+            // 8. Let toEncode be ? GetUint8ArrayBytes(O).
             const to_encode = try getUint8ArrayBytes(agent, typed_array);
 
             // 9. If alphabet is "base64", then
@@ -4718,14 +4723,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             return Value.from(try String.fromAscii(agent, out_ascii));
         }
 
-        /// 2 Uint8Array.prototype.toHex ( )
-        /// https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tohex
+        /// 23.3.2.4 Uint8Array.prototype.toHex ( )
+        /// https://tc39.es/ecma262/#sec-uint8array.prototype.tohex
         fn toHex(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
             // 1. Let O be the this value.
-            // 2. Perform ? ValidateUint8Array(O).
+            // 2. Perform ? ValidateUint8Array(O).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let toEncode be ? GetUint8ArrayBytes(O).
+            // 3. Let toEncode be ? GetUint8ArrayBytes(O).
             const to_encode = try getUint8ArrayBytes(agent, typed_array);
 
             // 4. Let out be the empty String.

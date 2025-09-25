@@ -2247,8 +2247,8 @@ pub fn createArrayFromListMapToValue(
     return array;
 }
 
-/// 9.2.9 GetOptionsObject ( options )
-/// https://tc39.es/ecma402/#sec-getoptionsobject
+/// 7.3.36 GetOptionsObject ( options )
+/// https://tc39.es/ecma262/#sec-getoptionsobject
 pub fn getOptionsObject(self: Value, agent: *Agent) Agent.Error!*Object {
     // 1. If options is undefined, then
     if (self.isUndefined()) {
