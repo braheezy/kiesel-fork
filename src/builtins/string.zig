@@ -1141,16 +1141,15 @@ pub const prototype = struct {
         // 9. Let searchLen be the length of searchStr.
         const search_len = search_str.length();
 
-        // 10. Let start be the result of clamping pos between 0 and len - searchLen.
-        const start = std.math.clamp(
-            std.math.lossyCast(usize, pos),
-            0,
-            std.math.sub(usize, len, search_len) catch return Value.from(-1),
-        );
+        // 10. If len < searchLen, return -1𝔽.
+        if (len < search_len) return Value.from(-1);
 
-        // 11. Let result be StringLastIndexOf(S, searchStr, start).
-        // 12. If result is not-found, return -1𝔽.
-        // 13. Return 𝔽(result).
+        // 11. Let start be the result of clamping pos between 0 and len - searchLen.
+        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len - search_len);
+
+        // 12. Let result be StringLastIndexOf(S, searchStr, start).
+        // 13. If result is not-found, return -1𝔽.
+        // 14. Return 𝔽(result).
         return if (string.lastIndexOf(search_str, start)) |result|
             Value.from(@as(u53, @intCast(result)))
         else
