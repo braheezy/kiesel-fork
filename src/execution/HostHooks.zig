@@ -10,6 +10,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ByteLength = types.ByteLength;
 const Cell = builtins.finalization_registry.Cell;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
@@ -84,8 +85,8 @@ hostGetImportMetaProperties: *const fn (
     module: *SourceTextModule,
 ) std.mem.Allocator.Error!ImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
 hostGrowSharedArrayBuffer: *const fn (
-    buffer: *builtins.SharedArrayBuffer,
-    new_byte_length: u53,
+    buffer: *builtins.ArrayBuffer,
+    new_byte_length: ByteLength,
 ) Agent.Error!GrowSharedArrayBufferHandled = default_host_hooks.hostGrowSharedArrayBuffer,
 hostHasSourceTextAvailable: *const fn (
     func: *Object,
@@ -107,7 +108,7 @@ hostPromiseRejectionTracker: *const fn (
 ) void = default_host_hooks.hostPromiseRejectionTracker,
 hostResizeArrayBuffer: *const fn (
     buffer: *builtins.ArrayBuffer,
-    new_byte_length: u53,
+    new_byte_length: ByteLength,
 ) Agent.Error!ResizeArrayBufferHandled = default_host_hooks.hostResizeArrayBuffer,
 hostSystemUTCEpochNanoseconds: *const fn (
     agent: *Agent,

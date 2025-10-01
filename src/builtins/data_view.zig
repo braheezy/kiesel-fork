@@ -9,8 +9,11 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const ArrayBufferLike = builtins.array_buffer.ArrayBufferLike;
+const AutoByteLength = types.AutoByteLength;
 const BigInt = types.BigInt;
+const ByteLength = types.ByteLength;
+const ByteOffset = types.ByteOffset;
+const DetachedByteLength = types.DetachedByteLength;
 const ElementType = builtins.typed_array.ElementType;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -29,17 +32,11 @@ const setValueInBuffer = builtins.setValueInBuffer;
 /// 25.3.1.1 DataView With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-dataview-with-buffer-witness-records
 const DataViewWithBufferWitness = struct {
-    pub const CachedBufferByteLength = enum(u53) {
-        // It is reasonable to assume no buffer will ever be this large.
-        detached = std.math.maxInt(u53),
-        _,
-    };
-
     /// [[Object]]
     object: *const DataView,
 
     /// [[CachedBufferByteLength]]
-    cached_buffer_byte_length: CachedBufferByteLength,
+    cached_buffer_byte_length: DetachedByteLength,
 };
 
 /// 25.3.1.2 MakeDataViewWithBufferWitnessRecord ( obj, order )
@@ -52,13 +49,13 @@ fn makeDataViewWithBufferWitnessRecord(
     const buffer = object.fields.viewed_array_buffer;
 
     // 2. If IsDetachedBuffer(buffer) is true, then
-    const byte_length: DataViewWithBufferWitness.CachedBufferByteLength = if (isDetachedBuffer(buffer)) blk: {
+    const byte_length: DetachedByteLength = if (isDetachedBuffer(buffer)) blk: {
         // a. Let byteLength be detached.
         break :blk .detached;
     } else blk: {
         // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
-        break :blk @enumFromInt(arrayBufferByteLength(buffer, order));
+        break :blk arrayBufferByteLength(buffer, order).toDetached();
     };
 
     // 4. Return the DataView With Buffer Witness Record {
@@ -69,7 +66,7 @@ fn makeDataViewWithBufferWitnessRecord(
 
 /// 25.3.1.3 GetViewByteLength ( viewRecord )
 /// https://tc39.es/ecma262/#sec-getviewbytelength
-fn getViewByteLength(view: DataViewWithBufferWitness) u53 {
+fn getViewByteLength(view: DataViewWithBufferWitness) ByteLength {
     // 1. Assert: IsViewOutOfBounds(viewRecord) is false.
     std.debug.assert(!isViewOutOfBounds(view));
 
@@ -77,7 +74,9 @@ fn getViewByteLength(view: DataViewWithBufferWitness) u53 {
     const data_view = view.object;
 
     // 3. If view.[[ByteLength]] is not auto, return view.[[ByteLength]].
-    if (data_view.fields.byte_length != .auto) return @intFromEnum(data_view.fields.byte_length);
+    if (data_view.fields.byte_length != .auto) {
+        return @enumFromInt(@intFromEnum(data_view.fields.byte_length));
+    }
 
     // 4. Assert: IsFixedLengthArrayBuffer(view.[[ViewedArrayBuffer]]) is false.
     std.debug.assert(!isFixedLengthArrayBuffer(data_view.fields.viewed_array_buffer));
@@ -92,7 +91,7 @@ fn getViewByteLength(view: DataViewWithBufferWitness) u53 {
     std.debug.assert(byte_length != .detached);
 
     // 8. Return byteLength - byteOffset.
-    return @intFromEnum(byte_length) - byte_offset;
+    return @enumFromInt(@intFromEnum(byte_length) - @intFromEnum(byte_offset));
 }
 
 /// 25.3.1.4 IsViewOutOfBounds ( viewRecord )
@@ -117,22 +116,22 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     const byte_offset_start = data_view.fields.byte_offset;
 
     // 6. If view.[[ByteLength]] is auto, then
-    const byte_offset_end = if (data_view.fields.byte_length == .auto) blk: {
+    const byte_offset_end: ByteOffset = if (data_view.fields.byte_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk @intFromEnum(buffer_byte_length);
+        break :blk @enumFromInt(@intFromEnum(buffer_byte_length));
     } else blk: {
         // 7. Else,
         // a. Let byteOffsetEnd be byteOffsetStart + view.[[ByteLength]].
-        break :blk std.math.add(
+        break :blk @enumFromInt(std.math.add(
             u53,
-            byte_offset_start,
-            @intFromEnum(data_view.fields.byte_length),
-        ) catch return true;
+            @intFromEnum(byte_offset_start),
+            @intFromEnum(data_view.fields.byte_length.unwrap().?),
+        ) catch return true);
     };
 
     // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (byte_offset_start > @intFromEnum(buffer_byte_length) or
-        byte_offset_end > @intFromEnum(buffer_byte_length)) return true;
+    if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
+        @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
 
     // 9. NOTE: 0-length DataViews are not considered out-of-bounds.
     // 10. Return false.
@@ -178,7 +177,7 @@ fn getViewValue(
     const element_size = @"type".elementSize();
 
     // 11. If getIndex + elementSize > viewSize, throw a RangeError exception.
-    if (if (std.math.add(u53, get_index, element_size)) |x| x > view_size else |_| true) {
+    if (if (std.math.add(u53, get_index, element_size)) |x| x > @intFromEnum(view_size) else |_| true) {
         return agent.throwException(
             .range_error,
             "Cannot get element of size {d} at index {d}",
@@ -187,7 +186,7 @@ fn getViewValue(
     }
 
     // 12. Let bufferIndex be getIndex + viewOffset.
-    const buffer_index = get_index + view_offset;
+    const buffer_index = get_index + @intFromEnum(view_offset);
 
     // 13. Return GetValueFromBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, false,
     //     unordered, isLittleEndian).
@@ -253,7 +252,7 @@ fn setViewValue(
     const element_size = @"type".elementSize();
 
     // 13. If getIndex + elementSize > viewSize, throw a RangeError exception.
-    if (if (std.math.add(u53, get_index, element_size)) |x| x > view_size else |_| true) {
+    if (if (std.math.add(u53, get_index, element_size)) |x| x > @intFromEnum(view_size) else |_| true) {
         return agent.throwException(
             .range_error,
             "Cannot set element of size {d} at index {d}",
@@ -262,7 +261,7 @@ fn setViewValue(
     }
 
     // 14. Let bufferIndex be getIndex + viewOffset.
-    const buffer_index = get_index + view_offset;
+    const buffer_index = get_index + @intFromEnum(view_offset);
 
     // 15. Perform SetValueInBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, numberValue,
     //     false, unordered, isLittleEndian).
@@ -323,16 +322,10 @@ pub const constructor = struct {
         }
 
         // 2. Perform ? RequireInternalSlot(buffer, [[ArrayBufferData]]).
-        const buffer: ArrayBufferLike = if (buffer_value.castObject(builtins.ArrayBuffer)) |array_buffer|
-            .{ .array_buffer = array_buffer }
-        else if (buffer_value.castObject(builtins.SharedArrayBuffer)) |shared_array_buffer|
-            .{ .shared_array_buffer = shared_array_buffer }
-        else {
-            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
-        };
+        const buffer = try buffer_value.requireInternalSlot(agent, builtins.ArrayBuffer);
 
         // 3. Let offset be ? ToIndex(byteOffset).
-        const offset = try byte_offset.toIndex(agent);
+        const offset: ByteOffset = @enumFromInt(try byte_offset.toIndex(agent));
 
         // 4. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
         if (isDetachedBuffer(buffer)) {
@@ -343,7 +336,7 @@ pub const constructor = struct {
         var buffer_byte_length = arrayBufferByteLength(buffer, .seq_cst);
 
         // 6. If offset > bufferByteLength, throw a RangeError exception.
-        if (offset > buffer_byte_length) {
+        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "DataView start cannot exceed buffer byte length",
@@ -355,11 +348,11 @@ pub const constructor = struct {
         const buffer_is_fixed_length = isFixedLengthArrayBuffer(buffer);
 
         // 8. If byteLength is undefined, then
-        const view_byte_length: DataView.Fields.ByteLength = if (byte_length.isUndefined()) blk: {
+        const view_byte_length: AutoByteLength = if (byte_length.isUndefined()) blk: {
             // a. If bufferIsFixedLength is true, then
             if (buffer_is_fixed_length) {
                 // i. Let viewByteLength be bufferByteLength - offset.
-                break :blk @enumFromInt(buffer_byte_length - offset);
+                break :blk @enumFromInt(@intFromEnum(buffer_byte_length) - @intFromEnum(offset));
             } else {
                 // b. Else,
                 // i. Let viewByteLength be auto.
@@ -368,11 +361,11 @@ pub const constructor = struct {
         } else blk: {
             // 9. Else,
             // a. Let viewByteLength be ? ToIndex(byteLength).
-            const view_byte_length = try byte_length.toIndex(agent);
+            const view_byte_length: ByteLength = @enumFromInt(try byte_length.toIndex(agent));
 
             // b. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, offset, view_byte_length)) |x|
-                x > buffer_byte_length
+            if (if (std.math.add(u53, @intFromEnum(offset), @intFromEnum(view_byte_length))) |x|
+                x > @intFromEnum(buffer_byte_length)
             else |_|
                 true)
             {
@@ -383,7 +376,7 @@ pub const constructor = struct {
                 );
             }
 
-            break :blk @enumFromInt(view_byte_length);
+            break :blk view_byte_length.toAuto();
         };
 
         // 10. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%DataView.prototype%",
@@ -409,7 +402,7 @@ pub const constructor = struct {
         buffer_byte_length = arrayBufferByteLength(buffer, .seq_cst);
 
         // 13. If offset > bufferByteLength, throw a RangeError exception.
-        if (offset > buffer_byte_length) {
+        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "DataView start cannot exceed buffer byte length",
@@ -420,8 +413,8 @@ pub const constructor = struct {
         // 14. If byteLength is not undefined, then
         if (!byte_length.isUndefined()) {
             // a. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, offset, @intFromEnum(view_byte_length))) |x|
-                x > buffer_byte_length
+            if (if (std.math.add(u53, @intFromEnum(offset), @intFromEnum(view_byte_length.unwrap().?))) |x|
+                x > @intFromEnum(buffer_byte_length)
             else |_|
                 true)
             {
@@ -515,7 +508,7 @@ pub const prototype = struct {
         const buffer_ = object.fields.viewed_array_buffer;
 
         // 5. Return buffer.
-        return Value.from(buffer_.object());
+        return Value.from(&buffer_.object);
     }
 
     /// 25.3.4.2 get DataView.prototype.byteLength
@@ -538,7 +531,7 @@ pub const prototype = struct {
         const size = getViewByteLength(view);
 
         // 7. Return 𝔽(size).
-        return Value.from(size);
+        return Value.from(@intFromEnum(size));
     }
 
     /// 25.3.4.3 get DataView.prototype.byteOffset
@@ -561,7 +554,7 @@ pub const prototype = struct {
         const offset = object.fields.byte_offset;
 
         // 7. Return 𝔽(offset).
-        return Value.from(offset);
+        return Value.from(@intFromEnum(offset));
     }
 
     /// 25.3.4.5 DataView.prototype.getBigInt64 ( byteOffset [ , littleEndian ] )
@@ -832,20 +825,14 @@ pub const prototype = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-dataview-instances
 pub const DataView = MakeObject(.{
     .Fields = struct {
-        pub const ByteLength = enum(u53) {
-            // It is reasonable to assume no buffer will ever be this large.
-            auto = std.math.maxInt(u53),
-            _,
-        };
-
         /// [[ViewedArrayBuffer]]
-        viewed_array_buffer: ArrayBufferLike,
+        viewed_array_buffer: *builtins.ArrayBuffer,
 
         /// [[ByteLength]]
-        byte_length: ByteLength,
+        byte_length: AutoByteLength,
 
         /// [[ByteOffset]]
-        byte_offset: u53,
+        byte_offset: ByteOffset,
     },
     .tag = .data_view,
 });

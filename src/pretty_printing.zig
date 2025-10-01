@@ -94,21 +94,29 @@ fn prettyPrintArrayBuffer(
 ) PrettyPrintError!void {
     const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("ArrayBuffer(");
-    try tty_config.setColor(writer, .reset);
-    if (array_buffer.fields.array_buffer_data) |data| {
-        try writer.print("byteLength: {f}", .{Value.from(@as(u53, @intCast(data.items.len))).fmtPretty()});
-        if (array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
-            try writer.print(", maxByteLength: {f}", .{Value.from(max_byte_length).fmtPretty()});
+    if (array_buffer.fields.data_block) |data_block| {
+        try tty_config.setColor(writer, .white);
+        if (data_block.shared) {
+            try writer.writeAll("SharedArrayBuffer(");
+        } else {
+            try writer.writeAll("ArrayBuffer(");
         }
-        if (data.items.len != 0) {
+        try tty_config.setColor(writer, .reset);
+        try writer.print("byteLength: {f}", .{
+            Value.from(@intFromEnum(array_buffer.fields.byte_length)).fmtPretty(),
+        });
+        if (array_buffer.fields.max_byte_length.unwrap()) |max_byte_length| {
+            try writer.print(", maxByteLength: {f}", .{
+                Value.from(@intFromEnum(max_byte_length)).fmtPretty(),
+            });
+        }
+        if (data_block.bytes.len != 0) {
             try writer.writeAll(", data: ");
             try tty_config.setColor(writer, .dim);
             // Like std.fmt.fmtSliceHexLower() but with a space between each bytes
             const charset = "0123456789abcdef";
             var buf: [2]u8 = undefined;
-            for (data.items, 0..) |c, i| {
+            for (data_block.bytes, 0..) |c, i| {
                 if (i != 0) try writer.writeAll(" ");
                 buf[0] = charset[c >> 4];
                 buf[1] = charset[c & 15];
@@ -116,14 +124,18 @@ fn prettyPrintArrayBuffer(
             }
             try tty_config.setColor(writer, .reset);
         }
+        try tty_config.setColor(writer, .white);
+        try writer.writeAll(")");
+        try tty_config.setColor(writer, .reset);
     } else {
+        try tty_config.setColor(writer, .white);
+        try writer.writeAll("ArrayBuffer(");
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<detached>");
+        try tty_config.setColor(writer, .white);
+        try writer.writeAll(")");
         try tty_config.setColor(writer, .reset);
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
 }
 
 fn prettyPrintArrayIterator(
@@ -201,19 +213,18 @@ fn prettyPrintDataView(
     writer: *std.Io.Writer,
 ) PrettyPrintError!void {
     const viewed_array_buffer = date.fields.viewed_array_buffer;
-    const byte_length = date.fields.byte_length;
     const byte_offset = date.fields.byte_offset;
     const tty_config = state.platform.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("DataView(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("arrayBuffer: {f}", .{Value.from(viewed_array_buffer.object()).fmtPretty()});
-    if (byte_length != .auto) {
+    try writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty()});
+    if (date.fields.byte_length.unwrap()) |byte_length| {
         try writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty()});
     }
-    if (byte_offset != 0) {
-        try writer.print(", byteOffset: {f}", .{Value.from(byte_offset).fmtPretty()});
+    if (byte_offset != .zero) {
+        try writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty()});
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -548,39 +559,6 @@ fn prettyPrintSetIterator(
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintSharedArrayBuffer(
-    shared_array_buffer: *const builtins.SharedArrayBuffer,
-    writer: *std.Io.Writer,
-) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("SharedArrayBuffer(");
-    try tty_config.setColor(writer, .reset);
-    const data = shared_array_buffer.fields.array_buffer_data;
-    try writer.print("byteLength: {f}", .{Value.from(@as(u53, @intCast(data.items.len))).fmtPretty()});
-    if (shared_array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
-        try writer.print(", maxByteLength: {f}", .{Value.from(max_byte_length).fmtPretty()});
-    }
-    if (data.items.len != 0) {
-        try writer.writeAll(", data: ");
-        try tty_config.setColor(writer, .dim);
-        // Like std.fmt.fmtSliceHexLower() but with a space between each bytes
-        const charset = "0123456789abcdef";
-        var buf: [2]u8 = undefined;
-        for (data.items, 0..) |c, i| {
-            if (i != 0) try writer.writeAll(" ");
-            buf[0] = charset[c >> 4];
-            buf[1] = charset[c & 15];
-            try writer.writeAll(&buf);
-        }
-        try tty_config.setColor(writer, .reset);
-    }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
-}
-
 fn prettyPrintStringIterator(
     string_iterator: *const builtins.StringIterator,
     writer: *std.Io.Writer,
@@ -613,12 +591,12 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.I
     try tty_config.setColor(writer, .white);
     try writer.print("{s}(", .{element_type.typedArrayName()});
     try tty_config.setColor(writer, .reset);
-    if (viewed_array_buffer.arrayBufferData()) |data| {
+    if (viewed_array_buffer.fields.data_block) |data_block| {
         const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
-        try writer.print("length: {f}", .{Value.from(array_length).fmtPretty()});
-        if (data.items.len != 0) {
+        try writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty()});
+        if (data_block.bytes.len != 0) {
             try writer.writeAll(", data: ");
             try tty_config.setColor(writer, .white);
             try writer.writeAll("[");
@@ -628,9 +606,9 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.I
                 inline else => |@"type"| {
                     const element_size = @"type".elementSize();
                     var i: u53 = 0;
-                    while (i < data.items.len) : (i += element_size) {
+                    while (i < data_block.bytes.len) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
-                            data.items[@intCast(byte_offset + i)..@intCast(byte_offset + i + element_size)],
+                            data_block.bytes[@intCast(@intFromEnum(byte_offset) + i)..@intCast(@intFromEnum(byte_offset) + i + element_size)],
                         );
                         const value = std.mem.bytesAsValue(@"type".type(), bytes).*;
                         const numeric = if (@"type".isBigIntElementType())
@@ -1334,7 +1312,6 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
             .{ builtins.RegExpStringIterator, prettyPrintRegExpStringIterator },
             .{ builtins.Set, prettyPrintSet },
             .{ builtins.SetIterator, prettyPrintSetIterator },
-            .{ builtins.SharedArrayBuffer, prettyPrintSharedArrayBuffer },
             .{ builtins.String, prettyPrintPrimitiveWrapper },
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },

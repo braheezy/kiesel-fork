@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const language = @import("types/language.zig");
 const spec = @import("types/spec.zig");
 
@@ -39,9 +41,103 @@ pub const isStrictlyEqual = language.isStrictlyEqual;
 pub const sameType = language.sameType;
 pub const sameValue = language.sameValue;
 pub const sameValueZero = language.sameValueZero;
-pub const data_block_max_byte_length = spec.data_block_max_byte_length;
 
 pub const SafePointer = @import("any-pointer").SafePointer;
+
+pub const ByteLength = enum(u53) {
+    zero = 0,
+    _,
+
+    pub fn toAuto(self: ByteLength) AutoByteLength {
+        const result: AutoByteLength = @enumFromInt(@intFromEnum(self));
+        std.debug.assert(result != .auto);
+        return result;
+    }
+
+    pub fn toDetached(self: ByteLength) DetachedByteLength {
+        const result: DetachedByteLength = @enumFromInt(@intFromEnum(self));
+        std.debug.assert(result != .detached);
+        return result;
+    }
+
+    pub fn toOptional(self: ByteLength) OptionalByteLength {
+        const result: OptionalByteLength = @enumFromInt(@intFromEnum(self));
+        std.debug.assert(result != .none);
+        return result;
+    }
+};
+
+pub const AutoByteLength = enum(u54) {
+    auto = std.math.maxInt(u53) + 1,
+    zero = 0,
+    _,
+
+    pub fn unwrap(self: AutoByteLength) ?ByteLength {
+        return if (self == .auto) null else @enumFromInt(@intFromEnum(self));
+    }
+};
+
+pub const DetachedByteLength = enum(u54) {
+    detached = std.math.maxInt(u53) + 1,
+    zero = 0,
+    _,
+
+    pub fn unwrap(self: DetachedByteLength) ?ByteLength {
+        return if (self == .detached) null else @enumFromInt(@intFromEnum(self));
+    }
+};
+
+pub const OptionalByteLength = enum(u54) {
+    none = std.math.maxInt(u53) + 1,
+    zero = 0,
+    _,
+
+    pub fn unwrap(self: OptionalByteLength) ?ByteLength {
+        return if (self == .none) null else @enumFromInt(@intFromEnum(self));
+    }
+};
+
+pub const ArrayLength = enum(u53) {
+    zero = 0,
+    _,
+
+    pub fn toAuto(self: ArrayLength) AutoArrayLength {
+        const result: AutoArrayLength = @enumFromInt(@intFromEnum(self));
+        std.debug.assert(result != .auto);
+        return result;
+    }
+
+    pub fn toOptional(self: ArrayLength) OptionalArrayLength {
+        const result: OptionalArrayLength = @enumFromInt(@intFromEnum(self));
+        std.debug.assert(result != .none);
+        return result;
+    }
+};
+
+pub const AutoArrayLength = enum(u54) {
+    auto = std.math.maxInt(u53) + 1,
+    zero = 0,
+    _,
+
+    pub fn unwrap(self: AutoArrayLength) ?ArrayLength {
+        return if (self == .auto) null else @enumFromInt(@intFromEnum(self));
+    }
+};
+
+pub const OptionalArrayLength = enum(u54) {
+    none = std.math.maxInt(u53) + 1,
+    zero = 0,
+    _,
+
+    pub fn unwrap(self: OptionalArrayLength) ?ArrayLength {
+        return if (self == .none) null else @enumFromInt(@intFromEnum(self));
+    }
+};
+
+pub const ByteOffset = enum(u53) {
+    zero = 0,
+    _,
+};
 
 test {
     _ = language;

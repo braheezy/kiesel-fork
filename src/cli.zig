@@ -135,16 +135,11 @@ const Kiesel = struct {
 
     fn @"asm"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const buffer_value = arguments.get(0);
-        const buffer: kiesel.builtins.array_buffer.ArrayBufferLike = if (buffer_value.castObject(kiesel.builtins.ArrayBuffer)) |array_buffer|
-            .{ .array_buffer = array_buffer }
-        else if (buffer_value.castObject(kiesel.builtins.SharedArrayBuffer)) |shared_array_buffer|
-            .{ .shared_array_buffer = shared_array_buffer }
-        else
-            return agent.throwException(.type_error, "{f} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
-        if (kiesel.builtins.isDetachedBuffer(buffer)) {
+        const array_buffer = try buffer_value.requireInternalSlot(agent, kiesel.builtins.ArrayBuffer);
+        if (kiesel.builtins.isDetachedBuffer(array_buffer)) {
             return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
-        const data = buffer.arrayBufferData().?.items;
+        const data = array_buffer.fields.data_block.?.bytes;
         if (data.len == 0) {
             return agent.throwException(.type_error, "ArrayBuffer has zero length", .{});
         }
@@ -290,17 +285,10 @@ const Kiesel = struct {
             break :blk string_utf8.ptr;
         } else if (value.isObject() and value.asObject().is(kiesel.builtins.ArrayBuffer)) blk: {
             const array_buffer = value.asObject().as(kiesel.builtins.ArrayBuffer);
-            if (array_buffer.fields.array_buffer_data) |data_block| {
-                if (data_block.items.len != 0) {
-                    break :blk data_block.items.ptr;
+            if (array_buffer.fields.data_block) |data_block| {
+                if (data_block.bytes.len != 0) {
+                    break :blk data_block.bytes.ptr;
                 }
-            }
-            break :blk null;
-        } else if (value.isObject() and value.asObject().is(kiesel.builtins.SharedArrayBuffer)) blk: {
-            const array_buffer = value.asObject().as(kiesel.builtins.SharedArrayBuffer);
-            const data_block = array_buffer.fields.array_buffer_data;
-            if (data_block.items.len != 0) {
-                break :blk data_block.items.ptr;
             }
             break :blk null;
         } else {

@@ -10,10 +10,16 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const ArrayBufferLike = builtins.array_buffer.ArrayBufferLike;
+const ArrayLength = types.ArrayLength;
+const AutoArrayLength = types.AutoArrayLength;
+const AutoByteLength = types.AutoByteLength;
 const BigInt = types.BigInt;
+const ByteLength = types.ByteLength;
+const ByteOffset = types.ByteOffset;
+const DetachedByteLength = types.DetachedByteLength;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const OptionalArrayLength = types.OptionalArrayLength;
 const Order = builtins.array_buffer.Order;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -31,6 +37,7 @@ const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
+const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
 const isStrictlyEqual = types.isStrictlyEqual;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
@@ -384,7 +391,7 @@ fn ownPropertyKeys(
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.property_storage.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
-            @as(usize, @intCast(typedArrayLength(ta)))
+            @as(usize, @intCast(@intFromEnum(typedArrayLength(ta))))
         else
             0,
     );
@@ -396,7 +403,7 @@ fn ownPropertyKeys(
 
         // b. For each integer i such that 0 ≤ i < length, in ascending order, do
         var i: u53 = 0;
-        while (i < length) : (i += 1) {
+        while (i < @intFromEnum(length)) : (i += 1) {
             // i. Append ! ToString(𝔽(i)) to keys.
             keys.appendAssumeCapacity(PropertyKey.from(i));
         }
@@ -427,17 +434,11 @@ fn ownPropertyKeys(
 /// 10.4.5.9 TypedArray With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-typedarray-with-buffer-witness-records
 pub const TypedArrayWithBufferWitness = struct {
-    pub const CachedBufferByteLength = enum(u53) {
-        // It is reasonable to assume no buffer will ever be this large.
-        detached = std.math.maxInt(u53),
-        _,
-    };
-
     /// [[Object]]
     object: *TypedArray,
 
     /// [[CachedBufferByteLength]]
-    cached_buffer_byte_length: CachedBufferByteLength,
+    cached_buffer_byte_length: DetachedByteLength,
 };
 
 /// 10.4.5.10 MakeTypedArrayWithBufferWitnessRecord ( obj, order )
@@ -450,13 +451,13 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
     const buffer = object.fields.viewed_array_buffer;
 
     // 2. If IsDetachedBuffer(buffer) is true, then
-    const byte_length: TypedArrayWithBufferWitness.CachedBufferByteLength = if (isDetachedBuffer(buffer)) blk: {
+    const byte_length: DetachedByteLength = if (isDetachedBuffer(buffer)) blk: {
         // a. Let byteLength be detached.
         break :blk .detached;
     } else blk: {
         // 3. Else,
         // a. Let byteLength be ArrayBufferByteLength(buffer, order).
-        break :blk @enumFromInt(arrayBufferByteLength(buffer, order));
+        break :blk arrayBufferByteLength(buffer, order).toDetached();
     };
 
     // 4. Return the TypedArray With Buffer Witness Record {
@@ -467,32 +468,34 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
 
 /// 10.4.5.12 TypedArrayByteLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraybytelength
-pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
+pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) ByteLength {
     // 1. If IsTypedArrayOutOfBounds(taRecord) is true, return 0.
-    if (isTypedArrayOutOfBounds(ta)) return 0;
+    if (isTypedArrayOutOfBounds(ta)) return .zero;
 
     // 2. Let length be TypedArrayLength(taRecord).
     const length = typedArrayLength(ta);
 
     // 3. If length = 0, return 0.
-    if (length == 0) return 0;
+    if (length == .zero) return .zero;
 
     // 4. Let O be taRecord.[[Object]].
     const typed_array = ta.object;
 
     // 5. If O.[[ByteLength]] is not auto, return O.[[ByteLength]].
-    if (typed_array.fields.byte_length != .auto) return @intFromEnum(typed_array.fields.byte_length);
+    if (typed_array.fields.byte_length != .auto) {
+        return @enumFromInt(@intFromEnum(typed_array.fields.byte_length));
+    }
 
     // 6. Let elementSize be TypedArrayElementSize(O).
     const element_size = typedArrayElementSize(typed_array);
 
     // 7. Return length × elementSize.
-    return length * element_size;
+    return @enumFromInt(@intFromEnum(length) * element_size);
 }
 
 /// 10.4.5.13 TypedArrayLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraylength
-pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
+pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) ArrayLength {
     // 1. Assert: IsTypedArrayOutOfBounds(taRecord) is false.
     std.debug.assert(!isTypedArrayOutOfBounds(ta));
 
@@ -500,7 +503,9 @@ pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     const typed_array = ta.object;
 
     // 3. If O.[[ArrayLength]] is not auto, return O.[[ArrayLength]].
-    if (typed_array.fields.array_length != .auto) return @intFromEnum(typed_array.fields.array_length);
+    if (typed_array.fields.array_length != .auto) {
+        return @enumFromInt(@intFromEnum(typed_array.fields.array_length));
+    }
 
     // 4. Assert: IsFixedLengthArrayBuffer(O.[[ViewedArrayBuffer]]) is false.
     std.debug.assert(!isFixedLengthArrayBuffer(typed_array.fields.viewed_array_buffer));
@@ -518,7 +523,7 @@ pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     std.debug.assert(byte_length != .detached);
 
     // 9. Return floor((byteLength - byteOffset) / elementSize).
-    return @divFloor(@intFromEnum(byte_length) - byte_offset, element_size);
+    return @enumFromInt(@divFloor(@intFromEnum(byte_length) - @intFromEnum(byte_offset), element_size));
 }
 
 /// 10.4.5.14 IsTypedArrayOutOfBounds ( taRecord )
@@ -543,29 +548,31 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     const byte_offset_start = typed_array.fields.byte_offset;
 
     // 6. If O.[[ArrayLength]] is auto, then
-    const byte_offset_end = if (typed_array.fields.array_length == .auto) blk: {
+    const byte_offset_end: ByteOffset = if (typed_array.fields.array_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk @intFromEnum(buffer_byte_length);
+        break :blk @enumFromInt(@intFromEnum(buffer_byte_length));
     } else blk: {
         // 7. Else,
         // a. Let elementSize be TypedArrayElementSize(O).
         const element_size = typedArrayElementSize(typed_array);
 
         // b. Let byteOffsetEnd be byteOffsetStart + O.[[ArrayLength]] × elementSize.
-        break :blk std.math.add(
+        const byte_offset_end = std.math.add(
             u53,
-            byte_offset_start,
+            @intFromEnum(byte_offset_start),
             std.math.mul(
                 u53,
-                @intFromEnum(typed_array.fields.array_length),
+                @intFromEnum(typed_array.fields.array_length.unwrap().?),
                 element_size,
             ) catch return true,
         ) catch return true;
+
+        break :blk @enumFromInt(byte_offset_end);
     };
 
     // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (byte_offset_start > @intFromEnum(buffer_byte_length) or
-        byte_offset_end > @intFromEnum(buffer_byte_length)) return true;
+    if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
+        @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
 
     // 9. NOTE: 0-length TypedArrays are not considered out-of-bounds.
     // 10. Return false.
@@ -582,7 +589,7 @@ fn isTypedArrayFixedLength(typed_array: *const TypedArray) bool {
     const buffer = typed_array.fields.viewed_array_buffer;
 
     // 3. If IsFixedLengthArrayBuffer(buffer) is false and IsSharedArrayBuffer(buffer) is false, return false.
-    if (!isFixedLengthArrayBuffer(buffer) and buffer != .shared_array_buffer) return false;
+    if (!isFixedLengthArrayBuffer(buffer) and !isSharedArrayBuffer(buffer)) return false;
 
     // 4. Return true.
     return true;
@@ -613,7 +620,7 @@ fn isValidIntegerIndex(
     const length = typedArrayLength(ta);
 
     // 8. If ℝ(index) ≥ length, return false.
-    if (index.integer_index >= length) return false;
+    if (index.integer_index >= @intFromEnum(length)) return false;
 
     // 9. Return true.
     return true;
@@ -636,7 +643,7 @@ fn typedArrayGetElement(
     const element_size = typedArrayElementSize(typed_array);
 
     // 4. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-    const byte_index_in_buffer = (index.integer_index * element_size) + offset;
+    const byte_index_in_buffer = (index.integer_index * element_size) + @intFromEnum(offset);
 
     // 5. Let elementType be TypedArrayElementType(O).
     switch (typed_array.fields.element_type) {
@@ -684,7 +691,7 @@ fn typedArraySetElement(
         const element_size = typedArrayElementSize(typed_array);
 
         // c. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-        const byte_index_in_buffer = (index.integer_index * element_size) + offset;
+        const byte_index_in_buffer = (index.integer_index * element_size) + @intFromEnum(offset);
 
         // d. Let elementType be TypedArrayElementType(O).
         switch (typed_array.fields.element_type) {
@@ -792,20 +799,20 @@ pub const constructor = struct {
             defer agent.gc_allocator.free(values);
 
             // b. Let len be the number of elements in values.
-            const len = values.len;
+            const len: ArrayLength = @enumFromInt(values.len);
 
             // c. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
             const typed_array = try typedArrayCreateFromConstructor(
                 agent,
                 constructor_.asObject(),
-                &.{Value.from(@as(u53, @intCast(len)))},
+                &.{Value.from(@intFromEnum(len))},
             );
 
             // d. Let k be 0.
             var k: u53 = 0;
 
             // e. Repeat, while k < len,
-            while (k < len) : (k += 1) {
+            while (k < @intFromEnum(len)) : (k += 1) {
                 // i. Let Pk be ! ToString(𝔽(k)).
                 const property_key = PropertyKey.from(k);
 
@@ -842,20 +849,20 @@ pub const constructor = struct {
         const array_like = source.toObject(agent) catch |err| try noexcept(err);
 
         // 9. Let len be ? LengthOfArrayLike(arrayLike).
-        const len = try array_like.lengthOfArrayLike(agent);
+        const len: ArrayLength = @enumFromInt(try array_like.lengthOfArrayLike(agent));
 
         // 10. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const typed_array = try typedArrayCreateFromConstructor(
             agent,
             constructor_.asObject(),
-            &.{Value.from(len)},
+            &.{Value.from(@intFromEnum(len))},
         );
 
         // 11. Let k be 0.
         var k: u53 = 0;
 
         // 12. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1018,10 +1025,10 @@ pub const prototype = struct {
         const k_f64 = if (relative_index >= 0)
             relative_index
         else
-            @as(f64, @floatFromInt(len)) + relative_index;
+            @as(f64, @floatFromInt(@intFromEnum(len))) + relative_index;
 
         // 7. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(@intFromEnum(len)))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
         // 8. Return ! Get(O, ! ToString(𝔽(k))).
@@ -1040,7 +1047,7 @@ pub const prototype = struct {
         const buffer_ = typed_array.fields.viewed_array_buffer;
 
         // 5. Return buffer.
-        return Value.from(buffer_.object());
+        return Value.from(&buffer_.object);
     }
 
     /// 23.2.3.3 get %TypedArray%.prototype.byteLength
@@ -1058,7 +1065,7 @@ pub const prototype = struct {
         const size = typedArrayByteLength(ta);
 
         // 6. Return 𝔽(size).
-        return Value.from(size);
+        return Value.from(@intFromEnum(size));
     }
 
     /// 23.2.3.4 get %TypedArray%.prototype.byteOffset
@@ -1079,7 +1086,7 @@ pub const prototype = struct {
         const offset = typed_array.fields.byte_offset;
 
         // 7. Return 𝔽(offset).
-        return Value.from(offset);
+        return Value.from(@intFromEnum(offset));
     }
 
     /// 23.2.3.6 %TypedArray%.prototype.copyWithin ( target, start [ , end ] )
@@ -1096,7 +1103,7 @@ pub const prototype = struct {
 
         // 3. Let len be TypedArrayLength(taRecord).
         var len = typedArrayLength(ta);
-        const len_f64: f64 = @floatFromInt(len);
+        const len_f64: f64 = @floatFromInt(@intFromEnum(len));
 
         // 4. Let relativeTarget be ? ToIntegerOrInfinity(target).
         const relative_target = try target.toIntegerOrInfinity(agent);
@@ -1177,13 +1184,13 @@ pub const prototype = struct {
             const byte_offset = typed_array.fields.byte_offset;
 
             // h. Let bufferByteLimit be (len × elementSize) + byteOffset.
-            const buffer_byte_limit = (len * element_size) + byte_offset;
+            const buffer_byte_limit = (@intFromEnum(len) * element_size) + @intFromEnum(byte_offset);
 
             // i. Let toByteIndex be (targetIndex × elementSize) + byteOffset.
-            var to_byte_index = (target_index * element_size) + byte_offset;
+            var to_byte_index = (target_index * element_size) + @intFromEnum(byte_offset);
 
             // j. Let fromByteIndex be (startIndex × elementSize) + byteOffset.
-            var from_byte_index = (start_index * element_size) + byte_offset;
+            var from_byte_index = (start_index * element_size) + @intFromEnum(byte_offset);
 
             // k. Let countBytes be count × elementSize.
             var count_bytes = count * element_size;
@@ -1289,7 +1296,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1327,7 +1334,7 @@ pub const prototype = struct {
 
         // 3. Let len be TypedArrayLength(taRecord).
         var len = typedArrayLength(ta);
-        const len_f64: f64 = @floatFromInt(len);
+        const len_f64: f64 = @floatFromInt(@intFromEnum(len));
 
         // 4. If O.[[ContentType]] is bigint, set value to ? ToBigInt(value).
         // 5. Otherwise, set value to ? ToNumber(value).
@@ -1382,7 +1389,7 @@ pub const prototype = struct {
         len = typedArrayLength(ta);
 
         // 17. Set endIndex to min(endIndex, len).
-        end_index = @min(end_index, len);
+        end_index = @min(end_index, @intFromEnum(len));
 
         // 18. Let k be startIndex.
         var k: u53 = start_index;
@@ -1432,7 +1439,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 7. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1501,7 +1508,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .ascending,
             predicate,
             this_arg,
@@ -1529,7 +1536,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .ascending,
             predicate,
             this_arg,
@@ -1557,7 +1564,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .descending,
             predicate,
             this_arg,
@@ -1585,7 +1592,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .descending,
             predicate,
             this_arg,
@@ -1618,7 +1625,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1657,7 +1664,7 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. If len = 0, return false.
-        if (len == 0) return Value.from(false);
+        if (len == .zero) return Value.from(false);
 
         // 5. Let n be ? ToIntegerOrInfinity(fromIndex).
         var n = try from_index.toIntegerOrInfinity(agent);
@@ -1676,12 +1683,12 @@ pub const prototype = struct {
         // 10. Else,
         //     a. Let k be len + n.
         //     b. If k < 0, set k to 0.
-        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
+        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(@intFromEnum(len))) + n, 0);
         if (k_f64 >= std.math.maxInt(u53)) return Value.from(-1);
         var k: u53 = @intFromFloat(k_f64);
 
         // 11. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let elementK be ! Get(O, ! ToString(𝔽(k))).
             const element_k = typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
 
@@ -1710,7 +1717,7 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. If len = 0, return -1𝔽.
-        if (len == 0) return Value.from(-1);
+        if (len == .zero) return Value.from(-1);
 
         // 5. Let n be ? ToIntegerOrInfinity(fromIndex).
         var n = try from_index.toIntegerOrInfinity(agent);
@@ -1729,12 +1736,12 @@ pub const prototype = struct {
         // 10. Else,
         //     a. Let k be len + n.
         //     b. If k < 0, set k to 0.
-        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
+        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(@intFromEnum(len))) + n, 0);
         if (k_f64 >= std.math.maxInt(u53)) return Value.from(-1);
         var k: u53 = @intFromFloat(k_f64);
 
         // 11. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1784,19 +1791,19 @@ pub const prototype = struct {
             .{ .string = try separator.toString(agent) };
 
         // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (len == 0) return Value.from(String.empty);
+        if (len == .zero) return Value.from(String.empty);
 
         // 6. Let R be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
+        if (@intFromEnum(len) > std.math.maxInt(usize)) return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@intFromEnum(len) * 2) - 1));
         defer result.deinit(agent.gc_allocator);
 
         // 7. Let k be 0.
         var k: u53 = 0;
 
         // 8. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and sep.
             if (k > 0) result.appendSegmentAssumeCapacity(sep);
 
@@ -1850,13 +1857,13 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. If len = 0, return -1𝔽.
-        if (len == 0) return Value.from(-1);
+        if (len == .zero) return Value.from(-1);
 
         // 5. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be len - 1.
         const n = if (arguments.count() > 1)
             try from_index.toIntegerOrInfinity(agent)
         else
-            @as(f64, @floatFromInt(len)) - 1;
+            @as(f64, @floatFromInt(@intFromEnum(len))) - 1;
 
         // 6. If n = -∞, return -1𝔽.
         if (std.math.isNegativeInf(n)) return Value.from(-1);
@@ -1866,9 +1873,9 @@ pub const prototype = struct {
         // 10. Else,
         //     a. Let k be len + n.
         const k_f64 = if (n >= 0)
-            @min(n, @as(f64, @floatFromInt(len)) - 1)
+            @min(n, @as(f64, @floatFromInt(@intFromEnum(len))) - 1)
         else
-            @as(f64, @floatFromInt(len)) + n;
+            @as(f64, @floatFromInt(@intFromEnum(len))) + n;
         if (k_f64 < 0) return Value.from(-1);
         var k: u53 = @intFromFloat(k_f64);
 
@@ -1918,10 +1925,10 @@ pub const prototype = struct {
         if (isTypedArrayOutOfBounds(ta)) return Value.from(0);
 
         // 6. Let length be TypedArrayLength(taRecord).
-        const length_ = typedArrayLength(ta);
+        const len = typedArrayLength(ta);
 
         // 7. Return 𝔽(length).
-        return Value.from(length_);
+        return Value.from(@intFromEnum(len));
     }
 
     /// 23.2.3.22 %TypedArray%.prototype.map ( callback [ , thisArg ] )
@@ -1947,14 +1954,14 @@ pub const prototype = struct {
         const new_typed_array = try typedArraySpeciesCreate(
             agent,
             typed_array,
-            &.{Value.from(len)},
+            &.{Value.from(@intFromEnum(len))},
         );
 
         // 6. Let k be 0.
         var k: u53 = 0;
 
         // 7. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2001,7 +2008,7 @@ pub const prototype = struct {
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
-        if (len == 0 and initial_value == null) {
+        if (len == .zero and initial_value == null) {
             return agent.throwException(
                 .type_error,
                 "Cannot reduce empty typed array without initial value",
@@ -2035,7 +2042,7 @@ pub const prototype = struct {
         }
 
         // 10. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2079,7 +2086,7 @@ pub const prototype = struct {
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
-        if (len == 0 and initial_value == null) {
+        if (len == .zero and initial_value == null) {
             return agent.throwException(
                 .type_error,
                 "Cannot reduce empty typed array without initial value",
@@ -2088,7 +2095,7 @@ pub const prototype = struct {
         }
 
         // 6. Let k be len - 1.
-        var k: ?u53 = std.math.sub(u53, len, 1) catch null;
+        var k: ?u53 = std.math.sub(u53, @intFromEnum(len), 1) catch null;
 
         // 7. Let accumulator be undefined.
         var accumulator: Value = undefined;
@@ -2149,7 +2156,7 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. Let middle be floor(len / 2).
-        const middle = @divFloor(len, 2);
+        const middle = @divFloor(@intFromEnum(len), 2);
 
         // 5. Let lower be 0.
         var lower: u53 = 0;
@@ -2157,7 +2164,7 @@ pub const prototype = struct {
         // 6. Repeat, while lower ≠ middle,
         while (lower != middle) {
             // a. Let upper be len - lower - 1.
-            const upper = len - lower - 1;
+            const upper = @intFromEnum(len) - lower - 1;
 
             // b. Let upperP be ! ToString(𝔽(upper)).
             const upper_property_key = PropertyKey.from(upper);
@@ -2259,7 +2266,7 @@ pub const prototype = struct {
         const src = try source.toObject(agent);
 
         // 5. Let srcLength be ? LengthOfArrayLike(src).
-        const src_length = try src.lengthOfArrayLike(agent);
+        const src_length: ArrayLength = @enumFromInt(try src.lengthOfArrayLike(agent));
 
         // 6. If targetOffset = +∞, throw a RangeError exception.
         if (target_offset_f64 == std.math.inf(f64)) {
@@ -2267,8 +2274,8 @@ pub const prototype = struct {
         }
 
         // 7. If srcLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset_f64))) |x|
-            x > target_length
+        if (if (std.math.add(u53, @intFromEnum(src_length), std.math.lossyCast(u53, target_offset_f64))) |x|
+            x > @intFromEnum(target_length)
         else |_|
             true)
         {
@@ -2285,7 +2292,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 9. Repeat, while k < srcLength,
-        while (k < src_length) : (k += 1) {
+        while (k < @intFromEnum(src_length)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2366,8 +2373,8 @@ pub const prototype = struct {
         }
 
         // 16. If srcLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
-            x > target_length
+        if (if (std.math.add(u53, @intFromEnum(src_length), std.math.lossyCast(u53, target_offset))) |x|
+            x > @intFromEnum(target_length)
         else |_|
             true)
         {
@@ -2390,39 +2397,37 @@ pub const prototype = struct {
         // 18. If IsSharedArrayBuffer(srcBuffer) is true, IsSharedArrayBuffer(targetBuffer) is true,
         //     and srcBuffer.[[ArrayBufferData]] is targetBuffer.[[ArrayBufferData]], let
         //     sameSharedArrayBuffer be true; otherwise let sameSharedArrayBuffer be false.
-        const same_shared_array_buffer = src_buffer == .shared_array_buffer and
-            target_buffer == .shared_array_buffer and
-            src_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr ==
-                target_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr;
+        const same_shared_array_buffer =
+            isSharedArrayBuffer(src_buffer) and
+            isSharedArrayBuffer(target_buffer) and
+            src_buffer.fields.data_block.?.bytes.ptr == target_buffer.fields.data_block.?.bytes.ptr;
 
         // 19. If SameValue(srcBuffer, targetBuffer) is true or sameSharedArrayBuffer is true, then
-        var src_byte_index = if (src_buffer.object() == target_buffer.object() or same_shared_array_buffer) blk: {
+        var src_byte_index = if (src_buffer == target_buffer or same_shared_array_buffer) blk: {
             // a. Let srcByteLength be TypedArrayByteLength(srcRecord).
             const src_byte_length = typedArrayByteLength(src_ta);
 
             // b. Set srcBuffer to ? CloneArrayBuffer(srcBuffer, srcByteOffset, srcByteLength).
-            src_buffer = .{
-                .array_buffer = try cloneArrayBuffer(
-                    agent,
-                    src_buffer,
-                    src_byte_offset,
-                    src_byte_length,
-                ),
-            };
+            src_buffer = try cloneArrayBuffer(
+                agent,
+                src_buffer,
+                src_byte_offset,
+                src_byte_length,
+            );
 
             // c. Let srcByteIndex be 0.
             break :blk 0;
         } else blk: {
             // 20. Else,
             // a. Let srcByteIndex be srcByteOffset.
-            break :blk src_byte_offset;
+            break :blk @intFromEnum(src_byte_offset);
         };
 
         // 21. Let targetByteIndex be (targetOffset × targetElementSize) + targetByteOffset.
-        var target_byte_index = (@as(u53, @intFromFloat(target_offset)) * target_element_size) + target_byte_offset;
+        var target_byte_index = (@as(u53, @intFromFloat(target_offset)) * target_element_size) + @intFromEnum(target_byte_offset);
 
         // 22. Let limit be targetByteIndex + (targetElementSize × srcLength).
-        const limit = target_byte_index + (target_element_size * src_length);
+        const limit = target_byte_index + (target_element_size * @intFromEnum(src_length));
 
         // 23. If srcType is targetType, then
         if (src_type == target_type) {
@@ -2521,7 +2526,7 @@ pub const prototype = struct {
         const typed_array = ta.object;
 
         // 3. Let srcArrayLength be TypedArrayLength(taRecord).
-        const src_array_length: f64 = @floatFromInt(typedArrayLength(ta));
+        const src_array_length: f64 = @floatFromInt(@intFromEnum(typedArrayLength(ta)));
 
         // 4. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = try start.toIntegerOrInfinity(agent);
@@ -2579,7 +2584,7 @@ pub const prototype = struct {
             }
 
             // c. Set endIndex to min(endIndex, TypedArrayLength(taRecord)).
-            end_index = @min(end_index, typedArrayLength(ta));
+            end_index = @min(end_index, @intFromEnum(typedArrayLength(ta)));
             end_index_f64 = @floatFromInt(end_index);
 
             // d. Set countBytes to max(endIndex - startIndex, 0).
@@ -2610,10 +2615,10 @@ pub const prototype = struct {
                 const src_byte_offset = typed_array.fields.byte_offset;
 
                 // vi. Let srcByteIndex be (startIndex × elementSize) + srcByteOffset.
-                var src_byte_index = (start_index * element_size) + src_byte_offset;
+                var src_byte_index = (start_index * element_size) + @intFromEnum(src_byte_offset);
 
                 // vii. Let targetByteIndex be A.[[ByteOffset]].
-                var target_byte_index = new_typed_array.fields.byte_offset;
+                var target_byte_index = @intFromEnum(new_typed_array.fields.byte_offset);
 
                 // viii. Let endByteIndex be targetByteIndex + (countBytes × elementSize).
                 const end_byte_index = target_byte_index + (count_bytes * element_size);
@@ -2711,7 +2716,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2772,7 +2777,7 @@ pub const prototype = struct {
         const sorted_list = try sortIndexedProperties(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .{
                 .impl = sortCompare,
                 .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
@@ -2784,7 +2789,7 @@ pub const prototype = struct {
         var j: u53 = 0;
 
         // 9. Repeat, while j < len,
-        while (j < len) : (j += 1) {
+        while (j < @intFromEnum(len)) : (j += 1) {
             // a. Perform ! Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
             typed_array.object.set(
                 agent,
@@ -2824,7 +2829,7 @@ pub const prototype = struct {
         } else blk: {
             // 7. Else,
             // a. Let srcLength be TypedArrayLength(srcRecord).
-            break :blk @floatFromInt(typedArrayLength(src));
+            break :blk @floatFromInt(@intFromEnum(typedArrayLength(src)));
         };
 
         // 8. Let relativeStart be ? ToIntegerOrInfinity(start).
@@ -2849,12 +2854,12 @@ pub const prototype = struct {
         const src_byte_offset = typed_array.fields.byte_offset;
 
         // 14. Let beginByteOffset be srcByteOffset + (startIndex × elementSize).
-        const begin_byte_offset = src_byte_offset + (start_index * element_size);
+        const begin_byte_offset = @intFromEnum(src_byte_offset) + (start_index * element_size);
 
         // 15. If O.[[ArrayLength]] is auto and end is undefined, then
         const arguments_list = if (typed_array.fields.array_length == .auto and end.isUndefined()) blk_args: {
             // a. Let argumentsList be « buffer, 𝔽(beginByteOffset) ».
-            break :blk_args &.{ Value.from(buffer_.object()), Value.from(begin_byte_offset) };
+            break :blk_args &.{ Value.from(&buffer_.object), Value.from(begin_byte_offset) };
         } else blk_args: {
             // 16. Else,
             // a. If end is undefined, let relativeEnd be srcLength; else let relativeEnd be
@@ -2880,7 +2885,7 @@ pub const prototype = struct {
 
             // f. Let argumentsList be « buffer, 𝔽(beginByteOffset), 𝔽(newLength) ».
             break :blk_args &.{
-                Value.from(buffer_.object()),
+                Value.from(&buffer_.object),
                 Value.from(begin_byte_offset),
                 Value.from(new_length),
             };
@@ -2902,7 +2907,7 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (len == 0) return Value.from(String.empty);
+        if (len == .zero) return Value.from(String.empty);
 
         // 3. Let separator be the implementation-defined list-separator String value appropriate
         //    for the host environment's current locale (such as ", ").
@@ -2910,15 +2915,15 @@ pub const prototype = struct {
 
         // 4. Let R be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
+        if (@intFromEnum(len) > std.math.maxInt(usize)) return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@intFromEnum(len) * 2) - 1));
         defer result.deinit(agent.gc_allocator);
 
         // 5. Let k be 0.
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and separator.
             if (k > 0) result.appendStringAssumeCapacity(separator);
 
@@ -2963,9 +2968,9 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let from be ! ToString(𝔽(len - k - 1)).
-            const from = PropertyKey.from(len - k - 1);
+            const from = PropertyKey.from(@intFromEnum(len) - k - 1);
 
             // b. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -3023,7 +3028,7 @@ pub const prototype = struct {
         const sorted_list = try sortIndexedProperties(
             agent,
             &typed_array.object,
-            len,
+            @intFromEnum(len),
             .{
                 .impl = sortCompare,
                 .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
@@ -3035,7 +3040,7 @@ pub const prototype = struct {
         var j: u53 = 0;
 
         // 10. Repeat, while j < len,
-        while (j < len) : (j += 1) {
+        while (j < @intFromEnum(len)) : (j += 1) {
             // a. Perform ! Set(A, ! ToString(𝔽(j)), sortedList[j], true).
             new_typed_array.object.set(
                 agent,
@@ -3086,7 +3091,7 @@ pub const prototype = struct {
         const actual_index_f64 = if (relative_index >= 0)
             relative_index
         else
-            @as(f64, @floatFromInt(len)) + relative_index;
+            @as(f64, @floatFromInt(@intFromEnum(len))) + relative_index;
 
         // 7. If O.[[ContentType]] is bigint, let numericValue be ? ToBigInt(value).
         // 8. Else, let numericValue be ? ToNumber(value).
@@ -3115,7 +3120,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 12. Repeat, while k < len,
-        while (k < len) : (k += 1) {
+        while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -3185,7 +3190,7 @@ fn typedArrayCreateFromConstructor(
         const length = typedArrayLength(ta);
 
         // c. If length < ℝ(argumentList[0]), throw a TypeError exception.
-        if (@as(f64, @floatFromInt(length)) < argument_list[0].asNumber().asFloat()) {
+        if (@as(f64, @floatFromInt(@intFromEnum(length))) < argument_list[0].asNumber().asFloat()) {
             return agent.throwException(
                 .type_error,
                 "Typed array must have at least length {d}, got {d}",
@@ -3203,7 +3208,7 @@ fn typedArrayCreateFromConstructor(
 fn typedArrayCreateSameType(
     agent: *Agent,
     exemplar: *const TypedArray,
-    length: u53,
+    length: ArrayLength,
 ) Agent.Error!*TypedArray {
     const realm = agent.currentRealm();
 
@@ -3220,7 +3225,7 @@ fn typedArrayCreateSameType(
     const typed_array = try typedArrayCreateFromConstructor(
         agent,
         constructor_,
-        &.{Value.from(length)},
+        &.{Value.from(@intFromEnum(length))},
     );
 
     // 3. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
@@ -3296,7 +3301,7 @@ pub fn validateTypedArray(
 
 /// 23.2.4.5 TypedArrayElementSize ( O )
 /// https://tc39.es/ecma262/#sec-typedarrayelementsize
-pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
+pub fn typedArrayElementSize(typed_array: *const TypedArray) u4 {
     // 1. Return the Element Size value specified in Table 70 for O.[[TypedArrayName]].
     return typed_array.fields.element_type.elementSize();
 }
@@ -3366,7 +3371,7 @@ pub fn allocateTypedArray(
     comptime element_type: ElementType,
     new_target: *Object,
     comptime default_prototype: []const u8,
-    length: ?u53,
+    maybe_length: OptionalArrayLength,
 ) Agent.Error!*TypedArray {
     // 1. Let proto be ? GetPrototypeFromConstructor(newTarget, defaultProto).
     const prototype_ = try getPrototypeFromConstructor(agent, new_target, default_prototype);
@@ -3427,21 +3432,21 @@ pub fn allocateTypedArray(
             // NOTE: We do this unconditionally here and skip the branch below instead.
 
             // a. Set obj.[[ByteLength]] to 0.
-            .byte_length = @enumFromInt(0),
+            .byte_length = .zero,
 
             // b. Set obj.[[ByteOffset]] to 0.
-            .byte_offset = 0,
+            .byte_offset = .zero,
 
             // c. Set obj.[[ArrayLength]] to 0.
-            .array_length = @enumFromInt(0),
+            .array_length = .zero,
         },
     });
 
     // 7. If length is not present, then
     // 8. Else,
-    if (length != null) {
+    if (maybe_length.unwrap()) |length| {
         // a. Perform ? AllocateTypedArrayBuffer(obj, length).
-        try allocateTypedArrayBuffer(agent, typed_array, length.?);
+        try allocateTypedArrayBuffer(agent, typed_array, length);
     }
 
     // 9. Return obj.
@@ -3487,13 +3492,13 @@ fn initializeTypedArrayFromTypedArray(
     const element_length = typedArrayLength(src);
 
     // 10. Let byteLength be elementSize × elementLength.
-    const byte_length = std.math.mul(u53, element_size, element_length) catch {
+    const byte_length: ByteLength = @enumFromInt(std.math.mul(u53, element_size, @intFromEnum(element_length)) catch {
         return agent.throwException(
             .range_error,
             "Invalid typed array length {d}",
             .{element_length},
         );
-    };
+    });
 
     // 11. If elementType is srcType, then
     const array_buffer = if (element_type == src_type) blk: {
@@ -3511,7 +3516,7 @@ fn initializeTypedArrayFromTypedArray(
             agent,
             try realm.intrinsics.@"%ArrayBuffer%"(),
             byte_length,
-            null,
+            .none,
         );
 
         // b. If srcArray.[[ContentType]] is not O.[[ContentType]], throw a TypeError exception.
@@ -3524,13 +3529,13 @@ fn initializeTypedArrayFromTypedArray(
         }
 
         // c. Let srcByteIndex be srcByteOffset.
-        var src_byte_index = src_byte_offset;
+        var src_byte_index = @intFromEnum(src_byte_offset);
 
         // d. Let targetByteIndex be 0.
         var target_byte_index: u53 = 0;
 
         // e. Let count be elementLength.
-        var count = element_length;
+        var count = @intFromEnum(element_length);
 
         // f. Repeat, while count > 0,
         while (count > 0) : (count -= 1) {
@@ -3558,7 +3563,7 @@ fn initializeTypedArrayFromTypedArray(
                     // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true, unordered).
                     try setValueInBuffer(
                         agent,
-                        .{ .array_buffer = array_buffer },
+                        array_buffer,
                         target_byte_index,
                         @"type",
                         value,
@@ -3582,16 +3587,16 @@ fn initializeTypedArrayFromTypedArray(
     };
 
     // 13. Set O.[[ViewedArrayBuffer]] to data.
-    typed_array.fields.viewed_array_buffer = .{ .array_buffer = array_buffer };
+    typed_array.fields.viewed_array_buffer = array_buffer;
 
     // 14. Set O.[[ByteLength]] to byteLength.
-    typed_array.fields.byte_length = @enumFromInt(byte_length);
+    typed_array.fields.byte_length = byte_length.toAuto();
 
     // 15. Set O.[[ByteOffset]] to 0.
-    typed_array.fields.byte_offset = 0;
+    typed_array.fields.byte_offset = .zero;
 
     // 16. Set O.[[ArrayLength]] to elementLength.
-    typed_array.fields.array_length = @enumFromInt(element_length);
+    typed_array.fields.array_length = element_length.toAuto();
 
     // 17. Return unused.
 }
@@ -3601,7 +3606,7 @@ fn initializeTypedArrayFromTypedArray(
 fn initializeTypedArrayFromArrayBuffer(
     agent: *Agent,
     typed_array: *TypedArray,
-    buffer: ArrayBufferLike,
+    buffer: *builtins.ArrayBuffer,
     byte_offset: Value,
     length: Value,
 ) Agent.Error!void {
@@ -3609,10 +3614,10 @@ fn initializeTypedArrayFromArrayBuffer(
     const element_size = typedArrayElementSize(typed_array);
 
     // 2. Let offset be ? ToIndex(byteOffset).
-    const offset = try byte_offset.toIndex(agent);
+    const offset: ByteOffset = @enumFromInt(try byte_offset.toIndex(agent));
 
     // 3. If offset modulo elementSize ≠ 0, throw a RangeError exception.
-    if (@mod(offset, element_size) != 0) {
+    if (@mod(@intFromEnum(offset), element_size) != 0) {
         return agent.throwException(
             .range_error,
             "Offset must be multiple of {d}, got {d}",
@@ -3638,7 +3643,7 @@ fn initializeTypedArrayFromArrayBuffer(
     // 8. If length is undefined and bufferIsFixedLength is false, then
     if (length.isUndefined() and !buffer_is_fixed_length) {
         // a. If offset > bufferByteLength, throw a RangeError exception.
-        if (offset > buffer_byte_length) {
+        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "Offset must not exceed buffer byte length {d}, got {d}",
@@ -3654,9 +3659,9 @@ fn initializeTypedArrayFromArrayBuffer(
     } else {
         // 9. Else,
         // a. If length is undefined, then
-        const new_byte_length = if (length.isUndefined()) blk: {
+        const new_byte_length: ByteLength = if (length.isUndefined()) blk: {
             // i. If bufferByteLength modulo elementSize ≠ 0, throw a RangeError exception.
-            if (@mod(buffer_byte_length, element_size) != 0) {
+            if (@mod(@intFromEnum(buffer_byte_length), element_size) != 0) {
                 return agent.throwException(
                     .range_error,
                     "Buffer byte length must be multiple of {d}, got {d}",
@@ -3665,7 +3670,11 @@ fn initializeTypedArrayFromArrayBuffer(
             }
 
             // ii. Let newByteLength be bufferByteLength - offset.
-            break :blk std.math.sub(u53, buffer_byte_length, offset) catch {
+            const new_byte_length = std.math.sub(
+                u53,
+                @intFromEnum(buffer_byte_length),
+                @intFromEnum(offset),
+            ) catch {
                 // iii. If newByteLength < 0, throw a RangeError exception.
                 return agent.throwException(
                     .range_error,
@@ -3673,6 +3682,8 @@ fn initializeTypedArrayFromArrayBuffer(
                     .{ buffer_byte_length, offset },
                 );
             };
+
+            break :blk @enumFromInt(new_byte_length);
         } else blk: {
             // b. Else,
             // i. Let newByteLength be newLength × elementSize.
@@ -3685,8 +3696,8 @@ fn initializeTypedArrayFromArrayBuffer(
             };
 
             // ii. If offset + newByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, offset, new_byte_length)) |x|
-                x > buffer_byte_length
+            if (if (std.math.add(u53, @intFromEnum(offset), new_byte_length)) |x|
+                x > @intFromEnum(buffer_byte_length)
             else |_|
                 true)
             {
@@ -3697,14 +3708,14 @@ fn initializeTypedArrayFromArrayBuffer(
                 );
             }
 
-            break :blk new_byte_length;
+            break :blk @enumFromInt(new_byte_length);
         };
 
         // c. Set O.[[ByteLength]] to newByteLength.
-        typed_array.fields.byte_length = @enumFromInt(new_byte_length);
+        typed_array.fields.byte_length = new_byte_length.toAuto();
 
         // d. Set O.[[ArrayLength]] to newByteLength / elementSize.
-        typed_array.fields.array_length = @enumFromInt(@divExact(new_byte_length, element_size));
+        typed_array.fields.array_length = @enumFromInt(@divExact(@intFromEnum(new_byte_length), element_size));
     }
 
     // 10. Set O.[[ViewedArrayBuffer]] to buffer.
@@ -3725,7 +3736,7 @@ fn initializeTypedArrayFromList(
 ) Agent.Error!void {
     // 1. Let len be the number of elements in values.
     // NOTE: allocateTypedArrayBuffer() will throw a nice error if this is too large, so truncating is fine
-    const len = std.math.lossyCast(u53, values.len);
+    const len: ArrayLength = @enumFromInt(std.math.lossyCast(u53, values.len));
 
     // 2. Perform ? AllocateTypedArrayBuffer(O, len).
     try allocateTypedArrayBuffer(agent, typed_array, len);
@@ -3734,7 +3745,7 @@ fn initializeTypedArrayFromList(
     var k: u53 = 0;
 
     // 4. Repeat, while k < len,
-    while (k < len) : (k += 1) {
+    while (k < @intFromEnum(len)) : (k += 1) {
         // a. Let Pk be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(k);
 
@@ -3762,7 +3773,7 @@ fn initializeTypedArrayFromArrayLike(
     array_like: *Object,
 ) Agent.Error!void {
     // 1. Let len be ? LengthOfArrayLike(arrayLike).
-    const len = try array_like.lengthOfArrayLike(agent);
+    const len: ArrayLength = @enumFromInt(try array_like.lengthOfArrayLike(agent));
 
     // 2. Perform ? AllocateTypedArrayBuffer(O, len).
     try allocateTypedArrayBuffer(agent, typed_array, len);
@@ -3771,7 +3782,7 @@ fn initializeTypedArrayFromArrayLike(
     var k: u53 = 0;
 
     // 4. Repeat, while k < len,
-    while (k < len) : (k += 1) {
+    while (k < @intFromEnum(len)) : (k += 1) {
         // a. Let Pk be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(k);
 
@@ -3792,7 +3803,7 @@ fn initializeTypedArrayFromArrayLike(
 fn allocateTypedArrayBuffer(
     agent: *Agent,
     typed_array: *TypedArray,
-    length: u53,
+    length: ArrayLength,
 ) Agent.Error!void {
     const realm = agent.currentRealm();
 
@@ -3802,39 +3813,39 @@ fn allocateTypedArrayBuffer(
     const element_size = typedArrayElementSize(typed_array);
 
     // 3. Let byteLength be elementSize × length.
-    const byte_length = std.math.mul(u53, element_size, length) catch {
+    const byte_length: ByteLength = @enumFromInt(std.math.mul(u53, element_size, @intFromEnum(length)) catch {
         return agent.throwException(
             .range_error,
             "Invalid typed array length {d}",
             .{length},
         );
-    };
+    });
 
     // 4. Let data be ? AllocateArrayBuffer(%ArrayBuffer%, byteLength).
     const array_buffer = try allocateArrayBuffer(
         agent,
         try realm.intrinsics.@"%ArrayBuffer%"(),
         byte_length,
-        null,
+        .none,
     );
 
     // 5. Set O.[[ViewedArrayBuffer]] to data.
-    typed_array.fields.viewed_array_buffer = .{ .array_buffer = array_buffer };
+    typed_array.fields.viewed_array_buffer = array_buffer;
 
     // 6. Set O.[[ByteLength]] to byteLength.
-    typed_array.fields.byte_length = @enumFromInt(byte_length);
+    typed_array.fields.byte_length = byte_length.toAuto();
 
     // 7. Set O.[[ByteOffset]] to 0.
-    typed_array.fields.byte_offset = 0;
+    typed_array.fields.byte_offset = .zero;
 
     // 8. Set O.[[ArrayLength]] to length.
-    typed_array.fields.array_length = @enumFromInt(length);
+    typed_array.fields.array_length = length.toAuto();
 
     // 9. Return unused.
 }
 
-/// 7 ValidateUint8Array ( ta )
-/// https://tc39.es/ecma262/#sec-validatetypedarray
+/// 23.3.3.1 ValidateUint8Array ( ta )
+/// https://tc39.es/ecma262/#sec-validateuint8array
 pub fn validateUint8Array(agent: *Agent, value: Value) error{ExceptionThrown}!*TypedArray {
     // 1. Perform ? RequireInternalSlot(ta, [[TypedArrayName]]).
     const typed_array = try value.requireInternalSlot(agent, TypedArray);
@@ -3878,7 +3889,7 @@ pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.E
     //     c. Append byte to bytes.
     //     d. Set index to index + 1.
     // 9. Return bytes.
-    return buffer.arrayBufferData().?.items[@intCast(byte_offset)..@intCast(byte_offset + len)];
+    return buffer.fields.data_block.?.bytes[@intCast(@intFromEnum(byte_offset))..@intCast(@intFromEnum(byte_offset) + @intFromEnum(len))];
 }
 
 /// 23.3.3.3 SetUint8ArrayBytes ( into, bytes )
@@ -3895,7 +3906,7 @@ fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void 
     for (bytes, 0..) |byte, index| {
         // a. Let byte be bytes[index].
         // b. Let byteIndexInBuffer be index + offset.
-        const byte_index_in_buffer = @as(u53, @intCast(index)) + offset;
+        const byte_index_in_buffer = @as(u53, @intCast(index)) + @intFromEnum(offset);
 
         // c. Perform SetValueInBuffer(into.[[ViewedArrayBuffer]], byteIndexInBuffer, uint8, 𝔽(byte), true, unordered).
         setValueInBuffer(
@@ -4168,7 +4179,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     element_type,
                     new_target.?,
                     prototype_,
-                    0,
+                    @enumFromInt(0),
                 );
                 return Value.from(&typed_array.object);
             } else {
@@ -4184,7 +4195,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         element_type,
                         new_target.?,
                         prototype_,
-                        null,
+                        .none,
                     );
 
                     // ii. If firstArgument has a [[TypedArrayName]] internal slot, then
@@ -4197,9 +4208,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         );
                     }
                     // iii. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
-                    else if (first_argument.asObject().is(builtins.ArrayBuffer) or
-                        first_argument.asObject().is(builtins.SharedArrayBuffer))
-                    {
+                    else if (first_argument.asObject().cast(builtins.ArrayBuffer)) |array_buffer| {
                         // 1. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset
                         //    be undefined.
                         const byte_offset = arguments.get(1);
@@ -4213,12 +4222,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         try initializeTypedArrayFromArrayBuffer(
                             agent,
                             typed_array,
-                            if (first_argument.asObject().cast(builtins.ArrayBuffer)) |array_buffer|
-                                .{ .array_buffer = array_buffer }
-                            else if (first_argument.asObject().cast(builtins.SharedArrayBuffer)) |shared_array_buffer|
-                                .{ .shared_array_buffer = shared_array_buffer }
-                            else
-                                unreachable,
+                            array_buffer,
                             byte_offset,
                             length,
                         );
@@ -4229,8 +4233,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         std.debug.assert(
                             first_argument.isObject() and
                                 !first_argument.asObject().is(TypedArray) and
-                                !first_argument.asObject().is(builtins.ArrayBuffer) and
-                                !first_argument.asObject().is(builtins.SharedArrayBuffer),
+                                !first_argument.asObject().is(builtins.ArrayBuffer),
                         );
 
                         // 2. Let usingIterator be ? GetMethod(firstArgument, %Symbol.iterator%).
@@ -4274,7 +4277,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     std.debug.assert(!first_argument.isObject());
 
                     // ii. Let elementLength be ? ToIndex(firstArgument).
-                    const element_length = try first_argument.toIndex(agent);
+                    const element_length: ArrayLength = @enumFromInt(try first_argument.toIndex(agent));
 
                     // iii. Return ? AllocateTypedArray(constructorName, NewTarget, proto, elementLength).
                     const typed_array = try allocateTypedArray(
@@ -4282,7 +4285,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         element_type,
                         new_target.?,
                         prototype_,
-                        element_length,
+                        element_length.toOptional(),
                     );
                     return Value.from(&typed_array.object);
                 }
@@ -4353,7 +4356,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
 
             // 11. Let resultLength be the number of elements in result.[[Bytes]].
-            const result_length: u53 = @intCast(result.bytes.len);
+            const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
 
             // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //     "%Uint8Array.prototype%", resultLength).
@@ -4367,10 +4370,14 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 13. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
             //     elements in result.[[Bytes]].
+            std.debug.assert(
+                @intFromEnum(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
+            );
+
             // 14. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
             //     the value at the corresponding index of result.[[Bytes]].
-            const block = typed_array.fields.viewed_array_buffer.arrayBufferData().?;
-            @memcpy(block.items, result.bytes);
+            const block = typed_array.fields.viewed_array_buffer.fields.data_block.?;
+            @memcpy(block.bytes, result.bytes);
 
             // 15. Return ta.
             return Value.from(&typed_array.object);
@@ -4402,7 +4409,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
 
             // 4. Let resultLength be the number of elements in result.[[Bytes]].
-            const result_length: u53 = @intCast(result.bytes.len);
+            const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
 
             // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //    "%Uint8Array.prototype%", resultLength).
@@ -4416,10 +4423,14 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 6. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
             //    elements in result.[[Bytes]].
+            std.debug.assert(
+                @intFromEnum(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
+            );
+
             // 7. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
             //    the value at the corresponding index of result.[[Bytes]].
-            const block = typed_array.fields.viewed_array_buffer.arrayBufferData().?;
-            @memcpy(block.items, result.bytes);
+            const block = typed_array.fields.viewed_array_buffer.fields.data_block.?;
+            @memcpy(block.bytes, result.bytes);
 
             // 8. Return ta.
             return Value.from(&typed_array.object);
@@ -4527,7 +4538,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
 
             // 13. Let byteLength be TypedArrayLength(taRecord).
-            const byte_length = typedArrayLength(ta);
+            const byte_length = @intFromEnum(typedArrayLength(ta));
 
             // 14. Let result be FromBase64(string, alphabet, lastChunkHandling, byteLength).
             const result = try fromBase64Impl(
@@ -4615,7 +4626,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const byte_length = typedArrayLength(ta);
 
             // 7. Let result be FromHex(string, byteLength).
-            const result = try fromHexImpl(agent, string, byte_length);
+            const result = try fromHexImpl(agent, string, @intFromEnum(byte_length));
 
             // 8. Let bytes be result.[[Bytes]].
             const bytes = result.bytes;
@@ -4627,7 +4638,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             //     cannot have been detached or shrunk.
 
             // 11. Assert: written ≤ byteLength.
-            std.debug.assert(written <= byte_length);
+            std.debug.assert(written <= @intFromEnum(byte_length));
 
             // 12. Perform SetUint8ArrayBytes(into, bytes).
             setUint8ArrayBytes(agent, into, bytes);
@@ -4752,12 +4763,6 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-instances
 pub const TypedArray = MakeObject(.{
     .Fields = struct {
-        pub const ByteLength = enum(u53) {
-            // It is reasonable to assume no buffer will ever be this large.
-            auto = std.math.maxInt(u53),
-            _,
-        };
-
         /// [[TypedArrayName]]
         element_type: ElementType,
 
@@ -4765,16 +4770,16 @@ pub const TypedArray = MakeObject(.{
         content_type: enum { bigint, number },
 
         /// [[ViewedArrayBuffer]]
-        viewed_array_buffer: ArrayBufferLike,
+        viewed_array_buffer: *builtins.ArrayBuffer,
 
         /// [[ByteLength]]
-        byte_length: ByteLength,
+        byte_length: AutoByteLength,
 
         /// [[ByteOffset]]
-        byte_offset: u53,
+        byte_offset: ByteOffset,
 
         /// [[ArrayLength]]
-        array_length: ByteLength,
+        array_length: AutoArrayLength,
     },
     .tag = .typed_array,
 });

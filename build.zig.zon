@@ -20,8 +20,8 @@
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#e18123edcc0fe41055533680ab3f0c43c314fc33",
-            .hash = "kiesel_runtime-0.1.0-goZjAYwaAQD8uBDeTp6WjZYU5Vq3zEFcC7xkh_28kiaI",
+            .url = "git+https://codeberg.org/kiesel-js/runtime#7b5c617cc4612896566c38937da79e30df20093f",
+            .hash = "kiesel_runtime-0.1.0-goZjARsYAQBokGea8-fnBVD68L00TVTF9JPeKRW_8l53",
         },
         .libgc = .{
             .url = "git+https://github.com/bdwgc/bdwgc#6d068ea3fa8191f252a8ca4910e0bd3cbb877d0f",

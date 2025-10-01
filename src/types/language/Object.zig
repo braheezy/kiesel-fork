@@ -70,7 +70,6 @@ pub const Tag = enum(u32) {
     reg_exp_string_iterator,
     set,
     set_iterator,
-    shared_array_buffer,
     string,
     string_iterator,
     symbol,

@@ -20,6 +20,7 @@ const TypedArrayWithBufferWitness = builtins.typed_array.TypedArrayWithBufferWit
 const Value = types.Value;
 const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
+const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -91,7 +92,7 @@ fn validateAtomicAccess(
 
     // 3. Assert: accessIndex ≥ 0.
     // 4. If accessIndex ≥ length, throw a RangeError exception.
-    if (access_index >= length) {
+    if (access_index >= @intFromEnum(length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {d} for typed array with length {d}",
@@ -109,7 +110,7 @@ fn validateAtomicAccess(
     const offset = typed_array.fields.byte_offset;
 
     // 8. Return (accessIndex × elementSize) + offset.
-    return (access_index * element_size) + offset;
+    return (access_index * element_size) + @intFromEnum(offset);
 }
 
 /// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( typedArray, requestIndex )
@@ -144,14 +145,14 @@ fn revalidateAtomicAccess(
     }
 
     // 4. Assert: byteIndexInBuffer ≥ typedArray.[[ByteOffset]].
-    std.debug.assert(byte_index_in_buffer >= typed_array.fields.byte_offset);
+    std.debug.assert(byte_index_in_buffer >= @intFromEnum(typed_array.fields.byte_offset));
 
     // 5. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
     if (byte_index_in_buffer >= @intFromEnum(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {d} for buffer with byte length {d}",
-            .{ byte_index_in_buffer, @intFromEnum(ta.cached_buffer_byte_length) },
+            .{ byte_index_in_buffer, ta.cached_buffer_byte_length },
         );
     }
 
@@ -177,7 +178,7 @@ fn doWait(
     const buffer = ta.object.fields.viewed_array_buffer;
 
     // 3. If IsSharedArrayBuffer(buffer) is false, throw a TypeError exception.
-    if (buffer != .shared_array_buffer) {
+    if (!isSharedArrayBuffer(buffer)) {
         return agent.throwException(
             .type_error,
             "TypedArray must be backed by a SharedArrayBuffer",
@@ -212,13 +213,13 @@ fn doWait(
     // 10. If mode is sync and AgentCanSuspend() is false, throw a TypeError exception.
 
     // 11. Let block be buffer.[[ArrayBufferData]].
-    const block = &buffer.shared_array_buffer.fields.array_buffer_data;
+    const block = buffer.fields.data_block;
 
     // 12. Let offset be typedArray.[[ByteOffset]].
     const offset = typed_array.fields.byte_offset;
 
     // 13. Let byteIndexInBuffer be (i × 4) + offset.
-    const byte_index_in_buffer = (i * 4) + offset;
+    const byte_index_in_buffer = (i * 4) + @intFromEnum(offset);
 
     // TODO: 14. Let WL be GetWaiterList(block, byteIndexInBuffer).
     _ = block;
@@ -486,7 +487,7 @@ pub const namespace = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 3. Let block be buffer.[[ArrayBufferData]].
-        const block = buffer.arrayBufferData().?;
+        const block = buffer.fields.data_block.?;
 
         // 4. If typedArray.[[ContentType]] is bigint, then
         const expected, const replacement = if (typed_array.fields.content_type == .bigint) .{
@@ -538,11 +539,11 @@ pub const namespace = struct {
                     is_little_endian,
                 );
 
-                const raw_bytes_read = block.items[@intCast(byte_index_in_buffer)..@intCast(byte_index_in_buffer + @"type".elementSize())];
+                const raw_bytes_read = block.bytes[@intCast(byte_index_in_buffer)..@intCast(byte_index_in_buffer + @"type".elementSize())];
                 var previous = std.mem.bytesToValue(@"type".type(), raw_bytes_read);
 
                 // 12. If IsSharedArrayBuffer(buffer) is true, then
-                if (buffer == .shared_array_buffer) {
+                if (isSharedArrayBuffer(buffer)) {
                     // a. Let rawBytesRead be AtomicCompareExchangeInSharedBlock(block,
                     //    byteIndexInBuffer, elementSize, expectedBytes, replacementBytes).
                     const ptr = std.mem.bytesAsValue(@"type".type(), raw_bytes_read);
@@ -689,10 +690,8 @@ pub const namespace = struct {
 
         // 6. Let block be buffer.[[ArrayBufferData]].
         // 7. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
-        const block = switch (buffer) {
-            .array_buffer => return Value.from(0),
-            .shared_array_buffer => |shared_array_buffer| &shared_array_buffer.fields.array_buffer_data,
-        };
+        if (!isSharedArrayBuffer(buffer)) return Value.from(0);
+        const block = buffer.fields.data_block.?;
 
         // TODO: 8. Let WL be GetWaiterList(block, byteIndexInBuffer).
         _ = block;

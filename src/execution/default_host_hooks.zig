@@ -6,6 +6,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ByteLength = types.ByteLength;
 const Cell = builtins.finalization_registry.Cell;
 const HostHooks = execution.HostHooks;
 const ImportedModulePayload = language.ImportedModulePayload;
@@ -156,7 +157,7 @@ pub fn hostHasSourceTextAvailable(_: *Object) bool {
 /// https://tc39.es/ecma262/#sec-hostresizearraybuffer
 pub fn hostResizeArrayBuffer(
     _: *builtins.ArrayBuffer,
-    _: u53,
+    _: ByteLength,
 ) error{}!HostHooks.ResizeArrayBufferHandled {
     // The default implementation of HostResizeArrayBuffer is to return NormalCompletion(unhandled).
     return .unhandled;
@@ -165,8 +166,8 @@ pub fn hostResizeArrayBuffer(
 /// 25.2.2.3 HostGrowSharedArrayBuffer ( buffer, newByteLength )
 /// https://tc39.es/ecma262/#sec-hostgrowsharedarraybuffer
 pub fn hostGrowSharedArrayBuffer(
-    _: *builtins.SharedArrayBuffer,
-    _: u53,
+    _: *builtins.ArrayBuffer,
+    _: ByteLength,
 ) error{}!HostHooks.GrowSharedArrayBufferHandled {
     // The default implementation of HostGrowSharedArrayBuffer is to return
     // NormalCompletion(unhandled).

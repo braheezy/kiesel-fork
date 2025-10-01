@@ -9,10 +9,11 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const ArrayBufferLike = builtins.array_buffer.ArrayBufferLike;
+const ArrayBuffer = builtins.ArrayBuffer;
+const ByteLength = types.ByteLength;
 const DataBlock = types.DataBlock;
-const MakeObject = types.MakeObject;
 const Object = types.Object;
+const OptionalByteLength = types.OptionalByteLength;
 const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
@@ -23,32 +24,31 @@ const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOp
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
-const data_block_max_byte_length = types.data_block_max_byte_length;
 
 /// 25.2.2.1 AllocateSharedArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
 /// https://tc39.es/ecma262/#sec-allocatesharedarraybuffer
 pub fn allocateSharedArrayBuffer(
     agent: *Agent,
     constructor_: *Object,
-    byte_length: usize,
-    max_byte_length: ?u53,
-) Agent.Error!*SharedArrayBuffer {
+    byte_length: ByteLength,
+    max_byte_length: OptionalByteLength,
+) Agent.Error!*ArrayBuffer {
     // 1. Let slots be « [[ArrayBufferData]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingGrowableBuffer
     //    be true; otherwise let allocatingGrowableBuffer be false.
-    const allocating_growable_buffer = max_byte_length != null;
+    const allocating_growable_buffer = max_byte_length != .none;
 
     // 3. If allocatingGrowableBuffer is true, then
     if (allocating_growable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
-        if (byte_length > max_byte_length.?) {
+        if (@intFromEnum(byte_length) > @intFromEnum(max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
         // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
         //       done in other engines (and tested by test262)
-        if (max_byte_length.? > data_block_max_byte_length) {
+        if (@intFromEnum(max_byte_length) > @intFromEnum(DataBlock.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -58,48 +58,65 @@ pub fn allocateSharedArrayBuffer(
     //     a. Append [[ArrayBufferByteLength]] to slots.
 
     // 5. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%SharedArrayBuffer.prototype%", slots).
-    const shared_array_buffer = try ordinaryCreateFromConstructor(
-        SharedArrayBuffer,
+    const array_buffer = try ordinaryCreateFromConstructor(
+        builtins.ArrayBuffer,
         agent,
         constructor_,
         "%SharedArrayBuffer.prototype%",
-        undefined,
+        .{
+            .data_block = undefined,
+            .byte_length = undefined,
+            .detach_key = undefined,
+            .max_byte_length = .none,
+        },
     );
 
     // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; otherwise let
     //    allocLength be byteLength.
-    const alloc_length: u64 = if (allocating_growable_buffer) max_byte_length.? else byte_length;
+    const alloc_length = max_byte_length.unwrap() orelse byte_length;
 
     // 7. Let block be ? CreateSharedByteDataBlock(allocLength).
     const block = try createSharedByteDataBlock(agent, alloc_length);
 
-    shared_array_buffer.fields = .{
-        // 8. Set obj.[[ArrayBufferData]] to block.
-        .array_buffer_data = block,
-
-        .array_buffer_byte_length_data = undefined,
-    };
+    // 8. Set obj.[[ArrayBufferData]] to block.
+    array_buffer.fields.data_block = block;
 
     // 9. If allocatingGrowableBuffer is true, then
     if (allocating_growable_buffer) {
         // a. Assert: byteLength ≤ maxByteLength.
-        std.debug.assert(byte_length <= max_byte_length.?);
+        std.debug.assert(@intFromEnum(byte_length) <= @intFromEnum(max_byte_length));
 
         // b. Let byteLengthBlock be ? CreateSharedByteDataBlock(8).
         // c. Perform SetValueInBuffer(byteLengthBlock, 0, biguint64, ℤ(byteLength), true, seq-cst).
         // d. Set obj.[[ArrayBufferByteLengthData]] to byteLengthBlock.
-        shared_array_buffer.fields.array_buffer_byte_length_data = .init(byte_length);
+        // NOTE: This is done with atomic load/store of the byte length
+        array_buffer.fields.byte_length = byte_length;
 
         // e. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
-        shared_array_buffer.fields.array_buffer_max_byte_length = max_byte_length.?;
+        array_buffer.fields.max_byte_length = max_byte_length;
     } else {
         // 10. Else,
         // a. Set obj.[[ArrayBufferByteLength]] to byteLength.
-        // NOTE: For fixed-length SABs we use the [[ArrayBufferData]] slice length.
+        array_buffer.fields.byte_length = byte_length;
     }
 
     // 11. Return obj.
-    return shared_array_buffer;
+    return array_buffer;
+}
+
+/// 25.2.2.2 IsSharedArrayBuffer ( obj )
+/// https://tc39.es/ecma262/#sec-issharedarraybuffer
+pub fn isSharedArrayBuffer(array_buffer: *const ArrayBuffer) bool {
+    // 1. Let bufferData be obj.[[ArrayBufferData]].
+    const data_block = array_buffer.fields.data_block orelse {
+        // 2. If bufferData is null, return false.
+        return false;
+    };
+
+    // 3. If bufferData is a Data Block, return false.
+    // 4. Assert: bufferData is a Shared Data Block.
+    // 5. Return true.
+    return data_block.shared;
 }
 
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
@@ -145,7 +162,7 @@ pub const constructor = struct {
         }
 
         // 2. Let byteLength be ? ToIndex(length).
-        const byte_length = try length.toIndex(agent);
+        const byte_length: ByteLength = @enumFromInt(try length.toIndex(agent));
 
         // 3. Let requestedMaxByteLength be ? GetArrayBufferMaxByteLengthOption(options).
         const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
@@ -154,7 +171,7 @@ pub const constructor = struct {
         const shared_array_buffer = try allocateSharedArrayBuffer(
             agent,
             new_target.?,
-            @intCast(byte_length),
+            byte_length,
             requested_max_byte_length,
         );
         return Value.from(&shared_array_buffer.object);
@@ -209,17 +226,22 @@ pub const prototype = struct {
     fn byteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
-        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+        if (!isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{this_value},
+            );
+        }
 
         // 4. Let length be ArrayBufferByteLength(O, seq-cst).
-        const length = arrayBufferByteLength(
-            ArrayBufferLike{ .shared_array_buffer = object },
-            .seq_cst,
-        );
+        const length = arrayBufferByteLength(array_buffer, .seq_cst);
 
         // 5. Return 𝔽(length).
-        return Value.from(length);
+        return Value.from(@intFromEnum(length));
     }
 
     /// 25.2.5.3 SharedArrayBuffer.prototype.grow ( newLength )
@@ -229,17 +251,29 @@ pub const prototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
+        var array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
-        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
-        if (object.fields.array_buffer_max_byte_length == null) {
+        if (!isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{this_value},
+            );
+        }
+
+        if (array_buffer.fields.max_byte_length == .none) {
             return agent.throwException(.type_error, "SharedArrayBuffer is not growable", .{});
         }
 
         // 4. Let newByteLength be ? ToIndex(newLength).
-        const new_byte_length = try new_length.toIndex(agent);
+        const new_byte_length: ByteLength = @enumFromInt(try new_length.toIndex(agent));
 
         // 5. Let hostHandled be ? HostGrowSharedArrayBuffer(O, newByteLength).
-        const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(object, new_byte_length);
+        const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(
+            array_buffer,
+            new_byte_length,
+        );
 
         // 6. If hostHandled is handled, return undefined.
         if (host_handled == .handled) return .undefined;
@@ -257,18 +291,18 @@ pub const prototype = struct {
         //    The loop exits if it was able to attempt to grow uncontended.
         // b. Let currentByteLength be ℝ(RawBytesToNumeric(biguint64, currentByteLengthRawBytes,
         //    isLittleEndian)).
-        const byte_length_block = &object.fields.array_buffer_byte_length_data;
-        const current_byte_length = byte_length_block.load(.seq_cst);
+        const ptr: *usize = @ptrCast(&array_buffer.fields.byte_length);
+        const current_byte_length: ByteLength = @enumFromInt(@atomicLoad(usize, ptr, .seq_cst));
 
         // c. If newByteLength = currentByteLength, return undefined.
         if (new_byte_length == current_byte_length) return .undefined;
 
         // d. If newByteLength < currentByteLength or newByteLength > O.[[ArrayBufferMaxByteLength]],
         //    throw a RangeError exception.
-        if (new_byte_length < current_byte_length) {
+        if (@intFromEnum(new_byte_length) < @intFromEnum(current_byte_length)) {
             return agent.throwException(.range_error, "Cannot shrink buffer", .{});
         }
-        if (new_byte_length > object.fields.array_buffer_max_byte_length.?) {
+        if (@intFromEnum(new_byte_length) > @intFromEnum(array_buffer.fields.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -284,17 +318,7 @@ pub const prototype = struct {
         // i. If ByteListEqual(readByteLengthRawBytes, currentByteLengthRawBytes) is true, return
         //    undefined.
         // j. Set currentByteLengthRawBytes to readByteLengthRawBytes.
-        const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
-            object.fields.array_buffer_data.resize(agent.gc_allocator, new_byte_length_casted)
-        else
-            error.Overflow;
-        result catch return agent.throwException(
-            .range_error,
-            "Cannot resize buffer to size {d}",
-            .{new_byte_length},
-        );
-        byte_length_block.store(@intCast(new_byte_length), .seq_cst);
-        @memset(object.fields.array_buffer_data.items[current_byte_length..], 0);
+        @atomicStore(usize, ptr, @intCast(@intFromEnum(new_byte_length)), .seq_cst);
         return .undefined;
     }
 
@@ -303,11 +327,19 @@ pub const prototype = struct {
     fn growable(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
-        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+        if (!isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{this_value},
+            );
+        }
 
         // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
-        return Value.from(!isFixedLengthArrayBuffer(ArrayBufferLike{ .shared_array_buffer = object }));
+        return Value.from(!isFixedLengthArrayBuffer(array_buffer));
     }
 
     /// 25.2.5.5 get SharedArrayBuffer.prototype.maxByteLength
@@ -315,23 +347,29 @@ pub const prototype = struct {
     fn maxByteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
-        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+        if (!isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{this_value},
+            );
+        }
 
         // 4. If IsFixedLengthArrayBuffer(O) is true, then
-        const length = if (isFixedLengthArrayBuffer(ArrayBufferLike{
-            .shared_array_buffer = object,
-        })) blk: {
+        const length = if (isFixedLengthArrayBuffer(array_buffer)) blk: {
             // a. Let length be O.[[ArrayBufferByteLength]].
-            break :blk object.fields.array_buffer_data.items.len;
+            break :blk array_buffer.fields.byte_length;
         } else blk: {
             // 5. Else,
             // a. Let length be O.[[ArrayBufferMaxByteLength]].
-            break :blk object.fields.array_buffer_max_byte_length.?;
+            break :blk array_buffer.fields.max_byte_length.unwrap().?;
         };
 
         // 6. Return 𝔽(length).
-        return Value.from(@as(u53, @intCast(length)));
+        return Value.from(@intFromEnum(length));
     }
 
     /// 25.2.5.6 SharedArrayBuffer.prototype.slice ( start, end )
@@ -343,15 +381,20 @@ pub const prototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
-        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+        if (!isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{this_value},
+            );
+        }
 
         // 4. Let len be ArrayBufferByteLength(O, seq-cst).
-        const len = arrayBufferByteLength(
-            ArrayBufferLike{ .shared_array_buffer = object },
-            .seq_cst,
-        );
-        const len_f64: f64 = @floatFromInt(len);
+        const len = arrayBufferByteLength(array_buffer, .seq_cst);
+        const len_f64: f64 = @floatFromInt(@intFromEnum(len));
 
         // 5. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = try start.toIntegerOrInfinity(agent);
@@ -390,7 +433,7 @@ pub const prototype = struct {
         const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
         // 14. Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
-        const constructor_ = try object.object.speciesConstructor(
+        const constructor_ = try array_buffer.object.speciesConstructor(
             agent,
             try realm.intrinsics.@"%SharedArrayBuffer%"(),
         );
@@ -399,11 +442,19 @@ pub const prototype = struct {
         const new_object = try constructor_.construct(agent, &.{Value.from(new_len)}, null);
 
         // 16. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
+        const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);
+
         // 17. If IsSharedArrayBuffer(new) is false, throw a TypeError exception.
-        const new = try Value.from(new_object).requireInternalSlot(agent, SharedArrayBuffer);
+        if (!isSharedArrayBuffer(new)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not a SharedArrayBuffer object",
+                .{Value.from(new_object)},
+            );
+        }
 
         // 18. If new.[[ArrayBufferData]] is O.[[ArrayBufferData]], throw a TypeError exception.
-        if (new.fields.array_buffer_data.items.ptr == object.fields.array_buffer_data.items.ptr) {
+        if (new.fields.data_block.?.bytes.ptr == array_buffer.fields.data_block.?.bytes.ptr) {
             return agent.throwException(
                 .type_error,
                 "Species constructor must return a new buffer",
@@ -412,18 +463,15 @@ pub const prototype = struct {
         }
 
         // 19. If ArrayBufferByteLength(new, seq-cst) < newLen, throw a TypeError exception.
-        if (arrayBufferByteLength(
-            ArrayBufferLike{ .shared_array_buffer = new },
-            .seq_cst,
-        ) < new_len) {
+        if (@intFromEnum(arrayBufferByteLength(new, .seq_cst)) < new_len) {
             return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
         }
 
         // 20. Let fromBuf be O.[[ArrayBufferData]].
-        const from_buf = &object.fields.array_buffer_data;
+        const from_buf = array_buffer.fields.data_block.?;
 
         // 21. Let toBuf be new.[[ArrayBufferData]].
-        const to_buf = &new.fields.array_buffer_data;
+        const to_buf = new.fields.data_block.?;
 
         // 22. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLen).
         copyDataBlockBytes(to_buf, 0, from_buf, first, new_len);
@@ -432,20 +480,3 @@ pub const prototype = struct {
         return Value.from(&new.object);
     }
 };
-
-/// 25.2.6 Properties of SharedArrayBuffer Instances
-/// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-instances
-pub const SharedArrayBuffer = MakeObject(.{
-    .Fields = struct {
-        /// [[ArrayBufferData]]
-        /// [[ArrayBufferByteLength]]
-        array_buffer_data: DataBlock,
-
-        /// [[ArrayBufferByteLengthData]]
-        array_buffer_byte_length_data: std.atomic.Value(usize),
-
-        /// [[ArrayBufferMaxByteLength]]
-        array_buffer_max_byte_length: ?u53 = null,
-    },
-    .tag = .shared_array_buffer,
-});
