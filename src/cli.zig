@@ -913,6 +913,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         stdout.flush() catch {};
     };
 
+    var lines: usize = 0;
     while (true) {
         const source_text = editor.getLine("> ") catch |err| switch (err) {
             error.Eof => break,
@@ -925,6 +926,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         if (source_text.len == 0) continue;
 
         try editor.addToHistory(source_text);
+        lines += 1;
 
         const result = run(allocator, realm, source_text, .{
             .base_dir = options.base_dir,
@@ -943,6 +945,17 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         }
         try stdout.writeAll("\n");
         try stdout.flush();
+    }
+    switch (lines) {
+        0 => {},
+        1 => {
+            try stdout.writeAll("Thanks for using Kiesel to evaluate one line of JavaScript :)\n");
+            try stdout.flush();
+        },
+        else => {
+            try stdout.print("Thanks for using Kiesel to evaluate {d} lines of JavaScript :)\n", .{lines});
+            try stdout.flush();
+        },
     }
 }
 
