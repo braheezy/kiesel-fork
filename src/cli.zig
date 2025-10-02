@@ -710,7 +710,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     var handler: struct {
         editor: *Editor,
         realm: *Realm,
-        string_allocator: std.heap.ArenaAllocator,
+        string_arena: std.heap.ArenaAllocator,
         completion_buffer: ?[]Editor.CompletionSuggestion = null,
 
         pub fn display_refresh(self: *@This()) void {
@@ -796,8 +796,10 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         }
 
         pub fn tab_complete(self: *@This()) ![]const Editor.CompletionSuggestion {
-            _ = self.string_allocator.reset(.{ .retain_with_limit = 4096 });
-            const string_allocator = self.string_allocator.allocator();
+            const gpa = self.editor.allocator;
+
+            _ = self.string_arena.reset(.{ .retain_with_limit = 4096 });
+            const string_arena = self.string_arena.allocator();
 
             const line = self.editor.getBufferedLineUpTo(self.editor.cursor) catch return &.{};
             defer self.editor.allocator.free(line);
@@ -848,46 +850,47 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                 break :b object_value.asObject();
             } else if (is_global_object_property_completion) self.realm.global_object else return &.{};
 
-            const property_prefix = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
-            const property_prefix_length = if (token_window[2].?.type == .identifier) token_window[2].?.text.len else 0;
+            const prefix_utf8 = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
+            const prefix = String.fromUtf8(self.realm.agent, prefix_utf8) catch return &.{};
+
             for (object.property_storage.shape.properties.keys()) |key| {
-                switch (key) {
-                    .string => |key_string| {
-                        if (seen.contains(key_string)) continue;
-                        const property_name = key_string.toUtf8(string_allocator) catch return &.{};
-                        if (std.mem.startsWith(u8, property_name, property_prefix)) {
-                            seen.put(self.editor.allocator, key_string, {}) catch continue;
-                            suggestions.appendBounded(.{
-                                .text = property_name,
-                                .invariant_offset = property_prefix_length,
-                            }) catch break; // OOM -> stop producing suggestions.
-                        }
-                    },
+                const property_name = switch (key) {
+                    .string => |string| string,
                     else => continue,
-                }
+                };
+                if (!property_name.startsWith(prefix)) continue;
+                const gop = seen.getOrPut(gpa, property_name) catch return &.{};
+                if (gop.found_existing) continue;
+                const property_name_utf8 = property_name.toUtf8(string_arena) catch return &.{};
+                suggestions.appendBounded(.{
+                    .text = property_name_utf8,
+                    .invariant_offset = prefix_utf8.len,
+                }) catch break; // OOM -> stop producing suggestions.
             }
 
             // (_)(_)(ident) -> complete global names starting with ident
             if (is_global_object_property_completion) {
-                const identifier = token_window[2].?.text;
-                const identifier_string = String.fromUtf8(self.realm.agent, identifier) catch return &.{};
                 var it = self.realm.global_env.declarative_record.bindings.keyIterator();
-                while (it.next()) |binding_name| {
-                    if (binding_name.*.startsWith(identifier_string)) {
-                        if (seen.contains(binding_name.*)) continue;
-                        const binding_name_utf8 = binding_name.*.toUtf8(string_allocator) catch return &.{};
-                        seen.put(self.editor.allocator, binding_name.*, {}) catch continue;
-                        suggestions.appendBounded(.{
-                            .text = binding_name_utf8,
-                            .invariant_offset = identifier.len,
-                        }) catch break;
-                    }
+                while (it.next()) |binding_name_ptr| {
+                    const binding_name = binding_name_ptr.*;
+                    if (!binding_name.startsWith(prefix)) continue;
+                    const gop = seen.getOrPut(gpa, binding_name) catch return &.{};
+                    if (gop.found_existing) continue;
+                    const binding_name_utf8 = binding_name.toUtf8(string_arena) catch return &.{};
+                    suggestions.appendBounded(.{
+                        .text = binding_name_utf8,
+                        .invariant_offset = prefix_utf8.len,
+                    }) catch break;
                 }
             }
 
             return suggestions.items;
         }
-    } = .{ .editor = &editor, .realm = realm, .string_allocator = std.heap.ArenaAllocator.init(allocator) };
+    } = .{
+        .editor = &editor,
+        .realm = realm,
+        .string_arena = .init(allocator),
+    };
 
     editor.setHandler(&handler);
     defer {
@@ -895,7 +898,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
             allocator.free(buffer);
             handler.completion_buffer = null;
         }
-        handler.string_allocator.deinit();
+        handler.string_arena.deinit();
     }
 
     const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(allocator) else "";
