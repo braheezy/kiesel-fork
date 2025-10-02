@@ -709,6 +709,9 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
 
     var handler: struct {
         editor: *Editor,
+        realm: *Realm,
+        string_allocator: std.heap.ArenaAllocator,
+        completion_buffer: ?[]Editor.CompletionSuggestion = null,
 
         pub fn display_refresh(self: *@This()) void {
             self.editor.stripStyles();
@@ -791,8 +794,109 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                 ) catch continue;
             }
         }
-    } = .{ .editor = &editor };
+
+        pub fn tab_complete(self: *@This()) ![]const Editor.CompletionSuggestion {
+            _ = self.string_allocator.reset(.{ .retain_with_limit = 4096 });
+            const string_allocator = self.string_allocator.allocator();
+
+            const line = self.editor.getBufferedLineUpTo(self.editor.cursor) catch return &.{};
+            defer self.editor.allocator.free(line);
+
+            var tokenizer = kiesel.language.tokenizer.initValidateUtf8(line, null) catch return &.{};
+            const change = kiesel.utils.temporaryChange(
+                &kiesel.language.tokenizer.state,
+                .{
+                    .tokenizer = &tokenizer,
+                    // Workaround to ensure the tokenizer generates template literal middle and
+                    // tail tokens even though there is no parser setting this.
+                    .parsing_template_literal = true,
+                },
+            );
+            defer change.restore();
+
+            var token_window: [3]?kiesel.language.tokenizer.Tokenizer.Token = .{ null, null, null };
+            while (tokenizer.next() catch null) |token| {
+                // Shift tokens in the window to the left
+                token_window[0] = token_window[1];
+                token_window[1] = token_window[2];
+                token_window[2] = token;
+            }
+
+            if (token_window[2] == null)
+                token_window[2] = .{ .type = .identifier, .text = "", .location = .{ .line = 0, .column = 0 } };
+
+            if (self.completion_buffer == null)
+                self.completion_buffer = try self.editor.allocator.alloc(Editor.CompletionSuggestion, 256);
+
+            var suggestions: std.ArrayList(Editor.CompletionSuggestion) = .initBuffer(self.completion_buffer.?);
+            var seen: String.HashMapUnmanaged(void) = .empty;
+            defer seen.deinit(self.editor.allocator);
+
+            // (k1)(.)(prop) OR (_)(k1)(.) -> complete property names of k1, starting with prop (if present)
+            // (_)(_)(ident) -> complete global object property names starting with ident.
+            const is_property_completion_partial = token_window[2].?.type == .@"." and token_window[1] != null and token_window[1].?.type == .identifier;
+            const is_property_completion_full = token_window[2].?.type == .identifier and token_window[1] != null and token_window[1].?.type == .@"." and token_window[0] != null and token_window[0].?.type == .identifier;
+            const is_global_object_property_completion = token_window[2].?.type == .identifier and (token_window[1] == null or token_window[1].?.type != .@".");
+
+            const object = if (is_property_completion_partial or is_property_completion_full) b: {
+                const object_name = if (is_property_completion_partial) token_window[1].?.text else token_window[0].?.text;
+                const object_name_string = String.fromUtf8(self.realm.agent, object_name) catch return &.{};
+                if (!(self.realm.global_env.hasBinding(self.realm.agent, object_name_string) catch false)) return &.{};
+
+                const object_value = self.realm.global_env.getBindingValue(self.realm.agent, object_name_string, true) catch return &.{};
+                if (!object_value.isObject()) return &.{};
+                break :b object_value.asObject();
+            } else if (is_global_object_property_completion) self.realm.global_object else return &.{};
+
+            const property_prefix = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
+            const property_prefix_length = if (token_window[2].?.type == .identifier) token_window[2].?.text.len else 0;
+            for (object.property_storage.shape.properties.keys()) |key| {
+                switch (key) {
+                    .string => |key_string| {
+                        if (seen.contains(key_string)) continue;
+                        const property_name = key_string.toUtf8(string_allocator) catch return &.{};
+                        if (std.mem.startsWith(u8, property_name, property_prefix)) {
+                            seen.put(self.editor.allocator, key_string, {}) catch continue;
+                            suggestions.appendBounded(.{
+                                .text = property_name,
+                                .invariant_offset = property_prefix_length,
+                            }) catch break; // OOM -> stop producing suggestions.
+                        }
+                    },
+                    else => continue,
+                }
+            }
+
+            // (_)(_)(ident) -> complete global names starting with ident
+            if (is_global_object_property_completion) {
+                const identifier = token_window[2].?.text;
+                const identifier_string = String.fromUtf8(self.realm.agent, identifier) catch return &.{};
+                var it = self.realm.global_env.declarative_record.bindings.keyIterator();
+                while (it.next()) |binding_name| {
+                    if (binding_name.*.startsWith(identifier_string)) {
+                        if (seen.contains(binding_name.*)) continue;
+                        const binding_name_utf8 = binding_name.*.toUtf8(string_allocator) catch return &.{};
+                        seen.put(self.editor.allocator, binding_name.*, {}) catch continue;
+                        suggestions.appendBounded(.{
+                            .text = binding_name_utf8,
+                            .invariant_offset = identifier.len,
+                        }) catch break;
+                    }
+                }
+            }
+
+            return suggestions.items;
+        }
+    } = .{ .editor = &editor, .realm = realm, .string_allocator = std.heap.ArenaAllocator.init(allocator) };
+
     editor.setHandler(&handler);
+    defer {
+        if (handler.completion_buffer) |buffer| {
+            allocator.free(buffer);
+            handler.completion_buffer = null;
+        }
+        handler.string_allocator.deinit();
+    }
 
     const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(allocator) else "";
     defer if (builtin.os.tag != .wasi) allocator.free(history_path);
