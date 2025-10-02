@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#36e078a3987780b45db0a4926ce5b89758ad62c7",
-            .hash = "icu4zig-0.1.0-IT7GrJU9AgC8OHUvUluazcYTTceibFBSKC3dQip-vFJf",
+            .url = "git+https://codeberg.org/linusg/icu4zig#3671e02ced77ea462b40f5f32f5fbc633993b3eb",
+            .hash = "icu4zig-0.1.0-IT7GrJU9AgAyT_q5Qae-u9kQwD_OtozJExgZmN4JW1YP",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -24,8 +24,8 @@
             .hash = "kiesel_runtime-0.1.0-goZjARsYAQBokGea8-fnBVD68L00TVTF9JPeKRW_8l53",
         },
         .libgc = .{
-            .url = "git+https://github.com/bdwgc/bdwgc#6d068ea3fa8191f252a8ca4910e0bd3cbb877d0f",
-            .hash = "N-V-__8AAErMLQAwjbOfoyLuc13gMqoO5Th7H6d6MkA9X6Uy",
+            .url = "git+https://github.com/bdwgc/bdwgc#7577ca7c2dc7364bb6733dab23be34231279db6b",
+            .hash = "bdwgc-8.3.0-8obE-KXZLQBlwYsdH83p4Mb39QTsBFIq6L8Pzko-rnZV",
             .lazy = true,
         },
         .libregexp = .{
@@ -41,22 +41,21 @@
             .hash = "stackinfo-0.1.0-NZ2qTgAhAABvyn8FufKS9sTqS6DsR3kGs-PE5qIAVUFM",
         },
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#1f6b8930c83907d1f98774c4cdffa7aee89debd1",
-            .hash = "N-V-__8AAAVdNACUL03oarBZ94FgBHPoTlfzYnu7eDirgrkP",
+            .url = "git+https://github.com/boa-dev/temporal#c0356884b9d7a084682b71113ab99b7392b0b568",
+            .hash = "N-V-__8AAGstNADyVsl8mLLzIWdYWl6kfvNFfsM-bTAErSUI",
             .lazy = true,
         },
         .unicode_id = .{
-            // FIXME: Points to https://codeberg.org/injuly/unicode-id/pulls/5, update when merged
-            .url = "git+https://codeberg.org/injuly/unicode-id#ae2ff41f138da95ee18405c4f43e58a778d239a0",
-            .hash = "unicode_id-0.0.1-MsAuU--AAQA7sBff4d_BdDMvNLOvb50BOZXDlQaJCiWm",
+            .url = "git+https://codeberg.org/linusg/unicode-id#9bd93f54a1e052a5eadf5937cb5e13d3e9b4b61e",
+            .hash = "unicode_id-0.0.1-u-LDL-yCAQCZOdJzkEzFHuZ8k-4TMGSBGgETIYXfIQAr",
         },
         .zement = .{
             .path = "./pkg/zement",
             .lazy = true,
         },
         .zigline = .{
-            .url = "git+https://github.com/alimpfard/zigline#ac2845de085c11073170e363372ee9653b495927",
-            .hash = "zigline-0.1.0-6llsB8yEAgCchW4PIZYx0n3LUZJJeLVqd__Dr-WmDSYC",
+            .url = "git+https://github.com/alimpfard/zigline#cd6ebe9efb5d79738090b03460a1ea6609f1380d",
+            .hash = "zigline-0.1.0-6llsB4CEAgA6Oy58ssb-9qe0Fyjoz0OfcK3zfnAmChTA",
         },
     },
     .paths = .{

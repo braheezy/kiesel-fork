@@ -7,7 +7,7 @@ edition = "2024"
 # headers for Zig.
 [dependencies.icu_capi]
 git = "https://github.com/unicode-org/icu4x.git"
-rev = "5e1909f7edd8b3baf4672e1cae88f64261bee716"
+rev = "ae3223531c81c63fcc3e739212e3273a92eaf412"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 
@@ -15,14 +15,14 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 # which provides the C headers for Zig.
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "1f6b8930c83907d1f98774c4cdffa7aee89debd1"
+rev = "c0356884b9d7a084682b71113ab99b7392b0b568"
 features = ["compiled_data"]
 
 # icu_capi points to a git version of diplomat between releases, which causes duplicate symbol
 # linker errors. Force it to use the same version as temporal_capi.
 [patch.'https://github.com/rust-diplomat/diplomat.git']
-diplomat = "0.12.0"
-diplomat-runtime = "0.12.0"
+diplomat = "0.13.0"
+diplomat-runtime = "0.13.0"
 
 [features]
 intl = []
