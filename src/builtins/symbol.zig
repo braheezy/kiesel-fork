@@ -182,7 +182,7 @@ pub const constructor = struct {
         };
 
         // 4. Return a new Symbol whose [[Description]] is descString.
-        return Value.from(try types.Symbol.init(agent.gc_allocator, description_string));
+        return Value.from(try types.Symbol.init(agent, description_string));
     }
 
     /// 20.4.2.2 Symbol.for ( key )
@@ -202,7 +202,7 @@ pub const constructor = struct {
         //    stringKey.
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
-        const new_symbol = try types.Symbol.init(agent.gc_allocator, string_key);
+        const new_symbol = try types.Symbol.init(agent, string_key);
 
         // 5. Append the GlobalSymbolRegistry Record { [[Key]]: stringKey, [[Symbol]]: newSymbol }
         //    to the GlobalSymbolRegistry List.

@@ -71,7 +71,7 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
         .gc_allocator = platform.gc_allocator,
         .gc_allocator_atomic = platform.gc_allocator_atomic,
         .options = options,
-        .well_known_symbols = try .init(platform.gc_allocator),
+        .well_known_symbols = .init,
         .global_symbol_registry = .empty,
         .host_hooks = .{},
         .execution_context_stack = .empty,
@@ -83,7 +83,6 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
 }
 
 pub fn deinit(self: *Agent) void {
-    self.well_known_symbols.deinit(self.gc_allocator);
     self.global_symbol_registry.deinit(self.gc_allocator);
     self.execution_context_stack.deinit(self.gc_allocator);
     self.queued_jobs.deinit(self.gc_allocator);

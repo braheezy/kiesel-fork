@@ -2444,8 +2444,7 @@ test from {
         try std.testing.expect(value.asNumber().isNan());
     }
     {
-        const symbol = try Symbol.init(std.testing.allocator, null);
-        defer symbol.deinit(std.testing.allocator);
+        const symbol = Symbol.initComptime(null);
         const value = Value.from(symbol);
         try std.testing.expect(value.isSymbol());
         try std.testing.expectEqual(value.asSymbol(), symbol);

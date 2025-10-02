@@ -18,18 +18,19 @@ is_private: bool = false,
 description: ?*const String,
 
 pub fn init(
-    allocator: std.mem.Allocator,
+    agent: *Agent,
     description: ?*const String,
 ) std.mem.Allocator.Error!*const Symbol {
-    const symbol = try allocator.create(Symbol);
+    const symbol = try agent.gc_allocator.create(Symbol);
     symbol.* = .{ .description = description };
     return symbol;
 }
 
-/// For tests not using the GC allocator.
-pub fn deinit(self: *const Symbol, allocator: std.mem.Allocator) void {
-    // TODO: To deinit the description string we need to know if it was dynamically allocated.
-    allocator.destroy(self);
+pub inline fn initComptime(comptime description: ?*const String) *const Symbol {
+    comptime {
+        const symbol: Symbol = .{ .description = description };
+        return &symbol;
+    }
 }
 
 pub fn format(self: *const Symbol, writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -57,10 +58,10 @@ pub fn descriptiveString(self: *const Symbol, agent: *Agent) std.mem.Allocator.E
 }
 
 test format {
-    const test_cases = [_]struct { Symbol, []const u8 }{
-        .{ .{ .description = null }, "Symbol()" },
-        .{ .{ .description = .empty }, "Symbol(\"\")" },
-        .{ .{ .description = String.fromLiteral("foo") }, "Symbol(\"foo\")" },
+    const test_cases = [_]struct { *const Symbol, []const u8 }{
+        .{ .initComptime(null), "Symbol()" },
+        .{ .initComptime(.empty), "Symbol(\"\")" },
+        .{ .initComptime(String.fromLiteral("foo")), "Symbol(\"foo\")" },
     };
     for (test_cases) |test_case| {
         const symbol, const expected = test_case;
