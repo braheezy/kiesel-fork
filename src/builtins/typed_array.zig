@@ -1158,7 +1158,7 @@ pub const prototype = struct {
 
         // 17. If count > 0, then
         if (count_f64 > 0) {
-            const count: u53 = @intFromFloat(count_f64);
+            var count: u53 = @intFromFloat(count_f64);
 
             // a. NOTE: The copying must be performed in a manner that preserves the bit-level
             //    encoding of the source data.
@@ -1177,25 +1177,27 @@ pub const prototype = struct {
             // e. Set len to TypedArrayLength(taRecord).
             len = typedArrayLength(ta);
 
-            // f. Let elementSize be TypedArrayElementSize(O).
+            // f. NOTE: Side-effects of the above steps may have reduced the size of O, in which
+            //    case copying should proceed with the longest still-applicable prefix.
+            // g. Set count to min(count, len - startIndex, len - targetIndex).
+            count = @min(count, @intFromEnum(len) - start_index, @intFromEnum(len) - target_index);
+
+            // h. Let elementSize be TypedArrayElementSize(O).
             const element_size = typedArrayElementSize(typed_array);
 
-            // g. Let byteOffset be O.[[ByteOffset]].
+            // i. Let byteOffset be O.[[ByteOffset]].
             const byte_offset = typed_array.fields.byte_offset;
 
-            // h. Let bufferByteLimit be (len × elementSize) + byteOffset.
-            const buffer_byte_limit = (@intFromEnum(len) * element_size) + @intFromEnum(byte_offset);
-
-            // i. Let toByteIndex be (targetIndex × elementSize) + byteOffset.
+            // j. Let toByteIndex be (targetIndex × elementSize) + byteOffset.
             var to_byte_index = (target_index * element_size) + @intFromEnum(byte_offset);
 
-            // j. Let fromByteIndex be (startIndex × elementSize) + byteOffset.
+            // k. Let fromByteIndex be (startIndex × elementSize) + byteOffset.
             var from_byte_index = (start_index * element_size) + @intFromEnum(byte_offset);
 
-            // k. Let countBytes be count × elementSize.
+            // l. Let countBytes be count × elementSize.
             var count_bytes = count * element_size;
 
-            // l. If fromByteIndex < toByteIndex and toByteIndex < fromByteIndex + countBytes, then
+            // m. If fromByteIndex < toByteIndex and toByteIndex < fromByteIndex + countBytes, then
             const direction: i2 = if (from_byte_index < to_byte_index and
                 to_byte_index < (from_byte_index + count_bytes))
             blk: {
@@ -1208,51 +1210,44 @@ pub const prototype = struct {
                 // i. Let direction be -1.
                 break :blk -1;
             } else blk: {
-                // m. Else,
+                // n. Else,
                 // i. Let direction be 1.
                 break :blk 1;
             };
 
-            // n. Repeat, while countBytes > 0,
+            // o. Repeat, while countBytes > 0,
             while (count_bytes > 0) {
-                // i. If fromByteIndex < bufferByteLimit and toByteIndex < bufferByteLimit, then
-                if (from_byte_index < buffer_byte_limit and to_byte_index < buffer_byte_limit) {
-                    // 1. Let value be GetValueFromBuffer(buffer, fromByteIndex, uint8, true, unordered).
-                    const value = getValueFromBuffer(
-                        agent,
-                        buffer_,
-                        from_byte_index,
-                        .uint8,
-                        true,
-                        .unordered,
-                        null,
-                    );
+                // i. Let value be GetValueFromBuffer(buffer, fromByteIndex, uint8, true, unordered).
+                const value = getValueFromBuffer(
+                    agent,
+                    buffer_,
+                    from_byte_index,
+                    .uint8,
+                    true,
+                    .unordered,
+                    null,
+                );
 
-                    // 2. Perform SetValueInBuffer(buffer, toByteIndex, uint8, value, true, unordered).
-                    try setValueInBuffer(
-                        agent,
-                        buffer_,
-                        to_byte_index,
-                        .uint8,
-                        Value.from(value),
-                        true,
-                        .unordered,
-                        null,
-                    );
+                // ii. Perform SetValueInBuffer(buffer, toByteIndex, uint8, value, true, unordered).
+                try setValueInBuffer(
+                    agent,
+                    buffer_,
+                    to_byte_index,
+                    .uint8,
+                    Value.from(value),
+                    true,
+                    .unordered,
+                    null,
+                );
 
-                    // 3. Set fromByteIndex to fromByteIndex + direction.
-                    if (direction == 1) from_byte_index += 1 else from_byte_index -|= 1;
+                // iii. Set fromByteIndex to fromByteIndex + direction.
+                if (direction == 1) from_byte_index += 1 else from_byte_index -|= 1;
 
-                    // 4. Set toByteIndex to toByteIndex + direction.
-                    if (direction == 1) to_byte_index += 1 else to_byte_index -|= 1;
+                // iv. Set toByteIndex to toByteIndex + direction.
+                if (direction == 1) to_byte_index += 1 else to_byte_index -|= 1;
 
-                    // 5. Set countBytes to countBytes - 1.
-                    count_bytes -= 1;
-                } else {
-                    // ii. Else,
-                    // 1. Set countBytes to 0.
-                    count_bytes = 0;
-                }
+                // v. Set countBytes to countBytes - 1.
+                count_bytes -= 1;
             }
         }
 
