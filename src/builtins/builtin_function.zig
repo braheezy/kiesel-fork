@@ -38,8 +38,6 @@ pub const ClassConstructorFields = struct {
     /// [[SourceText]]
     source_text: []const u8,
 
-    // TODO: These are not in the spec yet - https://github.com/tc39/ecma262/issues/3204
-
     /// [[PrivateMethods]]
     private_methods: []const PrivateMethodDefinition,
 

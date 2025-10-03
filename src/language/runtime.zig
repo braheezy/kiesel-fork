@@ -2202,8 +2202,9 @@ pub fn classDefinitionEvaluation(
             }
         }.func;
 
-        // b. Let F be CreateBuiltinFunction(defaultConstructor, 0, className, « [[ConstructorKind]],
-        //    [[SourceText]] », the current Realm Record, constructorParent).
+        // b. Let F be CreateBuiltinFunction(defaultConstructor, 0, className, «
+        //    [[ConstructorKind]], [[SourceText]], [[PrivateMethods]], [[Fields]] », the current
+        //    Realm Record, constructorParent).
         const class_constructor_fields = try agent.gc_allocator.create(ClassConstructorFields);
         const function = try createBuiltinFunction(
             agent,

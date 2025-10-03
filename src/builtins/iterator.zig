@@ -106,7 +106,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.1.4 Properties of the Iterator Prototype Object
+/// 27.1.3.3 Properties of the Iterator Prototype Object
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -127,13 +127,13 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
         try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
-        // 27.1.4.1 Iterator.prototype.constructor
+        // 27.1.3.3.1 Iterator.prototype.constructor
         // https://tc39.es/ecma262/#sec-iterator.prototype.constructor
         try object.defineBuiltinAccessor(
             agent,
             "constructor",
             struct {
-                /// 27.1.4.1.1 get Iterator.prototype.constructor
+                /// 27.1.3.3.1.1 get Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype.constructor
                 fn get(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     // 1. Return %Iterator%.
@@ -141,7 +141,7 @@ pub const prototype = struct {
                 }
             }.get,
             struct {
-                /// 27.1.4.1.2 set Iterator.prototype.constructor
+                /// 27.1.3.3.1.2 set Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype.constructor
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const value = arguments.get(0);
@@ -162,13 +162,13 @@ pub const prototype = struct {
             realm,
         );
 
-        // 27.1.4.14 Iterator.prototype [ %Symbol.toStringTag% ]
+        // 27.1.3.3.14 Iterator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.tostringtag%
         try object.defineBuiltinAccessor(
             agent,
             "%Symbol.toStringTag%",
             struct {
-                /// 27.1.4.14.1 get Iterator.prototype [ %Symbol.toStringTag% ]
+                /// 27.1.3.3.14.1 get Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype-%symbol.tostringtag%
                 fn get(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     // 1. Return "Iterator".
@@ -176,7 +176,7 @@ pub const prototype = struct {
                 }
             }.get,
             struct {
-                /// 27.1.4.14.2 set Iterator.prototype [ %Symbol.toStringTag% ]
+                /// 27.1.3.3.14.2 set Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype-%symbol.tostringtag%
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const value = arguments.get(0);
@@ -198,7 +198,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.1.4.2 Iterator.prototype.drop ( limit )
+    /// 27.1.3.3.2 Iterator.prototype.drop ( limit )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.drop
     fn drop(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -319,7 +319,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.4.3 Iterator.prototype.every ( predicate )
+    /// 27.1.3.3.3 Iterator.prototype.every ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.every
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
@@ -384,7 +384,7 @@ pub const prototype = struct {
         return Value.from(true);
     }
 
-    /// 27.1.4.4 Iterator.prototype.filter ( predicate )
+    /// 27.1.3.3.4 Iterator.prototype.filter ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.filter
     fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -488,7 +488,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.4.5 Iterator.prototype.find ( predicate )
+    /// 27.1.3.3.5 Iterator.prototype.find ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.find
     fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
@@ -553,7 +553,7 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 27.1.4.6 Iterator.prototype.flatMap ( mapper )
+    /// 27.1.3.3.6 Iterator.prototype.flatMap ( mapper )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.flatmap
     fn flatMap(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -697,7 +697,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.4.7 Iterator.prototype.forEach ( procedure )
+    /// 27.1.3.3.7 Iterator.prototype.forEach ( procedure )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const procedure = arguments.get(0);
@@ -757,7 +757,7 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 27.1.4.8 Iterator.prototype.map ( mapper )
+    /// 27.1.3.3.8 Iterator.prototype.map ( mapper )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.map
     fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -856,7 +856,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.4.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
+    /// 27.1.3.3.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.reduce
     fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const reducer = arguments.get(0);
@@ -943,7 +943,7 @@ pub const prototype = struct {
         return accumulator;
     }
 
-    /// 27.1.4.10 Iterator.prototype.some ( predicate )
+    /// 27.1.3.3.10 Iterator.prototype.some ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.some
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
@@ -1008,7 +1008,7 @@ pub const prototype = struct {
         return Value.from(false);
     }
 
-    /// 27.1.4.11 Iterator.prototype.take ( limit )
+    /// 27.1.3.3.11 Iterator.prototype.take ( limit )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.take
     fn take(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1127,7 +1127,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.4.12 Iterator.prototype.toArray ( )
+    /// 27.1.3.3.12 Iterator.prototype.toArray ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.toarray
     fn toArray(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
@@ -1155,7 +1155,7 @@ pub const prototype = struct {
         return Value.from(&array.object);
     }
 
-    /// 27.1.4.13 Iterator.prototype [ %Symbol.iterator% ] ( )
+    /// 27.1.3.3.13 Iterator.prototype [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.iterator%
     fn @"%Symbol.iterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.

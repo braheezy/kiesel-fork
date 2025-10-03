@@ -11,7 +11,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 27.1.5 The %AsyncIteratorPrototype% Object
+/// 27.1.4 The %AsyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-asynciteratorprototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -22,7 +22,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
     }
 
-    /// 27.1.3.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )
+    /// 27.1.4.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )
     /// https://tc39.es/ecma262/#sec-%asynciteratorprototype%-%symbol.asynciterator%
     fn @"%Symbol.asyncIterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.

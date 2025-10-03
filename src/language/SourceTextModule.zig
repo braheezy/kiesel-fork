@@ -730,12 +730,15 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 
         // c. If module.[[Status]] is evaluated, then
         if (module.status == .evaluated) {
-            // i. NOTE: This implies that evaluation of module completed synchronously.
+            // i. Assert: module.[[AsyncEvaluationOrder]] is either unset or done.
+            // ii. NOTE: module.[[AsyncEvaluationOrder]] is done if and only if module had already
+            //     been evaluated and that evaluation was asynchronous.
+            std.debug.assert(switch (module.async_evaluation_order) {
+                .unset, .done => true,
+                else => false,
+            });
 
-            // ii. Assert: module.[[AsyncEvaluationOrder]] is unset.
-            std.debug.assert(module.async_evaluation_order == .unset);
-
-            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
+            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
                 agent,
                 .undefined,

@@ -442,8 +442,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 
     // 10. If stripPrefix is true, then
     if (strip_prefix) {
-        // a. If the length of S is at least 2 and the first two code units of S are either "0x" or
-        //    "0X", then
+        // a. If the length of S ≥ 2 and the first two code units of S are either "0x" or "0X", then
         if (std.mem.startsWith(u8, string, "0x") or std.mem.startsWith(u8, string, "0X")) {
             // i. Set S to the substring of S from index 2.
             string = string[2..];

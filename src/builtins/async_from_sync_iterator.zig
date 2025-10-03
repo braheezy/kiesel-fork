@@ -1,4 +1,4 @@
-//! 27.1.6 Async-from-Sync Iterator Objects
+//! 27.1.5 Async-from-Sync Iterator Objects
 //! https://tc39.es/ecma262/#sec-async-from-sync-iterator-objects
 
 const std = @import("std");
@@ -25,7 +25,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
-/// 27.1.4.1 CreateAsyncFromSyncIterator ( syncIteratorRecord )
+/// 27.1.5.1 CreateAsyncFromSyncIterator ( syncIteratorRecord )
 /// https://tc39.es/ecma262/#sec-createasyncfromsynciterator
 pub fn createAsyncFromSyncIterator(
     agent: *Agent,
@@ -62,7 +62,7 @@ pub fn createAsyncFromSyncIterator(
     return iterator;
 }
 
-/// 27.1.6.2 The %AsyncFromSyncIteratorPrototype% Object
+/// 27.1.5.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -78,7 +78,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "throw", throw, 0, realm);
     }
 
-    /// 27.1.4.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
+    /// 27.1.5.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
     fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -123,7 +123,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.1.4.2.2 %AsyncFromSyncIteratorPrototype%.return ( [ value ] )
+    /// 27.1.5.2.2 %AsyncFromSyncIteratorPrototype%.return ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.return
     fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -221,7 +221,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.1.4.2.3 %AsyncFromSyncIteratorPrototype%.throw ( [ value ] )
+    /// 27.1.5.2.3 %AsyncFromSyncIteratorPrototype%.throw ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.throw
     fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -334,7 +334,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.1.6.3 Properties of Async-from-Sync Iterator Instances
+/// 27.1.5.3 Properties of Async-from-Sync Iterator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-async-from-sync-iterator-instances
 pub const AsyncFromSyncIterator = MakeObject(.{
     .Fields = struct {
@@ -344,7 +344,7 @@ pub const AsyncFromSyncIterator = MakeObject(.{
     .tag = .async_from_sync_iterator,
 });
 
-/// 27.1.6.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability, syncIteratorRecord, closeOnRejection )
+/// 27.1.5.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability, syncIteratorRecord, closeOnRejection )
 /// https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
 fn asyncFromSyncIteratorContinuation(
     agent: *Agent,
