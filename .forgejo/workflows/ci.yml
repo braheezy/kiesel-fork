@@ -11,6 +11,9 @@ jobs:
     container:
       image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
+      # NOTE: The ReleaseFast builds are being used for benchmarking, ReleaseSafe is noticeably slower
+      # - https://boajs.dev/benchmarks/
+      # - https://ahaoboy.github.io/js-engine-benchmark/
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
       - name: Install Zig
@@ -92,13 +95,16 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
       - name: Build kiesel-linux-x86_64 (ReleaseFast)
         run: |
-          # This is being used for https://boajs.dev/benchmarks, ReleaseSafe is noticeably slower
           zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-releasefast
       - name: Build kiesel-macos-aarch64
         run: |
           zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64
+      - name: Build kiesel-macos-aarch64 (ReleaseFast)
+        run: |
+          zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseFast
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64-releasefast
       - name: Build kiesel-macos-x86_64
         run: |
           zig build -Dtarget=x86_64-macos-none -Doptimize=ReleaseSafe
@@ -127,6 +133,10 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64.exe
+      - name: Build kiesel-windows-x86_64.exe (ReleaseFast)
+        run: |
+          zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast
+          mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64-releasefast.exe
       - name: Build kiesel-uefi-x86_64.efi
         run: |
           zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false -Denable-libgc=false -Denable-libregexp=false
