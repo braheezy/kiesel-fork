@@ -6,49 +6,30 @@ on:
   pull_request:
 
 jobs:
-  build:
+  # NOTE:
+  # - The ReleaseFast builds are being used for benchmarking, ReleaseSafe is noticeably slower
+  #   - https://boajs.dev/benchmarks/
+  #   - https://ahaoboy.github.io/js-engine-benchmark/
+  # - This is split into multiple build jobs to have some level of parallelization. Ideally that
+  #   would be fully handled in the Zig build system, which has proven difficult so far.
+  #   See: https://codeberg.org/kiesel-js/kiesel/issues/103
+  build-linux:
     runs-on: meow
     container:
       image: ghcr.io/catthehacker/ubuntu:act-24.04
     steps:
-      # NOTE: The ReleaseFast builds are being used for benchmarking, ReleaseSafe is noticeably slower
-      # - https://boajs.dev/benchmarks/
-      # - https://ahaoboy.github.io/js-engine-benchmark/
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v5
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.15.1
-          cache-size-limit: 20480 # 20 GiB
+          cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-09-11
           components: "rust-src"
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils-mingw-w64
-      - name: Build kiesel.wasm
-        run: |
-          # Building with Intl almost doubles the size, let's try to keep the final blob
-          # reasonably small - as a result we build this twice
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
-          # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
-      - name: Build kiesel-freebsd-aarch64
-        run: |
-          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
-      - name: Build kiesel-freebsd-x86
-        run: |
-          zig build -Dtarget=x86-freebsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86
-      - name: Build kiesel-freebsd-x86_64
-        run: |
-          zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
       - name: Build kiesel-linux-aarch64
         run: |
           # Verify building without NaN-boxing on aarch64.
@@ -97,6 +78,29 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-releasefast
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-linux
+          path: zig-out/bin/*
+
+  build-macos:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v5
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+          cache-size-limit: 5120 # 5 GiB
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-11
+          components: "rust-src"
       - name: Build kiesel-macos-aarch64
         run: |
           zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
@@ -109,18 +113,33 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-macos-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-x86_64
-      - name: Build kiesel-netbsd-aarch64
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-macos
+          path: zig-out/bin/*
+
+  build-windows:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v5
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+          cache-size-limit: 5120 # 5 GiB
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-11
+          components: "rust-src"
+      - name: Install dependencies
         run: |
-          zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
-      - name: Build kiesel-netbsd-x86
-        run: |
-          zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
-      - name: Build kiesel-netbsd-x86_64
-        run: |
-          zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
+          sudo apt-get update
+          sudo apt-get install -y binutils-mingw-w64
       - name: Build kiesel-windows-aarch64.exe
         run: |
           zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe
@@ -137,15 +156,91 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64-releasefast.exe
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-windows
+          path: zig-out/bin/*
+
+  build-misc:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v5
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+          cache-size-limit: 5120 # 5 GiB
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-09-11
+          components: "rust-src"
+      - name: Build kiesel.wasm
+        run: |
+          # Building with Intl almost doubles the size, let's try to keep the final blob
+          # reasonably small - as a result we build this twice
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
+      - name: Build kiesel-freebsd-aarch64
+        run: |
+          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
+      - name: Build kiesel-freebsd-x86
+        run: |
+          zig build -Dtarget=x86-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86
+      - name: Build kiesel-freebsd-x86_64
+        run: |
+          zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
+      - name: Build kiesel-netbsd-aarch64
+        run: |
+          zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
+      - name: Build kiesel-netbsd-x86
+        run: |
+          zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
+      - name: Build kiesel-netbsd-x86_64
+        run: |
+          zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
       - name: Build kiesel-uefi-x86_64.efi
         run: |
           zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false -Denable-libgc=false -Denable-libregexp=false
           mv zig-out/EFI/BOOT/bootx64.efi zig-out/bin/kiesel-uefi-x86_64.efi
-      - name: Upload binaries and update version.txt
-        if: ${{ github.ref_name == 'main' }}
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-misc
+          path: zig-out/bin/*
+
+  upload-files:
+    if: ${{ forgejo.ref_name == 'main' }}
+    needs:
+      - build-linux
+      - build-macos
+      - build-windows
+      - build-misc
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Download artifacts
+        uses: https://code.forgejo.org/forgejo/download-artifact@v4
+        with:
+          path: files
+          pattern: build-*
+          merge-multiple: true
+      - name: Upload files
         run: |
-          git rev-parse main > zig-out/bin/version.txt
-          for file in zig-out/bin/*; do
+          echo "$FORGEJO_SHA" > files/version.txt
+          for file in files/*; do
             curl \
               -u "${{ secrets.ARTIFACT_UPLOAD_USER }}:${{ secrets.ARTIFACT_UPLOAD_PASSWORD }}" \
               -F "path=@$file" \
