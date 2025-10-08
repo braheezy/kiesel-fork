@@ -237,16 +237,16 @@ pub fn print(self: Executable, writer: *std.Io.Writer, tty_config: std.Io.tty.Co
             inline else => |payload, comptime_instruction| {
                 switch (comptime_instruction) {
                     .evaluate_property_access_with_identifier_key => {
-                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier).fmtRaw()});
                     },
                     .load_constant, .store_constant => {
                         try writer.print(" {f}", .{self.getConstant(payload).fmtPretty()});
                     },
                     .resolve_binding, .resolve_binding_direct => {
-                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier).fmtRaw()});
                     },
                     .typeof_identifier => {
-                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload.identifier).fmtRaw()});
                     },
                     .has_private_element,
                     .initialize_bound_name,
@@ -254,7 +254,7 @@ pub fn print(self: Executable, writer: *std.Io.Writer, tty_config: std.Io.tty.Co
                     .make_private_reference_direct,
                     .resolve_private_identifier,
                     => {
-                        try writer.print(" {f}", .{self.getIdentifier(payload)});
+                        try writer.print(" {f}", .{self.getIdentifier(payload).fmtRaw()});
                     },
                     else => {},
                 }

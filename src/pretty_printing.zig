@@ -267,9 +267,9 @@ fn prettyPrintError(
     const tty_config = state.platform.tty_config;
 
     try tty_config.setColor(writer, .red);
-    try writer.print("{f}", .{error_data.name.fmtUnquoted()});
+    try writer.print("{f}", .{error_data.name.fmtRaw()});
     if (!error_data.message.isEmpty()) {
-        try writer.print(": {f}", .{error_data.message.fmtUnquoted()});
+        try writer.print(": {f}", .{error_data.message.fmtRaw()});
     }
     try tty_config.setColor(writer, .reset);
 }
@@ -480,7 +480,7 @@ fn prettyPrintRegExp(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("RegExp(");
     try tty_config.setColor(writer, .green);
-    try writer.print("/{f}/{f}", .{ original_source.fmtUnquoted(), original_flags.fmtUnquoted() });
+    try writer.print("/{f}/{f}", .{ original_source.fmtRaw(), original_flags.fmtRaw() });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -1200,7 +1200,7 @@ fn prettyPrintFunction(object: *const Object, writer: *std.Io.Writer) PrettyPrin
     }
     try tty_config.setColor(writer, .reset);
     if (!name.isEmpty()) {
-        try writer.print("{f}", .{name.fmtUnquoted()});
+        try writer.print("{f}", .{name.fmtRaw()});
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<anonymous>");
@@ -1229,7 +1229,7 @@ fn prettyPrintObject(object: *Object, writer: *std.Io.Writer) PrettyPrintError!v
             .string => |string| {
                 try writer.writeAll("\"");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{f}", .{string.fmtUnquoted()});
+                try writer.print("{f}", .{string.fmtEscaped()});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("\"");
             },

@@ -366,7 +366,7 @@ pub const prototype = struct {
                     return agent.throwException(
                         .range_error,
                         "Invalid language '{f}'",
-                        .{code.fmtUnquoted()},
+                        .{code.fmtEscaped()},
                     );
                 };
                 break :blk try locale_display_names_formatter.of(agent.gc_allocator, locale);
@@ -385,7 +385,7 @@ pub const prototype = struct {
                     error.Subtag => return agent.throwException(
                         .range_error,
                         "Invalid region '{f}'",
-                        .{code.fmtUnquoted()},
+                        .{code.fmtEscaped()},
                     ),
                 };
             },

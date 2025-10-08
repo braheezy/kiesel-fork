@@ -4159,7 +4159,7 @@ pub fn acceptWithClauseItem(
         try self.emitErrorAt(
             location,
             "Duplicate import attribute '{f}'",
-            .{key_string.fmtUnquoted()},
+            .{key_string.fmtEscaped()},
         );
         return error.UnexpectedToken;
     }

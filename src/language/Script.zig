@@ -160,7 +160,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             return agent.throwException(
                 .syntax_error,
                 "Global environment already has a lexical declaration '{f}'",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
         }
 
@@ -176,7 +176,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             return agent.throwException(
                 .syntax_error,
                 "Global object already has a non-configurable property '{f}'",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
         }
     }
@@ -190,7 +190,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             return agent.throwException(
                 .syntax_error,
                 "Global environment already has a lexical declaration '{f}'",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
         }
     }
@@ -235,7 +235,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                     return agent.throwException(
                         .type_error,
                         "Cannot declare '{f}' in global environment",
-                        .{function_name.fmtUnquoted()},
+                        .{function_name.fmtRaw()},
                     );
                 }
 
@@ -277,7 +277,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                         return agent.throwException(
                             .type_error,
                             "Cannot declare '{f}' in global environment",
-                            .{var_name.fmtUnquoted()},
+                            .{var_name.fmtRaw()},
                         );
                     }
 

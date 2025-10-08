@@ -130,7 +130,7 @@ pub fn setMutableBinding(
             return agent.throwException(
                 .reference_error,
                 "'{f}' is not defined",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
         }
 
@@ -153,7 +153,7 @@ pub fn setMutableBinding(
         return agent.throwException(
             .reference_error,
             "Binding for '{f}' is not initialized",
-            .{name.fmtUnquoted()},
+            .{name.fmtRaw()},
         );
     }
 
@@ -169,7 +169,7 @@ pub fn setMutableBinding(
             return agent.throwException(
                 .type_error,
                 "Binding for '{f}' is immutable",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
         }
     }
@@ -193,7 +193,7 @@ pub fn getBindingValue(
         return agent.throwException(
             .reference_error,
             "Binding for '{f}' is not initialized",
-            .{name.fmtUnquoted()},
+            .{name.fmtRaw()},
         );
     }
 

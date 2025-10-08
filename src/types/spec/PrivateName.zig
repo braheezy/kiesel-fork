@@ -25,7 +25,7 @@ pub fn init(
 }
 
 pub fn format(self: PrivateName, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("#{f}", .{self.symbol.description.?.fmtUnquoted()});
+    try writer.print("#{f}", .{self.symbol.description.?.fmtRaw()});
 }
 
 pub fn hash(self: PrivateName) u64 {

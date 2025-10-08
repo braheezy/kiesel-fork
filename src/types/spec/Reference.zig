@@ -81,7 +81,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         return agent.throwException(
             .reference_error,
             "'{f}' is not defined",
-            .{self.referenced_name.value.asString().fmtUnquoted()},
+            .{self.referenced_name.value.asString().fmtRaw()},
         );
     }
 
@@ -188,7 +188,7 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
             return agent.throwException(
                 .reference_error,
                 "'{f}' is not defined",
-                .{self.referenced_name.value.asString().fmtUnquoted()},
+                .{self.referenced_name.value.asString().fmtEscaped()},
             );
         }
 

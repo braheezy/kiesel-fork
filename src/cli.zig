@@ -273,7 +273,7 @@ const Kiesel = struct {
         if (pretty)
             stdout.print("{f}{s}", .{ value.fmtPretty(), end }) catch {}
         else
-            stdout.print("{f}{s}", .{ (try value.toString(agent)).fmtUnquoted(), end }) catch {};
+            stdout.print("{f}{s}", .{ (try value.toString(agent)).fmtRaw(), end }) catch {};
         stdout.flush() catch {};
         return .undefined;
     }
@@ -1149,7 +1149,7 @@ pub fn main() !u8 {
                 return agent_.throwException(
                     .internal_error,
                     "Failed to import '{f}': {t}",
-                    .{ module_request.specifier.fmtUnquoted(), err },
+                    .{ module_request.specifier.fmtEscaped(), err },
                 );
             };
             defer agent_.gc_allocator.free(source_text);
@@ -1166,7 +1166,7 @@ pub fn main() !u8 {
                     return agent_.throwException(
                         .internal_error,
                         "Failed to import '{f}' with unknown module type '{f}'",
-                        .{ module_request.specifier.fmtUnquoted(), import_attribute.value.fmtUnquoted() },
+                        .{ module_request.specifier.fmtEscaped(), import_attribute.value.fmtEscaped() },
                     );
                 }
             }

@@ -2487,10 +2487,10 @@ pub const prototype = struct {
                 agent.gc_allocator,
                 "<{[tag]s} {[attribute]s}=\"{[value]f}\">{[string]f}</{[tag]s}>",
                 .{
-                    .string = string.fmtUnquoted(),
+                    .string = string.fmtRaw(),
                     .tag = tag,
                     .attribute = attr.name,
-                    .value = value_string_escaped.fmtUnquoted(),
+                    .value = value_string_escaped.fmtRaw(),
                 },
             ));
         }
@@ -2498,7 +2498,7 @@ pub const prototype = struct {
         return types.String.fromUtf8(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "<{[tag]s}>{[string]f}</{[tag]s}>",
-            .{ .string = string.fmtUnquoted(), .tag = tag },
+            .{ .string = string.fmtRaw(), .tag = tag },
         ));
     }
 

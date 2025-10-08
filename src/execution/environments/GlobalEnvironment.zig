@@ -55,7 +55,7 @@ pub fn createMutableBinding(
         return agent.throwException(
             .type_error,
             "Binding for '{f}' already exists",
-            .{name.fmtUnquoted()},
+            .{name.fmtRaw()},
         );
     }
 
@@ -77,7 +77,7 @@ pub fn createImmutableBinding(
         return agent.throwException(
             .type_error,
             "Binding for '{f}' already exists",
-            .{name.fmtUnquoted()},
+            .{name.fmtRaw()},
         );
     }
 

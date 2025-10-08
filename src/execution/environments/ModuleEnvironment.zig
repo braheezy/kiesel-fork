@@ -78,7 +78,7 @@ pub fn getBindingValue(
         return agent.throwException(
             .reference_error,
             "Binding for '{f}' is not initialized",
-            .{name.fmtUnquoted()},
+            .{name.fmtRaw()},
         );
     }
 

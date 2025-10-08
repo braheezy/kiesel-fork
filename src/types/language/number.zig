@@ -606,7 +606,7 @@ pub const Number = union(enum) {
             return String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "-{f}",
-                .{negated_string.fmtUnquoted()},
+                .{negated_string.fmtRaw()},
             ));
         }
 

@@ -391,7 +391,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
                         const @"error" = try agent.createErrorObject(
                             .type_error,
                             "Import attribute '{f}' value is not a string",
-                            .{key.asString().fmtUnquoted()},
+                            .{key.asString().fmtEscaped()},
                         );
 
                         // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly
@@ -421,7 +421,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             const @"error" = try agent.createErrorObject(
                 .type_error,
                 "Import attribute '{f}' is not supported",
-                .{unsupported.fmtUnquoted()},
+                .{unsupported.fmtEscaped()},
             );
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created

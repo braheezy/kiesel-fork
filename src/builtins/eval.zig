@@ -215,7 +215,7 @@ fn evalDeclarationInstantiation(
                     return agent.throwException(
                         .syntax_error,
                         "Global environment already has a lexical declaration '{f}'",
-                        .{name.fmtUnquoted()},
+                        .{name.fmtRaw()},
                     );
                 }
 
@@ -302,7 +302,7 @@ fn evalDeclarationInstantiation(
                         return agent.throwException(
                             .type_error,
                             "Cannot declare '{f}' in global environment",
-                            .{function_name.fmtUnquoted()},
+                            .{function_name.fmtRaw()},
                         );
                     }
                 }
@@ -350,7 +350,7 @@ fn evalDeclarationInstantiation(
                             return agent.throwException(
                                 .type_error,
                                 "Cannot declare '{f}' in global environment",
-                                .{var_name.fmtUnquoted()},
+                                .{var_name.fmtRaw()},
                             );
                         }
                     }

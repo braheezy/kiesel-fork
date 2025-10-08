@@ -235,7 +235,7 @@ fn innerModuleLoading(
                 const @"error" = agent.throwException(
                     .syntax_error,
                     "Import attribute '{f}' is not supported",
-                    .{unsupported.fmtUnquoted()},
+                    .{unsupported.fmtEscaped()},
                 );
 
                 // 2. Perform ContinueModuleLoading(state, error).
@@ -1497,7 +1497,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             .ambiguous => return agent.throwException(
                 .syntax_error,
                 "Ambiguous star export '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtUnquoted() },
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
             ),
 
             // d. Assert: resolution is a ResolvedBinding Record.
@@ -1506,7 +1506,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             return agent.throwException(
                 .syntax_error,
                 "No export named '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtUnquoted() },
+                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
             );
         }
     }
@@ -1567,14 +1567,14 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 .ambiguous => return agent.throwException(
                     .syntax_error,
                     "Ambiguous star export '{s}' in module '{f}'",
-                    .{ import_name.string, import_entry.module_request.specifier.fmtUnquoted() },
+                    .{ import_name.string, import_entry.module_request.specifier.fmtEscaped() },
                 ),
                 .resolved_binding => |resolved_binding| resolved_binding,
             } else {
                 return agent.throwException(
                     .syntax_error,
                     "No export named '{s}' in module '{f}'",
-                    .{ import_name.string, import_entry.module_request.specifier.fmtUnquoted() },
+                    .{ import_name.string, import_entry.module_request.specifier.fmtEscaped() },
                 );
             };
 

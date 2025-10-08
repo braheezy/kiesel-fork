@@ -438,9 +438,9 @@ fn serializeJSONObject(
                     (try quoteJSONString(
                         agent,
                         (try property_key.toStringOrSymbol(agent)).string,
-                    )).fmtUnquoted(),
+                    )).fmtRaw(),
                     if (!state.gap.isEmpty()) " " else "",
-                    str_property.?.fmtUnquoted(),
+                    str_property.?.fmtRaw(),
                 },
             );
 
@@ -473,7 +473,7 @@ fn serializeJSONObject(
             // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
-            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{f}", .{state.indent.fmtUnquoted()});
+            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{f}", .{state.indent.fmtRaw()});
 
             // ii. Let properties be the String value formed by concatenating all the element
             //     Strings of partial with each adjacent pair of Strings separated with separator.
@@ -486,7 +486,7 @@ fn serializeJSONObject(
             break :blk String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{{\n{f}{s}\n{f}}}",
-                .{ state.indent.fmtUnquoted(), properties, step_back.fmtUnquoted() },
+                .{ state.indent.fmtRaw(), properties, step_back.fmtRaw() },
             ));
         }
     };
@@ -583,7 +583,7 @@ fn serializeJSONArray(
             const separator = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 ",\n{f}",
-                .{state.indent.fmtUnquoted()},
+                .{state.indent.fmtRaw()},
             );
 
             // ii. Let properties be the String value formed by concatenating all the element
@@ -597,7 +597,7 @@ fn serializeJSONArray(
             break :blk try String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "[\n{f}{s}\n{f}]",
-                .{ state.indent.fmtUnquoted(), properties, step_back.fmtUnquoted() },
+                .{ state.indent.fmtRaw(), properties, step_back.fmtRaw() },
             ));
         }
     };

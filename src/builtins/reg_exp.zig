@@ -184,7 +184,7 @@ pub fn regExpInitialize(
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
     const parsed_flags = ParsedFlags.from(try f.toUtf8(agent.gc_allocator)) orelse {
-        return agent.throwException(.syntax_error, "Invalid RegExp flags '{f}'", .{f.fmtUnquoted()});
+        return agent.throwException(.syntax_error, "Invalid RegExp flags '{f}'", .{f.fmtEscaped()});
     };
 
     // TODO: 11. If u is true or v is true, then

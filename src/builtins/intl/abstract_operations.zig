@@ -221,7 +221,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                 return agent.throwException(
                     .range_error,
                     "Invalid locale identifier '{f}'",
-                    .{tag.fmtUnquoted()},
+                    .{tag.fmtEscaped()},
                 );
             };
 

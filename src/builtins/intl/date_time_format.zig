@@ -94,7 +94,7 @@ pub fn createDateTimeFormat(
             return agent.throwException(
                 .range_error,
                 "Invalid locale identifier type '{f}'",
-                .{calendar.fmtUnquoted()},
+                .{calendar.fmtEscaped()},
             );
         }
     }
@@ -112,7 +112,7 @@ pub fn createDateTimeFormat(
             return agent.throwException(
                 .range_error,
                 "Invalid locale identifier type '{f}'",
-                .{numbering_system.fmtUnquoted()},
+                .{numbering_system.fmtEscaped()},
             );
         }
     }

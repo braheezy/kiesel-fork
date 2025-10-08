@@ -131,7 +131,7 @@ pub const constructor = struct {
                 return agent.throwException(
                     .range_error,
                     "Invalid locale identifier type '{f}'",
-                    .{numbering_system.fmtUnquoted()},
+                    .{numbering_system.fmtEscaped()},
                 );
             }
         }

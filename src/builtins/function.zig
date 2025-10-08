@@ -293,7 +293,7 @@ pub fn createDynamicFunction(
     const body_parse_string = try std.fmt.allocPrint(
         agent.gc_allocator,
         "\n{f}\n",
-        .{body_string.fmtUnquoted()},
+        .{body_string.fmtRaw()},
     );
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
@@ -631,7 +631,7 @@ pub const prototype = struct {
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "function {f}() {{ [native code] }}",
-                .{name.fmtUnquoted()},
+                .{name.fmtRaw()},
             );
             return Value.from(try String.fromAscii(agent, source_text));
         }

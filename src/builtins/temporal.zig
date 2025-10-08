@@ -197,7 +197,7 @@ pub fn canonicalizeCalendar(
         return agent.throwException(
             .range_error,
             "Invalid calendar '{f}'",
-            .{id.fmtUnquoted()},
+            .{id.fmtEscaped()},
         );
     };
     return calendar;

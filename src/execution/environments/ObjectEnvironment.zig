@@ -120,7 +120,7 @@ pub fn setMutableBinding(
 
     // 3. If stillExists is false and S is true, throw a ReferenceError exception.
     if (!still_exists and strict) {
-        return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtUnquoted()});
+        return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
     }
 
     // 4. Perform ? Set(bindingObject, N, V, S).
@@ -147,7 +147,7 @@ pub fn getBindingValue(
     if (!value) {
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
         if (!strict) return .undefined;
-        return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtUnquoted()});
+        return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
     }
 
     // 4. Return ? Get(bindingObject, N).

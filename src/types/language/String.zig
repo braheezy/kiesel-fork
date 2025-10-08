@@ -51,17 +51,57 @@ slice: Slice,
 hash: u64,
 
 pub fn format(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("\"{f}\"", .{self.fmtUnquoted()});
+    try writer.print("\"{f}\"", .{self.fmtEscaped()});
 }
 
-pub fn formatUnquoted(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+pub fn formatRaw(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     switch (self.slice) {
         .ascii => |ascii| try writer.print("{s}", .{ascii}),
         .utf16 => |utf16| try writer.print("{f}", .{std.unicode.fmtUtf16Le(utf16)}),
     }
 }
 
-pub fn fmtUnquoted(self: *const String) std.fmt.Alt(*const String, formatUnquoted) {
+pub fn fmtRaw(self: *const String) std.fmt.Alt(*const String, formatRaw) {
+    return .{ .data = self };
+}
+
+pub fn formatEscaped(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    var it = self.codeUnitIterator();
+    while (it.next()) |code_unit| {
+        const code_point = if (std.unicode.utf16IsHighSurrogate(code_unit)) blk: {
+            const code_unit_low = it.next() orelse {
+                try writer.print("\\u{x:0>4}", .{code_unit});
+                break;
+            };
+            break :blk std.unicode.utf16DecodeSurrogatePair(&.{ code_unit, code_unit_low }) catch {
+                try writer.print("\\u{x:0>4}\\u{x:0>4}", .{ code_unit, code_unit_low });
+                continue;
+            };
+        } else if (std.unicode.utf16IsLowSurrogate(code_unit)) {
+            try writer.print("\\u{x:0>4}", .{code_unit});
+            continue;
+        } else code_unit;
+        switch (code_point) {
+            // Control characters excluding those handled below
+            0x00...0x07, 0x0E...0x1F, 0x7F => try writer.print("\\x{x:0>2}", .{code_point}),
+            0x08 => try writer.writeAll("\\b"),
+            0x09 => try writer.writeAll("\\t"),
+            0x0A => try writer.writeAll("\\n"),
+            0x0B => try writer.writeAll("\\v"),
+            0x0C => try writer.writeAll("\\f"),
+            0x0D => try writer.writeAll("\\r"),
+            '\\' => try writer.writeAll("\\\\"),
+            else => {
+                var buf: [4]u8 = undefined;
+                // Unpaired surrogates are handled above, out-of-range code points are not possible
+                const len = std.unicode.utf8Encode(code_point, &buf) catch unreachable;
+                try writer.writeAll(buf[0..len]);
+            },
+        }
+    }
+}
+
+pub fn fmtEscaped(self: *const String) std.fmt.Alt(*const String, formatEscaped) {
     return .{ .data = self };
 }
 
@@ -638,6 +678,15 @@ test format {
         .{ empty, "\"\"" },
         .{ fromLiteral("foo"), "\"foo\"" },
         .{ fromLiteral("123"), "\"123\"" },
+        .{ fromLiteral("äöüß😎"), "\"äöüß😎\"" },
+        .{
+            fromLiteral("\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\\"),
+            "\"\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\b\\t\\n\\v\\f\\r\\x0e\\x0f\\\\\"",
+        },
+        .{
+            &.{ .slice = .{ .utf16 = &.{0xd83d} }, .hash = undefined },
+            "\"\\ud83d\"",
+        },
     };
     for (test_cases) |test_case| {
         const string, const expected = test_case;
