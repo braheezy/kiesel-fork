@@ -1604,7 +1604,7 @@ pub fn toTemporalZonedDateTime(
         //     ii. Assert: offsetParseResult is a Parse Node.
         //     iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set
         //          matchBehaviour to match-exactly.
-        const parsed_zoned_date_time = switch (item.asString().slice) {
+        const parsed_zoned_date_time = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedZonedDateTime_from_utf8(

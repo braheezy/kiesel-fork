@@ -125,7 +125,7 @@ pub const constructor = struct {
             .{ "word", .word },
             .{ "sentence", .sentence },
         });
-        segmenter.fields.segmenter_granularity = granularity_map.get(granularity.slice.ascii).?;
+        segmenter.fields.segmenter_granularity = granularity_map.get(granularity.asAscii()).?;
 
         // 13. Return segmenter.
         return Value.from(&segmenter.object);
@@ -283,16 +283,16 @@ const AnySegmenter = union(enum) {
 
     fn segment(self: AnySegmenter, string: *const String) BreakIterator {
         return switch (self) {
-            .grapheme => |segmenter| switch (string.slice) {
-                .ascii => |utf8| .{ .grapheme_utf8 = segmenter.segmentUtf8(utf8) },
+            .grapheme => |segmenter| switch (string.asAsciiOrUtf16()) {
+                .ascii => |ascii| .{ .grapheme_utf8 = segmenter.segmentUtf8(ascii) },
                 .utf16 => |utf16| .{ .grapheme_utf16 = segmenter.segmentUtf16(utf16) },
             },
-            .word => |segmenter| switch (string.slice) {
-                .ascii => |utf8| .{ .word_utf8 = segmenter.segmentUtf8(utf8) },
+            .word => |segmenter| switch (string.asAsciiOrUtf16()) {
+                .ascii => |ascii| .{ .word_utf8 = segmenter.segmentUtf8(ascii) },
                 .utf16 => |utf16| .{ .word_utf16 = segmenter.segmentUtf16(utf16) },
             },
-            .sentence => |segmenter| switch (string.slice) {
-                .ascii => |utf8| .{ .sentence_utf8 = segmenter.segmentUtf8(utf8) },
+            .sentence => |segmenter| switch (string.asAsciiOrUtf16()) {
+                .ascii => |ascii| .{ .sentence_utf8 = segmenter.segmentUtf8(ascii) },
                 .utf16 => |utf16| .{ .sentence_utf16 = segmenter.segmentUtf16(utf16) },
             },
         };
@@ -308,7 +308,7 @@ const AnySegmenter = union(enum) {
 };
 
 const Boundary = struct {
-    index: usize,
+    index: u32,
     is_word_like: ?bool = null,
 };
 
@@ -317,11 +317,11 @@ const Boundary = struct {
 pub fn findBoundary(
     segmenter: *builtins.intl.Segmenter,
     string: *const String,
-    start_index: usize,
+    start_index: u32,
     direction: enum { before, after },
 ) Boundary {
     // 1. Let len be the length of string.
-    const len = string.length();
+    const len = string.length;
 
     // 2. Assert: startIndex < len.
     std.debug.assert(start_index < len);
@@ -357,7 +357,7 @@ pub fn findBoundary(
 
 fn findBoundaryBefore(
     string: *const String,
-    start_index: usize,
+    start_index: u32,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {
     const segmenter: AnySegmenter = switch (granularity) {
@@ -368,18 +368,18 @@ fn findBoundaryBefore(
     defer segmenter.deinit();
     var iterator = segmenter.segment(string);
     defer iterator.deinit();
-    var previous_index: usize = 0;
+    var previous_index: u32 = 0;
     return switch (iterator) {
         inline .grapheme_utf8,
         .grapheme_utf16,
         .sentence_utf8,
         .sentence_utf16,
-        => |*it| while (it.next()) |index| : (previous_index = index) {
+        => |*it| while (it.next()) |index| : (previous_index = @intCast(index)) {
             if (index > start_index) break .{ .index = previous_index };
         } else null,
         inline .word_utf8,
         .word_utf16,
-        => |*it| while (it.next()) |index| : (previous_index = index) {
+        => |*it| while (it.next()) |index| : (previous_index = @intCast(index)) {
             if (index > start_index) break .{ .index = previous_index, .is_word_like = it.isWordLike() };
         } else null,
     };
@@ -387,7 +387,7 @@ fn findBoundaryBefore(
 
 fn findBoundaryAfter(
     string: *const String,
-    start_index: usize,
+    start_index: u32,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {
     const segmenter: AnySegmenter = switch (granularity) {
@@ -404,10 +404,10 @@ fn findBoundaryAfter(
         .sentence_utf8,
         .sentence_utf16,
         => |*it| while (it.next()) |index| {
-            if (index > start_index) break .{ .index = index };
+            if (index > start_index) break .{ .index = @intCast(index) };
         } else null,
         inline .word_utf8, .word_utf16 => |*it| while (it.next()) |index| {
-            if (index > start_index) return .{ .index = index, .is_word_like = it.isWordLike() };
+            if (index > start_index) return .{ .index = @intCast(index), .is_word_like = it.isWordLike() };
         } else null,
     };
 }

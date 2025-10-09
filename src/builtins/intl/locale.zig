@@ -243,7 +243,7 @@ pub const constructor = struct {
 
         // 22. Set opt.[[hc]] to hc.
         if (maybe_hc) |hc| {
-            tag.setUnicodeExtension("hc", hc.slice.ascii) catch unreachable;
+            tag.setUnicodeExtension("hc", hc.asAscii()) catch unreachable;
         }
 
         // 23. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
@@ -262,7 +262,7 @@ pub const constructor = struct {
 
         // 24. Set opt.[[kf]] to kf.
         if (maybe_kf) |kf| {
-            tag.setUnicodeExtension("kf", kf.slice.ascii) catch unreachable;
+            tag.setUnicodeExtension("kf", kf.asAscii()) catch unreachable;
         }
 
         // 25. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).

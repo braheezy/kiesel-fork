@@ -35,27 +35,24 @@ pub const Builder = @import("String/Builder.zig");
 pub const Cache = @import("String/Cache.zig");
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
 
-pub const Slice = union(enum) {
-    ascii: []const u8,
-    utf16: []const u16,
-
-    pub fn hash(self: @This()) u64 {
-        return std.hash.Wyhash.hash(0, switch (self) {
-            .ascii => |ascii| ascii,
-            .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
-        });
-    }
-};
-
-slice: Slice,
+data: Data,
+length: u32,
 hash: u64,
+
+const Data = union(enum) {
+    empty,
+    owned_ascii: [*]const u8,
+    owned_utf16: [*]const u16,
+    static_ascii: [*]const u8,
+    static_utf16: [*]const u16,
+};
 
 pub fn format(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try writer.print("\"{f}\"", .{self.fmtEscaped()});
 }
 
 pub fn formatRaw(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    switch (self.slice) {
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| try writer.print("{s}", .{ascii}),
         .utf16 => |utf16| try writer.print("{f}", .{std.unicode.fmtUtf16Le(utf16)}),
     }
@@ -105,32 +102,53 @@ pub fn fmtEscaped(self: *const String) std.fmt.Alt(*const String, formatEscaped)
     return .{ .data = self };
 }
 
-pub fn fromLiteral(comptime utf8: []const u8) *const String {
+pub inline fn fromLiteral(comptime utf8: []const u8) *const String {
     @setEvalBranchQuota(10_000);
-    const slice: Slice = comptime if (utf8IsAscii(utf8)) blk: {
-        break :blk .{ .ascii = utf8 };
-    } else blk: {
-        const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8);
-        break :blk .{ .utf16 = utf16 };
-    };
-    const string: *const String = comptime &.{ .slice = slice, .hash = slice.hash() };
-    return string;
+    if (utf8.len == 0) {
+        return &.{ .data = .empty, .length = 0, .hash = 0 };
+    }
+    comptime {
+        if (utf8IsAscii(utf8)) {
+            const ascii = utf8;
+            return &.{
+                .data = .{ .static_ascii = ascii.ptr },
+                .length = @intCast(ascii.len),
+                .hash = std.hash.Wyhash.hash(0, ascii),
+            };
+        } else {
+            const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8);
+            return &.{
+                .data = .{ .static_utf16 = utf16.ptr },
+                .length = @intCast(utf16.len),
+                .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16)),
+            };
+        }
+    }
 }
 
 pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(utf8.len <= std.math.maxInt(u32));
     if (utf8.len == 0) return empty;
     const result = try agent.string_cache.getOrPut(agent, .{ .utf8 = utf8 });
     if (!result.found_existing) {
-        const slice: Slice = if (utf8IsAscii(utf8)) blk: {
-            break :blk .{ .ascii = utf8 };
-        } else blk: {
+        if (utf8IsAscii(utf8)) {
+            const ascii = utf8;
+            result.string.* = .{
+                .data = .{ .owned_ascii = ascii.ptr },
+                .length = @intCast(ascii.len),
+                .hash = std.hash.Wyhash.hash(0, ascii),
+            };
+        } else {
             const utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, utf8) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
                 error.OutOfMemory => return error.OutOfMemory,
             };
-            break :blk .{ .utf16 = utf16 };
-        };
-        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+            result.string.* = .{
+                .data = .{ .owned_utf16 = utf16.ptr },
+                .length = @intCast(utf16.len),
+                .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16)),
+            };
+        }
     }
     return result.string;
 }
@@ -138,70 +156,120 @@ pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const 
 // The parser, AST, and parts of codegen need to create strings from UTF-8 slices but do not
 // currently have access to the agent, so we skip caching them. This can be revisited later.
 pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(utf8.len <= std.math.maxInt(u32));
     if (utf8.len == 0) return empty;
-    const slice: Slice = if (utf8IsAscii(utf8)) blk: {
-        break :blk .{ .ascii = utf8 };
-    } else blk: {
+    if (utf8IsAscii(utf8)) {
+        return fromAsciiAlloc(allocator, utf8);
+    } else {
         const utf16 = std.unicode.utf8ToUtf16LeAlloc(allocator, utf8) catch |err| switch (err) {
             error.InvalidUtf8 => @panic("Invalid UTF-8"),
             error.OutOfMemory => return error.OutOfMemory,
         };
-        break :blk .{ .utf16 = utf16 };
-    };
-    const string = try allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
-    return string;
+        errdefer allocator.free(utf16);
+        return fromUtf16Alloc(allocator, utf16);
+    }
 }
 
 pub fn fromAscii(agent: *Agent, ascii: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(ascii.len <= std.math.maxInt(u32));
     if (ascii.len == 0) return empty;
     const result = try agent.string_cache.getOrPut(agent, .{ .utf8 = ascii });
     if (!result.found_existing) {
-        const slice: Slice = .{ .ascii = ascii };
-        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+        result.string.* = .{
+            .data = .{ .owned_ascii = ascii.ptr },
+            .length = @intCast(ascii.len),
+            .hash = std.hash.Wyhash.hash(0, ascii),
+        };
     }
     return result.string;
 }
 
 pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(ascii.len <= std.math.maxInt(u32));
     if (ascii.len == 0) return empty;
-    const slice: Slice = .{ .ascii = ascii };
     const string = try allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
+    string.* = .{
+        .data = .{ .owned_ascii = ascii.ptr },
+        .length = @intCast(ascii.len),
+        .hash = std.hash.Wyhash.hash(0, ascii),
+    };
     return string;
 }
 
 pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*const String {
+    std.debug.assert(utf16.len <= std.math.maxInt(u32));
     if (utf16.len == 0) return empty;
     const result = try agent.string_cache.getOrPut(agent, .{ .utf16 = utf16 });
     if (!result.found_existing) {
-        const slice: String.Slice = .{ .utf16 = utf16 };
-        result.string.* = .{ .slice = slice, .hash = slice.hash() };
+        result.string.* = .{
+            .data = .{ .owned_utf16 = utf16.ptr },
+            .length = @intCast(utf16.len),
+            .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16)),
+        };
     }
     return result.string;
 }
 
 pub fn fromUtf16Alloc(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
+    std.debug.assert(utf16.len <= std.math.maxInt(u32));
     if (utf16.len == 0) return empty;
-    const slice: Slice = .{ .utf16 = utf16 };
     const string = try allocator.create(String);
-    string.* = .{ .slice = slice, .hash = slice.hash() };
+    string.* = .{
+        .data = .{ .owned_utf16 = utf16.ptr },
+        .length = @intCast(utf16.len),
+        .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16)),
+    };
     return string;
 }
 
 pub fn isEmpty(self: *const String) bool {
-    return self.length() == 0;
+    return self.length == 0;
 }
 
-pub fn length(self: *const String) usize {
-    return switch (self.slice) {
-        .ascii => |ascii| ascii.len,
-        .utf16 => |utf16| utf16.len,
+pub fn isAscii(self: *const String) bool {
+    return switch (self.data) {
+        .empty, .owned_ascii, .static_ascii => true,
+        else => false,
+    };
+}
+
+pub fn isUtf16(self: *const String) bool {
+    return switch (self.data) {
+        .owned_utf16, .static_utf16 => true,
+        else => false,
+    };
+}
+
+pub fn asAscii(self: *const String) []const u8 {
+    return switch (self.data) {
+        .empty => &.{},
+        .owned_ascii, .static_ascii => |ascii| ascii[0..self.length],
+        .owned_utf16, .static_utf16 => unreachable,
+    };
+}
+
+pub fn asUtf16(self: *const String) []const u16 {
+    return switch (self.data) {
+        .empty, .owned_ascii, .static_ascii => unreachable,
+        .owned_utf16, .static_utf16 => |utf16| utf16[0..self.length],
+    };
+}
+
+pub const AsciiOrUtf16 = union(enum) {
+    ascii: []const u8,
+    utf16: []const u16,
+};
+
+pub fn asAsciiOrUtf16(self: *const String) AsciiOrUtf16 {
+    return switch (self.data) {
+        .empty => .{ .ascii = &.{} },
+        .owned_ascii, .static_ascii => |ascii| .{ .ascii = ascii[0..self.length] },
+        .owned_utf16, .static_utf16 => |utf16| .{ .utf16 = utf16[0..self.length] },
     };
 }
 
 pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
-    return switch (self.slice) {
+    return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
             allocator,
@@ -212,9 +280,9 @@ pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocat
 }
 
 pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u16 {
-    return switch (self.slice) {
+    return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| blk: {
-            const utf16 = try allocator.alloc(u16, ascii.len);
+            const utf16 = try allocator.alloc(u16, self.length);
             for (ascii, 0..) |c, i| utf16[i] = c;
             break :blk utf16;
         },
@@ -228,17 +296,17 @@ pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
 
 pub fn eql(self: *const String, other: *const String) bool {
     if (self == other) return true;
-    if (self.slice == .ascii and other.slice == .ascii) {
-        return self.hash == other.hash and std.mem.eql(u8, self.slice.ascii, other.slice.ascii);
+    if (self.isAscii() and other.isAscii()) {
+        return self.hash == other.hash and std.mem.eql(u8, self.asAscii(), other.asAscii());
     }
-    if (self.slice == .utf16 and other.slice == .utf16) {
-        return self.hash == other.hash and std.mem.eql(u16, self.slice.utf16, other.slice.utf16);
+    if (self.isUtf16() and other.isUtf16()) {
+        return self.hash == other.hash and std.mem.eql(u16, self.asUtf16(), other.asUtf16());
     }
     if (self.isEmpty() and other.isEmpty()) return true;
-    if (self.length() != other.length()) return false;
+    if (self.length != other.length) return false;
     var it1 = self.codeUnitIterator();
     var it2 = other.codeUnitIterator();
-    for (0..self.length()) |_| {
+    for (0..self.length) |_| {
         const c1 = it1.next().?;
         const c2 = it2.next().?;
         if (c1 != c2) return false;
@@ -247,17 +315,17 @@ pub fn eql(self: *const String, other: *const String) bool {
 }
 
 pub fn startsWith(self: *const String, other: *const String) bool {
-    if (self.slice == .ascii and other.slice == .ascii) {
-        return std.mem.startsWith(u8, self.slice.ascii, other.slice.ascii);
+    if (self.isAscii() and other.isAscii()) {
+        return std.mem.startsWith(u8, self.asAscii(), other.asAscii());
     }
-    if (self.slice == .utf16 and other.slice == .utf16) {
-        return std.mem.startsWith(u16, self.slice.utf16, other.slice.utf16);
+    if (self.isUtf16() and other.isUtf16()) {
+        return std.mem.startsWith(u16, self.asUtf16(), other.asUtf16());
     }
     if (other.isEmpty()) return true;
-    if (self.length() < other.length()) return false;
+    if (self.length < other.length) return false;
     var it1 = self.codeUnitIterator();
     var it2 = other.codeUnitIterator();
-    for (0..other.length()) |_| {
+    for (0..other.length) |_| {
         const c1 = it1.next().?;
         const c2 = it2.next().?;
         if (c1 != c2) return false;
@@ -269,20 +337,20 @@ pub fn startsWith(self: *const String, other: *const String) bool {
 pub fn substring(
     self: *const String,
     agent: *Agent,
-    inclusive_start: usize,
-    exclusive_end: ?usize,
+    inclusive_start: u32,
+    exclusive_end: ?u32,
 ) std.mem.Allocator.Error!*const String {
-    if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length())) {
+    if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length)) {
         return self;
     }
-    if (self.isEmpty() or inclusive_start == self.length() or exclusive_end == 0) return empty;
-    switch (self.slice) {
+    if (self.isEmpty() or inclusive_start == self.length or exclusive_end == 0) return empty;
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
-            const ascii_substring = ascii[inclusive_start .. exclusive_end orelse self.length()];
+            const ascii_substring = ascii[inclusive_start .. exclusive_end orelse self.length];
             return fromAscii(agent, try agent.gc_allocator.dupe(u8, ascii_substring));
         },
         .utf16 => |utf16| {
-            const utf16_substring = utf16[inclusive_start .. exclusive_end orelse self.length()];
+            const utf16_substring = utf16[inclusive_start .. exclusive_end orelse self.length];
             const is_ascii = for (utf16_substring) |code_unit| {
                 if (code_unit > 0x7F) break false;
             } else true;
@@ -301,10 +369,10 @@ pub fn substring(
 
 /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringindexof
-pub fn indexOf(self: *const String, search_value: *const String, from_index: usize) ?usize {
+pub fn indexOf(self: *const String, search_value: *const String, from_index: u32) ?u32 {
     // 1. Let len be the length of string.
-    const len = self.length();
-    const search_len = search_value.length();
+    const len = self.length;
+    const search_len = search_value.length;
 
     // 2. If searchValue is the empty String and fromIndex ≤ len, return fromIndex.
     if (search_value.isEmpty() and from_index <= len) return from_index;
@@ -315,31 +383,31 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: usi
     //     b. If candidate is searchValue, return i.
     // 5. Return not-found.
     if (from_index >= len or search_len > len) return null;
-    if (self.slice == .ascii and search_value.slice == .ascii) {
+    if (self.isAscii() and search_value.isAscii()) {
         return if (std.mem.indexOf(
             u8,
-            self.slice.ascii[from_index..],
-            search_value.slice.ascii,
+            self.asAscii()[from_index..],
+            search_value.asAscii(),
         )) |index|
-            index + from_index
+            @as(u32, @intCast(index)) + from_index
         else
             null;
     }
-    if (self.slice == .utf16 and search_value.slice == .utf16) {
+    if (self.isUtf16() and search_value.isUtf16()) {
         return if (std.mem.indexOf(
             u16,
-            self.slice.utf16[from_index..],
-            search_value.slice.utf16,
+            self.asUtf16()[from_index..],
+            search_value.asUtf16(),
         )) |index|
-            index + from_index
+            @as(u32, @intCast(index)) + from_index
         else
             null;
     }
-    var i: usize = from_index;
+    var i: u32 = from_index;
     const end = len - search_len;
     outer: while (i <= end) : (i += 1) {
         for (0..search_len) |n| {
-            if (self.codeUnitAt(i + n) != search_value.codeUnitAt(n)) continue :outer;
+            if (self.codeUnitAt(i + @as(u32, @intCast(n))) != search_value.codeUnitAt(@intCast(n))) continue :outer;
         }
         return i;
     }
@@ -348,12 +416,12 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: usi
 
 /// 6.1.4.2 StringLastIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringlastindexof
-pub fn lastIndexOf(self: *const String, search_value: *const String, from_index: usize) ?usize {
+pub fn lastIndexOf(self: *const String, search_value: *const String, from_index: u32) ?u32 {
     // 1. Let len be the length of string.
-    const len = self.length();
+    const len = self.length;
 
     // 2. Let searchLen be the length of searchValue.
-    const search_len = search_value.length();
+    const search_len = search_value.length;
 
     // 3. Assert: fromIndex + searchLen ≤ len.
     // 1. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
@@ -362,32 +430,32 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     // 5. Return not-found.
     if (search_value.isEmpty() and from_index <= len) return from_index;
     if (from_index >= len or search_len > len) return null;
-    if (self.slice == .ascii and search_value.slice == .ascii) {
+    if (self.isAscii() and search_value.isAscii()) {
         const end = std.math.clamp(from_index + search_len, 0, len);
         return if (std.mem.lastIndexOf(
             u8,
-            self.slice.ascii[0..end],
-            search_value.slice.ascii,
+            self.asAscii()[0..end],
+            search_value.asAscii(),
         )) |index|
-            index
+            @as(u32, @intCast(index))
         else
             null;
     }
-    if (self.slice == .utf16 and search_value.slice == .utf16) {
+    if (self.isUtf16() and search_value.isUtf16()) {
         const end = std.math.clamp(from_index + search_len, 0, len);
         return if (std.mem.lastIndexOf(
             u16,
-            self.slice.utf16[0..end],
-            search_value.slice.utf16,
+            self.asUtf16()[0..end],
+            search_value.asUtf16(),
         )) |index|
-            index
+            @as(u32, @intCast(index))
         else
             null;
     }
-    var i = std.math.sub(usize, len - search_len, from_index) catch return null;
+    var i = std.math.sub(u32, len - search_len, from_index) catch return null;
     outer: while (true) : (i -= 1) {
         for (0..search_len) |n| {
-            if (self.codeUnitAt(i + n) != search_value.codeUnitAt(n)) continue :outer;
+            if (self.codeUnitAt(i + @as(u32, @intCast(n))) != search_value.codeUnitAt(@intCast(n))) continue :outer;
         }
         return i;
     }
@@ -396,13 +464,13 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
 /// 7.2.8 Static Semantics: IsStringWellFormedUnicode ( string )
 /// https://tc39.es/ecma262/#sec-isstringwellformedunicode
 pub fn isWellFormedUnicode(self: *const String) bool {
-    if (self.slice == .ascii) return true;
+    if (self.isAscii()) return true;
 
     // 1. Let len be the length of string.
-    const len = self.length();
+    const len = self.length;
 
     // 2. Let k be 0.
-    var k: usize = 0;
+    var k: u32 = 0;
 
     // 3. Repeat, while k < len,
     while (k < len) {
@@ -428,14 +496,14 @@ pub const CodePoint = struct {
 
 /// 11.1.4 Static Semantics: CodePointAt ( string, position )
 /// https://tc39.es/ecma262/#sec-codepointat
-pub fn codePointAt(self: *const String, position: usize) CodePoint {
+pub fn codePointAt(self: *const String, position: u32) CodePoint {
     // 1. Let size be the length of string.
-    const size = self.length();
+    const size = self.length;
 
     // 2. Assert: position ≥ 0 and position < size.
     std.debug.assert(position >= 0 and position < size);
 
-    switch (self.slice) {
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
             return .{ .code_point = ascii[position], .code_unit_count = 1, .is_unpaired_surrogate = false };
         },
@@ -476,8 +544,8 @@ pub fn codePointAt(self: *const String, position: usize) CodePoint {
     }
 }
 
-pub fn codeUnitAt(self: *const String, index: usize) u16 {
-    return switch (self.slice) {
+pub fn codeUnitAt(self: *const String, index: u32) u16 {
+    return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| ascii[index],
         .utf16 => |utf16| utf16[index],
     };
@@ -485,7 +553,7 @@ pub fn codeUnitAt(self: *const String, index: usize) u16 {
 
 pub fn toLowerCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
-    switch (self.slice) {
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
             const output = try agent.gc_allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
@@ -505,7 +573,7 @@ pub fn toLowerCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Er
 
 pub fn toUpperCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
-    switch (self.slice) {
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
             const output = try agent.gc_allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
@@ -531,7 +599,7 @@ pub fn trim(
     if (self.isEmpty()) return empty;
     switch (where) {
         .start => {
-            var start: usize = 0;
+            var start: u32 = 0;
             var it = self.codeUnitIterator();
             code_units: while (it.next()) |string_code_unit| {
                 for (whitespace_code_units) |whitespace_code_unit| {
@@ -545,9 +613,9 @@ pub fn trim(
             return self.substring(agent, start, null);
         },
         .end => {
-            var end: usize = self.length();
+            var end: u32 = self.length;
             var it = self.codeUnitIterator();
-            it.index = self.length() - 1;
+            it.index = self.length - 1;
             code_units: while (it.previous()) |string_code_unit| {
                 for (whitespace_code_units) |whitespace_code_unit| {
                     if (whitespace_code_unit == string_code_unit) {
@@ -560,8 +628,8 @@ pub fn trim(
             return self.substring(agent, 0, end);
         },
         .@"start+end" => {
-            var start: usize = 0;
-            var end: usize = self.length();
+            var start: u32 = 0;
+            var end: u32 = self.length;
             var it = self.codeUnitIterator();
             code_units: while (it.next()) |string_code_unit| {
                 for (whitespace_code_units) |whitespace_code_unit| {
@@ -572,7 +640,7 @@ pub fn trim(
                 }
                 break;
             }
-            it.index = self.length() - 1;
+            it.index = self.length - 1;
             code_units: while (it.previous()) |string_code_unit| {
                 for (whitespace_code_units) |whitespace_code_unit| {
                     if (whitespace_code_unit == string_code_unit) {
@@ -594,7 +662,7 @@ pub fn replace(
     replacement: []const u8,
 ) std.mem.Allocator.Error!*const String {
     // For now this only deals with simple ASCII replacements.
-    switch (self.slice) {
+    switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
             const output = try std.mem.replaceOwned(
                 u8,
@@ -629,7 +697,7 @@ pub fn replace(
 pub fn repeat(
     self: *const String,
     agent: *Agent,
-    n: usize,
+    n: u32,
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
     var builder = try Builder.initCapacity(agent.gc_allocator, n);
@@ -643,7 +711,7 @@ pub fn concat(
     strings: []const *const String,
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
-    var builder = try Builder.initCapacity(agent.gc_allocator, strings.len);
+    var builder = try Builder.initCapacity(agent.gc_allocator, @intCast(strings.len));
     defer builder.deinit(agent.gc_allocator);
     for (strings) |string| builder.appendStringAssumeCapacity(string);
     return builder.build(agent);
@@ -684,12 +752,125 @@ test format {
             "\"\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\b\\t\\n\\v\\f\\r\\x0e\\x0f\\\\\"",
         },
         .{
-            &.{ .slice = .{ .utf16 = &.{0xd83d} }, .hash = undefined },
+            &.{ .data = .{ .static_utf16 = &.{0xd83d} }, .length = 1, .hash = undefined },
             "\"\\ud83d\"",
         },
     };
     for (test_cases) |test_case| {
         const string, const expected = test_case;
         try std.testing.expectFmt(expected, "{f}", .{string});
+    }
+}
+
+test empty {
+    try std.testing.expectEqual(.empty, std.meta.activeTag(empty.data));
+    try std.testing.expectEqualSlices(u8, "", empty.asAscii());
+    try std.testing.expectEqual(0, empty.length);
+    try std.testing.expectEqual(0, empty.hash);
+}
+
+test fromLiteral {
+    {
+        const string = fromLiteral("");
+        try std.testing.expectEqual(string, empty);
+    }
+    {
+        const string = fromLiteral("foo");
+        try std.testing.expectEqual(.static_ascii, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u8, "foo", string.asAscii());
+        try std.testing.expectEqual(3, string.length);
+        try std.testing.expectEqual(0xa94472b2b241e867, string.hash);
+    }
+    {
+        const string = fromLiteral("😎");
+        try std.testing.expectEqual(.static_utf16, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u16, &.{ 0xD83D, 0xDE0E }, string.asUtf16());
+        try std.testing.expectEqual(2, string.length);
+        try std.testing.expectEqual(0x21e24ace07bf6072, string.hash);
+    }
+    {
+        const a = fromLiteral("foo");
+        const b = fromLiteral("foo");
+        // Comptime function caching guarantees deduplication
+        try std.testing.expectEqual(a, b);
+    }
+}
+
+test fromUtf8 {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const string = try fromUtf8(&agent, "");
+        try std.testing.expectEqual(string, empty);
+    }
+    {
+        const string = try fromUtf8(&agent, "foo");
+        try std.testing.expectEqual(.owned_ascii, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u8, "foo", string.asAscii());
+        try std.testing.expectEqual(3, string.length);
+        try std.testing.expectEqual(0xa94472b2b241e867, string.hash);
+    }
+    {
+        const string = try fromUtf8(&agent, "😎");
+        try std.testing.expectEqual(.owned_utf16, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u16, &.{ 0xD83D, 0xDE0E }, string.asUtf16());
+        try std.testing.expectEqual(2, string.length);
+        try std.testing.expectEqual(0x21e24ace07bf6072, string.hash);
+    }
+    {
+        const a = try fromUtf8(&agent, "foo");
+        const b = try fromUtf8(&agent, "foo");
+        // String cache weakly guarantees deduplication
+        try std.testing.expectEqual(a, b);
+    }
+}
+
+test fromAscii {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const string = try fromAscii(&agent, "");
+        try std.testing.expectEqual(string, empty);
+    }
+    {
+        const string = try fromAscii(&agent, "foo");
+        try std.testing.expectEqual(.owned_ascii, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u8, "foo", string.asAscii());
+        try std.testing.expectEqual(3, string.length);
+        try std.testing.expectEqual(0xa94472b2b241e867, string.hash);
+    }
+    {
+        const a = try fromAscii(&agent, "foo");
+        const b = try fromAscii(&agent, "foo");
+        // String cache weakly guarantees deduplication
+        try std.testing.expectEqual(a, b);
+    }
+}
+
+test fromUtf16 {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const string = try fromUtf16(&agent, &.{});
+        try std.testing.expectEqual(string, empty);
+    }
+    {
+        const string = try fromUtf16(&agent, std.unicode.utf8ToUtf16LeStringLiteral("😎"));
+        try std.testing.expectEqual(.owned_utf16, std.meta.activeTag(string.data));
+        try std.testing.expectEqualSlices(u16, &.{ 0xD83D, 0xDE0E }, string.asUtf16());
+        try std.testing.expectEqual(2, string.length);
+        try std.testing.expectEqual(0x21e24ace07bf6072, string.hash);
+    }
+    {
+        const a = try fromUtf16(&agent, std.unicode.utf8ToUtf16LeStringLiteral("😎"));
+        const b = try fromUtf16(&agent, std.unicode.utf8ToUtf16LeStringLiteral("😎"));
+        // String cache weakly guarantees deduplication
+        try std.testing.expectEqual(a, b);
     }
 }

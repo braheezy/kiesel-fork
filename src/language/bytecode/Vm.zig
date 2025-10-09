@@ -709,7 +709,7 @@ fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm) Agent.Error!v
         .object => base_value.asObject(),
         .string => blk: {
             if (property_name_value.type() == .string and property_name_value.asString().eql(String.fromLiteral("length"))) {
-                self.result = Value.from(@as(u53, @intCast(base_value.asString().length())));
+                self.result = Value.from(base_value.asString().length);
                 return;
             } else if (property_name_value.type() == .symbol) {
                 break :blk (try base_value.synthesizePrototype(self.agent)).?;
@@ -782,7 +782,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
         .object => base_value.asObject(),
         .string => blk: {
             if (property_name_string.eql(String.fromLiteral("length"))) {
-                self.result = Value.from(@as(u53, @intCast(base_value.asString().length())));
+                self.result = Value.from(base_value.asString().length);
                 return;
             }
             // Might be a property handled by String's [[GetOwnProperty]], we need to make an object

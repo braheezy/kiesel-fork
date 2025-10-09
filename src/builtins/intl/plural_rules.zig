@@ -130,7 +130,7 @@ pub const constructor = struct {
             .{ "cardinal", .cardinal },
             .{ "ordinal", .ordinal },
         });
-        plural_rules.fields.type = type_map.get(type_.slice.ascii).?;
+        plural_rules.fields.type = type_map.get(type_.asAscii()).?;
 
         // 12. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
         //     "engineering", "compact" », "standard").
@@ -156,7 +156,7 @@ pub const constructor = struct {
             .{ "engineering", .engineering },
             .{ "compact", .compact },
         });
-        plural_rules.fields.notation = notation_map.get(notation.slice.ascii).?;
+        plural_rules.fields.notation = notation_map.get(notation.asAscii()).?;
 
         // TODO: 14. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
 

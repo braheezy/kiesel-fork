@@ -36,9 +36,12 @@ pub var state: State = .{
 };
 
 fn asciiString(ascii: []const u8) *const String {
-    const slice: String.Slice = .{ .ascii = ascii };
     const string = arena.allocator().create(String) catch unreachable;
-    string.* = .{ .slice = slice, .hash = slice.hash() };
+    string.* = .{
+        .data = .{ .owned_ascii = ascii.ptr },
+        .length = @intCast(ascii.len),
+        .hash = undefined,
+    };
     return string;
 }
 

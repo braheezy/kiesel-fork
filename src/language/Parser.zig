@@ -333,7 +333,7 @@ fn utf8StringValue(
         return try allocator.dupe(u8, text);
     }
     const string = try ast.stringValueImpl(allocator, text);
-    return switch (string.slice) {
+    return switch (string.asAsciiOrUtf16()) {
         .ascii => |ascii| ascii,
         .utf16 => |utf16| std.unicode.utf16LeToUtf8Alloc(
             allocator,

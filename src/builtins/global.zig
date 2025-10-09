@@ -554,11 +554,11 @@ fn encode(
     const unescaped_set = always_unescaped ++ extra_unescaped;
 
     // OPTIMIZATION: If the string is ASCII we don't have to handle unpaired surrogates.
-    if (string.slice == .ascii) {
+    if (string.isAscii()) {
         var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
         defer allocating_writer.deinit();
         const writer = &allocating_writer.writer;
-        std.Uri.Component.percentEncode(writer, string.slice.ascii, struct {
+        std.Uri.Component.percentEncode(writer, string.asAscii(), struct {
             fn isValidChar(c: u8) bool {
                 return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
             }
@@ -569,14 +569,14 @@ fn encode(
     }
 
     // 1. Let len be the length of string.
-    const len = string.length();
+    const len = string.length;
 
     // 2. Let R be the empty String.
     var result: String.Builder = .empty;
     defer result.deinit(agent.gc_allocator);
 
     // 5. Let k be 0.
-    var k: usize = 0;
+    var k: u32 = 0;
 
     // 6. Repeat, while k < len,
     while (k < len) {
@@ -788,7 +788,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 
     // 3. Let R be the empty String.
     // NOTE: This allocates the exact needed capacity upfront
-    var result = try String.Builder.initCapacity(agent.gc_allocator, string.length());
+    var result = try String.Builder.initCapacity(agent.gc_allocator, string.length);
     defer result.deinit(agent.gc_allocator);
 
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
@@ -855,7 +855,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string = try string_value.toString(agent);
 
     // 2. Let len be the length of string.
-    const len = string.length();
+    const len = string.length;
 
     // 3. Let R be the empty String.
     var result: String.Builder = .empty;
@@ -865,7 +865,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     defer agent.gc_allocator.free(code_units);
 
     // 4. Let k be 0.
-    var k: usize = 0;
+    var k: u32 = 0;
 
     // 5. Repeat, while k < len,
     while (k < len) : (k += 1) {
@@ -878,7 +878,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             var hex_digits: []const u16 = &.{};
 
             // ii. Let optionalAdvance be 0.
-            var optional_advance: usize = 0;
+            var optional_advance: u32 = 0;
 
             // iii. If k + 5 < len and the code unit at index k + 1 within string is the code unit
             //      0x0075 (LATIN SMALL LETTER U), then

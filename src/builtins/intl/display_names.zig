@@ -136,7 +136,7 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "long", .long },
         });
-        display_names.fields.options.style = style_map.get(style.slice.ascii).?;
+        display_names.fields.options.style = style_map.get(style.asAscii()).?;
 
         // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
         //     "currency", "calendar", "dateTimeField" », undefined).
@@ -171,7 +171,7 @@ pub const constructor = struct {
             .{ "calendar", .calendar },
             .{ "dateTimeField", .date_time_field },
         });
-        display_names.fields.type = type_map.get(@"type".?.slice.ascii).?;
+        display_names.fields.type = type_map.get(@"type".?.asAscii()).?;
 
         // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback = try options.getOption(
@@ -192,7 +192,7 @@ pub const constructor = struct {
             .{ "code", .code },
             .{ "none", .none },
         });
-        display_names.fields.options.fallback = fallback_map.get(fallback.slice.ascii).?;
+        display_names.fields.options.fallback = fallback_map.get(fallback.asAscii()).?;
 
         // 17. Set displayNames.[[Locale]] to r.[[Locale]].
         display_names.fields.locale = resolved_locale;
@@ -227,7 +227,7 @@ pub const constructor = struct {
             .{ "dialect", .dialect },
             .{ "standard", .standard },
         });
-        display_names.fields.options.language_display = language_display_map.get(language_display.slice.ascii).?;
+        display_names.fields.options.language_display = language_display_map.get(language_display.asAscii()).?;
 
         // 25. Let styleFields be typeFields.[[<style>]].
         // 26. Assert: styleFields is a Record (see 12.2.3).

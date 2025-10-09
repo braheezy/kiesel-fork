@@ -76,7 +76,7 @@ pub inline fn availableCalendars() []const *const String {
         }
         std.mem.sortUnstable(*const String, &result, {}, struct {
             fn lessThanFn(_: void, lhs: *const String, rhs: *const String) bool {
-                return std.mem.lessThan(u8, lhs.slice.ascii, rhs.slice.ascii);
+                return std.mem.lessThan(u8, lhs.asAscii(), rhs.asAscii());
             }
         }.lessThanFn);
         const final = result; // Load bearing const assignment

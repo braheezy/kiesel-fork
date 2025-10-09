@@ -3968,7 +3968,7 @@ fn fromBase64Impl(
     // 4-10.
     // NOTE: This doesn't pass all tests. std.base64 has an awful API so I didn't bother with
     //       supporting partial decoding.
-    const bytes = switch (string.slice) {
+    const bytes = switch (string.asAsciiOrUtf16()) {
         .ascii => |ascii| switch (last_chunk_handling) {
             .loose => if (std.mem.indexOfScalar(u8, ascii, '=')) |end| blk: {
                 for (ascii[end..]) |c| {
@@ -4033,7 +4033,7 @@ fn fromHexImpl(
     const max_length = maybe_max_length orelse std.math.maxInt(u53);
 
     // 2. Let length be the length of string.
-    const length = string.length();
+    const length = string.length;
 
     // 3. Let bytes be a new empty List.
 

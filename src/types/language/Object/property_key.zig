@@ -47,8 +47,8 @@ pub const PropertyKey = union(enum) {
                 String => {
                     // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
                     //        are not canonical.
-                    if (value.slice == .utf16) return .{ .string = value };
-                    if (std.fmt.parseUnsigned(IntegerIndex, value.slice.ascii, 10)) |integer_index| {
+                    if (!value.isAscii()) return .{ .string = value };
+                    if (std.fmt.parseUnsigned(IntegerIndex, value.asAscii(), 10)) |integer_index| {
                         return .{ .integer_index = integer_index };
                     } else |_| {
                         return .{ .string = value };
@@ -85,9 +85,9 @@ pub const PropertyKey = union(enum) {
                 // 2. Let n be ! ToNumber(argument).
                 // 3. If ! ToString(n) is argument, return n.
                 // 4. Return undefined.
-                const ascii = switch (string.slice) {
-                    .utf16 => return null,
+                const ascii = switch (string.asAsciiOrUtf16()) {
                     .ascii => |ascii| ascii,
+                    .utf16 => return null,
                 };
                 // Do some manual validation to avoid allocations where possible
                 if (ascii.len == 0) return null;
@@ -134,11 +134,11 @@ pub const PropertyKey = union(enum) {
     fn eqlStringAndIntegerIndex(string: *const String, index: IntegerIndex) bool {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
         var buf: [len]u8 = undefined;
-        const index_string: *const String = blk: {
-            const slice: String.Slice = .{
-                .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
-            };
-            break :blk &.{ .slice = slice, .hash = undefined };
+        const ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable;
+        const index_string: *const String = &.{
+            .data = .{ .owned_ascii = ascii.ptr },
+            .length = @intCast(ascii.len),
+            .hash = std.hash.Wyhash.hash(0, ascii),
         };
         return string.eql(index_string);
     }

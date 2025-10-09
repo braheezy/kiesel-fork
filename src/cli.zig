@@ -677,7 +677,7 @@ fn printValueDebugInfo(
         .number => try writer.print(" (type: {t})", .{value.asNumber()}),
         .string => try writer.print(" (ptr: 0x{x}, type: {t})", .{
             @intFromPtr(value.asString()),
-            value.asString().slice,
+            value.asString().data,
         }),
         .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
         .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{

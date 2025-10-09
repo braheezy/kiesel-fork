@@ -718,7 +718,7 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
     // 9. Let epochNanoseconds be GetUTCEpochNanoseconds(balanced).
     // 10. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
     // 11. Return ! CreateTemporalInstant(epochNanoseconds).
-    const temporal_rs_instant = switch (item.asString().slice) {
+    const temporal_rs_instant = switch (item.asString().asAsciiOrUtf16()) {
         .ascii => |ascii| try temporal_rs.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_from_utf8(

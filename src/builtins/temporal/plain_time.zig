@@ -791,7 +791,7 @@ pub fn toTemporalPlainTime(
         //    throw a RangeError exception.
         // d. Assert: parseResult.[[Time]] is not start-of-day.
         // e. Set result to parseResult.[[Time]].
-        const temporal_rs_plain_time = switch (item.asString().slice) {
+        const temporal_rs_plain_time = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainTime_from_utf8(

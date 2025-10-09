@@ -188,7 +188,7 @@ pub fn createDateTimeFormat(
         .{ "persian", .persian },
         .{ "roc", .roc },
     });
-    date_time_format.fields.calendar = calendar_map.get(resolved.calendar.slice.ascii) orelse .gregorian;
+    date_time_format.fields.calendar = calendar_map.get(resolved.calendar.asAscii()) orelse .gregorian;
 
     // 21. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
     date_time_format.fields.numbering_system = resolved.numbering_system;
@@ -358,7 +358,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.fields.date_style = if (date_style) |s|
-        date_style_map.get(s.slice.ascii).?
+        date_style_map.get(s.asAscii()).?
     else
         null;
 
@@ -387,7 +387,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.fields.time_style = if (time_style) |s|
-        time_style_map.get(s.slice.ascii).?
+        time_style_map.get(s.asAscii()).?
     else
         null;
 
@@ -798,9 +798,9 @@ fn formatDateTimeImpl(
 
     const iana_parser = icu4zig.IanaParser.init();
     defer iana_parser.deinit();
-    const time_zone = iana_parser.parse(date_time_format.fields.time_zone.slice.ascii);
+    const time_zone = iana_parser.parse(date_time_format.fields.time_zone.asAscii());
     time_zone.deinit();
-    const offset = icu4zig.UtcOffset.fromString(date_time_format.fields.time_zone.slice.ascii) catch
+    const offset = icu4zig.UtcOffset.fromString(date_time_format.fields.time_zone.asAscii()) catch
         icu4zig.UtcOffset.fromSeconds(0) catch
         unreachable;
     defer offset.deinit();

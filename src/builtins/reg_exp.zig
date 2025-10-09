@@ -275,12 +275,12 @@ pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.
     );
 }
 
-fn getMatch(captures_list: []?*u8, string: []const u8, shift: bool, i: usize) ?Match {
+fn getMatch(captures_list: []?*u8, string: [*]const u8, shift: bool, i: usize) ?Match {
     const match = captures_list[2 * i ..][0..2].*;
     if (match[0] == null or match[1] == null) return null;
-    const start_index = (@intFromPtr(match[0]) - @intFromPtr(string.ptr)) >> @intFromBool(shift);
-    const end_index = (@intFromPtr(match[1]) - @intFromPtr(string.ptr)) >> @intFromBool(shift);
-    return .{ .start_index = start_index, .end_index = end_index };
+    const start_index = (@intFromPtr(match[0]) - @intFromPtr(string)) >> @intFromBool(shift);
+    const end_index = (@intFromPtr(match[1]) - @intFromPtr(string)) >> @intFromBool(shift);
+    return .{ .start_index = @intCast(start_index), .end_index = @intCast(end_index) };
 }
 
 /// 22.2.7.2 RegExpBuiltinExec ( R, S )
@@ -291,11 +291,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     }
 
     // 1. Let length be the length of S.
-    const length = string.length();
+    const length = string.length;
 
     // 2. Let lastIndex be ℝ(? ToLength(! Get(R, "lastIndex"))).
     const last_index_value = reg_exp.object.getPropertyValueDirect(PropertyKey.from("lastIndex"));
-    var last_index: usize = @intCast(try last_index_value.toLength(agent));
+    var last_index = std.math.lossyCast(u32, try last_index_value.toLength(agent));
 
     const re_bytecode = reg_exp.fields.re_bytecode;
     const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(@ptrCast(re_bytecode)));
@@ -318,20 +318,20 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     }
 
     // 8-13.
-    const shift = string.slice == .utf16;
-    const buf, const buf_len = switch (string.slice) {
-        .ascii => |ascii| .{ ascii, ascii.len },
-        .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
+    const shift = string.isUtf16();
+    const buf: [*]const u8 = switch (string.asAsciiOrUtf16()) {
+        .ascii => |ascii| ascii.ptr,
+        .utf16 => |utf16| @ptrCast(utf16.ptr),
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const ret = if (last_index > length) 0 else libregexp.c.lre_exec(
         @ptrCast(captures_list),
         @ptrCast(re_bytecode),
-        buf.ptr,
+        buf,
         @intCast(last_index),
-        @intCast(buf_len),
+        @intCast(string.length),
         // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16 (set internally via the u flag)
-        switch (string.slice) {
+        switch (string.asAsciiOrUtf16()) {
             .ascii => 0,
             .utf16 => 1,
         },
@@ -370,7 +370,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         try reg_exp.object.set(
             agent,
             PropertyKey.from("lastIndex"),
-            Value.from(@as(u53, @intCast(end_index))),
+            Value.from(end_index),
             .throw,
         );
     }
@@ -390,7 +390,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     try array.object.createDataPropertyDirect(
         agent,
         PropertyKey.from("index"),
-        Value.from(@as(u53, @intCast(last_index))),
+        Value.from(last_index),
     );
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
@@ -559,7 +559,7 @@ pub fn advanceStringIndex(string: *const String, index: u53, unicode: bool) u53 
     if (!unicode) return index + 1;
 
     // 3. Let length be the length of S.
-    const length = string.length();
+    const length = string.length;
 
     // 4. If index + 1 ≥ length, return index + 1.
     if (index + 1 >= length) return index + 1;
@@ -575,10 +575,10 @@ pub fn advanceStringIndex(string: *const String, index: u53, unicode: bool) u53 
 /// https://tc39.es/ecma262/#sec-match-records
 const Match = struct {
     /// [[StartIndex]]
-    start_index: usize,
+    start_index: u32,
 
     /// [[EndIndex]]
-    end_index: usize,
+    end_index: u32,
 };
 
 /// 22.2.7.6 GetMatchString ( S, match )
@@ -586,7 +586,7 @@ const Match = struct {
 fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*const String {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
-    std.debug.assert(match.end_index <= string.length());
+    std.debug.assert(match.end_index <= string.length);
 
     // 2. Return the substring of S from match.[[StartIndex]] to match.[[EndIndex]].
     return string.substring(agent, match.start_index, match.end_index);
@@ -597,16 +597,13 @@ fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Al
 fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*builtins.Array {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
-    std.debug.assert(match.end_index <= string.length());
+    std.debug.assert(match.end_index <= string.length);
 
     // 2. Return CreateArrayFromList(« 𝔽(match.[[StartIndex]]), 𝔽(match.[[EndIndex]]) »).
-    return createArrayFromList(
-        agent,
-        &.{
-            Value.from(@as(u53, @intCast(match.start_index))),
-            Value.from(@as(u53, @intCast(match.end_index))),
-        },
-    );
+    return createArrayFromList(agent, &.{
+        Value.from(match.start_index),
+        Value.from(match.end_index),
+    });
 }
 
 /// 22.2.7.8 MakeMatchIndicesIndexPairArray ( S, indices, groupNames, hasGroups )
@@ -822,8 +819,8 @@ pub const constructor = struct {
 
         // 3. Let cpList be StringToCodePoints(S).
         // 4. For each code point cp of cpList, do
-        var position: usize = 0;
-        while (position < string.length()) {
+        var position: u32 = 0;
+        while (position < string.length) {
             const cp = string.codePointAt(position);
             defer position += cp.code_unit_count;
 
@@ -1310,7 +1307,7 @@ pub const prototype = struct {
         const string = try string_value.toString(agent);
 
         // 4. Let lengthS be the length of S.
-        const string_length = string.length();
+        const string_length = string.length;
 
         // 5. Let functionalReplace be IsCallable(replaceValue).
         const functional_replace = replace_value.isCallable();
@@ -1384,7 +1381,7 @@ pub const prototype = struct {
         defer accumulated_result.deinit(agent.gc_allocator);
 
         // 14. Let nextSourcePosition be 0.
-        var next_source_position: usize = 0;
+        var next_source_position: u32 = 0;
 
         // 15. For each element result of results, do
         for (results.items) |result| {
@@ -1398,18 +1395,16 @@ pub const prototype = struct {
             const matched = try (try result.get(agent, PropertyKey.from(0))).toString(agent);
 
             // d. Let matchLength be the length of matched.
-            const matched_length = matched.length();
+            const matched_length = matched.length;
 
             // e. Let position be ? ToIntegerOrInfinity(? Get(result, "index")).
             const position_f64 = try (try result.get(agent, PropertyKey.from("index"))).toIntegerOrInfinity(agent);
 
             // f. Set position to the result of clamping position between 0 and lengthS.
-            const position: usize = @intFromFloat(
-                std.math.clamp(
-                    position_f64,
-                    0,
-                    @as(f64, @floatFromInt(string_length)),
-                ),
+            const position = std.math.clamp(
+                std.math.lossyCast(u32, position_f64),
+                0,
+                string_length,
             );
 
             // g. Let captures be a new empty List.
@@ -1460,7 +1455,7 @@ pub const prototype = struct {
                 for (captures.items) |capture| replacer_args.appendAssumeCapacity(
                     if (capture) |s| Value.from(s) else .null,
                 );
-                replacer_args.appendAssumeCapacity(Value.from(@as(u53, @intCast(position))));
+                replacer_args.appendAssumeCapacity(Value.from(position));
                 replacer_args.appendAssumeCapacity(Value.from(string));
 
                 // ii. If namedCaptures is not undefined, then
@@ -1703,7 +1698,7 @@ pub const prototype = struct {
         }
 
         // 16. Let size be the length of S.
-        const size = string.length();
+        const size = string.length;
 
         // 17. Let p be 0.
         var p: u53 = 0;

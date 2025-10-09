@@ -95,7 +95,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
             .string => switch (self.referenced_name) {
                 .value => |value| blk: {
                     if (value.type() == .string and value.asString().eql(String.fromLiteral("length"))) {
-                        return Value.from(@as(u53, @intCast(self.base.value.asString().length())));
+                        return Value.from(self.base.value.asString().length);
                     } else if (value.type() == .symbol) {
                         break :blk (try self.base.value.synthesizePrototype(agent)).?;
                     }

@@ -89,7 +89,7 @@ pub const prototype = struct {
         const start_index = iterator.fields.iterated_string_next_segment_code_unit_index;
 
         // 6. Let len be the length of string.
-        const len = string.length();
+        const len = string.length;
 
         // 7. If startIndex ≥ len, then
         if (start_index >= len) {
@@ -126,7 +126,7 @@ pub const SegmentIterator = MakeObject(.{
     .Fields = struct {
         iterating_segmenter: *builtins.intl.Segmenter,
         iterated_string: *const String,
-        iterated_string_next_segment_code_unit_index: usize,
+        iterated_string_next_segment_code_unit_index: u32,
     },
     .tag = .intl_segment_iterator,
 });
@@ -137,14 +137,14 @@ pub fn createSegmentDataObject(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
     string: *const String,
-    start_index: usize,
-    end_index: usize,
+    start_index: u32,
+    end_index: u32,
     is_word_like: bool,
 ) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the length of string.
-    const len = string.length();
+    const len = string.length;
 
     // 2. Assert: endIndex ≤ len.
     std.debug.assert(end_index <= len);
@@ -169,7 +169,7 @@ pub fn createSegmentDataObject(
     try result.createDataPropertyDirect(
         agent,
         PropertyKey.from("index"),
-        Value.from(@as(u53, @intCast(start_index))),
+        Value.from(start_index),
     );
 
     // 8. Perform ! CreateDataPropertyOrThrow(result, "input", string).

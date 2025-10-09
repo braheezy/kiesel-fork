@@ -1976,18 +1976,18 @@ pub fn isLessThan(
     // 3. If px is a String and py is a String, then
     if (px.isString() and py.isString()) {
         // a. Let lx be the length of px.
-        const lx = px.asString().length();
+        const lx = px.asString().length;
 
         // b. Let ly be the length of py.
-        const ly = py.asString().length();
+        const ly = py.asString().length;
 
         // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
         for (0..@min(lx, ly)) |i| {
             // i. Let cx be the numeric value of the code unit at index i within px.
-            const cx = px.asString().codeUnitAt(i);
+            const cx = px.asString().codeUnitAt(@intCast(i));
 
             // ii. Let cy be the numeric value of the code unit at index i within py.
-            const cy = py.asString().codeUnitAt(i);
+            const cy = py.asString().codeUnitAt(@intCast(i));
 
             // iii. If cx < cy, return true.
             if (cx < cy) return true;
@@ -2421,7 +2421,7 @@ test from {
     {
         const value = Value.from("foo");
         try std.testing.expect(value.isString());
-        try std.testing.expectEqual(value.asString().slice.ascii, "foo");
+        try std.testing.expectEqual(value.asString().asAscii(), "foo");
     }
     {
         const value = Value.from(123.456);

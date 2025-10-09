@@ -61,7 +61,7 @@ pub const prototype = struct {
         const position = string_iterator.fields.state.position;
 
         // a. Let len be the length of s.
-        const len = string.length();
+        const len = string.length;
 
         // b. Let position be 0.
         // c. Repeat, while position < len,
@@ -92,7 +92,7 @@ pub const StringIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             string: *const String,
-            position: usize,
+            position: u32,
         },
         completed,
     },

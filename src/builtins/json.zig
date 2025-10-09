@@ -792,7 +792,7 @@ pub const namespace = struct {
             // 8. Else if space is a String, then
             // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
             //    substring of space from 0 to 10.
-            break :blk if (space.asString().length() <= 10)
+            break :blk if (space.asString().length <= 10)
                 space.asString()
             else
                 try space.asString().substring(agent, 0, 10);

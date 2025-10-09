@@ -1001,7 +1001,7 @@ pub fn toTemporalPlainDate(
         // 5. Let calendar be result.[[Calendar]].
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
-        const parsed_date = switch (item.asString().slice) {
+        const parsed_date = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_from_utf8(

@@ -196,7 +196,7 @@ pub const constructor = struct {
             .{ "narrow", .narrow },
             .{ "digital", .digital },
         });
-        duration_format.fields.style = style_map.get(style.slice.ascii).?;
+        duration_format.fields.style = style_map.get(style.asAscii()).?;
 
         // 18. Let prevStyle be the empty String.
         var prev_style = String.empty;
@@ -355,8 +355,8 @@ pub const constructor = struct {
 
             // f. Set the value of durationFormat's internal slot whose name is slot to unitOptions.
             @field(duration_format.fields, slot) = .{
-                .style = unit_style_map.get(unit_options.style.slice.ascii).?,
-                .display = unit_display_map.get(unit_options.display.slice.ascii).?,
+                .style = unit_style_map.get(unit_options.style.asAscii()).?,
+                .display = unit_display_map.get(unit_options.display.asAscii()).?,
             };
 
             switch (unit) {

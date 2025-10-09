@@ -96,7 +96,7 @@ pub const constructor = struct {
             .{ "sort", .sort },
             .{ "search", .search },
         });
-        collator.fields.usage = usage_map.get(usage.slice.ascii).?;
+        collator.fields.usage = usage_map.get(usage.asAscii()).?;
 
         // TODO: 8-9.
 
@@ -192,7 +192,7 @@ pub const constructor = struct {
             .{ "variant", .{ .tertiary, null } },
         });
         if (maybe_sensitivity) |sensitivity| {
-            const strength, const case_level = sensitivity_map.get(sensitivity.slice.ascii).?;
+            const strength, const case_level = sensitivity_map.get(sensitivity.asAscii()).?;
             collator.fields.options.strength = strength;
             collator.fields.options.case_level = case_level;
         }
@@ -391,18 +391,18 @@ pub fn compareStrings(
     );
     defer collator.deinit();
 
-    const order = if (x.slice == .ascii and y.slice == .ascii) blk: {
-        break :blk collator.compareUtf8(x.slice.ascii, y.slice.ascii);
-    } else if (x.slice == .utf16 and y.slice == .utf16) blk: {
-        break :blk collator.compareUtf16(x.slice.utf16, y.slice.utf16);
-    } else if (x.slice == .ascii and y.slice == .utf16) blk: {
+    const order = if (x.isAscii() and y.isAscii()) blk: {
+        break :blk collator.compareUtf8(x.asAscii(), y.asAscii());
+    } else if (x.isUtf16() and y.isUtf16()) blk: {
+        break :blk collator.compareUtf16(x.asUtf16(), y.asUtf16());
+    } else if (x.isAscii() and y.isUtf16()) blk: {
         const x_utf16 = try x.toUtf16(allocator);
         defer allocator.free(x_utf16);
-        break :blk collator.compareUtf16(x_utf16, y.slice.utf16);
-    } else if (x.slice == .utf16 and y.slice == .ascii) blk: {
+        break :blk collator.compareUtf16(x_utf16, y.asUtf16());
+    } else if (x.isUtf16() and y.isAscii()) blk: {
         const y_utf16 = try y.toUtf16(allocator);
         defer allocator.free(y_utf16);
-        break :blk collator.compareUtf16(x.slice.utf16, y_utf16);
+        break :blk collator.compareUtf16(x.asUtf16(), y_utf16);
     } else unreachable;
     return switch (order) {
         .lt => Value.from(-1),

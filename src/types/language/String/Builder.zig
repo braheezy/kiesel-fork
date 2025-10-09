@@ -18,7 +18,7 @@ pub const Segment = union(enum) {
 
     pub fn isAscii(self: Segment) bool {
         return switch (self) {
-            .string => |string| string.slice == .ascii,
+            .string => |string| string.isAscii(),
             .char => true,
             .code_unit => |code_unit| code_unit <= 0x7F,
             .code_point => |code_point| code_point <= 0x7F,
@@ -32,7 +32,7 @@ pub const empty: Builder = .{
 
 pub fn initCapacity(
     allocator: std.mem.Allocator,
-    capacity: usize,
+    capacity: u32,
 ) std.mem.Allocator.Error!Builder {
     var builder: Builder = .empty;
     try builder.segments.ensureUnusedCapacity(allocator, capacity);
@@ -83,17 +83,14 @@ pub fn appendCodePointAssumeCapacity(self: *Builder, code_point: u21) void {
     self.segments.appendAssumeCapacity(.{ .code_point = code_point });
 }
 
-fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!String.Slice {
+fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!String.AsciiOrUtf16 {
     const is_ascii = for (self.segments.items) |segment| {
         if (!segment.isAscii()) break false;
     } else true;
     if (is_ascii) {
         var result: std.ArrayList(u8) = .empty;
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string.slice) {
-                .ascii => |ascii| try result.appendSlice(allocator, ascii),
-                .utf16 => unreachable,
-            },
+            .string => |string| try result.appendSlice(allocator, string.asAscii()),
             .char => |char| try result.append(allocator, char),
             .code_unit => |code_unit| try result.append(allocator, @intCast(code_unit)),
             .code_point => |code_point| try result.append(allocator, @intCast(code_point)),
@@ -102,7 +99,7 @@ fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
     } else {
         var result: std.ArrayList(u16) = .empty;
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string.slice) {
+            .string => |string| switch (string.asAsciiOrUtf16()) {
                 .ascii => |ascii| for (ascii) |c| try result.append(allocator, c),
                 .utf16 => |utf16| try result.appendSlice(allocator, utf16),
             },

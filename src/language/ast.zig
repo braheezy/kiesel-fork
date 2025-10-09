@@ -283,7 +283,7 @@ pub fn stringValueImpl(
     text: []const u8,
 ) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the maximum needed capacity upfront
-    var result = try String.Builder.initCapacity(allocator, text.len);
+    var result = try String.Builder.initCapacity(allocator, @intCast(text.len));
     defer result.deinit(allocator);
     var it = std.unicode.Utf8View.initUnchecked(text).iterator();
     while (it.nextCodepoint()) |code_point| {
@@ -420,7 +420,7 @@ pub const PropertyName = union(enum) {
                 .string_literal => |string_literal| {
                     const string = try string_literal.stringValue(allocator);
                     // TODO: This needs `String.deinit()`
-                    defer switch (string.slice) {
+                    defer switch (string.asAsciiOrUtf16()) {
                         .ascii => |ascii| allocator.free(ascii),
                         .utf16 => |utf16| allocator.free(utf16),
                     };
@@ -4280,11 +4280,11 @@ pub const WithClause = struct {
         }
         std.mem.sort(ImportAttribute, attributes.items, {}, struct {
             fn lessThanFn(_: void, lhs: ImportAttribute, rhs: ImportAttribute) bool {
-                const lhs_len = lhs.key.length();
-                const rhs_len = rhs.key.length();
+                const lhs_len = lhs.key.length;
+                const rhs_len = rhs.key.length;
                 for (0..@min(lhs_len, rhs_len)) |i| {
-                    const cx = lhs.key.codeUnitAt(i);
-                    const cy = rhs.key.codeUnitAt(i);
+                    const cx = lhs.key.codeUnitAt(@intCast(i));
+                    const cy = rhs.key.codeUnitAt(@intCast(i));
                     if (cx < cy) return true;
                     if (cx > cy) return false;
                 }

@@ -600,7 +600,7 @@ pub fn getTemporalOverflowOption(
         .{ "constrain", temporal_rs.c.ArithmeticOverflow_Constrain },
         .{ "reject", temporal_rs.c.ArithmeticOverflow_Reject },
     });
-    return arithmetic_overflow_map.get(string_value.slice.ascii).?;
+    return arithmetic_overflow_map.get(string_value.asAscii()).?;
 }
 
 /// 13.7 GetTemporalDisambiguationOption ( options )
@@ -636,7 +636,7 @@ pub fn getTemporalDisambiguationOption(
         .{ "later", temporal_rs.c.Disambiguation_Later },
         .{ "reject", temporal_rs.c.Disambiguation_Reject },
     });
-    return disambiguation_map.get(string_value.slice.ascii).?;
+    return disambiguation_map.get(string_value.asAscii()).?;
 }
 
 /// 13.9 GetTemporalOffsetOption ( options, fallback )
@@ -683,7 +683,7 @@ pub fn getTemporalOffsetOption(
         .{ "ignore", temporal_rs.c.OffsetDisambiguation_Ignore },
         .{ "reject", temporal_rs.c.OffsetDisambiguation_Reject },
     });
-    return offset_disambiguation_map.get(string_value.slice.ascii).?;
+    return offset_disambiguation_map.get(string_value.asAscii()).?;
 }
 
 /// 13.10 GetTemporalShowCalendarNameOption ( options )
@@ -719,7 +719,7 @@ pub fn getTemporalShowCalendarNameOption(
         .{ "never", temporal_rs.c.DisplayCalendar_Never },
         .{ "critical", temporal_rs.c.DisplayCalendar_Critical },
     });
-    return display_calendar_map.get(string_value.slice.ascii).?;
+    return display_calendar_map.get(string_value.asAscii()).?;
 }
 
 /// 13.11 GetTemporalShowTimeZoneNameOption ( options )
@@ -751,7 +751,7 @@ pub fn getTemporalShowTimeZoneNameOption(
         .{ "never", temporal_rs.c.DisplayTimeZone_Never },
         .{ "critical", temporal_rs.c.DisplayTimeZone_Critical },
     });
-    return display_time_zone_map.get(string_value.slice.ascii).?;
+    return display_time_zone_map.get(string_value.asAscii()).?;
 }
 
 /// 13.12 GetTemporalShowOffsetOption ( options )
@@ -780,7 +780,7 @@ pub fn getTemporalShowOffsetOption(
         .{ "auto", temporal_rs.c.DisplayOffset_Auto },
         .{ "never", temporal_rs.c.DisplayOffset_Never },
     });
-    return display_offset_map.get(string_value.slice.ascii).?;
+    return display_offset_map.get(string_value.asAscii()).?;
 }
 
 /// 13.13 GetDirectionOption ( options )
@@ -810,7 +810,7 @@ pub fn getTemporalDirectionOption(
         .{ "next", temporal_rs.c.TransitionDirection_Next },
         .{ "previous", temporal_rs.c.TransitionDirection_Previous },
     });
-    return transition_direction_map.get(string_value.slice.ascii).?;
+    return transition_direction_map.get(string_value.asAscii()).?;
 }
 
 /// 13.15 GetTemporalFractionalSecondDigitsOption ( options )
@@ -964,7 +964,7 @@ pub fn getTemporalUnitValuedOption(
         .{ "nanosecond", temporal_rs.c.Unit_Nanosecond },
         .{ "nanoseconds", temporal_rs.c.Unit_Nanosecond },
     });
-    return unit_map.get(value.slice.ascii).?;
+    return unit_map.get(value.asAscii()).?;
 }
 
 /// 13.18 ValidateTemporalUnitValue ( value, unitGroup [ , extraValues ] )
@@ -1132,7 +1132,7 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // i. Set calendar to ? CanonicalizeCalendar(calendar).
         // j. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // k. Let time be result.[[Time]].
-        const owned_relative_to = switch (value.asString().slice) {
+        const owned_relative_to = switch (value.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_OwnedRelativeTo_from_utf8(
@@ -1362,7 +1362,7 @@ pub fn getTemporalRoundingModeOption(
         .{ "halfTrunc", temporal_rs.c.RoundingMode_HalfTrunc },
         .{ "halfEven", temporal_rs.c.RoundingMode_HalfEven },
     });
-    return rounding_mode_map.get(rounding_mode.slice.ascii).?;
+    return rounding_mode_map.get(rounding_mode.asAscii()).?;
 }
 
 /// 14.5.2.4 GetRoundingIncrementOption ( options )

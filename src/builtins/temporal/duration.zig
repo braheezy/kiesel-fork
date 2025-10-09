@@ -1001,7 +1001,7 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Duration {
         }
 
         // b. Return ? ParseTemporalDurationString(item).
-        const temporal_rs_duration = switch (item.asString().slice) {
+        const temporal_rs_duration = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_Duration_from_utf8(

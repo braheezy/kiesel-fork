@@ -76,7 +76,7 @@ pub const prototype = struct {
         const string = segments.fields.segments_string;
 
         // 5. Let len be the length of string.
-        const len = string.length();
+        const len = string.length;
 
         // 6. Let n be ? ToIntegerOrInfinity(index).
         const n = try index.toIntegerOrInfinity(agent);

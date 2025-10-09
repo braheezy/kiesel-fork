@@ -1000,7 +1000,7 @@ pub const constructor = struct {
     }
 
     fn parseImpl(string: *const String) f64 {
-        const ascii = switch (string.slice) {
+        const ascii = switch (string.asAsciiOrUtf16()) {
             .ascii => |ascii| ascii,
             .utf16 => return std.math.nan(f64),
         };

@@ -37,12 +37,12 @@ pub const StringPadPlacement = enum { start, end };
 pub fn stringPad(
     agent: *Agent,
     string: *const types.String,
-    max_length: usize,
+    max_length: u32,
     fill_string: *const types.String,
     placement: StringPadPlacement,
 ) Agent.Error!*const types.String {
     // 1. Let stringLength be the length of S.
-    const string_length = string.length();
+    const string_length = string.length;
 
     // 2. If maxLength ≤ stringLength, return S.
     if (max_length <= string_length) return string;
@@ -61,8 +61,8 @@ pub fn stringPad(
 
         const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
 
-        var i: usize = 0;
-        while (i < fill_len) : (i += fill_string_code_units.len) {
+        var i: u32 = 0;
+        while (i < fill_len) : (i += @intCast(fill_string_code_units.len)) {
             const dest = repeated_code_units[i..@min(i + fill_string_code_units.len, fill_len)];
             @memcpy(dest, fill_string_code_units[0..dest.len]);
         }
@@ -90,13 +90,13 @@ pub fn getSubstitution(
     agent: *Agent,
     matched: *const types.String,
     str: *const types.String,
-    position: usize,
+    position: u32,
     captures: []const ?*const types.String,
     named_captures: ?*Object,
     replacement_template: *const types.String,
 ) Agent.Error!*const types.String {
     // 1. Let stringLength be the length of str.
-    const string_length = str.length();
+    const string_length = str.length;
 
     // 2. Assert: position ≤ stringLength.
     std.debug.assert(position <= string_length);
@@ -145,7 +145,7 @@ pub fn getSubstitution(
             const ref = types.String.fromLiteral("$'");
 
             // ii. Let matchLength be the length of matched.
-            const match_length = matched.length();
+            const match_length = matched.length;
 
             // iii. Let tailPos be position + matchLength.
             const tail_pos = position +| match_length;
@@ -161,14 +161,14 @@ pub fn getSubstitution(
             );
 
             break :blk .{ ref, ref_replacement };
-        } else if (template_reminder.length() >= 2 and
+        } else if (template_reminder.length >= 2 and
             template_reminder.codeUnitAt(0) == '$' and
             std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))))
         blk: {
             // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
             //    digitCount be 2; otherwise let digitCount be 1.
-            var digit_count: usize = if (template_reminder.length() >= 3 and
+            var digit_count: u2 = if (template_reminder.length >= 3 and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))) and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(2)))) 2 else 1;
 
@@ -177,7 +177,7 @@ pub fn getSubstitution(
                 agent,
                 1,
                 1 + digit_count,
-            )).slice.ascii;
+            )).asAscii();
 
             // iii. Let index be ℝ(StringToNumber(digits)).
             var index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
@@ -279,7 +279,7 @@ pub fn getSubstitution(
         };
 
         // i. Let refLength be the length of ref.
-        const ref_length = ref.length();
+        const ref_length = ref.length;
 
         // j. Set templateRemainder to the substring of templateRemainder from refLength.
         template_reminder = try template_reminder.substring(agent, ref_length, null);
@@ -355,7 +355,7 @@ fn ownPropertyKeys(
     const str = object.as(String).fields.string_data;
 
     // 4. Let len be the length of str.
-    const len = str.length();
+    const len = str.length;
 
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
@@ -449,14 +449,14 @@ pub fn stringCreate(
     });
 
     // 7. Let length be the length of value.
-    const length = value.length();
+    const length = value.length;
 
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     try string.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
-            .value = Value.from(@as(u53, @intCast(length))),
+            .value = Value.from(length),
         },
         .attributes = .none,
     });
@@ -477,15 +477,15 @@ fn stringGetOwnProperty(
     // 3. If index is not an integral Number, return undefined.
     // 4. If index is -0𝔽 or index < -0𝔽, return undefined.
     if (property_key != .integer_index) return null;
-    if (property_key.integer_index > std.math.maxInt(usize) - 1) return null;
-    const index: usize = @intCast(property_key.integer_index);
+    if (property_key.integer_index > std.math.maxInt(u32) - 1) return null;
+    const index: u32 = @intCast(property_key.integer_index);
 
     // 5. Let str be S.[[StringData]].
     // 6. Assert: str is a String.
     const str = string.fields.string_data;
 
     // 7. Let len be the length of str.
-    const len = str.length();
+    const len = str.length;
 
     // 8. If ℝ(index) ≥ len, return undefined.
     if (index >= len) return null;
@@ -567,7 +567,10 @@ pub const constructor = struct {
     fn fromCharCode(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
-        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
+        var result = try types.String.Builder.initCapacity(
+            agent.gc_allocator,
+            @intCast(arguments.count()),
+        );
         defer result.deinit(agent.gc_allocator);
 
         // 2. For each element next of codeUnits, do
@@ -588,7 +591,10 @@ pub const constructor = struct {
     fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
-        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
+        var result = try types.String.Builder.initCapacity(
+            agent.gc_allocator,
+            @intCast(arguments.count()),
+        );
         defer result.deinit(agent.gc_allocator);
 
         // 2. For each element next of codePoints, do
@@ -803,7 +809,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 5. Let relativeIndex be ? ToIntegerOrInfinity(index).
         const relative_index = try index.toIntegerOrInfinity(agent);
@@ -819,7 +825,7 @@ pub const prototype = struct {
 
         // 8. If k < 0 or k ≥ len, return undefined.
         if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
-        const k: usize = @intFromFloat(k_f64);
+        const k = std.math.lossyCast(u32, k_f64);
 
         // 9. Return the substring of S from k to k + 1.
         return Value.from(try string.substring(agent, k, k + 1));
@@ -843,11 +849,11 @@ pub const prototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 5. Let size be the length of S.
-        const size = string.length();
+        const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return the empty String.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.from("");
-        const position: usize = @intFromFloat(position_f64);
+        const position = std.math.lossyCast(u32, position_f64);
 
         // 7. Return the substring of S from position to position + 1.
         return Value.from(try string.substring(agent, position, position + 1));
@@ -871,11 +877,11 @@ pub const prototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 5. Let size be the length of S.
-        const size = string.length();
+        const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return NaN.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .nan;
-        const position: usize = @intFromFloat(position_f64);
+        const position = std.math.lossyCast(u32, position_f64);
 
         // 7. Return the Number value for the numeric value of the code unit at index position
         //    within the String S.
@@ -900,11 +906,11 @@ pub const prototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 5. Let size be the length of S.
-        const size = string.length();
+        const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return undefined.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
-        const position: usize = @intFromFloat(position_f64);
+        const position = std.math.lossyCast(u32, position_f64);
 
         // 7. Let cp be CodePointAt(S, position).
         const code_point = string.codePointAt(position);
@@ -927,7 +933,7 @@ pub const prototype = struct {
 
         // 4. Let R be S.
         // NOTE: This allocates the exact needed capacity upfront
-        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count() + 1);
+        var result = try types.String.Builder.initCapacity(agent.gc_allocator, @intCast(arguments.count() + 1));
         defer result.deinit(agent.gc_allocator);
         result.appendStringAssumeCapacity(string);
 
@@ -975,7 +981,7 @@ pub const prototype = struct {
         const search_str = try search_string.toString(agent);
 
         // 7. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 8. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(endPosition).
         const pos = if (end_position.isUndefined())
@@ -984,17 +990,17 @@ pub const prototype = struct {
             try end_position.toIntegerOrInfinity(agent);
 
         // 9. Let end be the result of clamping pos between 0 and len.
-        const end = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+        const end = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
 
         // 10. Let searchLength be the length of searchStr.
-        const search_length = search_str.length();
+        const search_length = search_str.length;
 
         // 11. If searchLength = 0, return true.
         if (search_length == 0) return Value.from(true);
 
         // 12. Let start be end - searchLength.
         // 13. If start < 0, return false.
-        const start = std.math.sub(usize, end, search_length) catch return Value.from(false);
+        const start = std.math.sub(u32, end, search_length) catch return Value.from(false);
 
         // 14. Let substring be the substring of S from start to end.
         const substring_ = try string.substring(agent, start, end);
@@ -1041,10 +1047,10 @@ pub const prototype = struct {
         const pos = try position.toIntegerOrInfinity(agent);
 
         // 9. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 10. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
 
         // 11. Let index be StringIndexOf(S, searchStr, start).
         const index = string.indexOf(search_str, start);
@@ -1077,10 +1083,10 @@ pub const prototype = struct {
         const pos = try position.toIntegerOrInfinity(agent);
 
         // 7. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 8. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
 
         // 9. Let result be StringIndexOf(S, searchStr, start).
         // 10. If result is not-found, return -1𝔽.
@@ -1136,16 +1142,16 @@ pub const prototype = struct {
             Value.from(num_pos).toIntegerOrInfinity(agent) catch unreachable;
 
         // 8. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 9. Let searchLen be the length of searchStr.
-        const search_len = search_str.length();
+        const search_len = search_str.length;
 
         // 10. If len < searchLen, return -1𝔽.
         if (len < search_len) return Value.from(-1);
 
         // 11. Let start be the result of clamping pos between 0 and len - searchLen.
-        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len - search_len);
+        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len - search_len);
 
         // 12. Let result be StringLastIndexOf(S, searchStr, start).
         // 13. If result is not-found, return -1𝔽.
@@ -1177,18 +1183,18 @@ pub const prototype = struct {
         // 4. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
 
-        const order = if (string.slice == .ascii and that_value.slice == .ascii) blk: {
-            break :blk std.mem.order(u8, string.slice.ascii, that_value.slice.ascii);
-        } else if (string.slice == .utf16 and that_value.slice == .utf16) blk: {
-            break :blk std.mem.order(u16, string.slice.utf16, that_value.slice.utf16);
-        } else if (string.slice == .ascii and that_value.slice == .utf16) blk: {
+        const order = if (string.isAscii() and that_value.isAscii()) blk: {
+            break :blk std.mem.order(u8, string.asAscii(), that_value.asAscii());
+        } else if (string.isUtf16() and that_value.isUtf16()) blk: {
+            break :blk std.mem.order(u16, string.asUtf16(), that_value.asUtf16());
+        } else if (string.isAscii() and that_value.isUtf16()) blk: {
             const string_utf16 = try string.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(string_utf16);
-            break :blk std.mem.order(u16, string_utf16, that_value.slice.utf16);
-        } else if (string.slice == .utf16 and that_value.slice == .ascii) blk: {
+            break :blk std.mem.order(u16, string_utf16, that_value.asUtf16());
+        } else if (string.isUtf16() and that_value.isAscii()) blk: {
             const that_value_utf16 = try that_value.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(that_value_utf16);
-            break :blk std.mem.order(u16, string.slice.utf16, that_value_utf16);
+            break :blk std.mem.order(u16, string.asUtf16(), that_value_utf16);
         } else unreachable;
         return switch (order) {
             .lt => Value.from(-1),
@@ -1375,7 +1381,7 @@ pub const prototype = struct {
     fn stringPaddingBuiltinsImpl(
         agent: *Agent,
         object: Value,
-        max_length: Value,
+        max_length_value: Value,
         fill_string_value: Value,
         placement: StringPadPlacement,
     ) Agent.Error!*const types.String {
@@ -1383,13 +1389,13 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 2. Let intMaxLength be ℝ(? ToLength(maxLength)).
-        const int_max_length = try max_length.toLength(agent);
+        const max_length = try max_length_value.toLength(agent);
 
         // 3. Let stringLength be the length of S.
-        const string_length = string.length();
+        const string_length = string.length;
 
         // 4. If intMaxLength ≤ stringLength, return S.
-        if (int_max_length <= string_length) return string;
+        if (max_length <= string_length) return string;
 
         // 5. If fillString is undefined, set fillString to the String value consisting solely of
         //    the code unit 0x0020 (SPACE).
@@ -1399,11 +1405,15 @@ pub const prototype = struct {
         else
             try fill_string_value.toString(agent);
 
+        if (max_length > std.math.maxInt(u32)) {
+            return agent.throwException(.range_error, "Maximum string length exceeded", .{});
+        }
+
         // 7. Return StringPad(S, intMaxLength, fillString, placement).
         return stringPad(
             agent,
             string,
-            @intCast(int_max_length),
+            @intCast(max_length),
             fill_string,
             placement,
         );
@@ -1441,8 +1451,8 @@ pub const prototype = struct {
         if (string.isEmpty()) return Value.from("");
 
         // 7. Return the String value that is made from n copies of S appended together.
-        const n_usize = std.math.lossyCast(usize, n);
-        return Value.from(try string.repeat(agent, n_usize));
+        const n_u32 = std.math.lossyCast(u32, n);
+        return Value.from(try string.repeat(agent, n_u32));
     }
 
     /// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
@@ -1492,7 +1502,7 @@ pub const prototype = struct {
         }
 
         // 8. Let searchLength be the length of searchString.
-        const search_length = search_string.length();
+        const search_length = search_string.length;
 
         // 9. Let position be StringIndexOf(string, searchString, 0).
         const position = string.indexOf(search_string, 0) orelse {
@@ -1612,13 +1622,13 @@ pub const prototype = struct {
         }
 
         // 8. Let searchLength be the length of searchString.
-        const search_length = search_string.length();
+        const search_length = search_string.length;
 
         // 9. Let advanceBy be max(1, searchLength).
         const advance_by = @max(1, search_length);
 
         // 10. Let matchPositions be a new empty List.
-        var match_positions: std.ArrayList(usize) = .empty;
+        var match_positions: std.ArrayList(u32) = .empty;
         defer match_positions.deinit(agent.gc_allocator);
 
         // 11. Let position be StringIndexOf(string, searchString, 0).
@@ -1634,7 +1644,7 @@ pub const prototype = struct {
         }
 
         // 13. Let endOfLastMatch be 0.
-        var end_of_last_match: usize = 0;
+        var end_of_last_match: u32 = 0;
 
         // 14. Let result be the empty String.
         var result: *const types.String = .empty;
@@ -1653,7 +1663,7 @@ pub const prototype = struct {
                     .undefined,
                     &.{
                         Value.from(search_string),
-                        Value.from(@as(f64, @floatFromInt(position))),
+                        Value.from(position),
                         Value.from(string),
                     },
                 )).toString(agent);
@@ -1684,7 +1694,7 @@ pub const prototype = struct {
         }
 
         // 16. If endOfLastMatch < the length of string, then
-        if (end_of_last_match < string.length()) {
+        if (end_of_last_match < string.length) {
             // a. Set result to the string-concatenation of result and the substring of string from
             //    endOfLastMatch.
             result = try types.String.concat(agent, &.{
@@ -1753,7 +1763,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
         const len_f64: f64 = @floatFromInt(len);
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
@@ -1769,7 +1779,7 @@ pub const prototype = struct {
             // 8. Else, let from be min(intStart, len).
             break :blk @min(int_start, len_f64);
         };
-        const from: u53 = @intFromFloat(from_f64);
+        const from = std.math.lossyCast(u32, from_f64);
 
         // 9. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
         const int_end = if (end.isUndefined())
@@ -1787,19 +1797,13 @@ pub const prototype = struct {
             // 12. Else, let to be min(intEnd, len).
             break :blk @min(int_end, len_f64);
         };
-        const to: u53 = @intFromFloat(to_f64);
+        const to = std.math.lossyCast(u32, to_f64);
 
         // 13. If from ≥ to, return the empty String.
         if (from >= to) return Value.from("");
 
         // 14. Return the substring of S from from to to.
-        return Value.from(
-            try string.substring(
-                agent,
-                std.math.lossyCast(usize, from),
-                std.math.lossyCast(usize, to),
-            ),
-        );
+        return Value.from(try string.substring(agent, from, to));
     }
 
     /// 22.1.3.23 String.prototype.split ( separator, limit )
@@ -1860,12 +1864,12 @@ pub const prototype = struct {
         }
 
         // 9. Let separatorLength be the length of R.
-        const separator_length = separator.length();
+        const separator_length = separator.length;
 
         // 10. If separatorLength = 0, then
         if (separator_length == 0) {
             // a. Let strLen be the length of S.
-            const str_len = string.length();
+            const str_len = string.length;
 
             // b. Let outLen be the result of clamping lim between 0 and strLen.
             const out_len = std.math.clamp(limit, 0, str_len);
@@ -1905,7 +1909,7 @@ pub const prototype = struct {
         defer substrings.deinit(agent.gc_allocator);
 
         // 13. Let i be 0.
-        var i: usize = 0;
+        var i: u32 = 0;
 
         // 14. Let j be StringIndexOf(S, R, 0).
         var j = string.indexOf(separator, 0);
@@ -1981,16 +1985,16 @@ pub const prototype = struct {
         const search_str = try search_string.toString(agent);
 
         // 7. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 8. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(position).
         const pos = if (position.isUndefined()) 0 else try position.toIntegerOrInfinity(agent);
 
         // 9. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
 
         // 10. Let searchLength be the length of searchStr.
-        const search_length = search_str.length();
+        const search_length = search_str.length;
 
         // 11. If searchLength = 0, return true.
         if (search_length == 0) return Value.from(true);
@@ -2027,7 +2031,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let len be the length of S.
-        const len = string.length();
+        const len = string.length;
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
         const int_start = try start.toIntegerOrInfinity(agent);
@@ -2039,10 +2043,10 @@ pub const prototype = struct {
             try end.toIntegerOrInfinity(agent);
 
         // 7. Let finalStart be the result of clamping intStart between 0 and len.
-        const final_start = std.math.clamp(std.math.lossyCast(usize, int_start), 0, len);
+        const final_start = std.math.clamp(std.math.lossyCast(u32, int_start), 0, len);
 
         // 8. Let finalEnd be the result of clamping intEnd between 0 and len.
-        const final_end = std.math.clamp(std.math.lossyCast(usize, int_end), 0, len);
+        const final_end = std.math.clamp(std.math.lossyCast(u32, int_end), 0, len);
 
         // 9. Let from be min(finalStart, finalEnd).
         const from = @min(final_start, final_end);
@@ -2248,13 +2252,13 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let strLen be the length of S.
-        const str_len = string.length();
+        const str_len = string.length;
 
         // OPTIMIZATION: If the array is empty the result will be an empty string
         if (str_len == 0) return Value.from(types.String.empty);
 
         // 5. Let k be 0.
-        var k: usize = 0;
+        var k: u32 = 0;
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
@@ -2401,7 +2405,7 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let size be the length of S.
-        const size: f64 = @floatFromInt(string.length());
+        const size: f64 = @floatFromInt(string.length);
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
         var int_start = try start.toIntegerOrInfinity(agent);

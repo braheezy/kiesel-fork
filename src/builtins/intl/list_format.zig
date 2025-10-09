@@ -130,7 +130,7 @@ pub const constructor = struct {
             .{ "disjunction", .disjunction },
             .{ "unit", .unit },
         });
-        list_format.fields.type = type_map.get(type_.slice.ascii).?;
+        list_format.fields.type = type_map.get(type_.asAscii()).?;
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
@@ -154,7 +154,7 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "narrow", .narrow },
         });
-        list_format.fields.style = style_map.get(style.slice.ascii).?;
+        list_format.fields.style = style_map.get(style.asAscii()).?;
 
         // TODO: 14. Let resolvedLocaleData be r.[[LocaleData]].
         // TODO: 15. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].

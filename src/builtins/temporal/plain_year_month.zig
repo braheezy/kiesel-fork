@@ -729,7 +729,7 @@ pub fn toTemporalPlainYearMonth(
         // 5. Let calendar be result.[[Calendar]].
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
-        const parsed_year_month = switch (item.asString().slice) {
+        const parsed_year_month = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try temporal_rs.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_year_month_from_utf8(
