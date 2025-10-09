@@ -45,6 +45,12 @@ const Data = union(enum) {
     owned_utf16: [*]const u16,
     static_ascii: [*]const u8,
     static_utf16: [*]const u16,
+    slice: Slice,
+};
+
+const Slice = struct {
+    string: *const String,
+    start: u32,
 };
 
 pub fn format(self: *const String, writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -222,6 +228,37 @@ pub fn fromUtf16Alloc(allocator: std.mem.Allocator, utf16: []const u16) std.mem.
     return string;
 }
 
+pub fn fromStringSliced(agent: *Agent, string: *const String, inclusive_start: u32, exclusive_end: u32) std.mem.Allocator.Error!*const String {
+    std.debug.assert(inclusive_start <= exclusive_end and exclusive_end <= string.length);
+    // TODO: It probably makes sense to have a minimum length for slices. For example string
+    // indexing should not keep the entire original string alive for a single character slice.
+    // This can be solved when we have inline string storage.
+    const length = exclusive_end - inclusive_start;
+    if (length == 0) return empty;
+    if (length == string.length) return string;
+    const result = try agent.string_cache.getOrPut(agent, switch (string.asAsciiOrUtf16()) {
+        .ascii => |ascii| .{ .utf8 = ascii[inclusive_start..exclusive_end] },
+        .utf16 => |utf16| .{ .utf16 = utf16[inclusive_start..exclusive_end] },
+    });
+    if (!result.found_existing) {
+        const slice_string, const start = switch (string.data) {
+            .empty => unreachable,
+            // Avoid nested slices
+            .slice => |slice| .{ slice.string, slice.start + inclusive_start },
+            else => .{ string, inclusive_start },
+        };
+        result.string.* = .{
+            .data = .{ .slice = .{ .string = slice_string, .start = start } },
+            .length = length,
+            .hash = std.hash.Wyhash.hash(0, switch (string.asAsciiOrUtf16()) {
+                .ascii => |ascii| ascii[inclusive_start..exclusive_end],
+                .utf16 => |utf16| std.mem.sliceAsBytes(utf16[inclusive_start..exclusive_end]),
+            }),
+        };
+    }
+    return result.string;
+}
+
 pub fn isEmpty(self: *const String) bool {
     return self.length == 0;
 }
@@ -229,6 +266,7 @@ pub fn isEmpty(self: *const String) bool {
 pub fn isAscii(self: *const String) bool {
     return switch (self.data) {
         .empty, .owned_ascii, .static_ascii => true,
+        .slice => |slice| slice.string.isAscii(),
         else => false,
     };
 }
@@ -236,6 +274,7 @@ pub fn isAscii(self: *const String) bool {
 pub fn isUtf16(self: *const String) bool {
     return switch (self.data) {
         .owned_utf16, .static_utf16 => true,
+        .slice => |slice| slice.string.isUtf16(),
         else => false,
     };
 }
@@ -245,6 +284,10 @@ pub fn asAscii(self: *const String) []const u8 {
         .empty => &.{},
         .owned_ascii, .static_ascii => |ascii| ascii[0..self.length],
         .owned_utf16, .static_utf16 => unreachable,
+        .slice => |slice| switch (slice.string.data) {
+            .owned_ascii, .static_ascii => |ascii| ascii[slice.start..][0..self.length],
+            .empty, .owned_utf16, .static_utf16, .slice => unreachable,
+        },
     };
 }
 
@@ -252,6 +295,10 @@ pub fn asUtf16(self: *const String) []const u16 {
     return switch (self.data) {
         .empty, .owned_ascii, .static_ascii => unreachable,
         .owned_utf16, .static_utf16 => |utf16| utf16[0..self.length],
+        .slice => |slice| switch (slice.string.data) {
+            .owned_utf16, .static_utf16 => |utf16| utf16[slice.start..][0..self.length],
+            .empty, .owned_ascii, .static_ascii, .slice => unreachable,
+        },
     };
 }
 
@@ -265,6 +312,10 @@ pub fn asAsciiOrUtf16(self: *const String) AsciiOrUtf16 {
         .empty => .{ .ascii = &.{} },
         .owned_ascii, .static_ascii => |ascii| .{ .ascii = ascii[0..self.length] },
         .owned_utf16, .static_utf16 => |utf16| .{ .utf16 = utf16[0..self.length] },
+        .slice => |slice| switch (slice.string.asAsciiOrUtf16()) {
+            .ascii => |ascii| .{ .ascii = ascii[slice.start..][0..self.length] },
+            .utf16 => |utf16| .{ .utf16 = utf16[slice.start..][0..self.length] },
+        },
     };
 }
 
@@ -338,19 +389,27 @@ pub fn substring(
     self: *const String,
     agent: *Agent,
     inclusive_start: u32,
-    exclusive_end: ?u32,
+    maybe_exclusive_end: ?u32,
 ) std.mem.Allocator.Error!*const String {
-    if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length)) {
+    const exclusive_end = maybe_exclusive_end orelse self.length;
+    if (inclusive_start == 0 and exclusive_end == self.length) {
         return self;
     }
-    if (self.isEmpty() or inclusive_start == self.length or exclusive_end == 0) return empty;
+    if (self.isEmpty() or
+        inclusive_start == self.length or
+        exclusive_end == 0 or
+        inclusive_start == exclusive_end)
+    {
+        return empty;
+    }
     switch (self.asAsciiOrUtf16()) {
-        .ascii => |ascii| {
-            const ascii_substring = ascii[inclusive_start .. exclusive_end orelse self.length];
-            return fromAscii(agent, try agent.gc_allocator.dupe(u8, ascii_substring));
+        .ascii => {
+            return fromStringSliced(agent, self, inclusive_start, exclusive_end);
         },
         .utf16 => |utf16| {
-            const utf16_substring = utf16[inclusive_start .. exclusive_end orelse self.length];
+            // We currently maintain the invariant that ASCII strings are always stored as ASCII,
+            // so if slicing the string changes the encoding we have to allocate.
+            const utf16_substring = utf16[inclusive_start..exclusive_end];
             const is_ascii = for (utf16_substring) |code_unit| {
                 if (code_unit > 0x7F) break false;
             } else true;
@@ -361,7 +420,7 @@ pub fn substring(
                 }
                 return fromAscii(agent, ascii);
             } else {
-                return fromUtf16(agent, try agent.gc_allocator.dupe(u16, utf16_substring));
+                return fromStringSliced(agent, self, inclusive_start, exclusive_end);
             }
         },
     }
@@ -772,7 +831,7 @@ test empty {
 test fromLiteral {
     {
         const string = fromLiteral("");
-        try std.testing.expectEqual(string, empty);
+        try std.testing.expectEqual(empty, string);
     }
     {
         const string = fromLiteral("foo");
@@ -803,7 +862,7 @@ test fromUtf8 {
     defer agent.deinit();
     {
         const string = try fromUtf8(&agent, "");
-        try std.testing.expectEqual(string, empty);
+        try std.testing.expectEqual(empty, string);
     }
     {
         const string = try fromUtf8(&agent, "foo");
@@ -834,7 +893,7 @@ test fromAscii {
     defer agent.deinit();
     {
         const string = try fromAscii(&agent, "");
-        try std.testing.expectEqual(string, empty);
+        try std.testing.expectEqual(empty, string);
     }
     {
         const string = try fromAscii(&agent, "foo");
@@ -858,7 +917,7 @@ test fromUtf16 {
     defer agent.deinit();
     {
         const string = try fromUtf16(&agent, &.{});
-        try std.testing.expectEqual(string, empty);
+        try std.testing.expectEqual(empty, string);
     }
     {
         const string = try fromUtf16(&agent, std.unicode.utf8ToUtf16LeStringLiteral("😎"));
@@ -872,5 +931,40 @@ test fromUtf16 {
         const b = try fromUtf16(&agent, std.unicode.utf8ToUtf16LeStringLiteral("😎"));
         // String cache weakly guarantees deduplication
         try std.testing.expectEqual(a, b);
+    }
+}
+
+test fromStringSliced {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    const parent = fromLiteral("foobarbaz");
+    {
+        const string = try fromStringSliced(&agent, parent, 0, 0);
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const string = try fromStringSliced(&agent, parent, 0, 9);
+        try std.testing.expectEqual(parent, string);
+    }
+    {
+        const string = try fromStringSliced(&agent, parent, 0, 6);
+        try std.testing.expectEqual(.slice, std.meta.activeTag(string.data));
+        try std.testing.expectEqual(parent, string.data.slice.string);
+        try std.testing.expectEqual(0, string.data.slice.start);
+        try std.testing.expectEqualSlices(u8, "foobar", string.asAscii());
+        try std.testing.expectEqual(6, string.length);
+        try std.testing.expectEqual(0xb9d35b96e1f6fe2, string.hash);
+    }
+    {
+        const parent_sliced = try fromStringSliced(&agent, parent, 3, 9);
+        const string = try fromStringSliced(&agent, parent_sliced, 3, 6);
+        try std.testing.expectEqual(.slice, std.meta.activeTag(string.data));
+        try std.testing.expectEqual(parent, string.data.slice.string);
+        try std.testing.expectEqual(6, string.data.slice.start);
+        try std.testing.expectEqualSlices(u8, "baz", string.asAscii());
+        try std.testing.expectEqual(3, string.length);
+        try std.testing.expectEqual(0xff605a97715ddf78, string.hash);
     }
 }
