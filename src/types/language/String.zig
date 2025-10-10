@@ -29,6 +29,16 @@ pub const whitespace_code_units = blk: {
     break :blk code_units;
 };
 
+const single_code_unit_strings = blk: {
+    @setEvalBranchQuota(100_000);
+    var strings: [256]*const String = undefined;
+    for (0..256) |i| {
+        const utf8: []const u8 = &std.unicode.utf8EncodeComptime(@intCast(i));
+        strings[i] = fromLiteral(utf8);
+    }
+    break :blk strings;
+};
+
 pub const empty = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
@@ -401,6 +411,12 @@ pub fn substring(
         inclusive_start == exclusive_end)
     {
         return empty;
+    }
+    if (exclusive_end - inclusive_start == 1) {
+        const code_unit = self.codeUnitAt(inclusive_start);
+        if (code_unit < single_code_unit_strings.len) {
+            return single_code_unit_strings[code_unit];
+        }
     }
     switch (self.asAsciiOrUtf16()) {
         .ascii => {
