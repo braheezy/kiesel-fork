@@ -15,15 +15,6 @@ pub const Segment = union(enum) {
     char: u8,
     code_unit: u16,
     code_point: u21,
-
-    pub fn isAscii(self: Segment) bool {
-        return switch (self) {
-            .string => |string| string.isAscii(),
-            .char => true,
-            .code_unit => |code_unit| code_unit <= 0x7F,
-            .code_point => |code_point| code_point <= 0x7F,
-        };
-    }
 };
 
 pub const empty: Builder = .{
@@ -84,34 +75,48 @@ pub fn appendCodePointAssumeCapacity(self: *Builder, code_point: u21) void {
 }
 
 fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Error!String.AsciiOrUtf16 {
-    const is_ascii = for (self.segments.items) |segment| {
-        if (!segment.isAscii()) break false;
-    } else true;
+    var is_ascii = true;
+    var capacity: u32 = 0;
+    for (self.segments.items) |segment| switch (segment) {
+        .string => |string| {
+            is_ascii &= string.isAscii();
+            capacity += string.length;
+        },
+        .char => {
+            capacity += 1;
+        },
+        .code_unit => |code_unit| {
+            is_ascii &= code_unit <= 0x7F;
+            capacity += 1;
+        },
+        .code_point => |code_point| {
+            is_ascii &= code_point <= 0x7F;
+            capacity += if (code_point < 0x10000) 1 else 2;
+        },
+    };
     if (is_ascii) {
-        var result: std.ArrayList(u8) = .empty;
+        var result: std.ArrayList(u8) = try .initCapacity(allocator, capacity);
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| try result.appendSlice(allocator, string.asAscii()),
-            .char => |char| try result.append(allocator, char),
-            .code_unit => |code_unit| try result.append(allocator, @intCast(code_unit)),
-            .code_point => |code_point| try result.append(allocator, @intCast(code_point)),
+            .string => |string| result.appendSliceAssumeCapacity(string.asAscii()),
+            .char => |char| result.appendAssumeCapacity(char),
+            .code_unit => |code_unit| result.appendAssumeCapacity(@intCast(code_unit)),
+            .code_point => |code_point| result.appendAssumeCapacity(@intCast(code_point)),
         };
         return .{ .ascii = try result.toOwnedSlice(allocator) };
     } else {
-        var result: std.ArrayList(u16) = .empty;
+        var result: std.ArrayList(u16) = try .initCapacity(allocator, capacity);
         for (self.segments.items) |segment| switch (segment) {
             .string => |string| switch (string.asAsciiOrUtf16()) {
-                .ascii => |ascii| for (ascii) |c| try result.append(allocator, c),
-                .utf16 => |utf16| try result.appendSlice(allocator, utf16),
+                .ascii => |ascii| for (ascii) |c| result.appendAssumeCapacity(c),
+                .utf16 => |utf16| result.appendSliceAssumeCapacity(utf16),
             },
-            .char => |char| try result.append(allocator, char),
-            .code_unit => |code_unit| try result.append(allocator, code_unit),
-            .code_point => |code_point| {
-                if (code_point < 0x10000) {
-                    try result.append(allocator, @intCast(code_point));
-                } else {
-                    try result.append(allocator, @intCast(0xd800 | ((code_point - 0x10000) >> 10)));
-                    try result.append(allocator, @intCast(0xdc00 | ((code_point - 0x10000) & 0x3ff)));
-                }
+            .char => |char| result.appendAssumeCapacity(char),
+            .code_unit => |code_unit| result.appendAssumeCapacity(code_unit),
+            .code_point => |code_point| if (code_point < 0x10000) {
+                result.appendAssumeCapacity(@intCast(code_point));
+            } else {
+                result.appendAssumeCapacity(@intCast(0xd800 | ((code_point - 0x10000) >> 10)));
+                result.appendAssumeCapacity(@intCast(0xdc00 | ((code_point - 0x10000) & 0x3ff)));
             },
         };
         return .{ .utf16 = try result.toOwnedSlice(allocator) };
