@@ -31,11 +31,37 @@ const String = @This();
 pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
-pub const whitespace_code_units = blk: {
+pub const whitespace_code_points = blk: {
     const whitespace = language.tokenizer.whitespace ++ language.tokenizer.line_terminators;
-    var code_units: [whitespace.len]u21 = undefined;
+    var code_points: [whitespace.len]u21 = undefined;
     for (whitespace, 0..) |utf8, i| {
-        code_units[i] = std.unicode.utf8Decode(utf8) catch unreachable;
+        code_points[i] = std.unicode.utf8Decode(utf8) catch unreachable;
+    }
+    break :blk code_points;
+};
+
+const whitespace_ascii = blk: {
+    var len = 0;
+    for (whitespace_code_points) |code_point| {
+        if (code_point <= 0x7F) len += 1;
+    }
+    var code_units: [len]u8 = undefined;
+    var i: usize = 0;
+    for (whitespace_code_points) |code_point| {
+        if (code_point <= 0x7F) {
+            code_units[i] = @intCast(code_point);
+            i += 1;
+        }
+    }
+    break :blk code_units;
+};
+
+const whitespace_utf16 = blk: {
+    // All whitespace code points are encoded with a single UTF-16 code unit
+    const len = whitespace_code_points.len;
+    var code_units: [len]u16 = undefined;
+    for (whitespace_code_points, 0..) |code_point, i| {
+        code_units[i] = @intCast(code_point);
     }
     break :blk code_units;
 };
@@ -677,68 +703,49 @@ pub fn toUpperCaseAscii(self: *const String, agent: *Agent) std.mem.Allocator.Er
     }
 }
 
-pub fn trim(
-    self: *const String,
-    agent: *Agent,
-    where: enum { start, end, @"start+end" },
-) std.mem.Allocator.Error!*const String {
+pub fn trimStart(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
-    switch (where) {
-        .start => {
-            var start: u32 = 0;
-            var it = self.codeUnitIterator();
-            code_units: while (it.next()) |string_code_unit| {
-                for (whitespace_code_units) |whitespace_code_unit| {
-                    if (whitespace_code_unit == string_code_unit) {
-                        start += 1;
-                        continue :code_units;
-                    }
-                }
-                break;
-            }
-            return self.substring(agent, start, null);
+    var start: u32 = 0;
+    switch (self.asAsciiOrUtf16()) {
+        .ascii => |ascii| {
+            while (start < self.length and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
         },
-        .end => {
-            var end: u32 = self.length;
-            var it = self.codeUnitIterator();
-            it.index = self.length - 1;
-            code_units: while (it.previous()) |string_code_unit| {
-                for (whitespace_code_units) |whitespace_code_unit| {
-                    if (whitespace_code_unit == string_code_unit) {
-                        end -= 1;
-                        continue :code_units;
-                    }
-                }
-                break;
-            }
-            return self.substring(agent, 0, end);
-        },
-        .@"start+end" => {
-            var start: u32 = 0;
-            var end: u32 = self.length;
-            var it = self.codeUnitIterator();
-            code_units: while (it.next()) |string_code_unit| {
-                for (whitespace_code_units) |whitespace_code_unit| {
-                    if (whitespace_code_unit == string_code_unit) {
-                        start += 1;
-                        continue :code_units;
-                    }
-                }
-                break;
-            }
-            it.index = self.length - 1;
-            code_units: while (it.previous()) |string_code_unit| {
-                for (whitespace_code_units) |whitespace_code_unit| {
-                    if (whitespace_code_unit == string_code_unit) {
-                        end -= 1;
-                        continue :code_units;
-                    }
-                }
-                break;
-            }
-            return self.substring(agent, start, end);
+        .utf16 => |utf16| {
+            while (start < self.length and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
         },
     }
+    return self.substring(agent, start, null);
+}
+
+pub fn trimEnd(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
+    if (self.isEmpty()) return empty;
+    var end: u32 = self.length;
+    switch (self.asAsciiOrUtf16()) {
+        .ascii => |ascii| {
+            while (end > 0 and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
+        },
+        .utf16 => |utf16| {
+            while (end > 0 and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
+        },
+    }
+    return self.substring(agent, 0, end);
+}
+
+pub fn trim(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const String {
+    if (self.isEmpty()) return empty;
+    var start: u32 = 0;
+    var end: u32 = self.length;
+    switch (self.asAsciiOrUtf16()) {
+        .ascii => |ascii| {
+            while (start < end and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
+            while (end > start and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
+        },
+        .utf16 => |utf16| {
+            while (start < end and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
+            while (end > start and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
+        },
+    }
+    return self.substring(agent, start, end);
 }
 
 pub fn replace(
@@ -993,5 +1000,71 @@ test fromStringSliced {
         try std.testing.expectEqualSlices(u8, "baz", string.asAscii());
         try std.testing.expectEqual(3, string.length);
         try std.testing.expectEqual(0xff605a97715ddf78, string.hash);
+    }
+}
+
+test trimStart {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\t");
+        const string = try parent.trimStart(&agent);
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.trimStart(&agent);
+        try std.testing.expectEqual(parent, string);
+    }
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\tfoo \n\r\t \n\r\t");
+        const string = try parent.trimStart(&agent);
+        try std.testing.expect(string.eql(String.fromLiteral("foo \n\r\t \n\r\t")));
+    }
+}
+
+test trimEnd {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\t");
+        const string = try parent.trimEnd(&agent);
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.trimEnd(&agent);
+        try std.testing.expectEqual(parent, string);
+    }
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\tfoo \n\r\t \n\r\t");
+        const string = try parent.trimEnd(&agent);
+        try std.testing.expect(string.eql(String.fromLiteral(" \n\r\t \n\r\tfoo")));
+    }
+}
+
+test trim {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\t");
+        const string = try parent.trim(&agent);
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.trim(&agent);
+        try std.testing.expectEqual(parent, string);
+    }
+    {
+        const parent = fromLiteral(" \n\r\t \n\r\tfoo \n\r\t \n\r\t");
+        const string = try parent.trim(&agent);
+        try std.testing.expect(string.eql(String.fromLiteral("foo")));
     }
 }

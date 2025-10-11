@@ -2316,14 +2316,14 @@ pub const prototype = struct {
             .start => blk: {
                 // a. Let T be the String value that is a copy of S with leading white space
                 //    removed.
-                break :blk try string.trim(agent, .start);
+                break :blk try string.trimStart(agent);
             },
 
             // 4. Else if where is end, then
             .end => blk: {
                 // a. Let T be the String value that is a copy of S with trailing white space
                 //    removed.
-                break :blk try string.trim(agent, .end);
+                break :blk try string.trimEnd(agent);
             },
 
             // 5. Else,
@@ -2331,7 +2331,7 @@ pub const prototype = struct {
             .@"start+end" => blk: {
                 // b. Let T be the String value that is a copy of S with both leading and trailing
                 //    white space removed.
-                break :blk try string.trim(agent, .@"start+end");
+                break :blk try string.trim(agent);
             },
         };
 

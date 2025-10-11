@@ -371,7 +371,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let trimmedString be ! TrimString(inputString, start).
-    var trimmed_string = try (try input_string.trim(agent, .start)).toUtf8(agent.gc_allocator);
+    var trimmed_string = try (try input_string.trimStart(agent)).toUtf8(agent.gc_allocator);
 
     // 3. Let trimmed be StringToCodePoints(trimmedString).
     // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
@@ -406,7 +406,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let S be ! TrimString(inputString, start).
-    var string = try (try input_string.trim(agent, .start)).toUtf8(agent.gc_allocator);
+    var string = try (try input_string.trimStart(agent)).toUtf8(agent.gc_allocator);
 
     // 3. Let sign be 1.
     var sign: f64 = 1;

@@ -1792,7 +1792,7 @@ pub fn stringToNumber(
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
-    const trimmed_string = try (try string.trim(agent, .@"start+end")).toUtf8(agent.gc_allocator);
+    const trimmed_string = try (try string.trim(agent)).toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(trimmed_string);
     if (trimmed_string.len == 0) return Number.from(0);
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
@@ -1837,7 +1837,7 @@ pub fn stringToBigInt(
     // 4. Assert: mv is an integer.
     // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
-    const trimmed_string = try (try string.trim(agent, .@"start+end")).toUtf8(agent.gc_allocator);
+    const trimmed_string = try (try string.trim(agent)).toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(trimmed_string);
     if (trimmed_string.len == 0) return .zero;
     // Unlike std.fmt.parseFloat() and std.fmt.parseInt() with base 0, std.math.big.int.Managed.setString()

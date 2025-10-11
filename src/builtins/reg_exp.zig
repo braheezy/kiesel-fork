@@ -899,7 +899,7 @@ pub const constructor = struct {
         // 5. If toEscape contains cp, cp is matched by either WhiteSpace or LineTerminator, or cp
         //    has the same numeric value as a leading surrogate or trailing surrogate, then
         if (hex_escape or
-            std.mem.indexOfScalar(u21, &String.whitespace_code_units, cp.code_point) != null or
+            std.mem.indexOfScalar(u21, &String.whitespace_code_points, cp.code_point) != null or
             cp.is_unpaired_surrogate)
         {
             // a. Let cpNum be the numeric value of cp.
