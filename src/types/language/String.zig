@@ -9,9 +9,20 @@ const language = @import("../../language.zig");
 const Agent = execution.Agent;
 
 fn utf8IsAscii(utf8: []const u8) bool {
-    return for (utf8) |c| {
-        if (!std.ascii.isAscii(c)) break false;
-    } else true;
+    var remaining = utf8;
+    if (std.simd.suggestVectorLength(u8)) |chunk_len| {
+        const Chunk = @Vector(chunk_len, u8);
+        while (remaining.len >= chunk_len) {
+            const chunk: Chunk = remaining[0..chunk_len].*;
+            const mask: Chunk = @splat(0x80);
+            if (@reduce(.Or, chunk & mask == mask)) return false;
+            remaining = remaining[chunk_len..];
+        }
+    }
+    for (remaining) |c| {
+        if (!std.ascii.isAscii(c)) return false;
+    }
+    return true;
 }
 
 const String = @This();
