@@ -884,6 +884,16 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                 }
             }
 
+            std.mem.sort(Editor.CompletionSuggestion, suggestions.items, {}, struct {
+                fn lessThanFn(
+                    _: void,
+                    lhs: Editor.CompletionSuggestion,
+                    rhs: Editor.CompletionSuggestion,
+                ) bool {
+                    return std.mem.lessThan(u8, lhs.text, rhs.text);
+                }
+            }.lessThanFn);
+
             return suggestions.items;
         }
     } = .{
