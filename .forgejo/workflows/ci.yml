@@ -23,7 +23,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -94,7 +94,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -129,7 +129,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -172,7 +172,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -257,7 +257,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -301,7 +301,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
       - name: Check formatting
         run: |
           zig fmt --check .
@@ -322,7 +322,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
@@ -350,7 +350,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.1
+          version: 0.15.2
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:

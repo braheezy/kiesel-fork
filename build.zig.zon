@@ -2,7 +2,7 @@
     .name = .kiesel,
     .version = "0.1.0",
     .fingerprint = 0x411228af4a775b43,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .any_pointer = .{
             .url = "git+https://github.com/ikskuh/any-pointer#0f9725a324d48239d1d7e07b7f270b0a87be576a",
@@ -13,15 +13,15 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#3671e02ced77ea462b40f5f32f5fbc633993b3eb",
-            .hash = "icu4zig-0.1.0-IT7GrJU9AgAyT_q5Qae-u9kQwD_OtozJExgZmN4JW1YP",
+            .url = "git+https://codeberg.org/linusg/icu4zig#49ab0dff7ad37b66c606ae4dea42170037424a69",
+            .hash = "icu4zig-0.1.0-IT7GrJU9AgAW2mdxfBhDkOXW1JKRUMfoY1EygHbysS1f",
             .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#cd107a41831061ee7f9fe67f542e39015b8640f3",
-            .hash = "kiesel_runtime-0.1.0-goZjAQoYAQA8X_Cc79YT93j8oqV71grE9qWVRt3xYYoJ",
+            .url = "git+https://codeberg.org/kiesel-js/runtime#6e1997b8c8bc005e2478c8122a06fff5cd331c5c",
+            .hash = "kiesel_runtime-0.1.0-goZjAQoYAQBABkCcGexDGfBJVyMvouJMjSzgBJc5N3cs",
         },
         .libgc = .{
             .url = "git+https://github.com/bdwgc/bdwgc#7577ca7c2dc7364bb6733dab23be34231279db6b",
@@ -37,8 +37,8 @@
             .hash = "parser_toolkit-0.1.0-baYGPUVCEwBaVmu09ORh0lLlVjRaJ489TdSIdTa_8VWg",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linusg/zig-stackinfo#ac041f05d74af7102e4b7adaa515c99bb50845c1",
-            .hash = "stackinfo-0.1.0-NZ2qTgAhAABvyn8FufKS9sTqS6DsR3kGs-PE5qIAVUFM",
+            .url = "git+https://codeberg.org/linusg/zig-stackinfo#e649c764521fc417386a3a4a65a9e47ea924c7f5",
+            .hash = "stackinfo-0.1.0-NZ2qTgAhAABd71COG6iF0UKBctEeOHmLNS_8STZPpCi1",
         },
         .temporal_rs = .{
             .url = "git+https://github.com/boa-dev/temporal#c0356884b9d7a084682b71113ab99b7392b0b568",
@@ -46,8 +46,8 @@
             .lazy = true,
         },
         .unicode_id = .{
-            .url = "git+https://codeberg.org/linusg/unicode-id#9bd93f54a1e052a5eadf5937cb5e13d3e9b4b61e",
-            .hash = "unicode_id-0.0.1-u-LDL-yCAQCZOdJzkEzFHuZ8k-4TMGSBGgETIYXfIQAr",
+            .url = "git+https://codeberg.org/linusg/unicode-id#78392c82bbe2e718423820aba39038ba2e51bfa1",
+            .hash = "unicode_id-0.0.1-u-LDL-yCAQDIRl7z5q2EZmVoUP_DgimhNRwxAiPBLTwl",
         },
         .zement = .{
             .path = "./pkg/zement",

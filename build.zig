@@ -6,9 +6,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Stop people from trying to build with an outdated Zig compiler
-    if (builtin.zig_version.order(.{ .major = 0, .minor = 15, .patch = 1 }) == .lt) {
+    if (builtin.zig_version.order(.{ .major = 0, .minor = 15, .patch = 2 }) == .lt) {
         std.debug.print("\n    {s}\n    {s}\n\n", .{
-            "Zig version 0.15.1 is required, found " ++ builtin.zig_version_string ++ ".",
+            "Zig version 0.15.2 is required, found " ++ builtin.zig_version_string ++ ".",
             "Please \u{1B}]8;;https://ziglang.org/download/\u{1B}\\download\u{1B}]8;;\u{1B}\\ or otherwise install a newer build and try again.",
         });
         std.process.exit(1);

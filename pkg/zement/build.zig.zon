@@ -2,7 +2,7 @@
     .name = .zement,
     .version = "0.1.0",
     .fingerprint = 0x61efa220c3b353b6,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .build_crab = .{
             .url = "git+https://github.com/linusg/build.crab#7c8ace3739023b88f1fb95151df4f5b65bd7a311",

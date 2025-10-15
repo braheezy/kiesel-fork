@@ -60,7 +60,7 @@ Further reading:
 
 ## Build
 
-The `main` branch targets Zig 0.15. The `zig-dev` branch targets Zig 0.15-dev
+The `main` branch targets Zig 0.15. The `zig-dev` branch targets Zig master
 and is kept up to date on a best effort basis.
 
 To build and run the Kiesel CLI you need to have `zig` and optionally `cargo`
