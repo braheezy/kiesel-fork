@@ -13,7 +13,7 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linusg/icu4zig#49ab0dff7ad37b66c606ae4dea42170037424a69",
+            .url = "git+https://codeberg.org/linus/icu4zig#49ab0dff7ad37b66c606ae4dea42170037424a69",
             .hash = "icu4zig-0.1.0-IT7GrJU9AgAW2mdxfBhDkOXW1JKRUMfoY1EygHbysS1f",
             .lazy = true,
         },
@@ -37,7 +37,7 @@
             .hash = "parser_toolkit-0.1.0-baYGPUVCEwBaVmu09ORh0lLlVjRaJ489TdSIdTa_8VWg",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linusg/zig-stackinfo#e649c764521fc417386a3a4a65a9e47ea924c7f5",
+            .url = "git+https://codeberg.org/linus/zig-stackinfo#e649c764521fc417386a3a4a65a9e47ea924c7f5",
             .hash = "stackinfo-0.1.0-NZ2qTgAhAABd71COG6iF0UKBctEeOHmLNS_8STZPpCi1",
         },
         .temporal_rs = .{
@@ -46,7 +46,7 @@
             .lazy = true,
         },
         .unicode_id = .{
-            .url = "git+https://codeberg.org/linusg/unicode-id#78392c82bbe2e718423820aba39038ba2e51bfa1",
+            .url = "git+https://codeberg.org/linus/unicode-id#78392c82bbe2e718423820aba39038ba2e51bfa1",
             .hash = "unicode_id-0.0.1-u-LDL-yCAQDIRl7z5q2EZmVoUP_DgimhNRwxAiPBLTwl",
         },
         .zement = .{
