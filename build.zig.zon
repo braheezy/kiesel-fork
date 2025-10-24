@@ -24,8 +24,8 @@
             .hash = "kiesel_runtime-0.1.0-goZjAQoYAQBABkCcGexDGfBJVyMvouJMjSzgBJc5N3cs",
         },
         .libgc = .{
-            .url = "git+https://github.com/bdwgc/bdwgc#7577ca7c2dc7364bb6733dab23be34231279db6b",
-            .hash = "bdwgc-8.3.0-8obE-KXZLQBlwYsdH83p4Mb39QTsBFIq6L8Pzko-rnZV",
+            .url = "git+https://github.com/bdwgc/bdwgc#e1042aa86d9403f433a2ab38ee2aab081984fca8",
+            .hash = "bdwgc-8.3.0-8obE-EA_LgDHI6QwLFVzcu5H6Xnw8bQHAhxMBy5Nc5PP",
             .lazy = true,
         },
         .libregexp = .{

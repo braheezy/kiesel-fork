@@ -134,7 +134,7 @@ pub fn build(b: *std.Build) void {
         if (b.lazyDependency("libgc", .{
             .target = target,
             .optimize = optimize,
-            .BUILD_SHARED_LIBS = false,
+            .linkage = .static,
             .CFLAGS_EXTRA = cflags_extra,
             .enable_gcj_support = false,
             .enable_java_finalization = false,
