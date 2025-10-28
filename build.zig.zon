@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linus/icu4zig#49ab0dff7ad37b66c606ae4dea42170037424a69",
-            .hash = "icu4zig-0.1.0-IT7GrJU9AgAW2mdxfBhDkOXW1JKRUMfoY1EygHbysS1f",
+            .url = "git+https://codeberg.org/linus/icu4zig#c4b23a76ab663b186cf20c5be57459569b854f1a",
+            .hash = "icu4zig-0.1.0-IT7GrA9tAgDlo7tCVofyvlXGjWj5z4zWKQTcCnJvR2Ee",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -41,8 +41,8 @@
             .hash = "stackinfo-0.1.0-NZ2qTgAhAABd71COG6iF0UKBctEeOHmLNS_8STZPpCi1",
         },
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#c0356884b9d7a084682b71113ab99b7392b0b568",
-            .hash = "N-V-__8AAGstNADyVsl8mLLzIWdYWl6kfvNFfsM-bTAErSUI",
+            .url = "git+https://github.com/boa-dev/temporal#8be579ffa719b964c1d5db73a7accf0dc4d3dc9b",
+            .hash = "N-V-__8AAO8wNABuUgKowmU2C1DWKLZKSS6WvXyuYP8FLN56",
             .lazy = true,
         },
         .unicode_id = .{
