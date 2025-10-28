@@ -714,6 +714,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "localeCompare", localeCompare, 1, realm);
         try object.defineBuiltinFunction(agent, "match", match, 1, realm);
         try object.defineBuiltinFunction(agent, "matchAll", matchAll, 1, realm);
+        try object.defineBuiltinFunction(agent, "normalize", normalize, 0, realm);
         try object.defineBuiltinFunction(agent, "padEnd", padEnd, 1, realm);
         try object.defineBuiltinFunction(agent, "padStart", padStart, 1, realm);
         try object.defineBuiltinFunction(agent, "repeat", repeat, 1, realm);
@@ -1338,6 +1339,63 @@ pub const prototype = struct {
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             &.{Value.from(string)},
         );
+    }
+
+    /// 22.1.3.15 String.prototype.normalize ( [ form ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.normalize
+    fn normalize(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        // Not an Intl function but we need ICU4X regardless.
+        if (!build_options.enable_intl) {
+            return agent.throwException(.internal_error, "Intl support is disabled", .{});
+        }
+
+        const form_value = arguments.get(0);
+
+        // 1. Let O be the this value.
+        const object = this_value;
+
+        // 2. Perform ? RequireObjectCoercible(O).
+        try object.requireObjectCoercible(agent);
+
+        // 3. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. If form is undefined, let f be "NFC".
+        // 5. Else, let f be ? ToString(form).
+        const form = if (form_value.isUndefined())
+            types.String.fromLiteral("NFC")
+        else
+            try form_value.toString(agent);
+
+        // 6. If f is not one of "NFC", "NFD", "NFKC", or "NFKD", throw a RangeError exception.
+        // 7. Let ns be the String value that is the result of normalizing S into the normalization
+        //    form named by f as specified in the latest Unicode Standard, Normalization Forms.
+        // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
+        //       correctly here.
+        const utf8 = try string.toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(utf8);
+        const utf8_normalized = if (form.eql(types.String.fromLiteral("NFC"))) blk: {
+            const normalizer = icu4zig.ComposingNormalizer.initNfc();
+            defer normalizer.deinit();
+            break :blk try normalizer.normalize(agent.gc_allocator, utf8);
+        } else if (form.eql(types.String.fromLiteral("NFD"))) blk: {
+            const normalizer = icu4zig.DecomposingNormalizer.initNfd();
+            defer normalizer.deinit();
+            break :blk try normalizer.normalize(agent.gc_allocator, utf8);
+        } else if (form.eql(types.String.fromLiteral("NFKC"))) blk: {
+            const normalizer = icu4zig.ComposingNormalizer.initNfkc();
+            defer normalizer.deinit();
+            break :blk try normalizer.normalize(agent.gc_allocator, utf8);
+        } else if (form.eql(types.String.fromLiteral("NFKD"))) blk: {
+            const normalizer = icu4zig.DecomposingNormalizer.initNfkd();
+            defer normalizer.deinit();
+            break :blk try normalizer.normalize(agent.gc_allocator, utf8);
+        } else {
+            return agent.throwException(.range_error, "Invalid normalization form", .{});
+        };
+
+        // 8. Return ns.
+        return Value.from(try types.String.fromUtf8(agent, utf8_normalized));
     }
 
     /// 22.1.3.16 String.prototype.padEnd ( maxLength [ , fillString ] )
