@@ -7,6 +7,7 @@ const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -16,6 +17,7 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const parseDigits = utils.parseDigits;
 const performEval = builtins.performEval;
 
 const module = @This();
@@ -772,7 +774,7 @@ fn parseHexOctet(string: []const u16, position: usize) ?u8 {
     var buf: [2]u8 = undefined;
     buf[0] = std.math.cast(u8, hex_digits[0]) orelse return null;
     buf[1] = std.math.cast(u8, hex_digits[1]) orelse return null;
-    const n = std.fmt.parseInt(u8, &buf, 16) catch return null;
+    const n = parseDigits(u8, &buf, 16) catch return null;
 
     // 8. Return n.
     return n;
@@ -904,7 +906,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             if (std.unicode.utf16LeToUtf8(&buf, hex_digits) catch null) |end| {
                 // v. Let parseResult be ParseText(hexDigits, HexDigits[~Sep]).
                 // vi. If parseResult is a Parse Node, then
-                if (std.fmt.parseInt(u16, buf[0..end], 16)) |n| {
+                if (parseDigits(u16, buf[0..end], 16)) |n| {
                     // 1. Let n be the MV of parseResult.
                     // 2. Set C to the code unit whose numeric value is n.
                     c = n;

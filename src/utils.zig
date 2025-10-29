@@ -72,6 +72,22 @@ pub fn containsSlice(haystack: []const []const u8, needle: []const u8) bool {
     return false;
 }
 
+pub const ParseDigitsError = error{
+    InvalidCharacter,
+    Overflow,
+};
+
+pub fn parseDigits(comptime T: type, buf: []const u8, base: u8) ParseDigitsError!T {
+    if (buf.len == 0) return error.InvalidCharacter;
+    var result: T = 0;
+    for (buf) |c| {
+        const digit = try std.fmt.charToDigit(c, base);
+        result = try std.math.mul(T, result, std.math.cast(T, base) orelse return error.Overflow);
+        result = try std.math.add(T, result, std.math.cast(T, digit) orelse return error.Overflow);
+    }
+    return result;
+}
+
 pub const StringParser = struct {
     string: []const u8,
     index: usize,
@@ -104,9 +120,26 @@ pub const StringParser = struct {
 
     pub fn consumeDigits(self: *StringParser, comptime T: type, count: usize) ?T {
         const slice = self.peekSlice(count) orelse return null;
-        if (std.mem.indexOfScalar(u8, slice, '_') != null) return null;
-        const result = std.fmt.parseInt(T, slice, 10) catch return null;
+        const result = parseDigits(T, slice, 10) catch return null;
         self.index += count;
         return result;
     }
 };
+
+test parseDigits {
+    try std.testing.expectEqual(0, try parseDigits(u8, "0", 2));
+    try std.testing.expectEqual(0, try parseDigits(u8, "0", 10));
+    try std.testing.expectEqual(0, try parseDigits(u8, "0", 16));
+    try std.testing.expectEqual(255, try parseDigits(u8, "11111111", 2));
+    try std.testing.expectEqual(255, try parseDigits(u8, "255", 10));
+    try std.testing.expectEqual(255, try parseDigits(u8, "FF", 16));
+    try std.testing.expectEqual(123456789, try parseDigits(i32, "111010110111100110100010101", 2));
+    try std.testing.expectEqual(123456789, try parseDigits(i32, "123456789", 10));
+    try std.testing.expectEqual(123456789, try parseDigits(i32, "75bcd15", 16));
+    try std.testing.expectError(error.InvalidCharacter, parseDigits(u8, "+10", 2));
+    try std.testing.expectError(error.InvalidCharacter, parseDigits(u8, "1_0", 2));
+    try std.testing.expectError(error.InvalidCharacter, parseDigits(u8, "A", 10));
+    try std.testing.expectError(error.InvalidCharacter, parseDigits(u8, "G", 16));
+    try std.testing.expectError(error.Overflow, parseDigits(u8, "256", 10));
+    try std.testing.expectError(error.Overflow, parseDigits(u8, "100", 16));
+}
