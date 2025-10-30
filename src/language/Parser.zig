@@ -1198,6 +1198,10 @@ pub fn acceptUpdateExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    if (primary_expression != null and self.followedByLineTerminator()) {
+        return error.UnexpectedToken;
+    }
+
     const operator_token = try self.core.accept(RuleSet.oneOf(.{ .@"++", .@"--" }));
     const operator: ast.UpdateExpression.Operator = switch (operator_token.type) {
         .@"++" => .@"++",
