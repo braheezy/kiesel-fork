@@ -82,10 +82,13 @@ pub fn parseJSON(agent: *Agent, text: *const String) Agent.Error!Value {
         std.json.Value,
         agent.gc_allocator,
         try text.toUtf8(agent.gc_allocator),
-        .{},
+        .{ .duplicate_field_behavior = .use_last },
     ) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        else => return agent.throwException(.syntax_error, "Invalid JSON document", .{}),
+        error.SyntaxError, error.UnexpectedEndOfInput => {
+            return agent.throwException(.syntax_error, "Invalid JSON document", .{});
+        },
+        else => unreachable,
     };
     defer parsed.deinit();
     return convertJsonValue(agent, parsed.value);
