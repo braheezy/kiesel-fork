@@ -15,7 +15,7 @@ features = ["compiled_data", "default_components", "experimental", "std"]
 # which provides the C headers for Zig.
 [dependencies.temporal_capi]
 git = "https://github.com/boa-dev/temporal.git"
-rev = "8be579ffa719b964c1d5db73a7accf0dc4d3dc9b"
+rev = "55fb8166abf5489befdd8c9bcacc96dacd04ac34"
 features = ["compiled_data"]
 
 # icu_capi sources diplomat from git whereas temporal_capi uses crates.io, which causes duplicate

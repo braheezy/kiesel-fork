@@ -41,8 +41,8 @@
             .hash = "stackinfo-0.1.0-NZ2qTgAhAABd71COG6iF0UKBctEeOHmLNS_8STZPpCi1",
         },
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#8be579ffa719b964c1d5db73a7accf0dc4d3dc9b",
-            .hash = "N-V-__8AAO8wNABuUgKowmU2C1DWKLZKSS6WvXyuYP8FLN56",
+            .url = "git+https://github.com/boa-dev/temporal#55fb8166abf5489befdd8c9bcacc96dacd04ac34",
+            .hash = "N-V-__8AAEFkNABziBtwl6spJMgbZdh8COEvVIasQ83iWh9G",
             .lazy = true,
         },
         .unicode_id = .{
