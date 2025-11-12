@@ -469,26 +469,25 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
 /// 10.4.5.12 TypedArrayByteLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraybytelength
 pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) ByteLength {
-    // 1. If IsTypedArrayOutOfBounds(taRecord) is true, return 0.
-    if (isTypedArrayOutOfBounds(ta)) return .zero;
+    // 1. Assert: IsTypedArrayOutOfBounds(taRecord) is false.
+    std.debug.assert(!isTypedArrayOutOfBounds(ta));
 
-    // 2. Let length be TypedArrayLength(taRecord).
-    const length = typedArrayLength(ta);
-
-    // 3. If length = 0, return 0.
-    if (length == .zero) return .zero;
-
-    // 4. Let O be taRecord.[[Object]].
+    // 2. Let O be taRecord.[[Object]].
     const typed_array = ta.object;
 
-    // 5. If O.[[ByteLength]] is not auto, return O.[[ByteLength]].
+    // 3. If O.[[ByteLength]] is not auto, return O.[[ByteLength]].
     if (typed_array.fields.byte_length != .auto) {
         return @enumFromInt(@intFromEnum(typed_array.fields.byte_length));
     }
 
-    // 6. Let elementSize be TypedArrayElementSize(O).
+    // 4. Let length be TypedArrayLength(taRecord).
+    const length = typedArrayLength(ta);
+
+    // 5. Let elementSize be TypedArrayElementSize(O).
     const element_size = typedArrayElementSize(typed_array);
 
+    // 6. NOTE: The returned byte length is always an integer multiple of elementSize, even when
+    //    the underlying buffer has been resized to a non-integer multiple.
     // 7. Return length × elementSize.
     return @enumFromInt(@intFromEnum(length) * element_size);
 }
@@ -535,14 +534,17 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     // 2. Let bufferByteLength be taRecord.[[CachedBufferByteLength]].
     const buffer_byte_length = ta.cached_buffer_byte_length;
 
-    // 3. Assert: IsDetachedBuffer(O.[[ViewedArrayBuffer]]) is true if and only if bufferByteLength
-    //    is detached.
-    std.debug.assert(
-        isDetachedBuffer(typed_array.fields.viewed_array_buffer) == (buffer_byte_length == .detached),
-    );
+    // 3. If IsDetachedBuffer(O.[[ViewedArrayBuffer]]) is true, then
+    if (isDetachedBuffer(typed_array.fields.viewed_array_buffer)) {
+        // a. Assert: bufferByteLength is detached.
+        std.debug.assert(buffer_byte_length == .detached);
 
-    // 4. If bufferByteLength is detached, return true.
-    if (buffer_byte_length == .detached) return true;
+        // b. Return true.
+        return true;
+    }
+
+    // 4. Assert: bufferByteLength is a non-negative integer.
+    std.debug.assert(buffer_byte_length != .detached);
 
     // 5. Let byteOffsetStart be O.[[ByteOffset]].
     const byte_offset_start = typed_array.fields.byte_offset;
@@ -556,25 +558,30 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
         // a. Let elementSize be TypedArrayElementSize(O).
         const element_size = typedArrayElementSize(typed_array);
 
-        // b. Let byteOffsetEnd be byteOffsetStart + O.[[ArrayLength]] × elementSize.
+        // b. Let arrayByteLength be O.[[ArrayLength]] × elementSize.
+        const array_byte_length = std.math.mul(
+            u53,
+            @intFromEnum(typed_array.fields.array_length.unwrap().?),
+            element_size,
+        ) catch return true;
+
+        // c. Let byteOffsetEnd be byteOffsetStart + arrayByteLength.
         const byte_offset_end = std.math.add(
             u53,
             @intFromEnum(byte_offset_start),
-            std.math.mul(
-                u53,
-                @intFromEnum(typed_array.fields.array_length.unwrap().?),
-                element_size,
-            ) catch return true,
+            array_byte_length,
         ) catch return true;
 
         break :blk @enumFromInt(byte_offset_end);
     };
 
-    // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
+    // 8. NOTE: A 0-length TypedArray whose [[ByteOffset]] is bufferByteLength is not considered
+    //    out-of-bounds.
+
+    // 9. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
     if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
         @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
 
-    // 9. NOTE: 0-length TypedArrays are not considered out-of-bounds.
     // 10. Return false.
     return false;
 }
@@ -1061,10 +1068,13 @@ pub const prototype = struct {
         // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
         const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
 
-        // 5. Let size be TypedArrayByteLength(taRecord).
+        // 5. If IsTypedArrayOutOfBounds(taRecord) is true, return +0𝔽.
+        if (isTypedArrayOutOfBounds(ta)) return Value.from(0);
+
+        // 6. Let size be TypedArrayByteLength(taRecord).
         const size = typedArrayByteLength(ta);
 
-        // 6. Return 𝔽(size).
+        // 7. Return 𝔽(size).
         return Value.from(@intFromEnum(size));
     }
 

@@ -104,7 +104,7 @@ pub fn initializeHostDefinedRealm(
     //    execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, new_context);
 
-    // 10. If the host requires use of an exotic object to serve as realm's global object, then
+    // 10. If the host requires use of a specific object to serve as realm's global object, then
     //     a. Let global be such an object created in a host-defined manner.
     // 11. Else,
     //     a. Let global be OrdinaryObjectCreate(realm.[[Intrinsics]].[[%Object.prototype%]]).

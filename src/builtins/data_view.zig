@@ -103,14 +103,17 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     // 2. Let bufferByteLength be viewRecord.[[CachedBufferByteLength]].
     const buffer_byte_length = view.cached_buffer_byte_length;
 
-    // 3. Assert: IsDetachedBuffer(view.[[ViewedArrayBuffer]]) is true if and only if
-    //    bufferByteLength is detached.
-    std.debug.assert(
-        isDetachedBuffer(data_view.fields.viewed_array_buffer) == (buffer_byte_length == .detached),
-    );
+    // 3. If IsDetachedBuffer(view.[[ViewedArrayBuffer]]) is true, then
+    if (isDetachedBuffer(data_view.fields.viewed_array_buffer)) {
+        // a. Assert: bufferByteLength is detached.
+        std.debug.assert(buffer_byte_length == .detached);
 
-    // 4. If bufferByteLength is detached, return true.
-    if (buffer_byte_length == .detached) return true;
+        // b. Return true.
+        return true;
+    }
+
+    // 4. Assert: bufferByteLength is a non-negative integer.
+    std.debug.assert(buffer_byte_length != .detached);
 
     // 5. Let byteOffsetStart be view.[[ByteOffset]].
     const byte_offset_start = data_view.fields.byte_offset;
@@ -129,11 +132,13 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
         ) catch return true);
     };
 
-    // 8. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
+    // 8. NOTE: A 0-length DataView whose [[ByteOffset]] is bufferByteLength is not considered
+    //    out-of-bounds.
+
+    // 9. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
     if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
         @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
 
-    // 9. NOTE: 0-length DataViews are not considered out-of-bounds.
     // 10. Return false.
     return false;
 }

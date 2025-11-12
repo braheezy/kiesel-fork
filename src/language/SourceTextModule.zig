@@ -1449,7 +1449,7 @@ pub fn resolveExport(
             };
 
             // iii. Else,
-            // 1. Assert: There is more than one * import that includes the requested name.
+            // 1. Assert: There is more than one * export that includes the requested name.
 
             // 2. If resolution.[[Module]] and starResolution.[[Module]] are not the same Module
             //    Record, return ambiguous.
@@ -1457,19 +1457,11 @@ pub fn resolveExport(
                 return .ambiguous;
             }
 
-            // 3. If resolution.[[BindingName]] is not starResolution.[[BindingName]] and either
-            //    resolution.[[BindingName]] or starResolution.[[BindingName]] is namespace, return
-            //    ambiguous.
-            if (std.meta.activeTag(resolution.binding_name) != std.meta.activeTag(star_resolution.binding_name)) {
-                std.debug.assert(resolution.binding_name == .namespace or star_resolution.binding_name == .namespace);
-                return .ambiguous;
-            }
-
-            // 4. If resolution.[[BindingName]] is a String, starResolution.[[BindingName]] is a
-            //    String, and resolution.[[BindingName]] is not starResolution.[[BindingName]], return ambiguous.
-            if (resolution.binding_name == .string and
-                star_resolution.binding_name == .string and
-                !std.mem.eql(u8, resolution.binding_name.string, star_resolution.binding_name.string))
+            // 3. If resolution.[[BindingName]] is not starResolution.[[BindingName]], return ambiguous.
+            if ((resolution.binding_name == .namespace and star_resolution.binding_name == .string) or
+                (resolution.binding_name == .string and star_resolution.binding_name == .namespace) or
+                (resolution.binding_name == .string and star_resolution.binding_name == .string and
+                    !std.mem.eql(u8, resolution.binding_name.string, star_resolution.binding_name.string)))
             {
                 return .ambiguous;
             }

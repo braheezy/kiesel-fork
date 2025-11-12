@@ -4,6 +4,9 @@ const std = @import("std");
 
 pub const float16 = @import("utils/float16.zig");
 
+/// 5.2.4.3 Shorthands for Unwrapping Completion Records
+/// https://tc39.es/ecma262/#sec-shorthands-for-unwrapping-completion-records
+///
 /// '!' in the spec, ensures that the error is not a throw completion (`error.ExceptionThrown`).
 /// OOM is still propagated. The name is a nod to C++, of course :^)
 pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) std.mem.Allocator.Error!noreturn {

@@ -180,6 +180,7 @@ pub const installErrorCause = @"error".installErrorCause;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const isFixedLengthArrayBuffer = array_buffer.isFixedLengthArrayBuffer;
+pub const isGrowableSharedArrayBuffer = shared_array_buffer.isGrowableSharedArrayBuffer;
 pub const isPartialTemporalObject = temporal.isPartialTemporalObject;
 pub const isSharedArrayBuffer = shared_array_buffer.isSharedArrayBuffer;
 pub const isTypedArrayOutOfBounds = typed_array.isTypedArrayOutOfBounds;

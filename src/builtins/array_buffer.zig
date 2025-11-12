@@ -23,6 +23,7 @@ const Value = types.Value;
 const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createByteDataBlock = types.createByteDataBlock;
+const isGrowableSharedArrayBuffer = builtins.isGrowableSharedArrayBuffer;
 const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -105,15 +106,14 @@ pub fn allocateArrayBuffer(
 /// 25.1.3.2 ArrayBufferByteLength ( arrayBuffer, order )
 /// https://tc39.es/ecma262/#sec-arraybufferbytelength
 pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, order: Order) ByteLength {
-    // 1. If IsSharedArrayBuffer(arrayBuffer) is true and arrayBuffer has an
-    //    [[ArrayBufferByteLengthData]] internal slot, then
-    if (isSharedArrayBuffer(array_buffer) and array_buffer.fields.max_byte_length != .none) {
+    // 1. If IsGrowableSharedArrayBuffer(arrayBuffer) is true, then
+    if (isGrowableSharedArrayBuffer(array_buffer)) {
         // a. Let bufferByteLengthBlock be arrayBuffer.[[ArrayBufferByteLengthData]].
         // b. Let rawLength be GetRawBytesFromSharedBlock(bufferByteLengthBlock, 0, biguint64,
         //    true, order).
-        // c. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
-        //    agent's Agent Record.
-        // d. Return ℝ(RawBytesToNumeric(biguint64, rawLength, isLittleEndian)).
+        // c. Let AR be the Agent Record of the surrounding agent.
+        // d. Let isLittleEndian be AR.[[LittleEndian]].
+        // e. Return ℝ(RawBytesToNumeric(biguint64, rawLength, isLittleEndian)).
         const ptr: *const usize = @ptrCast(&array_buffer.fields.byte_length);
         const value = switch (order) {
             .seq_cst => @atomicLoad(usize, ptr, .seq_cst),
@@ -348,7 +348,7 @@ pub fn getRawBytesFromSharedBlock(
     // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
-    // TODO: 2-10.
+    // TODO: 2-11.
     _ = is_typed_array;
     _ = order;
     return block.bytes[@intCast(byte_index)..][0..element_size].*;
@@ -396,8 +396,9 @@ pub fn getValueFromBuffer(
     // 7. Assert: The number of elements in rawValue is elementSize.
     std.debug.assert(raw_value.len == element_size);
 
-    // 8. If isLittleEndian is not present, set isLittleEndian to the value of the [[LittleEndian]]
-    //    field of the surrounding agent's Agent Record.
+    // 8. If isLittleEndian is not present, then
+    //     a. Let AR be the Agent Record of the surrounding agent.
+    //     b. Set isLittleEndian to AR.[[LittleEndian]].
     const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
 
     // 9. Return RawBytesToNumeric(type, rawValue, isLittleEndian).
@@ -514,17 +515,17 @@ pub fn setValueInBuffer(
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
-    // 6. If isLittleEndian is not present, set isLittleEndian to the value of the [[LittleEndian]]
-    //    field of the surrounding agent's Agent Record.
+    // 6. Let AR be the Agent Record of the surrounding agent.
+    // 7. If isLittleEndian is not present, then
+    //     a. Set isLittleEndian to AR.[[LittleEndian]].
     const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
 
-    // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
+    // 8. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
     const raw_bytes = try numericToRawBytes(agent, @"type", value, is_little_endian);
 
-    // 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    // 9. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (isSharedArrayBuffer(array_buffer)) {
-        // a. Let execution be the [[CandidateExecution]] field of the surrounding agent's Agent
-        //    Record.
+        // a. Let execution be AR.[[CandidateExecution]].
         // b. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
         //    [[AgentSignifier]] is AgentSignifier().
         // c. If isTypedArray is true and IsNoTearConfiguration(type, order) is true, let noTear be
@@ -537,12 +538,12 @@ pub fn setValueInBuffer(
         _ = is_typed_array;
         @memcpy(block.bytes[@intCast(byte_index)..@intCast(byte_index + element_size)], &raw_bytes);
     } else {
-        // 9. Else,
+        // 10. Else,
         // a. Store the individual bytes of rawBytes into block, starting at block[byteIndex].
         @memcpy(block.bytes[@intCast(byte_index)..@intCast(byte_index + element_size)], &raw_bytes);
     }
 
-    // 10. Return unused.
+    // 11. Return unused.
 }
 
 /// 25.1.3.19 GetModifySetValueInBuffer ( arrayBuffer, byteIndex, type, value, op )
@@ -572,19 +573,18 @@ pub fn getModifySetValueInBuffer(
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
-    // 6. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's
-    //    Agent Record.
+    // 6. Let AR be the Agent Record of the surrounding agent.
+    // 7. Let isLittleEndian be AR.[[LittleEndian]].
     const is_little_endian = agent.little_endian;
 
-    // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
+    // 8. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
     const raw_bytes = try numericToRawBytes(agent, @"type", value, is_little_endian);
 
     var previous: @"type".type() = undefined;
 
-    // 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    // 9. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (isSharedArrayBuffer(array_buffer)) {
-        // a. Let execution be the [[CandidateExecution]] field of the surrounding agent's Agent
-        //    Record.
+        // a. Let execution be AR.[[CandidateExecution]].
         // b. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
         //    [[AgentSignifier]] is AgentSignifier().
         // c. Let rawBytesRead be a List of length elementSize whose elements are
@@ -611,7 +611,7 @@ pub fn getModifySetValueInBuffer(
             .seq_cst,
         );
     } else {
-        // 9. Else,
+        // 10. Else,
         // a. Let rawBytesRead be a List of length elementSize whose elements are the sequence of
         //    elementSize bytes starting with block[byteIndex].
         // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
@@ -629,7 +629,7 @@ pub fn getModifySetValueInBuffer(
         );
     }
 
-    // 10. Return RawBytesToNumeric(type, rawBytesRead, isLittleEndian).
+    // 11. Return RawBytesToNumeric(type, rawBytesRead, isLittleEndian).
     return rawBytesToNumeric(@"type", std.mem.asBytes(&previous), is_little_endian);
 }
 

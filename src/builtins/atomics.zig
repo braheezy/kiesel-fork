@@ -448,7 +448,7 @@ pub const namespace = struct {
         // 1. Let add be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures typedArray and performs the following steps atomically when
         //    called:
-        //     a-i.
+        //     a-j.
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Add);
     }
@@ -510,8 +510,11 @@ pub const namespace = struct {
 
         // 7. Let elementType be TypedArrayElementType(typedArray).
         // 8. Let elementSize be TypedArrayElementSize(typedArray).
-        // 9. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's Agent Record.
+
+        // 9. Let AR be the Agent Record of the surrounding agent.
+        // 10. Let isLittleEndian be AR.[[LittleEndian]].
         const is_little_endian = agent.little_endian;
+
         switch (typed_array.fields.element_type) {
             .uint8_clamped, .float16, .float32, .float64 => unreachable,
             inline else => |@"type"| {
@@ -523,7 +526,7 @@ pub const namespace = struct {
                         .{@"type".typedArrayName()},
                     );
                 }
-                // 10. Let expectedBytes be NumericToRawBytes(elementType, expected, isLittleEndian).
+                // 11. Let expectedBytes be NumericToRawBytes(elementType, expected, isLittleEndian).
                 const expected_bytes = try numericToRawBytes(
                     agent,
                     @"type",
@@ -531,7 +534,7 @@ pub const namespace = struct {
                     is_little_endian,
                 );
 
-                // 11. Let replacementBytes be NumericToRawBytes(elementType, replacement, isLittleEndian).
+                // 12. Let replacementBytes be NumericToRawBytes(elementType, replacement, isLittleEndian).
                 const replacement_bytes = try numericToRawBytes(
                     agent,
                     @"type",
@@ -542,7 +545,7 @@ pub const namespace = struct {
                 const raw_bytes_read = block.bytes[@intCast(byte_index_in_buffer)..@intCast(byte_index_in_buffer + @"type".elementSize())];
                 var previous = std.mem.bytesToValue(@"type".type(), raw_bytes_read);
 
-                // 12. If IsSharedArrayBuffer(buffer) is true, then
+                // 13. If IsSharedArrayBuffer(buffer) is true, then
                 if (isSharedArrayBuffer(buffer)) {
                     // a. Let rawBytesRead be AtomicCompareExchangeInSharedBlock(block,
                     //    byteIndexInBuffer, elementSize, expectedBytes, replacementBytes).
@@ -556,7 +559,7 @@ pub const namespace = struct {
                         .seq_cst,
                     );
                 } else {
-                    // 13. Else,
+                    // 14. Else,
                     // a. Let rawBytesRead be a List of length elementSize whose elements are the
                     //    sequence of elementSize bytes starting with block[byteIndexInBuffer].
                     // b. If ByteListEqual(rawBytesRead, expectedBytes) is true, then
@@ -567,7 +570,7 @@ pub const namespace = struct {
                     }
                 }
 
-                // 14. Return RawBytesToNumeric(elementType, rawBytesRead, isLittleEndian).
+                // 15. Return RawBytesToNumeric(elementType, rawBytesRead, isLittleEndian).
                 const value = rawBytesToNumeric(
                     @"type",
                     std.mem.asBytes(&previous),
@@ -808,7 +811,7 @@ pub const namespace = struct {
         // 1. Let subtract be a new read-modify-write modification function with parameters
         //    (xBytes, yBytes) that captures typedArray and performs the following steps atomically
         //    when called:
-        //     a-i.
+        //     a-j.
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }

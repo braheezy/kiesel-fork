@@ -79,17 +79,18 @@ pub fn createSharedByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!Da
     };
     const data_block: DataBlock = .{ .bytes = bytes, .shared = true };
 
-    // 2. Let execution be the [[CandidateExecution]] field of the surrounding agent's Agent Record.
-    // 3. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
+    // 2. Let AR be the Agent Record of the surrounding agent.
+    // 3. Let execution be AR.[[CandidateExecution]].
+    // 4. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
     //    [[AgentSignifier]] is AgentSignifier().
-    // 4. Let zero be « 0 ».
-    // 5. For each index i of db, do
+    // 5. Let zero be « 0 ».
+    // 6. For each index i of db, do
     //     a. Append WriteSharedMemory { [[Order]]: init, [[NoTear]]: true, [[Block]]: db,
     //        [[ByteIndex]]: i, [[ElementSize]]: 1, [[Payload]]: zero } to
     //        eventsRecord.[[EventList]].
     @memset(data_block.bytes, 0);
 
-    // 6. Return db.
+    // 7. Return db.
     return data_block;
 }
 

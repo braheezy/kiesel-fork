@@ -107,16 +107,19 @@ pub fn allocateSharedArrayBuffer(
 /// 25.2.2.2 IsSharedArrayBuffer ( obj )
 /// https://tc39.es/ecma262/#sec-issharedarraybuffer
 pub fn isSharedArrayBuffer(array_buffer: *const ArrayBuffer) bool {
-    // 1. Let bufferData be obj.[[ArrayBufferData]].
-    const data_block = array_buffer.fields.data_block orelse {
-        // 2. If bufferData is null, return false.
-        return false;
-    };
-
-    // 3. If bufferData is a Data Block, return false.
-    // 4. Assert: bufferData is a Shared Data Block.
-    // 5. Return true.
+    // 1. If obj.[[ArrayBufferData]] is a Shared Data Block, return true.
+    // 2. Return false.
+    const data_block = array_buffer.fields.data_block orelse return false;
     return data_block.shared;
+}
+
+/// 25.2.2.3 IsGrowableSharedArrayBuffer ( obj )
+/// https://tc39.es/ecma262/#sec-isgrowablesharedarraybuffer
+pub fn isGrowableSharedArrayBuffer(array_buffer: *const ArrayBuffer) bool {
+    // 1. If IsSharedArrayBuffer(obj) is true and obj has an [[ArrayBufferByteLengthData]] internal
+    //    slot, return true.
+    // 2. Return false.
+    return isSharedArrayBuffer(array_buffer) and array_buffer.fields.max_byte_length != .none;
 }
 
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
@@ -278,14 +281,14 @@ pub const prototype = struct {
         // 6. If hostHandled is handled, return undefined.
         if (host_handled == .handled) return .undefined;
 
-        // 7. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
-        //    agent's Agent Record.
-        // 8. Let byteLengthBlock be O.[[ArrayBufferByteLengthData]].
-        // 9. Let currentByteLengthRawBytes be GetRawBytesFromSharedBlock(byteLengthBlock, 0,
+        // 7. Let AR be the Agent Record of the surrounding agent.
+        // 8. Let isLittleEndian be AR.[[LittleEndian]].
+        // 9. Let byteLengthBlock be O.[[ArrayBufferByteLengthData]].
+        // 10. Let currentByteLengthRawBytes be GetRawBytesFromSharedBlock(byteLengthBlock, 0,
         //    biguint64, true, seq-cst).
-        // 10. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
+        // 11. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
         //     isLittleEndian).
-        // 11. Repeat,
+        // 12. Repeat,
         // a. NOTE: This is a compare-and-exchange loop to ensure that parallel, racing grows of
         //    the same buffer are totally ordered, are not lost, and do not silently do nothing.
         //    The loop exits if it was able to attempt to grow uncontended.
