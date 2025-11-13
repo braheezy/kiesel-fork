@@ -224,8 +224,7 @@ fn parseAndCreateMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u
     //     b. Set isLeapMonth to true.
     // 6. Let monthCodeDigits be the substring of monthCode from 1 to 3.
     // 7. Let monthNumber be ℝ(StringToNumber(monthCodeDigits)).
-    // 8. If monthNumber is 0 and isLeapMonth is false, throw a RangeError exception.
-    // 9. Return the Record { [[MonthNumber]]: monthNumber, [[IsLeapMonth]]: isLeapMonth }.
+    // 8. Return the Record { [[MonthNumber]]: monthNumber, [[IsLeapMonth]]: isLeapMonth }.
     const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
     parseMonthCode(month_code_utf8) catch {
         return agent.throwException(.range_error, "Invalid month code", .{});
