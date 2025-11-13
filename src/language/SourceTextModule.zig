@@ -637,28 +637,32 @@ pub fn parse(
 
 /// 16.2.1.6.1.3 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-moduleevaluation
-pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
+pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
-    var module = self;
+    var module = module_arg;
 
     // TODO: 1. Assert: This call to Evaluate is not happening at the same time as another call to
     //          Evaluate within the surrounding agent.
 
     // 2. Assert: module.[[Status]] is one of linked, evaluating-async, or evaluated.
-    std.debug.assert(switch (self.status) {
+    std.debug.assert(switch (module.status) {
         .linked, .evaluating_async, .evaluated => true,
         else => false,
     });
 
-    // 3. If module.[[Status]] is either evaluating-async or evaluated, set module to
-    //    module.[[CycleRoot]].
-    if (switch (self.status) {
-        .evaluating_async, .evaluated => true,
-        else => false,
-    }) {
-        // FIXME: [[CycleRoot]] is still empty if the module evaluation previously threw.
-        // See: https://github.com/tc39/ecma262/issues/2823
-        if (module.cycle_root) |cycle_root| module = cycle_root;
+    // 3. If module.[[Status]] is either evaluating-async or evaluated, then
+    if (module.status == .evaluating_async or module.status == .evaluated) {
+        // a. If module.[[CycleRoot]] is not empty, then
+        if (module.cycle_root) |cycle_root| {
+            // i. Set module to module.[[CycleRoot]].
+            module = cycle_root;
+        } else {
+            // b. Else,
+            // i. Assert: module.[[Status]] is evaluated and module.[[EvaluationError]] is a throw
+            //    completion.
+            std.debug.assert(module.status == .evaluated);
+            std.debug.assert(module.evaluation_error != null);
+        }
     }
 
     // 4. If module.[[TopLevelCapability]] is not empty, then
