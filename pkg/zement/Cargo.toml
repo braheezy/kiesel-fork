@@ -18,6 +18,14 @@ git = "https://github.com/boa-dev/temporal.git"
 rev = "55fb8166abf5489befdd8c9bcacc96dacd04ac34"
 features = ["compiled_data"]
 
+# Not actually used directly, but we need to specify it as a dependency to enable features not
+# exposed via the temporal_capi crate.
+[dependencies.temporal_rs]
+git = "https://github.com/boa-dev/temporal.git"
+rev = "55fb8166abf5489befdd8c9bcacc96dacd04ac34"
+default-features = false
+features = ["float64_representable_durations"]
+
 # icu_capi sources diplomat from git whereas temporal_capi uses crates.io, which causes duplicate
 # symbol linker errors. Sometimes icu4x also uses an unreleased commit instead of a tagged release.
 # Force both to use the same stable version from crates.io by patching the git URL.

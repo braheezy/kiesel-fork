@@ -950,6 +950,7 @@ version = "0.1.0"
 dependencies = [
  "icu_capi",
  "temporal_capi",
+ "temporal_rs",
 ]
 
 [[package]]
