@@ -487,7 +487,7 @@ pub const namespace = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 3. Let block be buffer.[[ArrayBufferData]].
-        const block = buffer.fields.data_block.?;
+        // NOTE: This is only safe to access after step 6.
 
         // 4. If typedArray.[[ContentType]] is bigint, then
         const expected, const replacement = if (typed_array.fields.content_type == .bigint) .{
@@ -507,6 +507,8 @@ pub const namespace = struct {
 
         // 6. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
         try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
+
+        const block = buffer.fields.data_block.?;
 
         // 7. Let elementType be TypedArrayElementType(typedArray).
         // 8. Let elementSize be TypedArrayElementSize(typedArray).
