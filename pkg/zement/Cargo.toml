@@ -3,35 +3,26 @@ name = "zement"
 version = "0.1.0"
 edition = "2024"
 
-# This is pinned to the same commit as the icu4x dependency in icu4zig, which provides the C
+# This is pinned to the same version as the icu4x dependency in icu4zig, which provides the C
 # headers for Zig.
 [dependencies.icu_capi]
-git = "https://github.com/unicode-org/icu4x.git"
-rev = "b3310edb48aa49ecb35a1dcd780eaac6c4540dd3"
+version = "2.1.0"
 default-features = false
 features = ["compiled_data", "default_components", "experimental", "std"]
 
-# This is pinned to the same commit as the temporal_rs dependency in the top-level build.zig.zon,
+# This is pinned to the same version as the temporal_rs dependency in the top-level build.zig.zon,
 # which provides the C headers for Zig.
 [dependencies.temporal_capi]
-git = "https://github.com/boa-dev/temporal.git"
-rev = "55fb8166abf5489befdd8c9bcacc96dacd04ac34"
+version = "0.1.2"
+default-features = false
 features = ["compiled_data"]
 
 # Not actually used directly, but we need to specify it as a dependency to enable features not
 # exposed via the temporal_capi crate.
 [dependencies.temporal_rs]
-git = "https://github.com/boa-dev/temporal.git"
-rev = "55fb8166abf5489befdd8c9bcacc96dacd04ac34"
+version = "*"
 default-features = false
 features = ["float64_representable_durations"]
-
-# icu_capi sources diplomat from git whereas temporal_capi uses crates.io, which causes duplicate
-# symbol linker errors. Sometimes icu4x also uses an unreleased commit instead of a tagged release.
-# Force both to use the same stable version from crates.io by patching the git URL.
-[patch.'https://github.com/rust-diplomat/diplomat.git']
-diplomat = "0.14.0"
-diplomat-runtime = "0.14.0"
 
 [features]
 intl = []
