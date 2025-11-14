@@ -93,6 +93,9 @@ pub fn every(
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len) return null;
@@ -147,7 +150,14 @@ pub fn fill(
     end: u53,
     value: Value,
 ) std.mem.Allocator.Error!?void {
-    const has_ordinary_internal_methods = object.internal_methods.flags.contains(.ordinary_set);
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_set,
+        // Dependencies of ordinary [[Set]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
     if (!has_ordinary_internal_methods or
         start > std.math.maxInt(Object.IndexedProperties.Index) or
         end > std.math.maxInt(Object.IndexedProperties.Index)) return null;
@@ -206,7 +216,12 @@ pub fn findViaPredicate(
     done: FindViaPredicateResult,
     continue_slow: ?usize,
 } {
-    const has_ordinary_internal_methods = object.internal_methods.flags.contains(.ordinary_get);
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_get,
+        // Dependencies of ordinary [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len) return null;
 
@@ -302,6 +317,9 @@ pub fn forEach(
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len) return null;
@@ -341,7 +359,12 @@ pub fn forEach(
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[Get]]`
 pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Value) ?bool {
-    const has_ordinary_internal_methods = object.internal_methods.flags.contains(.ordinary_get);
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+        .ordinary_get,
+        // Dependencies of ordinary [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
@@ -395,6 +418,9 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len or
@@ -448,6 +474,9 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len or
@@ -504,6 +533,11 @@ pub fn reverse(object: *Object, len: u53) ?void {
         .ordinary_get,
         .ordinary_set,
         .ordinary_delete,
+        // Dependencies of ordinary [[HasProperty]], [[Get]], [[Set]], and [[Delete]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() != len) return null;
@@ -544,6 +578,9 @@ pub fn some(
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
         object.property_storage.indexed_properties.count() < len) return null;
