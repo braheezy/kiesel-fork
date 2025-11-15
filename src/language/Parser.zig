@@ -40,7 +40,6 @@ state: struct {
     in_method_definition: bool = false,
     in_module: bool = false,
     in_strict_mode: bool = false,
-    call_expression_forbidden: bool = false,
     arguments_object_needed: bool = false,
 } = .{},
 identifier_stack: std.ArrayList(ast.Identifier),
@@ -1055,17 +1054,10 @@ pub fn acceptNewExpression(self: *Parser) AcceptError!ast.NewExpression {
 
     const token = try self.core.accept(RuleSet.is(.new));
     const expression = blk: {
-        const call_expression_forbidden = if (self.core.peek() catch null) |next_token|
-            next_token.type != .@"("
-        else
-            true;
-        const tmp = temporaryChange(
-            &self.state.call_expression_forbidden,
-            call_expression_forbidden,
-        );
-        defer tmp.restore();
-
-        const ctx: AcceptContext = .{ .precedence = getPrecedence(.new) };
+        const ctx: AcceptContext = .{
+            .precedence = getPrecedence(.new),
+            .forbidden = &.{ .@"(", .@"?." },
+        };
         const expression = try self.allocator.create(ast.Expression);
         errdefer self.allocator.destroy(expression);
         expression.* = try self.acceptExpression(ctx);
@@ -1089,8 +1081,6 @@ pub fn acceptCallExpression(
 ) AcceptError!ast.CallExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
-
-    if (self.state.call_expression_forbidden) return error.UnexpectedToken;
 
     const arguments = try self.acceptArguments();
     // Defer heap allocation of expression until we know this is a CallExpression
