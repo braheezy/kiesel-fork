@@ -849,6 +849,22 @@ pub const Expression = union(enum) {
             },
         };
     }
+
+    pub fn endsWithPrivateIdentifier(self: Expression) bool {
+        return switch (self) {
+            .member_expression => |member_expression| switch (member_expression.property) {
+                .expression => |expression| expression.endsWithPrivateIdentifier(),
+                .identifier => false,
+                .private_identifier => true,
+            },
+            .optional_expression => |optional_expression| switch (optional_expression.property) {
+                .expression => |expression| expression.endsWithPrivateIdentifier(),
+                .arguments, .identifier => false,
+                .private_identifier => true,
+            },
+            else => false,
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-Statement

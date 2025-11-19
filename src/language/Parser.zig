@@ -1432,6 +1432,25 @@ pub fn acceptUnaryExpression(self: *Parser) AcceptError!ast.UnaryExpression {
     const expression = try self.allocator.create(ast.Expression);
     errdefer self.allocator.destroy(expression);
     expression.* = try self.acceptExpression(ctx);
+
+    if (operator == .delete and self.state.in_strict_mode) {
+        if (expression.* == .primary_expression and
+            expression.primary_expression == .identifier_reference)
+        {
+            try self.emitErrorAt(
+                operator_token.location,
+                "Invalid use of 'delete' on identifier reference in strict mode",
+                .{},
+            );
+        } else if (expression.endsWithPrivateIdentifier()) {
+            try self.emitErrorAt(
+                operator_token.location,
+                "Invalid use of 'delete' on private identifier in strict mode",
+                .{},
+            );
+        }
+    }
+
     return .{ .operator = operator, .expression = expression };
 }
 
