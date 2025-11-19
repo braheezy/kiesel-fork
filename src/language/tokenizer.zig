@@ -432,7 +432,7 @@ fn matchIdentifierPartChar(it: *std.unicode.Utf8Iterator) bool {
     return canCodePointContinueId(code_point);
 }
 
-fn identifierNameMatcher(str: []const u8) ?usize {
+pub fn identifierNameMatcher(str: []const u8) ?usize {
     const utf8_view = std.unicode.Utf8View.initUnchecked(str);
     var it = utf8_view.iterator();
 

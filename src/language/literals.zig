@@ -3,6 +3,7 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const tokenizer = @import("tokenizer.zig");
 const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
+const identifierNameMatcher = tokenizer.identifierNameMatcher;
 const startsWithLineTerminator = tokenizer.startsWithLineTerminator;
 
 /// 12.9.3 Numeric Literals
@@ -121,7 +122,7 @@ pub fn parseNumericLiteral(
         },
         '.' => switch (state) {
             .start => state = .fraction_period,
-            .integer_digit, .fraction_digit, .fraction_period, .exponent_digit, .big_int_suffix => {
+            .integer_digit, .fraction_digit, .fraction_period, .exponent_digit => {
                 if (state == .integer_digit and system == .decimal and production == .regular) {
                     state = .fraction_period;
                 } else if (state == .fraction_period and i == 1) {
@@ -147,6 +148,7 @@ pub fn parseNumericLiteral(
                 if (production != .regular) return error.InvalidNumericLiteral;
                 state = .big_int_suffix;
                 @"type" = .big_int;
+                break i + 1;
             },
             else => return error.InvalidNumericLiteral,
         },
@@ -154,6 +156,9 @@ pub fn parseNumericLiteral(
     } else str.len;
 
     if (consume == .complete and i != str.len) return error.InvalidNumericLiteral;
+
+    // "The SourceCharacter immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit."
+    if (consume == .partial and identifierNameMatcher(str[i..]) != null) return error.InvalidNumericLiteral;
 
     // Special case: fraction_period is allowed as an end state, but not on its own
     if (state == .fraction_period and i == 1) return error.InvalidNumericLiteral;
@@ -584,7 +589,7 @@ test "parseNumericLiteral" {
         // Invalid hexadecimal digits
         "0xg", "0xgh", "0xghijklmno", "0xx",
         // Invalid bigints
-        "1e1n", "00n", "01n",
+        "1n1", "1e1n", "00n", "01n",
         // Invalid fractions
         ".", "..", "..0", "0..", "0..0", "1.2.3", "0b1.1", "0o1.1", "0x1.1", "00.", "00.1", "01.", "01.1",
     }
@@ -593,6 +598,9 @@ test "parseNumericLiteral" {
         const parse_error = parseNumericLiteral(input, .complete);
         try std.testing.expectError(error.InvalidNumericLiteral, parse_error);
     }
+
+    // Ensure "3in" is not parsed as a numeric literal followed by an identifier
+    try std.testing.expectError(error.InvalidNumericLiteral, parseNumericLiteral("3in", .partial));
 }
 
 test "parseStringLiteral" {
