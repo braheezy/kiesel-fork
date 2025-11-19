@@ -203,6 +203,13 @@ const Kiesel = struct {
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const array_buffer_value = arguments.get(0);
         const array_buffer = try array_buffer_value.requireInternalSlot(agent, kiesel.builtins.ArrayBuffer);
+        if (kiesel.builtins.isSharedArrayBuffer(array_buffer)) {
+            return agent.throwException(
+                .type_error,
+                "{f} is not an ArrayBuffer object",
+                .{array_buffer_value},
+            );
+        }
         try kiesel.builtins.detachArrayBuffer(agent, array_buffer, null);
         return .undefined;
     }
