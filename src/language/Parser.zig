@@ -858,6 +858,13 @@ pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier 
     errdefer self.core.restoreState(state);
 
     const hash_token = try self.core.accept(RuleSet.is(.@"#"));
+    const identifier_token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
+
+    if (identifier_token.location.line != hash_token.location.line or
+        identifier_token.location.column != hash_token.location.column + 1)
+    {
+        return error.UnexpectedToken;
+    }
 
     if (!self.state.in_class_body) {
         try self.emitErrorAt(
@@ -868,8 +875,7 @@ pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier 
         return error.UnexpectedToken;
     }
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
-    return self.unescapeIdentifier(token);
+    return self.unescapeIdentifier(identifier_token);
 }
 
 pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression {
