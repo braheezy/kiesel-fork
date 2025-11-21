@@ -164,6 +164,15 @@ pub fn ordinaryGetOwnProperty(
     // 6. Set D.[[Enumerable]] to the value of X's [[Enumerable]] attribute.
     // 7. Set D.[[Configurable]] to the value of X's [[Configurable]] attribute.
     // 8. Return D.
+    // OPTIMIZATION: The Array length property is stored in fields instead of property storage.
+    if (object.is(builtins.Array) and property_key.isLength()) {
+        return .{
+            .value = Value.from(object.as(builtins.Array).fields.length),
+            .writable = object.as(builtins.Array).fields.length_writable,
+            .enumerable = false,
+            .configurable = false,
+        };
+    }
     const property_descriptor = (try object.property_storage.getCreateIntrinsicIfNeeded(property_key)) orelse return null;
     return property_descriptor.toPropertyDescriptor();
 }
@@ -458,6 +467,11 @@ pub fn ordinaryHasProperty(
     object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool {
+    // OPTIMIZATION: The Array length property is stored in fields instead of property storage.
+    if (object.is(builtins.Array) and property_key.isLength()) {
+        return true;
+    }
+
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
@@ -509,6 +523,11 @@ pub fn ordinaryGet(
     property_key: PropertyKey,
     receiver: Value,
 ) Agent.Error!Value {
+    // OPTIMIZATION: The Array length property is stored in fields instead of property storage.
+    if (object.is(builtins.Array) and property_key.isLength()) {
+        return Value.from(object.as(builtins.Array).fields.length);
+    }
+
     const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
@@ -778,6 +797,11 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
 /// 10.1.10.1 OrdinaryDelete ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinarydelete
 pub fn ordinaryDelete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool {
+    // OPTIMIZATION: The Array length property is stored in fields instead of property storage.
+    if (object.is(builtins.Array) and property_key.isLength()) {
+        return false;
+    }
+
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
     const descriptor = try object.internal_methods.getOwnProperty(
         agent,
@@ -820,7 +844,9 @@ pub fn ordinaryOwnPropertyKeys(
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         allocator,
-        object.property_storage.count(),
+        object.property_storage.indexed_properties.count() +
+            object.property_storage.shape.properties.count() +
+            @intFromBool(object.is(builtins.Array)),
     );
 
     // 2. For each own property key P of O such that P is an array index, in ascending numeric
@@ -846,6 +872,12 @@ pub fn ordinaryOwnPropertyKeys(
                 keys.appendAssumeCapacity(property_key);
             }
         },
+    }
+
+    // OPTIMIZATION: The Array length property is stored in fields instead of property storage.
+    if (object.is(builtins.Array)) {
+        // Always the first property in chronological order
+        keys.appendAssumeCapacity(PropertyKey.from("length"));
     }
 
     // 3. For each own property key P of O such that P is a String and P is not an array index, in

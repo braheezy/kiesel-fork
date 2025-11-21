@@ -69,6 +69,11 @@ pub const PropertyKey = union(enum) {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 
+    // This is so common that it's useful to have a dedicated method for it.
+    pub fn isLength(self: PropertyKey) bool {
+        return self == .string and self.string.eql(String.fromLiteral("length"));
+    }
+
     /// 7.1.21 CanonicalNumericIndexString ( argument )
     /// https://tc39.es/ecma262/#sec-canonicalnumericindexstring
     pub fn canonicalNumericIndex(

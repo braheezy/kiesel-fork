@@ -32,7 +32,6 @@ const evaluateCall = runtime.evaluateCall;
 const evaluateCallGetThisValue = runtime.evaluateCallGetThisValue;
 const evaluateImportCall = runtime.evaluateImportCall;
 const evaluateNew = runtime.evaluateNew;
-const getArrayLength = builtins.array.getArrayLength;
 const getIterator = types.getIterator;
 const getSuperConstructor = runtime.getSuperConstructor;
 const getTemplateObject = runtime.getTemplateObject;
@@ -138,7 +137,7 @@ fn executeArrayCreate(self: *Vm, length: u32) Agent.Error!void {
 fn executeArrayPushValue(self: *Vm) Agent.Error!void {
     const init_value = self.stack.pop().?;
     const array = self.stack.pop().?.asObject();
-    const index = getArrayLength(array);
+    const index = array.as(builtins.Array).fields.length;
     // From ArrayAccumulation:
     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
     try array.createDataPropertyDirect(
@@ -170,7 +169,7 @@ fn executeArraySetValueDirect(self: *Vm, index: u32) Agent.Error!void {
 
 fn executeArraySpreadValue(self: *Vm) Agent.Error!void {
     const array = self.stack.pop().?.asObject();
-    var next_index: u53 = @intCast(getArrayLength(array));
+    var next_index: u53 = array.as(builtins.Array).fields.length;
 
     // From ArrayAccumulation:
     // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).

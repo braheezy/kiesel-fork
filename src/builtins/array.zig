@@ -1,7 +1,6 @@
 //! 10.4.2 Array Exotic Objects
 //! https://tc39.es/ecma262/#sec-array-exotic-objects
 
-const builtin = @import("builtin");
 const std = @import("std");
 
 const build_options = @import("build-options");
@@ -40,35 +39,6 @@ const sameValueZero = types.sameValueZero;
 
 const array_fast_paths = @import("array_fast_paths.zig");
 
-const runtime_safety = switch (builtin.mode) {
-    .Debug, .ReleaseSafe => true,
-    .ReleaseFast, .ReleaseSmall => false,
-};
-
-// Non-standard helper to get the length property of an array
-pub fn getArrayLength(array: *const Object) u32 {
-    // The "length" property is always at index 0 in the shape's properties, so we can access it
-    // without a hashmap lookup. This warrants a sanity check in debug mode :^)
-    if (runtime_safety) {
-        const property_key = array.property_storage.shape.properties.keys()[0];
-        std.debug.assert(property_key.eql(PropertyKey.from("length")));
-        const property_metadata = array.property_storage.shape.properties.values()[0];
-        std.debug.assert(@intFromEnum(property_metadata.index.value) == 0);
-    }
-    const length_value = array.property_storage.values.items[0];
-    return @intFromFloat(length_value.asNumber().asFloat());
-}
-
-pub fn getArrayLengthPropertyMetadata(array: *const Object) Object.Shape.PropertyMetadata {
-    // The "length" property is always at index 0 in the shape's properties, so we can access it
-    // without a hashmap lookup. This warrants a sanity check in debug mode :^)
-    if (runtime_safety) {
-        const property_key = array.property_storage.shape.properties.keys()[0];
-        std.debug.assert(property_key.eql(PropertyKey.from("length")));
-    }
-    return array.property_storage.shape.properties.values()[0];
-}
-
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
@@ -78,30 +48,26 @@ fn defineOwnProperty(
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
     // 1. If P is "length", then
-    if (property_key == .string and property_key.string.eql(String.fromLiteral("length"))) {
+    if (property_key.isLength()) {
         // a. Return ? ArraySetLength(A, Desc).
-        return arraySetLength(agent, array, property_descriptor);
+        return arraySetLength(agent, array.as(builtins.Array), property_descriptor);
     }
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
-        const length_property_metadata = getArrayLengthPropertyMetadata(array);
-
         // b. Assert: lengthDesc is not undefined.
         // c. Assert: IsDataDescriptor(lengthDesc) is true.
         // d. Assert: lengthDesc.[[Configurable]] is false.
-        std.debug.assert(length_property_metadata.index == .value);
-        std.debug.assert(!length_property_metadata.attributes.configurable);
 
         // e. Let length be lengthDesc.[[Value]].
         // f. Assert: length is a non-negative integral Number.
-        const length = getArrayLength(array);
+        const length = array.as(builtins.Array).fields.length;
 
         // g. Let index be ! ToUint32(P).
         const index: u32 = @intCast(property_key.integer_index);
 
         // h. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
-        if (index >= length and length_property_metadata.attributes.writable == false)
+        if (index >= length and !array.as(builtins.Array).fields.length_writable)
             return false;
 
         // i. Let succeeded be ! OrdinaryDefineOwnProperty(A, P, Desc).
@@ -121,7 +87,7 @@ fn defineOwnProperty(
             // i. Set lengthDesc.[[Value]] to index + 1𝔽.
             // ii. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", lengthDesc).
             // iii. Assert: succeeded is true.
-            array.property_storage.values.items[0] = Value.from(index + 1);
+            array.as(builtins.Array).fields.length = index + 1;
         }
 
         // l. Return true.
@@ -154,17 +120,15 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
         .internal_methods = .initComptime(.{
             .defineOwnProperty = defineOwnProperty,
         }),
-    });
 
-    // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
-    //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-    //    }).
-    _ = ordinaryDefineOwnProperty(agent, &array.object, PropertyKey.from("length"), .{
-        .value = Value.from(@as(u32, @intCast(length))),
-        .writable = true,
-        .enumerable = false,
-        .configurable = false,
-    }) catch |err| try noexcept(err);
+        // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
+        //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+        //    }).
+        .fields = .{
+            .length = @as(u32, @intCast(length)),
+            .length_writable = true,
+        },
+    });
 
     // 7. Return A.
     return array;
@@ -231,145 +195,102 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
 /// https://tc39.es/ecma262/#sec-arraysetlength
-pub fn arraySetLength(
+fn arraySetLength(
     agent: *Agent,
-    array: *Object,
+    array: *builtins.Array,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
     // 1. If Desc does not have a [[Value]] field, then
-    if (property_descriptor.value == null) {
-        // a. Return ! OrdinaryDefineOwnProperty(A, "length", Desc).
-        return ordinaryDefineOwnProperty(
-            agent,
-            array,
-            PropertyKey.from("length"),
-            property_descriptor,
-        ) catch |err| try noexcept(err);
-    }
-
+    //     a. Return ! OrdinaryDefineOwnProperty(A, "length", Desc).
     // 2. Let newLenDesc be a copy of Desc.
-    var new_len_desc = property_descriptor;
 
-    // 3. Let newLen be ? ToUint32(Desc.[[Value]]).
-    const new_len = try property_descriptor.value.?.toUint32(agent);
+    var new_len: u32 = array.fields.length;
+    if (property_descriptor.value) |new_len_value| {
+        // 3. Let newLen be ? ToUint32(Desc.[[Value]]).
+        new_len = try new_len_value.toUint32(agent);
 
-    // 4. Let numberLen be ? ToNumber(Desc.[[Value]]).
-    const number_len = try property_descriptor.value.?.toNumber(agent);
+        // 4. Let numberLen be ? ToNumber(Desc.[[Value]]).
+        const number_len = try new_len_value.toNumber(agent);
 
-    // 5. If SameValueZero(newLen, numberLen) is false, throw a RangeError exception.
-    if (@as(f64, @floatFromInt(new_len)) != number_len.asFloat()) {
-        return agent.throwException(.range_error, "Invalid array length", .{});
+        // 5. If SameValueZero(newLen, numberLen) is false, throw a RangeError exception.
+        if (@as(f64, @floatFromInt(new_len)) != number_len.asFloat()) {
+            return agent.throwException(.range_error, "Invalid array length", .{});
+        }
     }
 
     // 6. Set newLenDesc.[[Value]] to newLen.
-    new_len_desc.value = Value.from(new_len);
-
     // 7. Let oldLenDesc be OrdinaryGetOwnProperty(A, "length").
-    const length_property_metadata = getArrayLengthPropertyMetadata(array);
-
     // 8. Assert: oldLenDesc is not undefined.
     // 9. Assert: IsDataDescriptor(oldLenDesc) is true.
     // 10. Assert: oldLenDesc.[[Configurable]] is false.
-    std.debug.assert(length_property_metadata.index == .value);
-    std.debug.assert(!length_property_metadata.attributes.configurable);
-
     // 11. Let oldLen be oldLenDesc.[[Value]].
-    const old_len = getArrayLength(array);
+    const old_len = array.fields.length;
+    const old_writable = array.fields.length_writable;
 
     // 12. If newLen ≥ oldLen, then
-    if (new_len >= old_len) {
-        // a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-        return ordinaryDefineOwnProperty(
-            agent,
-            array,
-            PropertyKey.from("length"),
-            new_len_desc,
-        ) catch |err| try noexcept(err);
-    }
-
+    //     a. Return ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
     // 13. If oldLenDesc.[[Writable]] is false, return false.
-    if (length_property_metadata.attributes.writable == false) return false;
-
-    var new_writable: bool = undefined;
 
     // 14. If newLenDesc does not have a [[Writable]] field or newLenDesc.[[Writable]] is true, then
-    if (new_len_desc.writable == null or new_len_desc.writable == true) {
-        // a. Let newWritable be true.
-        new_writable = true;
-    } else {
-        // 15. Else,
-        // a. NOTE: Setting the [[Writable]] attribute to false is deferred in case any elements
-        //          cannot be deleted.
-        // b. Let newWritable be false.
-        new_writable = false;
-
-        // c. Set newLenDesc.[[Writable]] to true.
-        new_len_desc.writable = true;
-    }
+    //     a. Let newWritable be true.
+    // 15. Else,
+    //     a. NOTE: Setting the [[Writable]] attribute to false is deferred in case any elements
+    //        cannot be deleted.
+    //     b. Let newWritable be false.
+    //     c. Set newLenDesc.[[Writable]] to true.
+    const new_writable = property_descriptor.writable orelse true;
 
     // 16. Let succeeded be ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-    var succeeded = ordinaryDefineOwnProperty(
-        agent,
-        array,
-        PropertyKey.from("length"),
-        new_len_desc,
-    ) catch |err| try noexcept(err);
-
     // 17. If succeeded is false, return false.
-    if (!succeeded) return false;
+    // Relevant steps from ValidateAndApplyPropertyDescriptor
+    if (property_descriptor.configurable == true) return false;
+    if (property_descriptor.enumerable == true) return false;
+    if (!property_descriptor.isGenericDescriptor() and property_descriptor.isAccessorDescriptor()) return false;
+    if (!old_writable) {
+        if (property_descriptor.writable == true) return false;
+        if (old_len != new_len) return false;
+    }
+    array.fields.length = new_len;
 
-    // 18. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
-    //     in descending numeric index order, do
-    var sparse_indices = switch (array.property_storage.indexed_properties.storage) {
-        .sparse => |sparse| blk: {
-            var indices: std.ArrayList(u32) = .empty;
-            try indices.ensureTotalCapacity(agent.gc_allocator, sparse.size);
-            var it = sparse.keyIterator();
-            while (it.next()) |index| indices.appendAssumeCapacity(index.*);
-            std.sort.insertion(u32, indices.items, {}, std.sort.asc(u32));
-            break :blk indices;
-        },
-        else => null,
-    };
-    defer if (sparse_indices) |*indices| indices.deinit(agent.gc_allocator);
-    var index: ?u32 = switch (array.property_storage.indexed_properties.storage) {
-        .none => null,
-        .sparse => sparse_indices.?.pop(),
-        else => @intCast(array.property_storage.indexed_properties.count() - 1),
-    };
-    while (index != null and index.? >= new_len) : ({
-        index = if (sparse_indices) |*indices|
-            indices.pop()
-        else
-            std.math.sub(u32, index.?, 1) catch null;
-    }) {
-        const property_key = PropertyKey.from(@as(u53, index.?));
+    if (new_len < old_len) {
+        // 18. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥
+        //     newLen, in descending numeric index order, do
+        //     a. Let deleteSucceeded be ! A.[[Delete]](P).
+        switch (array.object.property_storage.indexed_properties.storage) {
+            .none => {},
+            .dense_i32 => |*dense_i32| dense_i32.shrinkRetainingCapacity(new_len),
+            .dense_f64 => |*dense_f64| dense_f64.shrinkRetainingCapacity(new_len),
+            .dense_value => |*dense_value| dense_value.shrinkRetainingCapacity(new_len),
+            .sparse => |*sparse| {
+                var indices: std.ArrayList(u32) = .empty;
+                defer indices.deinit(agent.gc_allocator);
+                try indices.ensureTotalCapacity(agent.gc_allocator, sparse.size);
+                var it = sparse.keyIterator();
+                while (it.next()) |index| if (index.* >= new_len) indices.appendAssumeCapacity(index.*);
+                std.sort.insertion(u32, indices.items, {}, std.sort.asc(u32));
+                while (indices.pop()) |index| {
+                    const descriptor = sparse.get(index).?;
 
-        // a. Let deleteSucceeded be ! A.[[Delete]](P).
-        const delete_succeeded = array.internal_methods.delete(
-            agent,
-            array,
-            property_key,
-        ) catch |err| try noexcept(err);
+                    // b. If deleteSucceeded is false, then
+                    if (!descriptor.attributes.configurable) {
+                        // i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
 
-        // b. If deleteSucceeded is false, then
-        if (!delete_succeeded) {
-            // i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
-            new_len_desc.value = Value.from(@as(f64, @floatFromInt(index.?)) + 1);
+                        // ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
+                        if (!new_writable) {
+                            array.fields.length_writable = false;
+                        }
 
-            // ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
-            if (!new_writable) new_len_desc.writable = false;
+                        // iii. Perform ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
+                        array.fields.length = index + 1;
 
-            // iii. Perform ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-            _ = ordinaryDefineOwnProperty(
-                agent,
-                array,
-                PropertyKey.from("length"),
-                new_len_desc,
-            ) catch |err| try noexcept(err);
+                        // iv. Return false.
+                        return false;
+                    }
 
-            // iv. Return false.
-            return false;
+                    const removed = sparse.remove(index);
+                    std.debug.assert(removed);
+                }
+            },
         }
     }
 
@@ -378,15 +299,8 @@ pub fn arraySetLength(
         // a. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
         //      [[Writable]]: false
         //    }).
-        succeeded = ordinaryDefineOwnProperty(
-            agent,
-            array,
-            PropertyKey.from("length"),
-            .{ .writable = false },
-        ) catch |err| try noexcept(err);
-
         // b. Assert: succeeded is true.
-        std.debug.assert(succeeded);
+        array.fields.length_writable = false;
     }
 
     // 20. Return true.
@@ -506,7 +420,7 @@ pub const constructor = struct {
             }
 
             // e. Assert: The mathematical value of array's "length" property is numberOfArgs.
-            std.debug.assert(getArrayLength(&array.object) == @as(u32, @intCast(number_of_args)));
+            std.debug.assert(array.fields.length == @as(u32, @intCast(number_of_args)));
 
             // f. Return array.
             return Value.from(&array.object);
@@ -3771,5 +3685,9 @@ pub fn compareArrayElements(
 /// 23.1.4 Properties of Array Instances
 /// https://tc39.es/ecma262/#sec-properties-of-array-instances
 pub const Array = MakeObject(.{
+    .Fields = struct {
+        length: u32,
+        length_writable: bool,
+    },
     .tag = .array,
 });

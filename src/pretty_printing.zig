@@ -14,7 +14,6 @@ const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 const fmtToDateString = builtins.date.fmtToDateString;
-const getArrayLength = builtins.array.getArrayLength;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayLength = builtins.typedArrayLength;
@@ -59,7 +58,7 @@ fn prettyPrintArray(
     array: *const builtins.Array,
     writer: *std.Io.Writer,
 ) PrettyPrintError!void {
-    const length = getArrayLength(&array.object);
+    const length = array.fields.length;
     const tty_config = state.platform.tty_config;
 
     try tty_config.setColor(writer, .white);

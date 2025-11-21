@@ -360,7 +360,9 @@ fn ownPropertyKeys(
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.property_storage.count() + len,
+        object.property_storage.indexed_properties.count() +
+            object.property_storage.shape.properties.count() +
+            len,
     );
 
     // 5. For each integer i such that 0 ≤ i < len, in ascending order,

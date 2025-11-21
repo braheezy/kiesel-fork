@@ -205,7 +205,7 @@ pub fn createDataPropertyDirect(
     const use_fast_path_for_array =
         self.is(builtins.Array) and
         !property_key.isArrayIndex() and
-        !(property_key == .string and property_key.string.eql(String.fromLiteral("length")));
+        !property_key.isLength();
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
         // Go directly to the property storage.
@@ -246,7 +246,7 @@ pub fn definePropertyDirect(
     const use_fast_path_for_array =
         self.is(builtins.Array) and
         !property_key.isArrayIndex() and
-        !(property_key == .string and property_key.string.eql(String.fromLiteral("length")));
+        !property_key.isLength();
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
         try self.property_storage.set(

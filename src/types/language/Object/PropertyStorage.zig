@@ -134,10 +134,6 @@ pub const CompletePropertyDescriptor = struct {
     }
 };
 
-pub fn count(self: PropertyStorage) usize {
-    return self.shape.properties.count() + self.indexed_properties.count();
-}
-
 pub fn contains(
     self: PropertyStorage,
     property_key: PropertyKey,
