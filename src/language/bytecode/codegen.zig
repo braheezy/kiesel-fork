@@ -3336,6 +3336,9 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
     const default_or_end_jump = try executable.addInstructionDeferred(.jump);
     var i: usize = 0;
     for (case_block.items) |item| {
+        // Only consider break jumps from the following case block when intercepting
+        const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+
         switch (item) {
             .case_clause => |case_clause| {
                 const skip_jump = try executable.addInstructionDeferred(.jump);
@@ -3355,6 +3358,8 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
                 try codegenStatementList(default_clause.statement_list, executable, ctx);
             },
         }
+
+        try ctx.break_jumps.insertSlice(executable.allocator, 0, break_jumps);
     }
     if (!has_default_clause) {
         const skip_jump = try executable.addInstructionDeferred(.jump);
