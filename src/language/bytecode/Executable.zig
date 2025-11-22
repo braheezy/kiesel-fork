@@ -272,7 +272,9 @@ pub fn print(self: Executable, writer: *std.Io.Writer, tty_config: std.Io.tty.Co
                             if (i != 0) try writer.writeAll(", ");
                             try writer.print("{s}: ", .{field.name});
                             const value = @field(payload, field.name);
-                            if (@typeInfo(field.type) == .@"enum" and @typeInfo(field.type).@"enum".is_exhaustive) {
+                            if (std.meta.hasFn(field.type, "format")) {
+                                try writer.print("{f}", .{value});
+                            } else if (@typeInfo(field.type) == .@"enum" and @typeInfo(field.type).@"enum".is_exhaustive) {
                                 // Omit type name of exhaustive enums
                                 try writer.print("{t}", .{value});
                             } else {
