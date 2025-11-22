@@ -1253,8 +1253,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
-        // 3. If regexp is neither undefined nor null, then
-        if (!regexp.isUndefined() and !regexp.isNull()) {
+        // 3. If regexp is an Object, then
+        if (regexp.isObject()) {
             // a. Let matcher be ? GetMethod(regexp, %Symbol.match%).
             const maybe_matcher = try regexp.getMethod(
                 agent,
@@ -1293,8 +1293,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
-        // 3. If regexp is neither undefined nor null, then
-        if (!regexp.isUndefined() and !regexp.isNull()) {
+        // 3. If regexp is an Object, then
+        if (regexp.isObject()) {
             // a. Let isRegExp be ? IsRegExp(regexp).
             const is_reg_exp = try regexp.isRegExp(agent);
 
@@ -1527,8 +1527,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
-        // 3. If searchValue is neither undefined nor null, then
-        if (!search_value.isUndefined() and !search_value.isNull()) {
+        // 3. If searchValue is an Object, then
+        if (search_value.isObject()) {
             // a. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const maybe_replacer = try search_value.getMethod(
                 agent,
@@ -1626,8 +1626,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
-        // 3. If searchValue is neither undefined nor null, then
-        if (!search_value.isUndefined() and !search_value.isNull()) {
+        // 3. If searchValue is an Object, then
+        if (search_value.isObject()) {
             // a. Let isRegExp be ? IsRegExp(searchValue).
             const is_reg_exp = try search_value.isRegExp(agent);
 
@@ -1778,8 +1778,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try this_value.requireObjectCoercible(agent);
 
-        // 3. If regexp is neither undefined nor null, then
-        if (!regexp.isUndefined() and !regexp.isNull()) {
+        // 3. If regexp is an Object, then
+        if (regexp.isObject()) {
             // a. Let searcher be ? GetMethod(regexp, %Symbol.search%).
             const maybe_searcher = try regexp.getMethod(
                 agent,
@@ -1878,8 +1878,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
-        // 3. If separator is neither undefined nor null, then
-        if (!separator_value.isUndefined() and !separator_value.isNull()) {
+        // 3. If separator is an Object, then
+        if (separator_value.isObject()) {
             // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
             const maybe_splitter = try separator_value.getMethod(
                 agent,
