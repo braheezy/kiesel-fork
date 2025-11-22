@@ -50,6 +50,7 @@ pub fn bindThisValue(
 
     // 2. If envRec.[[ThisBindingStatus]] is initialized, throw a ReferenceError exception.
     if (self.this_binding_status == .initialized) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .reference_error,
             "Function this binding is already initialized",
@@ -91,6 +92,7 @@ pub fn getThisBinding(self: FunctionEnvironment, agent: *Agent) error{ExceptionT
 
     // 2. If envRec.[[ThisBindingStatus]] is uninitialized, throw a ReferenceError exception.
     if (self.this_binding_status == .uninitialized) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .reference_error,
             "Function this binding is uninitialized",

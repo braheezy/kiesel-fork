@@ -52,6 +52,7 @@ pub fn createMutableBinding(
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .type_error,
             "Binding for '{f}' already exists",
@@ -74,6 +75,7 @@ pub fn createImmutableBinding(
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .type_error,
             "Binding for '{f}' already exists",
@@ -168,6 +170,7 @@ pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const Strin
 
     // 6. If existingProp is true, then
     if (existing_prop) {
+        @branchHint(.likely);
         // a. Return ? ObjRec.DeleteBinding(N).
         return self.object_record.deleteBinding(agent, name);
     }

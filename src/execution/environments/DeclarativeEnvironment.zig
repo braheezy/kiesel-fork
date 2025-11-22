@@ -125,6 +125,7 @@ pub fn setMutableBinding(
 
     // 1. If envRec does not have a binding for N, then
     const binding = maybe_binding orelse {
+        @branchHint(.unlikely);
         // a. If S is true, throw a ReferenceError exception.
         if (strict) {
             return agent.throwException(
@@ -145,10 +146,11 @@ pub fn setMutableBinding(
     };
 
     // 2. If the binding for N in envRec is a strict binding, set S to true.
-    const final_strict = if (binding.strict) true else strict;
+    const final_strict = binding.strict or strict;
 
     // 3. If the binding for N in envRec has not yet been initialized, then
     if (!binding.initialized) {
+        @branchHint(.unlikely);
         // a. Throw a ReferenceError exception.
         return agent.throwException(
             .reference_error,
@@ -159,6 +161,7 @@ pub fn setMutableBinding(
 
     // 4. Else if the binding for N in envRec is a mutable binding, then
     if (binding.mutable) {
+        @branchHint(.likely);
         // a. Change its bound value to V.
         binding.value = value;
     } else {
@@ -190,6 +193,7 @@ pub fn getBindingValue(
 
     // 2. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError exception.
     if (!binding.initialized) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .reference_error,
             "Binding for '{f}' is not initialized",
@@ -208,7 +212,10 @@ pub fn deleteBinding(self: *DeclarativeEnvironment, name: *const String) bool {
     const binding = self.bindings.get(name).?;
 
     // 2. If the binding for N in envRec cannot be deleted, return false.
-    if (!binding.deletable) return false;
+    if (!binding.deletable) {
+        @branchHint(.unlikely);
+        return false;
+    }
 
     // 3. Remove the binding for N from envRec.
     _ = self.bindings.remove(name);

@@ -53,21 +53,22 @@ pub fn getBindingValue(
         const binding_name = indirect_binding.binding_name;
 
         // b. Let targetEnv be M.[[Environment]].
-        const target_env = switch (module) {
+        const maybe_target_env = switch (module) {
             inline else => |m| m.environment,
         };
 
         // c. If targetEnv is empty, throw a ReferenceError exception.
-        if (target_env == null) {
+        const target_env = maybe_target_env orelse {
+            @branchHint(.unlikely);
             return agent.throwException(
                 .reference_error,
                 "Module environment is not initialized",
                 .{},
             );
-        }
+        };
 
         // d. Return ? targetEnv.GetBindingValue(N2, true).
-        return target_env.?.getBindingValue(agent, binding_name, true);
+        return target_env.getBindingValue(agent, binding_name, true);
     }
 
     const binding = self.declarative_environment.bindings.get(name).?;
@@ -75,6 +76,7 @@ pub fn getBindingValue(
     // 4. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError
     //    exception.
     if (!binding.initialized) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .reference_error,
             "Binding for '{f}' is not initialized",

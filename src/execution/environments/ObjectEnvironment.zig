@@ -36,7 +36,10 @@ pub fn hasBinding(self: ObjectEnvironment, agent: *Agent, name: *const String) A
     if (!found_binding) return false;
 
     // 4. If envRec.[[IsWithEnvironment]] is false, return true.
-    if (!self.is_with_environment) return true;
+    if (!self.is_with_environment) {
+        @branchHint(.likely);
+        return true;
+    }
 
     // 5. Let unscopables be ? Get(bindingObject, %Symbol.unscopables%).
     const unscopables = try self.binding_object.get(
@@ -120,6 +123,7 @@ pub fn setMutableBinding(
 
     // 3. If stillExists is false and S is true, throw a ReferenceError exception.
     if (!still_exists and strict) {
+        @branchHint(.unlikely);
         return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
     }
 
@@ -145,6 +149,7 @@ pub fn getBindingValue(
 
     // 3. If value is false, then
     if (!value) {
+        @branchHint(.unlikely);
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
         if (!strict) return .undefined;
         return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
@@ -186,7 +191,10 @@ pub fn hasSuperBinding(_: ObjectEnvironment) bool {
 /// https://tc39.es/ecma262/#sec-object-environment-records-withbaseobject
 pub fn withBaseObject(self: ObjectEnvironment) ?*Object {
     // 1. If envRec.[[IsWithEnvironment]] is true, return envRec.[[BindingObject]].
-    if (self.is_with_environment) return self.binding_object;
+    if (self.is_with_environment) {
+        @branchHint(.unlikely);
+        return self.binding_object;
+    }
 
     // 2. Otherwise, return undefined.
     return null;
