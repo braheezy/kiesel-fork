@@ -1226,13 +1226,7 @@ fn asyncModuleExecutionRejected(
     //    slot is not empty.
     module.async_evaluation_order = .done;
 
-    // 9. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
-    for (module.async_parent_modules.items) |m| {
-        // a. Perform AsyncModuleExecutionRejected(m, error).
-        try asyncModuleExecutionRejected(agent, m, @"error");
-    }
-
-    // 10. If module.[[TopLevelCapability]] is not empty, then
+    // 9. If module.[[TopLevelCapability]] is not empty, then
     if (module.top_level_capability) |top_level_capability| {
         // a. Assert: module.[[CycleRoot]] and module are the same Module Record.
         std.debug.assert(module.cycle_root == module);
@@ -1243,6 +1237,12 @@ fn asyncModuleExecutionRejected(
             .undefined,
             &.{@"error".value},
         ) catch |err| try noexcept(err);
+    }
+
+    // 10. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
+    for (module.async_parent_modules.items) |m| {
+        // a. Perform AsyncModuleExecutionRejected(m, error).
+        try asyncModuleExecutionRejected(agent, m, @"error");
     }
 
     // 11. Return unused.
