@@ -1,6 +1,8 @@
 //! 9.1.1.4 Global Environment Records
 //! https://tc39.es/ecma262/#sec-global-environment-records
 
+const std = @import("std");
+
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -97,9 +99,12 @@ pub fn initializeBinding(
 ) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
-    if (self.declarative_record.hasBinding(name)) {
+    if (self.declarative_record.bindings.getPtr(name)) |binding| {
         // a. Return ! DclRec.InitializeBinding(N, V).
-        return self.declarative_record.initializeBinding(name, value);
+        std.debug.assert(binding.initialized == false);
+        binding.value = value;
+        binding.initialized = true;
+        return;
     }
 
     // 3. Assert: If the binding exists, it must be in the Object Environment Record.
@@ -119,9 +124,28 @@ pub fn setMutableBinding(
 ) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
-    if (self.declarative_record.hasBinding(name)) {
+    if (self.declarative_record.bindings.getPtr(name)) |binding| {
         // a. Return ? DclRec.SetMutableBinding(N, V, S).
-        return self.declarative_record.setMutableBinding(agent, name, value, strict);
+        const final_strict = binding.strict or strict;
+        if (!binding.initialized) {
+            @branchHint(.unlikely);
+            return agent.throwException(
+                .reference_error,
+                "Binding for '{f}' is not initialized",
+                .{name.fmtRaw()},
+            );
+        }
+        if (binding.mutable) {
+            @branchHint(.likely);
+            binding.value = value;
+        } else if (final_strict) {
+            return agent.throwException(
+                .type_error,
+                "Binding for '{f}' is immutable",
+                .{name.fmtRaw()},
+            );
+        }
+        return;
     }
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
@@ -139,9 +163,17 @@ pub fn getBindingValue(
 ) Agent.Error!Value {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
-    if (self.declarative_record.hasBinding(name)) {
+    if (self.declarative_record.bindings.get(name)) |binding| {
         // a. Return ? DclRec.GetBindingValue(N, S).
-        return self.declarative_record.getBindingValue(agent, name, strict);
+        if (!binding.initialized) {
+            @branchHint(.unlikely);
+            return agent.throwException(
+                .reference_error,
+                "Binding for '{f}' is not initialized",
+                .{name.fmtRaw()},
+            );
+        }
+        return binding.value;
     }
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
@@ -156,9 +188,14 @@ pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const Strin
 
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
-    if (self.declarative_record.hasBinding(name)) {
+    if (self.declarative_record.bindings.get(name)) |binding| {
         // a. Return ! DclRec.DeleteBinding(N).
-        return self.declarative_record.deleteBinding(name);
+        if (!binding.deletable) {
+            @branchHint(.unlikely);
+            return false;
+        }
+        _ = self.declarative_record.bindings.remove(name);
+        return true;
     }
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
