@@ -45,7 +45,8 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Environment, agent: *Agent, name: *const String) Agent.Error!bool {
+    // This benefits from inlining due to being very hot code.
+    pub inline fn hasBinding(self: Environment, agent: *Agent, name: *const String) Agent.Error!bool {
         return switch (self) {
             .declarative_environment => |env| env.hasBinding(name),
             .object_environment => |env| env.hasBinding(agent, name),
@@ -116,7 +117,8 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getBindingValue(
+    // This benefits from inlining due to being very hot code.
+    pub inline fn getBindingValue(
         self: Environment,
         agent: *Agent,
         name: *const String,
