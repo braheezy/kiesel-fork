@@ -36,6 +36,10 @@ jobs:
           zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe -Denable-nan-boxing=false
           zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-aarch64
+      - name: Build kiesel-linux-aarch64 (ReleaseFast)
+        run: |
+          zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseFast
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-aarch64-releasefast
       - name: Build kiesel-linux-arm
         run: |
           zig build -Dtarget=arm-linux-musleabihf -Doptimize=ReleaseSafe
