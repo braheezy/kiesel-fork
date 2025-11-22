@@ -209,6 +209,7 @@ pub fn getIdentifierReference(
             // In the case of an unresolvable reference we'll reach the last environment without an
             // outer env.
             for (0..cache.distance) |_| env = env.outerEnv() orelse {
+                @branchHint(.unlikely);
                 return .{
                     .base = .unresolvable,
                     .referenced_name = .{ .value = Value.from(name) },
@@ -225,6 +226,7 @@ pub fn getIdentifierReference(
     while (!try env.hasBinding(agent, name)) {
         distance += 1;
         env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
             return .{
                 .base = .unresolvable,
                 .referenced_name = .{ .value = Value.from(name) },

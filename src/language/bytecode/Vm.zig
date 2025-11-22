@@ -1568,6 +1568,7 @@ fn executeResolveBindingDirect(
     if (lookup_cache_entry.*) |cache| {
         for (0..cache.distance) |_| {
             env = env.outerEnv() orelse {
+                @branchHint(.unlikely);
                 return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
             };
         }
@@ -1575,6 +1576,7 @@ fn executeResolveBindingDirect(
         var distance: usize = 0;
         while (!try env.hasBinding(self.agent, name)) {
             env = env.outerEnv() orelse {
+                @branchHint(.unlikely);
                 return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
             };
             distance += 1;

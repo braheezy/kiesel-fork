@@ -78,6 +78,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
 
     // 2. If IsUnresolvableReference(V) is true, throw a ReferenceError exception.
     if (self.isUnresolvableReference()) {
+        @branchHint(.unlikely);
         return agent.throwException(
             .reference_error,
             "'{f}' is not defined",
@@ -183,6 +184,7 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
 
     // 2. If IsUnresolvableReference(V) is true, then
     if (self.isUnresolvableReference()) {
+        @branchHint(.unlikely);
         // a. If V.[[Strict]] is true, throw a ReferenceError exception.
         if (self.strict) {
             return agent.throwException(
@@ -237,6 +239,7 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
 
         // e. If succeeded is false and V.[[Strict]] is true, throw a TypeError exception.
         if (!succeeded and self.strict) {
+            @branchHint(.unlikely);
             return agent.throwException(.type_error, "Could not set property", .{});
         }
 
