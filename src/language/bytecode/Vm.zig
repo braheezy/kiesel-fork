@@ -539,6 +539,132 @@ fn executeDecrement(self: *Vm) Agent.Error!void {
     self.result = Value.from(try value.asBigInt().subtract(self.agent, .one));
 }
 
+fn updateExpressionImpl(
+    self: *Vm,
+    reference: Reference,
+    comptime op: enum { increment, decrement },
+    comptime kind: enum { prefix, postfix },
+) Agent.Error!void {
+    const old_value = try reference.getValue(self.agent);
+    const old_value_numeric, const new_value = switch (op) {
+        .increment => blk: {
+            // OPTIMIZATION: Fast path for number values
+            if (old_value.isNumber()) {
+                if (old_value.__isI32()) {
+                    if (std.math.add(i32, old_value.__asI32(), 1)) |result| {
+                        break :blk .{ old_value, Value.from(result) };
+                    } else |_| {}
+                }
+                break :blk .{ old_value, Value.from(old_value.__toF64() + 1) };
+            }
+            const numeric = try old_value.toNumeric(self.agent);
+            break :blk switch (numeric) {
+                .number => |number| .{
+                    Value.from(number),
+                    Value.from(number.add(.from(1))),
+                },
+                .big_int => |big_int| .{
+                    Value.from(big_int),
+                    Value.from(try big_int.add(self.agent, .one)),
+                },
+            };
+        },
+        .decrement => blk: {
+            // OPTIMIZATION: Fast path for number values
+            if (old_value.isNumber()) {
+                if (old_value.__isI32()) {
+                    if (std.math.sub(i32, old_value.__asI32(), 1)) |result| {
+                        break :blk .{ old_value, Value.from(result) };
+                    } else |_| {}
+                }
+                break :blk .{ old_value, Value.from(old_value.__toF64() - 1) };
+            }
+            const numeric = try old_value.toNumeric(self.agent);
+            break :blk switch (numeric) {
+                .number => |number| .{
+                    Value.from(number),
+                    Value.from(number.subtract(.from(1))),
+                },
+                .big_int => |big_int| .{
+                    Value.from(big_int),
+                    Value.from(try big_int.subtract(self.agent, .one)),
+                },
+            };
+        },
+    };
+    try reference.putValue(self.agent, new_value);
+    self.result = switch (kind) {
+        .prefix => new_value,
+        .postfix => old_value_numeric,
+    };
+}
+
+fn executeDecrementBindingPrefix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+) Agent.Error!void {
+    const name = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
+    const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+    try self.updateExpressionImpl(reference, .decrement, .prefix);
+}
+
+fn executeDecrementBindingPostfix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+) Agent.Error!void {
+    const name = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
+    const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+    try self.updateExpressionImpl(reference, .decrement, .postfix);
+}
+
+fn executeDecrementPropertyPrefix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+) Agent.Error!void {
+    const property_name_string = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getPropertyLookupCacheEntry(property_lookup_cache_index);
+    const base_value = self.stack.pop().?;
+    const reference: Reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{
+            .value = Value.from(property_name_string),
+        },
+        .strict = strict,
+        .this_value = null,
+        .maybe_lookup_cache_entry = lookup_cache_entry,
+    };
+    try self.updateExpressionImpl(reference, .decrement, .prefix);
+}
+
+fn executeDecrementPropertyPostfix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+) Agent.Error!void {
+    const property_name_string = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getPropertyLookupCacheEntry(property_lookup_cache_index);
+    const base_value = self.stack.pop().?;
+    const reference: Reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{
+            .value = Value.from(property_name_string),
+        },
+        .strict = strict,
+        .this_value = null,
+        .maybe_lookup_cache_entry = lookup_cache_entry,
+    };
+    try self.updateExpressionImpl(reference, .decrement, .postfix);
+}
+
 /// 13.5.1.2 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
 fn executeDelete(self: *Vm) Agent.Error!void {
@@ -1102,6 +1228,72 @@ fn executeIncrement(self: *Vm) Agent.Error!void {
     }
 
     self.result = Value.from(try value.asBigInt().add(self.agent, .one));
+}
+
+fn executeIncrementBindingPrefix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+) Agent.Error!void {
+    const name = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
+    const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+    try self.updateExpressionImpl(reference, .increment, .prefix);
+}
+
+fn executeIncrementBindingPostfix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
+) Agent.Error!void {
+    const name = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
+    const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+    try self.updateExpressionImpl(reference, .increment, .postfix);
+}
+
+fn executeIncrementPropertyPrefix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+) Agent.Error!void {
+    const property_name_string = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getPropertyLookupCacheEntry(property_lookup_cache_index);
+    const base_value = self.stack.pop().?;
+    const reference: Reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{
+            .value = Value.from(property_name_string),
+        },
+        .strict = strict,
+        .this_value = null,
+        .maybe_lookup_cache_entry = lookup_cache_entry,
+    };
+    try self.updateExpressionImpl(reference, .increment, .prefix);
+}
+
+fn executeIncrementPropertyPostfix(
+    self: *Vm,
+    strict: bool,
+    identifier_index: Executable.IdentifierIndex,
+    property_lookup_cache_index: Executable.PropertyLookupCacheIndex,
+) Agent.Error!void {
+    const property_name_string = self.executable.getIdentifier(identifier_index);
+    const lookup_cache_entry = self.executable.getPropertyLookupCacheEntry(property_lookup_cache_index);
+    const base_value = self.stack.pop().?;
+    const reference: Reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{
+            .value = Value.from(property_name_string),
+        },
+        .strict = strict,
+        .this_value = null,
+        .maybe_lookup_cache_entry = lookup_cache_entry,
+    };
+    try self.updateExpressionImpl(reference, .increment, .postfix);
 }
 
 fn executeInitializeBoundName(
@@ -1804,6 +1996,10 @@ fn executeInstruction(
         .create_object_property_iterator => self.executeCreateObjectPropertyIterator(),
         .create_with_environment => self.executeCreateWithEnvironment(),
         .decrement => self.executeDecrement(),
+        .decrement_binding_prefix => self.executeDecrementBindingPrefix(payload.strict, payload.identifier, payload.environment_lookup_cache_index),
+        .decrement_binding_postfix => self.executeDecrementBindingPostfix(payload.strict, payload.identifier, payload.environment_lookup_cache_index),
+        .decrement_property_prefix => self.executeDecrementPropertyPrefix(payload.strict, payload.identifier, payload.property_lookup_cache_index),
+        .decrement_property_postfix => self.executeDecrementPropertyPostfix(payload.strict, payload.identifier, payload.property_lookup_cache_index),
         .delete => self.executeDelete(),
         .dup_iterator => self.executeDupIterator(),
         .dup_reference => self.executeDupReference(),
@@ -1827,6 +2023,10 @@ fn executeInstruction(
         .has_private_element => self.executeHasPrivateElement(payload),
         .has_property => self.executeHasProperty(),
         .increment => self.executeIncrement(),
+        .increment_binding_prefix => self.executeIncrementBindingPrefix(payload.strict, payload.identifier, payload.environment_lookup_cache_index),
+        .increment_binding_postfix => self.executeIncrementBindingPostfix(payload.strict, payload.identifier, payload.environment_lookup_cache_index),
+        .increment_property_prefix => self.executeIncrementPropertyPrefix(payload.strict, payload.identifier, payload.property_lookup_cache_index),
+        .increment_property_postfix => self.executeIncrementPropertyPostfix(payload.strict, payload.identifier, payload.property_lookup_cache_index),
         .initialize_bound_name => self.executeInitializeBoundName(payload),
         .initialize_referenced_binding => self.executeInitializeReferencedBinding(),
         .instanceof_operator => self.executeInstanceofOperator(),

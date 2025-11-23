@@ -1318,18 +1318,42 @@ pub fn codegenUpdateExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    if (node.expression.assignmentTargetType(null) == .web_compat) {
+        try codegenExpression(node.expression.*, executable, ctx);
+        std.debug.assert(!node.expression.analyze(.is_reference));
+        try executable.addInstruction(.throw_call_assignment_reference_error, {});
+        return;
+    }
+    std.debug.assert(node.expression.analyze(.is_reference));
+
     // UpdateExpression : LeftHandSideExpression ++
     if (node.type == .postfix and node.operator == .@"++") {
+        if (node.expression.* == .primary_expression and node.expression.primary_expression == .identifier_reference) {
+            try executable.addInstruction(.increment_binding_postfix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.primary_expression.identifier_reference),
+                .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+            });
+            return;
+        }
+        if (node.expression.* == .member_expression and node.expression.member_expression.property == .identifier) {
+            try codegenExpressionAndGetValue(node.expression.*.member_expression.expression.*, executable, ctx);
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.increment_property_postfix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.*.member_expression.property.identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
+            return;
+        }
+
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
         //    ReferenceError exception.
-        if (node.expression.assignmentTargetType(null) == .web_compat) {
-            try executable.addInstruction(.throw_call_assignment_reference_error, {});
-            return;
-        }
+        // NOTE: This is handled at the beginning.
 
         // 3. Let oldValue be ? ToNumeric(? GetValue(lhs)).
         try executable.addInstruction(.get_value, {});
@@ -1352,16 +1376,32 @@ pub fn codegenUpdateExpression(
     }
     // UpdateExpression : LeftHandSideExpression --
     else if (node.type == .postfix and node.operator == .@"--") {
+        if (node.expression.* == .primary_expression and node.expression.primary_expression == .identifier_reference) {
+            try executable.addInstruction(.decrement_binding_postfix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.primary_expression.identifier_reference),
+                .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+            });
+            return;
+        }
+        if (node.expression.* == .member_expression and node.expression.member_expression.property == .identifier) {
+            try codegenExpressionAndGetValue(node.expression.*.member_expression.expression.*, executable, ctx);
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.decrement_property_postfix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.*.member_expression.property.identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
+            return;
+        }
+
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. If the AssignmentTargetType of LeftHandSideExpression is web-compat, throw a
         //    ReferenceError exception.
-        if (node.expression.assignmentTargetType(null) == .web_compat) {
-            try executable.addInstruction(.throw_call_assignment_reference_error, {});
-            return;
-        }
+        // NOTE: This is handled at the beginning.
 
         // 3. Let oldValue be ? ToNumeric(? GetValue(lhs)).
         try executable.addInstruction(.get_value, {});
@@ -1384,16 +1424,32 @@ pub fn codegenUpdateExpression(
     }
     // UpdateExpression : ++ UnaryExpression
     else if (node.type == .prefix and node.operator == .@"++") {
+        if (node.expression.* == .primary_expression and node.expression.primary_expression == .identifier_reference) {
+            try executable.addInstruction(.increment_binding_prefix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.primary_expression.identifier_reference),
+                .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+            });
+            return;
+        }
+        if (node.expression.* == .member_expression and node.expression.member_expression.property == .identifier) {
+            try codegenExpressionAndGetValue(node.expression.*.member_expression.expression.*, executable, ctx);
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.increment_property_prefix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.*.member_expression.property.identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
+            return;
+        }
+
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. If the AssignmentTargetType of UnaryExpression is web-compat, throw a ReferenceError
         //    exception.
-        if (node.expression.assignmentTargetType(null) == .web_compat) {
-            try executable.addInstruction(.throw_call_assignment_reference_error, {});
-            return;
-        }
+        // NOTE: This is handled at the beginning.
 
         // 3. Let oldValue be ? ToNumeric(? GetValue(expr)).
         try executable.addInstruction(.get_value, {});
@@ -1413,16 +1469,32 @@ pub fn codegenUpdateExpression(
     }
     // UpdateExpression : -- UnaryExpression
     else if (node.type == .prefix and node.operator == .@"--") {
+        if (node.expression.* == .primary_expression and node.expression.primary_expression == .identifier_reference) {
+            try executable.addInstruction(.decrement_binding_prefix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.primary_expression.identifier_reference),
+                .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
+            });
+            return;
+        }
+        if (node.expression.* == .member_expression and node.expression.member_expression.property == .identifier) {
+            try codegenExpressionAndGetValue(node.expression.*.member_expression.expression.*, executable, ctx);
+            try executable.addInstruction(.load, {});
+            try executable.addInstruction(.decrement_property_prefix, .{
+                .strict = ctx.contained_in_strict_mode_code,
+                .identifier = try executable.addIdentifier(node.expression.*.member_expression.property.identifier),
+                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+            });
+            return;
+        }
+
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
+        try executable.addInstruction(.dup_reference, {});
 
         // 2. If the AssignmentTargetType of UnaryExpression is web-compat, throw a ReferenceError
         //    exception.
-        if (node.expression.assignmentTargetType(null) == .web_compat) {
-            try executable.addInstruction(.throw_call_assignment_reference_error, {});
-            return;
-        }
+        // NOTE: This is handled at the beginning.
 
         // 3. Let oldValue be ? ToNumeric(? GetValue(expr)).
         try executable.addInstruction(.get_value, {});

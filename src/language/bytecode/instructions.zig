@@ -64,6 +64,29 @@ pub const Instruction = union(enum(u8)) {
     create_with_environment,
     /// Decrement the numeric result value by one.
     decrement,
+    /// Decrement a binding and set the result value.
+    decrement_binding_prefix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
+    decrement_binding_postfix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
+    /// Decrement a property and set the result value.
+    decrement_property_prefix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
+    /// Decrement a property and set the result value.
+    decrement_property_postfix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
     /// Apply the delete operation to the evaluated expression and set it as the result value.
     delete,
     /// Duplicate the last iterator on the stack.
@@ -136,6 +159,30 @@ pub const Instruction = union(enum(u8)) {
     has_property,
     /// Increment the numeric result value by one.
     increment,
+    /// Increment a binding and set the result value.
+    increment_binding_prefix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
+    /// Increment a binding and set the result value.
+    increment_binding_postfix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
+    },
+    /// Increment a property and set the result value.
+    increment_property_prefix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
+    /// Increment a property and set the result value.
+    increment_property_postfix: struct {
+        strict: bool,
+        identifier: IdentifierIndex,
+        property_lookup_cache_index: PropertyLookupCacheIndex,
+    },
     /// Call InitializeBoundName() with the given identifier.
     initialize_bound_name: IdentifierIndex,
     /// Call InitializeReferencedBinding() with the last reference on the reference stack and the result value.
