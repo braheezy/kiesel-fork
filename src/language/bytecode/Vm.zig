@@ -1904,11 +1904,13 @@ fn executeTypeofIdentifier(
     self: *Vm,
     name_index: Executable.IdentifierIndex,
     strict: bool,
+    environment_lookup_cache_index: Executable.EnvironmentLookupCacheIndex,
 ) Agent.Error!void {
     const name = self.executable.getIdentifier(name_index);
+    const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
 
     // 1. Let val be ? Evaluation of UnaryExpression.
-    const reference = try self.agent.resolveBinding(name, null, strict, null);
+    const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
 
     // 2. If val is a Reference Record, then
     //     a. If IsUnresolvableReference(val) is true, return "undefined".
@@ -2080,7 +2082,7 @@ fn executeInstruction(
         .to_object => self.executeToObject(),
         .to_string => self.executeToString(),
         .typeof => self.executeTypeof(),
-        .typeof_identifier => self.executeTypeofIdentifier(payload.identifier, payload.strict),
+        .typeof_identifier => self.executeTypeofIdentifier(payload.identifier, payload.strict, payload.environment_lookup_cache_index),
         .unary_minus => self.executeUnaryMinus(),
         .@"return", .yield, .end => unreachable,
     }) catch |err| switch (err) {

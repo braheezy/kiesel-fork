@@ -313,6 +313,7 @@ pub const Instruction = union(enum(u8)) {
     typeof_identifier: struct {
         identifier: IdentifierIndex,
         strict: bool,
+        environment_lookup_cache_index: EnvironmentLookupCacheIndex,
     },
     /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.
     unary_minus,

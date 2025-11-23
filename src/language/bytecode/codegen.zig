@@ -1565,6 +1565,7 @@ pub fn codegenUnaryExpression(
                         node.expression.primary_expression.identifier_reference,
                     ),
                     .strict = ctx.contained_in_strict_mode_code,
+                    .environment_lookup_cache_index = ctx.addEnvironmentLookupCacheIndex(),
                 });
             } else {
                 try codegenExpressionAndGetValue(node.expression.*, executable, ctx);
