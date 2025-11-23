@@ -32,7 +32,9 @@ pub const Environment = union(enum) {
     module_environment: *ModuleEnvironment,
 
     pub const LookupCacheEntry = struct {
-        distance: usize,
+        // Realistically an u8 should be enough for this but let's stay on the safe side.
+        // If you nest more than 256 environments you deserve to crash though.
+        distance: u16,
     };
 
     pub fn outerEnv(self: Environment) ?Environment {
@@ -219,7 +221,7 @@ pub fn getIdentifierReference(
             };
         };
     } else {
-        var distance: usize = 0;
+        var distance: u16 = 0;
         defer lookup_cache_entry.* = .{ .distance = distance };
         while (!try env.hasBinding(agent, name)) : (distance += 1) {
             env = env.outerEnv() orelse {

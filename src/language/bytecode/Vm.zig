@@ -1765,7 +1765,7 @@ fn executeResolveBindingDirect(
             };
         }
     } else {
-        var distance: usize = 0;
+        var distance: u16 = 0;
         defer lookup_cache_entry.* = .{ .distance = distance };
         while (!try env.hasBinding(self.agent, name)) : (distance += 1) {
             env = env.outerEnv() orelse {
