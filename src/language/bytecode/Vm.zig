@@ -1766,14 +1766,13 @@ fn executeResolveBindingDirect(
         }
     } else {
         var distance: usize = 0;
-        while (!try env.hasBinding(self.agent, name)) {
+        defer lookup_cache_entry.* = .{ .distance = distance };
+        while (!try env.hasBinding(self.agent, name)) : (distance += 1) {
             env = env.outerEnv() orelse {
                 @branchHint(.unlikely);
                 return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
             };
-            distance += 1;
         }
-        lookup_cache_entry.* = .{ .distance = distance };
     }
     self.result = try env.getBindingValue(self.agent, name, strict);
 }

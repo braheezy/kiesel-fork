@@ -191,7 +191,7 @@ pub fn getIdentifierReference(
     start_env: Environment,
     name: *const String,
     strict: bool,
-    maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
+    lookup_cache_entry: *?Environment.LookupCacheEntry,
 ) Agent.Error!Reference {
     // 1. If env is null, then
     //     a. Return the Reference Record {
@@ -206,11 +206,23 @@ pub fn getIdentifierReference(
     //     a. Let outer be env.[[OuterEnv]].
     //     b. Return ? GetIdentifierReference(outer, name, strict).
     var env = start_env;
-    if (maybe_lookup_cache_entry) |lookup_cache_entry| {
-        if (lookup_cache_entry.*) |cache| {
-            // In the case of an unresolvable reference we'll reach the last environment without an
-            // outer env.
-            for (0..cache.distance) |_| env = env.outerEnv() orelse {
+    if (lookup_cache_entry.*) |cache| {
+        // In the case of an unresolvable reference we'll reach the last environment without an
+        // outer env.
+        for (0..cache.distance) |_| env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            return .{
+                .base = .unresolvable,
+                .referenced_name = .{ .value = Value.from(name) },
+                .strict = strict,
+                .this_value = null,
+            };
+        };
+    } else {
+        var distance: usize = 0;
+        defer lookup_cache_entry.* = .{ .distance = distance };
+        while (!try env.hasBinding(agent, name)) : (distance += 1) {
+            env = env.outerEnv() orelse {
                 @branchHint(.unlikely);
                 return .{
                     .base = .unresolvable,
@@ -220,22 +232,6 @@ pub fn getIdentifierReference(
                 };
             };
         }
-    }
-    var distance: usize = 0;
-    defer if (maybe_lookup_cache_entry) |lookup_cache_entry| {
-        lookup_cache_entry.* = .{ .distance = distance };
-    };
-    while (!try env.hasBinding(agent, name)) {
-        distance += 1;
-        env = env.outerEnv() orelse {
-            @branchHint(.unlikely);
-            return .{
-                .base = .unresolvable,
-                .referenced_name = .{ .value = Value.from(name) },
-                .strict = strict,
-                .this_value = null,
-            };
-        };
     }
     return .{
         .base = .{ .environment = env },

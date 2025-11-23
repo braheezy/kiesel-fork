@@ -69,7 +69,8 @@ pub fn initializeBoundName(
         // 2. Else,
         .strict => |strict| {
             // a. Let lhs be ? ResolveBinding(name).
-            const lhs = try agent.resolveBinding(name, null, strict, null);
+            var dummy_cache: ?Environment.LookupCacheEntry = null;
+            const lhs = try agent.resolveBinding(name, null, strict, &dummy_cache);
 
             // b. Return ? PutValue(lhs, value).
             try lhs.putValue(agent, value);
