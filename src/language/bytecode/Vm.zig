@@ -1757,22 +1757,20 @@ fn executeResolveBindingDirect(
     const name = self.executable.getIdentifier(name_index);
     const lookup_cache_entry = self.executable.getEnvironmentLookupCacheEntry(environment_lookup_cache_index);
     var env = self.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    var distance: u16 = 0;
+    defer lookup_cache_entry.* = .{ .distance = distance };
     if (lookup_cache_entry.*) |cache| {
-        for (0..cache.distance) |_| {
-            env = env.outerEnv() orelse {
-                @branchHint(.unlikely);
-                return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
-            };
+        while (distance < cache.distance) : (distance += 1) {
+            // We only ever increase the distance up to the global env.
+            // If we do reach it, the while loop below will check if the binding still exists.
+            env = env.outerEnv().?;
         }
-    } else {
-        var distance: u16 = 0;
-        defer lookup_cache_entry.* = .{ .distance = distance };
-        while (!try env.hasBinding(self.agent, name)) : (distance += 1) {
-            env = env.outerEnv() orelse {
-                @branchHint(.unlikely);
-                return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
-            };
-        }
+    }
+    while (!try env.hasBinding(self.agent, name)) : (distance += 1) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            return self.agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
+        };
     }
     self.result = try env.getBindingValue(self.agent, name, strict);
 }

@@ -208,10 +208,17 @@ pub fn getIdentifierReference(
     //     a. Let outer be env.[[OuterEnv]].
     //     b. Return ? GetIdentifierReference(outer, name, strict).
     var env = start_env;
+    var distance: u16 = 0;
+    defer lookup_cache_entry.* = .{ .distance = distance };
     if (lookup_cache_entry.*) |cache| {
-        // In the case of an unresolvable reference we'll reach the last environment without an
-        // outer env.
-        for (0..cache.distance) |_| env = env.outerEnv() orelse {
+        while (distance < cache.distance) : (distance += 1) {
+            // We only ever increase the distance up to the global env.
+            // If we do reach it, the while loop below will check if the binding still exists.
+            env = env.outerEnv().?;
+        }
+    }
+    while (!try env.hasBinding(agent, name)) : (distance += 1) {
+        env = env.outerEnv() orelse {
             @branchHint(.unlikely);
             return .{
                 .base = .unresolvable,
@@ -220,20 +227,6 @@ pub fn getIdentifierReference(
                 .this_value = null,
             };
         };
-    } else {
-        var distance: u16 = 0;
-        defer lookup_cache_entry.* = .{ .distance = distance };
-        while (!try env.hasBinding(agent, name)) : (distance += 1) {
-            env = env.outerEnv() orelse {
-                @branchHint(.unlikely);
-                return .{
-                    .base = .unresolvable,
-                    .referenced_name = .{ .value = Value.from(name) },
-                    .strict = strict,
-                    .this_value = null,
-                };
-            };
-        }
     }
     return .{
         .base = .{ .environment = env },
