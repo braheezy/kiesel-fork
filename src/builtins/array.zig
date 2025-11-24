@@ -261,15 +261,27 @@ fn arraySetLength(
             .dense_i32 => |*dense_i32| dense_i32.shrinkRetainingCapacity(new_len),
             .dense_f64 => |*dense_f64| dense_f64.shrinkRetainingCapacity(new_len),
             .dense_value => |*dense_value| dense_value.shrinkRetainingCapacity(new_len),
-            .sparse => |*sparse| {
+            .sparse_value => |*sparse_value| {
                 var indices: std.ArrayList(u32) = .empty;
                 defer indices.deinit(agent.gc_allocator);
-                try indices.ensureTotalCapacity(agent.gc_allocator, sparse.size);
-                var it = sparse.keyIterator();
+                try indices.ensureTotalCapacity(agent.gc_allocator, sparse_value.count());
+                var it = sparse_value.keyIterator();
                 while (it.next()) |index| if (index.* >= new_len) indices.appendAssumeCapacity(index.*);
                 std.sort.insertion(u32, indices.items, {}, std.sort.asc(u32));
                 while (indices.pop()) |index| {
-                    const descriptor = sparse.get(index).?;
+                    const removed = sparse_value.remove(index);
+                    std.debug.assert(removed);
+                }
+            },
+            .sparse_property_descriptor => |*sparse_property_descriptor| {
+                var indices: std.ArrayList(u32) = .empty;
+                defer indices.deinit(agent.gc_allocator);
+                try indices.ensureTotalCapacity(agent.gc_allocator, sparse_property_descriptor.count());
+                var it = sparse_property_descriptor.keyIterator();
+                while (it.next()) |index| if (index.* >= new_len) indices.appendAssumeCapacity(index.*);
+                std.sort.insertion(u32, indices.items, {}, std.sort.asc(u32));
+                while (indices.pop()) |index| {
+                    const descriptor = sparse_property_descriptor.get(index).?;
 
                     // b. If deleteSucceeded is false, then
                     if (!descriptor.attributes.configurable) {
@@ -287,7 +299,7 @@ fn arraySetLength(
                         return false;
                     }
 
-                    const removed = sparse.remove(index);
+                    const removed = sparse_property_descriptor.remove(index);
                     std.debug.assert(removed);
                 }
             },

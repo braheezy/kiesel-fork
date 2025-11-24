@@ -23,14 +23,23 @@ pub const Storage = union(Type) {
         dense_i32,
         dense_f64,
         dense_value,
-        sparse,
+        sparse_value,
+        sparse_property_descriptor,
     };
 
     none,
     dense_i32: std.ArrayList(i32),
     dense_f64: std.ArrayList(f64),
     dense_value: std.ArrayList(Value),
-    sparse: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor),
+    sparse_value: std.AutoHashMapUnmanaged(Index, Value),
+    sparse_property_descriptor: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor),
+
+    pub fn isDense(self: Storage) bool {
+        return switch (self) {
+            .dense_i32, .dense_f64, .dense_value => true,
+            else => false,
+        };
+    }
 };
 
 fn propertyDescriptorFromValue(value: Value) CompletePropertyDescriptor {
@@ -52,12 +61,16 @@ pub fn migrateStorageIfNeeded(
     const new_storage_type: Storage.Type = blk: {
         // Property set or addition
         if (maybe_property_descriptor) |property_descriptor| {
-            if (old_storage_type == .sparse or // No downgrades
-                index > self.count() or // Created an array hole
+            if (old_storage_type == .sparse_property_descriptor or // No downgrades
                 property_descriptor.value_or_accessor == .accessor or // Accessor property
                 property_descriptor.attributes != Attributes.all // Non-default properties
             ) {
-                break :blk .sparse;
+                break :blk .sparse_property_descriptor;
+            }
+            if (old_storage_type == .sparse_value or // No downgrades
+                index > self.count() // Created an array hole
+            ) {
+                break :blk .sparse_value;
             }
             if (property_descriptor.value_or_accessor.value.__isI32()) {
                 switch (old_storage_type) {
@@ -74,13 +87,16 @@ pub fn migrateStorageIfNeeded(
             break :blk .dense_value;
         }
         // Property removal
-        else {
-            std.debug.assert(old_storage_type != .none);
-            if (old_storage_type != .sparse and index + 1 == self.count()) {
-                if (index == 0) break :blk .none;
-                break :blk old_storage_type;
-            }
-            break :blk .sparse;
+        else switch (old_storage_type) {
+            .none => unreachable,
+            .dense_i32, .dense_f64, .dense_value => {
+                if (index + 1 == self.count()) {
+                    if (index == 0) break :blk .none;
+                    break :blk old_storage_type;
+                }
+                break :blk .sparse_value;
+            },
+            .sparse_value, .sparse_property_descriptor => break :blk old_storage_type,
         }
     };
     if (old_storage_type != new_storage_type) {
@@ -103,7 +119,8 @@ pub fn migrateStorage(
                 .dense_i32 => |*dense_i32| dense_i32.deinit(allocator),
                 .dense_f64 => |*dense_f64| dense_f64.deinit(allocator),
                 .dense_value => |*dense_value| dense_value.deinit(allocator),
-                .sparse => |*sparse| sparse.deinit(allocator),
+                .sparse_value => |*sparse_value| sparse_value.deinit(allocator),
+                .sparse_property_descriptor => |*sparse_property_descriptor| sparse_property_descriptor.deinit(allocator),
             }
             break :blk .none;
         },
@@ -111,7 +128,7 @@ pub fn migrateStorage(
             const dense_i32: std.ArrayList(i32) = .empty;
             switch (self.storage) {
                 .none => {},
-                .dense_i32, .dense_f64, .dense_value, .sparse => unreachable,
+                .dense_i32, .dense_f64, .dense_value, .sparse_value, .sparse_property_descriptor => unreachable,
             }
             break :blk .{ .dense_i32 = dense_i32 };
         },
@@ -126,7 +143,7 @@ pub fn migrateStorage(
                     }
                     dense_i32.deinit(allocator);
                 },
-                .dense_f64, .dense_value, .sparse => unreachable,
+                .dense_f64, .dense_value, .sparse_value, .sparse_property_descriptor => unreachable,
             }
             break :blk .{ .dense_f64 = dense_f64 };
         },
@@ -148,18 +165,59 @@ pub fn migrateStorage(
                     }
                     dense_f64.deinit(allocator);
                 },
-                .dense_value, .sparse => unreachable,
+                .dense_value, .sparse_value, .sparse_property_descriptor => unreachable,
             }
             break :blk .{ .dense_value = dense_value };
         },
-        .sparse => blk: {
-            var sparse: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor) = .empty;
+        .sparse_value => blk: {
+            var sparse_value: std.AutoHashMapUnmanaged(Index, Value) = .empty;
             switch (self.storage) {
                 .none => {},
                 .dense_i32 => |*dense_i32| {
-                    try sparse.ensureTotalCapacity(allocator, @intCast(dense_i32.items.len));
+                    try sparse_value.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_i32.items.len),
+                    );
                     for (dense_i32.items, 0..) |value, i| {
-                        sparse.putAssumeCapacity(
+                        sparse_value.putAssumeCapacity(@intCast(i), Value.from(value));
+                    }
+                    dense_i32.deinit(allocator);
+                },
+                .dense_f64 => |*dense_f64| {
+                    try sparse_value.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_f64.items.len),
+                    );
+                    for (dense_f64.items, 0..) |value, i| {
+                        sparse_value.putAssumeCapacity(@intCast(i), Value.from(value));
+                    }
+                    dense_f64.deinit(allocator);
+                },
+                .dense_value => |*dense_value| {
+                    try sparse_value.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_value.items.len),
+                    );
+                    for (dense_value.items, 0..) |value, i| {
+                        sparse_value.putAssumeCapacity(@intCast(i), value);
+                    }
+                    dense_value.deinit(allocator);
+                },
+                .sparse_value, .sparse_property_descriptor => unreachable,
+            }
+            break :blk .{ .sparse_value = sparse_value };
+        },
+        .sparse_property_descriptor => blk: {
+            var sparse_property_descriptor: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor) = .empty;
+            switch (self.storage) {
+                .none => {},
+                .dense_i32 => |*dense_i32| {
+                    try sparse_property_descriptor.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_i32.items.len),
+                    );
+                    for (dense_i32.items, 0..) |value, i| {
+                        sparse_property_descriptor.putAssumeCapacity(
                             @intCast(i),
                             propertyDescriptorFromValue(Value.from(value)),
                         );
@@ -167,9 +225,12 @@ pub fn migrateStorage(
                     dense_i32.deinit(allocator);
                 },
                 .dense_f64 => |*dense_f64| {
-                    try sparse.ensureTotalCapacity(allocator, @intCast(dense_f64.items.len));
+                    try sparse_property_descriptor.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_f64.items.len),
+                    );
                     for (dense_f64.items, 0..) |value, i| {
-                        sparse.putAssumeCapacity(
+                        sparse_property_descriptor.putAssumeCapacity(
                             @intCast(i),
                             propertyDescriptorFromValue(Value.from(value)),
                         );
@@ -177,18 +238,35 @@ pub fn migrateStorage(
                     dense_f64.deinit(allocator);
                 },
                 .dense_value => |*dense_value| {
-                    try sparse.ensureTotalCapacity(allocator, @intCast(dense_value.items.len));
+                    try sparse_property_descriptor.ensureTotalCapacity(
+                        allocator,
+                        @intCast(dense_value.items.len),
+                    );
                     for (dense_value.items, 0..) |value, i| {
-                        sparse.putAssumeCapacity(
+                        sparse_property_descriptor.putAssumeCapacity(
                             @intCast(i),
                             propertyDescriptorFromValue(value),
                         );
                     }
                     dense_value.deinit(allocator);
                 },
-                .sparse => unreachable,
+                .sparse_value => |*sparse_value| {
+                    try sparse_property_descriptor.ensureTotalCapacity(
+                        allocator,
+                        sparse_value.count(),
+                    );
+                    var it = sparse_value.iterator();
+                    while (it.next()) |entry| {
+                        sparse_property_descriptor.putAssumeCapacity(
+                            entry.key_ptr.*,
+                            propertyDescriptorFromValue(entry.value_ptr.*),
+                        );
+                    }
+                    sparse_value.deinit(allocator);
+                },
+                .sparse_property_descriptor => unreachable,
             }
-            break :blk .{ .sparse = sparse };
+            break :blk .{ .sparse_property_descriptor = sparse_property_descriptor };
         },
     };
 }
@@ -199,7 +277,8 @@ pub fn count(self: IndexedProperties) usize {
         .dense_i32 => |dense_i32| return dense_i32.items.len,
         .dense_f64 => |dense_f64| return dense_f64.items.len,
         .dense_value => |dense_value| return dense_value.items.len,
-        .sparse => |sparse| return sparse.size,
+        .sparse_value => |sparse_value| return sparse_value.count(),
+        .sparse_property_descriptor => |sparse_property_descriptor| return sparse_property_descriptor.count(),
     }
 }
 
@@ -209,7 +288,8 @@ pub fn contains(self: IndexedProperties, index: Index) bool {
         .dense_i32 => |dense_i32| return index < dense_i32.items.len,
         .dense_f64 => |dense_f64| return index < dense_f64.items.len,
         .dense_value => |dense_value| return index < dense_value.items.len,
-        .sparse => |sparse| return sparse.contains(index),
+        .sparse_value => |sparse_value| return sparse_value.contains(index),
+        .sparse_property_descriptor => |sparse_property_descriptor| return sparse_property_descriptor.contains(index),
     }
 }
 
@@ -228,8 +308,12 @@ pub fn get(self: IndexedProperties, index: Index) ?CompletePropertyDescriptor {
             if (dense_value.items.len <= index) return null;
             return propertyDescriptorFromValue(dense_value.items[index]);
         },
-        .sparse => |sparse| {
-            return sparse.get(index);
+        .sparse_value => |sparse_value| {
+            const value = sparse_value.get(index) orelse return null;
+            return propertyDescriptorFromValue(value);
+        },
+        .sparse_property_descriptor => |sparse_property_descriptor| {
+            return sparse_property_descriptor.get(index);
         },
     }
 }
@@ -255,8 +339,11 @@ pub fn set(
             if (index >= dense_value.items.len) try dense_value.resize(allocator, index + 1);
             dense_value.items[index] = property_descriptor.value_or_accessor.value;
         },
-        .sparse => |*sparse| {
-            try sparse.put(allocator, index, property_descriptor);
+        .sparse_value => |*sparse_value| {
+            try sparse_value.put(allocator, index, property_descriptor.value_or_accessor.value);
+        },
+        .sparse_property_descriptor => |*sparse_property_descriptor| {
+            try sparse_property_descriptor.put(allocator, index, property_descriptor);
         },
     }
 }
@@ -272,8 +359,12 @@ pub fn remove(
         .dense_i32 => |*dense_i32| _ = dense_i32.pop().?,
         .dense_f64 => |*dense_f64| _ = dense_f64.pop().?,
         .dense_value => |*dense_value| _ = dense_value.pop().?,
-        .sparse => |*sparse| {
-            const removed = sparse.remove(index);
+        .sparse_value => |*sparse_value| {
+            const removed = sparse_value.remove(index);
+            std.debug.assert(removed);
+        },
+        .sparse_property_descriptor => |*sparse_property_descriptor| {
+            const removed = sparse_property_descriptor.remove(index);
             std.debug.assert(removed);
         },
     }

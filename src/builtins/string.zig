@@ -376,7 +376,7 @@ fn ownPropertyKeys(
     //     a. Append P to keys.
     switch (object.property_storage.indexed_properties.storage) {
         .none => {},
-        .sparse => |sparse| {
+        inline .sparse_value, .sparse_property_descriptor => |sparse| {
             var it = sparse.keyIterator();
             while (it.next()) |index| {
                 if (index.* < len) continue;

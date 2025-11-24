@@ -130,7 +130,7 @@ pub fn every(
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return .{ .done = true };
 }
@@ -189,7 +189,7 @@ pub fn fill(
             if (dense_value.items.len < end) dense_value.items.len = end_index;
             @memset(dense_value.items[start_index..end_index], value);
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
 }
 
@@ -291,7 +291,7 @@ pub fn findViaPredicate(
                     return .{ .continue_slow = std.math.sub(usize, index, 1) catch null };
             },
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return .{ .done = .{ .index = Value.from(-1), .value = .undefined } };
 }
@@ -348,7 +348,7 @@ pub fn forEach(
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return .done;
 }
@@ -404,7 +404,7 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
                 if (sameValueZero(search_element, value)) return true;
             }
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return false;
 }
@@ -460,7 +460,7 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
                 }
             }
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return Value.from(-1);
 }
@@ -517,7 +517,7 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
                 }
             }
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return Value.from(-1);
 }
@@ -553,7 +553,7 @@ pub fn reverse(object: *Object, len: u53) ?void {
         .dense_value => |dense_value| {
             std.mem.reverse(Value, dense_value.items);
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
 }
 
@@ -615,7 +615,7 @@ pub fn some(
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
-        .sparse => return null,
+        .sparse_value, .sparse_property_descriptor => return null,
     }
     return .{ .done = false };
 }

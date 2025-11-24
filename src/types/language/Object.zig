@@ -175,7 +175,8 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
             .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
             .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
             .dense_value => |dense_value| dense_value.items[index],
-            .sparse => |sparse| sparse.get(index).?.value_or_accessor.value,
+            .sparse_value => |sparse_value| sparse_value.get(index).?,
+            .sparse_property_descriptor => |sparse_property_descriptor| sparse_property_descriptor.get(index).?.value_or_accessor.value,
         };
     }
     const property_metadata = self.property_storage.shape.properties.get(property_key).?;
@@ -598,8 +599,8 @@ pub fn createNonEnumerableDataPropertyOrThrow(
         self.extensible() and for (self.property_storage.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
         } else true and switch (self.property_storage.indexed_properties.storage) {
-            .sparse => |sparse| blk: {
-                var it = sparse.valueIterator();
+            .sparse_property_descriptor => |sparse_property_descriptor| blk: {
+                var it = sparse_property_descriptor.valueIterator();
                 break :blk while (it.next()) |entry| {
                     if (!entry.attributes.configurable) break false;
                 } else true;
