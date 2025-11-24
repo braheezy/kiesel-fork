@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .quickjs = .{
-            .url = "git+https://github.com/bellard/quickjs#fcbf5ea2a63510f35f9ab2baadd59781be16a167",
-            .hash = "N-V-__8AADitMABpPfDZIvnItVuPnVL8lCiU2qSPbJtcrFJf",
+            .url = "git+https://github.com/bellard/quickjs#a77400796df93195e431216efa6e5344f40d08fe",
+            .hash = "N-V-__8AALrUMAD5T04FzeYsUVRR0UtRg1dGCLru2ehraL4q",
         },
     },
     .paths = .{
