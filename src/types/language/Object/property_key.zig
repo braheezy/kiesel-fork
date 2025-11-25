@@ -38,7 +38,7 @@ pub const PropertyKey = union(enum) {
     pub inline fn from(value: anytype) PropertyKey {
         const T = @TypeOf(value);
         if (isZigString(T)) {
-            if (comptime !std.meta.isError(std.fmt.parseUnsigned(IntegerIndex, value, 10))) {
+            if (comptime !std.meta.isError(utils.parseDigits(IntegerIndex, value, 10))) {
                 @compileError("Creating a numeric PropertyKey from a string literal is not supported, use comptime_int instead.");
             }
             return .{ .string = String.fromLiteral(value) };
@@ -48,7 +48,7 @@ pub const PropertyKey = union(enum) {
                     // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
                     //        are not canonical.
                     if (!value.isAscii()) return .{ .string = value };
-                    if (std.fmt.parseUnsigned(IntegerIndex, value.asAscii(), 10)) |integer_index| {
+                    if (utils.parseDigits(IntegerIndex, value.asAscii(), 10)) |integer_index| {
                         return .{ .integer_index = integer_index };
                     } else |_| {
                         return .{ .string = value };
