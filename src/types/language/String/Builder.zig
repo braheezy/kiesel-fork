@@ -82,7 +82,8 @@ fn buildImpl(self: Builder, allocator: std.mem.Allocator) std.mem.Allocator.Erro
             is_ascii &= string.isAscii();
             capacity += string.length;
         },
-        .char => {
+        .char => |char| {
+            is_ascii &= char <= 0x7F;
             capacity += 1;
         },
         .code_unit => |code_unit| {
