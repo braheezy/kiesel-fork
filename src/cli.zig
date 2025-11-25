@@ -682,9 +682,11 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .blue);
     switch (value.type()) {
         .number => try writer.print(" (type: {t})", .{value.asNumber()}),
-        .string => try writer.print(" (ptr: 0x{x}, type: {t})", .{
+        .string => try writer.print(" (ptr: 0x{x}, type: {t}, length: {d}, hash: 0x{x})", .{
             @intFromPtr(value.asString()),
             value.asString().data,
+            value.asString().length,
+            value.asString().hash,
         }),
         .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
         .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
