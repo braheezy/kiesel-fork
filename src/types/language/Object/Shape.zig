@@ -68,7 +68,10 @@ pub const PropertyLookupCacheEntry = struct {
     index: PropertyIndex,
 };
 
-pub const PropertyIndex = enum(u32) { _ };
+pub const PropertyIndex = enum(u32) {
+    zero = 0,
+    _,
+};
 
 pub const PropertyMetadata = struct {
     type: PropertyType,
@@ -77,6 +80,8 @@ pub const PropertyMetadata = struct {
 };
 
 const TransitionCount = enum(u8) {
+    zero = 0,
+
     /// This shape is no longer transitioning.
     unique = std.math.maxInt(u8),
 
@@ -111,8 +116,8 @@ is_htmldda: if (build_options.enable_annex_b) bool else void,
 pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
-        .transition_count = @enumFromInt(0),
-        .next_index = @enumFromInt(0),
+        .transition_count = .zero,
+        .next_index = .zero,
         .transitions = .empty,
         .properties = .empty,
         .prototype = null,
@@ -126,6 +131,10 @@ pub fn deinit(self: *Shape, allocator: std.mem.Allocator) void {
     self.transitions.deinit(allocator);
     self.properties.deinit(allocator);
     allocator.destroy(self);
+}
+
+pub fn isUnique(self: *const Shape) bool {
+    return self.transition_count == .unique;
 }
 
 pub fn makeUnique(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
@@ -178,17 +187,10 @@ pub fn setPrototype(
     return shape;
 }
 
-pub fn setPrototypeWithoutTransition(
-    self: *Shape,
-    allocator: std.mem.Allocator,
-    prototype: ?*Object,
-) std.mem.Allocator.Error!*Shape {
-    const shape = switch (self.transition_count) {
-        .unique => self,
-        else => try self.makeUnique(allocator),
-    };
-    shape.prototype = prototype;
-    return shape;
+pub fn setPrototypeWithoutTransition(self: *Shape, prototype: ?*Object) void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    self.prototype = prototype;
 }
 
 pub fn setNonExtensible(
@@ -204,16 +206,10 @@ pub fn setNonExtensible(
     return shape;
 }
 
-pub fn setNonExtensibleWithoutTransition(
-    self: *Shape,
-    allocator: std.mem.Allocator,
-) std.mem.Allocator.Error!*Shape {
-    const shape = switch (self.transition_count) {
-        .unique => self,
-        else => try self.makeUnique(allocator),
-    };
-    shape.extensible = false;
-    return shape;
+pub fn setNonExtensibleWithoutTransition(self: *Shape) void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    self.extensible = false;
 }
 
 pub fn setIsHTMLDDA(
@@ -229,16 +225,10 @@ pub fn setIsHTMLDDA(
     return shape;
 }
 
-pub fn setIsHTMLDDAWithoutTransition(
-    self: *Shape,
-    allocator: std.mem.Allocator,
-) std.mem.Allocator.Error!*Shape {
-    const shape = switch (self.transition_count) {
-        .unique => self,
-        else => try self.makeUnique(allocator),
-    };
-    shape.is_htmldda = true;
-    return shape;
+pub fn setIsHTMLDDAWithoutTransition(self: *Shape) void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    self.is_htmldda = true;
 }
 
 pub fn setProperty(
@@ -256,9 +246,9 @@ pub fn setProperty(
         }),
     };
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
-    if (property_gop.found_existing) {
+    if (property_gop.found_existing and property_type == property_gop.value_ptr.type) {
         property_gop.value_ptr.*.attributes = attributes;
-        if (property_type == property_gop.value_ptr.type) return shape;
+        return shape;
     }
     property_gop.value_ptr.* = .{
         .type = property_type,
@@ -278,26 +268,23 @@ pub fn setPropertyWithoutTransition(
     property_key: PropertyKey,
     attributes: Attributes,
     property_type: PropertyType,
-) std.mem.Allocator.Error!*Shape {
-    const shape = switch (self.transition_count) {
-        .unique => self,
-        else => try self.makeUnique(allocator),
-    };
-    const property_gop = try shape.properties.getOrPut(allocator, property_key);
-    if (property_gop.found_existing) {
+) std.mem.Allocator.Error!void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    const property_gop = try self.properties.getOrPut(allocator, property_key);
+    if (property_gop.found_existing and property_type == property_gop.value_ptr.type) {
         property_gop.value_ptr.*.attributes = attributes;
-        if (property_type == property_gop.value_ptr.type) return shape;
+        return;
     }
     property_gop.value_ptr.* = .{
         .type = property_type,
-        .index = shape.next_index,
+        .index = self.next_index,
         .attributes = attributes,
     };
-    shape.next_index = switch (property_type) {
-        .value => @enumFromInt(@intFromEnum(shape.next_index) + 1),
-        .accessor => @enumFromInt(@intFromEnum(shape.next_index) + 2),
+    self.next_index = switch (property_type) {
+        .value => @enumFromInt(@intFromEnum(self.next_index) + 1),
+        .accessor => @enumFromInt(@intFromEnum(self.next_index) + 2),
     };
-    return shape;
 }
 
 pub fn deleteProperty(
@@ -315,16 +302,9 @@ pub fn deleteProperty(
     return shape;
 }
 
-pub fn deletePropertyWithoutTransition(
-    self: *Shape,
-    allocator: std.mem.Allocator,
-    property_key: PropertyKey,
-) std.mem.Allocator.Error!*Shape {
-    const shape = switch (self.transition_count) {
-        .unique => self,
-        else => try self.makeUnique(allocator),
-    };
-    const removed = shape.properties.orderedRemove(property_key);
+pub fn deletePropertyWithoutTransition(self: *Shape, property_key: PropertyKey) void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    const removed = self.properties.orderedRemove(property_key);
     std.debug.assert(removed);
-    return shape;
 }

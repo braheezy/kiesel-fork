@@ -344,7 +344,10 @@ pub fn defineBuiltinAccessorWithAttributes(
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
-    self.property_storage.shape = try self.property_storage.shape.setPropertyWithoutTransition(
+    if (!self.property_storage.shape.isUnique()) {
+        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    }
+    try self.property_storage.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes_,
@@ -448,7 +451,10 @@ pub fn defineBuiltinPropertyWithAttributes(
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
-    self.property_storage.shape = try self.property_storage.shape.setPropertyWithoutTransition(
+    if (!self.property_storage.shape.isUnique()) {
+        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    }
+    try self.property_storage.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
@@ -458,7 +464,7 @@ pub fn defineBuiltinPropertyWithAttributes(
 }
 
 pub fn defineBuiltinPropertyLazy(
-    object: *Object,
+    self: *Object,
     agent: *Agent,
     comptime name: []const u8,
     comptime initializer: fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
@@ -466,14 +472,17 @@ pub fn defineBuiltinPropertyLazy(
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
-    object.property_storage.shape = try object.property_storage.shape.setPropertyWithoutTransition(
+    if (!self.property_storage.shape.isUnique()) {
+        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    }
+    try self.property_storage.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
         .value,
     );
-    try object.property_storage.properties.append(agent.gc_allocator, .{ .value = undefined });
-    try object.property_storage.lazy_properties.putNoClobber(
+    try self.property_storage.properties.append(agent.gc_allocator, .{ .value = undefined });
+    try self.property_storage.lazy_properties.putNoClobber(
         agent.gc_allocator,
         property_key,
         .{
