@@ -209,10 +209,7 @@ pub fn set(
                 allocator,
                 property_key,
                 attributes,
-                switch (value_or_accessor) {
-                    .value => .{ .value = @enumFromInt(self.values.items.len) },
-                    .accessor => .{ .accessor = @enumFromInt(self.accessors.items.len) },
-                },
+                std.meta.activeTag(value_or_accessor),
             );
         }
         if (property_type_change) {
@@ -232,25 +229,15 @@ pub fn set(
             }
         }
     } else {
+        self.shape = try self.shape.setProperty(
+            allocator,
+            property_key,
+            attributes,
+            std.meta.activeTag(value_or_accessor),
+        );
         switch (value_or_accessor) {
-            .value => |value| {
-                self.shape = try self.shape.setProperty(
-                    allocator,
-                    property_key,
-                    attributes,
-                    .{ .value = @enumFromInt(self.values.items.len) },
-                );
-                try self.values.append(allocator, value);
-            },
-            .accessor => |accessor| {
-                self.shape = try self.shape.setProperty(
-                    allocator,
-                    property_key,
-                    attributes,
-                    .{ .accessor = @enumFromInt(self.accessors.items.len) },
-                );
-                try self.accessors.append(allocator, accessor);
-            },
+            .value => |value| try self.values.append(allocator, value),
+            .accessor => |accessor| try self.accessors.append(allocator, accessor),
         }
     }
 }
