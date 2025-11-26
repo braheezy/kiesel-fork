@@ -114,15 +114,15 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
             if (lookup_cache_entry.*) |cache| {
                 if (base_object.property_storage.shape == cache.shape) {
-                    switch (cache.index) {
-                        .value => |index| {
-                            const value = base_object.property_storage.values.items[@intFromEnum(index)];
+                    switch (cache.type) {
+                        .value => {
+                            const value = base_object.property_storage.properties.items[@intFromEnum(cache.index)].value;
                             return value;
                         },
-                        .accessor => |index| {
-                            const accessor = base_object.property_storage.accessors.items[@intFromEnum(index)];
+                        .accessor => {
+                            const maybe_getter = base_object.property_storage.properties.items[@intFromEnum(cache.index)].getter_or_setter;
                             // Excerpt from ordinaryGet()
-                            const getter = accessor.get orelse return .undefined;
+                            const getter = maybe_getter orelse return .undefined;
                             const receiver = self.getThisValue();
                             return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
                         },
@@ -156,9 +156,11 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         );
 
         if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
-            if (base_object.property_storage.shape.properties.get(property_key)) |property_metadata| {
+            const shape = base_object.property_storage.shape;
+            if (shape.properties.get(property_key)) |property_metadata| {
                 lookup_cache_entry.* = .{
-                    .shape = base_object.property_storage.shape,
+                    .shape = shape,
+                    .type = property_metadata.type,
                     .index = property_metadata.index,
                 };
             }

@@ -64,18 +64,14 @@ pub const Transition = union(enum) {
 
 pub const PropertyLookupCacheEntry = struct {
     shape: *const Shape,
+    type: PropertyType,
     index: PropertyIndex,
 };
 
-pub const PropertyIndex = union(PropertyType) {
-    pub const Value = enum(u32) { _ };
-    pub const Accessor = enum(u32) { _ };
-
-    value: PropertyIndex.Value,
-    accessor: PropertyIndex.Accessor,
-};
+pub const PropertyIndex = enum(u32) { _ };
 
 pub const PropertyMetadata = struct {
+    type: PropertyType,
     index: PropertyIndex,
     attributes: Attributes,
 };
@@ -99,8 +95,7 @@ const TransitionCount = enum(u8) {
 };
 
 transition_count: TransitionCount,
-next_value_index: PropertyIndex.Value,
-next_accessor_index: PropertyIndex.Accessor,
+next_index: PropertyIndex,
 transitions: Transition.HashMapUnmanaged(*Shape),
 properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
 
@@ -117,8 +112,7 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
         .transition_count = @enumFromInt(0),
-        .next_value_index = @enumFromInt(0),
-        .next_accessor_index = @enumFromInt(0),
+        .next_index = @enumFromInt(0),
         .transitions = .empty,
         .properties = .empty,
         .prototype = null,
@@ -146,8 +140,7 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
     errdefer allocator.destroy(shape);
     shape.* = .{
         .transition_count = self.transition_count,
-        .next_value_index = self.next_value_index,
-        .next_accessor_index = self.next_accessor_index,
+        .next_index = self.next_index,
         .transitions = .empty,
         .properties = try self.properties.clone(allocator),
         .prototype = self.prototype,
@@ -265,20 +258,16 @@ pub fn setProperty(
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
-        if (property_type == property_gop.value_ptr.index) return shape;
+        if (property_type == property_gop.value_ptr.type) return shape;
     }
     property_gop.value_ptr.* = .{
-        .index = switch (property_type) {
-            .value => blk: {
-                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
-                break :blk .{ .value = shape.next_value_index };
-            },
-            .accessor => blk: {
-                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
-                break :blk .{ .accessor = shape.next_accessor_index };
-            },
-        },
+        .type = property_type,
+        .index = shape.next_index,
         .attributes = attributes,
+    };
+    shape.next_index = switch (property_type) {
+        .value => @enumFromInt(@intFromEnum(shape.next_index) + 1),
+        .accessor => @enumFromInt(@intFromEnum(shape.next_index) + 2),
     };
     return shape;
 }
@@ -297,20 +286,16 @@ pub fn setPropertyWithoutTransition(
     const property_gop = try shape.properties.getOrPut(allocator, property_key);
     if (property_gop.found_existing) {
         property_gop.value_ptr.*.attributes = attributes;
-        if (property_type == property_gop.value_ptr.index) return shape;
+        if (property_type == property_gop.value_ptr.type) return shape;
     }
     property_gop.value_ptr.* = .{
-        .index = switch (property_type) {
-            .value => blk: {
-                defer shape.next_value_index = @enumFromInt(@intFromEnum(shape.next_value_index) + 1);
-                break :blk .{ .value = shape.next_value_index };
-            },
-            .accessor => blk: {
-                defer shape.next_accessor_index = @enumFromInt(@intFromEnum(shape.next_accessor_index) + 1);
-                break :blk .{ .accessor = shape.next_accessor_index };
-            },
-        },
+        .type = property_type,
+        .index = shape.next_index,
         .attributes = attributes,
+    };
+    shape.next_index = switch (property_type) {
+        .value => @enumFromInt(@intFromEnum(shape.next_index) + 1),
+        .accessor => @enumFromInt(@intFromEnum(shape.next_index) + 2),
     };
     return shape;
 }

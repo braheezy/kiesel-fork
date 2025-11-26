@@ -916,15 +916,15 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
 
     if (lookup_cache_entry.*) |cache| {
         if (base_object.property_storage.shape == cache.shape) {
-            switch (cache.index) {
-                .value => |index| {
-                    self.result = base_object.property_storage.values.items[@intFromEnum(index)];
+            switch (cache.type) {
+                .value => {
+                    self.result = base_object.property_storage.properties.items[@intFromEnum(cache.index)].value;
                     return;
                 },
-                .accessor => |index| {
-                    const accessor = base_object.property_storage.accessors.items[@intFromEnum(index)];
+                .accessor => {
+                    const maybe_getter = base_object.property_storage.properties.items[@intFromEnum(cache.index)].getter_or_setter;
                     // Excerpt from ordinaryGet()
-                    if (accessor.get) |getter| {
+                    if (maybe_getter) |getter| {
                         self.result = try Value.from(getter).callAssumeCallable(self.agent, base_value, &.{});
                     } else {
                         self.result = .undefined;
@@ -944,9 +944,11 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
         property_key,
         base_value,
     );
-    if (base_object.property_storage.shape.properties.get(property_key)) |property_metadata| {
+    const shape = base_object.property_storage.shape;
+    if (shape.properties.get(property_key)) |property_metadata| {
         lookup_cache_entry.* = .{
-            .shape = base_object.property_storage.shape,
+            .shape = shape,
+            .type = property_metadata.type,
             .index = property_metadata.index,
         };
     }

@@ -181,8 +181,8 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
     }
     const property_metadata = self.property_storage.shape.properties.get(property_key).?;
     std.debug.assert(!self.property_storage.lazy_properties.contains(property_key));
-    return switch (property_metadata.index) {
-        .value => |index| self.property_storage.values.items[@intFromEnum(index)],
+    return switch (property_metadata.type) {
+        .value => self.property_storage.properties.items[@intFromEnum(property_metadata.index)].value,
         .accessor => unreachable,
     };
 }
@@ -350,9 +350,11 @@ pub fn defineBuiltinAccessorWithAttributes(
         attributes_,
         .accessor,
     );
-    try self.property_storage.accessors.append(agent.gc_allocator, .{
-        .get = if (@TypeOf(getter_function) != void) &getter_function.object else null,
-        .set = if (@TypeOf(setter_function) != void) &setter_function.object else null,
+    try self.property_storage.properties.append(agent.gc_allocator, .{
+        .getter_or_setter = if (@TypeOf(getter_function) != void) &getter_function.object else null,
+    });
+    try self.property_storage.properties.append(agent.gc_allocator, .{
+        .getter_or_setter = if (@TypeOf(setter_function) != void) &setter_function.object else null,
     });
 }
 
@@ -452,7 +454,7 @@ pub fn defineBuiltinPropertyWithAttributes(
         attributes,
         .value,
     );
-    try self.property_storage.values.append(agent.gc_allocator, value);
+    try self.property_storage.properties.append(agent.gc_allocator, .{ .value = value });
 }
 
 pub fn defineBuiltinPropertyLazy(
@@ -470,7 +472,7 @@ pub fn defineBuiltinPropertyLazy(
         attributes,
         .value,
     );
-    try object.property_storage.values.append(agent.gc_allocator, undefined);
+    try object.property_storage.properties.append(agent.gc_allocator, .{ .value = undefined });
     try object.property_storage.lazy_properties.putNoClobber(
         agent.gc_allocator,
         property_key,

@@ -641,14 +641,14 @@ pub fn ordinarySet(
             });
             return true;
         };
-        switch (property_metadata.index) {
-            .value => |index| {
+        switch (property_metadata.type) {
+            .value => {
                 if (!property_metadata.attributes.writable) return false;
-                object.property_storage.values.items[@intFromEnum(index)] = value;
+                object.property_storage.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
             },
-            .accessor => |index| {
-                const accessor = object.property_storage.accessors.items[@intFromEnum(index)];
-                const setter = accessor.set orelse return false;
+            .accessor => {
+                const maybe_setter = object.property_storage.properties.items[@intFromEnum(property_metadata.index) + 1].getter_or_setter;
+                const setter = maybe_setter orelse return false;
                 _ = try Value.from(setter).callAssumeCallable(agent, receiver, &.{value});
             },
         }

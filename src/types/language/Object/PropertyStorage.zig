@@ -15,8 +15,10 @@ const Value = types.Value;
 const PropertyStorage = @This();
 
 shape: *Object.Shape,
-values: std.ArrayList(Value),
-accessors: std.ArrayList(Accessor),
+properties: std.ArrayList(union {
+    value: Value,
+    getter_or_setter: ?*Object,
+}),
 indexed_properties: Object.IndexedProperties,
 lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
 
@@ -175,14 +177,28 @@ pub fn getCreateIntrinsicIfNeeded(
         const lazy_property = kv.value;
         const realm = lazy_property.realm;
         const agent = realm.agent;
-        switch (property_metadata.index) {
-            .value => |index| self.values.items[@intFromEnum(index)] = try lazy_property.initializer.value(agent, realm),
-            .accessor => |index| self.accessors.items[@intFromEnum(index)] = try lazy_property.initializer.accessor(agent, realm),
+        switch (property_metadata.type) {
+            .value => {
+                const value = try lazy_property.initializer.value(agent, realm);
+                self.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
+            },
+            .accessor => {
+                const accessor = try lazy_property.initializer.accessor(agent, realm);
+                self.properties.items[@intFromEnum(property_metadata.index)] = .{ .getter_or_setter = accessor.get };
+                self.properties.items[@intFromEnum(property_metadata.index) + 1] = .{ .getter_or_setter = accessor.set };
+            },
         }
     }
-    const value_or_accessor: ValueOrAccessor = switch (property_metadata.index) {
-        .value => |index| .{ .value = self.values.items[@intFromEnum(index)] },
-        .accessor => |index| .{ .accessor = self.accessors.items[@intFromEnum(index)] },
+    const value_or_accessor: ValueOrAccessor = switch (property_metadata.type) {
+        .value => .{
+            .value = self.properties.items[@intFromEnum(property_metadata.index)].value,
+        },
+        .accessor => .{
+            .accessor = .{
+                .get = self.properties.items[@intFromEnum(property_metadata.index)].getter_or_setter,
+                .set = self.properties.items[@intFromEnum(property_metadata.index) + 1].getter_or_setter,
+            },
+        },
     };
     return .{
         .value_or_accessor = value_or_accessor,
@@ -203,7 +219,7 @@ pub fn set(
     const attributes = property_descriptor.attributes;
     if (self.shape.properties.get(property_key)) |property_metadata| {
         const property_attributes_change = property_metadata.attributes != attributes;
-        const property_type_change = std.meta.activeTag(property_metadata.index) != std.meta.activeTag(value_or_accessor);
+        const property_type_change = property_metadata.type != std.meta.activeTag(value_or_accessor);
         if (property_attributes_change or property_type_change) {
             self.shape = try self.shape.setProperty(
                 allocator,
@@ -214,18 +230,33 @@ pub fn set(
         }
         if (property_type_change) {
             // Clear value in the previous storage list
-            switch (property_metadata.index) {
-                .value => |index| self.values.items[@intFromEnum(index)] = undefined,
-                .accessor => |index| self.accessors.items[@intFromEnum(index)] = undefined,
+            switch (property_metadata.type) {
+                .value => {
+                    self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+                },
+                .accessor => {
+                    self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+                    self.properties.items[@intFromEnum(property_metadata.index) + 1] = undefined;
+                },
             }
             switch (value_or_accessor) {
-                .value => |value| try self.values.append(allocator, value),
-                .accessor => |accessor| try self.accessors.append(allocator, accessor),
+                .value => |value| {
+                    try self.properties.append(allocator, .{ .value = value });
+                },
+                .accessor => |accessor| {
+                    try self.properties.append(allocator, .{ .getter_or_setter = accessor.get });
+                    try self.properties.append(allocator, .{ .getter_or_setter = accessor.set });
+                },
             }
         } else {
-            switch (property_metadata.index) {
-                .value => |index| self.values.items[@intFromEnum(index)] = value_or_accessor.value,
-                .accessor => |index| self.accessors.items[@intFromEnum(index)] = value_or_accessor.accessor,
+            switch (value_or_accessor) {
+                .value => |value| {
+                    self.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
+                },
+                .accessor => |accessor| {
+                    self.properties.items[@intFromEnum(property_metadata.index)] = .{ .getter_or_setter = accessor.get };
+                    self.properties.items[@intFromEnum(property_metadata.index) + 1] = .{ .getter_or_setter = accessor.set };
+                },
             }
         }
     } else {
@@ -236,8 +267,13 @@ pub fn set(
             std.meta.activeTag(value_or_accessor),
         );
         switch (value_or_accessor) {
-            .value => |value| try self.values.append(allocator, value),
-            .accessor => |accessor| try self.accessors.append(allocator, accessor),
+            .value => |value| {
+                try self.properties.append(allocator, .{ .value = value });
+            },
+            .accessor => |accessor| {
+                try self.properties.append(allocator, .{ .getter_or_setter = accessor.get });
+                try self.properties.append(allocator, .{ .getter_or_setter = accessor.set });
+            },
         }
     }
 }
@@ -256,8 +292,13 @@ pub fn remove(
     // deletions part of the regular transition chain without making them unique and invalidating
     // ICs. Additionally we save the cost of moving all elements after this one around, at the
     // memory cost of wasting one element.
-    switch (property_metadata.index) {
-        .value => |index| self.values.items[@intFromEnum(index)] = undefined,
-        .accessor => |index| self.accessors.items[@intFromEnum(index)] = undefined,
+    switch (property_metadata.type) {
+        .value => {
+            self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+        },
+        .accessor => {
+            self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+            self.properties.items[@intFromEnum(property_metadata.index) + 1] = undefined;
+        },
     }
 }
