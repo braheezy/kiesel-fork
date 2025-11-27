@@ -42,6 +42,7 @@ const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
+const ordinaryFunctionCreateFast = builtins.ordinaryFunctionCreateFast;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performEval = builtins.performEval;
 const setFunctionName = builtins.setFunctionName;
@@ -684,72 +685,42 @@ pub fn instantiateOrdinaryFunctionObject(
     env: Environment,
     private_env: ?*PrivateEnvironment,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
-    const realm = agent.currentRealm();
-
-    // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
-    if (function_declaration.identifier) |identifier| {
-        // 1. Let name be the StringValue of BindingIdentifier.
-        const name = identifier;
-
-        // 2. Let sourceText be the source text matched by FunctionDeclaration.
-        const source_text = function_declaration.source_text;
-
-        // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
-        //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-        const function = try ordinaryFunctionCreate(
-            agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
-            source_text,
-            function_declaration.formal_parameters,
-            function_declaration.function_body,
-            .non_lexical_this,
-            env,
-            private_env,
-        );
-
-        // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(
-            agent,
-            &function.object,
-            PropertyKey.from(try String.fromUtf8(agent, name)),
-            null,
-        );
-
-        // 5. Perform MakeConstructor(F).
-        try makeConstructor(agent, &function.object, .{});
-
-        // 6. Return F.
-        return function;
-    }
     // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
     // NOTE: An anonymous FunctionDeclaration can only occur as part of an export default
     // declaration, and its function code is therefore always strict mode code.
-    else {
-        // 1. Let sourceText be the source text matched by FunctionDeclaration.
-        const source_text = function_declaration.source_text;
+    // 1. Let sourceText be the source text matched by FunctionDeclaration.
+    // 2. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+    //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
+    // 3. Perform SetFunctionName(F, "default").
+    // 4. Perform MakeConstructor(F).
+    // 5. Return F.
 
-        // 2. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
-        //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-        const function = try ordinaryFunctionCreate(
-            agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
-            source_text,
-            function_declaration.formal_parameters,
-            function_declaration.function_body,
-            .non_lexical_this,
-            env,
-            private_env,
-        );
+    // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
+    // 1. Let name be the StringValue of BindingIdentifier.
+    const name = if (function_declaration.identifier) |identifier|
+        try String.fromUtf8(agent, identifier)
+    else
+        String.fromLiteral("default");
 
-        // 3. Perform SetFunctionName(F, "default").
-        try setFunctionName(agent, &function.object, PropertyKey.from("default"), null);
+    // 2. Let sourceText be the source text matched by FunctionDeclaration.
+    const source_text = function_declaration.source_text;
 
-        // 4. Perform MakeConstructor(F).
-        try makeConstructor(agent, &function.object, .{});
+    // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+    //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
+    // 4. Perform SetFunctionName(F, name).
+    // 5. Perform MakeConstructor(F).
+    const function = try ordinaryFunctionCreateFast(
+        agent,
+        source_text,
+        function_declaration.formal_parameters,
+        function_declaration.function_body,
+        env,
+        private_env,
+        name,
+    );
 
-        // 5. Return F.
-        return function;
-    }
+    // 6. Return F.
+    return function;
 }
 
 /// 15.2.5 Runtime Semantics: InstantiateOrdinaryFunctionExpression
@@ -759,8 +730,6 @@ pub fn instantiateOrdinaryFunctionExpression(
     function_expression: ast.FunctionExpression,
     default_name: ?[]const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
-    const realm = agent.currentRealm();
-
     // FunctionExpression : function BindingIdentifier ( FormalParameters ) { FunctionBody }
     if (function_expression.identifier) |identifier| {
         // 1. Assert: name is not present.
@@ -786,22 +755,17 @@ pub fn instantiateOrdinaryFunctionExpression(
 
         // 8. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, funcEnv, privateEnv).
-        const closure = try ordinaryFunctionCreate(
+        // 9. Perform SetFunctionName(closure, name).
+        // 10. Perform MakeConstructor(closure).
+        const closure = try ordinaryFunctionCreateFast(
             agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
             source_text,
             function_expression.formal_parameters,
             function_expression.function_body,
-            .non_lexical_this,
             .{ .declarative_environment = func_env },
             private_env,
+            name,
         );
-
-        // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
-
-        // 10. Perform MakeConstructor(closure).
-        try makeConstructor(agent, &closure.object, .{});
 
         // 11. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(name, Value.from(&closure.object));
@@ -828,22 +792,17 @@ pub fn instantiateOrdinaryFunctionExpression(
 
         // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-        const closure = try ordinaryFunctionCreate(
+        // 6. Perform SetFunctionName(closure, name).
+        // 7. Perform MakeConstructor(closure).
+        const closure = try ordinaryFunctionCreateFast(
             agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
             source_text,
             function_expression.formal_parameters,
             function_expression.function_body,
-            .non_lexical_this,
             env,
             private_env,
+            name,
         );
-
-        // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(agent, &closure.object, PropertyKey.from(name), null);
-
-        // 7. Perform MakeConstructor(closure).
-        try makeConstructor(agent, &closure.object, .{});
 
         // 8. Return closure.
         return closure;

@@ -909,6 +909,13 @@ pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?*Object) std.mem.Allocato
     return &o.object;
 }
 
+pub fn ordinaryObjectCreateFast(agent: *Agent) std.mem.Allocator.Error!*Object {
+    const realm = agent.currentRealm();
+    const shape = try realm.shapes.ordinaryObject();
+    const object = try builtins.Object.createWithShape(agent, .{ .shape = shape });
+    return &object.object;
+}
+
 /// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinaryobjectcreate
 pub fn ordinaryObjectCreateWithType(

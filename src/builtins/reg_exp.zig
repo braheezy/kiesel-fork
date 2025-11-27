@@ -20,7 +20,8 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const arrayCreate = builtins.arrayCreate;
+const arrayCreateFast = builtins.arrayCreateFast;
+const arrayCreateFastWithShape = builtins.arrayCreateFastWithShape;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createRegExpStringIterator = builtins.createRegExpStringIterator;
@@ -384,17 +385,15 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
     // 20. Let A be ! ArrayCreate(n + 1).
     // 21. Assert: The mathematical value of A's "length" property is n + 1.
-    const array = arrayCreate(agent, @intCast(n + 1), null) catch |err| try noexcept(err);
+    const realm = agent.currentRealm();
+    const array_shape, const array_indices = try realm.shapes.regExpExecObject();
+    const array = try arrayCreateFastWithShape(agent, @intCast(n + 1), array_shape);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
-    try array.object.createDataPropertyDirect(
-        agent,
-        PropertyKey.from("index"),
-        Value.from(last_index),
-    );
+    array.object.setValueAtPropertyIndex(array_indices.index, Value.from(last_index));
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
-    try array.object.createDataPropertyDirect(agent, PropertyKey.from("input"), Value.from(string));
+    array.object.setValueAtPropertyIndex(array_indices.input, Value.from(string));
 
     // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
     match = .{ .start_index = last_index, .end_index = end_index };
@@ -434,7 +433,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     };
 
     // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    try array.object.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
+    array.object.setValueAtPropertyIndex(array_indices.groups, groups);
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
@@ -627,7 +626,7 @@ fn makeMatchIndicesIndexPairArray(
     std.debug.assert(group_names.len == n - 1);
 
     // 5. Let A be ! ArrayCreate(n).
-    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+    const array = try arrayCreateFast(agent, 0);
 
     // 6. If hasGroups is true, then
     const groups: Value = if (has_groups) blk: {
@@ -1173,7 +1172,7 @@ pub const prototype = struct {
             try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
             // c. Let A be ! ArrayCreate(0).
-            const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+            const array = try arrayCreateFast(agent, 0);
 
             // d. Let n be 0.
             var n: u53 = 0;
@@ -1668,7 +1667,7 @@ pub const prototype = struct {
         );
 
         // 11. Let A be ! ArrayCreate(0).
-        const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+        const array = try arrayCreateFast(agent, 0);
 
         // 12. Let lengthA be 0.
         var length_array: u32 = 0;

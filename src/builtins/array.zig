@@ -134,6 +134,29 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
     return array;
 }
 
+pub fn arrayCreateFast(agent: *Agent, length: u32) std.mem.Allocator.Error!*Array {
+    const realm = agent.currentRealm();
+    const shape = try realm.shapes.array();
+    return arrayCreateFastWithShape(agent, length, shape);
+}
+
+pub fn arrayCreateFastWithShape(
+    agent: *Agent,
+    length: u32,
+    shape: *Object.Shape,
+) std.mem.Allocator.Error!*Array {
+    return Array.createWithShape(agent, .{
+        .shape = shape,
+        .internal_methods = .initComptime(.{
+            .defineOwnProperty = defineOwnProperty,
+        }),
+        .fields = .{
+            .length = length,
+            .length_writable = true,
+        },
+    });
+}
+
 /// 10.4.2.3 ArraySpeciesCreate ( originalArray, length )
 /// https://tc39.es/ecma262/#sec-arrayspeciescreate
 pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) Agent.Error!*Object {

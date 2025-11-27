@@ -902,6 +902,57 @@ pub fn ordinaryFunctionCreate(
     return function;
 }
 
+pub fn ordinaryFunctionCreateFast(
+    agent: *Agent,
+    source_text: []const u8,
+    parameter_list: ast.FormalParameters,
+    body: ast.FunctionBody,
+    env: Environment,
+    private_env: ?*PrivateEnvironment,
+    name: *const String,
+) std.mem.Allocator.Error!*ECMAScriptFunction {
+    const length: u53 = @intCast(parameter_list.expectedArgumentCount());
+    const strict = body.strict;
+
+    const realm = agent.currentRealm();
+    const function_shape, const function_indices = try realm.shapes.ordinaryFunction();
+    const prototype_shape, const prototype_indices = try realm.shapes.ordinaryFunctionPrototype();
+
+    const function = try ECMAScriptFunction.createWithShape(agent, .{
+        .shape = function_shape,
+        .internal_methods = .initComptime(.{
+            .call = call,
+            .construct = construct,
+        }),
+        .fields = .{
+            .source_text = source_text,
+            .formal_parameters = parameter_list,
+            .ecmascript_code = body,
+            .strict = strict,
+            .this_mode = if (strict) .strict else .global,
+            .is_class_constructor = false,
+            .environment = env,
+            .private_environment = private_env,
+            .script_or_module = agent.getActiveScriptOrModule().?,
+            .realm = realm,
+            .home_object = null,
+            .fields = &.{},
+            .private_methods = &.{},
+            .class_field_initializer_name = null,
+            .constructor_kind = .base,
+        },
+    });
+
+    const prototype = try builtins.Object.createWithShape(agent, .{ .shape = prototype_shape });
+    prototype.object.setValueAtPropertyIndex(prototype_indices.constructor, Value.from(&function.object));
+
+    function.object.setValueAtPropertyIndex(function_indices.length, Value.from(length));
+    function.object.setValueAtPropertyIndex(function_indices.name, Value.from(name));
+    function.object.setValueAtPropertyIndex(function_indices.prototype, Value.from(&prototype.object));
+
+    return function;
+}
+
 /// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
 pub fn addRestrictedFunctionProperties(

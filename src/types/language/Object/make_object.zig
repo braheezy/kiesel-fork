@@ -42,6 +42,15 @@ pub fn MakeObject(
         internal_methods: *const InternalMethods = .default,
     };
 
+    const ArgsWithShape = if (has_fields) struct {
+        fields: options.Fields,
+        shape: *Object.Shape,
+        internal_methods: *const InternalMethods = .default,
+    } else struct {
+        shape: *Object.Shape,
+        internal_methods: *const InternalMethods = .default,
+    };
+
     return struct {
         const Self = @This();
 
@@ -77,17 +86,56 @@ pub fn MakeObject(
             if (has_is_htmldda and args.is_htmldda) {
                 try self.object.setIsHTMLDDA(agent);
             }
-            if (build_options.enable_libgc and options.finalizer != null) {
-                const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(void));
-                finalizer_data.* = .{ .data = {} };
-                gc.registerFinalizer(self, finalizer_data, struct {
-                    fn finalizer(ptr: *anyopaque, _: *void) void {
-                        const self_: *Self = @ptrCast(@alignCast(ptr));
-                        options.finalizer.?(&self_.object);
-                    }
-                }.finalizer);
+            if (build_options.enable_libgc) {
+                if (options.finalizer) |finalizer| {
+                    try self.addFinalizer(agent, finalizer);
+                }
             }
             return self;
+        }
+
+        pub fn createWithShape(agent: *Agent, args: ArgsWithShape) std.mem.Allocator.Error!*Self {
+            const self = try agent.gc_allocator.create(Self);
+            errdefer agent.gc_allocator.destroy(self);
+            self.* = .{
+                .fields = if (has_fields) args.fields,
+                .object = .{
+                    .tag = options.tag,
+                    .internal_methods = args.internal_methods,
+                    .property_storage = .{
+                        .shape = args.shape,
+                        .properties = .empty,
+                        .indexed_properties = .empty,
+                        .lazy_properties = .empty,
+                        .private_elements = .empty,
+                    },
+                },
+            };
+            try self.object.property_storage.properties.resize(
+                agent.gc_allocator,
+                @intFromEnum(args.shape.next_index),
+            );
+            if (build_options.enable_libgc) {
+                if (options.finalizer) |finalizer| {
+                    try self.addFinalizer(agent, finalizer);
+                }
+            }
+            return self;
+        }
+
+        fn addFinalizer(
+            self: *Self,
+            agent: *Agent,
+            comptime finalizerImpl: fn (object: *Object) void,
+        ) std.mem.Allocator.Error!void {
+            const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(void));
+            finalizer_data.* = .{ .data = {} };
+            gc.registerFinalizer(self, finalizer_data, struct {
+                fn finalizer(ptr: *anyopaque, _: *void) void {
+                    const self_: *Self = @ptrCast(@alignCast(ptr));
+                    finalizerImpl(&self_.object);
+                }
+            }.finalizer);
         }
     };
 }

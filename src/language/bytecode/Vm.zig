@@ -21,7 +21,7 @@ const Reference = types.Reference;
 const String = types.String;
 const Value = types.Value;
 const applyStringOrNumericBinaryOperator = runtime.applyStringOrNumericBinaryOperator;
-const arrayCreate = builtins.arrayCreate;
+const arrayCreateFast = builtins.arrayCreateFast;
 const await = builtins.await;
 const bindingClassDeclarationEvaluation = runtime.bindingClassDeclarationEvaluation;
 const blockDeclarationInstantiation = runtime.blockDeclarationInstantiation;
@@ -50,6 +50,7 @@ const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const yield = builtins.yield;
 
 const Vm = @This();
@@ -125,7 +126,7 @@ fn getArguments(self: *Vm, arguments: Instruction.Arguments) Agent.Error![]const
 }
 
 fn executeArrayCreate(self: *Vm, length: u32) std.mem.Allocator.Error!void {
-    const array = arrayCreate(self.agent, length, null) catch |err| try noexcept(err);
+    const array = try arrayCreateFast(self.agent, length);
     self.result = Value.from(&array.object);
 }
 
@@ -1618,10 +1619,7 @@ fn executeMakeSuperPropertyReference(self: *Vm, strict: bool) std.mem.Allocator.
 }
 
 fn executeObjectCreate(self: *Vm) std.mem.Allocator.Error!void {
-    const object = try ordinaryObjectCreate(
-        self.agent,
-        try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
-    );
+    const object = try ordinaryObjectCreateFast(self.agent);
     self.result = Value.from(object);
 }
 

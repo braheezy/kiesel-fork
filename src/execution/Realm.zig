@@ -24,6 +24,7 @@ const newGlobalEnvironment = environments.newGlobalEnvironment;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
+pub const Shapes = @import("Realm/Shapes.zig");
 
 const Realm = @This();
 
@@ -51,6 +52,8 @@ host_defined: SafePointer,
 /// Non-standard, needed for `Math.random()`
 rng: std.Random.DefaultPrng,
 
+shapes: Shapes,
+
 /// 9.3.1 InitializeHostDefinedRealm ( )
 /// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
 pub fn initializeHostDefinedRealm(
@@ -71,6 +74,7 @@ pub fn initializeHostDefinedRealm(
 
     realm.* = .{
         .intrinsics = realm.intrinsics,
+        .shapes = .init(realm),
         .rng = .init(@intFromPtr(realm)),
         .global_object = undefined,
         .global_env = undefined,
