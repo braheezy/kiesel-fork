@@ -658,7 +658,6 @@ fn decode(
         const c = input[k];
 
         // b. Let S be C.
-        var s: String.Builder.Segment = .{ .code_unit = c };
 
         // c. If C is the code unit 0x0025 (PERCENT SIGN), then
         if (c == '%') {
@@ -687,10 +686,13 @@ fn decode(
                 // 1. Let asciiChar be the code unit whose numeric value is B.
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape; otherwise set S to
                 //    asciiChar.
-                s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
-                    .{ .string = try String.fromUtf16(agent, escape_) }
-                else
-                    .{ .code_unit = byte };
+                if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null) {
+                    try result.appendSegment(agent.gc_allocator, .{ .char = '%' });
+                    try result.appendSegment(agent.gc_allocator, .{ .char = @intCast(escape_[1]) });
+                    try result.appendSegment(agent.gc_allocator, .{ .char = @intCast(escape_[2]) });
+                } else {
+                    try result.appendSegment(agent.gc_allocator, .{ .char = byte });
+                }
             } else {
                 // viii. Else,
                 // 1. If n = 1 or n > 4, throw a URIError exception.
@@ -741,13 +743,13 @@ fn decode(
                 // 7. Let V be the code point obtained by applying the UTF-8 transformation to
                 //    Octets, that is, from a List of octets into a 21-bit value.
                 // 8. Set S to UTF16EncodeCodePoint(V).
-                s = .{ .code_point = code_point };
+                try result.appendSegment(agent.gc_allocator, .{ .code_point = code_point });
             }
+        } else {
+            try result.appendSegment(agent.gc_allocator, .{ .code_unit = c });
         }
 
         // d. Set R to the string-concatenation of R and S.
-        try result.appendSegment(agent.gc_allocator, s);
-
         // e. Set k to k + 1.
     }
 

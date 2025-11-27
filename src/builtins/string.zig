@@ -55,19 +55,43 @@ pub fn stringPad(
 
     // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
     //    fillString truncated to length fillLen.
-    const truncated_string_filler = blk: {
-        const fill_string_code_units = try fill_string.toUtf16(agent.gc_allocator);
-        defer agent.gc_allocator.free(fill_string_code_units);
-
-        const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
-
-        var i: u32 = 0;
-        while (i < fill_len) : (i += @intCast(fill_string_code_units.len)) {
-            const dest = repeated_code_units[i..@min(i + fill_string_code_units.len, fill_len)];
-            @memcpy(dest, fill_string_code_units[0..dest.len]);
-        }
-
-        break :blk try types.String.fromUtf16(agent, repeated_code_units);
+    const truncated_string_filler = switch (fill_string.asAsciiOrUtf16()) {
+        .ascii => |ascii| blk: {
+            const repeated_code_units = try agent.gc_allocator.alloc(u8, fill_len);
+            var i: u32 = 0;
+            while (i < fill_len) : (i += fill_string.length) {
+                const copy_end = @min(i + fill_string.length, fill_len);
+                const dest = repeated_code_units[i..copy_end];
+                @memcpy(dest, ascii[0..dest.len]);
+            }
+            break :blk try types.String.fromAscii(agent, repeated_code_units);
+        },
+        .utf16 => |utf16| blk: {
+            const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
+            var i: u32 = 0;
+            while (i < fill_len) : (i += fill_string.length) {
+                const copy_end = @min(i + fill_string.length, fill_len);
+                const dest = repeated_code_units[i..copy_end];
+                @memcpy(dest, utf16[0..dest.len]);
+            }
+            // No truncation, assume resulting string must be UTF-16
+            if (fill_len >= fill_string.length) {
+                break :blk try types.String.fromUtf16(agent, repeated_code_units);
+            }
+            // Check if fill string contains non-ASCII code units
+            for (repeated_code_units) |c| {
+                if (c > 0x7F) {
+                    break :blk try types.String.fromUtf16(agent, repeated_code_units);
+                }
+            }
+            // Fill string was truncated to only ASCII code units, convert
+            const repeated_code_units_ascii = try agent.gc_allocator.alloc(u8, fill_len);
+            for (repeated_code_units, 0..) |c, i_| {
+                repeated_code_units_ascii[i_] = @intCast(c);
+            }
+            agent.gc_allocator.free(repeated_code_units);
+            break :blk try types.String.fromAscii(agent, repeated_code_units_ascii);
+        },
     };
 
     switch (placement) {
