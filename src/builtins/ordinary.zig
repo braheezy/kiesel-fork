@@ -173,7 +173,7 @@ pub fn ordinaryGetOwnProperty(
             .configurable = false,
         };
     }
-    const property_descriptor = (try object.property_storage.getCreateIntrinsicIfNeeded(property_key)) orelse return null;
+    const property_descriptor = (try object.property_storage.getCreateLazyIfNeeded(property_key)) orelse return null;
     return property_descriptor.toPropertyDescriptor();
 }
 
@@ -549,7 +549,7 @@ pub fn ordinaryGet(
             };
         }
         // Otherwise go through the prototype chain and invoke the getter if necessary.
-        const property_descriptor = try object.property_storage.getCreateIntrinsicIfNeeded(property_key) orelse {
+        const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(property_key) orelse {
             const parent = object.prototype() orelse return .undefined;
             return parent.internal_methods.get(agent, parent, property_key, receiver);
         };

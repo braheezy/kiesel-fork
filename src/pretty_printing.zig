@@ -1220,7 +1220,7 @@ fn prettyPrintObject(object: *Object, writer: *std.Io.Writer) PrettyPrintError!v
 
     var printed_properties: usize = 0;
     for (property_keys) |property_key| {
-        const property_descriptor = (object.property_storage.getCreateIntrinsicIfNeeded(property_key) catch return).?;
+        const property_descriptor = (object.property_storage.getCreateLazyIfNeeded(property_key) catch return).?;
         if (!property_descriptor.attributes.enumerable) continue;
 
         if (printed_properties > 0) try writer.writeAll(",");

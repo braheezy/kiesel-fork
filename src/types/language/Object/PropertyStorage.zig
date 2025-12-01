@@ -146,26 +146,7 @@ pub fn contains(
     return self.shape.properties.contains(property_key);
 }
 
-pub fn get(
-    self: PropertyStorage,
-    property_key: PropertyKey,
-) ?CompletePropertyDescriptor {
-    if (property_key.isArrayIndex()) {
-        return self.indexed_properties.get(@intCast(property_key.integer_index));
-    }
-    const property_metadata = self.shape.properties.get(property_key) orelse return null;
-    std.debug.assert(!self.lazy_properties.contains(property_key));
-    const value_or_accessor: ValueOrAccessor = switch (property_metadata.index) {
-        .value => |index| .{ .value = self.values.items[@intFromEnum(index)] },
-        .accessor => |index| .{ .accessor = self.accessors.items[@intFromEnum(index)] },
-    };
-    return .{
-        .value_or_accessor = value_or_accessor,
-        .attributes = property_metadata.attributes,
-    };
-}
-
-pub fn getCreateIntrinsicIfNeeded(
+pub fn getCreateLazyIfNeeded(
     self: *PropertyStorage,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?CompletePropertyDescriptor {
