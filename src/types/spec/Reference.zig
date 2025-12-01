@@ -140,11 +140,14 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then
-        const property_key = switch (self.referenced_name.value.type()) {
-            .string => PropertyKey.from(self.referenced_name.value.asString()),
-            .symbol => PropertyKey.from(self.referenced_name.value.asSymbol()),
+        const property_key = blk: {
+            const property_key_value = self.referenced_name.value;
+            if (property_key_value.__isI32() and property_key_value.__asI32() >= 0)
+                break :blk PropertyKey.from(@as(u53, @intCast(property_key_value.__asI32())));
+            if (property_key_value.isString()) break :blk PropertyKey.from(property_key_value.asString());
+            if (property_key_value.isSymbol()) break :blk PropertyKey.from(property_key_value.asSymbol());
             // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
-            else => try self.referenced_name.value.toPropertyKey(agent),
+            break :blk try property_key_value.toPropertyKey(agent);
         };
 
         // d. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
@@ -223,11 +226,14 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then
-        const property_key = switch (self.referenced_name.value.type()) {
-            .string => PropertyKey.from(self.referenced_name.value.asString()),
-            .symbol => PropertyKey.from(self.referenced_name.value.asSymbol()),
+        const property_key = blk: {
+            const property_key_value = self.referenced_name.value;
+            if (property_key_value.__isI32() and property_key_value.__asI32() >= 0)
+                break :blk PropertyKey.from(@as(u53, @intCast(property_key_value.__asI32())));
+            if (property_key_value.isString()) break :blk PropertyKey.from(property_key_value.asString());
+            if (property_key_value.isSymbol()) break :blk PropertyKey.from(property_key_value.asSymbol());
             // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
-            else => try self.referenced_name.value.toPropertyKey(agent),
+            break :blk try property_key_value.toPropertyKey(agent);
         };
 
         // d. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).

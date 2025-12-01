@@ -695,11 +695,14 @@ fn executeDelete(self: *Vm) Agent.Error!void {
         const base_obj = try reference.base.value.toObject(self.agent);
 
         // d. If ref.[[ReferencedName]] is not a property key, then
-        const property_key = switch (reference.referenced_name.value.type()) {
-            .string => PropertyKey.from(reference.referenced_name.value.asString()),
-            .symbol => PropertyKey.from(reference.referenced_name.value.asSymbol()),
+        const property_key = blk: {
+            const property_key_value = reference.referenced_name.value;
+            if (property_key_value.__isI32() and property_key_value.__asI32() >= 0)
+                break :blk PropertyKey.from(@as(u53, @intCast(property_key_value.__asI32())));
+            if (property_key_value.isString()) break :blk PropertyKey.from(property_key_value.asString());
+            if (property_key_value.isSymbol()) break :blk PropertyKey.from(property_key_value.asSymbol());
             // i. Set ref.[[ReferencedName]] to ? ToPropertyKey(ref.[[ReferencedName]]).
-            else => try reference.referenced_name.value.toPropertyKey(self.agent),
+            break :blk try property_key_value.toPropertyKey(self.agent);
         };
 
         // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
@@ -824,15 +827,15 @@ fn executeEvaluatePropertyAccessWithExpressionKey(
 fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm) Agent.Error!void {
     // Combines executeEvaluatePropertyAccessWithExpressionKey() and Reference.getValue(), entirely
     // bypassing the creation of a reference.
-    const property_name_value = self.stack.pop().?;
+    const property_key_value = self.stack.pop().?;
     const base_value = self.stack.pop().?;
     const base_object = switch (base_value.type()) {
         .object => base_value.asObject(),
         .string => blk: {
-            if (property_name_value.type() == .string and property_name_value.asString().eql(String.fromLiteral("length"))) {
+            if (property_key_value.type() == .string and property_key_value.asString().eql(String.fromLiteral("length"))) {
                 self.result = Value.from(base_value.asString().length);
                 return;
-            } else if (property_name_value.type() == .symbol) {
+            } else if (property_key_value.type() == .symbol) {
                 break :blk (try base_value.synthesizePrototype(self.agent)).?;
             }
             // Might be a property handled by String's [[GetOwnProperty]], we need to make an object
@@ -843,10 +846,12 @@ fn executeEvaluatePropertyAccessWithExpressionKeyDirect(self: *Vm) Agent.Error!v
         .null, .undefined => try base_value.toObject(self.agent),
         else => (try base_value.synthesizePrototype(self.agent)).?,
     };
-    const property_key = switch (property_name_value.type()) {
-        .string => PropertyKey.from(property_name_value.asString()),
-        .symbol => PropertyKey.from(property_name_value.asSymbol()),
-        else => try property_name_value.toPropertyKey(self.agent),
+    const property_key = blk: {
+        if (property_key_value.__isI32() and property_key_value.__asI32() >= 0)
+            break :blk PropertyKey.from(@as(u53, @intCast(property_key_value.__asI32())));
+        if (property_key_value.isString()) break :blk PropertyKey.from(property_key_value.asString());
+        if (property_key_value.isSymbol()) break :blk PropertyKey.from(property_key_value.asSymbol());
+        break :blk try property_key_value.toPropertyKey(self.agent);
     };
     self.result = try base_object.internal_methods.get(
         self.agent,
