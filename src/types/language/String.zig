@@ -92,7 +92,8 @@ const Data = union(enum) {
     owned_utf16: [*]const u16,
     static_ascii: [*]const u8,
     static_utf16: [*]const u16,
-    slice: Slice,
+    slice_ascii: Slice,
+    slice_utf16: Slice,
 };
 
 const Slice = struct {
@@ -291,16 +292,20 @@ pub fn fromStringSliced(agent: *Agent, string: *const String, inclusive_start: u
         const slice_string, const start = switch (string.data) {
             .empty => unreachable,
             // Avoid nested slices
-            .slice => |slice| .{ slice.string, slice.start + inclusive_start },
+            .slice_ascii, .slice_utf16 => |slice| .{ slice.string, slice.start + inclusive_start },
             else => .{ string, inclusive_start },
         };
-        result.string.* = .{
-            .data = .{ .slice = .{ .string = slice_string, .start = start } },
-            .length = length,
-            .hash = std.hash.Wyhash.hash(0, switch (string.asAsciiOrUtf16()) {
-                .ascii => |ascii| ascii[inclusive_start..exclusive_end],
-                .utf16 => |utf16| std.mem.sliceAsBytes(utf16[inclusive_start..exclusive_end]),
-            }),
+        result.string.* = switch (string.asAsciiOrUtf16()) {
+            .ascii => |ascii| .{
+                .data = .{ .slice_ascii = .{ .string = slice_string, .start = start } },
+                .length = length,
+                .hash = std.hash.Wyhash.hash(0, ascii[inclusive_start..exclusive_end]),
+            },
+            .utf16 => |utf16| .{
+                .data = .{ .slice_utf16 = .{ .string = slice_string, .start = start } },
+                .length = length,
+                .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16[inclusive_start..exclusive_end])),
+            },
         };
     }
     return result.string;
@@ -312,16 +317,14 @@ pub fn isEmpty(self: *const String) bool {
 
 pub fn isAscii(self: *const String) bool {
     return switch (self.data) {
-        .empty, .owned_ascii, .static_ascii => true,
-        .slice => |slice| slice.string.isAscii(),
+        .empty, .owned_ascii, .static_ascii, .slice_ascii => true,
         else => false,
     };
 }
 
 pub fn isUtf16(self: *const String) bool {
     return switch (self.data) {
-        .owned_utf16, .static_utf16 => true,
-        .slice => |slice| slice.string.isUtf16(),
+        .owned_utf16, .static_utf16, .slice_utf16 => true,
         else => false,
     };
 }
@@ -330,21 +333,21 @@ pub fn asAscii(self: *const String) []const u8 {
     return switch (self.data) {
         .empty => &.{},
         .owned_ascii, .static_ascii => |ascii| ascii[0..self.length],
-        .owned_utf16, .static_utf16 => unreachable,
-        .slice => |slice| switch (slice.string.data) {
+        .slice_ascii => |slice| switch (slice.string.data) {
             .owned_ascii, .static_ascii => |ascii| ascii[slice.start..][0..self.length],
-            .empty, .owned_utf16, .static_utf16, .slice => unreachable,
+            .empty, .owned_utf16, .static_utf16, .slice_ascii, .slice_utf16 => unreachable,
         },
+        .owned_utf16, .static_utf16, .slice_utf16 => unreachable,
     };
 }
 
 pub fn asUtf16(self: *const String) []const u16 {
     return switch (self.data) {
-        .empty, .owned_ascii, .static_ascii => unreachable,
+        .empty, .owned_ascii, .static_ascii, .slice_ascii => unreachable,
         .owned_utf16, .static_utf16 => |utf16| utf16[0..self.length],
-        .slice => |slice| switch (slice.string.data) {
+        .slice_utf16 => |slice| switch (slice.string.data) {
             .owned_utf16, .static_utf16 => |utf16| utf16[slice.start..][0..self.length],
-            .empty, .owned_ascii, .static_ascii, .slice => unreachable,
+            .empty, .owned_ascii, .static_ascii, .slice_ascii, .slice_utf16 => unreachable,
         },
     };
 }
@@ -359,9 +362,13 @@ pub fn asAsciiOrUtf16(self: *const String) AsciiOrUtf16 {
         .empty => .{ .ascii = &.{} },
         .owned_ascii, .static_ascii => |ascii| .{ .ascii = ascii[0..self.length] },
         .owned_utf16, .static_utf16 => |utf16| .{ .utf16 = utf16[0..self.length] },
-        .slice => |slice| switch (slice.string.asAsciiOrUtf16()) {
-            .ascii => |ascii| .{ .ascii = ascii[slice.start..][0..self.length] },
-            .utf16 => |utf16| .{ .utf16 = utf16[slice.start..][0..self.length] },
+        .slice_ascii => |slice| switch (slice.string.data) {
+            .owned_ascii, .static_ascii => |ascii| .{ .ascii = ascii[slice.start..][0..self.length] },
+            .empty, .owned_utf16, .static_utf16, .slice_ascii, .slice_utf16 => unreachable,
+        },
+        .slice_utf16 => |slice| switch (slice.string.data) {
+            .owned_utf16, .static_utf16 => |utf16| .{ .utf16 = utf16[slice.start..][0..self.length] },
+            .empty, .owned_ascii, .static_ascii, .slice_ascii, .slice_utf16 => unreachable,
         },
     };
 }
@@ -984,9 +991,9 @@ test fromStringSliced {
     }
     {
         const string = try fromStringSliced(&agent, parent, 0, 6);
-        try std.testing.expectEqual(.slice, std.meta.activeTag(string.data));
-        try std.testing.expectEqual(parent, string.data.slice.string);
-        try std.testing.expectEqual(0, string.data.slice.start);
+        try std.testing.expectEqual(.slice_ascii, std.meta.activeTag(string.data));
+        try std.testing.expectEqual(parent, string.data.slice_ascii.string);
+        try std.testing.expectEqual(0, string.data.slice_ascii.start);
         try std.testing.expectEqualSlices(u8, "foobar", string.asAscii());
         try std.testing.expectEqual(6, string.length);
         try std.testing.expectEqual(0xb9d35b96e1f6fe2, string.hash);
@@ -994,9 +1001,9 @@ test fromStringSliced {
     {
         const parent_sliced = try fromStringSliced(&agent, parent, 3, 9);
         const string = try fromStringSliced(&agent, parent_sliced, 3, 6);
-        try std.testing.expectEqual(.slice, std.meta.activeTag(string.data));
-        try std.testing.expectEqual(parent, string.data.slice.string);
-        try std.testing.expectEqual(6, string.data.slice.start);
+        try std.testing.expectEqual(.slice_ascii, std.meta.activeTag(string.data));
+        try std.testing.expectEqual(parent, string.data.slice_ascii.string);
+        try std.testing.expectEqual(6, string.data.slice_ascii.start);
         try std.testing.expectEqualSlices(u8, "baz", string.asAscii());
         try std.testing.expectEqual(3, string.length);
         try std.testing.expectEqual(0xff605a97715ddf78, string.hash);
