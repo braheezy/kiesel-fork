@@ -209,7 +209,7 @@ pub fn createDataPropertyDirect(
     property_key: PropertyKey,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(.initMany(&.{
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
         .ordinary_get_own_property,
         .ordinary_is_extensible,
@@ -250,7 +250,7 @@ pub fn definePropertyDirect(
     property_key: PropertyKey,
     property_descriptor: PropertyStorage.CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(.initMany(&.{
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
         .ordinary_get_own_property,
         .ordinary_is_extensible,

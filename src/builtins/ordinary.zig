@@ -472,7 +472,7 @@ pub fn ordinaryHasProperty(
         return true;
     }
 
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
@@ -528,7 +528,7 @@ pub fn ordinaryGet(
         return Value.from(object.as(builtins.Array).fields.length);
     }
 
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
@@ -614,7 +614,7 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(.initMany(&.{
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
         .ordinary_is_extensible,
