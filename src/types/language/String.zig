@@ -20,7 +20,24 @@ fn utf8IsAscii(utf8: []const u8) bool {
         }
     }
     for (remaining) |c| {
-        if (!std.ascii.isAscii(c)) return false;
+        if (c > 0x7F) return false;
+    }
+    return true;
+}
+
+fn utf16IsAscii(utf16: []const u16) bool {
+    var remaining = utf16;
+    if (std.simd.suggestVectorLength(u16)) |chunk_len| {
+        const Chunk = @Vector(chunk_len, u16);
+        while (remaining.len >= chunk_len) {
+            const chunk: Chunk = remaining[0..chunk_len].*;
+            const mask: Chunk = @splat(std.mem.nativeToLittle(u16, 0x7F));
+            if (@reduce(.Or, chunk | mask != mask)) return false;
+            remaining = remaining[chunk_len..];
+        }
+    }
+    for (remaining) |c| {
+        if (c > 0x7F) return false;
     }
     return true;
 }
@@ -253,6 +270,7 @@ pub fn fromAsciiAlloc(allocator: std.mem.Allocator, ascii: []const u8) std.mem.A
 pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*const String {
     std.debug.assert(utf16.len <= std.math.maxInt(u32));
     if (utf16.len == 0) return empty;
+    std.debug.assert(!utf16IsAscii(utf16));
     const result = try agent.string_cache.getOrPut(agent, .{ .utf16 = utf16 });
     if (!result.found_existing) {
         result.string.* = .{
@@ -267,6 +285,7 @@ pub fn fromUtf16(agent: *Agent, utf16: []const u16) std.mem.Allocator.Error!*con
 pub fn fromUtf16Alloc(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
     std.debug.assert(utf16.len <= std.math.maxInt(u32));
     if (utf16.len == 0) return empty;
+    std.debug.assert(!utf16IsAscii(utf16));
     const string = try allocator.create(String);
     string.* = .{
         .data = .{ .owned_utf16 = utf16.ptr },
@@ -284,6 +303,9 @@ pub fn fromStringSliced(agent: *Agent, string: *const String, inclusive_start: u
     const length = exclusive_end - inclusive_start;
     if (length == 0) return empty;
     if (length == string.length) return string;
+    if (string.isUtf16()) {
+        std.debug.assert(!utf16IsAscii(string.asUtf16()[inclusive_start..exclusive_end]));
+    }
     const result = try agent.string_cache.getOrPut(agent, switch (string.asAsciiOrUtf16()) {
         .ascii => |ascii| .{ .utf8 = ascii[inclusive_start..exclusive_end] },
         .utf16 => |utf16| .{ .utf16 = utf16[inclusive_start..exclusive_end] },
@@ -401,22 +423,16 @@ pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
 
 pub fn eql(self: *const String, other: *const String) bool {
     if (self == other) return true;
+    if (self.hash != other.hash) return false;
     if (self.isAscii() and other.isAscii()) {
-        return self.hash == other.hash and std.mem.eql(u8, self.asAscii(), other.asAscii());
+        return std.mem.eql(u8, self.asAscii(), other.asAscii());
     }
     if (self.isUtf16() and other.isUtf16()) {
-        return self.hash == other.hash and std.mem.eql(u16, self.asUtf16(), other.asUtf16());
+        return std.mem.eql(u16, self.asUtf16(), other.asUtf16());
     }
-    if (self.isEmpty() and other.isEmpty()) return true;
-    if (self.length != other.length) return false;
-    var it1 = self.codeUnitIterator();
-    var it2 = other.codeUnitIterator();
-    for (0..self.length) |_| {
-        const c1 = it1.next().?;
-        const c2 = it2.next().?;
-        if (c1 != c2) return false;
-    }
-    return true;
+    // We currently maintain the invariant that strings are stored in their ideal encoding, so we
+    // can skip doing code unit comparions here.
+    return false;
 }
 
 pub fn startsWith(self: *const String, other: *const String) bool {
@@ -467,13 +483,10 @@ pub fn substring(
             return fromStringSliced(agent, self, inclusive_start, exclusive_end);
         },
         .utf16 => |utf16| {
-            // We currently maintain the invariant that ASCII strings are always stored as ASCII,
-            // so if slicing the string changes the encoding we have to allocate.
+            // We currently maintain the invariant that strings are stored in their ideal encoding,
+            // so if slicing changes the string to ASCII-only we have to allocate.
             const utf16_substring = utf16[inclusive_start..exclusive_end];
-            const is_ascii = for (utf16_substring) |code_unit| {
-                if (code_unit > 0x7F) break false;
-            } else true;
-            if (is_ascii) {
+            if (utf16IsAscii(utf16_substring)) {
                 const ascii = try agent.gc_allocator.alloc(u8, utf16_substring.len);
                 for (utf16_substring, 0..) |code_unit, i| {
                     ascii[i] = @intCast(code_unit);
