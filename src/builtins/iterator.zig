@@ -36,6 +36,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "concat", concat, 0, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
 
         // 27.1.3.2.2 Iterator.prototype
@@ -70,6 +71,137 @@ pub const constructor = struct {
             {},
         );
         return Value.from(&iterator.object);
+    }
+
+    /// 27.1.3.2.1 Iterator.concat ( ...items )
+    /// https://tc39.es/ecma262/#sec-iterator.concat
+    fn concat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        const Iterable = struct {
+            /// [[OpenMethod]]
+            open_method: *Object,
+
+            /// [[Iterable]]
+            iterable: *Object,
+        };
+
+        // 1. Let iterables be a new empty List.
+        const iterables = try agent.gc_allocator.alloc(Iterable, arguments.count());
+        errdefer agent.gc_allocator.free(iterables);
+
+        // 2. For each element item of items, do
+        for (arguments.values, 0..) |item, i| {
+            // a. If item is not an Object, throw a TypeError exception.
+            if (!item.isObject()) {
+                return agent.throwException(.type_error, "{f} is not an Object", .{item});
+            }
+
+            // b. Let method be ? GetMethod(item, %Symbol.iterator%).
+            const method = try item.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+            ) orelse {
+                // c. If method is undefined, throw a TypeError exception.
+                return agent.throwException(
+                    .type_error,
+                    "Object has no Symbol.iterator method",
+                    .{},
+                );
+            };
+
+            // d. Append the Record { [[OpenMethod]]: method, [[Iterable]]: item } to iterables.
+            iterables[i] = .{ .open_method = method, .iterable = item.asObject() };
+        }
+
+        const Captures = struct {
+            iterables: []const Iterable,
+            index: usize,
+            inner_iterator: ?types.Iterator,
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iterables = iterables,
+            .index = 0,
+            .inner_iterator = null,
+        };
+
+        // 3. Let closure be a new Abstract Closure with no parameters that captures iterables and
+        //    performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterables_ = captures_.iterables;
+                const index = &captures_.index;
+                const inner_iterator_ = &captures_.inner_iterator;
+
+                const State = enum { outer, inner };
+                const state: State = if (inner_iterator_.* == null)
+                    .outer
+                else
+                    .inner;
+
+                // a. For each Record iterable of iterables, do
+                loop: switch (state) {
+                    .outer => {
+                        if (index.* >= iterables_.len) return null;
+                        const iterable = iterables_[index.*];
+                        index.* += 1;
+
+                        // i. Let iter be ? Call(iterable.[[OpenMethod]], iterable.[[Iterable]]).
+                        const iter = try Value.from(iterable.open_method).callAssumeCallable(
+                            agent_,
+                            Value.from(iterable.iterable),
+                            &.{},
+                        );
+
+                        // ii. If iter is not an Object, throw a TypeError exception.
+                        if (!iter.isObject()) {
+                            return agent_.throwException(.type_error, "{f} is not an Object", .{iter});
+                        }
+
+                        // iii. Let iteratorRecord be ? GetIteratorDirect(iter).
+                        inner_iterator_.* = try getIteratorDirect(agent_, iter.asObject());
+
+                        continue :loop .inner;
+                    },
+                    .inner => {
+                        // iv. Let innerAlive be true.
+                        // v. Repeat, while innerAlive is true,
+                        //     1. Let innerValue be ? IteratorStepValue(iteratorRecord).
+                        //     2. If innerValue is done, then
+                        //         a. Set innerAlive to false.
+                        //     3. Else,
+                        //         a. Let completion be Completion(Yield(innerValue)).
+                        //         b. If completion is an abrupt completion, then
+                        //             i. Return ? IteratorClose(iteratorRecord, completion).
+                        if (try inner_iterator_.*.?.stepValue(agent_)) |value| return value;
+                        inner_iterator_.* = null;
+                        continue :loop .outer;
+                    },
+                }
+
+                // b. Return ReturnCompletion(undefined).
+            }
+        }.func;
+
+        // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const gen = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .fields = .{
+                .state = .{
+                    // 5. Set gen.[[UnderlyingIterators]] to a new empty List.
+                    .underlying_iterators = &.{},
+
+                    .closure = closure,
+                    .captures = .make(*Captures, captures),
+                },
+            },
+        });
+
+        // 6. Return gen.
+        return Value.from(&gen.object);
     }
 
     /// 27.1.3.2.1 Iterator.from ( O )
@@ -632,12 +764,13 @@ pub const prototype = struct {
                 const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
                 const iterated_ = captures_.iterated;
                 const mapper_ = captures_.mapper;
+                const inner_iterator_ = &captures_.inner_iterator;
 
                 // a. Let counter be 0.
                 const counter_ = &captures_.counter;
 
                 const State = enum { outer, inner };
-                const state: State = if (captures_.inner_iterator == null)
+                const state: State = if (inner_iterator_.* == null)
                     .outer
                 else
                     .inner;
@@ -660,7 +793,7 @@ pub const prototype = struct {
                         };
 
                         // v. Let innerIterator be Completion(GetIteratorFlattenable(mapped, reject-primitives)).
-                        const inner_iterator = getIteratorFlattenable(
+                        inner_iterator_.* = getIteratorFlattenable(
                             agent_,
                             mapped,
                             .reject_primitives,
@@ -669,12 +802,9 @@ pub const prototype = struct {
                             return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
-                        iterator_helper.fields.state.captures.cast(*Captures).inner_iterator = inner_iterator;
                         continue :loop .inner;
                     },
                     .inner => {
-                        const inner_iterator = &iterator_helper.fields.state.captures.cast(*Captures).inner_iterator.?;
-
                         // ix. Set counter to counter + 1.
                         defer counter_.* += 1;
 
@@ -682,24 +812,21 @@ pub const prototype = struct {
                         // viii. Repeat, while innerAlive is true,
 
                         // 1. Let innerValue be Completion(IteratorStepValue(innerIterator)).
-                        const inner_value = inner_iterator.stepValue(agent_) catch |err| {
+                        const inner_value = inner_iterator_.*.?.stepValue(agent_) catch |err| {
                             // 2. IfAbruptCloseIterator(innerValue, iterated).
                             return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
                         // 3. If innerValue is done, then
-                        if (inner_value == null) {
-                            // a. Set innerAlive to false.
-                            continue :loop .outer;
-                        } else {
-                            // 4. Else,
-                            // a. Let completion be Completion(Yield(innerValue)).
-                            // b. If completion is an abrupt completion, then
-                            //     i. Let backupCompletion be Completion(IteratorClose(innerIterator, completion)).
-                            //     ii. IfAbruptCloseIterator(backupCompletion, iterated).
-                            //     iii. Return ? IteratorClose(iterated, completion).
-                            return inner_value;
-                        }
+                        //     a. Set innerAlive to false.
+                        // 4. Else,
+                        //     a. Let completion be Completion(Yield(innerValue)).
+                        //     b. If completion is an abrupt completion, then
+                        //         i. Let backupCompletion be Completion(IteratorClose(innerIterator, completion)).
+                        //         ii. IfAbruptCloseIterator(backupCompletion, iterated).
+                        //         iii. Return ? IteratorClose(iterated, completion).
+                        if (inner_value) |value| return value;
+                        continue :loop .outer;
                     },
                 }
             }
