@@ -177,6 +177,22 @@ pub const Iterator = struct {
         return completion;
     }
 
+    /// 7.4.12 IteratorCloseAll ( iters, completion )
+    /// https://tc39.es/ecma262/#sec-iteratorcloseall
+    pub fn closeAll(agent: *Agent, iterators: []Iterator, completion: anytype) @TypeOf(completion) {
+        var new_completion = completion;
+
+        // 1. For each element iter of iters, in reverse List order, do
+        var it = std.mem.reverseIterator(iterators);
+        while (it.nextPtr()) |iterator| {
+            // a. Set completion to Completion(IteratorClose(iter, completion)).
+            new_completion = iterator.close(agent, new_completion);
+        }
+
+        // 2. Return ? completion.
+        return new_completion;
+    }
+
     /// 7.4.13 AsyncIteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-asynciteratorclose
     pub fn closeAsync(self: Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {

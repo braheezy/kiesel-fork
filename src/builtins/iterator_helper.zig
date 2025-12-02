@@ -77,13 +77,13 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-%iteratorhelperprototype%.return
     fn @"return"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be this value.
-        // 2. Perform ? RequireInternalSlot(O, [[UnderlyingIterator]]).
+        // 2. Perform ? RequireInternalSlot(O, [[UnderlyingIterators]]).
         // 3. Assert: O has a [[GeneratorState]] internal slot.
         const object = try this_value.requireInternalSlot(agent, IteratorHelper);
 
         // 4. If O.[[GeneratorState]] is suspended-start, then
         if (object.fields != .completed) {
-            const underlying_iterator = object.fields.state.underlying_iterator;
+            const underlying_iterators = object.fields.state.underlying_iterators;
 
             // a. Set O.[[GeneratorState]] to completed.
             object.fields = .completed;
@@ -92,8 +92,8 @@ pub const prototype = struct {
             //    associated execution context is never resumed. Any execution state associated
             //    with O can be discarded at this point.
 
-            // c. Perform ? IteratorClose(O.[[UnderlyingIterator]], NormalCompletion(unused)).
-            _ = try underlying_iterator.close(agent, @as(Agent.Error!void, {}));
+            // c. Perform ? IteratorClose(O.[[UnderlyingIterators]], NormalCompletion(unused)).
+            _ = try Iterator.closeAll(agent, underlying_iterators, @as(Agent.Error!void, {}));
 
             // d. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
@@ -108,8 +108,8 @@ pub const prototype = struct {
 pub const IteratorHelper = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
-            /// [[UnderlyingIterator]]
-            underlying_iterator: Iterator,
+            /// [[UnderlyingIterators]]
+            underlying_iterators: []Iterator,
 
             closure: *const fn (*Agent, *IteratorHelper) Agent.Error!?Value,
             captures: SafePointer = .null_pointer,

@@ -349,7 +349,10 @@ fn prettyPrintIteratorHelper(
     try tty_config.setColor(writer, .reset);
     switch (iterator_helper.fields) {
         .state => |state_| {
-            try writer.print("{f}", .{Value.from(state_.underlying_iterator.iterator).fmtPretty()});
+            for (state_.underlying_iterators, 0..) |iterator, i| {
+                if (i != 0) try writer.writeAll(", ");
+                try writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty()});
+            }
         },
         .completed => {
             try tty_config.setColor(writer, .dim);

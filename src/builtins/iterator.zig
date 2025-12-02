@@ -258,20 +258,28 @@ pub const prototype = struct {
         // 9. Set iterated to ? GetIteratorDirect(O).
         iterated = try getIteratorDirect(agent, object);
 
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
         const Captures = struct {
+            iterated: *types.Iterator,
             integer_limit: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .integer_limit = integer_limit };
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .integer_limit = integer_limit,
+        };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const iterated_ = &iterator_helper.fields.state.underlying_iterator;
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
-                const remaining = &iterator_helper.fields.state.captures.cast(*Captures).integer_limit;
+                const remaining = &captures_.integer_limit;
 
                 // b. Repeat, while remaining > 0,
                 while (remaining.* > 0) {
@@ -301,13 +309,13 @@ pub const prototype = struct {
         }.func;
 
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterator]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterator]] to iterated.
-                    .underlying_iterator = iterated,
+                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
 
                     .closure = closure,
                     .captures = .make(*Captures, captures),
@@ -422,24 +430,33 @@ pub const prototype = struct {
         // 5. Set iterated to ? GetIteratorDirect(O).
         iterated = try getIteratorDirect(agent, object);
 
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
         const Captures = struct {
+            iterated: *types.Iterator,
             predicate: Value,
             counter: u53,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .predicate = predicate, .counter = 0 };
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .predicate = predicate,
+            .counter = 0,
+        };
 
         // 6. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    predicate and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const iterated_ = &iterator_helper.fields.state.underlying_iterator;
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
-                const predicate_ = iterator_helper.fields.state.captures.cast(*Captures).predicate;
+                const predicate_ = captures_.predicate;
 
                 // a. Let counter be 0.
-                const counter = &iterator_helper.fields.state.captures.cast(*Captures).counter;
+                const counter = &captures_.counter;
 
                 // b. Repeat,
                 //     i. Let value be ? IteratorStepValue(iterated).
@@ -470,13 +487,13 @@ pub const prototype = struct {
         }.func;
 
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterator]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterator]] to iterated.
-                    .underlying_iterator = iterated,
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
 
                     .closure = closure,
                     .captures = .make(*Captures, captures),
@@ -591,26 +608,36 @@ pub const prototype = struct {
         // 5. Set iterated to ? GetIteratorDirect(O).
         iterated = try getIteratorDirect(agent, object);
 
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
         const Captures = struct {
+            iterated: *types.Iterator,
             mapper: Value,
             counter: u53,
             inner_iterator: ?types.Iterator,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .mapper = mapper, .counter = 0, .inner_iterator = null };
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .mapper = mapper,
+            .counter = 0,
+            .inner_iterator = null,
+        };
 
         // 6. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    mapper and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const iterated_ = &iterator_helper.fields.state.underlying_iterator;
-                const mapper_ = &iterator_helper.fields.state.captures.cast(*Captures).mapper;
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterated_ = captures_.iterated;
+                const mapper_ = captures_.mapper;
 
                 // a. Let counter be 0.
-                const counter_ = &iterator_helper.fields.state.captures.cast(*Captures).counter;
+                const counter_ = &captures_.counter;
 
                 const State = enum { outer, inner };
-                const state: State = if (iterator_helper.fields.state.captures.cast(*Captures).inner_iterator == null)
+                const state: State = if (captures_.inner_iterator == null)
                     .outer
                 else
                     .inner;
@@ -679,13 +706,13 @@ pub const prototype = struct {
         }.func;
 
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterator]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterator]] to iterated.
-                    .underlying_iterator = iterated,
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
 
                     .closure = closure,
                     .captures = .make(*Captures, captures),
@@ -795,22 +822,31 @@ pub const prototype = struct {
         // 5. Set iterated to ? GetIteratorDirect(O).
         iterated = try getIteratorDirect(agent, object);
 
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
         const Captures = struct {
+            iterated: *types.Iterator,
             mapper: Value,
             counter: u53,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .mapper = mapper, .counter = 0 };
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .mapper = mapper,
+            .counter = 0,
+        };
 
         // 6. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    mapper and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const iterated_ = &iterator_helper.fields.state.underlying_iterator;
-                const mapper_ = &iterator_helper.fields.state.captures.cast(*Captures).mapper;
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterated_ = captures_.iterated;
+                const mapper_ = captures_.mapper;
 
                 // a. Let counter be 0.
-                const counter = &iterator_helper.fields.state.captures.cast(*Captures).counter;
+                const counter = &captures_.counter;
 
                 // b. Repeat,
 
@@ -838,13 +874,13 @@ pub const prototype = struct {
         }.func;
 
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterator]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterator]] to iterated.
-                    .underlying_iterator = iterated,
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
 
                     .closure = closure,
                     .captures = .make(*Captures, captures),
@@ -1068,20 +1104,28 @@ pub const prototype = struct {
         // 9. Set iterated to ? GetIteratorDirect(O).
         iterated = try getIteratorDirect(agent, object);
 
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
         const Captures = struct {
+            iterated: *types.Iterator,
             integer_limit: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .integer_limit = integer_limit };
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .integer_limit = integer_limit,
+        };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //    integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const iterated_ = &iterator_helper.fields.state.underlying_iterator;
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
-                const remaining = &iterator_helper.fields.state.captures.cast(*Captures).integer_limit;
+                const remaining = &captures_.integer_limit;
 
                 // b. Repeat,
                 while (true) {
@@ -1109,13 +1153,13 @@ pub const prototype = struct {
         }.func;
 
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterator]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterator]] to iterated.
-                    .underlying_iterator = iterated,
+                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
 
                     .closure = closure,
                     .captures = .make(*Captures, captures),
