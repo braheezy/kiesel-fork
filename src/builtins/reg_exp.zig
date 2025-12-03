@@ -1618,7 +1618,12 @@ pub const prototype = struct {
         //    If P is the empty String, this specification can be met by letting S be "(?:)".
         // 6. Return S.
         if (pattern.isEmpty()) return String.fromLiteral("(?:)");
-        return pattern.replace(agent, "/", "\\/");
+        var escaped = pattern;
+        escaped = try escaped.replace(agent, "/", "\\/");
+        escaped = try escaped.replace(agent, "\r", "\\r");
+        escaped = try escaped.replace(agent, "\n", "\\n");
+        // TODO: Handle LS and PS line terminators
+        return escaped;
     }
 
     /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
