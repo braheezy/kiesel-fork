@@ -221,4 +221,5 @@ pub const BigInt = MakeObject(.{
         big_int_data: *const types.BigInt,
     },
     .tag = .big_int,
+    .display_name = "BigInt",
 });

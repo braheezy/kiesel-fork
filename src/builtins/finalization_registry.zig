@@ -333,4 +333,5 @@ pub const FinalizationRegistry = MakeObject(.{
         cells: std.ArrayList(*Cell),
     },
     .tag = .finalization_registry,
+    .display_name = "FinalizationRegistry",
 });

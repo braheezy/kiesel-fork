@@ -442,6 +442,7 @@ pub const PlainMonthDay = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_plain_month_day,
+    .display_name = "Temporal.PlainMonthDay",
 });
 
 /// 10.5.1 ToTemporalMonthDay ( item [ , options ] )

@@ -169,4 +169,5 @@ pub const RegExpStringIterator = MakeObject(.{
         completed,
     },
     .tag = .reg_exp_string_iterator,
+    .display_name = "RegExp String Iterator",
 });

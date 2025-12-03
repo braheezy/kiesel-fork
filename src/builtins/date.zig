@@ -2611,6 +2611,7 @@ pub const Date = MakeObject(.{
         date_value: f64,
     },
     .tag = .date,
+    .display_name = "Date",
 });
 
 test parseOtherString {

@@ -73,4 +73,5 @@ pub const WrapForValidIterator = MakeObject(.{
         iterated: Iterator,
     },
     .tag = .wrap_for_valid_iterator,
+    .display_name = "WrapForValidIterator",
 });

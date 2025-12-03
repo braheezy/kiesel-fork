@@ -214,6 +214,7 @@ pub const Error = MakeObject(.{
         },
     },
     .tag = .@"error",
+    .display_name = "Error",
 });
 
 /// 20.5.5.1 EvalError
@@ -394,13 +395,14 @@ fn MakeNativeErrorPrototype(comptime name: []const u8) type {
 
 /// 20.5.6.4 Properties of NativeError Instances
 /// https://tc39.es/ecma262/#sec-properties-of-nativeerror-instances
-fn MakeNativeError(comptime _: []const u8) type {
+fn MakeNativeError(comptime name: []const u8) type {
     return MakeObject(.{
         // NOTE: This shares a tag with the plain Error objects as it is identified by the same
         //       internal slot in the spec and thus subtypes are not distinguishable. For this
         //       reason the Fields type must be identical for Object.as() casts to work.
         .Fields = Error.Fields,
         .tag = .@"error",
+        .display_name = name,
     });
 }
 

@@ -247,4 +247,5 @@ pub const WeakSet = MakeObject(.{
         weak_set_data: WeakSetData,
     },
     .tag = .weak_set,
+    .display_name = "WeakSet",
 });

@@ -143,4 +143,5 @@ pub const Boolean = MakeObject(.{
         boolean_data: bool,
     },
     .tag = .boolean,
+    .display_name = "Boolean",
 });

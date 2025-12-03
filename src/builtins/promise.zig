@@ -2249,4 +2249,5 @@ pub const Promise = MakeObject(.{
         promise_is_handled: bool,
     },
     .tag = .promise,
+    .display_name = "Promise",
 });

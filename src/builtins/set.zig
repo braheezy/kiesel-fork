@@ -989,4 +989,5 @@ pub const Set = MakeObject(.{
         }
     },
     .tag = .set,
+    .display_name = "Set",
 });

@@ -1178,6 +1178,7 @@ pub const PlainDateTime = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_plain_date_time,
+    .display_name = "Temporal.PlainDateTime",
 });
 
 /// 5.5.8 CreateTemporalDateTime ( isoDateTime, calendar [ , newTarget ] )

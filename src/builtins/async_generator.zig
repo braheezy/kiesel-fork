@@ -282,6 +282,7 @@ pub const AsyncGenerator = MakeObject(.{
         },
     },
     .tag = .async_generator,
+    .display_name = "AsyncGenerator",
 });
 
 /// 27.6.3.1 AsyncGeneratorRequest Records

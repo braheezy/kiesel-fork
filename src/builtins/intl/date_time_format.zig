@@ -750,6 +750,7 @@ pub const DateTimeFormat = MakeObject(.{
         }
     },
     .tag = .intl_date_time_format,
+    .display_name = "Intl.DateTimeFormat",
 });
 
 /// 11.5.7 FormatDateTime ( dateTimeFormat, x )

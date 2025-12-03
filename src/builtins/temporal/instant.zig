@@ -628,6 +628,7 @@ pub const Instant = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_instant,
+    .display_name = "Temporal.Instant",
 });
 
 /// nsMaxInstant = 10**8 × nsPerDay = 8.64 × 10**21

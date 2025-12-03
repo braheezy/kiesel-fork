@@ -1466,6 +1466,7 @@ pub const ZonedDateTime = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_zoned_date_time,
+    .display_name = "Temporal.ZonedDateTime",
 });
 
 /// 6.5.2 ToTemporalZonedDateTime ( item [ , options ] )

@@ -556,4 +556,5 @@ pub const Map = MakeObject(.{
         }
     },
     .tag = .map,
+    .display_name = "Map",
 });

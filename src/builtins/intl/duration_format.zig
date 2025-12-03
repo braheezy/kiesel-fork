@@ -854,6 +854,7 @@ pub const DurationFormat = MakeObject(.{
         }
     },
     .tag = .intl_duration_format,
+    .display_name = "Intl.DurationFormat",
 });
 
 /// 13.5.1 Duration Records

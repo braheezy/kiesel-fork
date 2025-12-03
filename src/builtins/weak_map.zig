@@ -349,4 +349,5 @@ pub const WeakMap = MakeObject(.{
         weak_map_data: WeakMapData,
     },
     .tag = .weak_map,
+    .display_name = "WeakMap",
 });

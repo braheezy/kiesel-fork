@@ -13,7 +13,8 @@ pub fn MakeObject(
     comptime options: struct {
         Fields: type = void,
         finalizer: ?fn (object: *Object) void = null,
-        tag: Object.Tag = .unset,
+        tag: Object.Tag,
+        display_name: []const u8,
     },
 ) type {
     const has_fields = options.Fields != void;
@@ -56,6 +57,7 @@ pub fn MakeObject(
 
         pub const Fields = options.Fields;
         pub const tag = options.tag;
+        pub const display_name = options.display_name;
 
         fields: Fields,
         object: Object,

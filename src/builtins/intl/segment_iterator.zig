@@ -129,6 +129,7 @@ pub const SegmentIterator = MakeObject(.{
         iterated_string_next_segment_code_unit_index: u32,
     },
     .tag = .intl_segment_iterator,
+    .display_name = "Intl.SegmentIterator",
 });
 
 /// 19.7.1 CreateSegmentDataObject ( segmenter, string, startIndex, endIndex )

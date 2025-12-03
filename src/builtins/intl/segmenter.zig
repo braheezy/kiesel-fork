@@ -254,6 +254,7 @@ pub const Segmenter = MakeObject(.{
         }
     },
     .tag = .intl_segmenter,
+    .display_name = "Intl.Segmenter",
 });
 
 const AnySegmenter = union(enum) {

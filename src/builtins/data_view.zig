@@ -840,4 +840,5 @@ pub const DataView = MakeObject(.{
         byte_offset: ByteOffset,
     },
     .tag = .data_view,
+    .display_name = "DataView",
 });

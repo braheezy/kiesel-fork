@@ -2719,4 +2719,5 @@ pub const String = MakeObject(.{
         string_data: *const types.String,
     },
     .tag = .string,
+    .display_name = "String",
 });

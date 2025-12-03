@@ -1336,4 +1336,5 @@ pub const prototype = struct {
 
 pub const Iterator = MakeObject(.{
     .tag = .iterator,
+    .display_name = "Iterator",
 });

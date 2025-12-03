@@ -1677,20 +1677,6 @@ pub fn requireInternalSlot(
     agent: *Agent,
     comptime T: type,
 ) error{ExceptionThrown}!*T {
-    const name = comptime blk: {
-        var name: []const u8 = undefined;
-
-        // "builtins.date.Date__struct_12345" -> "Date__struct_12345"
-        var it = std.mem.splitScalar(u8, @typeName(T.Fields), '.');
-        while (it.next()) |part| name = part;
-
-        // "Date__struct_12345" -> "Date"
-        it = std.mem.splitScalar(u8, name, '_');
-        if (it.next()) |part| name = part;
-
-        break :blk name;
-    };
-
     // 1. If O is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
         return agent.throwException(.type_error, "{f} is not an Object", .{self});
@@ -1698,7 +1684,7 @@ pub fn requireInternalSlot(
 
     // 2. If O does not have an internalSlot internal slot, throw a TypeError exception.
     if (!self.asObject().is(T)) {
-        return agent.throwException(.type_error, "{f} is not a {s} object", .{ self, name });
+        return agent.throwException(.type_error, "{f} is not a {s} object", .{ self, T.display_name });
     }
 
     // 3. Return unused.

@@ -393,6 +393,7 @@ pub const ECMAScriptFunction = MakeObject(.{
         }
     },
     .tag = .ecmascript_function,
+    .display_name = "Function",
 });
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )

@@ -1223,4 +1223,5 @@ pub const Proxy = MakeObject(.{
         proxy_handler: ?*Object,
     },
     .tag = .proxy,
+    .display_name = "Proxy",
 });

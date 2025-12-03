@@ -172,4 +172,5 @@ pub const WeakRef = MakeObject(.{
         weak_ref_target: ?Value.Weak,
     },
     .tag = .weak_ref,
+    .display_name = "WeakRef",
 });

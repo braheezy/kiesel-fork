@@ -347,4 +347,5 @@ pub const ModuleNamespace = MakeObject(.{
         exports: []const []const u8,
     },
     .tag = .module_namespace,
+    .display_name = "Module Namespace",
 });

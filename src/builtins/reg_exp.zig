@@ -1938,4 +1938,5 @@ pub const RegExp = MakeObject(.{
         re_bytecode: []const u8,
     },
     .tag = .reg_exp,
+    .display_name = "RegExp",
 });

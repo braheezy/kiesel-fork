@@ -479,4 +479,5 @@ pub const Collator = MakeObject(.{
         }
     },
     .tag = .intl_collator,
+    .display_name = "Intl.Collator",
 });

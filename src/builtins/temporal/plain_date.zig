@@ -875,6 +875,7 @@ pub const PlainDate = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_plain_date,
+    .display_name = "Temporal.PlainDate",
 });
 
 /// 3.5.3 CreateTemporalDate ( isoDate, calendar [ , newTarget ] )

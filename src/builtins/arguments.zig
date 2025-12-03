@@ -435,4 +435,5 @@ pub const Arguments = MakeObject(.{
         parameter_map: ParameterMap,
     },
     .tag = .arguments,
+    .display_name = "Arguments",
 });

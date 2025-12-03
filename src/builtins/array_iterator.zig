@@ -184,4 +184,5 @@ pub const ArrayIterator = MakeObject(.{
         completed,
     },
     .tag = .array_iterator,
+    .display_name = "Array Iterator",
 });

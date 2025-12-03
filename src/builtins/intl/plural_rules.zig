@@ -351,6 +351,7 @@ pub const PluralRules = MakeObject(.{
         }
     },
     .tag = .intl_plural_rules,
+    .display_name = "Intl.PluralRules",
 });
 
 /// 17.5.4 ResolvePlural ( pluralRules, n )

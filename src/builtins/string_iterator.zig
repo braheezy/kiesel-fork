@@ -97,4 +97,5 @@ pub const StringIterator = MakeObject(.{
         completed,
     },
     .tag = .string_iterator,
+    .display_name = "String Iterator",
 });

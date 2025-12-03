@@ -58,6 +58,7 @@ pub const BuiltinFunction = MakeObject(.{
         additional_fields: SafePointer,
     },
     .tag = .builtin_function,
+    .display_name = "Builtin Function",
 });
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )

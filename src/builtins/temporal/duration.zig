@@ -976,6 +976,7 @@ pub const Duration = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_duration,
+    .display_name = "Temporal.Duration",
 });
 
 /// 7.5.12 ToTemporalDuration ( item )

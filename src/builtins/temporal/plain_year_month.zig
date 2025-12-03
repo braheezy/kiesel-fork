@@ -659,6 +659,7 @@ pub const PlainYearMonth = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_plain_year_month,
+    .display_name = "Temporal.PlainYearMonth",
 });
 
 /// 9.5.2 ToTemporalYearMonth ( item [ , options ] )

@@ -3725,4 +3725,5 @@ pub const Array = MakeObject(.{
         length_writable: bool,
     },
     .tag = .array,
+    .display_name = "Array",
 });

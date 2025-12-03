@@ -461,4 +461,5 @@ pub const DisplayNames = MakeObject(.{
         }
     },
     .tag = .intl_display_names,
+    .display_name = "Intl.DisplayNames",
 });

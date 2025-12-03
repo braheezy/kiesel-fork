@@ -168,4 +168,5 @@ pub const ForInIterator = MakeObject(.{
         completed,
     },
     .tag = .for_in_iterator,
+    .display_name = "For-In Iterator",
 });

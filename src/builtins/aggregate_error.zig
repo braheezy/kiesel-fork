@@ -162,4 +162,5 @@ pub const AggregateError = MakeObject(.{
     //       reason the Fields type must be identical for Object.as() casts to work.
     .Fields = builtins.Error.Fields,
     .tag = .@"error",
+    .display_name = "AggregateError",
 });

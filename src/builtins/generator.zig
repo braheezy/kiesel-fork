@@ -127,6 +127,7 @@ pub const Generator = MakeObject(.{
         },
     },
     .tag = .generator,
+    .display_name = "Generator",
 });
 
 /// 27.5.3.1 GeneratorStart ( generator, generatorBody )

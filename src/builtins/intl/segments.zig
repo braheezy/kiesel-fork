@@ -136,4 +136,5 @@ pub const Segments = MakeObject(.{
         segments_string: *const String,
     },
     .tag = .intl_segments,
+    .display_name = "Intl.Segments",
 });

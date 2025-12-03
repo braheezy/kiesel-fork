@@ -118,4 +118,5 @@ pub const IteratorHelper = MakeObject(.{
         completed,
     },
     .tag = .iterator_helper,
+    .display_name = "Iterator Helper",
 });

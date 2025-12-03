@@ -308,6 +308,7 @@ pub const ListFormat = MakeObject(.{
         }
     },
     .tag = .intl_list_format,
+    .display_name = "Intl.ListFormat",
 });
 
 /// 14.5.3 FormatList ( listFormat, list )

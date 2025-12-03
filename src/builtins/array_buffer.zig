@@ -1093,4 +1093,5 @@ pub const ArrayBuffer = MakeObject(.{
         max_byte_length: OptionalByteLength,
     },
     .tag = .array_buffer,
+    .display_name = "ArrayBuffer",
 });

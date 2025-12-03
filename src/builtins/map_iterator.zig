@@ -153,4 +153,5 @@ pub const MapIterator = MakeObject(.{
         completed,
     },
     .tag = .map_iterator,
+    .display_name = "Map Iterator",
 });

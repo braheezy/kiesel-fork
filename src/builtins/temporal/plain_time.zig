@@ -674,6 +674,7 @@ pub const PlainTime = MakeObject(.{
         }
     }.finalizer,
     .tag = .temporal_plain_time,
+    .display_name = "Temporal.PlainTime",
 });
 
 /// 4.5.11 CreateTemporalTime ( time [ , newTarget ] )

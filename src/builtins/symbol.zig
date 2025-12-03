@@ -340,6 +340,7 @@ pub const Symbol = MakeObject(.{
         symbol_data: *const types.Symbol,
     },
     .tag = .symbol,
+    .display_name = "Symbol",
 });
 
 /// 20.4.5.1 KeyForSymbol ( sym )

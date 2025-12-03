@@ -128,4 +128,5 @@ pub const BoundFunction = MakeObject(.{
         bound_arguments: []const Value,
     },
     .tag = .bound_function,
+    .display_name = "Bound Function",
 });

@@ -155,4 +155,5 @@ pub const SetIterator = MakeObject(.{
         completed,
     },
     .tag = .set_iterator,
+    .display_name = "Set Iterator",
 });

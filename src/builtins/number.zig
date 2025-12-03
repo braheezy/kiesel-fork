@@ -643,4 +643,5 @@ pub const Number = MakeObject(.{
         number_data: types.Number,
     },
     .tag = .number,
+    .display_name = "Number",
 });

@@ -4787,4 +4787,5 @@ pub const TypedArray = MakeObject(.{
         array_length: AutoArrayLength,
     },
     .tag = .typed_array,
+    .display_name = "TypedArray",
 });

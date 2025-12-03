@@ -628,4 +628,5 @@ pub const Locale = MakeObject(.{
         locale: icu4zig.Locale,
     },
     .tag = .intl_locale,
+    .display_name = "Intl.Locale",
 });
