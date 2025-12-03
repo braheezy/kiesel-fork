@@ -489,7 +489,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         if (group_name_ptr != null and group_name_ptr.* != 0) {
             // i. Let s be the CapturingGroupName of that GroupName.
             const group_name = std.mem.span(group_name_ptr);
-            group_name_ptr += group_name.len + 1;
+            group_name_ptr += group_name.len + libregexp.c.LRE_GROUP_NAME_TRAILER_LEN;
 
             // ii. If matchedGroupNames contains s, then
             if (matched_group_names.contains(group_name)) {
