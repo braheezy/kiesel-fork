@@ -1,0 +1,26 @@
+{
+   bdwgc malloc accesses uninitialized values
+   Memcheck:Cond
+   ...
+   fun:GC_malloc
+}
+{
+   bdwgc marking accesses uninitialized values
+   Memcheck:Cond
+   ...
+   fun:GC_mark_some
+}
+{
+   bdwgc marking accesses uninitialized values
+   Memcheck:Value8
+   ...
+   fun:GC_mark_some
+}
+{
+   bdwgc leaks pthread TLS allocations
+   Memcheck:Leak
+   ...
+   fun:pthread_create@@GLIBC_*
+   ...
+   fun:GC_start_mark_threads
+}
