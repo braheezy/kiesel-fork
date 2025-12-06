@@ -730,14 +730,17 @@ fn performPromiseAll(
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
-    // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
+    //    is only called once, even in the presence of a misbehaving "then" which calls the passed
+    //    callback before the input iterator is exhausted.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
-    // 3. Let index be 0.
+    // 4. Let index be 0.
     var index: usize = 0;
 
-    // 4. Repeat,
+    // 5. Repeat,
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
@@ -779,112 +782,96 @@ fn performPromiseAll(
             /// [[Index]]
             index: usize,
 
-            /// [[Values]]
+            // Captures
             values: *std.ArrayList(Value),
-
-            /// [[Capability]]
-            capability: PromiseCapability,
-
-            /// [[RemainingElements]]
-            remaining_elements: *RemainingElements,
+            result_capability: PromiseCapability,
+            remaining_elements_count: *RemainingElements,
         };
 
-        // e. Let steps be the algorithm steps defined in Promise.all Resolve Element Functions.
-        const steps = struct {
-            /// 27.2.4.1.3 Promise.all Resolve Element Functions
-            /// https://tc39.es/ecma262/#sec-promise.all-resolve-element-functions
+        // e. Let fulfilledSteps be a new Abstract Closure with parameters (value) that captures
+        //    values, resultCapability, and remainingElementsCount and performs the following steps
+        //    when called:
+        const fulfilled_steps = struct {
             fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-                const x = arguments.get(0);
+                const value = arguments.get(0);
 
-                // 1. Let F be the active function object.
+                // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
                 const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const values_ = additional_fields.values;
+                const result_capability_ = additional_fields.result_capability;
+                const remaining_elements_count_ = additional_fields.remaining_elements_count;
 
-                // 2. If F.[[AlreadyCalled]] is true, return undefined.
+                // ii. If F.[[AlreadyCalled]] is true, return undefined.
                 if (additional_fields.already_called) return .undefined;
 
-                // 3. Set F.[[AlreadyCalled]] to true.
+                // iii. Set F.[[AlreadyCalled]] to true.
                 additional_fields.already_called = true;
 
-                // 4. Let index be F.[[Index]].
-                const index_ = additional_fields.index;
+                // iv. Let thisIndex be F.[[Index]].
+                const this_index = additional_fields.index;
 
-                // 5. Let values be F.[[Values]].
-                const values_ = additional_fields.values;
+                // v. Set values[thisIndex] to value.
+                values_.items[this_index] = value;
 
-                // 6. Let promiseCapability be F.[[Capability]].
-                const promise_capability = additional_fields.capability;
-
-                // 7. Let remainingElementsCount be F.[[RemainingElements]].
-                const remaining_elements_count_ = additional_fields.remaining_elements;
-
-                // 8. Set values[index] to x.
-                values_.items[index_] = x;
-
-                // 9. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                // vi. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
 
-                // 10. If remainingElementsCount.[[Value]] = 0, then
+                // vii. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
-                    // a. Let valuesArray be CreateArrayFromList(values).
+                    // 1. Let valuesArray be CreateArrayFromList(values).
                     const values_array = try createArrayFromList(agent_, values_.items);
 
-                    // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                    return Value.from(result_capability_.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
                     );
                 }
 
-                // 11. Return undefined.
+                // viii. Return undefined.
                 return .undefined;
             }
         }.func;
 
-        // f. Let length be the number of non-optional parameters of the function definition in
-        //    Promise.all Resolve Element Functions.
-        // g. Let onFulfilled be CreateBuiltinFunction(steps, length, "", « [[AlreadyCalled]],
-        //    [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
+        // f. Let onFulfilled be CreateBuiltinFunction(fulfilledSteps, 1, "", « [[AlreadyCalled]],
+        //    [[Index]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(
             agent,
-            .{ .function = steps },
+            .{ .function = fulfilled_steps },
             1,
             "",
             .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
         );
 
         additional_fields.* = .{
-            // h. Set onFulfilled.[[AlreadyCalled]] to false.
+            // g. Set onFulfilled.[[AlreadyCalled]] to false.
             .already_called = false,
 
-            // i. Set onFulfilled.[[Index]] to index.
+            // h. Set onFulfilled.[[Index]] to index.
             .index = index,
 
-            // j. Set onFulfilled.[[Values]] to values.
+            // Captures
             .values = values,
-
-            // k. Set onFulfilled.[[Capability]] to resultCapability.
-            .capability = result_capability,
-
-            // l. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
-            .remaining_elements = remaining_elements_count,
+            .result_capability = result_capability,
+            .remaining_elements_count = remaining_elements_count,
         };
 
-        // m. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // i. Set index to index + 1.
+        index += 1;
+
+        // j. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // n. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
+        // k. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(&on_fulfilled.object), Value.from(result_capability.reject) },
         );
-
-        // o. Set index to index + 1.
-        index += 1;
     }
 }
 
@@ -901,14 +888,17 @@ fn performPromiseAllSettled(
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
-    // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
+    //    is only called once, even in the presence of a misbehaving "then" which calls one of the
+    //    passed callbacks before the input iterator is exhausted.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
-    // 3. Let index be 0.
+    // 4. Let index be 0.
     var index: usize = 0;
 
-    // 4. Repeat,
+    // 5. Repeat,
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
@@ -944,6 +934,11 @@ fn performPromiseAllSettled(
         );
 
         const AlreadyCalled = struct { value: bool };
+
+        // e. Let alreadyCalled be the Record { [[Value]]: false }.
+        const already_called = try agent.gc_allocator.create(AlreadyCalled);
+        already_called.* = .{ .value = false };
+
         const AdditionalFields = struct {
             /// [[AlreadyCalled]]
             already_called: *AlreadyCalled,
@@ -951,242 +946,202 @@ fn performPromiseAllSettled(
             /// [[Index]]
             index: usize,
 
-            /// [[Values]]
+            // Captures
             values: *std.ArrayList(Value),
-
-            /// [[Capability]]
-            capability: PromiseCapability,
-
-            /// [[RemainingElements]]
-            remaining_elements: *RemainingElements,
+            result_capability: PromiseCapability,
+            remaining_elements_count: *RemainingElements,
         };
 
-        // e. Let stepsFulfilled be the algorithm steps defined in Promise.allSettled Resolve
-        //    Element Functions.
-        const steps_fulfilled = struct {
-            /// 27.2.4.2.2 Promise.allSettled Resolve Element Functions
-            /// https://tc39.es/ecma262/#sec-promise.allsettled-resolve-element-
+        // f. Let fulfilledSteps be a new Abstract Closure with parameters (value) that captures
+        //    values, resultCapability, and remainingElementsCount and performs the following steps
+        //    when called:
+        const fulfilled_steps = struct {
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const realm = agent_.currentRealm();
-                const x = arguments_.get(0);
+                const value = arguments_.get(0);
 
-                // 1. Let F be the active function object.
+                // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
                 const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-
-                // 2. Let alreadyCalled be F.[[AlreadyCalled]].
-                const already_called_ = additional_fields_.already_called;
-
-                // 3. If alreadyCalled.[[Value]] is true, return undefined.
-                if (already_called_.value) return .undefined;
-
-                // 4. Set alreadyCalled.[[Value]] to true.
-                already_called_.value = true;
-
-                // 5. Let index be F.[[Index]].
-                const index_ = additional_fields_.index;
-
-                // 6. Let values be F.[[Values]].
                 const values_ = additional_fields_.values;
+                const result_capability_ = additional_fields_.result_capability;
+                const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // 7. Let promiseCapability be F.[[Capability]].
-                const promise_capability = additional_fields_.capability;
+                // ii. If F.[[AlreadyCalled]].[[Value]] is true, return undefined.
+                if (additional_fields_.already_called.value) return .undefined;
 
-                // 8. Let remainingElementsCount be F.[[RemainingElements]].
-                const remaining_elements_count_ = additional_fields_.remaining_elements;
+                // iii. Set F.[[AlreadyCalled]].[[Value]] to true.
+                additional_fields_.already_called.value = true;
 
-                // 9. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
                 const object = try ordinaryObjectCreate(
                     agent_,
                     try realm.intrinsics.@"%Object.prototype%"(),
                 );
 
-                // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
+                // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
                 try object.createDataPropertyDirect(
                     agent_,
                     PropertyKey.from("status"),
                     Value.from("fulfilled"),
                 );
 
-                // 11. Perform ! CreateDataPropertyOrThrow(obj, "value", x).
-                try object.createDataPropertyDirect(agent_, PropertyKey.from("value"), x);
+                // vi. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
+                try object.createDataPropertyDirect(agent_, PropertyKey.from("value"), value);
 
-                // 12. Set values[index] to obj.
-                values_.items[index_] = Value.from(object);
+                // vii. Let thisIndex be F.[[Index]].
+                const this_index = additional_fields_.index;
 
-                // 13. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                // viii. Set values[thisIndex] to obj.
+                values_.items[this_index] = Value.from(object);
+
+                // ix. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
 
-                // 14. If remainingElementsCount.[[Value]] = 0, then
+                // x. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
-                    // a. Let valuesArray be CreateArrayFromList(values).
+                    // 1. Let valuesArray be CreateArrayFromList(values).
                     const values_array = try createArrayFromList(agent_, values_.items);
 
-                    // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                    return Value.from(result_capability_.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
                     );
                 }
 
-                // 15. Return undefined.
+                // xi. Return undefined.
                 return .undefined;
             }
         }.func;
 
-        // f. Let lengthFulfilled be the number of non-optional parameters of the function
-        //    definition in Promise.allSettled Resolve Element Functions.
-        // g. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
-        //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
+        // g. Let onFulfilled be CreateBuiltinFunction(fulfilledSteps, 1, "", « [[AlreadyCalled]],
+        //    [[Index]] »).
         const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(
             agent,
-            .{ .function = steps_fulfilled },
+            .{ .function = fulfilled_steps },
             1,
             "",
             .{ .additional_fields = .make(*AdditionalFields, on_fulfilled_additional_fields) },
         );
 
-        // h. Let alreadyCalled be the Record { [[Value]]: false }.
-        const already_called = try agent.gc_allocator.create(AlreadyCalled);
-        already_called.* = .{ .value = false };
-
         on_fulfilled_additional_fields.* = .{
-            // i. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
+            // h. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
             .already_called = already_called,
 
-            // j. Set onFulfilled.[[Index]] to index.
+            // i. Set onFulfilled.[[Index]] to index.
             .index = index,
 
-            // k. Set onFulfilled.[[Values]] to values.
+            // Captures
             .values = values,
-
-            // l. Set onFulfilled.[[Capability]] to resultCapability.
-            .capability = result_capability,
-
-            // m. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
-            .remaining_elements = remaining_elements_count,
+            .result_capability = result_capability,
+            .remaining_elements_count = remaining_elements_count,
         };
 
-        // n. Let stepsRejected be the algorithm steps defined in Promise.allSettled Reject Element
-        //    Functions.
-        const steps_rejected = struct {
-            /// 27.2.4.2.3 Promise.allSettled Reject Element Functions
-            /// https://tc39.es/ecma262/#sec-promise.allsettled-reject-element-functions
+        // j. Let rejectedSteps be a new Abstract Closure with parameters (error) that captures
+        //    values, resultCapability, and remainingElementsCount and performs the following steps
+        //    when called:
+        const rejected_steps = struct {
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const realm = agent_.currentRealm();
-                const x = arguments_.get(0);
+                const @"error" = arguments_.get(0);
 
-                // 1. Let F be the active function object.
+                // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
                 const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-
-                // 2. Let alreadyCalled be F.[[AlreadyCalled]].
-                const already_called_ = additional_fields_.already_called;
-
-                // 3. If alreadyCalled.[[Value]] is true, return undefined.
-                if (already_called_.value) return .undefined;
-
-                // 4. Set alreadyCalled.[[Value]] to true.
-                already_called_.value = true;
-
-                // 5. Let index be F.[[Index]].
-                const index_ = additional_fields_.index;
-
-                // 6. Let values be F.[[Values]].
                 const values_ = additional_fields_.values;
+                const result_capability_ = additional_fields_.result_capability;
+                const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // 7. Let promiseCapability be F.[[Capability]].
-                const promise_capability = additional_fields_.capability;
+                // ii. If F.[[AlreadyCalled]].[[Value]] is true, return undefined.
+                if (additional_fields_.already_called.value) return .undefined;
 
-                // 8. Let remainingElementsCount be F.[[RemainingElements]].
-                const remaining_elements_count_ = additional_fields_.remaining_elements;
+                // iii. Set F.[[AlreadyCalled]].[[Value]] to true.
+                additional_fields_.already_called.value = true;
 
-                // 9. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
                 const object = try ordinaryObjectCreate(
                     agent_,
                     try realm.intrinsics.@"%Object.prototype%"(),
                 );
 
-                // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
+                // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
                 try object.createDataPropertyDirect(
                     agent_,
                     PropertyKey.from("status"),
                     Value.from("rejected"),
                 );
 
-                // 11. Perform ! CreateDataPropertyOrThrow(obj, "reason", x).
-                try object.createDataPropertyDirect(agent_, PropertyKey.from("reason"), x);
+                // vi. Perform ! CreateDataPropertyOrThrow(obj, "reason", error).
+                try object.createDataPropertyDirect(agent_, PropertyKey.from("reason"), @"error");
 
-                // 12. Set values[index] to obj.
-                values_.items[index_] = Value.from(object);
+                // vii. Let thisIndex be F.[[Index]].
+                const this_index = additional_fields_.index;
 
-                // 13. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                // viii. Set values[thisIndex] to obj.
+                values_.items[this_index] = Value.from(object);
+
+                // ix. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
 
-                // 14. If remainingElementsCount.[[Value]] = 0, then
+                // x. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
-                    // a. Let valuesArray be CreateArrayFromList(values).
+                    // 1. Let valuesArray be CreateArrayFromList(values).
                     const values_array = try createArrayFromList(agent_, values_.items);
 
-                    // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                    return Value.from(result_capability_.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
                     );
                 }
 
-                // 15. Return undefined.
+                // xi. Return undefined.
                 return .undefined;
             }
         }.func;
 
-        // o. Let lengthRejected be the number of non-optional parameters of the function
-        //    definition in Promise.allSettled Reject Element Functions.
-        // p. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
-        //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
+        // k. Let onRejected be CreateBuiltinFunction(rejectedSteps, 1, "", « [[AlreadyCalled]],
+        //    [[Index]] »).
         const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_rejected = try createBuiltinFunction(
             agent,
-            .{ .function = steps_rejected },
+            .{ .function = rejected_steps },
             1,
             "",
             .{ .additional_fields = .make(*AdditionalFields, on_rejected_additional_fields) },
         );
 
         on_rejected_additional_fields.* = .{
-            // q. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
+            // l. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
             .already_called = already_called,
 
-            // r. Set onRejected.[[Index]] to index.
+            // m. Set onRejected.[[Index]] to index.
             .index = index,
 
-            // s. Set onRejected.[[Values]] to values.
+            // Captures
             .values = values,
-
-            // t. Set onRejected.[[Capability]] to resultCapability.
-            .capability = result_capability,
-
-            // u. Set onRejected.[[RemainingElements]] to remainingElementsCount.
-            .remaining_elements = remaining_elements_count,
+            .result_capability = result_capability,
+            .remaining_elements_count = remaining_elements_count,
         };
 
-        // v. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // n. Set index to index + 1.
+        index += 1;
+
+        // o. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // w. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+        // p. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(&on_fulfilled.object), Value.from(&on_rejected.object) },
         );
-
-        // x. Set index to index + 1.
-        index += 1;
     }
 }
 
@@ -1203,14 +1158,17 @@ fn performPromiseAny(
     var errors = try agent.gc_allocator.create(std.ArrayList(Value));
     errors.* = .empty;
 
-    // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Reject]]
+    //    is only called once, even in the presence of a misbehaving "then" which calls the passed
+    //    callback before the input iterator is exhausted.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
-    // 3. Let index be 0.
+    // 4. Let index be 0.
     var index: usize = 0;
 
-    // 4. Repeat,
+    // 5. Repeat,
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
@@ -1220,31 +1178,31 @@ fn performPromiseAny(
 
             // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
-                // 1. Let error be a newly created AggregateError object.
-                const @"error" = try agent.createErrorObject(
+                // 1. Let aggregateError be a newly created AggregateError object.
+                const aggregate_error = try agent.createErrorObject(
                     .aggregate_error,
                     "All promises were rejected",
                     .{},
                 );
 
-                // 2. Perform ! DefinePropertyOrThrow(error, "errors", PropertyDescriptor {
+                // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
                 //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                 //      [[Value]]: CreateArrayFromList(errors)
                 //    }).
                 const errors_array = try createArrayFromList(agent, errors.items);
-                try @"error".object.definePropertyDirect(agent, PropertyKey.from("errors"), .{
+                try aggregate_error.object.definePropertyDirect(agent, PropertyKey.from("errors"), .{
                     .value_or_accessor = .{
                         .value = Value.from(&errors_array.object),
                     },
                     .attributes = .builtin_default,
                 });
 
-                // 3. Return ThrowCompletion(error).
-                agent.exception = .{
-                    .value = Value.from(&@"error".object),
-                    .stack_trace = try agent.captureStackTrace(),
-                };
-                return error.ExceptionThrown;
+                // 3. Perform ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
+                _ = try Value.from(result_capability.reject).callAssumeCallable(
+                    agent,
+                    .undefined,
+                    &.{Value.from(&aggregate_error.object)},
+                );
             }
 
             // iii. Return resultCapability.[[Promise]].
@@ -1268,129 +1226,112 @@ fn performPromiseAny(
             /// [[Index]]
             index: usize,
 
-            /// [[Errors]]
+            // Captures
             errors: *std.ArrayList(Value),
-
-            /// [[Capability]]
-            capability: PromiseCapability,
-
-            /// [[RemainingElements]]
-            remaining_elements: *RemainingElements,
+            result_capability: PromiseCapability,
+            remaining_elements_count: *RemainingElements,
         };
 
-        // e. Let stepsRejected be the algorithm steps defined in Promise.any Reject Element
-        //    Functions.
-        const steps_rejected = struct {
-            /// 27.2.4.3.2 Promise.any Reject Element Functions
-            /// https://tc39.es/ecma262/#sec-promise.any-reject-element-functions
+        // e. Let rejectedSteps be a new Abstract Closure with parameters (error) that captures
+        //    errors, resultCapability, and remainingElementsCount and performs the following steps
+        //    when called:
+        const rejected_steps = struct {
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
-                const x = arguments_.get(0);
+                const @"error" = arguments_.get(0);
 
-                // 1. Let F be the active function object.
+                // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
                 const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const errors_ = additional_fields_.errors;
+                const promise_capability = additional_fields_.result_capability;
+                const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // 2. If F.[[AlreadyCalled]] is true, return undefined.
+                // ii. If F.[[AlreadyCalled]] is true, return undefined.
                 if (additional_fields_.already_called) return .undefined;
 
-                // 3. Set F.[[AlreadyCalled]] to true.
+                // iii. Set F.[[AlreadyCalled]] to true.
                 additional_fields_.already_called = true;
 
-                // 4. Let index be F.[[Index]].
-                const index_ = additional_fields_.index;
+                // iv. Let thisIndex be F.[[Index]].
+                const this_index = additional_fields_.index;
 
-                // 5. Let errors be F.[[Errors]].
-                const errors_ = additional_fields_.errors;
+                // v. Set errors[thisIndex] to error.
+                errors_.items[this_index] = @"error";
 
-                // 6. Let promiseCapability be F.[[Capability]].
-                const promise_capability = additional_fields_.capability;
-
-                // 7. Let remainingElementsCount be F.[[RemainingElements]].
-                const remaining_elements_count_ = additional_fields_.remaining_elements;
-
-                // 8. Set errors[index] to x.
-                errors_.items[index_] = x;
-
-                // 9. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                // vi. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
 
-                // 10. If remainingElementsCount.[[Value]] = 0, then
+                // vii. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
-                    // a. Let error be a newly created AggregateError object.
-                    const @"error" = try agent_.createErrorObject(
+                    // 1. Let aggregateError be a newly created AggregateError object.
+                    const aggregate_error = try agent_.createErrorObject(
                         .aggregate_error,
                         "All promises were rejected",
                         .{},
                     );
 
-                    // b. Perform ! DefinePropertyOrThrow(error, "errors", PropertyDescriptor {
+                    // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
                     const errors_list = try createArrayFromList(agent_, errors_.items);
-                    try @"error".object.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
+                    try aggregate_error.object.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
                         .value_or_accessor = .{
                             .value = Value.from(&errors_list.object),
                         },
                         .attributes = .builtin_default,
                     });
 
-                    // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).
+                    // 3. Return ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
                         agent_,
                         .undefined,
-                        &.{Value.from(&@"error".object)},
+                        &.{Value.from(&aggregate_error.object)},
                     );
                 }
 
-                // 11. Return undefined.
+                // viii. Return undefined.
                 return .undefined;
             }
         }.func;
 
-        // f. Let lengthRejected be the number of non-optional parameters of the function
-        //    definition in Promise.any Reject Element Functions.
-        // g. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
-        //    « [[AlreadyCalled]], [[Index]], [[Errors]], [[Capability]], [[RemainingElements]] »).
+        // f. Let onRejected be CreateBuiltinFunction(rejectedSteps, 1, "", « [[AlreadyCalled]],
+        //    [[Index]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_rejected = try createBuiltinFunction(
             agent,
-            .{ .function = steps_rejected },
+            .{ .function = rejected_steps },
             1,
             "",
             .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
         );
 
         additional_fields.* = .{
-            // h. Set onRejected.[[AlreadyCalled]] to false.
+            // g. Set onRejected.[[AlreadyCalled]] to false.
             .already_called = false,
 
-            // i. Set onRejected.[[Index]] to index.
+            // h. Set onRejected.[[Index]] to index.
             .index = index,
 
-            // j. Set onRejected.[[Errors]] to errors.
+            // Captures
             .errors = errors,
-
-            // k. Set onRejected.[[Capability]] to resultCapability.
-            .capability = result_capability,
-
-            // l. Set onRejected.[[RemainingElements]] to remainingElementsCount.
-            .remaining_elements = remaining_elements_count,
+            .result_capability = result_capability,
+            .remaining_elements_count = remaining_elements_count,
         };
 
-        // m. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // i. Set index to index + 1.
+        index += 1;
+
+        // j. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // n. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
+        // k. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(result_capability.resolve), Value.from(&on_rejected.object) },
         );
-
-        // o. Set index to index + 1.
-        index += 1;
     }
 }
 
