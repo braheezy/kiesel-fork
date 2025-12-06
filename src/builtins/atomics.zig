@@ -186,8 +186,8 @@ fn doWait(
         );
     }
 
-    // 4. Let i be ? ValidateAtomicAccess(taRecord, index).
-    const i = try validateAtomicAccess(agent, ta, index);
+    // 4. Let byteIndexInBuffer be ? ValidateAtomicAccess(taRecord, index).
+    const byte_index_in_buffer = try validateAtomicAccess(agent, ta, index);
 
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
@@ -215,24 +215,18 @@ fn doWait(
     // 11. Let block be buffer.[[ArrayBufferData]].
     const block = buffer.fields.data_block;
 
-    // 12. Let offset be typedArray.[[ByteOffset]].
-    const offset = typed_array.fields.byte_offset;
-
-    // 13. Let byteIndexInBuffer be (i × 4) + offset.
-    const byte_index_in_buffer = (i * 4) + @intFromEnum(offset);
-
-    // TODO: 14. Let WL be GetWaiterList(block, byteIndexInBuffer).
+    // TODO: 12. Let WL be GetWaiterList(block, byteIndexInBuffer).
     _ = block;
 
     var promise_capability: PromiseCapability = undefined;
     var result_object: *Object = undefined;
 
-    // 15. If mode is sync, then
+    // 13. If mode is sync, then
     if (mode == .sync) {
         // a. Let promiseCapability be blocking.
         // b. Let resultObject be undefined.
     } else {
-        // 16. Else,
+        // 14. Else,
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         promise_capability = newPromiseCapability(
             agent,
@@ -246,13 +240,13 @@ fn doWait(
         );
     }
 
-    // TODO: 17. Perform EnterCriticalSection(WL).
+    // TODO: 15. Perform EnterCriticalSection(WL).
 
-    // 18. Let elementType be TypedArrayElementType(typedArray).
+    // 16. Let elementType be TypedArrayElementType(typedArray).
     const w = switch (typed_array.fields.element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| blk: {
-            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+            // 17. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
             const w = getValueFromBuffer(
                 agent,
                 buffer,
@@ -269,7 +263,7 @@ fn doWait(
         },
     };
 
-    // 20. If v ≠ w, then
+    // 18. If v ≠ w, then
     if (!sameValue(v, w)) {
         // TODO: a. Perform LeaveCriticalSection(WL).
 
@@ -294,7 +288,7 @@ fn doWait(
         return Value.from(result_object);
     }
 
-    // 21. If t = 0 and mode is async, then
+    // 19. If t = 0 and mode is async, then
     if (t == 0 and mode == .async) {
         // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
         //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
@@ -320,27 +314,27 @@ fn doWait(
         return Value.from(result_object);
     }
 
-    // TODO: 22-31.
+    // TODO: 20-29.
     const waiter = .{ .result = "timed-out" };
 
-    // 32. If mode is sync, return waiterRecord.[[Result]].
+    // 30. If mode is sync, return waiterRecord.[[Result]].
     if (mode == .sync) return Value.from(waiter.result);
 
-    // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
+    // 31. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("async"),
         Value.from(true),
     );
 
-    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
+    // 32. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
     );
 
-    // 35. Return resultObject.
+    // 33. Return resultObject.
     return Value.from(result_object);
 }
 
