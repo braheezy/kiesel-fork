@@ -812,18 +812,57 @@ pub fn repeat(
     agent: *Agent,
     n: u32,
 ) std.mem.Allocator.Error!*const String {
-    // NOTE: This allocates the exact needed capacity upfront
-    var builder = try Builder.initCapacity(agent.gc_allocator, n);
-    defer builder.deinit(agent.gc_allocator);
-    for (0..n) |_| builder.appendStringAssumeCapacity(self);
-    return builder.build(agent);
+    if (n == 0) return empty;
+    if (n == 1) return self;
+    switch (self.asAsciiOrUtf16()) {
+        .ascii => |ascii| {
+            const result = try agent.gc_allocator.alloc(u8, ascii.len * n);
+            for (0..n) |i| {
+                @memcpy(result[i * ascii.len ..][0..ascii.len], ascii);
+            }
+            return fromAscii(agent, result);
+        },
+        .utf16 => |utf16| {
+            const result = try agent.gc_allocator.alloc(u16, utf16.len * n);
+            for (0..n) |i| {
+                @memcpy(result[i * utf16.len ..][0..utf16.len], utf16);
+            }
+            return fromUtf16(agent, result);
+        },
+    }
 }
 
 pub fn concat(
     agent: *Agent,
     strings: []const *const String,
 ) std.mem.Allocator.Error!*const String {
-    // NOTE: This allocates the exact needed capacity upfront
+    // OPTIMIZATION: Fast path for concatenating two strings
+    // This should eventually be replaced with rope strings.
+    if (strings.len == 2) {
+        const lhs = strings[0];
+        const rhs = strings[1];
+        if (lhs.isEmpty()) return rhs;
+        if (rhs.isEmpty()) return lhs;
+        if (lhs.isAscii() and rhs.isAscii()) {
+            const result = try agent.gc_allocator.alloc(u8, lhs.length + rhs.length);
+            @memcpy(result[0..lhs.length], lhs.asAscii());
+            @memcpy(result[lhs.length..], rhs.asAscii());
+            return fromAscii(agent, result);
+        } else {
+            const result = try agent.gc_allocator.alloc(u16, lhs.length + rhs.length);
+            if (lhs.isUtf16()) {
+                @memcpy(result[0..lhs.length], lhs.asUtf16());
+            } else {
+                for (lhs.asAscii(), 0..) |c, i| result[i] = c;
+            }
+            if (rhs.isUtf16()) {
+                @memcpy(result[lhs.length..], rhs.asUtf16());
+            } else {
+                for (rhs.asAscii(), lhs.length..) |c, i| result[i] = c;
+            }
+            return fromUtf16(agent, result);
+        }
+    }
     var builder = try Builder.initCapacity(agent.gc_allocator, @intCast(strings.len));
     defer builder.deinit(agent.gc_allocator);
     for (strings) |string| builder.appendStringAssumeCapacity(string);
@@ -1086,5 +1125,61 @@ test trim {
         const parent = fromLiteral(" \n\r\t \n\r\tfoo \n\r\t \n\r\t");
         const string = try parent.trim(&agent);
         try std.testing.expect(string.eql(String.fromLiteral("foo")));
+    }
+}
+
+test repeat {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.repeat(&agent, 0);
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.repeat(&agent, 1);
+        try std.testing.expectEqual(string, string);
+    }
+    {
+        const parent = fromLiteral("foo");
+        const string = try parent.repeat(&agent, 3);
+        try std.testing.expect(string.eql(String.fromLiteral("foofoofoo")));
+    }
+}
+
+test concat {
+    const platform = Agent.Platform.default();
+    defer platform.deinit();
+    var agent = try Agent.init(&platform, .{});
+    defer agent.deinit();
+    {
+        const string = try String.concat(&agent, &.{});
+        try std.testing.expectEqual(empty, string);
+    }
+    {
+        const string = try String.concat(&agent, &.{
+            String.fromLiteral("foo"),
+        });
+        try std.testing.expect(string.eql(String.fromLiteral("foo")));
+    }
+    {
+        const string = try String.concat(&agent, &.{
+            String.fromLiteral("foo"),
+            String.fromLiteral("bar"),
+        });
+        try std.testing.expectEqual(.owned_ascii, std.meta.activeTag(string.data));
+        try std.testing.expect(string.eql(String.fromLiteral("foobar")));
+    }
+    {
+        const string = try String.concat(&agent, &.{
+            String.fromLiteral("foo"),
+            String.fromLiteral("bar"),
+            String.fromLiteral("äöü"),
+        });
+        try std.testing.expectEqual(.owned_utf16, std.meta.activeTag(string.data));
+        try std.testing.expect(string.eql(String.fromLiteral("foobaräöü")));
     }
 }
