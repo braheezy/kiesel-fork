@@ -362,7 +362,7 @@ fn validateAndApplyPropertyDescriptor(
             //    else let configurable be current.[[Configurable]].
             const configurable = descriptor.configurable orelse current.configurable.?;
 
-            // ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+            // ii. If Desc has an [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
             //     let enumerable be current.[[Enumerable]].
             const enumerable = descriptor.enumerable orelse current.enumerable.?;
 
@@ -390,7 +390,7 @@ fn validateAndApplyPropertyDescriptor(
             //    else let configurable be current.[[Configurable]].
             const configurable = descriptor.configurable orelse current.configurable.?;
 
-            // ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+            // ii. If Desc has an [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
             //     let enumerable be current.[[Enumerable]].
             const enumerable = descriptor.enumerable orelse current.enumerable.?;
 
