@@ -18,10 +18,7 @@
             .lazy = true,
         },
         .kiesel_runtime = .{
-            // Uncomment for local development:
-            // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#d5df4632d278204ef7436e902e228556a632c49f",
-            .hash = "kiesel_runtime-0.1.0-goZjAe4YAQCTIqteWrJnI_DmsqG_tMcHSp_0LEt_Qa0D",
+            .path = "./runtime",
         },
         .libgc = .{
             .url = "git+https://github.com/bdwgc/bdwgc#e1042aa86d9403f433a2ab38ee2aab081984fca8",
@@ -56,6 +53,10 @@
         .zigline = .{
             .url = "git+https://github.com/alimpfard/zigline#cd6ebe9efb5d79738090b03460a1ea6609f1380d",
             .hash = "zigline-0.1.0-6llsB4CEAgA6Oy58ssb-9qe0Fyjoz0OfcK3zfnAmChTA",
+        },
+        .libxev = .{
+            .url = "git+https://github.com/mitchellh/libxev#a86bdc692b384f692a99047466ec89c3705d861c",
+            .hash = "libxev-0.0.0-86vtcz8bEwB9PLXxMMckZwulRxoKleuLsrffobuUv993",
         },
     },
     .paths = .{

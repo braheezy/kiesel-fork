@@ -1,0 +1,19 @@
+.{
+    .name = .kiesel_runtime,
+    .version = "0.1.0",
+    .fingerprint = 0x55cbdb401638682,
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .libxev = .{
+            .url = "git+https://github.com/mitchellh/libxev#a86bdc692b384f692a99047466ec89c3705d861c",
+            .hash = "libxev-0.0.0-86vtcz8bEwB9PLXxMMckZwulRxoKleuLsrffobuUv993",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}

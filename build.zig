@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
         "enable-annex-b",
         "Enable Annex B features",
     ) orelse true;
-    const enable_intl = b.option(
+    const enable_intl_baseline = b.option(
         bool,
         "enable-intl",
         "Enable the Intl built-in object (requires cargo)",
@@ -52,11 +52,36 @@ pub fn build(b: *std.Build) void {
         "enable-runtime",
         "Enable the web-compatible runtime",
     ) orelse true;
-    const enable_temporal = b.option(
+    const enable_temporal_baseline = b.option(
         bool,
         "enable-temporal",
         "Enable the Temporal built-in object (requires cargo)",
     ) orelse true;
+
+    const cli_light = b.option(
+        bool,
+        "cli-light",
+        "Build only the CLI without optional dependencies (disables Intl/Temporal)",
+    ) orelse false;
+
+    const cli_step_requested = blk: {
+        if (b.args) |args_| {
+            var found = false;
+            for (args_) |arg| {
+                if (std.mem.eql(u8, arg, "cli")) {
+                    found = true;
+                    break;
+                }
+            }
+            break :blk found;
+        }
+        break :blk false;
+    };
+
+    const disable_optional_deps = cli_light or cli_step_requested;
+
+    const enable_intl = if (disable_optional_deps) false else enable_intl_baseline;
+    const enable_temporal = if (disable_optional_deps) false else enable_temporal_baseline;
 
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
     // Defaults to true for now as the self-hosted backend in 0.15 fails with a linker error.
@@ -186,7 +211,29 @@ pub fn build(b: *std.Build) void {
     // Ensure the runtime uses the kiesel module defined above.
     kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
 
-    const exe = switch (target.result.os.tag) {
+    const cli_module = b.createModule(.{
+        .root_source_file = b.path("src/cli.zig"),
+        .imports = &.{
+            .{ .name = "args", .module = args.module("args") },
+            .{ .name = "kiesel", .module = kiesel },
+            .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
+            .{ .name = "zigline", .module = zigline.module("zigline") },
+        },
+        .target = target,
+        .optimize = optimize,
+        .strip = strip,
+    });
+    if (enable_intl) {
+        if (b.lazyDependency("icu4zig", .{
+            .target = target,
+            .optimize = optimize,
+            .@"link-icu4x" = false,
+        })) |icu4zig| {
+            cli_module.addImport("icu4zig", icu4zig.module("icu4zig"));
+        }
+    }
+
+    const cli_exe = switch (target.result.os.tag) {
         .uefi => b.addExecutable(.{
             .name = "bootx64",
             .root_module = b.createModule(.{
@@ -204,41 +251,57 @@ pub fn build(b: *std.Build) void {
         }),
         else => b.addExecutable(.{
             .name = "kiesel",
-            .root_module = blk: {
-                const module = b.createModule(.{
-                    .root_source_file = b.path("src/cli.zig"),
-                    .imports = &.{
-                        .{ .name = "args", .module = args.module("args") },
-                        .{ .name = "kiesel", .module = kiesel },
-                        .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
-                        .{ .name = "zigline", .module = zigline.module("zigline") },
-                    },
-                    .target = target,
-                    .optimize = optimize,
-                    .strip = strip,
-                });
-                if (enable_intl) {
-                    if (b.lazyDependency("icu4zig", .{
-                        .target = target,
-                        .optimize = optimize,
-                        .@"link-icu4x" = false,
-                    })) |icu4zig| {
-                        module.addImport("icu4zig", icu4zig.module("icu4zig"));
-                    }
-                }
-                break :blk module;
-            },
+            .root_module = cli_module,
             .use_llvm = use_llvm,
         }),
     };
 
-    const install_exe = b.addInstallArtifact(exe, .{
+    const timer_example_module = b.createModule(.{
+        .root_source_file = b.path("src/timer_example_cli.zig"),
+        .imports = &.{
+            .{ .name = "kiesel", .module = kiesel },
+            .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
+            .{ .name = "cli", .module = cli_module },
+        },
+        .target = target,
+        .optimize = optimize,
+        .strip = strip,
+    });
+    const timer_example_exe = b.addExecutable(.{
+        .name = "kiesel-timer-example",
+        .root_module = timer_example_module,
+        .use_llvm = use_llvm,
+    });
+
+    const timer_light_module = b.createModule(.{
+        .root_source_file = b.path("src/timer_cli_minimal.zig"),
+        .imports = &.{
+            .{ .name = "kiesel", .module = kiesel },
+            .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
+        },
+        .target = target,
+        .optimize = optimize,
+        .strip = strip,
+    });
+    const timer_light_exe = b.addExecutable(.{
+        .name = "kiesel-timer-light",
+        .root_module = timer_light_module,
+        .use_llvm = use_llvm,
+    });
+
+    const install_exe = b.addInstallArtifact(cli_exe, .{
         .dest_dir = switch (target.result.os.tag) {
             .uefi => .{ .override = .{ .custom = "EFI/BOOT" } },
             else => .default,
         },
     });
     b.getInstallStep().dependOn(&install_exe.step);
+
+    const install_timer_example = b.addInstallArtifact(timer_example_exe, .{});
+    b.getInstallStep().dependOn(&install_timer_example.step);
+
+    const install_timer_light = b.addInstallArtifact(timer_light_exe, .{});
+    b.getInstallStep().dependOn(&install_timer_light.step);
 
     const run_cmd = switch (target.result.os.tag) {
         .uefi => b.addSystemCommand(&.{
@@ -248,7 +311,7 @@ pub fn build(b: *std.Build) void {
             "-drive",
             "format=raw,file=fat:rw:zig-out",
         }),
-        else => b.addRunArtifact(exe),
+        else => b.addRunArtifact(cli_exe),
     };
     run_cmd.step.dependOn(b.getInstallStep());
 
@@ -258,6 +321,10 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    const cli_step = b.step("cli", "Build the CLI without optional dependencies");
+    cli_step.dependOn(&cli_exe.step);
+    cli_step.dependOn(b.getInstallStep());
 
     const unit_tests = b.addTest(.{
         .root_module = kiesel,

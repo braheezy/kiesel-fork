@@ -75,7 +75,7 @@ fn resolveModulePath(
     return resolved_path;
 }
 
-fn initializeGlobalObject(agent: *Agent, realm: *Realm, global_object: *Object) Agent.Error!void {
+pub fn initializeGlobalObject(agent: *Agent, realm: *Realm, global_object: *Object) Agent.Error!void {
     try global_object.defineBuiltinPropertyLazy(
         agent,
         "Kiesel",
@@ -451,7 +451,9 @@ const Kiesel = struct {
     }
 };
 
-fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: struct {
+const RunError = std.mem.Allocator.Error || error{ExceptionThrown, AlreadyReported, WriteFailed};
+
+pub const RunOptions = struct {
     base_dir: []const u8,
     origin: union(enum) {
         repl,
@@ -460,7 +462,14 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
     },
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) !Value {
+};
+
+pub fn run(
+    allocator: std.mem.Allocator,
+    realm: *Realm,
+    source_text: []const u8,
+    options: RunOptions,
+) RunError!Value {
     const agent = realm.agent;
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
@@ -506,11 +515,11 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .value = Value.from(&syntax_error.object),
                 .stack_trace = &.{},
             };
-            try stderr.print("{f}\n{f}\n", .{
+            _ = stderr.print("{f}\n{f}\n", .{
                 fmtParseErrorHint(parse_error, source_text),
                 exception.fmtPretty(),
-            });
-            try stderr.flush();
+            }) catch {};
+            _ = stderr.flush() catch {};
             return error.AlreadyReported;
         },
         error.OutOfMemory => return error.OutOfMemory,
@@ -524,32 +533,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         try stdout.flush();
     }
 
-    defer {
-        agent.drainJobQueue();
-
-        // Report tracked promise rejections
-        if (options.print_promise_rejection_warnings) {
-            var it = tracked_promise_rejections.iterator();
-            while (it.next()) |entry| {
-                const promise = entry.key_ptr.*;
-                const operation = entry.value_ptr.*;
-                switch (operation) {
-                    .reject => stderr.print(
-                        "A promise was rejected without any handlers: {f}\n",
-                        .{Value.from(&promise.object).fmtPretty()},
-                    ) catch {},
-                    .handle => stderr.print(
-                        "A handler was added to an already rejected promise: {f}\n",
-                        .{Value.from(&promise.object).fmtPretty()},
-                    ) catch {},
-                }
-                stderr.flush() catch {};
-            }
-        }
-        tracked_promise_rejections.clearAndFree(agent.gc_allocator);
-    }
-
-    return switch (script_or_module) {
+    const result = switch (script_or_module) {
         .script => |script| script.evaluate(),
         .module => |module| blk: {
             const module_path = resolveModulePath(
@@ -599,17 +583,52 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         },
     } catch |err| switch (err) {
         error.OutOfMemory => {
-            try stderr.writeAll("Out of memory\n");
-            try stderr.flush();
+            stderr.writeAll("Out of memory\n") catch {};
+            stderr.flush() catch {};
+            cleanupAfterRun(realm.agent, options) catch |cleanup_err| return cleanup_err;
             return error.AlreadyReported;
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            try stderr.print("{f}\n", .{exception.fmtPretty()});
-            try stderr.flush();
+            stderr.print("{f}\n", .{exception.fmtPretty()}) catch {};
+            stderr.flush() catch {};
+            cleanupAfterRun(realm.agent, options) catch |cleanup_err| return cleanup_err;
             return error.AlreadyReported;
         },
     };
+
+    cleanupAfterRun(realm.agent, options) catch |cleanup_err| return cleanup_err;
+    return result;
+}
+
+fn cleanupAfterRun(agent: *Agent, options: RunOptions) RunError!void {
+    const stderr = agent.platform.stderr;
+
+    if (kiesel.build_options.enable_runtime) {
+        try kiesel_runtime.runEventLoop(agent);
+    } else {
+        agent.drainJobQueue();
+    }
+
+    if (options.print_promise_rejection_warnings) {
+        var it = tracked_promise_rejections.iterator();
+        while (it.next()) |entry| {
+            const promise = entry.key_ptr.*;
+            const operation = entry.value_ptr.*;
+            switch (operation) {
+                .reject => stderr.print(
+                    "A promise was rejected without any handlers: {f}\n",
+                    .{Value.from(&promise.object).fmtPretty()},
+                ) catch {},
+                .handle => stderr.print(
+                    "A handler was added to an already rejected promise: {f}\n",
+                    .{Value.from(&promise.object).fmtPretty()},
+                ) catch {},
+            }
+            stderr.flush() catch {};
+        }
+    }
+    tracked_promise_rejections.clearAndFree(agent.gc_allocator);
 }
 
 const ReadFileError = std.fs.File.OpenError || std.Io.Reader.LimitedAllocError;

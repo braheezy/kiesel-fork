@@ -13,12 +13,14 @@ const utils = @import("../utils.zig");
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
 const HostHooks = @import("HostHooks.zig");
+const TimerManagerModule = @import("Agent/TimerManager.zig");
 const Job = @import("Job.zig");
 const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
 const String = types.String;
 const Symbol = types.Symbol;
+const Number = types.Number;
 const Value = types.Value;
 const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
 const getIdentifierReference = environments.getIdentifierReference;
@@ -35,6 +37,7 @@ global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(*ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
+    timer_manager: TimerManagerModule.TimerManager,
 empty_shape: *Object.Shape,
 string_cache: String.Cache,
 platform: *const Platform,
@@ -76,6 +79,7 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
         .host_hooks = .{},
         .execution_context_stack = .empty,
         .queued_jobs = .empty,
+        .timer_manager = try TimerManagerModule.TimerManager.init(platform.gc_allocator),
         .empty_shape = try .init(platform.gc_allocator),
         .string_cache = .empty,
         .platform = platform,
@@ -86,6 +90,7 @@ pub fn deinit(self: *Agent) void {
     self.global_symbol_registry.deinit(self.gc_allocator);
     self.execution_context_stack.deinit(self.gc_allocator);
     self.queued_jobs.deinit(self.gc_allocator);
+    self.timer_manager.deinit();
     self.empty_shape.deinit(self.gc_allocator);
     self.string_cache.entries.deinit(self.gc_allocator);
 }
@@ -100,6 +105,69 @@ pub fn drainJobQueue(self: *Agent) void {
         _ = queued_job.job.func(queued_job.job.captures) catch {};
         self.runningExecutionContext().realm = current_realm;
     }
+}
+
+pub fn timerDelayNs(self: *Agent, number: Number) u128 {
+    return self.timer_manager.clampDelay(number);
+}
+
+pub fn hasPendingTimers(self: *Agent) bool {
+    return self.timer_manager.hasTimers();
+}
+
+pub fn nextTimerFireTime(self: *Agent) ?u128 {
+    return self.timer_manager.nextTimerFireTime();
+}
+
+pub fn scheduleTimer(
+    self: *Agent,
+    callback: Value,
+    this_value: Value,
+    realm: *Realm,
+    arguments: []const Value,
+    delay_ns: u128,
+    interval_ns: ?u128,
+) Agent.Error!u64 {
+    const now_ns: u128 = @intCast(self.platform.currentTimeNs());
+    return try self.timer_manager.schedule(
+        callback,
+        this_value,
+        realm,
+        arguments,
+        delay_ns,
+        interval_ns,
+        now_ns,
+    );
+}
+
+pub fn clearTimer(self: *Agent, handle: u64) bool {
+    return self.timer_manager.clear(handle);
+}
+
+pub fn collectDueTimerHandles(
+    self: *Agent,
+    now_ns: u128,
+    handles: *std.ArrayList(u64),
+) std.mem.Allocator.Error!void {
+    return self.timer_manager.collectDueHandles(now_ns, handles);
+}
+
+pub fn finalizeTimer(self: *Agent, handle: u64, now_ns: u128) void {
+    self.timer_manager.finalize(handle, now_ns);
+}
+
+pub fn runTimerCallback(self: *Agent, handle: u64, now_ns: u128) void {
+    const record = self.timer_manager.getRecord(handle) orelse return;
+    if (record.canceled) {
+        self.timer_manager.finalize(handle, now_ns);
+        return;
+    }
+
+    self.timer_manager.nested_level += 1;
+    defer self.timer_manager.nested_level -= 1;
+    _ = record.callback.callAssumeCallable(self, record.this_value, record.arguments) catch {};
+    self.drainJobQueue();
+    self.timer_manager.finalize(handle, now_ns);
 }
 
 pub fn checkStackOverflow(self: *Agent) error{ExceptionThrown}!void {
