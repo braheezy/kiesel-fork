@@ -226,6 +226,7 @@ pub const rawBytesToNumeric = array_buffer.rawBytesToNumeric;
 pub const regExpAlloc = reg_exp.regExpAlloc;
 pub const regExpBuiltinExec = reg_exp.regExpBuiltinExec;
 pub const regExpCreate = reg_exp.regExpCreate;
+pub const regExpCreateFast = reg_exp.regExpCreateFast;
 pub const regExpExec = reg_exp.regExpExec;
 pub const regExpInitialize = reg_exp.regExpInitialize;
 pub const rejectPromise = promise.rejectPromise;

@@ -19,6 +19,7 @@ lazy_shapes: struct {
     ordinary_function_prototype: ?*Object.Shape = null,
     unmapped_arguments_object: ?*Object.Shape = null,
     mapped_arguments_object: ?*Object.Shape = null,
+    reg_exp_object: ?*Object.Shape = null,
     reg_exp_exec_object: ?*Object.Shape = null,
 } = .{},
 
@@ -218,6 +219,38 @@ pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
         .length = @enumFromInt(0),
         .@"%Symbol.iterator%" = @enumFromInt(1),
         .callee = @enumFromInt(2),
+    };
+    return .{ shape, indices };
+}
+
+pub const RegExpObjectIndices = struct {
+    lastIndex: Object.Shape.PropertyIndex,
+};
+
+pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
+    *Object.Shape,
+    RegExpObjectIndices,
+} {
+    const shape = self.lazy_shapes.reg_exp_object orelse blk: {
+        const realm = self.realm;
+        const agent = realm.agent;
+        const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%RegExp.prototype%"());
+        try shape.setPropertyWithoutTransition(
+            agent.gc_allocator,
+            PropertyKey.from("lastIndex"),
+            .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            },
+            .value,
+        );
+        self.lazy_shapes.reg_exp_object = shape;
+        break :blk shape;
+    };
+    const indices: RegExpObjectIndices = .{
+        .lastIndex = @enumFromInt(0),
     };
     return .{ shape, indices };
 }

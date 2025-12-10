@@ -1729,9 +1729,9 @@ fn executePutValue(self: *Vm) Agent.Error!void {
 }
 
 fn executeRegExpCreate(self: *Vm) Agent.Error!void {
-    const flags = self.stack.pop().?;
-    const pattern = self.stack.pop().?;
-    const reg_exp = try builtins.regExpCreate(self.agent, pattern, flags);
+    const flags = self.stack.pop().?.asString();
+    const pattern = self.stack.pop().?.asString();
+    const reg_exp = try builtins.regExpCreateFast(self.agent, pattern, flags);
     self.result = Value.from(&reg_exp.object);
 }
 
