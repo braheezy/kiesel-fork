@@ -53,7 +53,7 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
         var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
         old_mem.len = if (build_options.enable_libgc)
-            gc.GcAllocator.alignedAllocSize(old_mem.ptr)
+            gc.size(old_mem.ptr)
         else
             lre_alloc_sizes.fetchRemove(ptr).?.value;
         break :blk old_mem;

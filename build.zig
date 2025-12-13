@@ -131,7 +131,7 @@ pub fn build(b: *std.Build) void {
             }
             break :blk std.mem.join(b.allocator, " ", cflags.items) catch @panic("OOM");
         };
-        if (b.lazyDependency("libgc", .{
+        if (b.lazyDependency("bdwgc_zig", .{
             .target = target,
             .optimize = optimize,
             .linkage = .static,
@@ -141,8 +141,8 @@ pub fn build(b: *std.Build) void {
             .enable_large_config = true,
             .disable_gc_debug = true,
             .enable_dynamic_pointer_mask = enable_nan_boxing,
-        })) |libgc| {
-            kiesel.linkLibrary(libgc.artifact("gc"));
+        })) |bdwgc| {
+            kiesel.addImport("bdwgc", bdwgc.module("bdwgc"));
         }
     }
 
