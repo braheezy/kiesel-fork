@@ -10,7 +10,6 @@ const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const gc = @import("../gc.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -26,7 +25,6 @@ const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createRegExpStringIterator = builtins.createRegExpStringIterator;
 const getSubstitution = builtins.getSubstitution;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
@@ -55,7 +53,7 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
         var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
         old_mem.len = if (build_options.enable_libgc)
-            gc.GcAllocator.alignedAllocSize(old_mem.ptr)
+            gc.size(old_mem.ptr)
         else
             lre_alloc_sizes.fetchRemove(ptr).?.value;
         break :blk old_mem;
@@ -80,8 +78,10 @@ pub const ParsedFlags = packed struct(u8) {
     v: bool = false,
     y: bool = false,
 
+    const empty: ParsedFlags = .{};
+
     pub fn from(flags: []const u8) ?ParsedFlags {
-        var parsed_flags: ParsedFlags = .{};
+        var parsed_flags: ParsedFlags = .empty;
         for (flags) |flag| switch (flag) {
             inline 'd', 'g', 'i', 'm', 's', 'u', 'v', 'y' => |c| {
                 if (@field(parsed_flags, &.{c})) return null;
@@ -107,24 +107,101 @@ pub const ParsedFlags = packed struct(u8) {
     }
 };
 
+fn compileRegexp(
+    agent: *Agent,
+    pattern: *const String,
+    flags: *const String,
+) Agent.Error![]const u8 {
+    const parsed_flags = blk: {
+        if (flags.isEmpty()) break :blk ParsedFlags.empty;
+        switch (flags.asAsciiOrUtf16()) {
+            .ascii => |ascii| if (ParsedFlags.from(ascii)) |parsed_flags| break :blk parsed_flags,
+            .utf16 => {},
+        }
+        return agent.throwException(
+            .syntax_error,
+            "Invalid RegExp flags '{f}'",
+            .{flags.fmtEscaped()},
+        );
+    };
+
+    // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
+    const buf = switch (pattern.asAsciiOrUtf16()) {
+        .ascii => |ascii| try agent.gc_allocator.dupeZ(u8, ascii),
+        .utf16 => |utf16| try std.fmt.allocPrintSentinel(
+            agent.gc_allocator,
+            "{f}",
+            .{std.unicode.fmtUtf16Le(utf16)},
+            0,
+        ),
+    };
+    defer agent.gc_allocator.free(buf);
+
+    var re_bytecode_len: c_int = undefined;
+    var error_msg: [64]u8 = undefined;
+    var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
+    const re_bytecode = libregexp.c.lre_compile(
+        &re_bytecode_len,
+        &error_msg,
+        error_msg.len,
+        buf.ptr,
+        buf.len,
+        parsed_flags.asLreFlags(),
+        &@"opaque",
+    ) orelse {
+        const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
+        if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
+        return agent.throwException(.syntax_error, "Invalid RegExp pattern: {s}", .{str});
+    };
+    return re_bytecode[0..@intCast(re_bytecode_len)];
+}
+
 /// 22.2.3.1 RegExpCreate ( P, F )
 /// https://tc39.es/ecma262/#sec-regexpcreate
 pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*RegExp {
     const realm = agent.currentRealm();
 
     // 1. Let obj be ! RegExpAlloc(%RegExp%).
-    const reg_exp = regExpAlloc(
-        agent,
-        try realm.intrinsics.@"%RegExp%"(),
-    ) catch |err| try noexcept(err);
+    const shape, _ = try realm.shapes.regExpObject();
+    const reg_exp = try RegExp.createWithShape(agent, .{
+        .shape = shape,
+        .fields = .{
+            .original_source = undefined,
+            .original_flags = undefined,
+            .re_bytecode = undefined,
+        },
+    });
 
     // 2. Return ? RegExpInitialize(obj, P, F).
     return regExpInitialize(agent, reg_exp, pattern, flags);
 }
 
+pub fn regExpCreateFast(
+    agent: *Agent,
+    pattern: *const String,
+    flags: *const String,
+) Agent.Error!*RegExp {
+    if (!build_options.enable_libregexp) {
+        return agent.throwException(.internal_error, "RegExp support is disabled", .{});
+    }
+    const re_bytecode = try compileRegexp(agent, pattern, flags);
+    const realm = agent.currentRealm();
+    const shape, const indices = try realm.shapes.regExpObject();
+    const reg_exp = try RegExp.createWithShape(agent, .{
+        .shape = shape,
+        .fields = .{
+            .original_source = pattern,
+            .original_flags = flags,
+            .re_bytecode = re_bytecode,
+        },
+    });
+    reg_exp.object.setValueAtPropertyIndex(indices.lastIndex, Value.from(0));
+    return reg_exp;
+}
+
 /// 22.2.3.2 RegExpAlloc ( newTarget )
 /// https://tc39.es/ecma262/#sec-regexpalloc
-pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
+fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
     // 1. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%RegExp.prototype%",
     //    « [[OriginalSource]], [[OriginalFlags]], [[RegExpRecord]], [[RegExpMatcher]] »).
     const reg_exp = try ordinaryCreateFromConstructor(
@@ -159,7 +236,7 @@ pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
 
 /// 22.2.3.3 RegExpInitialize ( obj, pattern, flags )
 /// https://tc39.es/ecma262/#sec-regexpinitialize
-pub fn regExpInitialize(
+fn regExpInitialize(
     agent: *Agent,
     reg_exp: *RegExp,
     pattern: Value,
@@ -184,38 +261,15 @@ pub fn regExpInitialize(
     // 8. If F contains "s", let s be true; else let s be false.
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
-    const parsed_flags = ParsedFlags.from(try f.toUtf8(agent.gc_allocator)) orelse {
-        return agent.throwException(.syntax_error, "Invalid RegExp flags '{f}'", .{f.fmtEscaped()});
-    };
-
     // TODO: 11. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).
     // 12. Else,
     //     a. Let patternText be the result of interpreting each of P's 16-bit elements as a
     //        Unicode BMP code point. UTF-16 decoding is not applied to the elements.
-
     // 13. Let parseResult be ParsePattern(patternText, u, v).
     // 14. If parseResult is a non-empty List of SyntaxError objects, throw a SyntaxError exception.
     // 15. Assert: parseResult is a Pattern Parse Node.
-    var re_bytecode_len: c_int = undefined;
-    var error_msg: [64]u8 = undefined;
-    // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
-    const buf = try agent.gc_allocator.dupeZ(u8, try p.toUtf8(agent.gc_allocator));
-    defer agent.gc_allocator.free(buf);
-    var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
-    const re_bytecode = libregexp.c.lre_compile(
-        &re_bytecode_len,
-        &error_msg,
-        error_msg.len,
-        buf.ptr,
-        buf.len,
-        parsed_flags.asLreFlags(),
-        &@"opaque",
-    ) orelse {
-        const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
-        if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
-        return agent.throwException(.syntax_error, "Invalid RegExp pattern: {s}", .{str});
-    };
+    const re_bytecode = try compileRegexp(agent, p, f);
 
     // 16. Set obj.[[OriginalSource]] to P.
     reg_exp.fields.original_source = p;
@@ -230,7 +284,7 @@ pub fn regExpInitialize(
     //     }.
     // 20. Set obj.[[RegExpRecord]] to rer.
     // 21. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
-    reg_exp.fields.re_bytecode = re_bytecode[0..@intCast(re_bytecode_len)];
+    reg_exp.fields.re_bytecode = re_bytecode;
 
     // 22. Perform ? Set(obj, "lastIndex", +0𝔽, true).
     try reg_exp.object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);

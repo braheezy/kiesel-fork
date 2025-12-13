@@ -8,8 +8,6 @@ const temporal_rs = @import("../../c/temporal_rs.zig");
 const build_options = @import("build-options");
 const gc = @import("../../gc.zig");
 
-const GcAllocator = gc.GcAllocator;
-
 const Platform = @This();
 
 gc_allocator: std.mem.Allocator,
@@ -43,8 +41,6 @@ const has_std_time_nanotimestamp = switch (builtin.os.tag) {
 };
 
 const State = struct {
-    gc_allocator: if (build_options.enable_libgc) GcAllocator else void,
-    gc_allocator_atomic: if (build_options.enable_libgc) GcAllocator else void,
     stdout_buffer: if (has_fd_t) [1024]u8 else void,
     stdout_writer: if (has_fd_t) std.fs.File.Writer else void,
     stderr_buffer: if (has_fd_t) [1024]u8 else void,
@@ -57,23 +53,16 @@ pub fn default() Platform {
     if (comptime !(has_fd_t and has_std_time_nanotimestamp)) {
         @compileError("Platform.default() is not supported on this platform");
     }
+    if (build_options.enable_libgc) gc.init();
     state = .{
-        .gc_allocator = if (@FieldType(State, "gc_allocator") != void) .init(.normal),
-        .gc_allocator_atomic = if (@FieldType(State, "gc_allocator_atomic") != void) .init(.atomic),
         .stdout_buffer = undefined,
         .stdout_writer = std.fs.File.stdout().writer(&state.stdout_buffer),
         .stderr_buffer = undefined,
         .stderr_writer = std.fs.File.stderr().writer(&state.stderr_buffer),
     };
     return .{
-        .gc_allocator = if (@FieldType(State, "gc_allocator") != void)
-            state.gc_allocator.allocator()
-        else
-            std.heap.page_allocator,
-        .gc_allocator_atomic = if (@FieldType(State, "gc_allocator_atomic") != void)
-            state.gc_allocator_atomic.allocator()
-        else
-            std.heap.page_allocator,
+        .gc_allocator = if (build_options.enable_libgc) gc.allocator else std.heap.page_allocator,
+        .gc_allocator_atomic = if (build_options.enable_libgc) gc.allocator_atomic else std.heap.page_allocator,
         .stdout = &state.stdout_writer.interface,
         .stderr = &state.stderr_writer.interface,
         .tty_config = .detect(.stdout()),

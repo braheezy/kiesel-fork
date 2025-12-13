@@ -30,7 +30,7 @@ const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 const parseJSONModule = kiesel.language.parseJSONModule;
-const regExpCreate = kiesel.builtins.regExpCreate;
+const regExpCreateFast = kiesel.builtins.regExpCreateFast;
 const regExpExec = kiesel.builtins.regExpExec;
 
 var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
@@ -261,10 +261,10 @@ const Kiesel = struct {
         const value = arguments.get(0);
         const string = try value.toString(agent);
         // See https://github.com/DerMolly/is-merlin/blob/main/src/index.ts for the source of the regexp
-        const regexp = try regExpCreate(
+        const regexp = try regExpCreateFast(
             agent,
-            Value.from("[mM][eE][rR][lL][iI][nN]|[rR][uU][hH][rR][-_\\s]*[sS][cC][hH][oO][lL][zZ]"),
-            .undefined,
+            String.fromLiteral("[mM][eE][rR][lL][iI][nN]|[rR][uU][hH][rR][-_\\s]*[sS][cC][hH][oO][lL][zZ]"),
+            .empty,
         );
         const match = try regExpExec(agent, &regexp.object, string);
         return Value.from(match != null);
