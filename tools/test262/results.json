@@ -1289,7 +1289,7 @@
   "test/built-ins/Array/fromAsync/sync-iterable-with-thenable-sync-mapped-awaits-once.js": "PASS",
   "test/built-ins/Array/fromAsync/sync-iterable-with-thenable-sync-mapped-callback-err.js": "PASS",
   "test/built-ins/Array/fromAsync/sync-iterable-with-thenable-then-method-err.js": "PASS",
-  "test/built-ins/Array/fromAsync/this-constructor-operations.js": "FAIL",
+  "test/built-ins/Array/fromAsync/this-constructor-operations.js": "PASS",
   "test/built-ins/Array/fromAsync/this-constructor-with-bad-length-setter.js": "PASS",
   "test/built-ins/Array/fromAsync/this-constructor-with-readonly-elements.js": "PASS",
   "test/built-ins/Array/fromAsync/this-constructor-with-readonly-length.js": "PASS",
