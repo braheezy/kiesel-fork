@@ -417,6 +417,49 @@ pub fn defineBuiltinFunctionWithAttributes(
     );
 }
 
+pub fn defineBuiltinAsyncFunction(
+    self: *Object,
+    agent: *Agent,
+    comptime name: []const u8,
+    comptime function: Behaviour.Function,
+    comptime length: u32,
+    realm: *Realm,
+) std.mem.Allocator.Error!void {
+    return self.defineBuiltinAsyncFunctionWithAttributes(
+        agent,
+        name,
+        function,
+        length,
+        realm,
+        .builtin_default,
+    );
+}
+
+pub fn defineBuiltinAsyncFunctionWithAttributes(
+    self: *Object,
+    agent: *Agent,
+    comptime name: []const u8,
+    comptime function: Behaviour.Function,
+    comptime length: u32,
+    realm: *Realm,
+    attributes: Object.PropertyStorage.Attributes,
+) std.mem.Allocator.Error!void {
+    const function_name = comptime getFunctionName(name);
+    const builtin_function = try createBuiltinFunction(
+        agent,
+        .{ .function = function },
+        length,
+        function_name,
+        .{ .realm = realm, .async = true },
+    );
+    try self.defineBuiltinPropertyWithAttributes(
+        agent,
+        name,
+        Value.from(&builtin_function.object),
+        attributes,
+    );
+}
+
 pub fn defineBuiltinFunctionLazy(
     self: *Object,
     agent: *Agent,

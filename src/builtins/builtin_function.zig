@@ -3,14 +3,16 @@
 
 const std = @import("std");
 
-const ecmascript_function = @import("ecmascript_function.zig");
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const ClassFieldDefinition = types.ClassFieldDefinition;
-const ConstructorKind = ecmascript_function.ConstructorKind;
+const Completion = types.Completion;
+const ConstructorKind = builtins.ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -20,8 +22,11 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
-const setFunctionLength = ecmascript_function.setFunctionLength;
-const setFunctionName = ecmascript_function.setFunctionName;
+const asyncFunctionStart = builtins.asyncFunctionStart;
+const newPromiseCapability = builtins.newPromiseCapability;
+const noexcept = utils.noexcept;
+const setFunctionLength = builtins.setFunctionLength;
+const setFunctionName = builtins.setFunctionName;
 
 pub const Behaviour = union(enum) {
     pub const Function = fn (*Agent, Value, Arguments) Agent.Error!Value;
@@ -54,6 +59,9 @@ pub const BuiltinFunction = MakeObject(.{
 
         /// [[InitialName]]
         initial_name: ?*const String,
+
+        /// [[Async]]
+        async: bool,
 
         additional_fields: SafePointer,
     },
@@ -127,26 +135,94 @@ pub fn builtinCallOrConstruct(
     //    execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, callee_context);
 
-    // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
-    //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
-    //     uninitialized; otherwise thisArgument provides the this value. argumentsList provides
-    //     the named parameters. newTarget provides the NewTarget value.
-    // 11. NOTE: If F is defined in this document, “the specification of F” is the behaviour
-    //     specified for it via algorithm steps or other means.
-    const result = switch (builtin_function.fields.behaviour) {
-        .function => |function| function(agent, this_argument.?, arguments_list),
-        .constructor => |constructor| constructor(agent, arguments_list, new_target),
-    };
+    // 10. If F.[[Async]] is true, then
+    if (builtin_function.fields.async) {
+        const realm = agent.currentRealm();
 
-    // 12. Remove calleeContext from the execution context stack and restore callerContext as the
-    //     running execution context.
-    _ = agent.execution_context_stack.pop().?;
+        // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        const promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
 
-    // 13. Return ? result.
-    return result;
+        const Captures = struct {
+            builtin_function: *BuiltinFunction,
+            this_argument: ?Value,
+            arguments_list: Arguments,
+            new_target: ?*Object,
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .builtin_function = builtin_function,
+            .this_argument = this_argument,
+            .arguments_list = arguments_list,
+            .new_target = new_target,
+        };
+
+        // b. Let resultsClosure be a new Abstract Closure with no parameters that captures F,
+        //    thisArgument, argumentsList, and newTarget and performs the following steps when
+        //    called:
+        const resultsClosure = struct {
+            fn func(agent_: *Agent, captures_: SafePointer) Agent.Error!Completion {
+                const builtin_function_ = captures_.cast(*Captures).builtin_function;
+                const this_argument_ = captures_.cast(*Captures).this_argument;
+                const arguments_list_ = captures_.cast(*Captures).arguments_list;
+                const new_target_ = captures_.cast(*Captures).new_target;
+
+                // i. Let result be the Completion Record that is the result of evaluating F in a
+                //    manner that conforms to the specification of F. If thisArgument is
+                //    uninitialized, the this value is uninitialized; otherwise thisArgument
+                //    provides the this value. argumentsList provides the named parameters.
+                //    newTarget provides the NewTarget value.
+                // ii. NOTE: If F is defined in this document, “the specification of F” is the
+                //     behaviour specified for it via algorithm steps or other means.
+                const result = switch (builtin_function_.fields.behaviour) {
+                    .function => |function| function(agent_, this_argument_.?, arguments_list_),
+                    .constructor => |constructor| constructor(agent_, arguments_list_, new_target_),
+                };
+
+                // iii. Return Completion(result).
+                return .@"return"(try result);
+            }
+        }.func;
+
+        // c. Perform AsyncFunctionStart(promiseCapability, resultsClosure).
+        try asyncFunctionStart(agent, promise_capability, .{
+            .abstract_closure = .{
+                .func = resultsClosure,
+                .captures = .make(*Captures, captures),
+            },
+        });
+
+        // d. Remove calleeContext from the execution context stack and restore callerContext as
+        //    the running execution context.
+        _ = agent.execution_context_stack.pop().?;
+
+        // e. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
+    } else {
+        // 11. Else,
+        // a. Let result be the Completion Record that is the result of evaluating F in a manner
+        //    that conforms to the specification of F. If thisArgument is uninitialized, the this
+        //    value is uninitialized; otherwise thisArgument provides the this value. argumentsList
+        //    provides the named parameters. newTarget provides the NewTarget value.
+        // b. NOTE: If F is defined in this document, “the specification of F” is the behaviour
+        //    specified for it via algorithm steps or other means.
+        const result = switch (builtin_function.fields.behaviour) {
+            .function => |function| function(agent, this_argument.?, arguments_list),
+            .constructor => |constructor| constructor(agent, arguments_list, new_target),
+        };
+
+        // c. Remove calleeContext from the execution context stack and restore callerContext as
+        //    the running execution context.
+        _ = agent.execution_context_stack.pop().?;
+
+        // d. Return ? result.
+        return result;
+    }
 }
 
-/// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix ] ] ] )
+/// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix [ , async ] ] ] ] )
 /// https://tc39.es/ecma262/#sec-createbuiltinfunction
 pub fn createBuiltinFunction(
     agent: *Agent,
@@ -159,6 +235,7 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?*Object = null,
         prefix: ?[]const u8 = null,
+        async: ?bool = null,
         additional_fields: SafePointer = .null_pointer,
     },
 ) std.mem.Allocator.Error!*BuiltinFunction {
@@ -168,11 +245,14 @@ pub fn createBuiltinFunction(
     // 2. If prototype is not present, set prototype to realm.[[Intrinsics]].[[%Function.prototype%]].
     const prototype = args.prototype orelse try realm.intrinsics.@"%Function.prototype%"();
 
-    // 3. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
-    //    requires for the built-in function object that is about to be created.
-    // 4. Append to internalSlotsList the elements of additionalInternalSlotsList.
+    // 3. If async is not present, set async to false.
+    const async = args.async orelse false;
 
-    // 5. Let func be a new built-in function object that, when called, performs the action
+    // 4. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
+    //    requires for the built-in function object that is about to be created.
+    // 5. Append to internalSlotsList the elements of additionalInternalSlotsList.
+
+    // 6. Let func be a new built-in function object that, when called, performs the action
     //    described by behaviour using the provided arguments as the values of the corresponding
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
@@ -182,31 +262,34 @@ pub fn createBuiltinFunction(
             .construct = if (behaviour == .constructor) construct else null,
         }),
 
-        // 6. Set func.[[Prototype]] to prototype.
+        // 8. Set func.[[Prototype]] to prototype.
         .prototype = prototype,
 
-        // 7. Set func.[[Extensible]] to true.
+        // 9. Set func.[[Extensible]] to true.
         .extensible = true,
 
         .fields = .{
             .behaviour = behaviour,
 
-            // 8. Set func.[[Realm]] to realm.
+            // 10. Set func.[[Realm]] to realm.
             .realm = realm,
 
-            // 9. Set func.[[InitialName]] to null.
+            // 11. Set func.[[InitialName]] to null.
             .initial_name = null,
+
+            // 7. Set func.[[Async]] to async.
+            .async = async,
 
             .additional_fields = args.additional_fields,
         },
     });
 
-    // 10. Perform SetFunctionLength(func, length).
+    // 12. Perform SetFunctionLength(func, length).
     try setFunctionLength(agent, &function.object, @floatFromInt(length));
 
-    // 11. If prefix is not present, then
+    // 13. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
-    // 12. Else,
+    // 14. Else,
     //     a. Perform SetFunctionName(func, name, prefix).
     // NOTE: We make the name optional because classDefinitionEvaluation() calls createBuiltinFunction()
     //       with a runtime-known name and we want to keep the assertion in setFunctionName() to
@@ -216,6 +299,6 @@ pub fn createBuiltinFunction(
         try setFunctionName(agent, &function.object, PropertyKey.from(name), args.prefix);
     }
 
-    // 13. Return func.
+    // 15. Return func.
     return function;
 }
