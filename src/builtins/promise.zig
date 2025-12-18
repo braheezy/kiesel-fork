@@ -92,99 +92,95 @@ pub fn createResolvingFunctions(
     promise: *Promise,
 ) std.mem.Allocator.Error!ResolvingFunctions {
     const AlreadyResolved = struct { value: bool };
+
+    // 1. Let alreadyResolved be the Record { [[Value]]: false }.
+    const already_resolved: AlreadyResolved = .{ .value = false };
+
     const AdditionalFields = struct {
         promise: *Promise,
         already_resolved: AlreadyResolved,
     };
-
     const additional_fields = try agent.gc_allocator.create(AdditionalFields);
+    additional_fields.* = .{
+        .promise = promise,
+        .already_resolved = already_resolved,
+    };
 
-    // 1. Let alreadyResolved be the Record { [[Value]]: false }.
-    const already_resolved: AlreadyResolved = .{ .value = false };
-
-    // 2. Let stepsResolve be the algorithm steps defined in Promise Resolve Functions.
-    const steps_resolve = struct {
-        /// 27.2.1.3.2 Promise Resolve Functions
-        /// https://tc39.es/ecma262/#sec-promise-resolve-functions
+    // 2. Let resolveSteps be a new Abstract Closure with parameters (resolution) that captures
+    //    promise and alreadyResolved and performs the following steps when called:
+    const resolve_steps = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const resolution = arguments.get(0);
 
-            // 1. Let F be the active function object.
             const function = agent_.activeFunctionObject();
-
-            // 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
             const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-
-            // 3. Let promise be F.[[Promise]].
             const promise_ = additional_fields_.promise;
-
-            // 4. Let alreadyResolved be F.[[AlreadyResolved]].
             const already_resolved_ = &additional_fields_.already_resolved;
 
-            // 5. If alreadyResolved.[[Value]] is true, return undefined.
+            // a. If alreadyResolved.[[Value]] is true, return undefined.
             if (already_resolved_.value) return .undefined;
 
-            // 6. Set alreadyResolved.[[Value]] to true.
+            // b. Set alreadyResolved.[[Value]] to true.
             already_resolved_.value = true;
 
-            // 7. If SameValue(resolution, promise) is true, then
+            // c. If SameValue(resolution, promise) is true, then
             if (sameValue(resolution, Value.from(&promise_.object))) {
-                // a. Let selfResolutionError be a newly created TypeError object.
+                // i. Let selfResolutionError be a newly created TypeError object.
                 const self_resolution_error = try agent_.createErrorObject(
                     .type_error,
                     "Cannot resolve promise with itself",
                     .{},
                 );
 
-                // b. Perform RejectPromise(promise, selfResolutionError).
+                // ii. Perform RejectPromise(promise, selfResolutionError).
                 try rejectPromise(agent_, promise_, Value.from(&self_resolution_error.object));
 
-                // c. Return undefined.
+                // iii. Return undefined.
                 return .undefined;
             }
 
-            // 8. If resolution is not an Object, then
+            // d. If resolution is not an Object, then
             if (!resolution.isObject()) {
-                // a. Perform FulfillPromise(promise, resolution).
+                // i. Perform FulfillPromise(promise, resolution).
                 try fulfillPromise(agent_, promise_, resolution);
 
-                // b. Return undefined.
+                // ii. Return undefined.
                 return .undefined;
             }
 
-            // 9. Let then be Completion(Get(resolution, "then")).
-            // 11. Let thenAction be then.[[Value]].
+            // e. Let then be Completion(Get(resolution, "then")).
+            // g. Let thenAction be then.[[Value]].
             const then_action = resolution.asObject().get(
                 agent_,
                 PropertyKey.from("then"),
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
 
-                // 10. If then is an abrupt completion, then
+                // f. If then is an abrupt completion, then
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
-                    // a. Perform RejectPromise(promise, then.[[Value]]).
+                    // i. Perform RejectPromise(promise, then.[[Value]]).
                     try rejectPromise(agent_, promise_, exception.value);
 
-                    // b. Return undefined.
+                    // ii. Return undefined.
                     return .undefined;
                 },
             };
 
-            // 12. If IsCallable(thenAction) is false, then
+            // h. If IsCallable(thenAction) is false, then
             if (!then_action.isCallable()) {
-                // a. Perform FulfillPromise(promise, resolution).
+                // i. Perform FulfillPromise(promise, resolution).
                 try fulfillPromise(agent_, promise_, resolution);
 
-                // b. Return undefined.
+                // ii. Return undefined.
                 return .undefined;
             }
 
-            // 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
+            // i. Let thenJobCallback be HostMakeJobCallback(thenAction).
             const then_job_callback = agent_.host_hooks.hostMakeJobCallback(then_action.asObject());
 
-            // 14. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
+            // j. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
             const job = try newPromiseResolveThenableJob(
                 agent_,
                 promise_,
@@ -192,88 +188,58 @@ pub fn createResolvingFunctions(
                 then_job_callback,
             );
 
-            // 15. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+            // k. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
             try agent_.host_hooks.hostEnqueuePromiseJob(agent_, job.job, job.realm);
 
-            // 16. Return undefined.
+            // l. Return undefined.
             return .undefined;
         }
     }.func;
 
-    // 3. Let lengthResolve be the number of non-optional parameters of the function definition in
-    //    Promise Resolve Functions.
-    const length_resolve = 1;
-
-    // 4. Let resolve be CreateBuiltinFunction(stepsResolve, lengthResolve, "", « [[Promise]],
-    //    [[AlreadyResolved]] »).
+    // 3. Let resolve be CreateBuiltinFunction(resolveSteps, 1, "", « »).
     const resolve = try createBuiltinFunction(
         agent,
-        .{ .function = steps_resolve },
-        length_resolve,
+        .{ .function = resolve_steps },
+        1,
         "",
         .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
     );
 
-    additional_fields.* = .{
-        // 5. Set resolve.[[Promise]] to promise.
-        .promise = promise,
-
-        // 6. Set resolve.[[AlreadyResolved]] to alreadyResolved.
-        .already_resolved = already_resolved,
-    };
-
-    // 7. Let stepsReject be the algorithm steps defined in Promise Reject Functions.
-    const steps_reject = struct {
-        /// 27.2.1.3.1 Promise Reject Functions
-        /// https://tc39.es/ecma262/#sec-promise-reject-functions
+    // 4. Let rejectSteps be a new Abstract Closure with parameters (reason) that captures promise
+    //    and alreadyResolved and performs the following steps when called:
+    const reject_steps = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const reason = arguments.get(0);
 
-            // 1. Let F be the active function object.
             const function = agent_.activeFunctionObject();
-
-            // 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
             const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-
-            // 3. Let promise be F.[[Promise]].
             const promise_ = additional_fields_.promise;
-
-            // 4. Let alreadyResolved be F.[[AlreadyResolved]].
             const already_resolved_ = &additional_fields_.already_resolved;
 
-            // 5. If alreadyResolved.[[Value]] is true, return undefined.
+            // a. If alreadyResolved.[[Value]] is true, return undefined.
             if (already_resolved_.value) return .undefined;
 
-            // 6. Set alreadyResolved.[[Value]] to true.
+            // b. Set alreadyResolved.[[Value]] to true.
             already_resolved_.value = true;
 
-            // 7. Perform RejectPromise(promise, reason).
+            // c. Perform RejectPromise(promise, reason).
             try rejectPromise(agent_, promise_, reason);
 
-            // 8. Return undefined.
+            // d. Return undefined.
             return .undefined;
         }
     }.func;
 
-    // 8. Let lengthReject be the number of non-optional parameters of the function definition in
-    //    Promise Reject Functions.
-    const length_reject = 1;
-
-    // 9. Let reject be CreateBuiltinFunction(stepsReject, lengthReject, "", « [[Promise]],
-    //    [[AlreadyResolved]] »).
+    // 5. Let reject be CreateBuiltinFunction(rejectSteps, 1, "", « »).
     const reject = try createBuiltinFunction(
         agent,
-        .{ .function = steps_reject },
-        length_reject,
+        .{ .function = reject_steps },
+        1,
         "",
         .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
     );
 
-    // 10. Set reject.[[Promise]] to promise.
-    // 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
-    // NOTE: This was already done for the resolve function, `additional_fields` is shared between both.
-
-    // 12. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
+    // 6. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
     return .{ .resolve = resolve, .reject = reject };
 }
 
