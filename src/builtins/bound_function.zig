@@ -90,9 +90,9 @@ pub fn boundFunctionCreate(
         // 4. Set obj.[[Prototype]] to proto.
         .prototype = prototype,
 
-        // 5. Set obj.[[Call]] as described in 10.4.1.1.
+        // 5. Set obj.[[Call]] as specified in 10.4.1.1.
         // 6. If IsConstructor(targetFunction) is true, then
-        //     a. Set obj.[[Construct]] as described in 10.4.1.2.
+        //     a. Set obj.[[Construct]] as specified in 10.4.1.2.
         .internal_methods = if (Value.from(target_function).isConstructor())
             .initComptime(.{ .call = call, .construct = construct })
         else

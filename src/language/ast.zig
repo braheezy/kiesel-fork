@@ -3118,7 +3118,7 @@ pub const ClassBody = struct {
         // ClassElementList : ClassElementList ClassElement
         // 1. Let list be the NonConstructorElements of ClassElementList.
         // 2. If the ClassElementKind of ClassElement is non-constructor-method, then
-        //     a. Append ClassElement to the end of list.
+        //     a. Append ClassElement to list.
         // 3. Return list.
         var class_elements = try std.ArrayList(ClassElement).initCapacity(
             allocator,

@@ -256,7 +256,7 @@ pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Gene
     // NOTE: All iterators using [[GeneratorBrand]] in the spec are implemented without generators
     //       so this is currently not needed.
 
-    // 4. Assert: generator also has a [[GeneratorContext]] internal slot.
+    // 4. Assert: generator has a [[GeneratorContext]] internal slot.
     // 5. Let state be generator.[[GeneratorState]].
     const state = generator.fields.generator_state;
 

@@ -75,7 +75,7 @@ pub const constructor = struct {
         );
     }
 
-    /// 20.1.1.1 Object ( [ value ] )
+    /// 20.1.1.1 Object ( value )
     /// https://tc39.es/ecma262/#sec-object-value
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*types.Object) Agent.Error!Value {
         const realm = agent.currentRealm();
