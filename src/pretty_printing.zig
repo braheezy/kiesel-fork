@@ -904,6 +904,11 @@ fn prettyPrintIntlPluralRules(
         Value.from(resolved_options.type).fmtPretty(),
         Value.from(resolved_options.notation).fmtPretty(),
     });
+    if (resolved_options.compact_display) |compact_display| {
+        try writer.print(", compactDisplay: {f}", .{
+            Value.from(compact_display).fmtPretty(),
+        });
+    }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);

@@ -65,12 +65,12 @@ pub const constructor = struct {
             );
         }
 
-        // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
+        // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.PluralRules.prototype%", « [[InitializedPluralRules]], [[Locale]], [[Type]],
-        //    [[Notation]], [[MinimumIntegerDigits]], [[MinimumFractionDigits]],
-        //    [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
+        //    [[Notation]], [[CompactDisplay]], [[MinimumIntegerDigits]],
+        //    [[MinimumFractionDigits]], [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
         //    [[MaximumSignificantDigits]], [[RoundingType]], [[RoundingIncrement]],
-        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
+        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
         const plural_rules = try ordinaryCreateFromConstructor(
             PluralRules,
             agent,
@@ -80,6 +80,7 @@ pub const constructor = struct {
                 .locale = undefined,
                 .type = undefined,
                 .notation = undefined,
+                .compact_display = null,
             },
         );
 
@@ -158,9 +159,31 @@ pub const constructor = struct {
         });
         plural_rules.fields.notation = notation_map.get(notation.asAscii()).?;
 
-        // TODO: 14. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
+        // 14. Let compactDisplay be ? GetOption(options, "compactDisplay", string, « "short",
+        //     "long" », "short").
+        const compact_display = try options.getOption(
+            agent,
+            "compactDisplay",
+            .string,
+            &.{ String.fromLiteral("short"), String.fromLiteral("long") },
+            String.fromLiteral("short"),
+        );
 
-        // 15. Return pluralRules.
+        // 15. If notation is "compact", then
+        if (plural_rules.fields.notation == .compact) {
+            // a. Set pluralRules.[[CompactDisplay]] to compactDisplay.
+            const compact_display_map = std.StaticStringMap(
+                PluralRules.Fields.CompactDisplay,
+            ).initComptime(&.{
+                .{ "short", .short },
+                .{ "long", .long },
+            });
+            plural_rules.fields.compact_display = compact_display_map.get(compact_display.asAscii()).?;
+        }
+
+        // TODO: 16. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
+
+        // 17. Return pluralRules.
         return Value.from(&plural_rules.object);
     }
 };
@@ -269,6 +292,13 @@ pub const prototype = struct {
             PropertyKey.from("notation"),
             Value.from(resolved_options.notation),
         );
+        if (resolved_options.compact_display) |compact_display| {
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("compactDisplay"),
+                Value.from(compact_display),
+            );
+        }
         const plural_categories_array = try createArrayFromList(agent, plural_categories.items);
         try options.createDataPropertyDirect(
             agent,
@@ -319,6 +349,11 @@ pub const PluralRules = MakeObject(.{
             compact,
         };
 
+        pub const CompactDisplay = enum {
+            short,
+            long,
+        };
+
         /// [[Locale]]
         locale: icu4zig.Locale,
 
@@ -328,9 +363,13 @@ pub const PluralRules = MakeObject(.{
         /// [[Notation]]
         notation: Notation,
 
+        /// [[CompactDisplay]]
+        compact_display: ?CompactDisplay,
+
         pub const ResolvedOptions = struct {
             type: *const String,
             notation: *const String,
+            compact_display: ?*const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
@@ -344,9 +383,17 @@ pub const PluralRules = MakeObject(.{
                 .engineering => String.fromLiteral("engineering"),
                 .compact => String.fromLiteral("compact"),
             };
+            const compact_display = if (self.compact_display) |compact_display|
+                switch (compact_display) {
+                    .short => String.fromLiteral("short"),
+                    .long => String.fromLiteral("long"),
+                }
+            else
+                null;
             return .{
                 .type = @"type",
                 .notation = notation,
+                .compact_display = compact_display,
             };
         }
     },
@@ -381,8 +428,13 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
     // 6. Let notation be pluralRules.[[Notation]].
     const notation = plural_rules_object.fields.notation;
 
-    // 7. Let p be PluralRuleSelect(locale, type, notation, s).
-    _ = notation; // TODO: Use this once ICU4X supports it.
+    // 7. Let compactDisplay be pluralRules.[[CompactDisplay]].
+    const compact_display = plural_rules_object.fields.compact_display;
+
+    // 8. Let p be PluralRuleSelect(locale, type, notation, compactDisplay, s).
+    // TODO: Use these once ICU4X supports it.
+    _ = notation;
+    _ = compact_display;
     const plural_rules = icu4zig.PluralRules.init(locale, switch (@"type") {
         .cardinal => .cardinal,
         .ordinal => .ordinal,
@@ -393,6 +445,6 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         .f64 => |value| .{ .f64 = value },
     }) catch unreachable;
 
-    // 8. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    // 9. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
 }
