@@ -89,6 +89,8 @@ lazy_intrinsics: struct {
     @"%Intl.ListFormat.prototype%": ?*Object = null,
     @"%Intl.Locale%": ?*Object = null,
     @"%Intl.Locale.prototype%": ?*Object = null,
+    @"%Intl.NumberFormat%": ?*Object = null,
+    @"%Intl.NumberFormat.prototype%": ?*Object = null,
     @"%Intl.PluralRules%": ?*Object = null,
     @"%Intl.PluralRules.prototype%": ?*Object = null,
     @"%Intl.Segmenter%": ?*Object = null,
@@ -424,6 +426,12 @@ pub fn @"%Intl.Locale%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
 }
 pub fn @"%Intl.Locale.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.intl.locale.prototype);
+}
+pub fn @"%Intl.NumberFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.NumberFormat%", builtins.intl.number_format.constructor);
+}
+pub fn @"%Intl.NumberFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.NumberFormat.prototype%", builtins.intl.number_format.prototype);
 }
 pub fn @"%Intl.PluralRules%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.PluralRules%", builtins.intl.plural_rules.constructor);

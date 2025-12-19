@@ -55,33 +55,68 @@ pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) *const String {
     };
 }
 
-/// 6.9.1 AvailableCalendars ( )
-/// https://tc39.es/ecma402/#sec-availablecalendars
-pub inline fn availableCalendars() []const *const String {
-    // The implementation-defined abstract operation AvailableCalendars takes no arguments and
-    // returns a List of Strings. The returned List is sorted according to lexicographic code unit
-    // order, and contains unique calendar types in canonical form (6.9) identifying the calendars
-    // for which the implementation provides the functionality of Intl.DateTimeFormat objects,
-    // including their aliases (e.g., either both or neither of "islamicc" and "islamic-civil").
-    // The List must include "iso8601".
-    // NOTE: For now we only include the canonical BCP 47 language tags, so this isn't spec compliant.
-    comptime {
-        const calendar_kinds = std.enums.values(icu4zig.Calendar.Kind);
-        var result: [calendar_kinds.len - 1]*const String = undefined;
-        var i = 0;
-        for (calendar_kinds) |calendar_kind| {
-            if (calendar_kind == .japanese_extended) continue;
-            result[i] = calendarToBcp47(calendar_kind);
-            i += 1;
-        }
-        std.mem.sortUnstable(*const String, &result, {}, struct {
-            fn lessThanFn(_: void, lhs: *const String, rhs: *const String) bool {
-                return std.mem.lessThan(u8, lhs.asAscii(), rhs.asAscii());
-            }
-        }.lessThanFn);
-        const final = result; // Load bearing const assignment
-        return &final;
+/// 6.3.1 IsWellFormedCurrencyCode ( currency )
+/// https://tc39.es/ecma402/#sec-iswellformedcurrencycode
+pub fn isWellFormedCurrencyCode(currency: *const String) bool {
+    // 1. If the length of currency is not 3, return false.
+    if (currency.length != 3) return false;
+
+    // 2. Let normalized be the ASCII-uppercase of currency.
+    // 3. If normalized contains any code unit outside of 0x0041 through 0x005A (corresponding to
+    //    Unicode characters LATIN CAPITAL LETTER A through LATIN CAPITAL LETTER Z), return false.
+    // 4. Return true.
+    return switch (currency.asAsciiOrUtf16()) {
+        .ascii => |ascii| std.ascii.isAlphabetic(ascii[0]) and
+            std.ascii.isAlphabetic(ascii[1]) and
+            std.ascii.isAlphabetic(ascii[2]),
+        .utf16 => false,
+    };
+}
+
+/// 6.6.1 IsWellFormedUnitIdentifier ( unitIdentifier )
+/// https://tc39.es/ecma402/#sec-iswellformedunitidentifier
+pub fn isWellFormedUnitIdentifier(unit_identifier: *const String) bool {
+    const ascii = switch (unit_identifier.asAsciiOrUtf16()) {
+        .ascii => |ascii| ascii,
+        .utf16 => return false,
+    };
+
+    // 1. If IsSanctionedSingleUnitIdentifier(unitIdentifier) is true, then
+    if (isSanctionedSingleUnitIdentifier(ascii)) {
+        // a. Return true.
+        return true;
     }
+
+    // 2. Let i be StringIndexOf(unitIdentifier, "-per-", 0).
+    // 3. If i is not-found or StringIndexOf(unitIdentifier, "-per-", i + 1) is not not-found, then
+    // a. Return false.
+    // 4. Assert: The five-character substring "-per-" occurs exactly once in unitIdentifier, at index i.
+    var it = std.mem.splitSequence(u8, ascii, "-per-");
+
+    // 5. Let numerator be the substring of unitIdentifier from 0 to i.
+    const numerator = it.next() orelse return false;
+
+    // 6. Let denominator be the substring of unitIdentifier from i + 5.
+    const denominator = it.next() orelse return false;
+
+    if (it.next() != null) return false;
+
+    // 7. If IsSanctionedSingleUnitIdentifier(numerator) and IsSanctionedSingleUnitIdentifier(denominator)
+    //    are both true, then
+    //     a. Return true.
+    // 8. Return false.
+    return isSanctionedSingleUnitIdentifier(numerator) and isSanctionedSingleUnitIdentifier(denominator);
+}
+
+/// 6.6.2 IsSanctionedSingleUnitIdentifier ( unitIdentifier )
+/// https://tc39.es/ecma402/#sec-issanctionedsingleunitidentifier
+fn isSanctionedSingleUnitIdentifier(unit_identifier: []const u8) bool {
+    // 1. If unitIdentifier is listed in Table 2 below, return true.
+    // 2. Else, return false.
+    for (availableCanonicalUnits()) |canonical_unit| {
+        if (std.mem.eql(u8, canonical_unit.asAscii(), unit_identifier)) return true;
+    }
+    return false;
 }
 
 /// 6.6.3 AvailableCanonicalUnits ( )
@@ -144,6 +179,35 @@ pub fn availableCanonicalNumberingSystems() []const *const String {
         String.fromLiteral("tibt"),     String.fromLiteral("tirh"),     String.fromLiteral("tnsa"),
         String.fromLiteral("vaii"),     String.fromLiteral("wara"),     String.fromLiteral("wcho"),
     };
+}
+
+/// 6.9.1 AvailableCalendars ( )
+/// https://tc39.es/ecma402/#sec-availablecalendars
+pub inline fn availableCalendars() []const *const String {
+    // The implementation-defined abstract operation AvailableCalendars takes no arguments and
+    // returns a List of Strings. The returned List is sorted according to lexicographic code unit
+    // order, and contains unique calendar types in canonical form (6.9) identifying the calendars
+    // for which the implementation provides the functionality of Intl.DateTimeFormat objects,
+    // including their aliases (e.g., either both or neither of "islamicc" and "islamic-civil").
+    // The List must include "iso8601".
+    // NOTE: For now we only include the canonical BCP 47 language tags, so this isn't spec compliant.
+    comptime {
+        const calendar_kinds = std.enums.values(icu4zig.Calendar.Kind);
+        var result: [calendar_kinds.len - 1]*const String = undefined;
+        var i = 0;
+        for (calendar_kinds) |calendar_kind| {
+            if (calendar_kind == .japanese_extended) continue;
+            result[i] = calendarToBcp47(calendar_kind);
+            i += 1;
+        }
+        std.mem.sortUnstable(*const String, &result, {}, struct {
+            fn lessThanFn(_: void, lhs: *const String, rhs: *const String) bool {
+                return std.mem.lessThan(u8, lhs.asAscii(), rhs.asAscii());
+            }
+        }.lessThanFn);
+        const final = result; // Load bearing const assignment
+        return &final;
+    }
 }
 
 /// 9.2.1 CanonicalizeLocaleList ( locales )
@@ -240,7 +304,45 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     return seen;
 }
 
-/// 9.2.13 DefaultNumberOption ( value, minimum, maximum, fallback )
+/// 9.2.13 GetBooleanOrStringNumberFormatOption ( options, property, stringValues, fallback )
+/// https://tc39.es/ecma402/#sec-getbooleanorstringnumberformatoption
+pub fn getBooleanOrStringNumberFormatOption(
+    agent: *Agent,
+    options: *Object,
+    comptime property: []const u8,
+    string_values: []const *const String,
+    fallback: *const String,
+) Agent.Error!union(enum) {
+    bool: bool,
+    string: *const String,
+} {
+    // 1. Let value be ? Get(options, property).
+    const value = try options.get(agent, PropertyKey.from(property));
+
+    // 2. If value is undefined, return fallback.
+    if (value.isUndefined()) return .{ .string = fallback };
+
+    // 3. If value is true, return true.
+    if (value.isBoolean() and value.asBoolean()) return .{ .bool = true };
+
+    // 4. If ToBoolean(value) is false, return false.
+    if (!value.toBoolean()) return .{ .bool = false };
+
+    // 5. Set value to ? ToString(value).
+    const string_value = try value.toString(agent);
+
+    // 6. If stringValues does not contain value, throw a RangeError exception.
+    for (string_values) |allowed_string_value| {
+        if (string_value.eql(allowed_string_value)) break;
+    } else {
+        return agent.throwException(.range_error, "Invalid value for option '{s}'", .{property});
+    }
+
+    // 7. Return value.
+    return .{ .string = string_value };
+}
+
+/// 9.2.14 DefaultNumberOption ( value, minimum, maximum, fallback )
 /// https://tc39.es/ecma402/#sec-defaultnumberoption
 pub fn defaultNumberOption(
     agent: *Agent,
@@ -273,7 +375,7 @@ pub fn defaultNumberOption(
     return @intFromFloat(@floor(number.asFloat()));
 }
 
-/// 9.2.14 GetNumberOption ( options, property, minimum, maximum, fallback )
+/// 9.2.15 GetNumberOption ( options, property, minimum, maximum, fallback )
 /// https://tc39.es/ecma402/#sec-getnumberoption
 pub fn getNumberOption(
     agent: *Agent,

@@ -33,6 +33,7 @@ pub const display_names = @import("./intl/display_names.zig");
 pub const duration_format = @import("./intl/duration_format.zig");
 pub const list_format = @import("./intl/list_format.zig");
 pub const locale = @import("./intl/locale.zig");
+pub const number_format = @import("./intl/number_format.zig");
 pub const plural_rules = @import("./intl/plural_rules.zig");
 pub const segment_iterator = @import("./intl/segment_iterator.zig");
 pub const segmenter = @import("./intl/segmenter.zig");
@@ -44,6 +45,7 @@ pub const DisplayNames = display_names.DisplayNames;
 pub const DurationFormat = duration_format.DurationFormat;
 pub const ListFormat = list_format.ListFormat;
 pub const Locale = locale.Locale;
+pub const NumberFormat = number_format.NumberFormat;
 pub const PluralRules = plural_rules.PluralRules;
 pub const SegmentIterator = segment_iterator.SegmentIterator;
 pub const Segmenter = segmenter.Segmenter;
@@ -123,6 +125,14 @@ pub const namespace = struct {
             agent,
             "Locale",
             Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+        );
+
+        // 8.2.7 Intl.NumberFormat ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.numberformat-intro
+        try object.defineBuiltinProperty(
+            agent,
+            "NumberFormat",
+            Value.from(try realm.intrinsics.@"%Intl.NumberFormat%"()),
         );
 
         // 8.2.8 Intl.PluralRules ( . . . )

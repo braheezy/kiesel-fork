@@ -887,6 +887,76 @@ fn prettyPrintIntlLocale(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlNumberFormat(
+    intl_number_format: *const builtins.intl.NumberFormat,
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
+    const locale = intl_number_format.fields.locale;
+    const tty_config = state.platform.tty_config;
+
+    const resolved_options = intl_number_format.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.NumberFormat(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{f}, numberingSystem: {f}, style: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.numbering_system).fmtPretty(),
+        Value.from(resolved_options.style).fmtPretty(),
+    });
+    if (resolved_options.currency) |currency| {
+        try writer.print(", currency: {f}", .{Value.from(currency).fmtPretty()});
+    }
+    if (resolved_options.currency_display) |currency_display| {
+        try writer.print(", currencyDisplay: {f}", .{Value.from(currency_display).fmtPretty()});
+    }
+    if (resolved_options.currency_sign) |currency_sign| {
+        try writer.print(", currencySign: {f}", .{Value.from(currency_sign).fmtPretty()});
+    }
+    if (resolved_options.unit) |unit| {
+        try writer.print(", unit: {f}", .{Value.from(unit).fmtPretty()});
+    }
+    if (resolved_options.unit_display) |unit_display| {
+        try writer.print(", unitDisplay: {f}", .{Value.from(unit_display).fmtPretty()});
+    }
+    try writer.print(", minimumIntegerDigits: {f}", .{
+        Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
+    });
+    if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
+        try writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+    }
+    if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
+        try writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+    }
+    if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
+        try writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+    }
+    if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
+        try writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+    }
+    try writer.print(", useGrouping: {f}, notation: {f}", .{
+        switch (resolved_options.use_grouping) {
+            .false => Value.from(false),
+            .string => |string| Value.from(string),
+        }.fmtPretty(),
+        Value.from(resolved_options.notation).fmtPretty(),
+    });
+    if (resolved_options.compact_display) |compact_display| {
+        try writer.print(", compactDisplay: {f}", .{Value.from(compact_display).fmtPretty()});
+    }
+    try writer.print(", signDisplay: {f}, roundingIncrement: {f}, roundingMode: {f}, " ++
+        "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
+        Value.from(resolved_options.sign_display).fmtPretty(),
+        Value.from(resolved_options.rounding_increment).fmtPretty(),
+        Value.from(resolved_options.rounding_mode).fmtPretty(),
+        Value.from(resolved_options.rounding_priority).fmtPretty(),
+        Value.from(resolved_options.trailing_zero_display).fmtPretty(),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlPluralRules(
     intl_plural_rules: *const builtins.intl.PluralRules,
     writer: *std.Io.Writer,
@@ -1337,6 +1407,7 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
             .{ builtins.intl.DurationFormat, prettyPrintIntlDurationFormat },
             .{ builtins.intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.intl.Locale, prettyPrintIntlLocale },
+            .{ builtins.intl.NumberFormat, prettyPrintIntlNumberFormat },
             .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },
             .{ builtins.intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) ++ (if (build_options.enable_temporal) .{
