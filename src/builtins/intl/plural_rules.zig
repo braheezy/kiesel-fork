@@ -440,10 +440,11 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         .ordinal => .ordinal,
     });
     defer plural_rules.deinit();
-    const plural_category = plural_rules.categoryFor(switch (n) {
-        .i32 => |value| .{ .i32 = value },
-        .f64 => |value| .{ .f64 = value },
-    }) catch unreachable;
+    const decimal = switch (n) {
+        .i32 => |value| icu4zig.Decimal.fromI32(value),
+        .f64 => |value| icu4zig.Decimal.fromDoubleWithRoundTripPrecision(value) catch unreachable,
+    };
+    const plural_category = plural_rules.categoryFor(decimal);
 
     // 9. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
