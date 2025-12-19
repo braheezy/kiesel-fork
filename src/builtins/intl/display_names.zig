@@ -289,8 +289,8 @@ pub const prototype = struct {
         // 4. For each row of Table 18, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
         //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot value of the current row.
-        //     c. Assert: v is not undefined.
-        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //     c. If v is not undefined, then
+        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = display_names.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
