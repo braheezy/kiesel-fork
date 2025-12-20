@@ -511,6 +511,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
         try object.defineBuiltinAccessor(agent, "format", format, null, realm);
+        try object.defineBuiltinFunction(agent, "formatRange", formatRange, 1, realm);
 
         // 11.3.1 Intl.DateTimeFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.constructor
@@ -679,6 +680,31 @@ pub const prototype = struct {
         // 5. Return dtf.[[BoundFormat]].
         return Value.from(&date_time_format.fields.bound_format.?.object);
     }
+
+    /// 11.3.4 Intl.DateTimeFormat.prototype.formatRange ( startDate, endDate )
+    /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.formatRange
+    fn formatRange(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const start_date = arguments.get(0);
+        const end_date = arguments.get(1);
+
+        // 1. Let dtf be this value.
+        // 2. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
+        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+
+        // 3. If startDate is undefined or endDate is undefined, throw a TypeError exception.
+        if (start_date.isUndefined() or end_date.isUndefined()) {
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. Let x be ? ToNumber(startDate).
+        const x = try start_date.toNumber(agent);
+
+        // 5. Let y be ? ToNumber(endDate).
+        const y = try end_date.toNumber(agent);
+
+        // 6. Return ? FormatDateTimeRange(dtf, x, y).
+        return formatDateTimeRange(agent, date_time_format, x.asFloat(), y.asFloat());
+    }
 };
 
 /// 11.4 Properties of Intl.DateTimeFormat Instances
@@ -756,6 +782,11 @@ pub const DateTimeFormat = MakeObject(.{
 /// 11.5.7 FormatDateTime ( dateTimeFormat, x )
 /// https://tc39.es/ecma402/#sec-formatdatetime
 pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_: f64) Agent.Error!Value {
+    // 1. Let parts be ? PartitionDateTimePattern(dateTimeFormat, x).
+    // 2. Let result be the empty String.
+    // 3. For each Record { [[Type]], [[Value]] } part of parts, do
+    //     a. Set result to the string-concatenation of result and part.[[Value]].
+    // 4. Return result.
     const date = @import("../date.zig");
     const x = date.timeClip(x_);
     if (std.math.isNan(x)) return agent.throwException(.range_error, "Invalid time value", .{});
@@ -839,4 +870,41 @@ fn formatDateTimeImpl(
     );
 
     return result;
+}
+
+/// 11.5.10 FormatDateTimeRange ( dateTimeFormat, x, y )
+/// https://tc39.es/ecma402/#sec-formatdatetimerange
+pub fn formatDateTimeRange(agent: *Agent, date_time_format: *const DateTimeFormat, x_: f64, y_: f64) Agent.Error!Value {
+    // 1. Let parts be ? PartitionDateTimeRangePattern(dateTimeFormat, x, y).
+    // 2. Let result be the empty String.
+    // 3. For each Record { [[Type]], [[Value]], [[Source]] } part of parts, do
+    //     a. Set result to the string-concatenation of result and part.[[Value]].
+    // 4. Return result.
+    const date = @import("../date.zig");
+    const x = date.timeClip(x_);
+    if (std.math.isNan(x)) return agent.throwException(.range_error, "Invalid time value", .{});
+    const y = date.timeClip(y_);
+    if (std.math.isNan(y)) return agent.throwException(.range_error, "Invalid time value", .{});
+    const result_x = formatDateTimeImpl(
+        agent.gc_allocator,
+        date_time_format,
+        x,
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
+    };
+    const result_y = formatDateTimeImpl(
+        agent.gc_allocator,
+        date_time_format,
+        y,
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
+    };
+    if (std.mem.eql(u8, result_x, result_y)) {
+        return Value.from(try String.fromUtf8(agent, result_x));
+    } else {
+        const result = try std.mem.concat(agent.gc_allocator, u8, &.{ result_x, " – ", result_y });
+        return Value.from(try String.fromUtf8(agent, result));
+    }
 }

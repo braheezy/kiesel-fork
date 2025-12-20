@@ -824,6 +824,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
         try object.defineBuiltinAccessor(agent, "format", format, null, realm);
+        try object.defineBuiltinFunction(agent, "formatRange", formatRange, 2, realm);
 
         // 16.3.1 Intl.NumberFormat.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.numberformat.prototype.constructor
@@ -1068,6 +1069,31 @@ pub const prototype = struct {
 
         // 5. Return nf.[[BoundFormat]].
         return Value.from(&number_format.fields.bound_format.?.object);
+    }
+
+    /// 16.3.4 Intl.NumberFormat.prototype.formatRange ( start, end )
+    /// https://tc39.es/ecma402/#sec-intl.numberformat.prototype.formatrange
+    fn formatRange(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let nf be the this value.
+        // 2. Perform ? RequireInternalSlot(nf, [[InitializedNumberFormat]]).
+        const number_format = try this_value.requireInternalSlot(agent, NumberFormat);
+
+        // 3. If start is undefined or end is undefined, throw a TypeError exception.
+        if (start.isUndefined() or end.isUndefined()) {
+            return agent.throwException(.type_error, "Argument must not be undefined", .{});
+        }
+
+        // 4. Let x be ? ToIntlMathematicalValue(start).
+        const x = try toIntlMathematicalValue(agent, start);
+
+        // 5. Let y be ? ToIntlMathematicalValue(end).
+        const y = try toIntlMathematicalValue(agent, end);
+
+        // 6. Return ? FormatNumericRange(nf, x, y).
+        return formatNumericRange(agent, number_format, x, y);
     }
 };
 
@@ -1426,4 +1452,28 @@ pub fn toIntlMathematicalValue(agent: *Agent, value: Value) Agent.Error!IntlMath
         .{ .mathematical_value = decimal }
     else |_|
         .not_a_number;
+}
+
+/// 16.5.22 FormatNumericRange ( numberFormat, x, y )
+/// https://tc39.es/ecma402/#sec-formatnumericrange
+fn formatNumericRange(
+    agent: *Agent,
+    number_format: *const NumberFormat,
+    x: IntlMathematicalValue,
+    y: IntlMathematicalValue,
+) std.mem.Allocator.Error!Value {
+    // 1. Let parts be ? PartitionNumberRangePattern(numberFormat, x, y).
+    // 2. Let result be the empty String.
+    // 3. For each element part of parts, do
+    //     a. Set result to the string-concatenation of result and part.[[Value]].
+    // 4. Return result.
+    const result_x = try formatNumericImpl(agent.gc_allocator, number_format, x);
+    const result_y = try formatNumericImpl(agent.gc_allocator, number_format, y);
+    if (std.mem.eql(u8, result_x, result_y)) {
+        const result = try std.mem.concat(agent.gc_allocator, u8, &.{ "≈", result_x });
+        return Value.from(try String.fromUtf8(agent, result));
+    } else {
+        const result = try std.mem.concat(agent.gc_allocator, u8, &.{ result_x, "–", result_y });
+        return Value.from(try String.fromUtf8(agent, result));
+    }
 }
