@@ -984,6 +984,29 @@ fn prettyPrintIntlPluralRules(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlRelativeTimeFormat(
+    intl_relative_time_format: *const builtins.intl.RelativeTimeFormat,
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
+    const locale = intl_relative_time_format.fields.locale;
+    const tty_config = state.platform.tty_config;
+
+    const resolved_options = intl_relative_time_format.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.RelativeTimeFormat(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{f}, style: {f}, numeric: {f}, numberingSystem: {f}", .{
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(resolved_options.style).fmtPretty(),
+        Value.from(resolved_options.numeric).fmtPretty(),
+        Value.from(resolved_options.numbering_system).fmtPretty(),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.intl.Segmenter,
     writer: *std.Io.Writer,
@@ -1409,6 +1432,7 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
             .{ builtins.intl.Locale, prettyPrintIntlLocale },
             .{ builtins.intl.NumberFormat, prettyPrintIntlNumberFormat },
             .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },
+            .{ builtins.intl.RelativeTimeFormat, prettyPrintIntlRelativeTimeFormat },
             .{ builtins.intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) ++ (if (build_options.enable_temporal) .{
             .{ builtins.temporal.Duration, prettyPrintTemporalDuration },

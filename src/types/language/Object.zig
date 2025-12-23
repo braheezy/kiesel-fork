@@ -96,6 +96,7 @@ pub const Tag = enum(u32) {
     intl_locale,
     intl_number_format,
     intl_plural_rules,
+    intl_relative_time_format,
     intl_segmenter,
     intl_segments,
     intl_segment_iterator,

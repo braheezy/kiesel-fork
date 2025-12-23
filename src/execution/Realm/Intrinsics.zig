@@ -93,6 +93,8 @@ lazy_intrinsics: struct {
     @"%Intl.NumberFormat.prototype%": ?*Object = null,
     @"%Intl.PluralRules%": ?*Object = null,
     @"%Intl.PluralRules.prototype%": ?*Object = null,
+    @"%Intl.RelativeTimeFormat%": ?*Object = null,
+    @"%Intl.RelativeTimeFormat.prototype%": ?*Object = null,
     @"%Intl.Segmenter%": ?*Object = null,
     @"%Intl.Segmenter.prototype%": ?*Object = null,
     @"%IntlSegmentsPrototype%": ?*Object = null,
@@ -438,6 +440,12 @@ pub fn @"%Intl.PluralRules%"(self: *Intrinsics) std.mem.Allocator.Error!*Object 
 }
 pub fn @"%Intl.PluralRules.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.PluralRules.prototype%", builtins.intl.plural_rules.prototype);
+}
+pub fn @"%Intl.RelativeTimeFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.RelativeTimeFormat%", builtins.intl.relative_time_format.constructor);
+}
+pub fn @"%Intl.RelativeTimeFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
+    return self.lazyIntrinsic("%Intl.RelativeTimeFormat.prototype%", builtins.intl.relative_time_format.prototype);
 }
 pub fn @"%Intl.Segmenter%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
     return self.lazyIntrinsic("%Intl.Segmenter%", builtins.intl.segmenter.constructor);

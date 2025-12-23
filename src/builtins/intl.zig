@@ -35,6 +35,7 @@ pub const list_format = @import("./intl/list_format.zig");
 pub const locale = @import("./intl/locale.zig");
 pub const number_format = @import("./intl/number_format.zig");
 pub const plural_rules = @import("./intl/plural_rules.zig");
+pub const relative_time_format = @import("./intl/relative_time_format.zig");
 pub const segment_iterator = @import("./intl/segment_iterator.zig");
 pub const segmenter = @import("./intl/segmenter.zig");
 pub const segments = @import("./intl/segments.zig");
@@ -47,6 +48,7 @@ pub const ListFormat = list_format.ListFormat;
 pub const Locale = locale.Locale;
 pub const NumberFormat = number_format.NumberFormat;
 pub const PluralRules = plural_rules.PluralRules;
+pub const RelativeTimeFormat = relative_time_format.RelativeTimeFormat;
 pub const SegmentIterator = segment_iterator.SegmentIterator;
 pub const Segmenter = segmenter.Segmenter;
 pub const Segments = segments.Segments;
@@ -141,6 +143,14 @@ pub const namespace = struct {
             agent,
             "PluralRules",
             Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
+        );
+
+        // 8.2.9 Intl.RelativeTimeFormat ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.relativetimeformat-intro
+        try object.defineBuiltinProperty(
+            agent,
+            "RelativeTimeFormat",
+            Value.from(try realm.intrinsics.@"%Intl.RelativeTimeFormat%"()),
         );
 
         // 8.2.10 Intl.Segmenter ( . . . )
