@@ -19,11 +19,10 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 18.2 Properties of the Intl.RelativeTimeFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-relativetimeformat-constructor
@@ -84,55 +83,35 @@ pub const constructor = struct {
 
         // 3. Let optionsResolution be ? ResolveOptions(%Intl.RelativeTimeFormat%,
         //    %Intl.RelativeTimeFormat%.[[LocaleData]], locales, options, « coerce-options »).
-        // 4. Set options to optionsResolution.[[Options]].
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-        const options = try options_value.coerceOptionsToObject(agent);
-        const matcher = try options.getOption(
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{
+                .{ .key = "nu", .property = "numberingSystem" },
+            },
+            locales,
+            options_value,
+            .{ .coerce_options = true },
         );
 
-        const maybe_numbering_system = try options.getOption(
-            agent,
-            "numberingSystem",
-            .string,
-            null,
-            null,
-        );
-        if (maybe_numbering_system) |numbering_system| {
-            if (!matchUnicodeLocaleIdentifierType(try numbering_system.toUtf8(agent.gc_allocator))) {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid locale identifier type '{f}'",
-                    .{numbering_system.fmtEscaped()},
-                );
-            }
-        }
+        // 4. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
         // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        _ = matcher;
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
-        const resolved = .{
-            .locale = resolved_locale,
-            .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
-                try String.fromAscii(agent, nu)
-            else
-                maybe_numbering_system orelse String.fromLiteral("latn"),
-        };
+        const r = options_resolution.resolved_locale;
 
         // 6. Let locale be r.[[Locale]].
+        const locale = r.locale;
+
         // 7. Set relativeTimeFormat.[[Locale]] to locale.
         // 8. Set relativeTimeFormat.[[LocaleData]] to r.[[LocaleData]].
-        relative_time_format.fields.locale = resolved.locale;
+        relative_time_format.fields.locale = locale;
 
         // 9. Set relativeTimeFormat.[[NumberingSystem]] to r.[[nu]].
-        relative_time_format.fields.numbering_system = resolved.numbering_system;
+        const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
+            try String.fromAscii(agent, nu)
+        else
+            r.options.nu orelse String.fromLiteral("latn");
+        relative_time_format.fields.numbering_system = numbering_system;
 
         // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" », "long").
         const style_string = try options.getOption(

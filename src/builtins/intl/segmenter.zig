@@ -18,11 +18,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSegmentsObject = builtins.intl.createSegmentsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 19.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
@@ -74,38 +74,29 @@ pub const constructor = struct {
             .{ .locale = undefined, .segmenter_granularity = undefined },
         );
 
-        // 4. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-
-        // 5. Set options to ? GetOptionsObject(options).
-        const options = try options_value.getOptionsObject(agent);
-
-        // 6. Let opt be a new Record.
-
-        // 7. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" », "best fit").
-        const matcher = try options.getOption(
+        // 4. Let optionsResolution be ? ResolveOptions(%Intl.Segmenter%,
+        //    %Intl.Segmenter%.[[LocaleData]], locales, options).
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{},
+            locales,
+            options_value,
+            .{},
         );
 
-        // TODO: 8. Set opt.[[localeMatcher]] to matcher.
-        // TODO: 9. Let r be ResolveLocale(%Intl.Segmenter%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.Segmenter%.[[RelevantExtensionKeys]], %Intl.Segmenter%.[[LocaleData]]).
-        _ = matcher;
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
+        // 5. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
-        // 10. Set segmenter.[[Locale]] to r.[[Locale]].
-        segmenter.fields.locale = resolved_locale;
+        // 6. Let r be optionsResolution.[[ResolvedLocale]].
+        const r = options_resolution.resolved_locale;
+        const locale = r.locale;
 
-        // 11. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
+        // 7. Set segmenter.[[Locale]] to r.[[Locale]].
+        segmenter.fields.locale = locale;
+
+        // 8. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
         //     "sentence" », "grapheme").
-        const granularity = try options.getOption(
+        const granularity_string = try options.getOption(
             agent,
             "granularity",
             .string,
@@ -116,18 +107,18 @@ pub const constructor = struct {
             },
             String.fromLiteral("grapheme"),
         );
-
-        // 12. Set segmenter.[[SegmenterGranularity]] to granularity.
-        const granularity_map = std.StaticStringMap(
+        const granularity = std.StaticStringMap(
             Segmenter.Fields.SegmenterGranularity,
         ).initComptime(&.{
             .{ "grapheme", .grapheme },
             .{ "word", .word },
             .{ "sentence", .sentence },
-        });
-        segmenter.fields.segmenter_granularity = granularity_map.get(granularity.asAscii()).?;
+        }).get(granularity_string.asAscii()).?;
 
-        // 13. Return segmenter.
+        // 9. Set segmenter.[[SegmenterGranularity]] to granularity.
+        segmenter.fields.segmenter_granularity = granularity;
+
+        // 10. Return segmenter.
         return Value.from(&segmenter.object);
     }
 };

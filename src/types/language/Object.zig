@@ -1298,25 +1298,27 @@ pub fn initializeInstanceElements(
     // 5. Return unused.
 }
 
+pub const OptionType = enum {
+    boolean,
+    number,
+    string,
+
+    pub fn T(self: OptionType) type {
+        return switch (self) {
+            .boolean => bool,
+            .number => Number,
+            .string => *const String,
+        };
+    }
+};
+
 /// 9.2.13 GetOption ( options, property, type, values, default )
 /// https://tc39.es/ecma402/#sec-getoption
 pub fn getOption(
     self: *Object,
     agent: *Agent,
     comptime property: []const u8,
-    comptime type_: enum {
-        boolean,
-        number,
-        string,
-
-        fn T(t: @This()) type {
-            return switch (t) {
-                .boolean => bool,
-                .number => Number,
-                .string => *const String,
-            };
-        }
-    },
+    comptime type_: OptionType,
     values: ?[]const type_.T(),
     default: anytype,
 ) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?type_.T() else type_.T() {

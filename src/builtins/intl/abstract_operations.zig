@@ -304,6 +304,163 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     return seen;
 }
 
+fn OptionsResolution(comptime ResolutionType: type) type {
+    return struct {
+        options: *Object,
+        resolved_locale: ResolutionType,
+    };
+}
+
+fn Resolution(comptime ResolutionOptionsType: type) type {
+    return struct {
+        locale: icu4zig.Locale,
+        options: ResolutionOptionsType,
+    };
+}
+
+fn ResolutionOptions(comptime resolution_option_descriptors: anytype) type {
+    var fields: []const std.builtin.Type.StructField = &.{};
+    inline for (resolution_option_descriptors) |desc| {
+        const @"type": Object.OptionType = if (@hasField(@TypeOf(desc), "type")) desc.type else .string;
+        const T = ?@"type".T();
+        const field: std.builtin.Type.StructField = .{
+            .name = desc.key ++ "",
+            .type = T,
+            .default_value_ptr = null,
+            .is_comptime = false,
+            .alignment = @alignOf(T),
+        };
+        fields = fields ++ .{field};
+    }
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .is_tuple = false,
+            .fields = fields,
+            .decls = &.{},
+        },
+    });
+}
+
+const Matcher = enum { lookup, best_fit };
+
+/// 9.2.7 ResolveLocale ( availableLocales, requestedLocales, options, relevantExtensionKeys, localeData )
+/// tc39.es/ecma402/#sec-resolvelocale
+fn resolveLocale(
+    agent: *Agent,
+    requested_locales: []const icu4zig.Locale,
+    matcher: Matcher,
+    resolution_options: anytype,
+) Resolution(@TypeOf(resolution_options)) {
+    _ = matcher;
+    const locale = if (requested_locales.len != 0)
+        requested_locales[0]
+    else
+        agent.platform.default_locale;
+    return .{
+        .locale = locale,
+        .options = resolution_options,
+    };
+}
+
+/// 9.2.8 ResolveOptions ( constructor, localeData, locales, options [ , specialBehaviours [ , modifyResolutionOptions ] ] )
+/// https://tc39.es/ecma402/#sec-resolveoptions
+pub fn resolveOptions(
+    agent: *Agent,
+    comptime resolution_option_descriptors: anytype,
+    locales: Value,
+    options_value: Value,
+    special_behaviours: struct {
+        require_options: bool = false,
+        coerce_options: bool = false,
+    },
+) Agent.Error!OptionsResolution(Resolution(ResolutionOptions(resolution_option_descriptors))) {
+    // 1. Let requestedLocales be ? CanonicalizeLocaleList(locales).
+    const requested_locales = try canonicalizeLocaleList(agent, locales);
+
+    // 2. If specialBehaviours is present and contains require-options and options is undefined,
+    //    throw a TypeError exception.
+    if (special_behaviours.require_options and options_value.isUndefined()) {
+        return agent.throwException(.type_error, "Options object must not be undefined", .{});
+    }
+
+    // 3. If specialBehaviours is present and contains coerce-options, set options to ?
+    //    CoerceOptionsToObject(options). Otherwise, set options to ? GetOptionsObject(options).
+    const options = if (special_behaviours.coerce_options)
+        try options_value.coerceOptionsToObject(agent)
+    else
+        try options_value.getOptionsObject(agent);
+
+    // 4. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
+    //    "best fit").
+    const matcher_string = try options.getOption(
+        agent,
+        "localeMatcher",
+        .string,
+        &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
+        String.fromLiteral("best fit"),
+    );
+    const matcher = std.StaticStringMap(Matcher).initComptime(&.{
+        .{ "lookup", .lookup },
+        .{ "best fit", .best_fit },
+    }).get(matcher_string.asAscii()).?;
+
+    // 5. Let opt be the Record { [[localeMatcher]]: matcher }.
+    var resolution_options: ResolutionOptions(resolution_option_descriptors) = undefined;
+
+    // 6. For each Resolution Option Descriptor desc of constructor.[[ResolutionOptionDescriptors]], do
+    inline for (resolution_option_descriptors) |desc| {
+        const Desc = @TypeOf(desc);
+
+        // a. If desc has a [[Type]] field, let type be desc.[[Type]]. Otherwise, let type be string.
+        const @"type": Object.OptionType = if (@hasField(Desc, "type")) desc.type else .string;
+
+        // b. If desc has a [[Values]] field, let values be desc.[[Values]]. Otherwise, let values
+        //    be empty.
+        const values: ?[]const @"type".T() = if (@hasField(Desc, "values")) desc.values else null;
+
+        // c. Let value be ? GetOption(options, desc.[[Property]], type, values, undefined).
+        const maybe_value = try options.getOption(agent, desc.property, @"type", values, null);
+
+        // d. If value is not undefined, then
+        if (maybe_value) |value| {
+            // i. Set value to ! ToString(value).
+            // ii. If value cannot be matched by the type Unicode locale nonterminal, throw a
+            //     RangeError exception.
+            if (@"type" == .string) {
+                const value_utf8 = try value.toUtf8(agent.gc_allocator);
+                defer agent.gc_allocator.free(value_utf8);
+                if (!matchUnicodeLocaleIdentifierType(value_utf8)) {
+                    return agent.throwException(
+                        .range_error,
+                        "Invalid locale identifier type '{f}'",
+                        .{value.fmtEscaped()},
+                    );
+                }
+            }
+        }
+
+        // e. Let key be desc.[[Key]].
+        // f. Set opt.[[<key>]] to value.
+        @field(resolution_options, desc.key) = maybe_value;
+    }
+
+    // TODO: 7. If modifyResolutionOptions is present, perform ! modifyResolutionOptions(opt).
+
+    // 8. Let resolution be ResolveLocale(constructor.[[AvailableLocales]], requestedLocales, opt,
+    //    constructor.[[RelevantExtensionKeys]], localeData).
+    const resolution = resolveLocale(
+        agent,
+        requested_locales.items,
+        matcher,
+        resolution_options,
+    );
+
+    // 9. Return the Record { [[Options]]: options, [[ResolvedLocale]]: resolution,
+    //    [[ResolutionOptions]]: opt }.
+    return .{ .options = options, .resolved_locale = resolution };
+}
+
 /// 9.2.13 GetBooleanOrStringNumberFormatOption ( options, property, stringValues, fallback )
 /// https://tc39.es/ecma402/#sec-getbooleanorstringnumberformatoption
 pub fn getBooleanOrStringNumberFormatOption(

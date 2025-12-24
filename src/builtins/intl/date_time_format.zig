@@ -20,12 +20,11 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const calendarToBcp47 = abstract_operations.calendarToBcp47;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getNumberOption = abstract_operations.getNumberOption;
-const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 
 /// 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
@@ -61,115 +60,45 @@ pub fn createDateTimeFormat(
         },
     );
 
-    // 2. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-    const requested_locales = try canonicalizeLocaleList(agent, locales);
+    // TODO: 2-3.
 
-    // 3. Set options to ? CoerceOptionsToObject(options).
-    const options = try options_value.coerceOptionsToObject(agent);
-
-    // 4. Let opt be a new Record.
-
-    // 5. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
-    //    "best fit").
-    const matcher = try options.getOption(
+    // 4. Let optionsResolution be ? ResolveOptions(%Intl.DateTimeFormat%,
+    //    %Intl.DateTimeFormat%.[[LocaleData]], locales, options, « coerce-options »,
+    //    modifyResolutionOptions).
+    const options_resolution = try resolveOptions(
         agent,
-        "localeMatcher",
-        .string,
-        &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-        String.fromLiteral("best fit"),
-    );
-
-    // TODO: 6. Set opt.[[localeMatcher]] to matcher.
-    _ = matcher;
-
-    // 7. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
-    //    "best fit").
-    const maybe_calendar = try options.getOption(agent, "calendar", .string, null, null);
-
-    // 8. If calendar is not undefined, then
-    if (maybe_calendar) |calendar| {
-        // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
-        //    RangeError exception.
-        if (!matchUnicodeLocaleIdentifierType(try calendar.toUtf8(agent.gc_allocator))) {
-            return agent.throwException(
-                .range_error,
-                "Invalid locale identifier type '{f}'",
-                .{calendar.fmtEscaped()},
-            );
-        }
-    }
-
-    // TODO: 9. Set opt.[[ca]] to calendar.
-
-    // 10. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty, undefined).
-    const maybe_numbering_system = try options.getOption(agent, "numberingSystem", .string, null, null);
-
-    // 11. If numberingSystem is not undefined, then
-    if (maybe_numbering_system) |numbering_system| {
-        // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw a
-        //    RangeError exception.
-        if (!matchUnicodeLocaleIdentifierType(try numbering_system.toUtf8(agent.gc_allocator))) {
-            return agent.throwException(
-                .range_error,
-                "Invalid locale identifier type '{f}'",
-                .{numbering_system.fmtEscaped()},
-            );
-        }
-    }
-
-    // TODO: 12. Set opt.[[nu]] to numberingSystem.
-
-    // 13. Let hour12 be ? GetOption(options, "hour12", boolean, empty, undefined).
-    const hour12 = try options.getOption(agent, "hour12", .boolean, null, null);
-
-    // 14. Let hourCycle be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" », undefined).
-    var hour_cycle = try options.getOption(
-        agent,
-        "hourCycle",
-        .string,
         &.{
-            String.fromLiteral("h11"),
-            String.fromLiteral("h12"),
-            String.fromLiteral("h23"),
-            String.fromLiteral("h24"),
+            .{ .key = "ca", .property = "calendar" },
+            .{ .key = "nu", .property = "numberingSystem" },
+            .{ .key = "hour12", .property = "hour12", .type = .boolean },
+            .{ .key = "hc", .property = "hourCycle", .values = &.{
+                String.fromLiteral("h11"),
+                String.fromLiteral("h12"),
+                String.fromLiteral("h23"),
+                String.fromLiteral("h24"),
+            } },
         },
-        null,
+        locales,
+        options_value,
+        .{ .coerce_options = true },
     );
 
-    // 15. If hour12 is not undefined, then
-    if (hour12 != null) {
-        // a. Set hourCycle to null.
-        hour_cycle = null;
-    }
+    // 5. Set options to optionsResolution.[[Options]].
+    const options = options_resolution.options;
 
-    // TODO: 16. Set opt.[[hc]] to hourCycle.
+    // 6. Let r be optionsResolution.[[ResolvedLocale]].
+    const r = options_resolution.resolved_locale;
+    const locale = r.locale;
 
-    // TODO: 17. Let r be ResolveLocale(%Intl.DateTimeFormat%.[[AvailableLocales]], requestedLocales,
-    //           opt, %Intl.DateTimeFormat%.[[RelevantExtensionKeys]], %Intl.DateTimeFormat%.[[LocaleData]]).
-    const resolved_locale = if (requested_locales.items.len != 0)
-        requested_locales.items[0]
+    // 7. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
+    date_time_format.fields.locale = locale;
+
+    // 8. Let resolvedCalendar be r.[[ca]].
+    const resolved_calendar = if (try locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
+        try String.fromAscii(agent, ca)
     else
-        agent.platform.default_locale;
-    const resolved = .{
-        .locale = resolved_locale,
-        .calendar = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
-            try String.fromAscii(agent, ca)
-        else
-            maybe_calendar orelse String.fromLiteral("gregory"),
-        .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
-            try String.fromAscii(agent, nu)
-        else
-            maybe_numbering_system orelse String.fromLiteral("latn"),
-    };
-
-    // 18. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
-    date_time_format.fields.locale = resolved.locale;
-
-    // 19. Let resolvedCalendar be r.[[ca]].
-    // 20. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
-    const calendar_map = std.StaticStringMap(
-        icu4zig.Calendar.Kind,
-    ).initComptime(&.{
+        r.options.ca orelse String.fromLiteral("gregory");
+    const calendar = std.StaticStringMap(icu4zig.Calendar.Kind).initComptime(&.{
         .{ "buddhist", .buddhist },
         .{ "chinese", .chinese },
         .{ "coptic", .coptic },
@@ -187,18 +116,24 @@ pub fn createDateTimeFormat(
         .{ "japanese", .japanese },
         .{ "persian", .persian },
         .{ "roc", .roc },
-    });
-    date_time_format.fields.calendar = calendar_map.get(resolved.calendar.asAscii()) orelse .gregorian;
+    }).get(resolved_calendar.asAscii()) orelse .gregorian;
 
-    // 21. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
-    date_time_format.fields.numbering_system = resolved.numbering_system;
+    // 9. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
+    date_time_format.fields.calendar = calendar;
 
-    // TODO: 22-25.
+    // 10. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
+    const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
+        try String.fromAscii(agent, nu)
+    else
+        r.options.nu orelse String.fromLiteral("latn");
+    date_time_format.fields.numbering_system = numbering_system;
 
-    // 26. Let timeZone be ? Get(options, "timeZone").
+    // TODO: 11-14.
+
+    // 15. Let timeZone be ? Get(options, "timeZone").
     const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
-    // 27. If timeZone is undefined, then
+    // 16. If timeZone is undefined, then
     const time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
         const time_zone = systemTimeZoneIdentifier(agent.platform);
@@ -207,12 +142,12 @@ pub fn createDateTimeFormat(
         temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
         break :blk try write.toOwnedSlice();
     } else blk: {
-        // 28. Else,
+        // 17. Else,
         // a. Set timeZone to ? ToString(timeZone).
         break :blk try (try time_zone_value.toString(agent)).toUtf8(agent.gc_allocator);
     };
 
-    // 29. If IsTimeZoneOffsetString(timeZone) is true, then
+    // 18. If IsTimeZoneOffsetString(timeZone) is true, then
     //     a. Let parseResult be ParseText(StringToCodePoints(timeZone), UTCOffset).
     //     b. Assert: parseResult is a Parse Node.
     //     c. If parseResult contains more than one MinuteSecond Parse Node, throw a RangeError exception.
@@ -220,22 +155,22 @@ pub fn createDateTimeFormat(
     //     e. Let offsetMinutes be offsetNanoseconds / (6 × 10**10).
     //     f. Assert: offsetMinutes is an integer.
     //     g. Set timeZone to FormatOffsetTimeZoneIdentifier(offsetMinutes).
-    // 30. Else,
+    // 19. Else,
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
     // TODO: Detect invalid time zone
 
-    // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
+    // 20. Set dateTimeFormat.[[TimeZone]] to timeZone.
     date_time_format.fields.time_zone = try String.fromAscii(agent, time_zone_string);
 
-    // TODO: 32. Let formatOptions be a new Record.
-    // TODO: 33. Set formatOptions.[[hourCycle]] to hc.
+    // TODO: 21. Let formatOptions be a new Record.
+    // TODO: 22. Set formatOptions.[[hourCycle]] to hc.
 
-    // 34. Let hasExplicitFormatComponents be false.
+    // 23. Let hasExplicitFormatComponents be false.
     var has_explicit_format_components = false;
 
-    // 35. For each row of Table 16, except the header row, in table order, do
+    // 24. For each row of Table 16, except the header row, in table order, do
     inline for (comptime .{
         .{ "weekday", &.{
             String.fromLiteral("narrow"),
@@ -323,7 +258,7 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // 36. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
+    //25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
     //     "best fit").
     const format_matcher = try options.getOption(
         agent,
@@ -333,9 +268,9 @@ pub fn createDateTimeFormat(
         String.fromLiteral("best fit"),
     );
 
-    // 37. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
+    // 26. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
-    const date_style = try options.getOption(
+    const maybe_date_style_string = try options.getOption(
         agent,
         "dateStyle",
         .string,
@@ -347,24 +282,22 @@ pub fn createDateTimeFormat(
         },
         null,
     );
-
-    // 38. Set dateTimeFormat.[[DateStyle]] to dateStyle.
-    const date_style_map = std.StaticStringMap(
-        DateTimeFormat.Fields.DateStyle,
-    ).initComptime(&.{
-        .{ "full", .full },
-        .{ "long", .long },
-        .{ "medium", .medium },
-        .{ "short", .short },
-    });
-    date_time_format.fields.date_style = if (date_style) |s|
-        date_style_map.get(s.asAscii()).?
+    const date_style = if (maybe_date_style_string) |date_style_string|
+        std.StaticStringMap(DateTimeFormat.Fields.DateStyle).initComptime(&.{
+            .{ "full", .full },
+            .{ "long", .long },
+            .{ "medium", .medium },
+            .{ "short", .short },
+        }).get(date_style_string.asAscii()).?
     else
         null;
 
-    // 39. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
+    // 27. Set dateTimeFormat.[[DateStyle]] to dateStyle.
+    date_time_format.fields.date_style = date_style;
+
+    // 28. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
-    const time_style = try options.getOption(
+    const maybe_time_style_string = try options.getOption(
         agent,
         "timeStyle",
         .string,
@@ -376,22 +309,20 @@ pub fn createDateTimeFormat(
         },
         null,
     );
-
-    // 40. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
-    const time_style_map = std.StaticStringMap(
-        DateTimeFormat.Fields.TimeStyle,
-    ).initComptime(&.{
-        .{ "full", .full },
-        .{ "long", .long },
-        .{ "medium", .medium },
-        .{ "short", .short },
-    });
-    date_time_format.fields.time_style = if (time_style) |s|
-        time_style_map.get(s.asAscii()).?
+    const time_style = if (maybe_time_style_string) |time_style_string|
+        std.StaticStringMap(DateTimeFormat.Fields.TimeStyle).initComptime(&.{
+            .{ "full", .full },
+            .{ "long", .long },
+            .{ "medium", .medium },
+            .{ "short", .short },
+        }).get(time_style_string.asAscii()).?
     else
         null;
 
-    // 41. If dateStyle is not undefined or timeStyle is not undefined, then
+    // 29. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
+    date_time_format.fields.time_style = time_style;
+
+    // 30. If dateStyle is not undefined or timeStyle is not undefined, then
     if (date_style != null or time_style != null) {
         // a. If hasExplicitFormatComponents is true, then
         if (has_explicit_format_components) {
@@ -426,7 +357,7 @@ pub fn createDateTimeFormat(
         // TODO: d. Let styles be resolvedLocaleData.[[styles]].[[<resolvedCalendar>]].
         // TODO: e. Let bestFormat be DateTimeStyleFormat(dateStyle, timeStyle, styles).
     } else {
-        // 42. Else,
+        // 31. Else,
         // TODO: a-f.
         _ = defaults;
 
@@ -439,11 +370,11 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // TODO: 43. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
-    // TODO: 44. If bestFormat has a field [[hour]], then
+    // TODO: 32. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
+    // TODO: 33. If bestFormat has a field [[hour]], then
     //           a. Set dateTimeFormat.[[HourCycle]] to hc.
 
-    // 45. Return dateTimeFormat.
+    // 34. Return dateTimeFormat.
     return date_time_format;
 }
 

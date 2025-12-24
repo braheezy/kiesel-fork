@@ -19,11 +19,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 17.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
@@ -84,58 +84,45 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-
-        // 4. Set options to ? CoerceOptionsToObject(options).
-        const options = try options_value.coerceOptionsToObject(agent);
-
-        // 5. Let opt be a new Record.
-
-        // 6. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup",
-        //    "best fit" », "best fit").
-        const matcher = try options.getOption(
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.PluralRules%,
+        //    %Intl.PluralRules%.[[LocaleData]], locales, options, « coerce-options »).
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{},
+            locales,
+            options_value,
+            .{ .coerce_options = true },
         );
 
-        // TODO: 7. Set opt.[[localeMatcher]] to matcher.
-        _ = matcher;
+        // 4. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
-        // TODO: 8. Let r be ResolveLocale(%Intl.PluralRules%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.PluralRules%.[[RelevantExtensionKeys]], %Intl.PluralRules%.[[LocaleData]]).
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
+        // 5. Let r be optionsResolution.[[ResolvedLocale]].
+        const r = options_resolution.resolved_locale;
+        const locale = r.locale;
 
-        // 9. Set pluralRules.[[Locale]] to r.[[Locale]].
-        plural_rules.fields.locale = resolved_locale;
+        // 6. Set pluralRules.[[Locale]] to r.[[Locale]].
+        plural_rules.fields.locale = locale;
 
-        // 10. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
-        const type_ = try options.getOption(
+        // 7. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
+        const type_string = try options.getOption(
             agent,
             "type",
             .string,
             &.{ String.fromLiteral("cardinal"), String.fromLiteral("ordinal") },
             String.fromLiteral("cardinal"),
         );
-
-        // 11. Set pluralRules.[[Type]] to t.
-        const type_map = std.StaticStringMap(
-            PluralRules.Fields.Type,
-        ).initComptime(&.{
+        const @"type" = std.StaticStringMap(PluralRules.Fields.Type).initComptime(&.{
             .{ "cardinal", .cardinal },
             .{ "ordinal", .ordinal },
-        });
-        plural_rules.fields.type = type_map.get(type_.asAscii()).?;
+        }).get(type_string.asAscii()).?;
 
-        // 12. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
-        //     "engineering", "compact" », "standard").
-        const notation = try options.getOption(
+        // 8. Set pluralRules.[[Type]] to t.
+        plural_rules.fields.type = @"type";
+
+        // 9. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
+        //    "engineering", "compact" », "standard").
+        const notation_string = try options.getOption(
             agent,
             "notation",
             .string,
@@ -147,43 +134,41 @@ pub const constructor = struct {
             },
             String.fromLiteral("standard"),
         );
-
-        // 13. Set pluralRules.[[Notation]] to notation.
-        const notation_map = std.StaticStringMap(
-            PluralRules.Fields.Notation,
-        ).initComptime(&.{
+        const notation = std.StaticStringMap(PluralRules.Fields.Notation).initComptime(&.{
             .{ "standard", .standard },
             .{ "scientific", .scientific },
             .{ "engineering", .engineering },
             .{ "compact", .compact },
-        });
-        plural_rules.fields.notation = notation_map.get(notation.asAscii()).?;
+        }).get(notation_string.asAscii()).?;
 
-        // 14. Let compactDisplay be ? GetOption(options, "compactDisplay", string, « "short",
+        // 10. Set pluralRules.[[Notation]] to notation.
+        plural_rules.fields.notation = notation;
+
+        // 11. Let compactDisplay be ? GetOption(options, "compactDisplay", string, « "short",
         //     "long" », "short").
-        const compact_display = try options.getOption(
+        const compact_display_string = try options.getOption(
             agent,
             "compactDisplay",
             .string,
             &.{ String.fromLiteral("short"), String.fromLiteral("long") },
             String.fromLiteral("short"),
         );
+        const compact_display = std.StaticStringMap(
+            PluralRules.Fields.CompactDisplay,
+        ).initComptime(&.{
+            .{ "short", .short },
+            .{ "long", .long },
+        }).get(compact_display_string.asAscii()).?;
 
-        // 15. If notation is "compact", then
-        if (plural_rules.fields.notation == .compact) {
+        // 12. If notation is "compact", then
+        if (notation == .compact) {
             // a. Set pluralRules.[[CompactDisplay]] to compactDisplay.
-            const compact_display_map = std.StaticStringMap(
-                PluralRules.Fields.CompactDisplay,
-            ).initComptime(&.{
-                .{ "short", .short },
-                .{ "long", .long },
-            });
-            plural_rules.fields.compact_display = compact_display_map.get(compact_display.asAscii()).?;
+            plural_rules.fields.compact_display = compact_display;
         }
 
-        // TODO: 16. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
+        // TODO: 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
 
-        // 17. Return pluralRules.
+        // 14. Return pluralRules.
         return Value.from(&plural_rules.object);
     }
 };

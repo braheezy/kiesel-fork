@@ -18,12 +18,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getNumberOption = abstract_operations.getNumberOption;
-const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 13.2 Properties of the Intl.DurationFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-constructor
@@ -97,84 +96,52 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-
-        // 4. Let options be ? GetOptionsObject(options).
-        const options = try options_value.getOptionsObject(agent);
-
-        // 5. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
-        //    "best fit").
-        const matcher = try options.getOption(
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DurationFormat%,
+        //    %Intl.DurationFormat%.[[LocaleData]], locales, options).
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{
+                .{ .key = "nu", .property = "numberingSystem" },
+            },
+            locales,
+            options_value,
+            .{},
         );
 
-        // 6. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
-        //    undefined).
-        const maybe_numbering_system = try options.getOption(
-            agent,
-            "numberingSystem",
-            .string,
-            null,
-            null,
-        );
+        // 4. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
-        // 7. If numberingSystem is not undefined, then
-        if (maybe_numbering_system) |numbering_system| {
-            // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw a
-            //    RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(try numbering_system.toUtf8(agent.gc_allocator))) {
-                return agent.throwException(
-                    .range_error,
-                    "Invalid locale identifier type '{f}'",
-                    .{numbering_system.fmtEscaped()},
-                );
-            }
-        }
+        // 5. Let r be optionsResolution.[[ResolvedLocale]].
+        const r = options_resolution.resolved_locale;
+        const locale = r.locale;
 
-        // 8. Let opt be the Record { [[localeMatcher]]: matcher, [[nu]]: numberingSystem }.
-        // TODO: 9. Let r be ResolveLocale(%Intl.DurationFormat%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.DurationFormat%.[[RelevantExtensionKeys]], %Intl.DurationFormat%.[[LocaleData]]).
-        _ = matcher;
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
-        const resolved = .{
-            .locale = resolved_locale,
-            .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
-                try String.fromAscii(agent, nu)
-            else
-                maybe_numbering_system orelse String.fromLiteral("latn"),
-        };
+        // 6. Set durationFormat.[[Locale]] to r.[[Locale]].
+        duration_format.fields.locale = locale;
 
-        // 10. Set durationFormat.[[Locale]] to r.[[Locale]].
-        duration_format.fields.locale = resolved.locale;
-
-        // TODO: 11. Let resolvedLocaleData be r.[[LocaleData]].
-        // 12. Let digitalFormat be resolvedLocaleData.[[DigitalFormat]].
+        // TODO: 7. Let resolvedLocaleData be r.[[LocaleData]].
+        // 8. Let digitalFormat be resolvedLocaleData.[[DigitalFormat]].
         const digital_format = .{
             .hour_minute_separator = ':',
             .minute_second_separator = ':',
             .two_digit_hours = false,
         };
 
-        // 13. Set durationFormat.[[HourMinuteSeparator]] to digitalFormat.[[HourMinuteSeparator]].
+        // 9. Set durationFormat.[[HourMinuteSeparator]] to digitalFormat.[[HourMinuteSeparator]].
         duration_format.fields.hour_minute_separator = digital_format.hour_minute_separator;
 
-        // 14. Set durationFormat.[[MinuteSecondSeparator]] to digitalFormat.[[MinuteSecondSeparator]].
+        // 10. Set durationFormat.[[MinuteSecondSeparator]] to digitalFormat.[[MinuteSecondSeparator]].
         duration_format.fields.minute_second_separator = digital_format.minute_second_separator;
 
-        // 15. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
-        duration_format.fields.numbering_system = resolved.numbering_system;
+        // 11. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
+        const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
+            try String.fromAscii(agent, nu)
+        else
+            r.options.nu orelse String.fromLiteral("latn");
+        duration_format.fields.numbering_system = numbering_system;
 
-        // 16. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow",
+        // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow",
         //     "digital" », "short").
-        const style = try options.getOption(
+        const style_string = try options.getOption(
             agent,
             "style",
             .string,
@@ -186,22 +153,20 @@ pub const constructor = struct {
             },
             String.fromLiteral("short"),
         );
-
-        // 17. Set durationFormat.[[Style]] to style.
-        const style_map = std.StaticStringMap(
-            DurationFormat.Fields.Style,
-        ).initComptime(&.{
+        const style = std.StaticStringMap(DurationFormat.Fields.Style).initComptime(&.{
             .{ "long", .long },
             .{ "short", .short },
             .{ "narrow", .narrow },
             .{ "digital", .digital },
-        });
-        duration_format.fields.style = style_map.get(style.asAscii()).?;
+        }).get(style_string.asAscii()).?;
 
-        // 18. Let prevStyle be the empty String.
-        var prev_style = String.empty;
+        // 13. Set durationFormat.[[Style]] to style.
+        duration_format.fields.style = style;
 
-        // 19. For each row of Table 20, except the header row, in table order, do
+        // 14. Let prevStyle be the empty String.
+        var prev_style: *const String = .empty;
+
+        // 15. For each row of Table 20, except the header row, in table order, do
         const Row = struct { Unit, []const *const String, *const String };
         inline for (comptime [_]Row{
             .{
@@ -310,6 +275,9 @@ pub const constructor = struct {
             // d. Let digitalBase be the Digital Default value of the current row.
             const unit, const styles, const digital_base = row;
             const slot = std.fmt.comptimePrint("{t}_options", .{unit});
+            const UnitOptions = @FieldType(DurationFormat.Fields, slot);
+            const UnitStyle = @FieldType(UnitOptions, "style");
+            const UnitDisplay = @FieldType(UnitOptions, "display");
 
             // e. Let unitOptions be ? GetDurationUnitOptions(unit, options, style, styles,
             //    digitalBase, prevStyle, digitalFormat.[[TwoDigitHours]]).
@@ -317,16 +285,14 @@ pub const constructor = struct {
                 agent,
                 unit,
                 options,
-                style,
+                style_string,
                 styles,
                 digital_base,
                 prev_style,
                 digital_format.two_digit_hours,
             );
 
-            const unit_style_map = std.StaticStringMap(
-                @FieldType(@FieldType(DurationFormat.Fields, slot), "style"),
-            ).initComptime(switch (unit) {
+            const unit_style = std.StaticStringMap(UnitStyle).initComptime(switch (unit) {
                 .years, .months, .weeks, .days => &.{
                     .{ "long", .long },
                     .{ "short", .short },
@@ -345,18 +311,17 @@ pub const constructor = struct {
                     .{ "narrow", .narrow },
                     .{ "fractional", .fractional },
                 },
-            });
-            const unit_display_map = std.StaticStringMap(
-                @FieldType(@FieldType(DurationFormat.Fields, slot), "display"),
-            ).initComptime(&.{
+            }).get(unit_options.style.asAscii()).?;
+
+            const unit_display = std.StaticStringMap(UnitDisplay).initComptime(&.{
                 .{ "auto", .auto },
                 .{ "always", .always },
-            });
+            }).get(unit_options.display.asAscii()).?;
 
             // f. Set the value of durationFormat's internal slot whose name is slot to unitOptions.
             @field(duration_format.fields, slot) = .{
-                .style = unit_style_map.get(unit_options.style.asAscii()).?,
-                .display = unit_display_map.get(unit_options.display.asAscii()).?,
+                .style = unit_style,
+                .display = unit_display,
             };
 
             switch (unit) {
@@ -370,7 +335,7 @@ pub const constructor = struct {
             }
         }
 
-        // 20. Set durationFormat.[[FractionalDigits]] to ? GetNumberOption(options,
+        // 16. Set durationFormat.[[FractionalDigits]] to ? GetNumberOption(options,
         //     "fractionalDigits", 0, 9, undefined).
         duration_format.fields.fractional_digits = if (try getNumberOption(
             agent,
@@ -384,7 +349,7 @@ pub const constructor = struct {
         else
             null;
 
-        // 21. Return durationFormat.
+        //17. Return durationFormat.
         return Value.from(&duration_format.object);
     }
 };

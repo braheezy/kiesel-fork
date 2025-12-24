@@ -18,10 +18,10 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
@@ -82,41 +82,25 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-
-        // 4. If options is undefined, throw a TypeError exception.
-        if (options_value.isUndefined()) {
-            return agent.throwException(.type_error, "Options object must not be undefined", .{});
-        }
-
-        // 5. Set options to ? GetOptionsObject(options).
-        const options = try options_value.getOptionsObject(agent);
-
-        // 6. Let opt be a new Record.
-
-        // 7. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" »,
-        //    "best fit").
-        const matcher = try options.getOption(
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DisplayNames%,
+        //    %Intl.DisplayNames%.[[LocaleData]], locales, options, « require-options »).
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{},
+            locales,
+            options_value,
+            .{ .require_options = true },
         );
 
-        // TODO: 8. Set opt.[[localeMatcher]] to matcher.
-        // TODO: 9. Let r be ResolveLocale(%Intl.DisplayNames%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.DisplayNames%.[[RelevantExtensionKeys]], %Intl.DisplayNames%.[[LocaleData]]).
-        _ = matcher;
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
+        // 4. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
-        // 10. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
-        //     "long").
-        const style = try options.getOption(
+        // 5. Let r be optionsResolution.[[ResolvedLocale]].
+        const r = options_resolution.resolved_locale;
+
+        // 6. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
+        //    "long").
+        const style_string = try options.getOption(
             agent,
             "style",
             .string,
@@ -127,20 +111,18 @@ pub const constructor = struct {
             },
             String.fromLiteral("long"),
         );
-
-        // 11. Set displayNames.[[Style]] to style.
-        const style_map = std.StaticStringMap(
-            icu4zig.DisplayNamesOptions.Style,
-        ).initComptime(&.{
+        const style = std.StaticStringMap(icu4zig.DisplayNamesOptions.Style).initComptime(&.{
             .{ "narrow", .narrow },
             .{ "short", .short },
             .{ "long", .long },
-        });
-        display_names.fields.options.style = style_map.get(style.asAscii()).?;
+        }).get(style_string.asAscii()).?;
 
-        // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
-        //     "currency", "calendar", "dateTimeField" », undefined).
-        const @"type" = try options.getOption(
+        // 7. Set displayNames.[[Style]] to style.
+        display_names.fields.options.style = style;
+
+        // 8. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
+        //    "currency", "calendar", "dateTimeField" », undefined).
+        const type_string = try options.getOption(
             agent,
             "type",
             .string,
@@ -153,28 +135,25 @@ pub const constructor = struct {
                 String.fromLiteral("dateTimeField"),
             },
             null,
-        );
-
-        // 13. If type is undefined, throw a TypeError exception.
-        if (@"type" == null) {
+        ) orelse {
+            // 9. If type is undefined, throw a TypeError exception.
             return agent.throwException(.type_error, "'type' option must not be undefined", .{});
-        }
+        };
 
-        // 14. Set displayNames.[[Type]] to type.
-        const type_map = std.StaticStringMap(
-            DisplayNames.Fields.Type,
-        ).initComptime(&.{
+        const @"type" = std.StaticStringMap(DisplayNames.Fields.Type).initComptime(&.{
             .{ "language", .language },
             .{ "region", .region },
             .{ "script", .script },
             .{ "currency", .currency },
             .{ "calendar", .calendar },
             .{ "dateTimeField", .date_time_field },
-        });
-        display_names.fields.type = type_map.get(@"type".?.asAscii()).?;
+        }).get(type_string.asAscii()).?;
 
-        // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
-        const fallback = try options.getOption(
+        // 10. Set displayNames.[[Type]] to type.
+        display_names.fields.type = @"type";
+
+        // 11. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
+        const fallback_string = try options.getOption(
             agent,
             "fallback",
             .string,
@@ -184,26 +163,24 @@ pub const constructor = struct {
             },
             String.fromLiteral("code"),
         );
-
-        // 16. Set displayNames.[[Fallback]] to fallback.
-        const fallback_map = std.StaticStringMap(
-            icu4zig.DisplayNamesOptions.Fallback,
-        ).initComptime(&.{
+        const fallback = std.StaticStringMap(icu4zig.DisplayNamesOptions.Fallback).initComptime(&.{
             .{ "code", .code },
             .{ "none", .none },
-        });
-        display_names.fields.options.fallback = fallback_map.get(fallback.asAscii()).?;
+        }).get(fallback_string.asAscii()).?;
 
-        // 17. Set displayNames.[[Locale]] to r.[[Locale]].
-        display_names.fields.locale = resolved_locale;
+        // 12. Set displayNames.[[Fallback]] to fallback.
+        display_names.fields.options.fallback = fallback;
 
-        // 18. Let resolvedLocaleData be r.[[LocaleData]].
-        // 19. Let types be resolvedLocaleData.[[types]].
-        // 20. Assert: types is a Record (see 12.2.3).
+        // 13. Set displayNames.[[Locale]] to r.[[Locale]].
+        display_names.fields.locale = r.locale;
 
-        // 21. Let languageDisplay be ? GetOption(options, "languageDisplay", string, « "dialect",
+        // 14. Let resolvedLocaleData be r.[[LocaleData]].
+        // 15. Let types be resolvedLocaleData.[[types]].
+        // 16. Assert: types is a Record (see 12.2.3).
+
+        // 17. Let languageDisplay be ? GetOption(options, "languageDisplay", string, « "dialect",
         //     "standard" », "dialect").
-        const language_display = try options.getOption(
+        const language_display_string = try options.getOption(
             agent,
             "languageDisplay",
             .string,
@@ -213,27 +190,27 @@ pub const constructor = struct {
             },
             String.fromLiteral("dialect"),
         );
-
-        // 22. Let typeFields be types.[[<type>]].
-        // 23. Assert: typeFields is a Record (see 12.2.3).
-        // 24. If type is "language", then
-        //     a. Set displayNames.[[LanguageDisplay]] to languageDisplay.
-        //     b. Set typeFields to typeFields.[[<languageDisplay>]].
-        //     c. Assert: typeFields is a Record (see 12.2.3).
-        // NOTE: We do this unconditionally as it's part of the options struct.
-        const language_display_map = std.StaticStringMap(
+        const language_display = std.StaticStringMap(
             icu4zig.DisplayNamesOptions.LanguageDisplay,
         ).initComptime(&.{
             .{ "dialect", .dialect },
             .{ "standard", .standard },
-        });
-        display_names.fields.options.language_display = language_display_map.get(language_display.asAscii()).?;
+        }).get(language_display_string.asAscii()).?;
 
-        // 25. Let styleFields be typeFields.[[<style>]].
-        // 26. Assert: styleFields is a Record (see 12.2.3).
-        // 27. Set displayNames.[[Fields]] to styleFields.
+        // 18. Let typeFields be types.[[<type>]].
+        // 19. Assert: typeFields is a Record (see 12.2.3).
+        // 20. If type is "language", then
+        //     a. Set displayNames.[[LanguageDisplay]] to languageDisplay.
+        //     b. Set typeFields to typeFields.[[<languageDisplay>]].
+        //     c. Assert: typeFields is a Record (see 12.2.3).
+        // NOTE: We do this unconditionally as it's part of the options struct.
+        display_names.fields.options.language_display = language_display;
 
-        // 28. Return displayNames.
+        // 21. Let styleFields be typeFields.[[<style>]].
+        // 22. Assert: styleFields is a Record (see 12.2.3).
+        // 23. Set displayNames.[[Fields]] to styleFields.
+
+        // 24. Return displayNames.
         return Value.from(&display_names.object);
     }
 };

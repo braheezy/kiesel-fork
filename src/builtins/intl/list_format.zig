@@ -18,11 +18,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const resolveOptions = abstract_operations.resolveOptions;
 
 /// 14.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
@@ -79,38 +79,29 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let requestedLocales be ? CanonicalizeLocaleList(locales).
-        const requested_locales = try canonicalizeLocaleList(agent, locales);
-
-        // 4. Set options to ? GetOptionsObject(options).
-        const options = try options_value.getOptionsObject(agent);
-
-        // 5. Let opt be a new Record.
-
-        // 6. Let matcher be ? GetOption(options, "localeMatcher", string, « "lookup", "best fit" », "best fit").
-        const matcher = try options.getOption(
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.ListFormat%,
+        //    %Intl.ListFormat%.[[LocaleData]], locales, options).
+        const options_resolution = try resolveOptions(
             agent,
-            "localeMatcher",
-            .string,
-            &.{ String.fromLiteral("lookup"), String.fromLiteral("best fit") },
-            String.fromLiteral("best fit"),
+            &.{},
+            locales,
+            options_value,
+            .{},
         );
 
-        // TODO: 7. Set opt.[[localeMatcher]] to matcher.
-        // TODO: 8. Let r be ResolveLocale(%Intl.ListFormat%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.ListFormat%.[[RelevantExtensionKeys]], %Intl.ListFormat%.[[LocaleData]]).
-        _ = matcher;
-        const resolved_locale = if (requested_locales.items.len != 0)
-            requested_locales.items[0]
-        else
-            agent.platform.default_locale;
+        // 4. Set options to optionsResolution.[[Options]].
+        const options = options_resolution.options;
 
-        // 9. Set listFormat.[[Locale]] to r.[[Locale]].
-        list_format.fields.locale = resolved_locale;
+        // 5. Let r be optionsResolution.[[ResolvedLocale]].
+        const r = options_resolution.resolved_locale;
+        const locale = r.locale;
 
-        // 10. Let type be ? GetOption(options, "type", string, « "conjunction", "disjunction",
-        //     "unit" », "conjunction").
-        const type_ = try options.getOption(
+        // 6. Set listFormat.[[Locale]] to r.[[Locale]].
+        list_format.fields.locale = locale;
+
+        // 7. Let type be ? GetOption(options, "type", string, « "conjunction", "disjunction",
+        //    "unit" », "conjunction").
+        const type_string = try options.getOption(
             agent,
             "type",
             .string,
@@ -121,20 +112,18 @@ pub const constructor = struct {
             },
             String.fromLiteral("conjunction"),
         );
-
-        // 11. Set listFormat.[[Type]] to type.
-        const type_map = std.StaticStringMap(
-            ListFormat.Fields.Type,
-        ).initComptime(&.{
+        const @"type" = std.StaticStringMap(ListFormat.Fields.Type).initComptime(&.{
             .{ "conjunction", .conjunction },
             .{ "disjunction", .disjunction },
             .{ "unit", .unit },
-        });
-        list_format.fields.type = type_map.get(type_.asAscii()).?;
+        }).get(type_string.asAscii()).?;
 
-        // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
+        // 8. Set listFormat.[[Type]] to type.
+        list_format.fields.type = @"type";
+
+        // 9. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
-        const style = try options.getOption(
+        const style_string = try options.getOption(
             agent,
             "style",
             .string,
@@ -145,22 +134,20 @@ pub const constructor = struct {
             },
             String.fromLiteral("long"),
         );
-
-        // 13. Set listFormat.[[Style]] to style.
-        const style_map = std.StaticStringMap(
-            ListFormat.Fields.Style,
-        ).initComptime(&.{
+        const style = std.StaticStringMap(ListFormat.Fields.Style).initComptime(&.{
             .{ "long", .long },
             .{ "short", .short },
             .{ "narrow", .narrow },
-        });
-        list_format.fields.style = style_map.get(style.asAscii()).?;
+        }).get(style_string.asAscii()).?;
 
-        // TODO: 14. Let resolvedLocaleData be r.[[LocaleData]].
-        // TODO: 15. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].
-        // TODO: 16. Set listFormat.[[Templates]] to dataLocaleTypes.[[<style>]].
+        // 10. Set listFormat.[[Style]] to style.
+        list_format.fields.style = style;
 
-        // 17. Return listFormat.
+        // TODO: 11. Let resolvedLocaleData be r.[[LocaleData]].
+        // TODO: 12. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].
+        // TODO: 13. Set listFormat.[[Templates]] to dataLocaleTypes.[[<style>]].
+
+        // 14. Return listFormat.
         return Value.from(&list_format.object);
     }
 };
