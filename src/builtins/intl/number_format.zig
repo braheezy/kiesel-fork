@@ -200,6 +200,7 @@ pub const constructor = struct {
         // 15. Perform ? SetNumberFormatDigitOptions(numberFormat, options, mnfdDefault,
         //     mxfdDefault, notation).
         try setNumberFormatDigitOptions(
+            NumberFormat,
             agent,
             number_format,
             options,
@@ -319,13 +320,14 @@ pub const constructor = struct {
 
     /// 16.1.2 SetNumberFormatDigitOptions ( intlObj, options, mnfdDefault, mxfdDefault, notation )
     /// https://tc39.es/ecma402/#sec-setnumberformatdigitoptions
-    fn setNumberFormatDigitOptions(
+    pub fn setNumberFormatDigitOptions(
+        comptime T: type,
         agent: *Agent,
-        number_format: *NumberFormat,
+        intl_object: *T,
         options: *Object,
         mnfd_default: u8,
         mxfd_default_arg: u8,
-        notation: NumberFormat.Fields.Notation,
+        notation: T.Fields.Notation,
     ) Agent.Error!void {
         var mxfd_default = mxfd_default_arg;
 
@@ -345,7 +347,7 @@ pub const constructor = struct {
         const mxsd_value = try options.get(agent, PropertyKey.from("maximumSignificantDigits"));
 
         // 6. Set intlObj.[[MinimumIntegerDigits]] to mnid.
-        number_format.fields.minimum_integer_digits = @intCast(mnid);
+        intl_object.fields.minimum_integer_digits = @intCast(mnid);
 
         // 7. Let roundingIncrement be ? GetNumberOption(options, "roundingIncrement", 1, 5000, 1).
         const rounding_increment_value = (try getNumberOption(agent, options, "roundingIncrement", 1, 5000, 1)).?;
@@ -353,7 +355,7 @@ pub const constructor = struct {
         // 8. If roundingIncrement is not in « 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000,
         //    2000, 2500, 5000 », throw a RangeError exception.
         const rounding_increment = std.enums.fromInt(
-            NumberFormat.Fields.RoundingIncrement,
+            T.Fields.RoundingIncrement,
             rounding_increment_value,
         ) orelse {
             return agent.throwException(
@@ -384,7 +386,7 @@ pub const constructor = struct {
             String.fromLiteral("halfExpand"),
         );
         const rounding_mode = std.StaticStringMap(
-            NumberFormat.Fields.RoundingMode,
+            T.Fields.RoundingMode,
         ).initComptime(&.{
             .{ "ceil", .ceil },
             .{ "floor", .floor },
@@ -411,7 +413,7 @@ pub const constructor = struct {
             String.fromLiteral("auto"),
         );
         const rounding_priority = std.StaticStringMap(
-            NumberFormat.Fields.RoundingPriority,
+            T.Fields.RoundingPriority,
         ).initComptime(&.{
             .{ "auto", .auto },
             .{ "morePrecision", .more_precision },
@@ -428,7 +430,7 @@ pub const constructor = struct {
             String.fromLiteral("auto"),
         );
         const trailing_zero_display = std.StaticStringMap(
-            NumberFormat.Fields.TrailingZeroDisplay,
+            T.Fields.TrailingZeroDisplay,
         ).initComptime(&.{
             .{ "auto", .auto },
             .{ "stripIfInteger", .strip_if_integer },
@@ -441,13 +443,13 @@ pub const constructor = struct {
         if (rounding_increment != .@"1") mxfd_default = mnfd_default;
 
         // 14. Set intlObj.[[RoundingIncrement]] to roundingIncrement.
-        number_format.fields.rounding_increment = rounding_increment;
+        intl_object.fields.rounding_increment = rounding_increment;
 
         // 15. Set intlObj.[[RoundingMode]] to roundingMode.
-        number_format.fields.rounding_mode = rounding_mode;
+        intl_object.fields.rounding_mode = rounding_mode;
 
         // 16. Set intlObj.[[TrailingZeroDisplay]] to trailingZeroDisplay.
-        number_format.fields.trailing_zero_display = trailing_zero_display;
+        intl_object.fields.trailing_zero_display = trailing_zero_display;
 
         // 17. If mnsd is undefined and mxsd is undefined, let hasSd be false. Otherwise, let hasSd be true.
         const has_sd = if (mnsd_value.isUndefined() and mxsd_value.isUndefined()) false else true;
@@ -479,7 +481,7 @@ pub const constructor = struct {
             if (has_sd) {
                 // i. Set intlObj.[[MinimumSignificantDigits]] to ? DefaultNumberOption(mnsd, 1,
                 //    21, 1).
-                number_format.fields.minimum_significant_digits = @intCast((try defaultNumberOption(
+                intl_object.fields.minimum_significant_digits = @intCast((try defaultNumberOption(
                     agent,
                     mnsd_value,
                     "minimumSignificantDigits",
@@ -490,11 +492,11 @@ pub const constructor = struct {
 
                 // ii. Set intlObj.[[MaximumSignificantDigits]] to ? DefaultNumberOption(mxsd,
                 //     intlObj.[[MinimumSignificantDigits]], 21, 21).
-                number_format.fields.maximum_significant_digits = @intCast((try defaultNumberOption(
+                intl_object.fields.maximum_significant_digits = @intCast((try defaultNumberOption(
                     agent,
                     mxsd_value,
                     "maximumSignificantDigits",
-                    number_format.fields.minimum_significant_digits.?,
+                    intl_object.fields.minimum_significant_digits.?,
                     21,
                     21,
                 )).?);
@@ -502,10 +504,10 @@ pub const constructor = struct {
             // b. Else,
             else {
                 // i. Set intlObj.[[MinimumSignificantDigits]] to 1.
-                number_format.fields.minimum_significant_digits = 1;
+                intl_object.fields.minimum_significant_digits = 1;
 
                 // ii. Set intlObj.[[MaximumSignificantDigits]] to 21.
-                number_format.fields.maximum_significant_digits = 21;
+                intl_object.fields.maximum_significant_digits = 21;
             }
         }
 
@@ -549,78 +551,78 @@ pub const constructor = struct {
                 }
 
                 // vi. Set intlObj.[[MinimumFractionDigits]] to mnfd.
-                number_format.fields.minimum_fraction_digits = mnfd;
+                intl_object.fields.minimum_fraction_digits = mnfd;
 
                 // vii. Set intlObj.[[MaximumFractionDigits]] to mxfd.
-                number_format.fields.maximum_fraction_digits = mxfd;
+                intl_object.fields.maximum_fraction_digits = mxfd;
             }
             // b. Else,
             else {
                 // i. Set intlObj.[[MinimumFractionDigits]] to mnfdDefault.
-                number_format.fields.minimum_fraction_digits = mnfd_default;
+                intl_object.fields.minimum_fraction_digits = mnfd_default;
 
                 // ii. Set intlObj.[[MaximumFractionDigits]] to mxfdDefault.
-                number_format.fields.maximum_fraction_digits = mxfd_default;
+                intl_object.fields.maximum_fraction_digits = mxfd_default;
             }
         }
 
         // 24. If needSd is false and needFd is false, then
         if (!need_sd and !need_fd) {
             // a. Set intlObj.[[MinimumFractionDigits]] to 0.
-            number_format.fields.minimum_fraction_digits = 0;
+            intl_object.fields.minimum_fraction_digits = 0;
 
             // b. Set intlObj.[[MaximumFractionDigits]] to 0.
-            number_format.fields.maximum_fraction_digits = 0;
+            intl_object.fields.maximum_fraction_digits = 0;
 
             // c. Set intlObj.[[MinimumSignificantDigits]] to 1.
-            number_format.fields.minimum_significant_digits = 0;
+            intl_object.fields.minimum_significant_digits = 0;
 
             // d. Set intlObj.[[MaximumSignificantDigits]] to 2.
-            number_format.fields.maximum_significant_digits = 0;
+            intl_object.fields.maximum_significant_digits = 0;
 
             // e. Set intlObj.[[RoundingType]] to more-precision.
-            number_format.fields.rounding_type = .more_precision;
+            intl_object.fields.rounding_type = .more_precision;
 
             // f. Set intlObj.[[ComputedRoundingPriority]] to "morePrecision".
-            number_format.fields.computed_rounding_priority = .more_precision;
+            intl_object.fields.computed_rounding_priority = .more_precision;
         }
         // 25. Else if roundingPriority is "morePrecision", then
         else if (rounding_priority == .more_precision) {
             // a. Set intlObj.[[RoundingType]] to more-precision.
-            number_format.fields.rounding_type = .more_precision;
+            intl_object.fields.rounding_type = .more_precision;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "morePrecision".
-            number_format.fields.computed_rounding_priority = .more_precision;
+            intl_object.fields.computed_rounding_priority = .more_precision;
         }
         // 26. Else if roundingPriority is "lessPrecision", then
         else if (rounding_priority == .less_precision) {
             // a. Set intlObj.[[RoundingType]] to less-precision.
-            number_format.fields.rounding_type = .less_precision;
+            intl_object.fields.rounding_type = .less_precision;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "lessPrecision".
-            number_format.fields.computed_rounding_priority = .less_precision;
+            intl_object.fields.computed_rounding_priority = .less_precision;
         }
         // 27. Else if hasSd is true, then
         else if (has_sd) {
             // a. Set intlObj.[[RoundingType]] to significant-digits.
-            number_format.fields.rounding_type = .significant_digits;
+            intl_object.fields.rounding_type = .significant_digits;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "auto".
-            number_format.fields.computed_rounding_priority = .auto;
+            intl_object.fields.computed_rounding_priority = .auto;
         }
         // 28. Else,
         else {
             // a. Set intlObj.[[RoundingType]] to fraction-digits.
-            number_format.fields.rounding_type = .fraction_digits;
+            intl_object.fields.rounding_type = .fraction_digits;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "auto".
-            number_format.fields.computed_rounding_priority = .auto;
+            intl_object.fields.computed_rounding_priority = .auto;
         }
 
         // 29. If roundingIncrement is not 1, then
         if (rounding_increment != .@"1") {
             // a. If intlObj.[[RoundingType]] is not fraction-digits, throw a TypeError exception.
-            if (number_format.fields.rounding_type != .fraction_digits) {
+            if (intl_object.fields.rounding_type != .fraction_digits) {
                 return agent.throwException(
                     .type_error,
                     "Invalid value for option 'roundingIncrement'",
@@ -630,7 +632,7 @@ pub const constructor = struct {
 
             // b. If intlObj.[[MaximumFractionDigits]] is not intlObj.[[MinimumFractionDigits]],
             //    throw a RangeError exception.
-            if (number_format.fields.maximum_fraction_digits != number_format.fields.minimum_fraction_digits) {
+            if (intl_object.fields.maximum_fraction_digits != intl_object.fields.minimum_fraction_digits) {
                 return agent.throwException(
                     .range_error,
                     "Options 'maximumFractionDigits' and 'minimumFractionDigits' must be equal",
@@ -1086,7 +1088,6 @@ pub const NumberFormat = MakeObject(.{
         pub const UseGrouping = enum { always, min2, auto, false };
         pub const RoundingType = enum { fraction_digits, significant_digits, more_precision, less_precision };
         pub const RoundingPriority = enum { auto, more_precision, less_precision };
-        pub const ComputedRoundingPriority = enum { auto, more_precision, less_precision };
         pub const Notation = enum { standard, scientific, engineering, compact };
         pub const CompactDisplay = enum { short, long };
         pub const SignDisplay = enum { auto, always, never, except_zero, negative };
@@ -1166,7 +1167,7 @@ pub const NumberFormat = MakeObject(.{
         rounding_type: RoundingType,
 
         /// [[ComputedRoundingPriority]]
-        computed_rounding_priority: ComputedRoundingPriority,
+        computed_rounding_priority: RoundingPriority,
 
         /// [[Notation]]
         notation: Notation,

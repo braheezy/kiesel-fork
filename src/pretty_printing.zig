@@ -979,6 +979,28 @@ fn prettyPrintIntlPluralRules(
             Value.from(compact_display).fmtPretty(),
         });
     }
+    try writer.print(", minimumIntegerDigits: {f}", .{
+        Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
+    });
+    if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
+        try writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+    }
+    if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
+        try writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+    }
+    if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
+        try writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+    }
+    if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
+        try writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+    }
+    try writer.print(", roundingIncrement: {f}, roundingMode: {f}, " ++
+        "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
+        Value.from(resolved_options.rounding_increment).fmtPretty(),
+        Value.from(resolved_options.rounding_mode).fmtPretty(),
+        Value.from(resolved_options.rounding_priority).fmtPretty(),
+        Value.from(resolved_options.trailing_zero_display).fmtPretty(),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);

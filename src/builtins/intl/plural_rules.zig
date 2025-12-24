@@ -24,6 +24,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const resolveOptions = abstract_operations.resolveOptions;
+const setNumberFormatDigitOptions = builtins.intl.number_format.constructor.setNumberFormatDigitOptions;
 
 /// 17.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
@@ -81,6 +82,16 @@ pub const constructor = struct {
                 .type = undefined,
                 .notation = undefined,
                 .compact_display = null,
+                .minimum_integer_digits = undefined,
+                .minimum_fraction_digits = null,
+                .maximum_fraction_digits = null,
+                .minimum_significant_digits = null,
+                .maximum_significant_digits = null,
+                .rounding_type = undefined,
+                .computed_rounding_priority = undefined,
+                .rounding_increment = undefined,
+                .rounding_mode = undefined,
+                .trailing_zero_display = undefined,
             },
         );
 
@@ -166,7 +177,16 @@ pub const constructor = struct {
             plural_rules.fields.compact_display = compact_display;
         }
 
-        // TODO: 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
+        // 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
+        try setNumberFormatDigitOptions(
+            PluralRules,
+            agent,
+            plural_rules,
+            options,
+            0,
+            3,
+            notation,
+        );
 
         // 14. Return pluralRules.
         return Value.from(&plural_rules.object);
@@ -322,22 +342,40 @@ pub const prototype = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-instances
 pub const PluralRules = MakeObject(.{
     .Fields = struct {
-        pub const Type = enum {
-            cardinal,
-            ordinal,
+        pub const Type = enum { cardinal, ordinal };
+        pub const Notation = enum { standard, scientific, engineering, compact };
+        pub const CompactDisplay = enum { short, long };
+        pub const RoundingType = enum { fraction_digits, significant_digits, more_precision, less_precision };
+        pub const RoundingPriority = enum { auto, more_precision, less_precision };
+        pub const RoundingIncrement = enum(u16) {
+            @"1" = 1,
+            @"2" = 2,
+            @"5" = 5,
+            @"10" = 10,
+            @"20" = 20,
+            @"25" = 25,
+            @"50" = 50,
+            @"100" = 100,
+            @"200" = 200,
+            @"250" = 250,
+            @"500" = 500,
+            @"1000" = 1000,
+            @"2000" = 2000,
+            @"2500" = 2500,
+            @"5000" = 5000,
         };
-
-        pub const Notation = enum {
-            standard,
-            scientific,
-            engineering,
-            compact,
+        pub const RoundingMode = enum {
+            ceil,
+            floor,
+            expand,
+            trunc,
+            half_ceil,
+            half_floor,
+            half_expand,
+            half_trunc,
+            half_even,
         };
-
-        pub const CompactDisplay = enum {
-            short,
-            long,
-        };
+        pub const TrailingZeroDisplay = enum { auto, strip_if_integer };
 
         /// [[Locale]]
         locale: icu4zig.Locale,
@@ -351,34 +389,96 @@ pub const PluralRules = MakeObject(.{
         /// [[CompactDisplay]]
         compact_display: ?CompactDisplay,
 
+        /// [[MinimumIntegerDigits]]
+        minimum_integer_digits: u8,
+
+        /// [[MinimumFractionDigits]]
+        minimum_fraction_digits: ?u8,
+
+        /// [[MaximumFractionDigits]]
+        maximum_fraction_digits: ?u8,
+
+        /// [[MinimumSignificantDigits]]
+        minimum_significant_digits: ?u8,
+
+        /// [[MaximumSignificantDigits]]
+        maximum_significant_digits: ?u8,
+
+        /// [[RoundingType]]
+        rounding_type: RoundingType,
+
+        /// [[ComputedRoundingPriority]]
+        computed_rounding_priority: RoundingPriority,
+
+        /// [[RoundingIncrement]]
+        rounding_increment: RoundingIncrement,
+
+        /// [[RoundingMode]]
+        rounding_mode: RoundingMode,
+
+        /// [[TrailingZeroDisplay]]
+        trailing_zero_display: TrailingZeroDisplay,
+
         pub const ResolvedOptions = struct {
             type: *const String,
             notation: *const String,
             compact_display: ?*const String,
+            minimum_integer_digits: u8,
+            minimum_fraction_digits: ?u8,
+            maximum_fraction_digits: ?u8,
+            minimum_significant_digits: ?u8,
+            maximum_significant_digits: ?u8,
+            rounding_increment: u16,
+            rounding_mode: *const String,
+            rounding_priority: *const String,
+            trailing_zero_display: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
-            const @"type" = switch (self.type) {
-                .cardinal => String.fromLiteral("cardinal"),
-                .ordinal => String.fromLiteral("ordinal"),
-            };
-            const notation = switch (self.notation) {
-                .standard => String.fromLiteral("standard"),
-                .scientific => String.fromLiteral("scientific"),
-                .engineering => String.fromLiteral("engineering"),
-                .compact => String.fromLiteral("compact"),
-            };
-            const compact_display = if (self.compact_display) |compact_display|
-                switch (compact_display) {
-                    .short => String.fromLiteral("short"),
-                    .long => String.fromLiteral("long"),
-                }
-            else
-                null;
             return .{
-                .type = @"type",
-                .notation = notation,
-                .compact_display = compact_display,
+                .type = switch (self.type) {
+                    .cardinal => String.fromLiteral("cardinal"),
+                    .ordinal => String.fromLiteral("ordinal"),
+                },
+                .notation = switch (self.notation) {
+                    .standard => String.fromLiteral("standard"),
+                    .scientific => String.fromLiteral("scientific"),
+                    .engineering => String.fromLiteral("engineering"),
+                    .compact => String.fromLiteral("compact"),
+                },
+                .compact_display = if (self.compact_display) |compact_display|
+                    switch (compact_display) {
+                        .short => String.fromLiteral("short"),
+                        .long => String.fromLiteral("long"),
+                    }
+                else
+                    null,
+                .minimum_integer_digits = self.minimum_integer_digits,
+                .minimum_fraction_digits = self.minimum_fraction_digits,
+                .maximum_fraction_digits = self.maximum_fraction_digits,
+                .minimum_significant_digits = self.minimum_significant_digits,
+                .maximum_significant_digits = self.maximum_significant_digits,
+                .rounding_increment = @intFromEnum(self.rounding_increment),
+                .rounding_mode = switch (self.rounding_mode) {
+                    .ceil => String.fromLiteral("ceil"),
+                    .floor => String.fromLiteral("floor"),
+                    .expand => String.fromLiteral("expand"),
+                    .trunc => String.fromLiteral("trunc"),
+                    .half_ceil => String.fromLiteral("halfCeil"),
+                    .half_floor => String.fromLiteral("halfFloor"),
+                    .half_expand => String.fromLiteral("halfExpand"),
+                    .half_trunc => String.fromLiteral("halfTrunc"),
+                    .half_even => String.fromLiteral("halfEven"),
+                },
+                .rounding_priority = switch (self.computed_rounding_priority) {
+                    .auto => String.fromLiteral("auto"),
+                    .more_precision => String.fromLiteral("morePrecision"),
+                    .less_precision => String.fromLiteral("lessPrecision"),
+                },
+                .trailing_zero_display = switch (self.trailing_zero_display) {
+                    .auto => String.fromLiteral("auto"),
+                    .strip_if_integer => String.fromLiteral("stripIfInteger"),
+                },
             };
         }
     },
