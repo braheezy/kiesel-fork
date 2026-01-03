@@ -164,7 +164,6 @@ pub fn build(b: *std.Build) void {
             .enable_gcj_support = false,
             .enable_java_finalization = false,
             .enable_large_config = true,
-            .disable_gc_debug = true,
             .enable_dynamic_pointer_mask = enable_nan_boxing,
         })) |bdwgc| {
             kiesel.addImport("bdwgc", bdwgc.module("bdwgc"));
