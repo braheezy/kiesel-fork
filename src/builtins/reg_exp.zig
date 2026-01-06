@@ -353,12 +353,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     var last_index = std.math.lossyCast(u32, try last_index_value.toLength(agent));
 
     const re_bytecode = reg_exp.fields.re_bytecode;
+    const alloc_count: usize = @intCast(libregexp.c.lre_get_alloc_count(@ptrCast(re_bytecode)));
     const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(@ptrCast(re_bytecode)));
 
     // libregexp's capture count includes the matched string
     std.debug.assert(capture_count >= 1);
 
-    const captures_list = try agent.gc_allocator.alloc(?*u8, capture_count * 2);
+    const captures_list = try agent.gc_allocator.alloc(?*u8, alloc_count);
 
     // 3. Let flags be R.[[OriginalFlags]].
     const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
