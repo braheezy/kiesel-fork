@@ -111,7 +111,7 @@ fn compileRegexp(
     agent: *Agent,
     pattern: *const String,
     flags: *const String,
-) Agent.Error![]const u8 {
+) Agent.Error![*]const u8 {
     const parsed_flags = blk: {
         if (flags.isEmpty()) break :blk ParsedFlags.empty;
         switch (flags.asAsciiOrUtf16()) {
@@ -153,7 +153,7 @@ fn compileRegexp(
         if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
         return agent.throwException(.syntax_error, "Invalid RegExp pattern: {s}", .{str});
     };
-    return re_bytecode[0..@intCast(re_bytecode_len)];
+    return re_bytecode;
 }
 
 /// 22.2.3.1 RegExpCreate ( P, F )
@@ -353,8 +353,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     var last_index = std.math.lossyCast(u32, try last_index_value.toLength(agent));
 
     const re_bytecode = reg_exp.fields.re_bytecode;
-    const alloc_count: usize = @intCast(libregexp.c.lre_get_alloc_count(@ptrCast(re_bytecode)));
-    const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(@ptrCast(re_bytecode)));
+    const alloc_count: usize = @intCast(libregexp.c.lre_get_alloc_count(re_bytecode));
+    const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(re_bytecode));
 
     // libregexp's capture count includes the matched string
     std.debug.assert(capture_count >= 1);
@@ -362,7 +362,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const captures_list = try agent.gc_allocator.alloc(?*u8, alloc_count);
 
     // 3. Let flags be R.[[OriginalFlags]].
-    const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
+    const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
     // 4. If flags contains "g", let global be true; else let global be false.
     // 5. If flags contains "y", let sticky be true; else let sticky be false.
@@ -382,7 +382,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const ret = if (last_index > length) 0 else libregexp.c.lre_exec(
         @ptrCast(captures_list),
-        @ptrCast(re_bytecode),
+        re_bytecode,
         buf,
         @intCast(last_index),
         @intCast(string.length),
@@ -470,7 +470,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
     try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(matched_substr));
 
-    var group_name_ptr = libregexp.c.lre_get_groupnames(@ptrCast(re_bytecode));
+    var group_name_ptr = libregexp.c.lre_get_groupnames(re_bytecode);
     const has_groups = group_name_ptr != null;
 
     // 30. If R contains any GroupName, then
@@ -1157,7 +1157,7 @@ pub const prototype = struct {
 
         // 3. Let flags be R.[[OriginalFlags]].
         const re_bytecode = reg_exp.fields.re_bytecode;
-        const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
+        const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
         // 4. If flags contains codeUnit, return true.
         // 5. Return false.
@@ -1650,7 +1650,7 @@ pub const prototype = struct {
 
         // 6. Let flags be R.[[OriginalFlags]].
         const re_bytecode = reg_exp.fields.re_bytecode;
-        const re_flags = libregexp.c.lre_get_flags(@ptrCast(re_bytecode));
+        const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
         // 7. Return EscapeRegExpPattern(src, flags).
         return Value.from(try escapeRegExpPattern(agent, src, re_flags));
@@ -1990,7 +1990,7 @@ pub const RegExp = MakeObject(.{
         original_flags: *const String,
 
         /// [[RegExpRecord]]
-        re_bytecode: []const u8,
+        re_bytecode: [*]const u8,
     },
     .tag = .reg_exp,
     .display_name = "RegExp",
