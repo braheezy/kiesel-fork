@@ -13,8 +13,8 @@
             .hash = "args-0.0.0-CiLiqojRAACGzDRO7A9dw7kWSchNk29caJZkXuMCb0Cn",
         },
         .bdwgc_zig = .{
-            .url = "git+https://github.com/bdwgc/bdwgc-zig#29d39d0b93eb950adf46385ebac3757fa3386136",
-            .hash = "bdwgc_zig-0.1.0-ffcEgQh6AABL85V7sTB76kRZHILonJkplXPssV4RF43C",
+            .url = "git+https://github.com/bdwgc/bdwgc-zig#9f314f4dc3b51d4322f543819e0de366312cd258",
+            .hash = "bdwgc_zig-0.1.0-ffcEgb97AACiZD_NTx7O-2p6cA5CDBDEF3UpxNYRdzny",
             .lazy = true,
         },
         .icu4zig = .{
