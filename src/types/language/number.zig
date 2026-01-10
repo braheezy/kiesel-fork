@@ -49,14 +49,12 @@ pub const Number = union(enum) {
                 return .{ .f64 = @floatFromInt(number) };
             },
             .float, .comptime_float => {
-                const truncated = std.math.trunc(number);
-                if (std.math.isFinite(@as(f64, number)) and
-                    !std.math.signbit(@as(f64, number)) and
-                    truncated == number and
-                    truncated <= @as(f64, @floatFromInt(std.math.maxInt(i32))) and
-                    truncated >= @as(f64, @floatFromInt(std.math.minInt(i32))))
+                if (!std.math.signbit(@as(f64, number)) and
+                    number <= @as(f64, @floatFromInt(std.math.maxInt(i32))) and
+                    number >= @as(f64, @floatFromInt(std.math.minInt(i32))) and
+                    number == @as(f64, @floatFromInt(@as(i32, @intFromFloat(number)))))
                 {
-                    return .{ .i32 = @intFromFloat(truncated) };
+                    return .{ .i32 = @intFromFloat(number) };
                 }
                 return .{ .f64 = @as(f64, number) };
             },
