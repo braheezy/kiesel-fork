@@ -120,7 +120,10 @@ pub const Number = union(enum) {
 
     /// https://tc39.es/ecma262/#integral-number
     pub fn isIntegral(self: Number) bool {
-        return self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
+        return switch (self) {
+            .f64 => |x| std.math.isFinite(x) and x == @trunc(x),
+            .i32 => true,
+        };
     }
 
     pub fn truncate(self: Number) Number {
