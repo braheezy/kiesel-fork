@@ -141,7 +141,12 @@ pub const prototype = struct {
             const next_index = advanceStringIndex(string, this_index, full_unicode);
 
             // c. Perform ? Set(R, "lastIndex", 𝔽(nextIndex), true).
-            try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+            try reg_exp.set(
+                agent,
+                PropertyKey.from("lastIndex"),
+                Value.from(@as(f64, @floatFromInt(next_index))),
+                .throw,
+            );
         }
 
         // 14. Return CreateIteratorResultObject(match, false).

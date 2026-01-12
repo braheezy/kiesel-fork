@@ -606,8 +606,9 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
 /// 22.2.7.3 AdvanceStringIndex ( S, index, unicode )
 /// https://tc39.es/ecma262/#sec-advancestringindex
-pub fn advanceStringIndex(string: *const String, index: u53, unicode: bool) u53 {
+pub fn advanceStringIndex(string: *const String, index_: u53, unicode: bool) u54 {
     // 1. Assert: index ≤ 2**53 - 1.
+    const index: u54 = @intCast(index_);
 
     // 2. If unicode is false, return index + 1.
     if (!unicode) return index + 1;
@@ -1268,7 +1269,12 @@ pub const prototype = struct {
                         const next_index = advanceStringIndex(string, this_index, full_unicode);
 
                         // c. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
-                        try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+                        try reg_exp.set(
+                            agent,
+                            PropertyKey.from("lastIndex"),
+                            Value.from(@as(f64, @floatFromInt(next_index))),
+                            .throw,
+                        );
                     }
 
                     // 4. Set n to n + 1.
@@ -1426,7 +1432,12 @@ pub const prototype = struct {
                 const next_index = advanceStringIndex(string, this_index, full_unicode);
 
                 // d. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
-                try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+                try reg_exp.set(
+                    agent,
+                    PropertyKey.from("lastIndex"),
+                    Value.from(@as(f64, @floatFromInt(next_index))),
+                    .throw,
+                );
             }
         }
 
@@ -1776,7 +1787,10 @@ pub const prototype = struct {
             // c. If z is null, then
             if (z == null) {
                 // i. Set q to AdvanceStringIndex(S, q, unicodeMatching).
-                q = advanceStringIndex(string, q, unicode_matching);
+                q = std.math.cast(
+                    u53,
+                    advanceStringIndex(string, q, unicode_matching),
+                ) orelse break;
             } else {
                 // d. Else,
                 // i. Let e be ℝ(? ToLength(? Get(splitter, "lastIndex"))).
@@ -1788,7 +1802,10 @@ pub const prototype = struct {
                 // iii. If e = p, then
                 if (e == p) {
                     // 1. Set q to AdvanceStringIndex(S, q, unicodeMatching).
-                    q = advanceStringIndex(string, q, unicode_matching);
+                    q = std.math.cast(
+                        u53,
+                        advanceStringIndex(string, q, unicode_matching),
+                    ) orelse break;
                 } else {
                     // iv. Else,
                     // 1. Let T be the substring of S from p to q.

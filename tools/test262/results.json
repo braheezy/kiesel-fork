@@ -14458,7 +14458,7 @@
   "test/built-ins/RegExp/prototype/Symbol.replace/arg-2-coerce.js": "PASS",
   "test/built-ins/RegExp/prototype/Symbol.replace/coerce-global.js": "PASS",
   "test/built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex-err.js": "PASS",
-  "test/built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex.js": "FAIL",
+  "test/built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex.js": "PASS",
   "test/built-ins/RegExp/prototype/Symbol.replace/coerce-unicode.js": "PASS",
   "test/built-ins/RegExp/prototype/Symbol.replace/exec-err.js": "PASS",
   "test/built-ins/RegExp/prototype/Symbol.replace/exec-invocation.js": "PASS",
