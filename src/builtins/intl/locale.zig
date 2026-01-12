@@ -70,10 +70,31 @@ fn updateLanguageId(
         };
     }
 
-    // 8-14.
-    // NOTE: These are done as part of step 3.a., 5.a., and 7.a.
+    // 8. Let variants be ? GetOption(options, "variants", string, empty, GetLocaleVariants(baseName)).
+    const maybe_variants = try options.getOption(agent, "variants", .string, null, null);
 
-    // 15. Return newTag.
+    // 9. If variants is not undefined, then
+    if (maybe_variants) |variants| {
+        const value = try variants.toUtf8(agent.gc_allocator);
+
+        // a. If variants is the empty String, throw a RangeError exception.
+        if (variants.isEmpty()) {
+            return agent.throwException(.range_error, "Invalid variants subtag '{s}'", .{value});
+        }
+
+        // b. Let lowerVariants be the ASCII-lowercase of variants.
+        // c. Let variantSubtags be StringSplitToList(lowerVariants, "-").
+        // d. For each element variant of variantSubtags, do
+        //     i. If variant cannot be matched by the unicode_variant_subtag Unicode locale
+        //        nonterminal, throw a RangeError exception.
+        //     e. If variantSubtags contains any duplicate elements, throw a RangeError exception.
+        // TODO: This is blocked by https://github.com/unicode-org/icu4x/issues/6671
+    }
+
+    // 10-15.
+    // NOTE: These are done as part of step 3.a., 5.a., 7.a., and 9.d.
+
+    // 16. Return newTag.
     return new_tag;
 }
 
@@ -346,6 +367,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "region", region, null, realm);
         try object.defineBuiltinAccessor(agent, "script", script, null, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+        try object.defineBuiltinAccessor(agent, "variants", variants, null, realm);
 
         // 15.3.1 Intl.Locale.prototype.constructor
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
@@ -617,6 +639,19 @@ pub const prototype = struct {
         return Value.from(
             try String.fromAscii(agent, try locale.fields.locale.toString(agent.gc_allocator)),
         );
+    }
+
+    /// 15.3.15 get Intl.Locale.prototype.variants
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.variants
+    fn variants(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return GetLocaleVariants(loc.[[Locale]]).
+        // TODO: This is blocked by https://github.com/unicode-org/icu4x/issues/6671
+        _ = locale;
+        return .undefined;
     }
 };
 
