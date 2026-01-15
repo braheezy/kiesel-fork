@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
@@ -2404,7 +2404,7 @@ pub const prototype = struct {
         const ns = temporal_rs.toI128Nanoseconds(@as(i128, @intFromFloat(time_value)) * 1_000_000);
 
         // 5. Return ! CreateTemporalInstant(ns).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
         );

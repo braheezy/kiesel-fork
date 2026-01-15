@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -99,7 +99,7 @@ pub const constructor = struct {
         }
 
         // 4. Return ? CreateTemporalInstant(epochNanoseconds, NewTarget).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         );
@@ -151,7 +151,7 @@ pub const constructor = struct {
         // 3. Let epochNanoseconds be epochMilliseconds × ℤ(10**6).
         // 4. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
         // 5. Return ! CreateTemporalInstant(epochNanoseconds).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_from_epoch_milliseconds(epoch_milliseconds),
         );
@@ -177,7 +177,7 @@ pub const constructor = struct {
 
         // 2. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
         // 3. Return ! CreateTemporalInstant(epochNanoseconds).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
         );
@@ -384,7 +384,7 @@ pub const prototype = struct {
         // 18. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]],
         //     roundingIncrement, smallestUnit, roundingMode).
         // 19. Return ! CreateTemporalInstant(roundedNs).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_round(
                 instant.fields.inner,
@@ -448,7 +448,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
@@ -469,7 +469,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalInstantToString(instant, undefined, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
@@ -544,7 +544,7 @@ pub const prototype = struct {
         // 14. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
         // 15. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_to_ixdtf_string_with_compiled_data(
                 instant.fields.inner,
@@ -573,7 +573,7 @@ pub const prototype = struct {
         const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
 
         // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_to_zoned_date_time_iso(
                 instant.fields.inner,
@@ -720,13 +720,13 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
     // 10. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
     // 11. Return ! CreateTemporalInstant(epochNanoseconds).
     const temporal_rs_instant = switch (item.asString().asAsciiOrUtf16()) {
-        .ascii => |ascii| try temporal_rs.extractResult(
+        .ascii => |ascii| try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_from_utf8(
                 temporal_rs.toDiplomatStringView(ascii),
             ),
         ),
-        .utf16 => |utf16| try temporal_rs.extractResult(
+        .utf16 => |utf16| try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_from_utf16(
                 temporal_rs.toDiplomatString16View(utf16),
@@ -763,7 +763,7 @@ fn differenceTemporalInstant(
     // 6. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 7. Return result.
     const temporal_rs_duration = switch (operation) {
-        .since => try temporal_rs.extractResult(
+        .since => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_since(
                 instant.fields.inner,
@@ -771,7 +771,7 @@ fn differenceTemporalInstant(
                 settings,
             ),
         ),
-        .until => try temporal_rs.extractResult(
+        .until => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_until(
                 instant.fields.inner,
@@ -806,14 +806,14 @@ fn addDurationToInstant(
     // 6. Let ns be ? AddInstant(instant.[[EpochNanoseconds]], internalDuration.[[Time]]).
     // 7. Return ! CreateTemporalInstant(ns).
     const temporal_rs_instant = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_add(
                 instant.fields.inner,
                 duration.fields.inner,
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_subtract(
                 instant.fields.inner,

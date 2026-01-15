@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -127,7 +127,7 @@ pub const constructor = struct {
         //     a. Set timeZone to FormatOffsetTimeZoneIdentifier(timeZoneParse.[[OffsetMinutes]]).
         const time_zone_utf8 = try time_zone_value.asString().toUtf8(agent.gc_allocator);
         defer agent.gc_allocator.free(time_zone_utf8);
-        const time_zone = try temporal_rs.extractResult(
+        const time_zone = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
                 temporal_rs.toDiplomatStringView(time_zone_utf8),
@@ -146,7 +146,7 @@ pub const constructor = struct {
         const calendar = try canonicalizeCalendar(agent, calendar_value.asString());
 
         // 11. Return ? CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar, NewTarget).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 epoch_nanoseconds,
@@ -534,7 +534,7 @@ pub const prototype = struct {
         //     b. Let transition be GetNamedTimeZonePreviousTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
         // 11. If transition is null, return null.
         // 12. Return ! CreateTemporalZonedDateTime(transition, timeZone, zonedDateTime.[[Calendar]]).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_get_time_zone_transition(
                 zoned_date_time.fields.inner,
@@ -580,7 +580,7 @@ pub const prototype = struct {
         // 8. Let tomorrowNs be ? GetStartOfDay(timeZone, tomorrow).
         // 9. Let diff be TimeDurationFromEpochNanosecondsDifference(tomorrowNs, todayNs).
         // 10. Return 𝔽(TotalTimeDuration(diff, hour)).
-        const hours_in_day = try temporal_rs.extractResult(
+        const hours_in_day = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_hours_in_day(zoned_date_time.fields.inner),
         );
@@ -711,7 +711,7 @@ pub const prototype = struct {
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         // NOTE: I don't think this is actually fallible
         // https://github.com/boa-dev/temporal/blob/34522ae99c9d6e2ac2782162eaf01b36494951ca/src/builtins/core/timezone.rs#L183-L198
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_offset(zoned_date_time.fields.inner, &write.inner),
         );
@@ -828,7 +828,7 @@ pub const prototype = struct {
         //     b. Let offsetNanoseconds be GetOffsetNanosecondsFor(timeZone, thisNs).
         //     c. Let epochNanoseconds be ? InterpretISODateTimeOffset(roundResult.[[ISODate]], roundResult.[[Time]], option, offsetNanoseconds, timeZone, compatible, prefer, match-exactly).
         // 21. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_round(
                 zoned_date_time.fields.inner,
@@ -896,7 +896,7 @@ pub const prototype = struct {
         // 5. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
         // 6. Let epochNanoseconds be ? GetStartOfDay(timeZone, isoDateTime.[[ISODate]]).
         // 7. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_start_of_day(zoned_date_time.fields.inner),
         );
@@ -975,7 +975,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
@@ -998,7 +998,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalZonedDateTimeToString(zonedDateTime, auto, auto, auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
@@ -1141,7 +1141,7 @@ pub const prototype = struct {
         //     showCalendar, showTimeZone, showOffset, precision.[[Increment]], precision.[[Unit]],
         //     roundingMode).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_to_ixdtf_string(
                 zoned_date_time.fields.inner,
@@ -1299,7 +1299,7 @@ pub const prototype = struct {
         //     dateTimeResult.[[Time]], option, newOffsetNanoseconds, timeZone, disambiguation,
         //     offset, match-exactly).
         // 26. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_with(
                 zoned_date_time.fields.inner,
@@ -1373,7 +1373,7 @@ pub const prototype = struct {
         };
 
         // 8. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, calendar).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_with_plain_time(
                 zoned_date_time.fields.inner,
@@ -1403,7 +1403,7 @@ pub const prototype = struct {
 
         // 4. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]], timeZone,
         //    zonedDateTime.[[Calendar]]).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_with_timezone(
                 zoned_date_time.fields.inner,
@@ -1567,7 +1567,7 @@ pub fn toTemporalZonedDateTime(
         // j. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
         // k. Let isoDate be result.[[ISODate]].
         // l. Let time be result.[[Time]].
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
                 partial,
@@ -1606,13 +1606,13 @@ pub fn toTemporalZonedDateTime(
         //     iii. If offsetParseResult contains more than one MinuteSecond Parse Node, set
         //          matchBehaviour to match-exactly.
         const parsed_zoned_date_time = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedZonedDateTime_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedZonedDateTime_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -1639,7 +1639,7 @@ pub fn toTemporalZonedDateTime(
 
         // q. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // r. Let time be result.[[Time]].
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_from_parsed(
                 parsed_zoned_date_time.?,
@@ -1752,7 +1752,7 @@ fn differenceTemporalZonedDateTime(
     // 11. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 12. Return result.
     const temporal_rs_duration = switch (operation) {
-        .since => try temporal_rs.extractResult(
+        .since => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_since(
                 zoned_date_time.fields.inner,
@@ -1760,7 +1760,7 @@ fn differenceTemporalZonedDateTime(
                 settings,
             ),
         ),
-        .until => try temporal_rs.extractResult(
+        .until => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_until(
                 zoned_date_time.fields.inner,
@@ -1804,7 +1804,7 @@ fn addDurationToZonedDateTime(
     //    calendar, internalDuration, overflow).
     // 9. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
     const temporal_rs_zoned_date_time = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_add(
                 zoned_date_time.fields.inner,
@@ -1812,7 +1812,7 @@ fn addDurationToZonedDateTime(
                 temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_subtract(
                 zoned_date_time.fields.inner,

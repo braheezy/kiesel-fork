@@ -3,7 +3,7 @@ const std = @import("std");
 
 const icu4zig = @import("icu4zig");
 const stackinfo = @import("stackinfo");
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const build_options = @import("build-options");
 const gc = @import("../../gc.zig");

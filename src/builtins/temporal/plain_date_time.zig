@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -155,7 +155,7 @@ pub const constructor = struct {
         // 17. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
         // 18. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 19. Return ? CreateTemporalDateTime(isoDateTime, calendar, NewTarget).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_try_new(
                 @intFromFloat(iso_year),
@@ -667,7 +667,7 @@ pub const prototype = struct {
         // 15. Let result be RoundISODateTime(plainDateTime.[[ISODateTime]], roundingIncrement,
         //     smallestUnit, roundingMode).
         // 16. Return ? CreateTemporalDateTime(result, plainDateTime.[[Calendar]]).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_round(
                 plain_date_time.fields.inner,
@@ -753,7 +753,7 @@ pub const prototype = struct {
         // 3. Return ISODateTimeToString(plainDateTime.[[ISODateTime]], plainDateTime.[[Calendar]],
         //    auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
                 plain_date_time.fields.inner,
@@ -775,7 +775,7 @@ pub const prototype = struct {
         // 3. Return ISODateTimeToString(plainDateTime.[[ISODateTime]], plainDateTime.[[Calendar]],
         //    auto, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
                 plain_date_time.fields.inner,
@@ -886,7 +886,7 @@ pub const prototype = struct {
         // 14. Return ISODateTimeToString(result, plainDateTime.[[Calendar]],
         //     precision.[[Precision]], showCalendar).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_to_ixdtf_string(
                 plain_date_time.fields.inner,
@@ -923,7 +923,7 @@ pub const prototype = struct {
 
         // 6. Let epochNs be ? GetEpochNanosecondsFor(timeZone, plainDateTime.[[ISODateTime]], disambiguation).
         // 7. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, plainDateTime.[[Calendar]]).
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_to_zoned_date_time(
                 plain_date_time.fields.inner,
@@ -1058,7 +1058,7 @@ pub const prototype = struct {
 
         // 16. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
         // 17. Return ? CreateTemporalDateTime(result, calendar).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_with(
                 plain_date_time.fields.inner,
@@ -1115,7 +1115,7 @@ pub const prototype = struct {
 
         // 4. Let isoDateTime be CombineISODateAndTimeRecord(plainDateTime.[[ISODateTime]].[[ISODate]], time).
         // 5. Return ? CreateTemporalDateTime(isoDateTime, plainDateTime.[[Calendar]]).
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_with_time(
                 plain_date_time.fields.inner,
@@ -1260,12 +1260,12 @@ pub fn toTemporalPlainDateTime(
 
             // iii. Let isoDateTime be CombineISODateAndTimeRecord(item.[[ISODate]], MidnightTimeRecord()).
             // iv. Return ? CreateTemporalDateTime(isoDateTime, item.[[Calendar]]).
-            const midnight = try temporal_rs.extractResult(
+            const midnight = try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainTime_try_new(0, 0, 0, 0, 0, 0),
             );
             defer temporal_rs.c.temporal_rs_PlainTime_destroy(midnight.?);
-            break :blk try temporal_rs.extractResult(
+            break :blk try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainDate_to_plain_date_time(
                     plain_date.fields.inner,
@@ -1310,7 +1310,7 @@ pub fn toTemporalPlainDateTime(
 
         // h. Let result be ? InterpretTemporalDateTimeFields(calendar, fields, overflow).
         // i. Return ? CreateTemporalDateTime(result, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_from_partial(
                 partial,
@@ -1334,13 +1334,13 @@ pub fn toTemporalPlainDateTime(
         // 7. If calendar is empty, set calendar to "iso8601".
         // 8. Set calendar to ? CanonicalizeCalendar(calendar).
         const parsed_date_time = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDateTime_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDateTime_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -1358,7 +1358,7 @@ pub fn toTemporalPlainDateTime(
         // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // 12. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 13. Return ? CreateTemporalDateTime(isoDateTime, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_from_parsed(parsed_date_time.?),
         );
@@ -1414,7 +1414,7 @@ fn differenceTemporalPlainDateTime(
     // 8. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 9. Return result.
     const temporal_rs_duration = switch (operation) {
-        .since => try temporal_rs.extractResult(
+        .since => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_since(
                 plain_date_time.fields.inner,
@@ -1422,7 +1422,7 @@ fn differenceTemporalPlainDateTime(
                 settings,
             ),
         ),
-        .until => try temporal_rs.extractResult(
+        .until => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_until(
                 plain_date_time.fields.inner,
@@ -1466,7 +1466,7 @@ fn addDurationToDateTime(
     // 9. Let result be CombineISODateAndTimeRecord(addedDate, timeResult).
     // 10. Return ? CreateTemporalDateTime(result, dateTime.[[Calendar]]).
     const temporal_rs_plain_date_time = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_add(
                 plain_date_time.fields.inner,
@@ -1474,7 +1474,7 @@ fn addDurationToDateTime(
                 temporal_rs.toArithmeticOverflowOption(overflow),
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_subtract(
                 plain_date_time.fields.inner,

@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -60,7 +60,7 @@ pub const namespace = struct {
         const ns = systemUTCEpochNanoseconds(agent);
 
         // 2. Return ! CreateTemporalInstant(ns).
-        const temporal_rs_instant = try temporal_rs.extractResult(
+        const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_try_new(ns),
         );
@@ -82,7 +82,7 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], "iso8601").
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
+        const temporal_rs_plain_date = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
@@ -104,7 +104,7 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalDateTime(isoDateTime, "iso8601").
-        const temporal_rs_plain_date_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDateTime_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
@@ -126,7 +126,7 @@ pub const namespace = struct {
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
         // 2. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_from_epoch_nanoseconds(epoch_ns, time_zone),
         );
@@ -168,7 +168,7 @@ pub const namespace = struct {
         const ns = systemUTCEpochNanoseconds(agent);
 
         // 4. Return ! CreateTemporalZonedDateTime(ns, timeZone, "iso8601").
-        const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+        const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
                 ns,

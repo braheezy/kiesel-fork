@@ -1,14 +1,6 @@
 const std = @import("std");
 
-const build_options = @import("build-options");
-const execution = @import("../execution.zig");
-
-const Agent = execution.Agent;
-
 pub const c = @cImport({
-    if (!build_options.enable_temporal) {
-        @compileError("temporal not enabled");
-    }
     @cInclude("AnyCalendarKind.h");
     @cInclude("Calendar.h");
     @cInclude("Duration.h");
@@ -254,22 +246,6 @@ test DiplomatWrite {
     try std.testing.expectEqualSlices(u8, &.{}, write.array_list.items);
 }
 
-pub fn extractResult(agent: *Agent, result: anytype) Agent.Error!Success(@TypeOf(result)) {
-    if (success(result)) |x| return x;
-    const message = if (fromOption(result.unnamed_0.err.msg)) |sv|
-        fromDiplomatStringView(sv)
-    else
-        "";
-    switch (result.unnamed_0.err.kind) {
-        c.ErrorKind_Generic => return agent.throwException(.internal_error, "{s}", .{message}),
-        c.ErrorKind_Type => return agent.throwException(.type_error, "{s}", .{message}),
-        c.ErrorKind_Range => return agent.throwException(.range_error, "{s}", .{message}),
-        c.ErrorKind_Syntax => return agent.throwException(.syntax_error, "{s}", .{message}),
-        c.ErrorKind_Assert => @panic("temporal_rs assertion failed"),
-        else => unreachable,
-    }
-}
-
 /// Converts a "result" value to its "success" type, or returns `null` if the value is an error.
 /// This is `inline` to prevent binary bloat, because each instantiation is expected to be called
 /// only once.
@@ -280,7 +256,7 @@ pub inline fn success(result: anytype) ?Success(@TypeOf(result)) {
 }
 
 /// Given the C API representation of a `Result<T, E>`, returns the type 'T'.
-fn Success(comptime Result: type) type {
+pub fn Success(comptime Result: type) type {
     const Union = @FieldType(Result, "unnamed_0");
     if (!@hasField(Union, "ok")) return void;
     return @FieldType(Union, "ok");

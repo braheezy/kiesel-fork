@@ -5,7 +5,7 @@ const args = @import("args");
 const icu4zig = @import("icu4zig");
 const kiesel = @import("kiesel");
 const kiesel_runtime = @import("kiesel-runtime");
-const temporal_rs = kiesel.temporal_rs;
+const temporal_rs = @import("temporal_rs");
 
 const Editor = @import("zigline").Editor;
 

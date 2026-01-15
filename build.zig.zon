@@ -41,8 +41,7 @@
             .hash = "stackinfo-0.1.0-NZ2qTgAhAABd71COG6iF0UKBctEeOHmLNS_8STZPpCi1",
         },
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#v0.1.2",
-            .hash = "N-V-__8AANlkNAB77Z946lqp-lgp2qSsOBDADValZC86PhB-",
+            .path = "./pkg/temporal_rs",
             .lazy = true,
         },
         .unicode_id = .{

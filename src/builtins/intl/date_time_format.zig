@@ -4,7 +4,7 @@
 const std = @import("std");
 
 const icu4zig = @import("icu4zig");
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");

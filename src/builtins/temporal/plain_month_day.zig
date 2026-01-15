@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -109,7 +109,7 @@ pub const constructor = struct {
 
         // 10. Let isoDate be CreateISODateRecord(y, m, d).
         // 11. Return ? CreateTemporalMonthDay(isoDate, calendar, NewTarget).
-        const temporal_rs_plain_month_day = try temporal_rs.extractResult(
+        const temporal_rs_plain_month_day = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_try_new_with_overflow(
                 @intFromFloat(iso_month),
@@ -312,7 +312,7 @@ pub const prototype = struct {
         const partial = fields.date;
 
         // 8. Let isoDate be ? CalendarDateFromFields(calendar, mergedFields, constrain).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
+        const temporal_rs_plain_date = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_to_plain_date(
                 plain_month_day.fields.inner,
@@ -412,7 +412,7 @@ pub const prototype = struct {
 
         // 10. Let isoDate be ? CalendarMonthDayFromFields(calendar, fields, overflow).
         // 11. Return ! CreateTemporalMonthDay(isoDate, calendar).
-        const temporal_rs_plain_month_day = try temporal_rs.extractResult(
+        const temporal_rs_plain_month_day = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_with(
                 plain_month_day.fields.inner,
@@ -490,7 +490,7 @@ pub fn toTemporalPlainMonthDay(
 
         // f. Let isoDate be ? CalendarMonthDayFromFields(calendar, fields, overflow).
         // g. Return ! CreateTemporalMonthDay(isoDate, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_from_partial(
                 partial,
@@ -512,13 +512,13 @@ pub fn toTemporalPlainMonthDay(
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
         const parsed_month_day = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_month_day_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_month_day_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -545,7 +545,7 @@ pub fn toTemporalPlainMonthDay(
         //     the [[ISODate]] internal slot of the result.
         // 15. Set isoDate to ? CalendarMonthDayFromFields(calendar, result, constrain).
         // 16. Return ! CreateTemporalMonthDay(isoDate, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainMonthDay_from_parsed(parsed_month_day.?),
         );

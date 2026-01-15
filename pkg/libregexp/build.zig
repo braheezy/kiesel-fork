@@ -6,16 +6,14 @@ pub fn build(b: *std.Build) !void {
 
     const quickjs = b.dependency("quickjs", .{});
 
-    const lib = b.addLibrary(.{
-        .linkage = .static,
-        .name = "regexp",
-        .root_module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-        }),
+    const module = b.addModule("libregexp", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
     });
-    lib.root_module.addCSourceFiles(.{
+    module.addIncludePath(quickjs.path("."));
+    module.addCSourceFiles(.{
         .root = quickjs.path("."),
         .files = &.{
             "cutils.c",
@@ -23,14 +21,4 @@ pub fn build(b: *std.Build) !void {
             "libunicode.c",
         },
     });
-    lib.installHeadersDirectory(quickjs.path("."), "", .{
-        .include_extensions = &.{
-            "cutils.h",
-            "libregexp.h",
-            "libregexp-opcode.h",
-            "libunicode.h",
-            "libunicode-table.h",
-        },
-    });
-    b.installArtifact(lib);
 }

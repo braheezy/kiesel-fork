@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -42,6 +42,22 @@ pub const PlainMonthDay = plain_month_day.PlainMonthDay;
 pub const PlainTime = plain_time.PlainTime;
 pub const PlainYearMonth = plain_year_month.PlainYearMonth;
 pub const ZonedDateTime = zoned_date_time.ZonedDateTime;
+
+pub fn extractResult(agent: *Agent, result: anytype) Agent.Error!temporal_rs.Success(@TypeOf(result)) {
+    if (temporal_rs.success(result)) |x| return x;
+    const message = if (temporal_rs.fromOption(result.unnamed_0.err.msg)) |sv|
+        temporal_rs.fromDiplomatStringView(sv)
+    else
+        "";
+    switch (result.unnamed_0.err.kind) {
+        temporal_rs.c.ErrorKind_Generic => return agent.throwException(.internal_error, "{s}", .{message}),
+        temporal_rs.c.ErrorKind_Type => return agent.throwException(.type_error, "{s}", .{message}),
+        temporal_rs.c.ErrorKind_Range => return agent.throwException(.range_error, "{s}", .{message}),
+        temporal_rs.c.ErrorKind_Syntax => return agent.throwException(.syntax_error, "{s}", .{message}),
+        temporal_rs.c.ErrorKind_Assert => @panic("temporal_rs assertion failed"),
+        else => unreachable,
+    }
+}
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -169,7 +185,7 @@ pub fn toTemporalTimeZoneIdentifier(
     // 9. Return timeZoneIdentifierRecord.[[Identifier]].
     const time_zone = try temporal_time_zone_like.asString().toUtf8(agent.gc_allocator);
     defer agent.gc_allocator.free(time_zone);
-    return temporal_rs.extractResult(
+    return builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_str(
             temporal_rs.toDiplomatStringView(time_zone),
@@ -1132,13 +1148,13 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         // j. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
         // k. Let time be result.[[Time]].
         const owned_relative_to = switch (value.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_OwnedRelativeTo_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_OwnedRelativeTo_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -1151,7 +1167,7 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     // 7. If timeZone is unset, then
     if (!partial.timezone.is_ok) {
         // a. Let plainDate be ? CreateTemporalDate(isoDate, calendar).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
+        const temporal_rs_plain_date = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_partial(
                 partial.date,
@@ -1170,7 +1186,7 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     // 10. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
     //     offsetNs, timeZone, compatible, reject, matchBehaviour).
     // 11. Let zonedRelativeTo be ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
-    const temporal_rs_zoned_date_time = try temporal_rs.extractResult(
+    const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
             partial,
@@ -1234,7 +1250,7 @@ fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 3. Perform ? ParseDateTimeUTCOffset(offset).
     // 4. Return offset.
     const offset_utf8 = try offset.asString().toUtf8(agent.gc_allocator);
-    _ = try temporal_rs.extractResult(
+    _ = try builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(
             temporal_rs.toDiplomatStringView(offset_utf8),

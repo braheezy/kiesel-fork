@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -110,7 +110,7 @@ pub const constructor = struct {
 
         // 9. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
         // 10. Return ? CreateTemporalTime(time, NewTarget).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_try_new(
                 @intFromFloat(hour),
@@ -371,7 +371,7 @@ pub const prototype = struct {
         // 14. Let result be RoundTime(plainTime.[[Time]], roundingIncrement, smallestUnit,
         //     roundingMode).
         // 15. Return ! CreateTemporalTime(result).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_round(
                 plain_time.fields.inner,
@@ -452,7 +452,7 @@ pub const prototype = struct {
 
         // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
@@ -472,7 +472,7 @@ pub const prototype = struct {
 
         // 3. Return TimeRecordToString(plainTime.[[Time]], auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
@@ -535,7 +535,7 @@ pub const prototype = struct {
         //     precision.[[Unit]], roundingMode).
         // 12. Return TimeRecordToString(roundResult, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_to_ixdtf_string(
                 plain_time.fields.inner,
@@ -644,7 +644,7 @@ pub const prototype = struct {
         const partial = try record.regulate(agent, overflow);
 
         // 20. Return ! CreateTemporalTime(result).
-        const temporal_rs_plain_time = try temporal_rs.extractResult(
+        const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_with(
                 plain_time.fields.inner,
@@ -768,7 +768,7 @@ pub fn toTemporalPlainTime(
         // g. Set result to ? RegulateTime(result.[[Hour]], result.[[Minute]], result.[[Second]],
         //    result.[[Millisecond]], result.[[Microsecond]], result.[[Nanosecond]], overflow).
         const partial = try result.regulate(agent, overflow);
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_from_partial(
                 partial,
@@ -793,13 +793,13 @@ pub fn toTemporalPlainTime(
         // d. Assert: parseResult.[[Time]] is not start-of-day.
         // e. Set result to parseResult.[[Time]].
         const temporal_rs_plain_time = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainTime_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_PlainTime_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -1130,7 +1130,7 @@ fn differenceTemporalPlainTime(
     // 8. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 9. Return result.
     const temporal_rs_duration = switch (operation) {
-        .since => try temporal_rs.extractResult(
+        .since => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_since(
                 plain_time.fields.inner,
@@ -1138,7 +1138,7 @@ fn differenceTemporalPlainTime(
                 settings,
             ),
         ),
-        .until => try temporal_rs.extractResult(
+        .until => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_until(
                 plain_time.fields.inner,
@@ -1170,14 +1170,14 @@ fn addDurationToTime(
     // 3. Let internalDuration be ToInternalDurationRecord(duration).
     // 4. Let result be AddTime(temporalTime.[[Time]], internalDuration.[[Time]]).
     const temporal_rs_plain_time = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_add(
                 plain_time.fields.inner,
                 duration.fields.inner,
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_subtract(
                 plain_time.fields.inner,

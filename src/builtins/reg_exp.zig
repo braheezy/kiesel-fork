@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const libregexp = @import("../c/libregexp.zig");
+const libregexp = @import("libregexp");
 
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");

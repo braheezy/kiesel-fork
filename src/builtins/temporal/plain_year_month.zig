@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -113,7 +113,7 @@ pub const constructor = struct {
 
         // 10. Let isoDate be CreateISODateRecord(y, m, ref).
         // 11. Return ? CreateTemporalYearMonth(isoDate, calendar, NewTarget).
-        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+        const temporal_rs_plain_year_month = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_try_new_with_overflow(
                 @intFromFloat(iso_year),
@@ -496,7 +496,7 @@ pub const prototype = struct {
         const partial = fields.date;
 
         // 8. Let isoDate be ? CalendarDateFromFields(calendar, mergedFields, constrain).
-        const temporal_rs_plain_date = try temporal_rs.extractResult(
+        const temporal_rs_plain_date = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_to_plain_date(
                 plain_year_month.fields.inner,
@@ -616,7 +616,7 @@ pub const prototype = struct {
 
         // 10. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, overflow).
         // 11. Return ! CreateTemporalYearMonth(isoDate, calendar).
-        const temporal_rs_plain_year_month = try temporal_rs.extractResult(
+        const temporal_rs_plain_year_month = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_with(
                 plain_year_month.fields.inner,
@@ -709,7 +709,7 @@ pub fn toTemporalPlainYearMonth(
 
         // f. Let isoDate be ? CalendarYearMonthFromFields(calendar, fields, overflow).
         // g. Return ! CreateTemporalYearMonth(isoDate, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_from_partial(
                 partial,
@@ -731,13 +731,13 @@ pub fn toTemporalPlainYearMonth(
         // 6. If calendar is empty, set calendar to "iso8601".
         // 7. Set calendar to ? CanonicalizeCalendar(calendar).
         const parsed_year_month = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_year_month_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_ParsedDate_year_month_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -760,7 +760,7 @@ pub fn toTemporalPlainYearMonth(
         //     of the [[ISODate]] internal slot of the result.
         // 14. Set isoDate to ? CalendarYearMonthFromFields(calendar, result, constrain).
         // 15. Return ! CreateTemporalYearMonth(isoDate, calendar).
-        break :blk try temporal_rs.extractResult(
+        break :blk try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_from_parsed(parsed_year_month.?),
         );
@@ -856,7 +856,7 @@ fn differenceTemporalPlainYearMonth(
     // 18. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 19. Return result.
     const temporal_rs_duration = switch (operation) {
-        .since => try temporal_rs.extractResult(
+        .since => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_since(
                 plain_year_month.fields.inner,
@@ -864,7 +864,7 @@ fn differenceTemporalPlainYearMonth(
                 settings,
             ),
         ),
-        .until => try temporal_rs.extractResult(
+        .until => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_until(
                 plain_year_month.fields.inner,
@@ -919,7 +919,7 @@ fn addDurationToYearMonth(
     // 15. Let isoDate be ? CalendarYearMonthFromFields(calendar, addedDateFields, overflow).
     // 16. Return ! CreateTemporalYearMonth(isoDate, calendar).
     const temporal_rs_plain_year_month = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_add(
                 plain_year_month.fields.inner,
@@ -927,7 +927,7 @@ fn addDurationToYearMonth(
                 overflow,
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainYearMonth_subtract(
                 plain_year_month.fields.inner,

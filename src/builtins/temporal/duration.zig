@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const temporal_rs = @import("../../c/temporal_rs.zig");
+const temporal_rs = @import("temporal_rs");
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -115,7 +115,7 @@ pub const constructor = struct {
         const nanoseconds = if (nanoseconds_value.isUndefined()) 0 else try nanoseconds_value.toIntegerIfIntegral(agent);
 
         // 12. Return ? CreateTemporalDuration(y, mo, w, d, h, m, s, ms, mis, ns, NewTarget).
-        const temporal_rs_duration = try temporal_rs.extractResult(
+        const temporal_rs_duration = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_try_new(
                 std.math.lossyCast(i64, years),
@@ -189,7 +189,7 @@ pub const constructor = struct {
         // 15. Let timeDuration1 be ? Add24HourDaysToTimeDuration(duration1.[[Time]], days1).
         // 16. Let timeDuration2 be ? Add24HourDaysToTimeDuration(duration2.[[Time]], days2).
         // 17. Return 𝔽(CompareTimeDuration(timeDuration1, timeDuration2)).
-        const result = try temporal_rs.extractResult(
+        const result = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_compare(
                 one.fields.inner,
@@ -539,7 +539,7 @@ pub const prototype = struct {
         //        roundingIncrement, smallestUnit, roundingMode).
         //     b. Set internalDuration to CombineDateAndTimeDuration(ZeroDateDuration(), timeDuration).
         // 34. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
-        const temporal_rs_duration = try temporal_rs.extractResult(
+        const temporal_rs_duration = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_round(
                 duration.fields.inner,
@@ -631,7 +631,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalDurationToString(duration, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
@@ -651,7 +651,7 @@ pub const prototype = struct {
 
         // 3. Return TemporalDurationToString(duration, auto).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
@@ -712,7 +712,7 @@ pub const prototype = struct {
         // 17. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
         // 18. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        try temporal_rs.extractResult(
+        try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_to_string(
                 duration.fields.inner,
@@ -808,7 +808,7 @@ pub const prototype = struct {
         //     c. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
         //     d. Let total be TotalTimeDuration(internalDuration.[[Time]], unit).
         // 15. Return 𝔽(total).
-        const result = try temporal_rs.extractResult(
+        const result = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_total(
                 duration.fields.inner,
@@ -930,7 +930,7 @@ pub const prototype = struct {
 
         // 24. Return ? CreateTemporalDuration(years, months, weeks, days, hours, minutes, seconds,
         //     milliseconds, microseconds, nanoseconds).
-        const temporal_rs_duration = try temporal_rs.extractResult(
+        const temporal_rs_duration = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_try_new(
                 years_,
@@ -1003,13 +1003,13 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Duration {
 
         // b. Return ? ParseTemporalDurationString(item).
         const temporal_rs_duration = switch (item.asString().asAsciiOrUtf16()) {
-            .ascii => |ascii| try temporal_rs.extractResult(
+            .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_Duration_from_utf8(
                     temporal_rs.toDiplomatStringView(ascii),
                 ),
             ),
-            .utf16 => |utf16| try temporal_rs.extractResult(
+            .utf16 => |utf16| try builtins.temporal.extractResult(
                 agent,
                 temporal_rs.c.temporal_rs_Duration_from_utf16(
                     temporal_rs.toDiplomatString16View(utf16),
@@ -1037,7 +1037,7 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Duration {
     // 15. Return ? CreateTemporalDuration(result.[[Years]], result.[[Months]], result.[[Weeks]],
     //     result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
     //     result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]).
-    const temporal_rs_duration = try temporal_rs.extractResult(
+    const temporal_rs_duration = try builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_Duration_from_partial_duration(partial),
     );
@@ -1265,14 +1265,14 @@ fn addDurations(
     // 10. Let result be CombineDateAndTimeDuration(ZeroDateDuration(), timeResult).
     // 11. Return ? TemporalDurationFromInternal(result, largestUnit).
     const temporal_rs_duration = switch (operation) {
-        .add => try temporal_rs.extractResult(
+        .add => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_add(
                 duration.fields.inner,
                 other.fields.inner,
             ),
         ),
-        .subtract => try temporal_rs.extractResult(
+        .subtract => try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Duration_subtract(
                 duration.fields.inner,

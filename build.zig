@@ -151,7 +151,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         })) |libregexp| {
-            kiesel.linkLibrary(libregexp.artifact("regexp"));
+            kiesel.addImport("libregexp", libregexp.module("libregexp"));
         }
     }
 
@@ -160,7 +160,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         })) |temporal_rs| {
-            kiesel.addIncludePath(temporal_rs.path("temporal_capi/bindings/c"));
+            kiesel.addImport("temporal_rs", temporal_rs.module("temporal_rs"));
         }
     }
 
@@ -224,6 +224,14 @@ pub fn build(b: *std.Build) void {
                         .@"link-icu4x" = false,
                     })) |icu4zig| {
                         module.addImport("icu4zig", icu4zig.module("icu4zig"));
+                    }
+                }
+                if (enable_temporal) {
+                    if (b.lazyDependency("temporal_rs", .{
+                        .target = target,
+                        .optimize = optimize,
+                    })) |temporal_rs| {
+                        module.addImport("temporal_rs", temporal_rs.module("temporal_rs"));
                     }
                 }
                 break :blk module;
