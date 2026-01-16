@@ -669,9 +669,18 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
     return descriptor;
 }
 
+pub inline fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
+    // OPTIMIZATION: Inline the fast path.
+    if (!self.isObject()) {
+        @branchHint(.likely);
+        return self;
+    }
+    return self.toPrimitiveImpl(agent, preferred_type);
+}
+
 /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
 /// https://tc39.es/ecma262/#sec-toprimitive
-pub fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
+fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
     // 1. If input is an Object, then
     if (self.isObject()) {
         // a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
@@ -723,18 +732,29 @@ pub fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
     }
 
     // 2. Return input.
-    return self;
+    // NOTE: This is handled by the fast path.
+    unreachable;
+}
+
+pub inline fn toBoolean(self: Value) bool {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.isBoolean()) {
+        @branchHint(.likely);
+        return self.asBoolean();
+    }
+    return self.toBooleanImpl();
 }
 
 /// 7.1.2 ToBoolean ( argument )
 /// https://tc39.es/ecma262/#sec-toboolean
-pub fn toBoolean(self: Value) bool {
-    // 1. If argument is a Boolean, return argument.
-    if (self.isBoolean()) return self.asBoolean();
-
-    // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
-    //    false.
+fn toBooleanImpl(self: Value) bool {
     switch (self.type()) {
+        // 1. If argument is a Boolean, return argument.
+        // NOTE: This is handled by the fast path.
+        .boolean => unreachable,
+
+        // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
+        //    false.
         .undefined, .null => return false,
         .number => if (self.asNumber().isZero() or self.asNumber().isNan()) {
             return false;
@@ -772,12 +792,22 @@ pub fn toNumeric(self: Value, agent: *Agent) Agent.Error!Numeric {
     return .{ .number = try primitive_value.toNumber(agent) };
 }
 
+pub inline fn toNumber(self: Value, agent: *Agent) Agent.Error!Number {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.isNumber()) {
+        @branchHint(.likely);
+        return self.asNumber();
+    }
+    return self.toNumberImpl(agent);
+}
+
 /// 7.1.4 ToNumber ( argument )
 /// https://tc39.es/ecma262/#sec-tonumber
-pub fn toNumber(self: Value, agent: *Agent) Agent.Error!Number {
+fn toNumberImpl(self: Value, agent: *Agent) Agent.Error!Number {
     switch (self.type()) {
         // 1. If argument is a Number, return argument.
-        .number => return self.asNumber(),
+        // NOTE: This is handled by the fast path.
+        .number => unreachable,
 
         // 2. If argument is either a Symbol or a BigInt, throw a TypeError exception.
         .symbol => return agent.throwException(
@@ -979,9 +1009,18 @@ pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
     if (f_int % 2 == 0) return f_int else return f_int + 1;
 }
 
+pub inline fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.isBigInt()) {
+        @branchHint(.likely);
+        return self.asBigInt();
+    }
+    return self.toBigIntImpl(agent);
+}
+
 /// 7.1.13 ToBigInt ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint
-pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
+fn toBigIntImpl(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
     const primitive = try self.toPrimitive(agent, .number);
 
@@ -1000,6 +1039,7 @@ pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
             .zero,
 
         // Return prim.
+        // NOTE: This is handled by the fast path.
         .big_int => primitive.asBigInt(),
 
         .string => {
@@ -1045,12 +1085,22 @@ pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
     return int64bit.toInt(u64) catch unreachable;
 }
 
+pub inline fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.isString()) {
+        @branchHint(.likely);
+        return self.asString();
+    }
+    return self.toStringImpl(agent);
+}
+
 /// 7.1.17 ToString ( argument )
 /// https://tc39.es/ecma262/#sec-tostring
-pub fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
+fn toStringImpl(self: Value, agent: *Agent) Agent.Error!*const String {
     return switch (self.type()) {
         // 1. If argument is a String, return argument.
-        .string => self.asString(),
+        // NOTE: This is handled by the fast path.
+        .string => unreachable,
 
         // 2. If argument is a Symbol, throw a TypeError exception.
         .symbol => return agent.throwException(
@@ -1092,9 +1142,18 @@ pub fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
     };
 }
 
+pub inline fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.isObject()) {
+        @branchHint(.likely);
+        return self.asObject();
+    }
+    return self.toObjectImpl(agent);
+}
+
 /// 7.1.18 ToObject ( argument )
 /// https://tc39.es/ecma262/#sec-toobject
-pub fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
+fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
     return switch (self.type()) {
         // 1. If argument is either undefined or null, throw a TypeError exception.
@@ -1154,7 +1213,8 @@ pub fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
 
         // 7. Assert: argument is an Object.
         // 8. Return argument.
-        .object => self.asObject(),
+        // NOTE: This is handled by the fast path.
+        .object => unreachable,
     };
 }
 
@@ -1191,6 +1251,12 @@ pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
 /// 7.1.20 ToLength ( argument )
 /// https://tc39.es/ecma262/#sec-tolength
 pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return @max(0, self.__asI32());
+    }
+
     // 1. Let len be ? ToIntegerOrInfinity(argument).
     const length = try self.toIntegerOrInfinity(agent);
 
@@ -1204,6 +1270,12 @@ pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
 /// 7.1.22 ToIndex ( value )
 /// https://tc39.es/ecma262/#sec-toindex
 pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32() and self.__asI32() >= 0) {
+        @branchHint(.likely);
+        return @intCast(self.__asI32());
+    }
+
     // 1. Let integer be ? ToIntegerOrInfinity(value).
     const integer = try self.toIntegerOrInfinity(agent);
 
