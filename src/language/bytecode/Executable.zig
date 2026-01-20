@@ -99,11 +99,33 @@ pub fn addInstruction(
     comptime tag: Instruction.Tag,
     payload: Instruction.Payload(tag),
 ) std.mem.Allocator.Error!void {
+    if (try self.optimizeInstruction(tag, payload)) return;
     const Payload = @TypeOf(payload);
     const bytes = try self.instructions.addManyAsSlice(self.allocator, 1 + @sizeOf(Payload));
     bytes[0] = @intFromEnum(tag);
     const payload_ptr: *align(1) Payload = @ptrCast(bytes[1..][0..@sizeOf(Payload)]);
     payload_ptr.* = payload;
+}
+
+fn optimizeInstruction(
+    self: *Executable,
+    comptime tag: Instruction.Tag,
+    payload: Instruction.Payload(tag),
+) std.mem.Allocator.Error!bool {
+    switch (tag) {
+        .evaluate_call => {
+            if (payload.arguments.has_spread or payload.arguments.count > 3) return false;
+            switch (payload.arguments.count) {
+                0 => try self.addInstruction(.evaluate_call0, {}),
+                1 => try self.addInstruction(.evaluate_call1, {}),
+                2 => try self.addInstruction(.evaluate_call2, {}),
+                3 => try self.addInstruction(.evaluate_call3, {}),
+                else => unreachable,
+            }
+            return true;
+        },
+        else => return false,
+    }
 }
 
 pub fn addConstant(self: *Executable, constant: Value) Error!ConstantIndex {

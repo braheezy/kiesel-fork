@@ -63,14 +63,12 @@ iterator_stack: std.ArrayList(Iterator),
 lexical_environment_stack: std.ArrayList(Environment),
 reference_stack: std.ArrayList(Reference),
 exception_jump_target_stack: std.ArrayList(u32),
-function_arguments: std.ArrayList(Value),
 result: ?Value = null,
 exception: ?Agent.Exception = null,
 cached_this_value: ?Value = null,
 
 pub fn init(agent: *Agent, executable: *const Executable) std.mem.Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
-    const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
     return .{
         .agent = agent,
         .executable = executable,
@@ -80,7 +78,6 @@ pub fn init(agent: *Agent, executable: *const Executable) std.mem.Allocator.Erro
         .lexical_environment_stack = .empty,
         .reference_stack = .empty,
         .exception_jump_target_stack = .empty,
-        .function_arguments = function_arguments,
         .result = null,
         .exception = null,
         .cached_this_value = null,
@@ -93,36 +90,32 @@ pub fn deinit(self: *Vm) void {
     self.lexical_environment_stack.deinit(self.agent.gc_allocator);
     self.reference_stack.deinit(self.agent.gc_allocator);
     self.exception_jump_target_stack.deinit(self.agent.gc_allocator);
-    self.function_arguments.deinit(self.agent.gc_allocator);
 }
 
 fn getArguments(self: *Vm, arguments: Instruction.Arguments) Agent.Error![]const Value {
-    self.function_arguments.clearRetainingCapacity();
     if (!arguments.has_spread) {
-        try self.function_arguments.appendSlice(
-            self.agent.gc_allocator,
-            self.stack.items[self.stack.items.len - arguments.count ..],
-        );
+        const slice = self.stack.items[self.stack.items.len - arguments.count ..];
         self.stack.items.len -= arguments.count;
+        return slice;
     } else {
         const array = self.stack.pop().?.asObject();
         const argument_spread_indices = array.property_storage.indexed_properties.storage.dense_i32.items;
         // May still resize when spreading
-        try self.function_arguments.ensureTotalCapacity(self.agent.gc_allocator, arguments.count);
+        var values: std.ArrayList(Value) = try .initCapacity(self.agent.gc_allocator, arguments.count);
         for (0..arguments.count) |i| {
             const argument = self.stack.pop().?;
             if (std.mem.indexOfScalar(i32, argument_spread_indices, @intCast(arguments.count - i - 1)) == null) {
-                try self.function_arguments.insert(self.agent.gc_allocator, 0, argument);
+                try values.insert(self.agent.gc_allocator, 0, argument);
             } else {
                 var iterator = try getIterator(self.agent, argument, .sync);
                 var n: usize = 0;
                 while (try iterator.stepValue(self.agent)) |value| : (n += 1) {
-                    try self.function_arguments.insert(self.agent.gc_allocator, n, value);
+                    try values.insert(self.agent.gc_allocator, n, value);
                 }
             }
         }
+        return values.toOwnedSlice(self.agent.gc_allocator);
     }
-    return self.function_arguments.items;
 }
 
 fn executeArrayCreate(self: *Vm, length: u32) std.mem.Allocator.Error!void {
@@ -744,6 +737,61 @@ fn executeDupReference(self: *Vm) std.mem.Allocator.Error!void {
 
 fn executeEvaluateCall(self: *Vm, args: Instruction.Arguments) Agent.Error!void {
     const arguments = try self.getArguments(args);
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+fn executeEvaluateCall0(self: *Vm) Agent.Error!void {
+    const arguments: []const Value = &.{};
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+fn executeEvaluateCall1(self: *Vm) Agent.Error!void {
+    const arguments = self.stack.items[self.stack.items.len - 1 ..];
+    self.stack.items.len -= 1;
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+fn executeEvaluateCall2(self: *Vm) Agent.Error!void {
+    const arguments = self.stack.items[self.stack.items.len - 2 ..];
+    self.stack.items.len -= 2;
+    const this_value = self.stack.pop().?;
+    const function = self.stack.pop().?;
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+fn executeEvaluateCall3(self: *Vm) Agent.Error!void {
+    const arguments = self.stack.items[self.stack.items.len - 3 ..];
+    self.stack.items.len -= 3;
     const this_value = self.stack.pop().?;
     const function = self.stack.pop().?;
 
@@ -1988,6 +2036,10 @@ pub fn run(self: *Vm) Agent.Error!Completion {
                 .dup_iterator => self.executeDupIterator(),
                 .dup_reference => self.executeDupReference(),
                 .evaluate_call => self.executeEvaluateCall(payload.arguments),
+                .evaluate_call0 => self.executeEvaluateCall0(),
+                .evaluate_call1 => self.executeEvaluateCall1(),
+                .evaluate_call2 => self.executeEvaluateCall2(),
+                .evaluate_call3 => self.executeEvaluateCall3(),
                 .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(payload.arguments, payload.strict),
                 .evaluate_import_call => self.executeEvaluateImportCall(),
                 .evaluate_new => self.executeEvaluateNew(payload.arguments),

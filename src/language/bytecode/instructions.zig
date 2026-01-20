@@ -100,6 +100,11 @@ pub const Instruction = union(enum(u8)) {
     evaluate_call: struct {
         arguments: Arguments,
     },
+    // Spezializations for N arguments and no spread
+    evaluate_call0,
+    evaluate_call1,
+    evaluate_call2,
+    evaluate_call3,
     /// Store EvaluateCall() as the result value, possibly invoking direct eval.
     evaluate_call_direct_eval: struct {
         arguments: Arguments,
