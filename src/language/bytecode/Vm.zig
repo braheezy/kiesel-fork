@@ -263,12 +263,39 @@ fn executeBinaryOperatorMod(self: *Vm) Agent.Error!void {
     const r_val = self.stack.pop().?;
     const l_val = self.stack.pop().?;
 
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            if (std.math.rem(i32, l_val.__asI32(), r_val.__asI32())) |result| {
+                self.result = if (result == 0 and l_val.__asI32() < 0)
+                    Value.from(-0.0)
+                else
+                    Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(l_val.asNumber().remainder(r_val.asNumber()));
+        return;
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"%", r_val);
 }
 
 fn executeBinaryOperatorExp(self: *Vm) Agent.Error!void {
     const r_val = self.stack.pop().?;
     const l_val = self.stack.pop().?;
+
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            if (std.math.powi(i32, l_val.__asI32(), r_val.__asI32())) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(l_val.asNumber().exponentiate(r_val.asNumber()));
+        return;
+    }
 
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"**", r_val);
 }
