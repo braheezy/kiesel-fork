@@ -3978,7 +3978,7 @@ fn fromBase64Impl(
     // 4-10.
     // NOTE: This doesn't pass all tests. std.base64 has an awful API so I didn't bother with
     //       supporting partial decoding.
-    const bytes = switch (string.asAsciiOrUtf16()) {
+    const source = switch (string.asAsciiOrUtf16()) {
         .ascii => |ascii| switch (last_chunk_handling) {
             .loose => if (std.mem.indexOfScalar(u8, ascii, '=')) |end| blk: {
                 for (ascii[end..]) |c| {
@@ -4014,8 +4014,8 @@ fn fromBase64Impl(
         if (last_chunk_handling == .loose) null else '=',
         "\t\n\u{c}\r ",
     );
-    const buf = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(bytes.len) catch unreachable);
-    const buf_len = decoder.decode(buf, bytes) catch {
+    const dest = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(source.len) catch unreachable);
+    const dest_len = decoder.decode(dest, source) catch {
         const @"error" = try agent.createErrorObject(
             .syntax_error,
             "Invalid base64 string",
@@ -4023,7 +4023,10 @@ fn fromBase64Impl(
         );
         return .{ .read = 0, .bytes = &.{}, .@"error" = @"error" };
     };
-    return .{ .read = bytes.len, .bytes = buf[0..buf_len], .@"error" = null };
+    // This is wrong when max_length is set, but `decode()` doesn't tell us the actual value.
+    const read = source.len;
+    const bytes = dest[0..@min(dest_len, max_length)];
+    return .{ .read = read, .bytes = bytes, .@"error" = null };
 }
 
 const FromHexResult = struct {
