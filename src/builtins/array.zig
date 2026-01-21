@@ -277,9 +277,11 @@ fn arraySetLength(
         //     a. Let deleteSucceeded be ! A.[[Delete]](P).
         switch (array.object.property_storage.indexed_properties.storage) {
             .none => {},
-            .dense_i32 => |*dense_i32| dense_i32.shrinkRetainingCapacity(new_len),
-            .dense_f64 => |*dense_f64| dense_f64.shrinkRetainingCapacity(new_len),
-            .dense_value => |*dense_value| dense_value.shrinkRetainingCapacity(new_len),
+            // `shrinkRetainingCapacity()` asserts that the new length is less than the old length,
+            // so we have to check the storage size first.
+            .dense_i32 => |*dense_i32| if (dense_i32.items.len > new_len) dense_i32.shrinkRetainingCapacity(new_len),
+            .dense_f64 => |*dense_f64| if (dense_f64.items.len > new_len) dense_f64.shrinkRetainingCapacity(new_len),
+            .dense_value => |*dense_value| if (dense_value.items.len > new_len) dense_value.shrinkRetainingCapacity(new_len),
             .sparse_value => |*sparse_value| {
                 var indices: std.ArrayList(u32) = .empty;
                 defer indices.deinit(agent.gc_allocator);
