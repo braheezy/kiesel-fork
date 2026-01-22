@@ -12,8 +12,8 @@ const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
+const IntlMathematicalValue = builtins.intl.number_format.IntlMathematicalValue;
 const MakeObject = types.MakeObject;
-const Number = types.Number;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -25,6 +25,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const resolveOptions = abstract_operations.resolveOptions;
 const setNumberFormatDigitOptions = builtins.intl.number_format.constructor.setNumberFormatDigitOptions;
+const toIntlMathematicalValue = builtins.intl.number_format.toIntlMathematicalValue;
 
 /// 17.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
@@ -328,8 +329,9 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
         const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
 
-        // 3. Let n be ? ToNumber(value).
-        const n = try value.toNumber(agent);
+        // 3. Let n be ? ToIntlMathematicalValue(value).
+        const n = try toIntlMathematicalValue(agent, value);
+        defer n.deinit();
 
         // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
         return Value.from(
@@ -486,37 +488,48 @@ pub const PluralRules = MakeObject(.{
     .display_name = "Intl.PluralRules",
 });
 
-/// 17.5.4 ResolvePlural ( pluralRules, n )
+/// 17.5.2 ResolvePlural ( pluralRules, n )
 /// https://tc39.es/ecma402/#sec-resolveplural
-pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct {
+pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematicalValue) struct {
     /// [[PluralCategory]]
     plural_category: icu4zig.PluralRules.PluralCategory,
 
     // TODO: [[FormattedString]]
 } {
-    // 1. If n is not a finite Number, then
-    if (!n.isFinite()) {
-        // a. Let s be ! ToString(n).
-        // b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
-        return .{ .plural_category = .other };
-    }
+    const decimal = switch (n) {
+        // 1. If n is not-a-number, then
+        //     a. Let s be an ILD String value indicating the NaN value.
+        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        // 2. If n is positive-infinity, then
+        //     a. Let s be an ILD String value indicating positive infinity.
+        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        // 3. If n is negative-infinity, then
+        //     a. Let s be an ILD String value indicating negative infinity.
+        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        .not_a_number, .positive_infinity, .negative_infinity => {
+            return .{ .plural_category = .other };
+        },
+        .negative_zero => icu4zig.Decimal.fromDoubleWithRoundTripPrecision(-0.0) catch unreachable,
+        .mathematical_value => |decimal| decimal,
+    };
+    defer if (n == .negative_zero) decimal.deinit();
 
-    // TODO: 2. Let res be FormatNumericToString(pluralRules, ℝ(n)).
-    // TODO: 3. Let s be res.[[FormattedString]].
+    // TODO: 4. Let res be FormatNumericToString(pluralRules, n).
+    // TODO: 5. Let s be res.[[FormattedString]].
 
-    // 4. Let locale be pluralRules.[[Locale]].
+    // 6. Let locale be pluralRules.[[Locale]].
     const locale = plural_rules_object.fields.locale;
 
-    // 5. Let type be pluralRules.[[Type]].
+    // 7. Let type be pluralRules.[[Type]].
     const @"type" = plural_rules_object.fields.type;
 
-    // 6. Let notation be pluralRules.[[Notation]].
+    // 8. Let notation be pluralRules.[[Notation]].
     const notation = plural_rules_object.fields.notation;
 
-    // 7. Let compactDisplay be pluralRules.[[CompactDisplay]].
+    // 9. Let compactDisplay be pluralRules.[[CompactDisplay]].
     const compact_display = plural_rules_object.fields.compact_display;
 
-    // 8. Let p be PluralRuleSelect(locale, type, notation, compactDisplay, s).
+    // 10. Let p be PluralRuleSelect(locale, type, notation, compactDisplay, s).
     // TODO: Use these once ICU4X supports it.
     _ = notation;
     _ = compact_display;
@@ -525,12 +538,8 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         .ordinal => .ordinal,
     });
     defer plural_rules.deinit();
-    const decimal = switch (n) {
-        .i32 => |value| icu4zig.Decimal.fromI32(value),
-        .f64 => |value| icu4zig.Decimal.fromDoubleWithRoundTripPrecision(value) catch unreachable,
-    };
     const plural_category = plural_rules.categoryFor(decimal);
 
-    // 9. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    // 11. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
 }
