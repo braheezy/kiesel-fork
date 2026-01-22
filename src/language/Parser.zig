@@ -24,7 +24,10 @@ const Parser = @This();
 allocator: std.mem.Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
-state: struct {
+state: State = .{},
+identifier_stack: std.ArrayList(ast.Identifier),
+
+pub const State = struct {
     in_async_arrow_function_expression: bool = false,
     in_async_function_body: bool = false,
     in_breakable_statement: bool = false,
@@ -34,6 +37,7 @@ state: struct {
     in_default_export: bool = false,
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
+    in_function_body_eval: bool = false,
     in_generator_function_body: bool = false,
     in_iteration_statement: bool = false,
     in_labelled_statement: bool = false,
@@ -41,8 +45,7 @@ state: struct {
     in_module: bool = false,
     in_strict_mode: bool = false,
     arguments_object_needed: bool = false,
-} = .{},
-identifier_stack: std.ArrayList(ast.Identifier),
+};
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -57,6 +60,7 @@ pub const Error = error{
 pub const Options = struct {
     diagnostics: ?*ptk.Diagnostics = null,
     file_name: ?[]const u8 = null,
+    state: State = .{},
 };
 
 pub fn fmtParseError(parse_error: ptk.Error) std.fmt.Alt(ptk.Error, formatParseError) {
@@ -277,6 +281,7 @@ pub fn parseNode(
         .core = core,
         .diagnostics = diagnostics,
         .identifier_stack = .empty,
+        .state = options.state,
     };
     defer parser.identifier_stack.deinit(allocator);
     const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
@@ -1034,7 +1039,11 @@ pub fn acceptNewTarget(self: *Parser) AcceptError!void {
     _ = try self.core.accept(RuleSet.is(.@"."));
     _ = try self.acceptKeyword("target");
 
-    if (!(self.state.in_formal_parameters or self.state.in_function_body or self.state.in_class_static_block)) {
+    if (!(self.state.in_formal_parameters or
+        self.state.in_function_body or
+        self.state.in_function_body_eval or
+        self.state.in_class_static_block))
+    {
         try self.emitErrorAt(token.location, "'new.target' is only allowed in functions", .{});
         return error.UnexpectedToken;
     }

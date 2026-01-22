@@ -41,7 +41,44 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
     try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, x.asString(), direct);
 
-    // TODO: 6-10.
+    // 6. Let inFunction be false.
+    var in_function = false;
+
+    // 7. Let inMethod be false.
+    var in_method = false;
+
+    // 8. Let inDerivedConstructor be false.
+    var in_derived_constructor = false;
+
+    // 9. Let inClassFieldInitializer be false.
+    var in_class_field_initializer = false;
+
+    // 10. If direct is true, then
+    if (direct) {
+        // a. Let thisEnvRec be GetThisEnvironment().
+        const this_env = agent.getThisEnvironment();
+
+        // b. If thisEnvRec is a Function Environment Record, then
+        if (this_env == .function_environment) {
+            // i. Let F be thisEnvRec.[[FunctionObject]].
+            const function_object = this_env.function_environment.function_object;
+
+            // ii. Set inFunction to true.
+            in_function = true;
+
+            // iii. Set inMethod to thisEnvRec.HasSuperBinding().
+            in_method = this_env.hasSuperBinding();
+
+            // iv. If F.[[ConstructorKind]] is derived, set inDerivedConstructor to true.
+            in_derived_constructor = function_object.fields.constructor_kind == .derived;
+
+            // v. Let classFieldInitializerName be F.[[ClassFieldInitializerName]].
+            const class_field_initializer_name = function_object.fields.class_field_initializer_name;
+
+            // vi. If classFieldInitializerName is not empty, set inClassFieldInitializer to true.
+            if (class_field_initializer_name != null) in_class_field_initializer = true;
+        }
+    }
 
     // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
@@ -53,6 +90,16 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     const script = Parser.parse(ast.Script, agent.gc_allocator, try x.asString().toUtf8(agent.gc_allocator), .{
         .diagnostics = &diagnostics,
         .file_name = "eval",
+        .state = .{
+            // e-h.
+            .in_strict_mode = strict_caller,
+            .in_function_body_eval = in_function,
+            .in_method_definition = in_method,
+            // TODO: The state should track whether we're in a *derived* constructor
+            .in_class_constructor = in_derived_constructor,
+            // TODO: The state should track whether we're in a class field initializer
+            // .in_class_field_initializer = in_class_field_initializer,
+        },
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {
@@ -67,8 +114,6 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
     // d. Let body be the ScriptBody of script.
     const body = script;
-
-    // TODO: e-h.
 
     // 12. If strictCaller is true, let strictEval be true.
     // 13. Else, let strictEval be ScriptIsStrict of script.
