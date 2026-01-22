@@ -523,7 +523,7 @@ fn templateTailMatcher(str: []const u8) ?usize {
 }
 
 /// Parse a unicode escape sequence, and return the parsed code point and its length in bytes.
-fn parseUnicodeEscapeSequence(str: []const u8) ?struct { code_point: u21, len: usize } {
+pub fn parseUnicodeEscapeSequence(str: []const u8) ?struct { code_point: u21, len: usize } {
     if (str.len < 3 or !std.mem.startsWith(u8, str, "\\u"))
         return null;
 
@@ -546,23 +546,48 @@ fn parseUnicodeEscapeSequence(str: []const u8) ?struct { code_point: u21, len: u
     }
 }
 
+pub fn parseLegacyOctalEscapeSequence(str: []const u8) ?struct { code_point: u8, len: usize } {
+    if (str.len < 2 or str[0] != '\\') return null;
+    var len: usize = 1;
+    var code_point: u16 = 0;
+    for (str[1..]) |ch| {
+        if (ch < '0' or ch > '7') break;
+        const next_code_point = code_point * 8 + (ch - '0');
+        if (next_code_point > 0xFF) break;
+        code_point = next_code_point;
+        len += 1;
+        if (len == 4) break;
+    }
+    if (len == 1) return null;
+    if (len == 2 and code_point == 0) return null;
+    return .{ .code_point = @intCast(code_point), .len = len };
+}
+
 pub fn escapeSequenceMatcher(str: []const u8) ?usize {
     if (str.len < 2 or str[0] != '\\') return null;
     switch (str[1]) {
         'x' => {
-            // \xXX
+            // \xXX (HexEscapeSequence)
             if (str.len >= 4 and std.ascii.isHex(str[2]) and std.ascii.isHex(str[3]))
                 return 4
             else
                 return null;
         },
         'u' => {
-            // \uXXXX or \u{X} - \u{XXXXXX}
+            // \uXXXX or \u{X} - \u{XXXXXX} (UnicodeEscapeSequence)
             const parsed = parseUnicodeEscapeSequence(str) orelse return null;
             return parsed.len;
         },
-        else => return 2,
+        '0'...'7' => {
+            // \1 to \377 (LegacyOctalEscapeSequence)
+            if (parseLegacyOctalEscapeSequence(str)) |parsed| return parsed.len;
+        },
+        else => {},
     }
+
+    // CharacterEscapeSequence
+    // NonOctalDecimalEscapeSequence
+    return 2;
 }
 
 test indexOfFirstLineTerminator {
@@ -648,7 +673,7 @@ test escapeSequenceMatcher {
         // zig fmt: off
     {
         // Valid no-op escapes
-        "\\a", "\\z", "\\A", "\\Z", "\\1", "\\9",
+        "\\a", "\\z", "\\A", "\\Z", "\\8", "\\9",
         // Valid one-char escapes
         "\\0", "\\f", "\\n", "\\r", "\\t", "\\v", "\\\\",
         // Valid \x escapes
@@ -656,6 +681,8 @@ test escapeSequenceMatcher {
         // Valid \u escapes
         "\\u0000", "\\uffff", "\\uFFFF", "\\u1234", "\\u0000",
         "\\u{0}", "\\u{00}", "\\u{000}", "\\u{0000}", "\\u{00000}", "\\u{000000}",
+        // Valid octal escapes
+        "\\00", "\\000", "\\077", "\\1", "\\12", "\\123",
     }
     // zig fmt: on
     ) |input| {

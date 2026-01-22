@@ -18,7 +18,8 @@ const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
-const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
+const parseUnicodeEscapeSequence = language.tokenizer.parseUnicodeEscapeSequence;
+const parseLegacyOctalEscapeSequence = language.tokenizer.parseLegacyOctalEscapeSequence;
 
 const AnalyzeQuery = enum {
     is_await_expression,
@@ -298,10 +299,6 @@ pub fn stringValueImpl(
                     result.appendCharAssumeCapacity('\\');
                     it.i += 1;
                 },
-                '0' => {
-                    result.appendCharAssumeCapacity(0x00);
-                    it.i += 1;
-                },
                 'b' => {
                     result.appendCharAssumeCapacity(0x08);
                     it.i += 1;
@@ -333,16 +330,18 @@ pub fn stringValueImpl(
                     it.i += 3;
                 },
                 'u' => {
-                    const chars = switch (text[it.i + 1]) {
-                        '{' => text[it.i + 2 .. it.i + escapeSequenceMatcher(text[it.i - 1 ..]).? - 2],
-                        else => text[it.i + 1 .. it.i + 5],
-                    };
-                    const parsed = std.fmt.parseInt(u21, chars, 16) catch unreachable;
-                    result.appendCodePointAssumeCapacity(parsed);
-                    it.i += switch (text[it.i + 1]) {
-                        '{' => chars.len + 3,
-                        else => 5,
-                    };
+                    const parsed = parseUnicodeEscapeSequence(text[it.i - 1 ..]).?;
+                    result.appendCodePointAssumeCapacity(parsed.code_point);
+                    it.i += parsed.len - 1;
+                },
+                '0'...'7' => |c| {
+                    if (parseLegacyOctalEscapeSequence(text[it.i - 1 ..])) |parsed| {
+                        result.appendCharAssumeCapacity(parsed.code_point);
+                        it.i += parsed.len - 1;
+                    } else if (c == '0') {
+                        result.appendCharAssumeCapacity(0x00);
+                        it.i += 1;
+                    } else unreachable;
                 },
                 else => {},
             },
