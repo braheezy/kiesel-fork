@@ -213,12 +213,12 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Map%"()),
         );
 
-        // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
+        // 24.1.3.14 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
         const @"%Map.prototype.entries%" = object.getPropertyValueDirect(PropertyKey.from("entries"));
         try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Map.prototype.entries%");
 
-        // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]
+        // 24.1.3.15 Map.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -364,8 +364,8 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 1 Map.prototype.getOrInsert ( key, value )
-    /// https://tc39.es/proposal-upsert/#sec-map.prototype.getOrInsert
+    /// 24.1.3.7 Map.prototype.getOrInsert ( key, value )
+    /// https://tc39.es/ecma262/#sec-map.prototype.getorinsert
     fn getOrInsert(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
         const value = arguments.get(1);
@@ -390,8 +390,8 @@ pub const prototype = struct {
         return value;
     }
 
-    /// 2 Map.prototype.getOrInsertComputed ( key, callback )
-    /// https://tc39.es/proposal-upsert/#sec-map.prototype.getOrInsertComputed
+    /// 24.1.3.8 Map.prototype.getOrInsertComputed ( key, callback )
+    /// https://tc39.es/ecma262/#sec-map.prototype.getorinsertcomputed
     fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
         const callback = arguments.get(1);
@@ -428,7 +428,7 @@ pub const prototype = struct {
         return value;
     }
 
-    /// 24.1.3.7 Map.prototype.has ( key )
+    /// 24.1.3.9 Map.prototype.has ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.has
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
@@ -446,7 +446,7 @@ pub const prototype = struct {
         return Value.from(map.fields.map_data.contains(key));
     }
 
-    /// 24.1.3.8 Map.prototype.keys ( )
+    /// 24.1.3.10 Map.prototype.keys ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.keys
     fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
@@ -457,7 +457,7 @@ pub const prototype = struct {
         return Value.from(&map_iterator.object);
     }
 
-    /// 24.1.3.9 Map.prototype.set ( key, value )
+    /// 24.1.3.11 Map.prototype.set ( key, value )
     /// https://tc39.es/ecma262/#sec-map.prototype.set
     fn set(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
@@ -488,7 +488,7 @@ pub const prototype = struct {
         return Value.from(&map.object);
     }
 
-    /// 24.1.3.10 get Map.prototype.size
+    /// 24.1.3.12 get Map.prototype.size
     /// https://tc39.es/ecma262/#sec-get-map.prototype.size
     fn size(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
@@ -504,7 +504,7 @@ pub const prototype = struct {
         return Value.from(@as(u53, @intCast(count)));
     }
 
-    /// 24.1.3.11 Map.prototype.values ( )
+    /// 24.1.3.13 Map.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.values
     fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.

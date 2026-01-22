@@ -117,7 +117,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%WeakMap%"()),
         );
 
-        // 24.3.3.6 WeakMap.prototype [ %Symbol.toStringTag% ]
+        // 24.3.3.8 WeakMap.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weakmap.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -176,8 +176,8 @@ pub const prototype = struct {
         return maybe_value orelse .undefined;
     }
 
-    /// 3 WeakMap.prototype.getOrInsert ( key, value )
-    /// https://tc39.es/proposal-upsert/#sec-weakmap.prototype.getOrInsert
+    /// 24.3.3.4 WeakMap.prototype.getOrInsert ( key, value )
+    /// https://tc39.es/ecma262/#sec-weakmap.prototype.getorinsert
     fn getOrInsert(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
         const value = arguments.get(1);
@@ -207,8 +207,8 @@ pub const prototype = struct {
         return value;
     }
 
-    /// 4 WeakMap.prototype.getOrInsertComputed ( key, callback )
-    /// https://tc39.es/proposal-upsert/#sec-weakmap.prototype.getOrInsertComputed
+    /// 24.3.3.5 WeakMap.prototype.getOrInsertComputed ( key, callback )
+    /// https://tc39.es/ecma262/#sec-weakmap.prototype.getorinsertcomputed
     fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
         const callback = arguments.get(1);
@@ -253,7 +253,7 @@ pub const prototype = struct {
         return value;
     }
 
-    /// 24.3.3.4 WeakMap.prototype.has ( key )
+    /// 24.3.3.6 WeakMap.prototype.has ( key )
     /// https://tc39.es/ecma262/#sec-weakmap.prototype.has
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
@@ -274,7 +274,7 @@ pub const prototype = struct {
         return Value.from(is_present);
     }
 
-    /// 24.3.3.5 WeakMap.prototype.set ( key, value )
+    /// 24.3.3.7 WeakMap.prototype.set ( key, value )
     /// https://tc39.es/ecma262/#sec-weakmap.prototype.set
     fn set(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
