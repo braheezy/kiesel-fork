@@ -548,8 +548,7 @@ pub const namespace = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the natural logarithm
-        //    of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing ln(ℝ(n)).
         return Value.from(@log(n.asFloat()));
     }
 
@@ -564,8 +563,7 @@ pub const namespace = struct {
         // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
         // 3. If n is -1𝔽, return -∞𝔽.
         // 4. If n < -1𝔽, return NaN.
-        // 5. Return an implementation-approximated Number value representing the natural logarithm
-        //    of 1 + ℝ(n).
+        // 5. Return an implementation-approximated Number value representing ln(1 + ℝ(n)).
         if (n.isNegativeZero()) return Value.from(n);
         return Value.from(@log(1 + n.asFloat()));
     }
@@ -582,8 +580,7 @@ pub const namespace = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the base 10 logarithm
-        //    of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing log10(ℝ(n)).
         return Value.from(@log10(n.asFloat()));
     }
 
@@ -599,7 +596,7 @@ pub const namespace = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the base 2 logarithm of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing log2(ℝ(n)).
         return Value.from(@log2(n.asFloat()));
     }
 
