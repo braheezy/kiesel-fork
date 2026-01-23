@@ -1,13 +1,14 @@
 diff --git a/Sources/FuzzilliCli/Profiles/KieselProfile.swift b/Sources/FuzzilliCli/Profiles/KieselProfile.swift
 new file mode 100644
-index 0000000..415482e
+index 0000000..b349c57
 --- /dev/null
 +++ b/Sources/FuzzilliCli/Profiles/KieselProfile.swift
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,31 @@
 +import Fuzzilli
 +
 +let kieselProfile = Profile(
 +  processArgs: { randomize in return [""] },
++  processArgsReference: nil,
 +  processEnv: [:],
 +  maxExecsBeforeRespawn: 1000,
 +  timeout: Timeout.value(250),
@@ -35,10 +36,10 @@ index 0000000..415482e
 +  optionalPostProcessor: nil
 +)
 diff --git a/Sources/FuzzilliCli/Profiles/Profile.swift b/Sources/FuzzilliCli/Profiles/Profile.swift
-index 0947d95..1c1f6a9 100644
+index 8d9d7dc..03eecdd 100644
 --- a/Sources/FuzzilliCli/Profiles/Profile.swift
 +++ b/Sources/FuzzilliCli/Profiles/Profile.swift
-@@ -54,4 +54,5 @@ let profiles = [
+@@ -61,4 +61,5 @@ let profiles = [
      "v8holefuzzing": v8HoleFuzzingProfile,
      "serenity": serenityProfile,
      "njs": njsProfile,
