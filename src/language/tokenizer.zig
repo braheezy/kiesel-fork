@@ -360,8 +360,8 @@ fn commentMatcher(str: []const u8) ?usize {
         return indexOfFirstLineTerminator(str) orelse str.len;
     }
     if (std.mem.startsWith(u8, str, "/*")) {
-        if (std.mem.indexOf(u8, str, "*/")) |index|
-            return index + 2;
+        if (std.mem.indexOf(u8, str[2..], "*/")) |index|
+            return index + 4;
     }
     return null;
 }

@@ -40741,7 +40741,7 @@
   "test/language/literals/regexp/7.8.5-2gs.js": "PASS",
   "test/language/literals/regexp/S7.8.5_A1.1_T1.js": "PASS",
   "test/language/literals/regexp/S7.8.5_A1.1_T2.js": "FAIL",
-  "test/language/literals/regexp/S7.8.5_A1.2_T1.js": "FAIL",
+  "test/language/literals/regexp/S7.8.5_A1.2_T1.js": "PASS",
   "test/language/literals/regexp/S7.8.5_A1.2_T2.js": "PASS",
   "test/language/literals/regexp/S7.8.5_A1.2_T3.js": "PASS",
   "test/language/literals/regexp/S7.8.5_A1.2_T4.js": "PASS",
