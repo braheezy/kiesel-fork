@@ -1106,7 +1106,11 @@ pub fn codegenOptionalExpression(
 ) Executable.Error!void {
     // 1. Let baseReference be ? Evaluation of OptionalExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference, {});
+    if (node.expression.analyze(.is_reference) and node.property == .arguments) {
+        // Only `load_this_value_for_evaluate_call` needs a reference on the stack, all other
+        // cases use `*_direct` instructions.
+        try executable.addInstruction(.dup_reference, {});
+    }
 
     // 2. Let baseValue be ? GetValue(baseReference).
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value, {});
@@ -1122,7 +1126,9 @@ pub fn codegenOptionalExpression(
     // a. Return undefined.
     jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
     try executable.addInstruction(.store, {}); // Drop baseValue from the stack
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.pop_reference, {});
+    if (node.expression.analyze(.is_reference) and node.property == .arguments) {
+        try executable.addInstruction(.pop_reference, {});
+    }
     try executable.addInstructionWithConstant(.store_constant, .undefined);
     const end_jump = try executable.addInstructionDeferred(.jump);
 
