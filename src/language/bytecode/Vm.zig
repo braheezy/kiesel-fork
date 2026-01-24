@@ -1684,7 +1684,11 @@ fn executeMakeSuperPropertyReference(self: *Vm, strict: bool) std.mem.Allocator.
 
     // 3. Assert: env is a Function Environment Record.
     // 4. Let baseValue be GetSuperBase(env).
-    const base_value = try env.function_environment.getSuperBase(self.agent);
+    const base = try env.function_environment.getSuperBase(self.agent);
+    const base_value: Value = switch (base) {
+        .undefined => .undefined,
+        .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
+    };
 
     // 5. Return the Reference Record {
     //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
