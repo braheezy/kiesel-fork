@@ -1852,10 +1852,13 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
                     .@"&&=",
                     .@"||=",
                     .@"??=",
-                    // For loop initializer
-                    .in,
+                    => break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern },
                     .identifier,
-                    => if (next_token_.type != .identifier or std.mem.eql(u8, next_token_.text, "of")) {
+                    => if (std.mem.eql(u8, next_token_.text, "of")) {
+                        break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
+                    },
+                    // For loop initializer
+                    .in => if (std.mem.indexOfScalar(Tokenizer.TokenType, ctx.forbidden, .in) != null) {
                         break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
                     },
                     else => {},
