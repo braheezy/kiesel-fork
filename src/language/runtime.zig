@@ -256,7 +256,7 @@ pub fn evaluateCall(
 
 /// 13.3.7.2 GetSuperConstructor ( )
 /// https://tc39.es/ecma262/#sec-getsuperconstructor
-pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!Value {
+pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
     // 1. Let envRec be GetThisEnvironment().
     const env = agent.getThisEnvironment();
 
@@ -274,7 +274,7 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!Value {
     ) catch |err| try noexcept(err);
 
     // 6. Return superConstructor.
-    return if (super_constructor) |object| Value.from(object) else .null;
+    return super_constructor;
 }
 
 /// 13.3.10.2 EvaluateImportCall ( specifierExpression [ , optionsExpression ] )

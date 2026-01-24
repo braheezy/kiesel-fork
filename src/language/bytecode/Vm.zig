@@ -1046,17 +1046,22 @@ fn executeEvaluateSuperCall(self: *Vm, args: Instruction.Arguments) Agent.Error!
 
     // 3. Let func be GetSuperConstructor().
     const function = try getSuperConstructor(self.agent);
+    const function_value: Value = if (function) |f| Value.from(f) else .null;
 
     // 4. Let argList be ? ArgumentListEvaluation of Arguments.
     const arguments = try self.getArguments(args);
 
     // 5. If IsConstructor(func) is false, throw a TypeError exception.
-    if (!function.isConstructor()) {
-        return self.agent.throwException(.type_error, "{f} is not a constructor", .{function});
+    if (!function_value.isConstructor()) {
+        return self.agent.throwException(
+            .type_error,
+            "{f} is not a constructor",
+            .{function_value},
+        );
     }
 
     // 6. Let result be ? Construct(func, argList, newTarget).
-    var result = try function.asObject().construct(self.agent, arguments, new_target);
+    var result = try function.?.construct(self.agent, arguments, new_target);
 
     // 7. Let thisER be GetThisEnvironment().
     const this_environment = self.agent.getThisEnvironment();
