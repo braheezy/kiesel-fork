@@ -13,9 +13,11 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
 const getIteratorFlattenable = types.getIteratorFlattenable;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -38,6 +40,8 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "concat", concat, 0, realm);
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
+        try object.defineBuiltinFunction(agent, "zip", zip, 1, realm);
+        try object.defineBuiltinFunction(agent, "zipKeyed", zipKeyed, 1, realm);
 
         // 27.1.3.2.2 Iterator.prototype
         // https://tc39.es/ecma262/#sec-iterator.prototype
@@ -246,6 +250,618 @@ pub const constructor = struct {
 
         // 6. Return wrapper.
         return Value.from(&wrapper.object);
+    }
+
+    /// 1 Iterator.zip ( iterables [ , options ] )
+    /// https://tc39.es/proposal-joint-iteration/#sec-iterator.zip
+    fn zip(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const iterables = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. If iterables is not an Object, throw a TypeError exception.
+        if (!iterables.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{iterables});
+        }
+
+        // 2. Set options to ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 3. Let mode be ? Get(options, "mode").
+        var mode_value = try options.get(agent, PropertyKey.from("mode"));
+
+        // 4. If mode is undefined, set mode to "shortest".
+        // 5. If mode is not one of "shortest", "longest", or "strict", throw a TypeError
+        //    exception.
+        const mode: ZipMode = blk: {
+            if (mode_value.isUndefined()) break :blk .shortest;
+            if (mode_value.isString()) {
+                if (mode_value.asString().eql(String.fromLiteral("shortest"))) break :blk .shortest;
+                if (mode_value.asString().eql(String.fromLiteral("longest"))) break :blk .longest;
+                if (mode_value.asString().eql(String.fromLiteral("strict"))) break :blk .strict;
+            }
+            return agent.throwException(.type_error, "Invalid mode {f}", .{mode_value});
+        };
+
+        // 6. Let paddingOption be undefined.
+        var padding_option: ?*Object = null;
+
+        // 7. If mode is "longest", then
+        if (mode == .longest) {
+            // a. Set paddingOption to ? Get(options, "padding").
+            const padding_option_value = try options.get(agent, PropertyKey.from("padding"));
+
+            // b. If paddingOption is not undefined and paddingOption is not an Object, throw a
+            //    TypeError exception.
+            if (!padding_option_value.isUndefined() and !padding_option_value.isObject()) {
+                return agent.throwException(
+                    .type_error,
+                    "{f} is not an Object",
+                    .{padding_option_value},
+                );
+            }
+            if (padding_option_value.isObject()) {
+                padding_option = padding_option_value.asObject();
+            }
+        }
+
+        // 8. Let iters be a new empty List.
+        var iters: std.ArrayList(types.Iterator) = .empty;
+        defer iters.deinit(agent.gc_allocator);
+
+        // 9. Let padding be a new empty List.
+        var padding: std.ArrayList(Value) = .empty;
+        defer padding.deinit(agent.gc_allocator);
+
+        // 10. Let inputIter be ? GetIterator(iterables, SYNC).
+        var input_iter = try getIterator(agent, iterables, .sync);
+
+        // 11. Let next be NOT-STARTED.
+        // 12. Repeat, while next is not DONE,
+        while (true) {
+            // a. Set next to Completion(IteratorStepValue(inputIter)).
+            const next = input_iter.stepValue(agent) catch |err| {
+                // b. IfAbruptCloseIterators(next, iters).
+                return types.Iterator.closeAll(agent, iters.items, @as(Agent.Error!Value, err));
+            } orelse break;
+
+            // c. If next is not DONE, then
+            // i. Let iter be Completion(GetIteratorFlattenable(next, REJECT-PRIMITIVES)).
+            const iter = getIteratorFlattenable(agent, next, .reject_primitives) catch |err| {
+                // ii. IfAbruptCloseIterators(iter, the list-concatenation of « inputIter » and iters).
+                var all_iters: std.ArrayList(types.Iterator) = .empty;
+                defer all_iters.deinit(agent.gc_allocator);
+                try all_iters.append(agent.gc_allocator, input_iter);
+                try all_iters.appendSlice(agent.gc_allocator, iters.items);
+                return types.Iterator.closeAll(
+                    agent,
+                    all_iters.items,
+                    @as(Agent.Error!Value, err),
+                );
+            };
+
+            // iii. Append iter to iters.
+            try iters.append(agent.gc_allocator, iter);
+        }
+
+        // 13. Let iterCount be the number of elements in iters.
+        const iter_count = iters.items.len;
+
+        // 14. If mode is "longest", then
+        if (mode == .longest) {
+            // a. If paddingOption is undefined, then
+            if (padding_option == null) {
+                // i. Perform the following steps iterCount times:
+                for (0..iter_count) |_| {
+                    // 1. Append undefined to padding.
+                    try padding.append(agent.gc_allocator, .undefined);
+                }
+            } else {
+                // b. Else,
+                // i. Let paddingIter be Completion(GetIterator(paddingOption, SYNC)).
+                var padding_iter = getIterator(
+                    agent,
+                    Value.from(padding_option.?),
+                    .sync,
+                ) catch |err| {
+                    // ii. IfAbruptCloseIterators(paddingIter, iters).
+                    return types.Iterator.closeAll(
+                        agent,
+                        iters.items,
+                        @as(Agent.Error!Value, err),
+                    );
+                };
+
+                // iii. Let usingIterator be true.
+                var using_iterator = true;
+
+                // iv. Perform the following steps iterCount times:
+                for (0..iter_count) |_| {
+                    // 1. If usingIterator is true, then
+                    if (using_iterator) {
+                        // a. Set next to Completion(IteratorStepValue(paddingIter)).
+                        const maybe_next = padding_iter.stepValue(agent) catch |err| {
+                            // b. IfAbruptCloseIterators(next, iters).
+                            return types.Iterator.closeAll(
+                                agent,
+                                iters.items,
+                                @as(Agent.Error!Value, err),
+                            );
+                        };
+
+                        // c. If next is done, then
+                        //     i. Set usingIterator to false.
+                        // d. Else,
+                        //     i. Append next to padding.
+                        if (maybe_next) |next| {
+                            try padding.append(agent.gc_allocator, next);
+                        } else {
+                            using_iterator = false;
+                        }
+                    }
+
+                    // 2. If usingIterator is false, append undefined to padding.
+                    if (!using_iterator) {
+                        try padding.append(agent.gc_allocator, .undefined);
+                    }
+                }
+
+                // v. If usingIterator is true, then
+                if (using_iterator) {
+                    // 1. Let completion be Completion(IteratorClose(paddingIter, NormalCompletion(UNUSED))).
+                    padding_iter.close(agent, @as(Agent.Error!void, {})) catch |err| {
+                        // 2. IfAbruptCloseIterators(completion, iters).
+                        return types.Iterator.closeAll(
+                            agent,
+                            iters.items,
+                            @as(Agent.Error!Value, err),
+                        );
+                    };
+                }
+            }
+        }
+
+        // 15. Let finishResults be a new Abstract Closure with parameters (results) that captures
+        //     nothing and performs the following steps when called:
+        //     a. Return CreateArrayFromList(results).
+        // 16. Return IteratorZip(iters, mode, padding, finishResults).
+        return iteratorZip(
+            agent,
+            try iters.toOwnedSlice(agent.gc_allocator),
+            mode,
+            try padding.toOwnedSlice(agent.gc_allocator),
+            .array,
+        );
+    }
+
+    /// 2 Iterator.zipKeyed ( iterables [ , options ] )
+    /// https://tc39.es/proposal-joint-iteration/#sec-iterator.zipkeyed
+    fn zipKeyed(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const iterables_value = arguments.get(0);
+        const options_value = arguments.get(1);
+
+        // 1. If iterables is not an Object, throw a TypeError exception.
+        if (!iterables_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{iterables_value});
+        }
+        const iterables = iterables_value.asObject();
+
+        // 2. Set options to ? GetOptionsObject(options).
+        const options = try options_value.getOptionsObject(agent);
+
+        // 3. Let mode be ? Get(options, "mode").
+        var mode_value = try options.get(agent, PropertyKey.from("mode"));
+
+        // 4. If mode is undefined, set mode to "shortest".
+        // 5. If mode is not one of "shortest", "longest", or "strict", throw a TypeError
+        //    exception.
+        const mode: ZipMode = blk: {
+            if (mode_value.isUndefined()) break :blk .shortest;
+            if (mode_value.isString()) {
+                if (mode_value.asString().eql(String.fromLiteral("shortest"))) break :blk .shortest;
+                if (mode_value.asString().eql(String.fromLiteral("longest"))) break :blk .longest;
+                if (mode_value.asString().eql(String.fromLiteral("strict"))) break :blk .strict;
+            }
+            return agent.throwException(.type_error, "Invalid mode {f}", .{mode_value});
+        };
+
+        // 6. Let paddingOption be undefined.
+        var padding_option: ?*Object = null;
+
+        // 7. If mode is "longest", then
+        if (mode == .longest) {
+            // a. Set paddingOption to ? Get(options, "padding").
+            const padding_option_value = try options.get(agent, PropertyKey.from("padding"));
+
+            // b. If paddingOption is not undefined and paddingOption is not an Object, throw a
+            //    TypeError exception.
+            if (!padding_option_value.isUndefined() and !padding_option_value.isObject()) {
+                return agent.throwException(.type_error, "padding must be an Object", .{});
+            }
+            if (padding_option_value.isObject()) {
+                padding_option = padding_option_value.asObject();
+            }
+        }
+
+        // 8. Let iters be a new empty List.
+        var iters: std.ArrayList(types.Iterator) = .empty;
+        defer iters.deinit(agent.gc_allocator);
+
+        // 9. Let padding be a new empty List.
+        var padding: std.ArrayList(Value) = .empty;
+        defer padding.deinit(agent.gc_allocator);
+
+        // 10. Let allKeys be ? iterables.[[OwnPropertyKeys]]().
+        const all_keys = try iterables.internal_methods.ownPropertyKeys(
+            agent,
+            iterables,
+        );
+        defer agent.gc_allocator.free(all_keys);
+
+        // 11. Let keys be a new empty List.
+        var keys: std.ArrayList(PropertyKey) = .empty;
+        defer keys.deinit(agent.gc_allocator);
+
+        // 12. For each element key of allKeys, do
+        for (all_keys) |key| {
+            // a. Let desc be Completion(iterables.[[GetOwnProperty]](key)).
+            const descriptor = iterables.internal_methods.getOwnProperty(
+                agent,
+                iterables,
+                key,
+            ) catch |err| {
+                // b. IfAbruptCloseIterators(desc, iters).
+                return types.Iterator.closeAll(agent, iters.items, @as(Agent.Error!Value, err));
+            };
+
+            // c. If desc is not undefined and desc.[[Enumerable]] is true, then
+            if (descriptor != null and descriptor.?.enumerable == true) {
+                // i. Let value be Completion(Get(iterables, key)).
+                const value = iterables.get(agent, key) catch |err| {
+                    // ii. IfAbruptCloseIterators(value, iters).
+                    return types.Iterator.closeAll(
+                        agent,
+                        iters.items,
+                        @as(Agent.Error!Value, err),
+                    );
+                };
+
+                // iii. If value is not undefined, then
+                if (!value.isUndefined()) {
+                    // 1. Append key to keys.
+                    try keys.append(agent.gc_allocator, key);
+
+                    // 2. Let iter be Completion(GetIteratorFlattenable(value, REJECT-PRIMITIVES)).
+                    const iter = getIteratorFlattenable(
+                        agent,
+                        value,
+                        .reject_primitives,
+                    ) catch |err| {
+                        // 3. IfAbruptCloseIterators(iter, iters).
+                        return types.Iterator.closeAll(
+                            agent,
+                            iters.items,
+                            @as(Agent.Error!Value, err),
+                        );
+                    };
+
+                    // 4. Append iter to iters.
+                    try iters.append(agent.gc_allocator, iter);
+                }
+            }
+        }
+
+        // 13. Let iterCount be the number of elements in iters.
+        const iter_count = iters.items.len;
+
+        // 14. If mode is "longest", then
+        if (mode == .longest) {
+            // a. If paddingOption is undefined, then
+            if (padding_option == null) {
+                // i. Perform the following steps iterCount times:
+                for (0..iter_count) |_| {
+                    // 1. Append undefined to padding.
+                    try padding.append(agent.gc_allocator, .undefined);
+                }
+            } else {
+                // b. Else,
+                // i. For each element key of keys, do
+                for (keys.items) |key| {
+                    // 1. Let value be Completion(Get(paddingOption, key)).
+                    const value = padding_option.?.get(agent, key) catch |err| {
+                        // 2. IfAbruptCloseIterators(value, iters).
+                        return types.Iterator.closeAll(
+                            agent,
+                            iters.items,
+                            @as(Agent.Error!Value, err),
+                        );
+                    };
+
+                    // 3. Append value to padding.
+                    try padding.append(agent.gc_allocator, value);
+                }
+            }
+        }
+
+        // 15. Let finishResults be a new Abstract Closure with parameters (results) that captures
+        //     keys and iterCount and performs the following steps when called:
+        //     a. Let obj be OrdinaryObjectCreate(null).
+        //     b. For each integer i such that 0 ≤ i < iterCount, in ascending order, do
+        //         i. Perform ! CreateDataPropertyOrThrow(obj, keys[i], results[i]).
+        //     c. Return obj.
+        // 16. Return IteratorZip(iters, mode, padding, finishResults).
+        return iteratorZip(
+            agent,
+            try iters.toOwnedSlice(agent.gc_allocator),
+            mode,
+            try padding.toOwnedSlice(agent.gc_allocator),
+            .{ .object = try keys.toOwnedSlice(agent.gc_allocator) },
+        );
+    }
+
+    const ZipMode = enum { shortest, longest, strict };
+    const FinishResults = union(enum) {
+        array,
+        object: []PropertyKey,
+    };
+
+    fn removeFromOpenIters(open_iters: *std.ArrayList(types.Iterator), iter: types.Iterator) void {
+        for (open_iters.items, 0..) |open_iter, idx| {
+            if (open_iter.iterator == iter.iterator) {
+                _ = open_iters.orderedRemove(idx);
+                break;
+            }
+        }
+    }
+
+    /// 3 IteratorZip ( iters, mode, padding, finishResults )
+    /// https://tc39.es/proposal-joint-iteration/#sec-iteratorzip
+    fn iteratorZip(
+        agent: *Agent,
+        iters: []types.Iterator,
+        mode: ZipMode,
+        padding: []Value,
+        finish_results: FinishResults,
+    ) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let iterCount be the number of elements in iters.
+        // 2. Let openIters be a copy of iters.
+        var open_iters: std.ArrayList(types.Iterator) = .empty;
+        try open_iters.appendSlice(agent.gc_allocator, iters);
+
+        const Captures = struct {
+            iters: []types.Iterator,
+            open_iters: std.ArrayList(types.Iterator),
+            mode: ZipMode,
+            padding: []Value,
+            finish_results: FinishResults,
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iters = iters,
+            .open_iters = open_iters,
+            .mode = mode,
+            .padding = padding,
+            .finish_results = finish_results,
+        };
+
+        // 3. Let closure be a new Abstract Closure with no parameters that captures iters,
+        //    iterCount, openIters, mode, padding, and finishResults, and performs the following
+        //    steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const iters_ = captures_.iters;
+                const open_iters_ = &captures_.open_iters;
+                const mode_ = captures_.mode;
+                const padding_ = captures_.padding;
+                const finish_results_ = captures_.finish_results;
+                const iter_count = iters_.len;
+
+                // a. If iterCount = 0, return ReturnCompletion(undefined).
+                if (iter_count == 0) return null;
+
+                // b. Repeat,
+                // i. Let results be a new empty List.
+                var results: std.ArrayList(Value) = .empty;
+                defer results.deinit(agent_.gc_allocator);
+
+                // ii. Assert: openIters is not empty.
+                std.debug.assert(open_iters_.items.len > 0);
+
+                // iii. For each integer i such that 0 ≤ i < iterCount, in ascending order, do
+                for (0..iter_count) |i| {
+                    var result: Value = undefined;
+
+                    // 1. Let iter be iters[i].
+                    var iter = iters_[i];
+
+                    // 2. If iter is null, then
+                    if (iter.done) {
+                        // a. Assert: mode is "longest".
+                        std.debug.assert(mode_ == .longest);
+
+                        // b. Let result be padding[i].
+                        result = padding_[i];
+                    } else {
+                        // 3. Else,
+                        // a. Let result be Completion(IteratorStepValue(iter)).
+                        const maybe_result = iter.stepValue(agent_) catch |err| {
+                            // b. If result is an abrupt completion, then
+                            // i. Remove iter from openIters.
+                            removeFromOpenIters(open_iters_, iter);
+                            // ii. Return ? IteratorCloseAll(openIters, result).
+                            return types.Iterator.closeAll(
+                                agent_,
+                                open_iters_.items,
+                                @as(Agent.Error!?Value, err),
+                            );
+                        };
+
+                        // c. Set result to ! result.
+                        // d. If result is done, then
+                        if (maybe_result) |value| {
+                            result = value;
+                        } else {
+                            // i. Remove iter from openIters.
+                            removeFromOpenIters(open_iters_, iter);
+
+                            switch (mode_) {
+                                // ii. If mode is "shortest", then
+                                .shortest => {
+                                    // 1. Return ? IteratorCloseAll(openIters, ReturnCompletion(undefined)).
+                                    return types.Iterator.closeAll(
+                                        agent_,
+                                        open_iters_.items,
+                                        @as(Agent.Error!?Value, null),
+                                    );
+                                },
+                                // iii. Else if mode is "strict", then
+                                .strict => {
+                                    // i. If i ≠ 0, then
+                                    if (i != 0) {
+                                        // 1. Return ? IteratorCloseAll(openIters, ThrowCompletion(
+                                        //    a newly created TypeError object)).
+                                        const @"error" = agent_.throwException(
+                                            .type_error,
+                                            "Iterators finished at different lengths in strict mode",
+                                            .{},
+                                        );
+                                        return types.Iterator.closeAll(
+                                            agent_,
+                                            open_iters_.items,
+                                            @as(Agent.Error!?Value, @"error"),
+                                        );
+                                    }
+
+                                    // ii. For each integer k such that 1 ≤ k < iterCount, in ascending order, do
+                                    for (1..iter_count) |k| {
+                                        // i. Assert: iters[k] is not null.
+                                        std.debug.assert(!iters_[k].done);
+
+                                        // ii. Let open be Completion(IteratorStep(iters[k])).
+                                        const open = iters_[k].step(agent_) catch |err| {
+                                            // iii. If open is an abrupt completion, then
+                                            // 1. Remove iters[k] from openIters.
+                                            removeFromOpenIters(open_iters_, iters_[k]);
+
+                                            // 2. Return ? IteratorCloseAll(openIters, open).
+                                            return types.Iterator.closeAll(
+                                                agent_,
+                                                open_iters_.items,
+                                                @as(Agent.Error!?Value, err),
+                                            );
+                                        };
+
+                                        // iv. Set open to ! open.
+                                        // v. If open is done, then
+                                        if (open == null) {
+                                            // i. Remove iters[k] from openIters.
+                                            removeFromOpenIters(open_iters_, iters_[k]);
+                                        } else {
+                                            // vi. Else,
+                                            // i. Return ? IteratorCloseAll(openIters,
+                                            //    ThrowCompletion(a newly created TypeError object)).
+                                            const @"error" = agent_.throwException(
+                                                .type_error,
+                                                "Iterators finished at different lengths in strict mode",
+                                                .{},
+                                            );
+                                            return types.Iterator.closeAll(
+                                                agent_,
+                                                open_iters_.items,
+                                                @as(Agent.Error!?Value, @"error"),
+                                            );
+                                        }
+                                    }
+
+                                    // iii. Return ReturnCompletion(undefined).
+                                    return null;
+                                },
+                                .longest => {
+                                    // iv. Else,
+                                    // i. Assert: mode is "longest".
+                                    std.debug.assert(mode_ == .longest);
+
+                                    // ii. If openIters is empty, return ReturnCompletion(undefined).
+                                    if (open_iters_.items.len == 0) return null;
+
+                                    // iii. Set iters[i] to null.
+                                    // (We mark done flag, which we check above)
+
+                                    // iv. Set result to padding[i].
+                                    result = padding_[i];
+                                },
+                            }
+                        }
+                    }
+
+                    // 4. Append result to results.
+                    try results.append(agent_.gc_allocator, result);
+                }
+
+                // iv. Set results to finishResults(results).
+                const final_result = switch (finish_results_) {
+                    // Iterator.zip, step 15.
+                    .array => blk: {
+                        // a. Return CreateArrayFromList(results).
+                        const array = try createArrayFromList(agent_, results.items);
+                        break :blk Value.from(&array.object);
+                    },
+                    // Iterator.zipKeyed, step 15.
+                    .object => |keys| blk: {
+                        // a. Let obj be OrdinaryObjectCreate(null).
+                        const obj = try ordinaryObjectCreate(agent_, null);
+
+                        // b. For each integer i such that 0 ≤ i < iterCount, in ascending order, do
+                        for (0..iter_count) |i| {
+                            // i. Perform ! CreateDataPropertyOrThrow(obj, keys[i], results[i]).
+                            try obj.createDataPropertyOrThrow(agent_, keys[i], results.items[i]);
+                        }
+
+                        // c. Return obj.
+                        break :blk Value.from(obj);
+                    },
+                };
+
+                // v. Let completion be Completion(Yield(results)).
+                // vi. If completion is an abrupt completion, then
+                //     1. Return ? IteratorCloseAll(openIters, completion).
+                return final_result;
+            }
+        }.func;
+
+        const abruptClosure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
+                // 3.b.vi.
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const open_iters_ = captures_.open_iters;
+                _ = try types.Iterator.closeAll(
+                    agent_,
+                    open_iters_.items,
+                    @as(Agent.Error!void, {}),
+                );
+            }
+        }.func;
+
+        // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const gen = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .fields = .{
+                .state = .{
+                    // 5. Set gen.[[UnderlyingIterators]] to openIters.
+                    .underlying_iterators = open_iters.items,
+
+                    .closure = closure,
+                    .abruptClosure = abruptClosure,
+                    .captures = .make(*Captures, captures),
+                },
+            },
+        });
+
+        // 6. Return gen.
+        return Value.from(&gen.object);
     }
 };
 
