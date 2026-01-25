@@ -575,7 +575,7 @@ pub const prototype = struct {
         // 3. Let timeZone be zonedDateTime.[[TimeZone]].
         // 4. Let isoDateTime be GetISODateTimeFor(timeZone, zonedDateTime.[[EpochNanoseconds]]).
         // 5. Let today be isoDateTime.[[ISODate]].
-        // 6. Let tomorrow be BalanceISODate(today.[[Year]], today.[[Month]], today.[[Day]] + 1).
+        // 6. Let tomorrow be AddDaysToISODate(today, 1).
         // 7. Let todayNs be ? GetStartOfDay(timeZone, today).
         // 8. Let tomorrowNs be ? GetStartOfDay(timeZone, tomorrow).
         // 9. Let diff be TimeDurationFromEpochNanosecondsDifference(tomorrowNs, todayNs).
@@ -814,7 +814,7 @@ pub const prototype = struct {
         // 18. Let isoDateTime be GetISODateTimeFor(timeZone, thisNs).
         // 19. If smallestUnit is day, then
         //     a. Let dateStart be isoDateTime.[[ISODate]].
-        //     b. Let dateEnd be BalanceISODate(dateStart.[[Year]], dateStart.[[Month]], dateStart.[[Day]] + 1).
+        //     b. Let dateEnd be AddDaysToISODate(dateStart, 1).
         //     c. Let startNs be ? GetStartOfDay(timeZone, dateStart).
         //     d. Assert: thisNs ≥ startNs.
         //     e. Let endNs be ? GetStartOfDay(timeZone, dateEnd).

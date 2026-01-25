@@ -1298,20 +1298,20 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     // 7. If largestUnit is unset, then
     //     a. Set largestUnit to auto.
     // 8. If disallowedUnits contains largestUnit, throw a RangeError exception.
-    // 9. If operation is since, then
-    //     a. Set roundingMode to NegateRoundingMode(roundingMode).
-    // 10. Perform ? ValidateTemporalUnitValue(smallestUnit, unitGroup).
-    // 11. If smallestUnit is unset, then
+    // 9. Perform ? ValidateTemporalUnitValue(smallestUnit, unitGroup).
+    // 10. If smallestUnit is unset, then
     //     a. Set smallestUnit to fallbackSmallestUnit.
-    // 12. If disallowedUnits contains smallestUnit, throw a RangeError exception.
-    // 13. Let defaultLargestUnit be LargerOfTwoTemporalUnits(smallestLargestDefaultUnit,
+    // 11. If disallowedUnits contains smallestUnit, throw a RangeError exception.
+    // 12. Let defaultLargestUnit be LargerOfTwoTemporalUnits(smallestLargestDefaultUnit,
     //     smallestUnit).
-    // 14. If largestUnit is auto, set largestUnit to defaultLargestUnit.
-    // 15. If LargerOfTwoTemporalUnits(largestUnit, smallestUnit) is not largestUnit, throw a
-    //     RangeError exception.largestUnit
-    // 16. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
-    // 17. If maximum is not unset, perform ? ValidateTemporalRoundingIncrement(roundingIncrement,
+    // 13. If largestUnit is auto, set largestUnit to defaultLargestUnit.
+    // 14. If LargerOfTwoTemporalUnits(largestUnit, smallestUnit) is not largestUnit, throw a
+    //     RangeError exception.
+    // 15. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
+    // 16. If maximum is not unset, perform ? ValidateTemporalRoundingIncrement(roundingIncrement,
     //     maximum, false).
+    // 17. If operation is since, then
+    //     a. Set roundingMode to NegateRoundingMode(roundingMode).
     // NOTE: These steps are handled by temporal_rs.
 
     // 18. Return the Record { [[SmallestUnit]]: smallestUnit, [[LargestUnit]]: largestUnit,

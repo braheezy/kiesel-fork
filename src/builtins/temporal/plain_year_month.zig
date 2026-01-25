@@ -909,7 +909,7 @@ fn addDurationToYearMonth(
     // 10. If sign < 0, then
     //     a. Let oneMonthDuration be ! CreateDateDurationRecord(0, 1, 0, 0).
     //     b. Let nextMonth be ? CalendarDateAdd(calendar, intermediateDate, oneMonthDuration, constrain).
-    //     c. Let date be BalanceISODate(nextMonth.[[Year]], nextMonth.[[Month]], nextMonth.[[Day]] - 1).
+    //     c. Let date be AddDaysToISODate(nextMonth, -1).
     //     d. Assert: ISODateWithinLimits(date) is true.
     // 11. Else,
     //     a. Let date be intermediateDate.
