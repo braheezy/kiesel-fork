@@ -710,6 +710,7 @@ pub const constructor = struct {
                                 // ii. If mode is "shortest", then
                                 .shortest => {
                                     // 1. Return ? IteratorCloseAll(openIters, ReturnCompletion(undefined)).
+                                    iterator_helper.fields = .completed;
                                     return types.Iterator.closeAll(
                                         agent_,
                                         open_iters_.items,
@@ -1900,6 +1901,7 @@ pub const prototype = struct {
                     // i. If remaining = 0, then
                     if (remaining.* == 0) {
                         // 1. Return ? IteratorClose(iterated, ReturnCompletion(undefined)).
+                        iterator_helper.fields = .completed;
                         return iterated_.close(agent_, @as(Agent.Error!?Value, null));
                     }
 

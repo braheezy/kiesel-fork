@@ -7448,7 +7448,7 @@
   "test/built-ins/Iterator/prototype/take/argument-effect-order.js": "PASS",
   "test/built-ins/Iterator/prototype/take/argument-validation-failure-closes-underlying.js": "PASS",
   "test/built-ins/Iterator/prototype/take/callable.js": "PASS",
-  "test/built-ins/Iterator/prototype/take/exhaustion-calls-return.js": "FAIL",
+  "test/built-ins/Iterator/prototype/take/exhaustion-calls-return.js": "PASS",
   "test/built-ins/Iterator/prototype/take/get-next-method-only-once.js": "PASS",
   "test/built-ins/Iterator/prototype/take/get-next-method-throws.js": "PASS",
   "test/built-ins/Iterator/prototype/take/get-return-method-throws.js": "PASS",
