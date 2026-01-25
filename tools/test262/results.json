@@ -7290,7 +7290,7 @@
   "test/built-ins/Iterator/prototype/flatMap/iterator-already-exhausted.js": "PASS",
   "test/built-ins/Iterator/prototype/flatMap/iterator-return-method-throws.js": "PASS",
   "test/built-ins/Iterator/prototype/flatMap/length.js": "PASS",
-  "test/built-ins/Iterator/prototype/flatMap/mapper-args.js": "FAIL",
+  "test/built-ins/Iterator/prototype/flatMap/mapper-args.js": "PASS",
   "test/built-ins/Iterator/prototype/flatMap/mapper-returns-closed-iterator.js": "PASS",
   "test/built-ins/Iterator/prototype/flatMap/mapper-returns-non-object.js": "PASS",
   "test/built-ins/Iterator/prototype/flatMap/mapper-this.js": "PASS",

@@ -1433,9 +1433,6 @@ pub const prototype = struct {
                         continue :loop .inner;
                     },
                     .inner => {
-                        // ix. Set counter to counter + 1.
-                        defer counter_.* += 1;
-
                         // vii. Let innerAlive be true.
                         // viii. Repeat, while innerAlive is true,
 
@@ -1454,6 +1451,10 @@ pub const prototype = struct {
                         //         ii. IfAbruptCloseIterator(backupCompletion, iterated).
                         //         iii. Return ? IteratorClose(iterated, completion).
                         if (inner_value) |value| return value;
+
+                        // ix. Set counter to counter + 1.
+                        counter_.* += 1;
+
                         continue :loop .outer;
                     },
                 }
