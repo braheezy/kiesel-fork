@@ -185,6 +185,16 @@ pub const constructor = struct {
             }
         }.func;
 
+        const abruptClosure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
+                // 3.a.v.3.b.
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                if (captures_.inner_iterator) |inner_iterator| {
+                    _ = try inner_iterator.close(agent_, @as(Agent.Error!void, {}));
+                }
+            }
+        }.func;
+
         // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const gen = try builtins.IteratorHelper.create(agent, .{
@@ -195,6 +205,7 @@ pub const constructor = struct {
                     .underlying_iterators = &.{},
 
                     .closure = closure,
+                    .abruptClosure = abruptClosure,
                     .captures = .make(*Captures, captures),
                 },
             },
@@ -832,6 +843,19 @@ pub const prototype = struct {
             }
         }.func;
 
+        const abruptClosure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
+                // 6.b.viii.4.b.
+                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                if (captures_.inner_iterator) |inner_iterator| {
+                    inner_iterator.close(agent_, @as(Agent.Error!void, {})) catch |err| {
+                        return captures_.iterated.close(agent_, @as(Agent.Error!void, err));
+                    };
+                }
+                try captures_.iterated.close(agent_, @as(Agent.Error!void, {}));
+            }
+        }.func;
+
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
@@ -842,6 +866,7 @@ pub const prototype = struct {
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
+                    .abruptClosure = abruptClosure,
                     .captures = .make(*Captures, captures),
                 },
             },

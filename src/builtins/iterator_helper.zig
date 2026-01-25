@@ -63,6 +63,7 @@ pub const prototype = struct {
         iterator_helper.fields.state.executing = true;
         defer if (iterator_helper.fields != .completed) {
             iterator_helper.fields.state.executing = false;
+            iterator_helper.fields.state.has_yielded = true;
         };
 
         const value = try iterator_helper.fields.state.closure(agent, iterator_helper) orelse {
@@ -79,20 +80,28 @@ pub const prototype = struct {
         // 1. Let O be this value.
         // 2. Perform ? RequireInternalSlot(O, [[UnderlyingIterators]]).
         // 3. Assert: O has a [[GeneratorState]] internal slot.
-        const object = try this_value.requireInternalSlot(agent, IteratorHelper);
+        const iterator_helper = try this_value.requireInternalSlot(agent, IteratorHelper);
+
+        if (iterator_helper.fields == .completed) {
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
+        }
+
+        if (iterator_helper.fields.state.executing) {
+            return agent.throwException(.type_error, "Generator is already executing", .{});
+        }
 
         // 4. If O.[[GeneratorState]] is suspended-start, then
-        if (object.fields != .completed) {
-            const underlying_iterators = object.fields.state.underlying_iterators;
+        if (!iterator_helper.fields.state.has_yielded) {
+            const underlying_iterators = iterator_helper.fields.state.underlying_iterators;
 
             // a. Set O.[[GeneratorState]] to completed.
-            object.fields = .completed;
+            iterator_helper.fields = .completed;
 
             // b. NOTE: Once a generator enters the completed state it never leaves it and its
             //    associated execution context is never resumed. Any execution state associated
             //    with O can be discarded at this point.
 
-            // c. Perform ? IteratorClose(O.[[UnderlyingIterators]], NormalCompletion(unused)).
+            // c. Perform ? IteratorCloseAll(O.[[UnderlyingIterators]], NormalCompletion(unused)).
             _ = try Iterator.closeAll(agent, underlying_iterators, @as(Agent.Error!void, {}));
 
             // d. Return CreateIteratorResultObject(undefined, true).
@@ -101,6 +110,16 @@ pub const prototype = struct {
 
         // 5. Let C be ReturnCompletion(undefined).
         // 6. Return ? GeneratorResumeAbrupt(O, C, "Iterator Helper").
+
+        iterator_helper.fields.state.executing = true;
+        defer iterator_helper.fields = .completed;
+
+        if (iterator_helper.fields.state.abruptClosure) |closure| {
+            try closure(agent, iterator_helper);
+        } else {
+            _ = try Iterator.closeAll(agent, iterator_helper.fields.state.underlying_iterators, @as(Agent.Error!void, {}));
+        }
+
         return Value.from(try createIteratorResultObject(agent, .undefined, true));
     }
 };
@@ -112,8 +131,10 @@ pub const IteratorHelper = MakeObject(.{
             underlying_iterators: []Iterator,
 
             closure: *const fn (*Agent, *IteratorHelper) Agent.Error!?Value,
+            abruptClosure: ?*const fn (*Agent, *IteratorHelper) Agent.Error!void = null,
             captures: SafePointer = .null_pointer,
             executing: bool = false,
+            has_yielded: bool = false,
         },
         completed,
     },
