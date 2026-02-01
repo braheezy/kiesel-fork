@@ -404,7 +404,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .logical_expression => try b.todo("logical expression"),
         .conditional_expression => try b.todo("conditional expression"),
         .assignment_expression => try b.todo("assignment expression"),
-        .sequence_expression => try b.todo("sequence expression"),
+        .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
         .await_expression => try b.todo("await expression"),
         .yield_expression => try b.todo("yield expression"),
         .tagged_template => try b.todo("tagged template"),
@@ -429,4 +429,12 @@ fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Err
             .rhs = rhs,
         } },
     });
+}
+
+fn lowerSequenceExpression(b: *Builder, seq_expr: *const ast.SequenceExpression) Error!Ir.Inst.Ref {
+    var last: Ir.Inst.Ref = undefined;
+    for (seq_expr.expressions) |*expr| {
+        last = try b.lowerExpression(expr);
+    }
+    return last;
 }
