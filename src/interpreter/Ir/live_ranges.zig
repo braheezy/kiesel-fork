@@ -12,6 +12,7 @@ pub const LiveRange = struct {
 pub fn computeLiveRanges(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
+    extras: []const u32,
 ) std.mem.Allocator.Error![]LiveRange {
     var live_ranges = try gpa.alloc(LiveRange, instructions.len);
 
@@ -20,8 +21,9 @@ pub fn computeLiveRanges(
     }
 
     for (instructions.items(.tag), instructions.items(.data), 0..) |tag, data, inst_index| {
-        var buffer: [3]Ir.Inst.Ref = undefined;
-        var uses: std.ArrayList(Ir.Inst.Ref) = .initBuffer(&buffer);
+        var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
+        defer uses.deinit(gpa);
+
         switch (tag) {
             .undefined,
             .null,
@@ -33,24 +35,31 @@ pub fn computeLiveRanges(
             .string,
             .big_int,
             => {},
-            .@"if" => uses.appendSliceBounded(&.{
+            .array => {
+                const extra_index = @intFromEnum(data.array.extra_index);
+                const elements = @as([*]const Ir.Inst.Ref, @ptrCast(extras[extra_index..]))[0..data.array.len];
+                for (elements) |elem| {
+                    if (elem != .none) try uses.append(gpa, elem);
+                }
+            },
+            .@"if" => try uses.appendSlice(gpa, &.{
                 data.@"if".@"test",
                 data.@"if".then,
                 data.@"if".@"else",
-            }) catch unreachable,
-            .@"while" => uses.appendSliceBounded(&.{
+            }),
+            .@"while" => try uses.appendSlice(gpa, &.{
                 data.@"while".@"test",
                 data.@"while".body,
-            }) catch unreachable,
-            .@"for" => uses.appendSliceBounded(&.{
+            }),
+            .@"for" => try uses.appendSlice(gpa, &.{
                 data.@"for".@"test",
                 data.@"for".update,
                 data.@"for".body,
-            }) catch unreachable,
-            .loop => uses.appendSliceBounded(&.{
+            }),
+            .loop => try uses.appendSlice(gpa, &.{
                 data.loop.body,
                 data.loop.update,
-            }) catch unreachable,
+            }),
             .add,
             .sub,
             .mul,
@@ -68,10 +77,10 @@ pub fn computeLiveRanges(
             .logical_and,
             .logical_or,
             .nullish_coalesce,
-            => uses.appendSliceBounded(&.{
+            => try uses.appendSlice(gpa, &.{
                 data.binary.lhs,
                 data.binary.rhs,
-            }) catch unreachable,
+            }),
             .unary_plus,
             .unary_minus,
             .bitwise_not,
@@ -79,7 +88,7 @@ pub fn computeLiveRanges(
             .typeof,
             .void,
             .end,
-            => uses.appendBounded(data.ref) catch unreachable,
+            => try uses.append(gpa, data.ref),
         }
         for (uses.items) |use| {
             if (use.toIndex()) |index| {

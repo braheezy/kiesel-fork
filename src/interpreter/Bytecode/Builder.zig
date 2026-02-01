@@ -78,6 +78,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .number => try b.lowerNumber(data.number, dest),
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
+            .array => try b.lowerArray(data.array, dest),
             .@"if" => try b.lowerIf(data.@"if", dest),
             .@"while" => try b.lowerWhile(data.@"while", dest),
             .@"for" => try b.lowerFor(data.@"for", dest),
@@ -388,13 +389,34 @@ fn lowerNumber(b: *Builder, n: f64, dest: Bytecode.Inst.Reg) Error!void {
 }
 
 fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const str_idx: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string));
-    try b.emit(.{ .tag = .load_string, .data = .{ .reg_string = .{ dest, str_idx } } });
+    const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string));
+    try b.emit(.{ .tag = .load_string, .data = .{
+        .reg_string = .{ dest, string_index },
+    } });
 }
 
 fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const big_int_idx: Bytecode.Inst.BigIntIndex = @enumFromInt(@intFromEnum(big_int));
-    try b.emit(.{ .tag = .load_big_int, .data = .{ .reg_big_int = .{ dest, big_int_idx } } });
+    const big_int_index: Bytecode.Inst.BigIntIndex = @enumFromInt(@intFromEnum(big_int));
+    try b.emit(.{ .tag = .load_big_int, .data = .{
+        .reg_big_int = .{ dest, big_int_index },
+    } });
+}
+
+fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: Bytecode.Inst.Reg) Error!void {
+    const extra_index = @intFromEnum(array_data.extra_index);
+    const elements = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..array_data.len];
+
+    try b.emit(.{ .tag = .array_create, .data = .{
+        .reg_u32 = .{ dest, array_data.len },
+    } });
+
+    for (elements, 0..) |elem, i| {
+        if (elem == .none) continue; // Skip elisions
+        const elem_reg = b.resolve(elem);
+        try b.emit(.{ .tag = .array_set, .data = .{
+            .reg_reg_u32 = .{ dest, elem_reg, @intCast(i) },
+        } });
+    }
 }
 
 fn lowerIf(b: *Builder, data: @FieldType(Ir.Inst.Data, "if"), dest: Bytecode.Inst.Reg) Error!void {

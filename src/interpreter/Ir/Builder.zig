@@ -19,6 +19,7 @@ root_node: Ast,
 instructions: std.MultiArrayList(Ir.Inst),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
+extras: std.ArrayListUnmanaged(u32),
 
 const Ast = union(enum) {
     script: *const ast.Script,
@@ -53,6 +54,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .instructions = .empty,
         .strings = .empty,
         .big_ints = .empty,
+        .extras = .empty,
     };
 }
 
@@ -62,6 +64,7 @@ pub fn deinit(b: *Builder) void {
     b.strings.deinit(b.gpa);
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
+    b.extras.deinit(b.gpa);
 }
 
 pub fn build(b: *Builder) Error!Ir {
@@ -80,10 +83,13 @@ pub fn build(b: *Builder) Error!Ir {
     var instructions = b.instructions.toOwnedSlice();
     errdefer instructions.deinit(b.gpa);
 
-    var liveness = try computeLiveness(b.gpa, instructions);
+    const extras = try b.extras.toOwnedSlice(b.gpa);
+    errdefer b.gpa.free(extras);
+
+    var liveness = try computeLiveness(b.gpa, instructions, extras);
     errdefer liveness.deinit(b.gpa);
 
-    const live_ranges = try computeLiveRanges(b.gpa, instructions);
+    const live_ranges = try computeLiveRanges(b.gpa, instructions, extras);
     errdefer b.gpa.free(live_ranges);
 
     const strings = try b.gpa.dupe([]const u8, b.strings.keys());
@@ -103,6 +109,7 @@ pub fn build(b: *Builder) Error!Ir {
         .live_ranges = live_ranges,
         .strings = strings,
         .big_ints = big_ints,
+        .extras = extras,
     };
 }
 
@@ -376,7 +383,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .this => try b.todo("this"),
             .identifier_reference => try b.todo("identifier reference"),
             .literal => unreachable, // Guaranteed to constant-fold
-            .array_literal => try b.todo("array literal"),
+            .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
             .object_literal => try b.todo("object literal"),
             .function_expression => try b.todo("function expression"),
             .class_expression => try b.todo("class expression"),
@@ -410,6 +417,32 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .tagged_template => try b.todo("tagged template"),
         .binding_pattern_for_assignment_expression => try b.todo("binding pattern for assignment expression"),
     };
+}
+
+fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.Inst.Ref {
+    var elements: std.ArrayListUnmanaged(Ir.Inst.Ref) = .empty;
+    defer elements.deinit(b.gpa);
+
+    for (array_lit.element_list) |elem| {
+        const elem_ref: Ir.Inst.Ref = switch (elem) {
+            .elision => .none,
+            .expression => |*expr| try b.lowerExpression(expr),
+            .spread => try b.todo("spread operator in array literal"),
+        };
+        try elements.append(b.gpa, elem_ref);
+    }
+
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const len: u32 = @intCast(elements.items.len);
+    try b.extras.appendSlice(b.gpa, @ptrCast(elements.items));
+
+    return b.addInst(.{
+        .tag = .array,
+        .data = .{ .array = .{
+            .extra_index = extra_index,
+            .len = len,
+        } },
+    });
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {

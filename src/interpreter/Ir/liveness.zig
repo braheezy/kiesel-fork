@@ -7,6 +7,7 @@ const Ir = interpreter.Ir;
 pub fn computeLiveness(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
+    extras: []const u32,
 ) std.mem.Allocator.Error!std.DynamicBitSetUnmanaged {
     var reachable: std.DynamicBitSetUnmanaged = try .initEmpty(gpa, instructions.len);
     defer reachable.deinit(gpa);
@@ -27,7 +28,7 @@ pub fn computeLiveness(
             .@"for",
             .loop,
             .end,
-            => try markLive(gpa, instructions, &live, @enumFromInt(i)),
+            => try markLive(gpa, instructions, extras, &live, @enumFromInt(i)),
             else => {},
         }
     }
@@ -103,6 +104,7 @@ fn markReachable(
 fn markLive(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
+    extras: []const u32,
     live: *std.DynamicBitSetUnmanaged,
     start: Ir.Inst.Index,
 ) std.mem.Allocator.Error!void {
@@ -121,8 +123,9 @@ fn markLive(
         const tag = tags[i];
         const data = datas[i];
 
-        var uses_buffer: [3]Ir.Inst.Ref = undefined;
-        var uses: std.ArrayList(Ir.Inst.Ref) = .initBuffer(&uses_buffer);
+        var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
+        defer uses.deinit(gpa);
+
         switch (tag) {
             .undefined,
             .null,
@@ -134,24 +137,31 @@ fn markLive(
             .string,
             .big_int,
             => {},
-            .@"if" => uses.appendSliceBounded(&.{
+            .array => {
+                const extra_index = @intFromEnum(data.array.extra_index);
+                const elements = @as([*]const Ir.Inst.Ref, @ptrCast(extras.ptr + extra_index))[0..data.array.len];
+                for (elements) |elem| {
+                    if (elem != .none) try uses.append(gpa, elem);
+                }
+            },
+            .@"if" => try uses.appendSlice(gpa, &.{
                 data.@"if".@"test",
                 data.@"if".then,
                 data.@"if".@"else",
-            }) catch unreachable,
-            .@"while" => uses.appendSliceBounded(&.{
+            }),
+            .@"while" => try uses.appendSlice(gpa, &.{
                 data.@"while".@"test",
                 data.@"while".body,
-            }) catch unreachable,
-            .@"for" => uses.appendSliceBounded(&.{
+            }),
+            .@"for" => try uses.appendSlice(gpa, &.{
                 data.@"for".@"test",
                 data.@"for".update,
                 data.@"for".body,
-            }) catch unreachable,
-            .loop => uses.appendSliceBounded(&.{
+            }),
+            .loop => try uses.appendSlice(gpa, &.{
                 data.loop.body,
                 data.loop.update,
-            }) catch unreachable,
+            }),
             .add,
             .sub,
             .mul,
@@ -169,10 +179,10 @@ fn markLive(
             .logical_and,
             .logical_or,
             .nullish_coalesce,
-            => uses.appendSliceBounded(&.{
+            => try uses.appendSlice(gpa, &.{
                 data.binary.lhs,
                 data.binary.rhs,
-            }) catch unreachable,
+            }),
             .unary_plus,
             .unary_minus,
             .bitwise_not,
@@ -180,7 +190,7 @@ fn markLive(
             .typeof,
             .void,
             .end,
-            => uses.appendBounded(data.ref) catch unreachable,
+            => try uses.append(gpa, data.ref),
         }
 
         for (uses.items) |use| {

@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
@@ -12,6 +13,7 @@ const String = types.String;
 const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
+const arrayCreateFast = builtins.arrayCreateFast;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
@@ -82,6 +84,9 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .load_string => vm.executeLoadString(data.reg_string[0], data.reg_string[1]),
                 .load_big_int => vm.executeLoadBigInt(data.reg_big_int[0], data.reg_big_int[1]),
                 .move => vm.executeMove(data.reg_reg[0], data.reg_reg[1]),
+                .array_create => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
+                .array_push => vm.executeArrayPush(data.reg_reg[0], data.reg_reg[1]),
+                .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .unary_minus => vm.executeUnaryMinus(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
@@ -192,6 +197,32 @@ fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIn
 
 fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
     vm.load(dest, vm.store(src));
+}
+
+fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, capacity: u32) Agent.Error!void {
+    const array = try arrayCreateFast(vm.agent, capacity);
+    vm.load(dst, Value.from(&array.object));
+}
+
+fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const array_value = vm.store(array_reg);
+    const elem_value = vm.store(elem_reg);
+    const array = array_value.asObject().as(builtins.Array);
+    const index = array.fields.length;
+    try array.object.property_storage.indexed_properties.set(vm.agent.gc_allocator, index, .{
+        .value_or_accessor = .{ .value = elem_value },
+        .attributes = .all,
+    });
+}
+
+fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) Agent.Error!void {
+    const array_value = vm.store(array_reg);
+    const elem_value = vm.store(elem_reg);
+    const array = array_value.asObject().as(builtins.Array);
+    try array.object.property_storage.indexed_properties.set(vm.agent.gc_allocator, index, .{
+        .value_or_accessor = .{ .value = elem_value },
+        .attributes = .all,
+    });
 }
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {

@@ -8,6 +8,7 @@ liveness: std.DynamicBitSetUnmanaged,
 live_ranges: []const LiveRange,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
+extras: []const u32,
 
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
@@ -70,6 +71,7 @@ pub const Inst = struct {
         number,
         string,
         big_int,
+        array,
 
         @"if",
         @"while",
@@ -113,6 +115,7 @@ pub const Inst = struct {
         number: f64,
         string: StringIndex,
         big_int: BigIntIndex,
+        array: struct { extra_index: ExtraIndex, len: u32 },
         @"if": struct { @"test": Ref, then: Ref, @"else": Ref },
         @"while": struct { @"test": Ref, body: Ref },
         @"for": struct { @"test": Ref, update: Ref, body: Ref },
@@ -123,6 +126,7 @@ pub const Inst = struct {
 
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
+    pub const ExtraIndex = enum(u32) { _ };
 
     pub const Ref = enum(u32) {
         none,
@@ -155,6 +159,7 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.strings);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
+    gpa.free(ir.extras);
 }
 
 pub fn print(
@@ -204,6 +209,16 @@ pub fn print(
                 try big_int.formatNumber(cw, .{});
                 try cw.writeByte('n');
                 try tty_config.setColor(writer, .reset);
+            },
+            .array => {
+                try cw.writeAll(" [");
+                const extra_index = @intFromEnum(data.array.extra_index);
+                const elements = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.array.len];
+                for (elements, 0..) |element, j| {
+                    if (j > 0) try cw.writeAll(", ");
+                    try printRef(element, cw, tty_config);
+                }
+                try cw.writeByte(']');
             },
             .@"if" => {
                 try cw.writeByte(' ');
