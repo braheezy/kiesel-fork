@@ -4,6 +4,7 @@ const std = @import("std");
 const ast = @import("../../language/ast.zig");
 const interpreter = @import("../../interpreter.zig");
 
+const Constant = @import("constant_folding.zig").Constant;
 const Ir = interpreter.Ir;
 
 const computeLiveness = @import("liveness.zig").computeLiveness;
@@ -117,6 +118,61 @@ fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
     const index: Ir.Inst.Index = @enumFromInt(b.instructions.len);
     try b.instructions.append(b.gpa, inst);
     return index.toRef();
+}
+
+fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
+    return switch (constant) {
+        .undefined => b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        }),
+        .null => b.addInst(.{
+            .tag = .null,
+            .data = .{ .none = {} },
+        }),
+        .boolean => |boolean| b.addInst(.{
+            .tag = if (boolean) .true else .false,
+            .data = .{ .none = {} },
+        }),
+        .number => |number| {
+            if (number == 0 and !std.math.isNegativeZero(number)) {
+                return b.addInst(.{
+                    .tag = .zero,
+                    .data = .{ .none = {} },
+                });
+            } else if (number == 1) {
+                return b.addInst(.{
+                    .tag = .one,
+                    .data = .{ .none = {} },
+                });
+            } else {
+                return b.addInst(.{
+                    .tag = .number,
+                    .data = .{ .number = number },
+                });
+            }
+        },
+        .big_int => |big_int| {
+            const gop = try b.big_ints.getOrPut(b.gpa, big_int);
+            if (!gop.found_existing) {
+                gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
+            }
+            return b.addInst(.{
+                .tag = .big_int,
+                .data = .{ .big_int = @enumFromInt(gop.index) },
+            });
+        },
+        .string => |string| {
+            const gop = try b.strings.getOrPut(b.gpa, string);
+            if (!gop.found_existing) {
+                gop.key_ptr.* = try b.gpa.dupe(u8, string);
+            }
+            return b.addInst(.{
+                .tag = .string,
+                .data = .{ .string = @enumFromInt(gop.index) },
+            });
+        },
+    };
 }
 
 fn lowerScript(b: *Builder, script: *const ast.Script) Error!Ir.Inst.Ref {
@@ -284,6 +340,10 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
 }
 
 fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
+    if (try constantFold(b.gpa, expr)) |constant| {
+        defer constant.deinit(b.gpa);
+        return b.lowerConstant(constant);
+    }
     return switch (expr.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .this => try b.todo("this"),

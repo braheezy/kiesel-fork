@@ -40,11 +40,22 @@ pub fn constantFold(
     gpa: std.mem.Allocator,
     expr: *const ast.Expression,
 ) std.mem.Allocator.Error!?Constant {
-    // TODO: Implement constant folding for more complex expressions
-    if (expr.* != .primary_expression or expr.primary_expression != .literal) {
-        return null;
+    switch (expr.*) {
+        .primary_expression => |prim_expr| switch (prim_expr) {
+            .literal => |*literal| return try constantFoldLiteral(gpa, literal),
+            else => {},
+        },
+        .binary_expression => |*bin_expr| return constantFoldBinaryExpression(gpa, bin_expr),
+        else => {},
     }
-    return switch (expr.primary_expression.literal) {
+    return null;
+}
+
+fn constantFoldLiteral(
+    gpa: std.mem.Allocator,
+    literal: *const ast.Literal,
+) std.mem.Allocator.Error!Constant {
+    return switch (literal.*) {
         .null => .null,
         .boolean => |boolean| .{ .boolean = boolean },
         .numeric => |numeric| blk: {
@@ -67,4 +78,65 @@ pub fn constantFold(
         },
         .string => |s| .{ .string = try gpa.dupe(u8, s.text[1 .. s.text.len - 1]) },
     };
+}
+
+fn constantFoldBinaryExpression(
+    gpa: std.mem.Allocator,
+    bin_expr: *const ast.BinaryExpression,
+) std.mem.Allocator.Error!?Constant {
+    if (try constantFold(gpa, bin_expr.lhs_expression)) |lhs| {
+        defer lhs.deinit(gpa);
+        if (try constantFold(gpa, bin_expr.rhs_expression)) |rhs| {
+            defer rhs.deinit(gpa);
+            switch (bin_expr.operator) {
+                .@"+" => {
+                    if (lhs == .string or rhs == .string) {
+                        const lhs_str = switch (lhs) {
+                            .undefined => "undefined",
+                            .null => "null",
+                            .boolean => |b| if (b) "true" else "false",
+                            // TODO: Implement Number.toString() without needing an agent
+                            .number => return null,
+                            .big_int => |b| try b.toStringAlloc(gpa, 10, .lower),
+                            .string => |s| s,
+                        };
+                        defer if (lhs == .big_int) gpa.free(lhs_str);
+                        const rhs_str = switch (rhs) {
+                            .undefined => "undefined",
+                            .null => "null",
+                            .boolean => |b| if (b) "true" else "false",
+                            // TODO: Implement Number.toString() without needing an agent
+                            .number => return null,
+                            .big_int => |b| try b.toStringAlloc(gpa, 10, .lower),
+                            .string => |s| s,
+                        };
+                        defer if (rhs == .big_int) gpa.free(rhs_str);
+                        const result = try std.mem.concat(gpa, u8, &.{ lhs_str, rhs_str });
+                        return .{ .string = result };
+                    } else if (lhs == .number and rhs == .number) {
+                        const result = lhs.number + rhs.number;
+                        return .{ .number = result };
+                    } else if (lhs == .big_int and rhs == .big_int) {
+                        var result_managed: std.math.big.int.Managed = try .init(gpa);
+                        defer result_managed.deinit();
+                        try result_managed.ensureAddCapacity(lhs.big_int, rhs.big_int);
+                        var result_mutable = result_managed.toMutable();
+                        result_mutable.add(lhs.big_int, rhs.big_int);
+                        result_managed.setMetadata(result_mutable.positive, result_mutable.len);
+                        const result: std.math.big.int.Const = .{
+                            .limbs = try gpa.dupe(std.math.big.Limb, result_managed.toConst().limbs),
+                            .positive = result_managed.toConst().positive,
+                        };
+                        return .{ .big_int = result };
+                    } else if (lhs == .boolean and rhs == .boolean) {
+                        // Y tho
+                        const result: f64 = @floatFromInt(@intFromBool(lhs.boolean) + @intFromBool(rhs.boolean));
+                        return .{ .number = result };
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+    return null;
 }

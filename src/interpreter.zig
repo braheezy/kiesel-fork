@@ -102,21 +102,13 @@ test {
     , Value.from(6),
         \\IR (test)
         \\   0: number 42               [0..0] dead
-        \\   1: one                     [1..3]
-        \\   2: number 2                [2..3]
-        \\   3: add %1, %2              [3..5]
-        \\   4: number 3                [4..5]
-        \\   5: add %3, %4              [5..6]
-        \\   6: end %5                  [6..6]
+        \\   1: number 6                [1..2]
+        \\   2: end %1                  [2..2]
         \\
     ,
         \\Bytecode (test)
-        \\   0: load_number_i32 r0, 1
-        \\   6: load_number_i32 r1, 2
-        \\  12: add r2, r0, r1
-        \\  16: load_number_i32 r0, 3
-        \\  22: add r1, r2, r0
-        \\  26: end r1
+        \\   0: load_number_i32 r0, 6
+        \\   6: end r0
         \\
     );
 }
