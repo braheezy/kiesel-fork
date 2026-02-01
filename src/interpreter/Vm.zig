@@ -119,6 +119,9 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .not_eq => vm.executeNotEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
+                .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
+                .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -694,4 +697,42 @@ fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, r
     }
 
     vm.load(dst, Value.from(!isStrictlyEqual(lhs_value, rhs_value)));
+}
+
+fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.strings[@intFromEnum(name_index)];
+    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            return vm.agent.throwException(
+                .reference_error,
+                "'{f}' is not defined",
+                .{name.fmtRaw()},
+            );
+        };
+    }
+    vm.load(dst, try env.getBindingValue(vm.agent, name, true));
+}
+
+fn executeSetBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg, strict: bool) Agent.Error!void {
+    const name = vm.strings[@intFromEnum(name_index)];
+    const value = vm.store(value_reg);
+
+    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            if (strict) {
+                return vm.agent.throwException(
+                    .reference_error,
+                    "'{f}' is not defined",
+                    .{name.fmtRaw()},
+                );
+            }
+            const global_obj = vm.agent.getGlobalObject();
+            return try global_obj.set(vm.agent, PropertyKey.from(name), value, .ignore);
+        };
+    }
+    return try env.setMutableBinding(vm.agent, name, value, strict);
 }

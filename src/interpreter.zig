@@ -53,6 +53,21 @@ fn testInterpreter(
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
 
+    const realm = agent.currentRealm();
+    const test_context = try agent.gc_allocator.create(execution.ExecutionContext);
+    test_context.* = .{
+        .origin = .script,
+        .realm = realm,
+        .script_or_module = null,
+        .ecmascript_code = .{
+            .variable_environment = .{ .global_environment = realm.global_env },
+            .lexical_environment = .{ .global_environment = realm.global_env },
+            .private_environment = null,
+        },
+    };
+    try agent.execution_context_stack.append(agent.gc_allocator, test_context);
+    defer _ = agent.execution_context_stack.pop().?;
+
     var vm: Vm = try .init(gpa, &agent, &bc);
     defer vm.deinit(gpa);
     const result = try vm.run();
@@ -210,6 +225,28 @@ test {
         \\  45: object_set_computed r6, r2, r3
         \\  49: object_set r6, @2, r5
         \\  56: end r6
+        \\
+    );
+
+    // Variable assignment
+    try testInterpreter(std.testing.allocator,
+        \\x = 42;
+        \\x;
+        \\
+    , .{ .value = Value.from(42) },
+        \\IR (test)
+        \\   0: number 42               [0..1]
+        \\   1: set_binding "x", %0     [1..1]
+        \\   2: get_binding "x"         [2..3]
+        \\   3: end %2                  [3..3]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 42
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: get_binding r0, @0
+        \\  21: end r0
         \\
     );
 }

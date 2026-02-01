@@ -16,6 +16,7 @@ pub const Builder = @This();
 gpa: std.mem.Allocator,
 name: []const u8,
 root_node: Ast,
+in_strict_mode: bool,
 instructions: std.MultiArrayList(Ir.Inst),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
@@ -47,10 +48,15 @@ fn BigIntArrayHashMapUnmanaged(comptime V: type) type {
 pub const Error = error{ OutOfMemory, NotImplemented };
 
 pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
+    const in_strict_mode = switch (root_node) {
+        .script => |script| script.scriptIsStrict(),
+        .module => true,
+    };
     return .{
         .gpa = gpa,
         .name = name,
         .root_node = root_node,
+        .in_strict_mode = in_strict_mode,
         .instructions = .empty,
         .strings = .empty,
         .big_ints = .empty,
@@ -384,7 +390,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
     return switch (expr.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .this => try b.todo("this"),
-            .identifier_reference => try b.todo("identifier reference"),
+            .identifier_reference => |identifier| try b.lowerIdentifierReference(identifier),
             .literal => unreachable, // Guaranteed to constant-fold
             .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
             .object_literal => |*object_lit| try b.lowerObjectLiteral(object_lit),
@@ -413,13 +419,24 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
         .logical_expression => |*log_expr| try b.lowerLogicalExpression(log_expr),
         .conditional_expression => |*cond_expr| try b.lowerConditionalExpression(cond_expr),
-        .assignment_expression => try b.todo("assignment expression"),
+        .assignment_expression => |*assign_expr| try b.lowerAssignmentExpression(assign_expr),
         .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
         .await_expression => try b.todo("await expression"),
         .yield_expression => try b.todo("yield expression"),
         .tagged_template => try b.todo("tagged template"),
         .binding_pattern_for_assignment_expression => try b.todo("binding pattern for assignment expression"),
     };
+}
+
+fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.Ref {
+    const gop = try b.strings.getOrPut(b.gpa, identifier);
+    if (!gop.found_existing) {
+        gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
+    }
+    return b.addInst(.{
+        .tag = .get_binding,
+        .data = .{ .string = @enumFromInt(gop.index) },
+    });
 }
 
 fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.Inst.Ref {
@@ -630,6 +647,34 @@ fn lowerConditionalExpression(b: *Builder, cond_expr: *const ast.ConditionalExpr
             .@"else" = @"else",
         } },
     });
+}
+
+fn lowerAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpression) Error!Ir.Inst.Ref {
+    if (assign_expr.operator != .@"=") {
+        try b.todo("compound assignment");
+    }
+
+    const value = try b.lowerExpression(assign_expr.rhs_expression);
+
+    return switch (assign_expr.lhs_expression.*) {
+        .primary_expression => |prim_expr| switch (prim_expr) {
+            .identifier_reference => |identifier| {
+                const gop = try b.strings.getOrPut(b.gpa, identifier);
+                if (!gop.found_existing) {
+                    gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
+                }
+                return b.addInst(.{
+                    .tag = if (b.in_strict_mode) .set_binding_strict else .set_binding,
+                    .data = .{ .set_binding = .{
+                        .name = @enumFromInt(gop.index),
+                        .value = value,
+                    } },
+                });
+            },
+            else => try b.todo("non-identifier lhs"),
+        },
+        else => try b.todo("non-identifier lhs"),
+    };
 }
 
 fn lowerSequenceExpression(b: *Builder, seq_expr: *const ast.SequenceExpression) Error!Ir.Inst.Ref {

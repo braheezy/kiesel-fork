@@ -115,6 +115,10 @@ pub const Inst = struct {
         logical_or,
         nullish_coalesce,
 
+        get_binding,
+        set_binding,
+        set_binding_strict,
+
         end,
     };
 
@@ -131,6 +135,7 @@ pub const Inst = struct {
         @"for": struct { @"test": Ref, update: Ref, body: Ref },
         loop: struct { body: Ref, update: Ref },
         binary: struct { lhs: Ref, rhs: Ref },
+        set_binding: struct { name: StringIndex, value: Ref },
         ref: Ref,
     };
 
@@ -319,6 +324,28 @@ pub fn print(
             => {
                 try cw.writeByte(' ');
                 try printRef(data.ref, cw, tty_config);
+            },
+            .get_binding => {
+                const str = ir.strings[@intFromEnum(data.string)];
+                try cw.writeByte(' ');
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .set_binding,
+            .set_binding_strict,
+            => {
+                const str = ir.strings[@intFromEnum(data.set_binding.name)];
+                try cw.writeByte(' ');
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+                try cw.writeAll(", ");
+                try printRef(data.set_binding.value, cw, tty_config);
             },
             .end => if (data.ref != .none) {
                 try cw.writeByte(' ');

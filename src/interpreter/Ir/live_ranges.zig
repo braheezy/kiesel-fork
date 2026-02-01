@@ -34,7 +34,11 @@ pub fn computeLiveRanges(
             .number,
             .string,
             .big_int,
+            .get_binding,
             => {},
+            .set_binding,
+            .set_binding_strict,
+            => try uses.append(gpa, data.set_binding.value),
             .array => {
                 const extra_index = @intFromEnum(data.array.extra_index);
                 const elements = @as([*]const Ir.Inst.Ref, @ptrCast(extras[extra_index..]))[0..data.array.len];

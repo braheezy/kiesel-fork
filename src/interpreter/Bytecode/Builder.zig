@@ -115,6 +115,9 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_and => try b.lowerLogicalAnd(data.binary, dest),
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
+            .get_binding => try b.lowerGetBinding(data.string, dest),
+            .set_binding => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, false, dest),
+            .set_binding_strict => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, true, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -786,6 +789,31 @@ fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
 
 fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
+}
+
+fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .get_binding,
+        .data = .{ .reg_string = .{
+            dest,
+            bytecode_string_index,
+        } },
+    });
+}
+
+fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    const value_reg = b.resolve(value);
+    const tag: Bytecode.Inst.Tag = if (strict) .set_binding_strict else .set_binding;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .string_reg = .{
+            bytecode_string_index,
+            value_reg,
+        } },
+    });
+    try b.emitMoveIfNeeded(value, dest);
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
