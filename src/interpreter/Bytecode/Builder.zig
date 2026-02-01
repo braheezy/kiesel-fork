@@ -94,6 +94,14 @@ pub fn build(b: *Builder) Error!Bytecode {
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
             .div => try b.lowerDiv(data.binary, dest),
+            .rem => try b.lowerRem(data.binary, dest),
+            .exp => try b.lowerExp(data.binary, dest),
+            .shift_left => try b.lowerShiftLeft(data.binary, dest),
+            .shift_right => try b.lowerShiftRight(data.binary, dest),
+            .shift_right_unsigned => try b.lowerShiftRightUnsigned(data.binary, dest),
+            .bitwise_and => try b.lowerBitwiseAnd(data.binary, dest),
+            .bitwise_or => try b.lowerBitwiseOr(data.binary, dest),
+            .bitwise_xor => try b.lowerBitwiseXor(data.binary, dest),
             .lt => try b.lowerLt(data.binary, dest),
             .gt => try b.lowerGt(data.binary, dest),
             .lt_eq => try b.lowerLtEq(data.binary, dest),
@@ -593,6 +601,54 @@ fn lowerDiv(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecod
     const lhs_reg = b.resolve(data.lhs);
     const rhs_reg = b.resolve(data.rhs);
     try b.emit(.{ .tag = .div, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerRem(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .rem, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerExp(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .exp, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerShiftLeft(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .shift_left, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerShiftRight(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .shift_right, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerShiftRightUnsigned(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .shift_right_unsigned, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerBitwiseAnd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .bitwise_and, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerBitwiseOr(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .bitwise_or, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerBitwiseXor(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .bitwise_xor, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
 }
 
 fn lowerLt(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {

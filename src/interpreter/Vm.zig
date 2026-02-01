@@ -101,6 +101,14 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .mul => vm.executeMul(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .div => vm.executeDiv(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .rem => vm.executeRem(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .exp => vm.executeExp(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .shift_left => vm.executeShiftLeft(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .shift_right => vm.executeShiftRight(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .shift_right_unsigned => vm.executeShiftRightUnsigned(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .bitwise_and => vm.executeBitwiseAnd(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .bitwise_or => vm.executeBitwiseOr(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .bitwise_xor => vm.executeBitwiseXor(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .lt => vm.executeLt(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .gt => vm.executeGt(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .lt_eq => vm.executeLtEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -380,6 +388,136 @@ fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     }
 
     vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"/", rhs_value));
+}
+
+fn executeRem(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            if (std.math.rem(i32, lhs_value.__asI32(), rhs_value.__asI32())) |result| {
+                vm.load(dst, if (result == 0 and lhs_value.__asI32() < 0)
+                    Value.from(-0.0)
+                else
+                    Value.from(result));
+                return;
+            } else |_| {}
+        }
+        vm.load(dst, Value.from(lhs_value.asNumber().remainder(rhs_value.asNumber())));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"%", rhs_value));
+}
+
+fn executeExp(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            if (std.math.powi(i32, lhs_value.__asI32(), rhs_value.__asI32())) |result| {
+                vm.load(dst, Value.from(result));
+                return;
+            } else |_| {}
+        }
+        vm.load(dst, Value.from(lhs_value.asNumber().exponentiate(rhs_value.asNumber())));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"**", rhs_value));
+}
+
+fn executeShiftLeft(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(rhs_value.__asI32())), 32));
+        vm.load(dst, Value.from(lhs_value.__asI32() << shift_count));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"<<", rhs_value));
+}
+
+fn executeShiftRight(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(rhs_value.__asI32())), 32));
+        vm.load(dst, Value.from(lhs_value.__asI32() >> shift_count));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>", rhs_value));
+}
+
+fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        const shift_count: u5 = @intCast(@mod(@as(u32, @bitCast(rhs_value.__asI32())), 32));
+        vm.load(dst, Value.from(@as(u32, @bitCast(lhs_value.__asI32())) >> shift_count));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>>", rhs_value));
+}
+
+fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        vm.load(dst, Value.from(lhs_value.__asI32() & rhs_value.__asI32()));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"&", rhs_value));
+}
+
+fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        vm.load(dst, Value.from(lhs_value.__asI32() | rhs_value.__asI32()));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"|", rhs_value));
+}
+
+fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (lhs_value.__isI32() and rhs_value.__isI32()) {
+        @branchHint(.likely);
+        vm.load(dst, Value.from(lhs_value.__asI32() ^ rhs_value.__asI32()));
+        return;
+    }
+
+    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"^", rhs_value));
 }
 
 fn executeLt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {

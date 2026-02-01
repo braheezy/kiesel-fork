@@ -534,7 +534,14 @@ fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Err
         .@"-" => .sub,
         .@"*" => .mul,
         .@"/" => .div,
-        else => try b.todo("binary operator"),
+        .@"%" => .rem,
+        .@"**" => .exp,
+        .@"<<" => .shift_left,
+        .@">>" => .shift_right,
+        .@">>>" => .shift_right_unsigned,
+        .@"&" => .bitwise_and,
+        .@"^" => .bitwise_xor,
+        .@"|" => .bitwise_or,
     };
     return b.addInst(.{
         .tag = tag,
