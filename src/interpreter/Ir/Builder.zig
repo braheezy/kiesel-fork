@@ -199,7 +199,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .if_statement => |*if_stmt| try b.lowerIfStatement(if_stmt),
         .breakable_statement => |brk_stmt| switch (brk_stmt) {
             .iteration_statement => |iter_stmt| switch (iter_stmt) {
-                .do_while_statement => try b.todo("do while statement"),
+                .do_while_statement => |*do_while_stmt| try b.lowerDoWhileStatement(do_while_stmt),
                 .while_statement => |*while_stmt| try b.lowerWhileStatement(while_stmt),
                 .for_statement => |*for_stmt| try b.lowerForStatement(for_stmt),
                 .for_in_of_statement => try b.todo("for in/of statement"),
@@ -250,6 +250,33 @@ fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.
             .@"test" = @"test",
             .then = then,
             .@"else" = @"else",
+        } },
+    });
+}
+
+fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement) Error!Ir.Inst.Ref {
+    const body = try b.lowerStatement(do_while_stmt.consequent_statement);
+
+    if (try constantFold(b.gpa, &do_while_stmt.test_expression)) |constant| {
+        defer constant.deinit(b.gpa);
+        if (!constant.isTruthy()) {
+            return body;
+        }
+        return b.addInst(.{
+            .tag = .loop,
+            .data = .{ .loop = .{
+                .body = body,
+                .update = .none,
+            } },
+        });
+    }
+
+    const @"test" = try b.lowerExpression(&do_while_stmt.test_expression);
+    return b.addInst(.{
+        .tag = .@"while",
+        .data = .{ .@"while" = .{
+            .@"test" = @"test",
+            .body = body,
         } },
     });
 }
