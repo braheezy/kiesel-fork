@@ -179,8 +179,10 @@ pub fn print(
 
         try cw.print("{d: >4}: ", .{i});
 
+        try cw.flush();
         try tty_config.setColor(writer, .cyan);
         try cw.print("{t}", .{tag});
+        try cw.flush();
         try tty_config.setColor(writer, .reset);
 
         switch (tag) {
@@ -193,23 +195,29 @@ pub fn print(
             => {},
             .number => {
                 try cw.writeByte(' ');
+                try cw.flush();
                 try tty_config.setColor(writer, .yellow);
                 try cw.print("{d}", .{data.number});
+                try cw.flush();
                 try tty_config.setColor(writer, .reset);
             },
             .string => {
                 const str = ir.strings[@intFromEnum(data.string)];
                 try cw.writeByte(' ');
+                try cw.flush();
                 try tty_config.setColor(writer, .yellow);
                 try cw.print("\"{s}\"", .{str});
+                try cw.flush();
                 try tty_config.setColor(writer, .reset);
             },
             .big_int => {
                 const big_int = ir.big_ints[@intFromEnum(data.big_int)];
                 try cw.writeByte(' ');
+                try cw.flush();
                 try tty_config.setColor(writer, .yellow);
                 try big_int.formatNumber(cw, .{});
                 try cw.writeByte('n');
+                try cw.flush();
                 try tty_config.setColor(writer, .reset);
             },
             .array => {
@@ -332,14 +340,18 @@ fn printRef(
     const writer = counting_writer.out;
     switch (ref) {
         .none => {
+            try cw.flush();
             try tty_config.setColor(writer, .dim);
             try cw.print("none", .{});
+            try cw.flush();
             try tty_config.setColor(writer, .reset);
         },
         else => {
             const index = ref.toIndex().?;
+            try cw.flush();
             try tty_config.setColor(writer, .blue);
             try cw.print("%{d}", .{@intFromEnum(index)});
+            try cw.flush();
             try tty_config.setColor(writer, .reset);
         },
     }
