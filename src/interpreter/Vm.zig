@@ -82,6 +82,11 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .load_string => vm.executeLoadString(data.reg_string[0], data.reg_string[1]),
                 .load_big_int => vm.executeLoadBigInt(data.reg_big_int[0], data.reg_big_int[1]),
                 .move => vm.executeMove(data.reg_reg[0], data.reg_reg[1]),
+                .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
+                .unary_minus => vm.executeUnaryMinus(data.reg_reg[0], data.reg_reg[1]),
+                .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
+                .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
+                .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
                 .add => vm.executeAdd(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .mul => vm.executeMul(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -187,6 +192,54 @@ fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIn
 
 fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
     vm.load(dest, vm.store(src));
+}
+
+fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    if (value.isNumber()) {
+        @branchHint(.likely);
+        vm.load(dst, value);
+        return;
+    }
+    const number = try value.toNumber(vm.agent);
+    vm.load(dst, Value.from(number));
+}
+
+fn executeUnaryMinus(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    if (value.isNumber()) {
+        @branchHint(.likely);
+        if (value.__isI32()) {
+            const i = value.__asI32();
+            if (i != 0 and i != std.math.minInt(i32)) {
+                vm.load(dst, Value.from(-i));
+                return;
+            }
+        }
+        vm.load(dst, Value.from(-value.__toF64()));
+        return;
+    }
+    const numeric = try value.toNumeric(vm.agent);
+    vm.load(dst, switch (numeric) {
+        .number => |n| Value.from(n.unaryMinus()),
+        .big_int => |b| Value.from(try b.unaryMinus(vm.agent)),
+    });
+}
+
+fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    const i = try value.toInt32(vm.agent);
+    vm.load(dst, Value.from(~i));
+}
+
+fn executeLogicalNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
+    const value = vm.store(src);
+    vm.load(dst, Value.from(!value.toBoolean()));
+}
+
+fn executeTypeof(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
+    const value = vm.store(src);
+    vm.load(dst, Value.from(value.typeof()));
 }
 
 fn executeAdd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {

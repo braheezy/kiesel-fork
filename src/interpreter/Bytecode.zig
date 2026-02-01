@@ -35,6 +35,12 @@ pub const Inst = struct {
         load_big_int,
         move,
 
+        to_number,
+        unary_minus,
+        bitwise_not,
+        logical_not,
+        typeof,
+
         add,
         sub,
         mul,
@@ -114,7 +120,13 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(BigIntIndex, reader),
             } },
-            .move => .{ .reg_reg = .{
+            .move,
+            .to_number,
+            .unary_minus,
+            .bitwise_not,
+            .logical_not,
+            .typeof,
+            => .{ .reg_reg = .{
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(Reg, reader),
             } },
@@ -177,7 +189,13 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_big_int[0]), .little);
                 try writer.writeInt(u32, @intFromEnum(inst.data.reg_big_int[1]), .little);
             },
-            .move => {
+            .move,
+            .to_number,
+            .unary_minus,
+            .bitwise_not,
+            .logical_not,
+            .typeof,
+            => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[0]), .little);
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[1]), .little);
             },
@@ -293,7 +311,13 @@ pub fn print(
                 try writer.writeAll(", ");
                 try printData(@intFromEnum(inst.data.reg_big_int[1]), '@', .green, writer, tty_config);
             },
-            .move => {
+            .move,
+            .to_number,
+            .unary_minus,
+            .bitwise_not,
+            .logical_not,
+            .typeof,
+            => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg_reg[0], 'r', .blue, writer, tty_config);
                 try writer.writeAll(", ");

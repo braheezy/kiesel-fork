@@ -82,6 +82,12 @@ pub fn build(b: *Builder) Error!Bytecode {
             .@"while" => try b.lowerWhile(data.@"while", dest),
             .@"for" => try b.lowerFor(data.@"for", dest),
             .loop => try b.lowerLoop(data.loop, dest),
+            .unary_plus => try b.lowerUnaryPlus(data.ref, dest),
+            .unary_minus => try b.lowerUnaryMinus(data.ref, dest),
+            .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
+            .logical_not => try b.lowerLogicalNot(data.ref, dest),
+            .typeof => try b.lowerTypeof(data.ref, dest),
+            .void => try b.lowerVoid(data.ref, dest),
             .add => try b.lowerAdd(data.binary, dest),
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
@@ -628,6 +634,35 @@ fn lowerNullishCoalesce(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), d
     b.jump(merge_block);
 
     b.switchToBlock(merge_block);
+}
+
+fn lowerUnaryPlus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src_reg = b.resolve(ref);
+    try b.emit(.{ .tag = .to_number, .data = .{ .reg_reg = .{ dest, src_reg } } });
+}
+
+fn lowerUnaryMinus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src_reg = b.resolve(ref);
+    try b.emit(.{ .tag = .unary_minus, .data = .{ .reg_reg = .{ dest, src_reg } } });
+}
+
+fn lowerBitwiseNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src_reg = b.resolve(ref);
+    try b.emit(.{ .tag = .bitwise_not, .data = .{ .reg_reg = .{ dest, src_reg } } });
+}
+
+fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src_reg = b.resolve(ref);
+    try b.emit(.{ .tag = .logical_not, .data = .{ .reg_reg = .{ dest, src_reg } } });
+}
+
+fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src_reg = b.resolve(ref);
+    try b.emit(.{ .tag = .typeof, .data = .{ .reg_reg = .{ dest, src_reg } } });
+}
+
+fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

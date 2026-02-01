@@ -173,7 +173,14 @@ fn markLive(
                 data.binary.lhs,
                 data.binary.rhs,
             }) catch unreachable,
-            .end => uses.appendBounded(data.ref) catch unreachable,
+            .unary_plus,
+            .unary_minus,
+            .bitwise_not,
+            .logical_not,
+            .typeof,
+            .void,
+            .end,
+            => uses.appendBounded(data.ref) catch unreachable,
         }
 
         for (uses.items) |use| {

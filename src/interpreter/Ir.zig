@@ -76,6 +76,13 @@ pub const Inst = struct {
         @"for",
         loop,
 
+        unary_plus,
+        unary_minus,
+        bitwise_not,
+        logical_not,
+        typeof,
+        void,
+
         add,
         sub,
         mul,
@@ -248,6 +255,16 @@ pub fn print(
                 try printRef(data.binary.lhs, cw, tty_config);
                 try cw.print(", ", .{});
                 try printRef(data.binary.rhs, cw, tty_config);
+            },
+            .unary_plus,
+            .unary_minus,
+            .bitwise_not,
+            .logical_not,
+            .typeof,
+            .void,
+            => {
+                try cw.writeByte(' ');
+                try printRef(data.ref, cw, tty_config);
             },
             .end => if (data.ref != .none) {
                 try cw.writeByte(' ');

@@ -45,6 +45,7 @@ pub fn constantFold(
             .literal => |*literal| return try constantFoldLiteral(gpa, literal),
             else => {},
         },
+        .unary_expression => |*unary_expr| return constantFoldUnaryExpression(gpa, unary_expr),
         .binary_expression => |*bin_expr| return constantFoldBinaryExpression(gpa, bin_expr),
         .logical_expression => |*log_expr| return constantFoldLogicalExpression(gpa, log_expr),
         else => {},
@@ -79,6 +80,55 @@ fn constantFoldLiteral(
         },
         .string => |s| .{ .string = try gpa.dupe(u8, s.text[1 .. s.text.len - 1]) },
     };
+}
+
+fn constantFoldUnaryExpression(
+    gpa: std.mem.Allocator,
+    unary_expr: *const ast.UnaryExpression,
+) std.mem.Allocator.Error!?Constant {
+    if (try constantFold(gpa, unary_expr.expression)) |operand| {
+        defer operand.deinit(gpa);
+        switch (unary_expr.operator) {
+            .@"+" => switch (operand) {
+                .undefined => return .{ .number = std.math.nan(f64) },
+                .null => return .{ .number = 0 },
+                .boolean => |b| return .{ .number = if (b) 1 else 0 },
+                .number => |n| return .{ .number = n },
+                else => {},
+            },
+            .@"-" => switch (operand) {
+                .undefined => return .{ .number = std.math.nan(f64) },
+                .null => return .{ .number = -0.0 },
+                .boolean => |b| return .{ .number = if (b) -1 else -0.0 },
+                .number => |n| return .{ .number = -n },
+                else => {},
+            },
+            .@"!" => return .{ .boolean = !operand.isTruthy() },
+            .@"~" => switch (operand) {
+                .undefined, .null => return .{ .number = -1 },
+                .boolean => |b| return .{ .number = if (b) -2 else -1 },
+                .number => |n| {
+                    const i: i32 = @intFromFloat(@trunc(n));
+                    return .{ .number = @floatFromInt(~i) };
+                },
+                else => {},
+            },
+            .void => return .undefined,
+            .typeof => {
+                const @"type" = switch (operand) {
+                    .undefined => "undefined",
+                    .null => "object",
+                    .boolean => "boolean",
+                    .number => "number",
+                    .big_int => "bigint",
+                    .string => "string",
+                };
+                return .{ .string = try gpa.dupe(u8, @"type") };
+            },
+            .delete => {},
+        }
+    }
+    return null;
 }
 
 fn constantFoldBinaryExpression(

@@ -397,7 +397,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .import_call => try b.todo("import call"),
         .optional_expression => try b.todo("optional expression"),
         .update_expression => try b.todo("update expression"),
-        .unary_expression => try b.todo("unary expression"),
+        .unary_expression => |*unary_expr| try b.lowerUnaryExpression(unary_expr),
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
         .relational_expression => |*rel_expr| try b.lowerRelationalExpression(rel_expr),
         .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
@@ -410,6 +410,23 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .tagged_template => try b.todo("tagged template"),
         .binding_pattern_for_assignment_expression => try b.todo("binding pattern for assignment expression"),
     };
+}
+
+fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {
+    const operand = try b.lowerExpression(unary_expr.expression);
+    const tag: Ir.Inst.Tag = switch (unary_expr.operator) {
+        .@"+" => .unary_plus,
+        .@"-" => .unary_minus,
+        .@"~" => .bitwise_not,
+        .@"!" => .logical_not,
+        .typeof => .typeof,
+        .void => .void,
+        .delete => try b.todo("delete operator"),
+    };
+    return b.addInst(.{
+        .tag = tag,
+        .data = .{ .ref = operand },
+    });
 }
 
 fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Error!Ir.Inst.Ref {
