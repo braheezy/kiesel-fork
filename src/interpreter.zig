@@ -20,8 +20,8 @@ fn testInterpreter(
     gpa: std.mem.Allocator,
     source: []const u8,
     expected_result: ExpectedResult,
-    expected_ir: []const u8,
-    expected_bc: []const u8,
+    expected_ir: ?[]const u8,
+    expected_bc: ?[]const u8,
 ) !void {
     const ast = @import("language/ast.zig");
     const Parser = @import("language/Parser.zig");
@@ -79,13 +79,17 @@ fn testInterpreter(
     var aw: std.Io.Writer.Allocating = .init(gpa);
     defer aw.deinit();
 
-    try ir.print(&aw.writer, .no_color);
-    try std.testing.expectEqualStrings(expected_ir, aw.written());
-    aw.clearRetainingCapacity();
+    if (expected_ir) |expected| {
+        try ir.print(&aw.writer, .no_color);
+        try std.testing.expectEqualStrings(expected, aw.written());
+        aw.clearRetainingCapacity();
+    }
 
-    try bc.print(&aw.writer, .no_color);
-    try std.testing.expectEqualStrings(expected_bc, aw.written());
-    aw.clearRetainingCapacity();
+    if (expected_bc) |expected| {
+        try bc.print(&aw.writer, .no_color);
+        try std.testing.expectEqualStrings(expected, aw.written());
+        aw.clearRetainingCapacity();
+    }
 }
 
 test {
@@ -249,4 +253,29 @@ test {
         \\  21: end r0
         \\
     );
+
+    // Increment/decrement operators
+    try testInterpreter(std.testing.allocator,
+        \\x = 5;
+        \\++x;
+        \\
+    , .{ .value = Value.from(6) },
+        \\IR (test)
+        \\   0: number 5                [0..1]
+        \\   1: set_binding "x", %0     [1..1]
+        \\   2: increment_binding_prefix "x" [2..3]
+        \\   3: end %2                  [3..3]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 5
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: increment_binding_prefix r0, @0
+        \\  21: end r0
+        \\
+    );
+    try testInterpreter(std.testing.allocator, "x = 5; x++;", .{ .value = Value.from(5) }, null, null);
+    try testInterpreter(std.testing.allocator, "x = 10; --x;", .{ .value = Value.from(9) }, null, null);
+    try testInterpreter(std.testing.allocator, "x = 10; x--;", .{ .value = Value.from(10) }, null, null);
 }

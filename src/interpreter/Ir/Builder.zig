@@ -412,7 +412,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .super_call => try b.todo("super call"),
         .import_call => try b.todo("import call"),
         .optional_expression => try b.todo("optional expression"),
-        .update_expression => try b.todo("update expression"),
+        .update_expression => |*update_expr| try b.lowerUpdateExpression(update_expr),
         .unary_expression => |*unary_expr| try b.lowerUnaryExpression(unary_expr),
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
         .relational_expression => |*rel_expr| try b.lowerRelationalExpression(rel_expr),
@@ -524,6 +524,38 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .len = len,
         } },
     });
+}
+
+fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {
+    return switch (update_expr.expression.*) {
+        .primary_expression => |prim_expr| switch (prim_expr) {
+            .identifier_reference => |identifier| {
+                const gop = try b.strings.getOrPut(b.gpa, identifier);
+                if (!gop.found_existing) {
+                    gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
+                }
+                const string_index: Ir.Inst.StringIndex = @enumFromInt(gop.index);
+
+                const tag: Ir.Inst.Tag = switch (update_expr.type) {
+                    .prefix => switch (update_expr.operator) {
+                        .@"++" => if (b.in_strict_mode) .increment_binding_prefix_strict else .increment_binding_prefix,
+                        .@"--" => if (b.in_strict_mode) .decrement_binding_prefix_strict else .decrement_binding_prefix,
+                    },
+                    .postfix => switch (update_expr.operator) {
+                        .@"++" => if (b.in_strict_mode) .increment_binding_postfix_strict else .increment_binding_postfix,
+                        .@"--" => if (b.in_strict_mode) .decrement_binding_postfix_strict else .decrement_binding_postfix,
+                    },
+                };
+
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .update_binding = string_index },
+                });
+            },
+            else => try b.todo("non-identifier update expression"),
+        },
+        else => try b.todo("non-identifier update expression"),
+    };
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {

@@ -118,6 +118,14 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_binding => try b.lowerGetBinding(data.string, dest),
             .set_binding => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, false, dest),
             .set_binding_strict => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, true, dest),
+            .increment_binding_prefix => try b.lowerUpdateBinding(data.update_binding, .increment, .prefix, false, dest),
+            .increment_binding_prefix_strict => try b.lowerUpdateBinding(data.update_binding, .increment, .prefix, true, dest),
+            .increment_binding_postfix => try b.lowerUpdateBinding(data.update_binding, .increment, .postfix, false, dest),
+            .increment_binding_postfix_strict => try b.lowerUpdateBinding(data.update_binding, .increment, .postfix, true, dest),
+            .decrement_binding_prefix => try b.lowerUpdateBinding(data.update_binding, .decrement, .prefix, false, dest),
+            .decrement_binding_prefix_strict => try b.lowerUpdateBinding(data.update_binding, .decrement, .prefix, true, dest),
+            .decrement_binding_postfix => try b.lowerUpdateBinding(data.update_binding, .decrement, .postfix, false, dest),
+            .decrement_binding_postfix_strict => try b.lowerUpdateBinding(data.update_binding, .decrement, .postfix, true, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -814,6 +822,30 @@ fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Ins
         } },
     });
     try b.emitMoveIfNeeded(value, dest);
+}
+
+const UpdateOp = enum { increment, decrement };
+const UpdateType = enum { prefix, postfix };
+
+fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, op: UpdateOp, update_type: UpdateType, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    const tag: Bytecode.Inst.Tag = switch (op) {
+        .increment => switch (update_type) {
+            .prefix => if (strict) .increment_binding_prefix_strict else .increment_binding_prefix,
+            .postfix => if (strict) .increment_binding_postfix_strict else .increment_binding_postfix,
+        },
+        .decrement => switch (update_type) {
+            .prefix => if (strict) .decrement_binding_prefix_strict else .decrement_binding_prefix,
+            .postfix => if (strict) .decrement_binding_postfix_strict else .decrement_binding_postfix,
+        },
+    };
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_string = .{
+            dest,
+            bytecode_string_index,
+        } },
+    });
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

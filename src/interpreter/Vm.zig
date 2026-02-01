@@ -9,6 +9,7 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
+const Number = types.Number;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
@@ -122,6 +123,14 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
+                .increment_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, false),
+                .increment_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, true),
+                .increment_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, false),
+                .increment_binding_postfix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, true),
+                .decrement_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .prefix, false),
+                .decrement_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .prefix, true),
+                .decrement_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .postfix, false),
+                .decrement_binding_postfix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .postfix, true),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -735,4 +744,54 @@ fn executeSetBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex, value_reg: 
         };
     }
     return try env.setMutableBinding(vm.agent, name, value, strict);
+}
+
+const UpdateOp = enum { increment, decrement };
+const UpdateType = enum { prefix, postfix };
+
+fn executeUpdateBinding(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    name_index: Bytecode.Inst.StringIndex,
+    comptime op: UpdateOp,
+    comptime update_type: UpdateType,
+    comptime strict: bool,
+) Agent.Error!void {
+    const name = vm.strings[@intFromEnum(name_index)];
+
+    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            return vm.agent.throwException(
+                .reference_error,
+                "'{f}' is not defined",
+                .{name.fmtRaw()},
+            );
+        };
+    }
+    const old_value = try env.getBindingValue(vm.agent, name, strict);
+    const old_numeric = try old_value.toNumeric(vm.agent);
+
+    const new_value = switch (old_numeric) {
+        .number => |n| switch (op) {
+            .increment => Value.from(Number.add(n, Number.from(1))),
+            .decrement => Value.from(Number.subtract(n, Number.from(1))),
+        },
+        .big_int => |b| switch (op) {
+            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
+            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
+        },
+    };
+
+    try env.setMutableBinding(vm.agent, name, new_value, strict);
+
+    const result = switch (update_type) {
+        .prefix => new_value,
+        .postfix => switch (old_numeric) {
+            .number => |n| Value.from(n),
+            .big_int => |b| Value.from(b),
+        },
+    };
+    vm.load(dest, result);
 }

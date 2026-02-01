@@ -77,6 +77,14 @@ pub const Inst = struct {
         get_binding,
         set_binding,
         set_binding_strict,
+        increment_binding_prefix,
+        increment_binding_prefix_strict,
+        increment_binding_postfix,
+        increment_binding_postfix_strict,
+        decrement_binding_prefix,
+        decrement_binding_prefix_strict,
+        decrement_binding_postfix,
+        decrement_binding_postfix_strict,
     };
 
     pub const Data = union {
@@ -143,6 +151,14 @@ pub const Inst = struct {
             } },
             .load_string,
             .get_binding,
+            .increment_binding_prefix,
+            .increment_binding_prefix_strict,
+            .increment_binding_postfix,
+            .increment_binding_postfix_strict,
+            .decrement_binding_prefix,
+            .decrement_binding_prefix_strict,
+            .decrement_binding_postfix,
+            .decrement_binding_postfix_strict,
             => .{ .reg_string = .{
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(StringIndex, reader),
@@ -245,6 +261,14 @@ pub const Inst = struct {
             },
             .load_string,
             .get_binding,
+            .increment_binding_prefix,
+            .increment_binding_prefix_strict,
+            .increment_binding_postfix,
+            .increment_binding_postfix_strict,
+            .decrement_binding_prefix,
+            .decrement_binding_prefix_strict,
+            .decrement_binding_postfix,
+            .decrement_binding_postfix_strict,
             => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_string[0]), .little);
                 try writer.writeInt(u32, @intFromEnum(inst.data.reg_string[1]), .little);
@@ -398,6 +422,14 @@ pub fn print(
             },
             .load_string,
             .get_binding,
+            .increment_binding_prefix,
+            .increment_binding_prefix_strict,
+            .increment_binding_postfix,
+            .increment_binding_postfix_strict,
+            .decrement_binding_prefix,
+            .decrement_binding_prefix_strict,
+            .decrement_binding_postfix,
+            .decrement_binding_postfix_strict,
             => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg_string[0], 'r', .blue, writer, tty_config);

@@ -118,6 +118,14 @@ pub const Inst = struct {
         get_binding,
         set_binding,
         set_binding_strict,
+        increment_binding_prefix,
+        increment_binding_prefix_strict,
+        increment_binding_postfix,
+        increment_binding_postfix_strict,
+        decrement_binding_prefix,
+        decrement_binding_prefix_strict,
+        decrement_binding_postfix,
+        decrement_binding_postfix_strict,
 
         end,
     };
@@ -136,6 +144,7 @@ pub const Inst = struct {
         loop: struct { body: Ref, update: Ref },
         binary: struct { lhs: Ref, rhs: Ref },
         set_binding: struct { name: StringIndex, value: Ref },
+        update_binding: StringIndex,
         ref: Ref,
     };
 
@@ -325,7 +334,8 @@ pub fn print(
                 try cw.writeByte(' ');
                 try printRef(data.ref, cw, tty_config);
             },
-            .get_binding => {
+            .get_binding,
+            => {
                 const str = ir.strings[@intFromEnum(data.string)];
                 try cw.writeByte(' ');
                 try cw.flush();
@@ -346,6 +356,23 @@ pub fn print(
                 try tty_config.setColor(writer, .reset);
                 try cw.writeAll(", ");
                 try printRef(data.set_binding.value, cw, tty_config);
+            },
+            .increment_binding_prefix,
+            .increment_binding_prefix_strict,
+            .increment_binding_postfix,
+            .increment_binding_postfix_strict,
+            .decrement_binding_prefix,
+            .decrement_binding_prefix_strict,
+            .decrement_binding_postfix,
+            .decrement_binding_postfix_strict,
+            => {
+                const str = ir.strings[@intFromEnum(data.update_binding)];
+                try cw.writeByte(' ');
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
             },
             .end => if (data.ref != .none) {
                 try cw.writeByte(' ');
