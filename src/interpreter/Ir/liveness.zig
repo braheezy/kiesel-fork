@@ -156,6 +156,10 @@ fn markLive(
             .sub,
             .mul,
             .div,
+            .eq,
+            .not_eq,
+            .eq_strict,
+            .not_eq_strict,
             => uses.appendSliceBounded(&.{
                 data.binary.lhs,
                 data.binary.rhs,

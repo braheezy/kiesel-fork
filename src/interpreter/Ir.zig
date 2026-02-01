@@ -78,6 +78,10 @@ pub const Inst = struct {
         sub,
         mul,
         div,
+        eq,
+        not_eq,
+        eq_strict,
+        not_eq_strict,
         end,
     };
 
@@ -211,6 +215,10 @@ pub fn print(
             .sub,
             .mul,
             .div,
+            .eq,
+            .not_eq,
+            .eq_strict,
+            .not_eq_strict,
             => {
                 try cw.writeByte(' ');
                 try printRef(data.binary.lhs, cw, tty_config);

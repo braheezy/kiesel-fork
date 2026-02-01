@@ -12,6 +12,8 @@ const String = types.String;
 const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
+const isLooselyEqual = types.isLooselyEqual;
+const isStrictlyEqual = types.isStrictlyEqual;
 const stringValueImpl = language.ast.stringValueImpl;
 
 const Vm = @This();
@@ -83,6 +85,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .mul => vm.executeMul(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .div => vm.executeDiv(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .eq => vm.executeEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .not_eq => vm.executeNotEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -256,4 +262,76 @@ fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     }
 
     vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"/", rhs_value));
+}
+
+fn executeEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() == rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() == rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    vm.load(dst, Value.from(try isLooselyEqual(vm.agent, rhs_value, lhs_value)));
+}
+
+fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() != rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() != rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    vm.load(dst, Value.from(!try isLooselyEqual(vm.agent, rhs_value, lhs_value)));
+}
+
+fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() == rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() == rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    vm.load(dst, Value.from(isStrictlyEqual(lhs_value, rhs_value)));
+}
+
+fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() != rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() != rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    vm.load(dst, Value.from(!isStrictlyEqual(lhs_value, rhs_value)));
 }

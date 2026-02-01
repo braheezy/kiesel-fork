@@ -86,6 +86,10 @@ pub fn build(b: *Builder) Error!Bytecode {
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
             .div => try b.lowerDiv(data.binary, dest),
+            .eq => try b.lowerEq(data.binary, dest),
+            .not_eq => try b.lowerNotEq(data.binary, dest),
+            .eq_strict => try b.lowerEqStrict(data.binary, dest),
+            .not_eq_strict => try b.lowerNotEqStrict(data.binary, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -483,6 +487,30 @@ fn lowerDiv(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecod
     const lhs_reg = b.resolve(data.lhs);
     const rhs_reg = b.resolve(data.rhs);
     try b.emit(.{ .tag = .div, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerNotEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .not_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerEqStrict(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .eq_strict, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerNotEqStrict(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .not_eq_strict, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

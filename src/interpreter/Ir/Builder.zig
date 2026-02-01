@@ -400,7 +400,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .unary_expression => try b.todo("unary expression"),
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
         .relational_expression => try b.todo("relational expression"),
-        .equality_expression => try b.todo("equality expression"),
+        .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
         .logical_expression => try b.todo("logical expression"),
         .conditional_expression => try b.todo("conditional expression"),
         .assignment_expression => try b.todo("assignment expression"),
@@ -421,6 +421,24 @@ fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Err
         .@"*" => .mul,
         .@"/" => .div,
         else => try b.todo("binary operator"),
+    };
+    return b.addInst(.{
+        .tag = tag,
+        .data = .{ .binary = .{
+            .lhs = lhs,
+            .rhs = rhs,
+        } },
+    });
+}
+
+fn lowerEqualityExpression(b: *Builder, eq_expr: *const ast.EqualityExpression) Error!Ir.Inst.Ref {
+    const lhs = try b.lowerExpression(eq_expr.lhs_expression);
+    const rhs = try b.lowerExpression(eq_expr.rhs_expression);
+    const tag: Ir.Inst.Tag = switch (eq_expr.operator) {
+        .@"==" => .eq,
+        .@"!=" => .not_eq,
+        .@"===" => .eq_strict,
+        .@"!==" => .not_eq_strict,
     };
     return b.addInst(.{
         .tag = tag,

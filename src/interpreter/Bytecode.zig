@@ -39,6 +39,11 @@ pub const Inst = struct {
         sub,
         mul,
         div,
+
+        eq,
+        not_eq,
+        eq_strict,
+        not_eq_strict,
     };
 
     pub const Data = union {
@@ -110,6 +115,10 @@ pub const Inst = struct {
             .sub,
             .mul,
             .div,
+            .eq,
+            .not_eq,
+            .eq_strict,
+            .not_eq_strict,
             => .{ .reg_reg_reg = .{
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(Reg, reader),
@@ -163,6 +172,10 @@ pub const Inst = struct {
             .sub,
             .mul,
             .div,
+            .eq,
+            .not_eq,
+            .eq_strict,
+            .not_eq_strict,
             => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
@@ -271,6 +284,10 @@ pub fn print(
             .sub,
             .mul,
             .div,
+            .eq,
+            .not_eq,
+            .eq_strict,
+            .not_eq_strict,
             => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
