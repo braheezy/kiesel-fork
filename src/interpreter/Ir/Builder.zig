@@ -402,7 +402,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .relational_expression => |*rel_expr| try b.lowerRelationalExpression(rel_expr),
         .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
         .logical_expression => |*log_expr| try b.lowerLogicalExpression(log_expr),
-        .conditional_expression => try b.todo("conditional expression"),
+        .conditional_expression => |*cond_expr| try b.lowerConditionalExpression(cond_expr),
         .assignment_expression => try b.todo("assignment expression"),
         .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
         .await_expression => try b.todo("await expression"),
@@ -485,6 +485,28 @@ fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) E
         .data = .{ .binary = .{
             .lhs = lhs,
             .rhs = rhs,
+        } },
+    });
+}
+
+fn lowerConditionalExpression(b: *Builder, cond_expr: *const ast.ConditionalExpression) Error!Ir.Inst.Ref {
+    if (try constantFold(b.gpa, cond_expr.test_expression)) |constant| {
+        defer constant.deinit(b.gpa);
+        return if (constant.isTruthy())
+            try b.lowerExpression(cond_expr.consequent_expression)
+        else
+            try b.lowerExpression(cond_expr.alternate_expression);
+    }
+
+    const @"test" = try b.lowerExpression(cond_expr.test_expression);
+    const then = try b.lowerExpression(cond_expr.consequent_expression);
+    const @"else" = try b.lowerExpression(cond_expr.alternate_expression);
+    return b.addInst(.{
+        .tag = .@"if",
+        .data = .{ .@"if" = .{
+            .@"test" = @"test",
+            .then = then,
+            .@"else" = @"else",
         } },
     });
 }
