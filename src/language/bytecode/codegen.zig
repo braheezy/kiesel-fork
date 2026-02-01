@@ -1547,7 +1547,7 @@ pub fn codegenUnaryExpression(
 
             if (!node.expression.analyze(.is_reference))
                 // 2. If ref is not a Reference Record, return true.
-                try executable.addInstructionWithConstant(.store_constant, Value.from(true))
+                try executable.addInstructionWithConstant(.store_constant, .true)
             else
                 // 3-5.
                 try executable.addInstruction(.delete, {});

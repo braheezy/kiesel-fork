@@ -183,13 +183,13 @@ pub const constructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
-        if (!number.isNumber()) return Value.from(false);
+        if (!number.isNumber()) return .false;
 
         // 2. If number is not finite, return false.
-        if (!number.asNumber().isFinite()) return Value.from(false);
+        if (!number.asNumber().isFinite()) return .false;
 
         // 3. Otherwise, return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 21.1.2.3 Number.isInteger ( number )
@@ -198,10 +198,10 @@ pub const constructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is an integral Number, return true.
-        if (number.isNumber() and number.asNumber().isIntegral()) return Value.from(true);
+        if (number.isNumber() and number.asNumber().isIntegral()) return .true;
 
         // 2. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 21.1.2.4 Number.isNaN ( number )
@@ -210,13 +210,13 @@ pub const constructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
-        if (!number.isNumber()) return Value.from(false);
+        if (!number.isNumber()) return .false;
 
         // 2. If number is NaN, return true.
-        if (number.asNumber().isNan()) return Value.from(true);
+        if (number.asNumber().isNan()) return .true;
 
         // 3. Otherwise, return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 21.1.2.5 Number.isSafeInteger ( number )
@@ -228,12 +228,12 @@ pub const constructor = struct {
         if (number.isNumber() and number.asNumber().isIntegral()) {
             // a. If abs(ℝ(number)) ≤ 2**53 - 1, return true.
             if (@abs(number.asNumber().asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
-                return Value.from(true);
+                return .true;
             }
         }
 
         // 2. Return false.
-        return Value.from(false);
+        return .false;
     }
 };
 

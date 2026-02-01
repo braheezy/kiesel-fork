@@ -1316,13 +1316,13 @@ pub const prototype = struct {
             )).toBoolean();
 
             // d. If testResult is false, return false.
-            if (!test_result) return Value.from(false);
+            if (!test_result) return .false;
 
             // e. Set k to k + 1.
         }
 
         // 7. Return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 23.2.3.9 %TypedArray%.prototype.fill ( value [ , start [ , end ] ] )
@@ -1669,7 +1669,7 @@ pub const prototype = struct {
         const len = typedArrayLength(ta);
 
         // 4. If len = 0, return false.
-        if (len == .zero) return Value.from(false);
+        if (len == .zero) return .false;
 
         // 5. Let n be ? ToIntegerOrInfinity(fromIndex).
         var n = try from_index.toIntegerOrInfinity(agent);
@@ -1678,7 +1678,7 @@ pub const prototype = struct {
         if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 7. If n = +∞, return false.
-        if (std.math.isPositiveInf(n)) return Value.from(false);
+        if (std.math.isPositiveInf(n)) return .false;
 
         // 8. Else if n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
@@ -1698,13 +1698,13 @@ pub const prototype = struct {
             const element_k = typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
-            if (sameValueZero(search_element, element_k)) return Value.from(true);
+            if (sameValueZero(search_element, element_k)) return .true;
 
             // c. Set k to k + 1.
         }
 
         // 12. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 23.2.3.17 %TypedArray%.prototype.indexOf ( searchElement [ , fromIndex ] )
@@ -2739,13 +2739,13 @@ pub const prototype = struct {
             )).toBoolean();
 
             // d. If testResult is true, return true.
-            if (test_result) return Value.from(true);
+            if (test_result) return .true;
 
             // e. Set k to k + 1.
         }
 
         // 7. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 23.2.3.29 %TypedArray%.prototype.sort ( comparator )

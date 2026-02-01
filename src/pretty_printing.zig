@@ -936,7 +936,7 @@ fn prettyPrintIntlNumberFormat(
     }
     try writer.print(", useGrouping: {f}, notation: {f}", .{
         switch (resolved_options.use_grouping) {
-            .false => Value.from(false),
+            .false => Value.false,
             .string => |string| Value.from(string),
         }.fmtPretty(),
         Value.from(resolved_options.notation).fmtPretty(),

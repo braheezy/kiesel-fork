@@ -360,6 +360,8 @@ impl: Impl,
 
 pub const @"undefined": Value = .{ .impl = Impl.undefined };
 pub const @"null": Value = .{ .impl = Impl.null };
+pub const @"true": Value = from(true);
+pub const @"false": Value = from(false);
 pub const nan: Value = from(std.math.nan(f64));
 pub const infinity: Value = from(std.math.inf(f64));
 pub const negative_infinity: Value = from(-std.math.inf(f64));
@@ -2445,6 +2447,18 @@ test @"undefined" {
 test @"null" {
     const value: Value = .null;
     try std.testing.expect(value.isNull());
+}
+
+test @"true" {
+    const value: Value = .true;
+    try std.testing.expect(value.isBoolean());
+    try std.testing.expectEqual(value.asBoolean(), true);
+}
+
+test @"false" {
+    const value: Value = .false;
+    try std.testing.expect(value.isBoolean());
+    try std.testing.expectEqual(value.asBoolean(), false);
 }
 
 test nan {

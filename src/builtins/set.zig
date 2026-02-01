@@ -357,11 +357,11 @@ pub const prototype = struct {
             if (set.fields.iterable_values) |*iterable_values| {
                 iterable_values.items[index] = null;
             }
-            return Value.from(true);
+            return .true;
         }
 
         // 5. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 24.2.4.5 Set.prototype.difference ( other )
@@ -676,7 +676,7 @@ pub const prototype = struct {
 
                 // 2. If inOther is true, return false.
                 if (in_other) {
-                    return Value.from(false);
+                    return .false;
                 }
 
                 // 3. NOTE: The number of elements in O.[[SetData]] may have increased during
@@ -704,13 +704,13 @@ pub const prototype = struct {
                     try keys_iter.close(agent, @as(Agent.Error!void, {}));
 
                     // b. Return false.
-                    return Value.from(false);
+                    return .false;
                 }
             }
         }
 
         // 6. Return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 24.2.4.11 Set.prototype.isSubsetOf ( other )
@@ -727,7 +727,7 @@ pub const prototype = struct {
 
         // 4. If SetDataSize(O.[[SetData]]) > otherRec.[[Size]], return false.
         if (setDataSize(object.fields.set_data) > other_rec.size) {
-            return Value.from(false);
+            return .false;
         }
 
         // 5. Let thisSize be the number of elements in O.[[SetData]].
@@ -753,7 +753,7 @@ pub const prototype = struct {
 
             // ii. If inOther is false, return false.
             if (!in_other) {
-                return Value.from(false);
+                return .false;
             }
 
             // iii. NOTE: The number of elements in O.[[SetData]] may have increased during
@@ -763,7 +763,7 @@ pub const prototype = struct {
         }
 
         // 8. Return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 24.2.4.12 Set.prototype.isSupersetOf ( other )
@@ -780,7 +780,7 @@ pub const prototype = struct {
 
         // 4. If SetDataSize(O.[[SetData]]) < otherRec.[[Size]], return false.
         if (setDataSize(object.fields.set_data) < other_rec.size) {
-            return Value.from(false);
+            return .false;
         }
 
         // 5. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
@@ -801,12 +801,12 @@ pub const prototype = struct {
                 try keys_iter.close(agent, @as(Agent.Error!void, {}));
 
                 // 2. Return false.
-                return Value.from(false);
+                return .false;
             }
         }
 
         // 8. Return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 24.2.4.14 get Set.prototype.size

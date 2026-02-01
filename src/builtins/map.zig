@@ -273,11 +273,11 @@ pub const prototype = struct {
             if (map.fields.iterable_keys) |*iterable_keys| {
                 iterable_keys.items[index] = null;
             }
-            return Value.from(true);
+            return .true;
         }
 
         // 5. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 24.1.3.4 Map.prototype.entries ( )

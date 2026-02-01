@@ -203,7 +203,7 @@ pub const prototype = struct {
 
         // 3. If CanBeHeldWeakly(value) is false, return false.
         if (!value.canBeHeldWeakly(agent)) {
-            return Value.from(false);
+            return .false;
         }
 
         // 4. For each element e of S.[[WeakSetData]], do
@@ -226,7 +226,7 @@ pub const prototype = struct {
 
         // 3. If CanBeHeldWeakly(value) is false, return false.
         if (!value.canBeHeldWeakly(agent)) {
-            return Value.from(false);
+            return .false;
         }
 
         // 4. For each element e of S.[[WeakSetData]], do

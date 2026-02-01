@@ -600,7 +600,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getfloat32
     fn getFloat32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -612,7 +612,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getfloat64
     fn getFloat64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -627,14 +627,14 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. Return ? GetViewValue(view, byteOffset, true, int8).
-        return getViewValue(agent, this_value, byte_offset, Value.from(true), .int8);
+        return getViewValue(agent, this_value, byte_offset, .true, .int8);
     }
 
     /// 25.3.4.11 DataView.prototype.getInt16 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getint16
     fn getInt16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -646,7 +646,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getint32
     fn getInt32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -661,14 +661,14 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. Return ? GetViewValue(view, byteOffset, true, uint8).
-        return getViewValue(agent, this_value, byte_offset, Value.from(true), .uint8);
+        return getViewValue(agent, this_value, byte_offset, .true, .uint8);
     }
 
     /// 25.3.4.14 DataView.prototype.getUint16 ( byteOffset [ , littleEndian ] )
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getuint16
     fn getUint16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -680,7 +680,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-dataview.prototype.getuint32
     fn getUint32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
-        const little_endian = arguments.getOrNull(1) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(1) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -717,7 +717,7 @@ pub const prototype = struct {
     fn setFloat16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -730,7 +730,7 @@ pub const prototype = struct {
     fn setFloat32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -743,7 +743,7 @@ pub const prototype = struct {
     fn setFloat64(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -759,7 +759,7 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. Return ? SetViewValue(view, byteOffset, true, int8, value).
-        return setViewValue(agent, this_value, byte_offset, Value.from(true), .int8, value);
+        return setViewValue(agent, this_value, byte_offset, .true, .int8, value);
     }
 
     /// 25.3.4.22 DataView.prototype.setInt16 ( byteOffset, value [ , littleEndian ] )
@@ -767,7 +767,7 @@ pub const prototype = struct {
     fn setInt16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -780,7 +780,7 @@ pub const prototype = struct {
     fn setInt32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -796,7 +796,7 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. Return ? SetViewValue(view, byteOffset, true, uint8, value).
-        return setViewValue(agent, this_value, byte_offset, Value.from(true), .uint8, value);
+        return setViewValue(agent, this_value, byte_offset, .true, .uint8, value);
     }
 
     /// 25.3.4.25 DataView.prototype.setUint16 ( byteOffset, value [ , littleEndian ] )
@@ -804,7 +804,7 @@ pub const prototype = struct {
     fn setUint16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
@@ -817,7 +817,7 @@ pub const prototype = struct {
     fn setUint32(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const byte_offset = arguments.get(0);
         const value = arguments.get(1);
-        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+        const little_endian = arguments.getOrNull(2) orelse Value.false;
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.

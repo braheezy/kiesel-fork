@@ -693,7 +693,7 @@ fn executeDelete(self: *Vm) Agent.Error!void {
         std.debug.assert(!reference.strict);
 
         // b. Return true.
-        self.result = Value.from(true);
+        self.result = .true;
         return;
     }
 

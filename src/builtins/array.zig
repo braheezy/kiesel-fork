@@ -1020,7 +1020,7 @@ pub const prototype = struct {
                     try unscopable_list.createDataPropertyDirect(
                         agent,
                         PropertyKey.from(name),
-                        Value.from(true),
+                        .true,
                     );
                 }
 
@@ -1363,14 +1363,14 @@ pub const prototype = struct {
                 )).toBoolean();
 
                 // iii. If testResult is false, return false.
-                if (!test_result) return Value.from(false);
+                if (!test_result) return .false;
             }
 
             // d. Set k to k + 1.
         }
 
         // 6. Return true.
-        return Value.from(true);
+        return .true;
     }
 
     /// 23.1.3.7 Array.prototype.fill ( value [ , start [ , end ] ] )
@@ -1867,7 +1867,7 @@ pub const prototype = struct {
         const len = try object.lengthOfArrayLike(agent);
 
         // 3. If len = 0, return false.
-        if (len == 0) return Value.from(false);
+        if (len == 0) return .false;
 
         // 4. Let n be ? ToIntegerOrInfinity(fromIndex).
         var n = try from_index.toIntegerOrInfinity(agent);
@@ -1876,7 +1876,7 @@ pub const prototype = struct {
         if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 6. If n = +∞, return false.
-        if (std.math.isPositiveInf(n)) return Value.from(false);
+        if (std.math.isPositiveInf(n)) return .false;
 
         // 7. Else if n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
@@ -1887,7 +1887,7 @@ pub const prototype = struct {
         //     a. Let k be len + n.
         //     b. If k < 0, set k to 0.
         const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
-        if (k_f64 >= std.math.maxInt(u53)) return Value.from(false);
+        if (k_f64 >= std.math.maxInt(u53)) return .false;
         var k: u53 = @intFromFloat(k_f64);
 
         // OPTIMIZATION: Use fast path if applicable
@@ -1901,13 +1901,13 @@ pub const prototype = struct {
             const element_k = try object.get(agent, PropertyKey.from(k));
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
-            if (sameValueZero(search_element, element_k)) return Value.from(true);
+            if (sameValueZero(search_element, element_k)) return .true;
 
             // c. Set k to k + 1.
         }
 
         // 11. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 23.1.3.17 Array.prototype.indexOf ( searchElement [ , fromIndex ] )
@@ -2716,14 +2716,14 @@ pub const prototype = struct {
                 )).toBoolean();
 
                 // iii. If testResult is true, return true.
-                if (test_result) return Value.from(true);
+                if (test_result) return .true;
             }
 
             // d. Set k to k + 1.
         }
 
         // 6. Return true.
-        return Value.from(false);
+        return .false;
     }
 
     /// 23.1.3.30 Array.prototype.sort ( comparator )

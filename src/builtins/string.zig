@@ -1023,20 +1023,20 @@ pub const prototype = struct {
         const search_length = search_str.length;
 
         // 11. If searchLength = 0, return true.
-        if (search_length == 0) return Value.from(true);
+        if (search_length == 0) return .true;
 
         // 12. Let start be end - searchLength.
         // 13. If start < 0, return false.
-        const start = std.math.sub(u32, end, search_length) catch return Value.from(false);
+        const start = std.math.sub(u32, end, search_length) catch return .false;
 
         // 14. Let substring be the substring of S from start to end.
         const substring_ = try string.substring(agent, start, end);
 
         // 15. If substring is searchStr, return true.
-        if (substring_.eql(search_str)) return Value.from(true);
+        if (substring_.eql(search_str)) return .true;
 
         // 16. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 22.1.3.8 String.prototype.includes ( searchString [ , position ] )
@@ -2081,22 +2081,22 @@ pub const prototype = struct {
         const search_length = search_str.length;
 
         // 11. If searchLength = 0, return true.
-        if (search_length == 0) return Value.from(true);
+        if (search_length == 0) return .true;
 
         // 12. Let end be start + searchLength.
         const end = start +| search_length;
 
         // 13. If end > len, return false.
-        if (end > len) return Value.from(false);
+        if (end > len) return .false;
 
         // 14. Let substring be the substring of S from start to end.
         const substring_ = try string.substring(agent, start, end);
 
         // 15. If substring is searchStr, return true.
-        if (substring_.eql(search_str)) return Value.from(true);
+        if (substring_.eql(search_str)) return .true;
 
         // 16. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 22.1.3.25 String.prototype.substring ( start, end )

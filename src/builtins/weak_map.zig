@@ -142,7 +142,7 @@ pub const prototype = struct {
 
         // 3. If CanBeHeldWeakly(key) is false, return false.
         if (!key.canBeHeldWeakly(agent)) {
-            return Value.from(false);
+            return .false;
         }
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
@@ -264,7 +264,7 @@ pub const prototype = struct {
 
         // 3. If CanBeHeldWeakly(key) is false, return false.
         if (!key.canBeHeldWeakly(agent)) {
-            return Value.from(false);
+            return .false;
         }
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do

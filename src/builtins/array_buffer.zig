@@ -698,7 +698,7 @@ pub const constructor = struct {
         const arg = arguments.get(0);
 
         // 1. If arg is not an Object, return false.
-        if (!arg.isObject()) return Value.from(false);
+        if (!arg.isObject()) return .false;
 
         // 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
         // 3. Return false.

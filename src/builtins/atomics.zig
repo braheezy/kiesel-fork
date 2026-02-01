@@ -274,7 +274,7 @@ fn doWait(
         try result_object.createDataPropertyDirect(
             agent,
             PropertyKey.from("async"),
-            Value.from(false),
+            .false,
         );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "not-equal").
@@ -300,7 +300,7 @@ fn doWait(
         try result_object.createDataPropertyDirect(
             agent,
             PropertyKey.from("async"),
-            Value.from(false),
+            .false,
         );
 
         // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "timed-out").
@@ -324,7 +324,7 @@ fn doWait(
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("async"),
-        Value.from(true),
+        .true,
     );
 
     // 32. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
@@ -609,10 +609,10 @@ pub const namespace = struct {
         // 4. If n = 2, return AR.[[IsLockFree2]].
         // 5. If n = 4, return true.
         // 6. If n = 8, return AR.[[IsLockFree8]].
-        if (n == 1 or n == 2 or n == 4 or n == 8) return Value.from(true);
+        if (n == 1 or n == 2 or n == 4 or n == 8) return .true;
 
         // 7. Return false.
-        return Value.from(false);
+        return .false;
     }
 
     /// 25.4.9 Atomics.load ( typedArray, index )

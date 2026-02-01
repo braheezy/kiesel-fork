@@ -1143,13 +1143,13 @@ pub const prototype = struct {
 
             // e. If ToBoolean(result) is false, return ? IteratorClose(iterated, NormalCompletion(false)).
             if (!result.toBoolean()) {
-                return try iterated.close(agent, @as(Agent.Error!Value, Value.from(false)));
+                return try iterated.close(agent, @as(Agent.Error!Value, .false));
             }
 
             // f. Set counter to counter + 1.
             counter += 1;
         }
-        return Value.from(true);
+        return .true;
     }
 
     /// 27.1.3.3.4 Iterator.prototype.filter ( predicate )
@@ -1805,13 +1805,13 @@ pub const prototype = struct {
 
             // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(true)).
             if (result.toBoolean()) {
-                return try iterated.close(agent, @as(Agent.Error!Value, Value.from(true)));
+                return try iterated.close(agent, @as(Agent.Error!Value, .true));
             }
 
             // f. Set counter to counter + 1.
             counter += 1;
         }
-        return Value.from(false);
+        return .false;
     }
 
     /// 27.1.3.3.11 Iterator.prototype.take ( limit )

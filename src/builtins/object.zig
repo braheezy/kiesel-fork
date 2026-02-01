@@ -566,7 +566,7 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (!object.isObject()) return Value.from(true);
+        if (!object.isObject()) return .true;
 
         // 2. Return ? IsExtensible(O).
         return Value.from(try object.asObject().isExtensible(agent));
@@ -578,7 +578,7 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (!object.isObject()) return Value.from(true);
+        if (!object.isObject()) return .true;
 
         // 2. Return ? TestIntegrityLevel(O, frozen).
         return Value.from(try object.asObject().testIntegrityLevel(agent, .frozen));
@@ -590,7 +590,7 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (!object.isObject()) return Value.from(true);
+        if (!object.isObject()) return .true;
 
         // 2. Return ? TestIntegrityLevel(O, sealed).
         return Value.from(try object.asObject().testIntegrityLevel(agent, .sealed));
@@ -637,7 +637,7 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
-        if (!object.isObject()) return Value.from(true);
+        if (!object.isObject()) return .true;
 
         // 2. Let status be ? SetIntegrityLevel(O, sealed).
         const status = try object.asObject().setIntegrityLevel(agent, .sealed);
@@ -760,7 +760,7 @@ pub const prototype = struct {
         const value = arguments.get(0);
 
         // 1. If V is not an Object, return false.
-        if (!value.isObject()) return Value.from(false);
+        if (!value.isObject()) return .false;
 
         // 2. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
@@ -772,11 +772,11 @@ pub const prototype = struct {
             // a. Set V to ? V.[[GetPrototypeOf]]().
             prototype_ = try prototype_.internal_methods.getPrototypeOf(agent, prototype_) orelse {
                 // b. If V is null, return false.
-                return Value.from(false);
+                return .false;
             };
 
             // c. If SameValue(O, V) is true, return true.
-            if (object == prototype_) return Value.from(true);
+            if (object == prototype_) return .true;
         }
     }
 
@@ -802,7 +802,7 @@ pub const prototype = struct {
             property_key,
         ) orelse {
             // 4. If desc is undefined, return false.
-            return Value.from(false);
+            return .false;
         };
 
         // 5. Return desc.[[Enumerable]].

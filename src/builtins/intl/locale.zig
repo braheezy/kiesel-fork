@@ -592,7 +592,7 @@ pub const prototype = struct {
             "kn",
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-        } orelse return Value.from(false);
+        } orelse return .false;
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }
 

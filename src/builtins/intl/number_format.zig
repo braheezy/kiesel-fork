@@ -946,7 +946,7 @@ pub const prototype = struct {
             agent,
             PropertyKey.from("useGrouping"),
             switch (resolved_options.use_grouping) {
-                .false => Value.from(false),
+                .false => .false,
                 .string => |string| Value.from(string),
             },
         );
