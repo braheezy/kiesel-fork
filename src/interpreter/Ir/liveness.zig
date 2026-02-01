@@ -144,6 +144,13 @@ fn markLive(
                     if (elem != .none) try uses.append(gpa, elem);
                 }
             },
+            .object => {
+                const extra_index = @intFromEnum(data.object.extra_index);
+                const pairs = @as([*]const Ir.Inst.Ref, @ptrCast(extras.ptr + extra_index))[0 .. data.object.len * 2];
+                for (pairs) |ref| {
+                    if (ref != .none) try uses.append(gpa, ref);
+                }
+            },
             .@"if" => try uses.appendSlice(gpa, &.{
                 data.@"if".@"test",
                 data.@"if".then,

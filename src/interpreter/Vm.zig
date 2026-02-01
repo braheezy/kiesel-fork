@@ -9,6 +9,7 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
+const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 
@@ -17,6 +18,7 @@ const arrayCreateFast = builtins.arrayCreateFast;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = language.ast.stringValueImpl;
 
 const Vm = @This();
@@ -87,6 +89,9 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .array_create => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
                 .array_push => vm.executeArrayPush(data.reg_reg[0], data.reg_reg[1]),
                 .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
+                .object_create => vm.executeObjectCreate(data.reg),
+                .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
+                .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .unary_minus => vm.executeUnaryMinus(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
@@ -223,6 +228,28 @@ fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Ins
         .value_or_accessor = .{ .value = elem_value },
         .attributes = .all,
     });
+}
+
+fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) Agent.Error!void {
+    const object = try ordinaryObjectCreateFast(vm.agent);
+    vm.load(dst, Value.from(object));
+}
+
+fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const object_value = vm.store(object_reg);
+    const property_value = vm.store(value_reg);
+    const object = object_value.asObject();
+    const property_key = PropertyKey.from(vm.strings[@intFromEnum(key_index)]);
+    try object.createDataPropertyDirect(vm.agent, property_key, property_value);
+}
+
+fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const object_value = vm.store(object_reg);
+    const key_value = vm.store(key_reg);
+    const property_value = vm.store(value_reg);
+    const object = object_value.asObject();
+    const property_key = try key_value.toPropertyKey(vm.agent);
+    try object.createDataPropertyDirect(vm.agent, property_key, property_value);
 }
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {

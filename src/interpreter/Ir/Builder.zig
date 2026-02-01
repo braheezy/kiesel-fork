@@ -384,7 +384,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .identifier_reference => try b.todo("identifier reference"),
             .literal => unreachable, // Guaranteed to constant-fold
             .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
-            .object_literal => try b.todo("object literal"),
+            .object_literal => |*object_lit| try b.lowerObjectLiteral(object_lit),
             .function_expression => try b.todo("function expression"),
             .class_expression => try b.todo("class expression"),
             .generator_expression => try b.todo("generator expression"),
@@ -439,6 +439,67 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
     return b.addInst(.{
         .tag = .array,
         .data = .{ .array = .{
+            .extra_index = extra_index,
+            .len = len,
+        } },
+    });
+}
+
+fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!Ir.Inst.Ref {
+    var pairs: std.ArrayListUnmanaged(Ir.Inst.Ref) = .empty;
+    defer pairs.deinit(b.gpa);
+
+    for (object_lit.property_definition_list.items) |prop_def| {
+        switch (prop_def) {
+            .identifier_reference => try b.todo("identifier reference in object literal"),
+            .spread => try b.todo("spread in object literal"),
+            .method_definition => try b.todo("method definition in object literal"),
+            .property_name_and_expression => |*prop| {
+                const key_ref = switch (prop.property_name) {
+                    .literal_property_name => |literal| switch (literal) {
+                        .identifier => |id| blk: {
+                            const gop = try b.strings.getOrPut(b.gpa, id);
+                            if (!gop.found_existing) {
+                                gop.key_ptr.* = try b.gpa.dupe(u8, id);
+                            }
+                            break :blk try b.addInst(.{
+                                .tag = .string,
+                                .data = .{ .string = @enumFromInt(gop.index) },
+                            });
+                        },
+                        .string_literal => |str_lit| blk: {
+                            const expr: ast.Expression = .{
+                                .primary_expression = .{
+                                    .literal = .{ .string = str_lit },
+                                },
+                            };
+                            break :blk try b.lowerExpression(&expr);
+                        },
+                        .numeric_literal => |num_lit| blk: {
+                            const expr: ast.Expression = .{
+                                .primary_expression = .{
+                                    .literal = .{ .numeric = num_lit },
+                                },
+                            };
+                            break :blk try b.lowerExpression(&expr);
+                        },
+                    },
+                    .computed_property_name => |*expr| try b.lowerExpression(expr),
+                };
+                const value_ref = try b.lowerExpression(&prop.expression);
+                try pairs.append(b.gpa, key_ref);
+                try pairs.append(b.gpa, value_ref);
+            },
+        }
+    }
+
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const len: u32 = @intCast(pairs.items.len / 2);
+    try b.extras.appendSlice(b.gpa, @ptrCast(pairs.items));
+
+    return b.addInst(.{
+        .tag = .object,
+        .data = .{ .object = .{
             .extra_index = extra_index,
             .len = len,
         } },

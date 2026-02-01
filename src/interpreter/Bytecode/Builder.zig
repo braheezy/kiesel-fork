@@ -79,6 +79,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
             .array => try b.lowerArray(data.array, dest),
+            .object => try b.lowerObject(data.object, dest),
             .@"if" => try b.lowerIf(data.@"if", dest),
             .@"while" => try b.lowerWhile(data.@"while", dest),
             .@"for" => try b.lowerFor(data.@"for", dest),
@@ -416,6 +417,50 @@ fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: 
         try b.emit(.{ .tag = .array_set, .data = .{
             .reg_reg_u32 = .{ dest, elem_reg, @intCast(i) },
         } });
+    }
+}
+
+fn lowerObject(b: *Builder, object_data: @FieldType(Ir.Inst.Data, "object"), dest: Bytecode.Inst.Reg) Error!void {
+    const extra_index = @intFromEnum(object_data.extra_index);
+    const pairs = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0 .. object_data.len * 2];
+
+    try b.emit(.{
+        .tag = .object_create,
+        .data = .{ .reg = dest },
+    });
+
+    var i: usize = 0;
+    while (i < pairs.len) : (i += 2) {
+        const key_ref = pairs[i];
+        const value_ref = pairs[i + 1];
+
+        const value_reg = b.resolve(value_ref);
+
+        const key_index = key_ref.toIndex().?;
+        const key_tag = b.ir.instructions.items(.tag)[@intFromEnum(key_index)];
+        const key_data = b.ir.instructions.items(.data)[@intFromEnum(key_index)];
+
+        if (key_tag == .string) {
+            const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_data.string));
+            try b.emit(.{
+                .tag = .object_set,
+                .data = .{ .reg_string_reg = .{
+                    dest,
+                    string_index,
+                    value_reg,
+                } },
+            });
+        } else {
+            const key_reg = b.resolve(key_ref);
+            try b.emit(.{
+                .tag = .object_set_computed,
+                .data = .{ .reg_reg_reg = .{
+                    dest,
+                    key_reg,
+                    value_reg,
+                } },
+            });
+        }
     }
 }
 

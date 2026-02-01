@@ -72,6 +72,7 @@ pub const Inst = struct {
         string,
         big_int,
         array,
+        object,
 
         @"if",
         @"while",
@@ -116,6 +117,7 @@ pub const Inst = struct {
         string: StringIndex,
         big_int: BigIntIndex,
         array: struct { extra_index: ExtraIndex, len: u32 },
+        object: struct { extra_index: ExtraIndex, len: u32 },
         @"if": struct { @"test": Ref, then: Ref, @"else": Ref },
         @"while": struct { @"test": Ref, body: Ref },
         @"for": struct { @"test": Ref, update: Ref, body: Ref },
@@ -219,6 +221,19 @@ pub fn print(
                     try printRef(element, cw, tty_config);
                 }
                 try cw.writeByte(']');
+            },
+            .object => {
+                try cw.writeAll(" {");
+                const extra_index = @intFromEnum(data.object.extra_index);
+                const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0 .. data.object.len * 2];
+                var pair_index: usize = 0;
+                while (pair_index < pairs.len) : (pair_index += 2) {
+                    if (pair_index > 0) try cw.writeAll(", ");
+                    try printRef(pairs[pair_index], cw, tty_config);
+                    try cw.writeAll(": ");
+                    try printRef(pairs[pair_index + 1], cw, tty_config);
+                }
+                try cw.writeByte('}');
             },
             .@"if" => {
                 try cw.writeByte(' ');

@@ -39,6 +39,10 @@ pub const Inst = struct {
         array_push,
         array_set,
 
+        object_create,
+        object_set,
+        object_set_computed,
+
         to_number,
         unary_minus,
         bitwise_not,
@@ -75,6 +79,7 @@ pub const Inst = struct {
         reg_f64: struct { Reg, f64 },
         reg_string: struct { Reg, StringIndex },
         reg_big_int: struct { Reg, BigIntIndex },
+        reg_string_reg: struct { Reg, StringIndex, Reg },
     };
 
     pub const Reg = enum(u8) {
@@ -108,6 +113,7 @@ pub const Inst = struct {
             .load_null,
             .load_true,
             .load_false,
+            .object_create,
             => .{ .reg = try takeEnumNonExhaustive(Reg, reader) },
             .jump => .{ .i32 = try reader.takeInt(i32, .little) },
             .jump_if_true, .jump_if_false, .jump_if_nullish, .load_number_i32 => .{ .reg_i32 = .{
@@ -146,6 +152,12 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
                 try reader.takeInt(u32, .little),
             } },
+            .object_set => .{ .reg_string_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(StringIndex, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .object_set_computed,
             .add,
             .sub,
             .mul,
@@ -183,6 +195,7 @@ pub const Inst = struct {
             .load_null,
             .load_true,
             .load_false,
+            .object_create,
             => try writer.writeInt(u8, @intFromEnum(inst.data.reg), .little),
             .jump => try writer.writeInt(i32, inst.data.i32, .little),
             .jump_if_true,
@@ -225,6 +238,12 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
                 try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
             },
+            .object_set => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_string_reg[0]), .little);
+                try writer.writeInt(u32, @intFromEnum(inst.data.reg_string_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_string_reg[2]), .little);
+            },
+            .object_set_computed,
             .add,
             .sub,
             .mul,
@@ -296,6 +315,7 @@ pub fn print(
             .load_null,
             .load_true,
             .load_false,
+            .object_create,
             => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg, 'r', .blue, writer, tty_config);
@@ -364,6 +384,15 @@ pub fn print(
                 try writer.writeAll(", ");
                 try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
             },
+            .object_set => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_string_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(@intFromEnum(inst.data.reg_string_reg[1]), '@', .green, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_string_reg[2], 'r', .blue, writer, tty_config);
+            },
+            .object_set_computed,
             .add,
             .sub,
             .mul,
