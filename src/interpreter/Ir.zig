@@ -70,18 +70,29 @@ pub const Inst = struct {
         number,
         string,
         big_int,
+
         @"if",
         @"while",
         @"for",
         loop,
+
         add,
         sub,
         mul,
         div,
+
+        lt,
+        gt,
+        lt_eq,
+        gt_eq,
+        instanceof,
+        in,
+
         eq,
         not_eq,
         eq_strict,
         not_eq_strict,
+
         end,
     };
 
@@ -215,6 +226,12 @@ pub fn print(
             .sub,
             .mul,
             .div,
+            .lt,
+            .gt,
+            .lt_eq,
+            .gt_eq,
+            .instanceof,
+            .in,
             .eq,
             .not_eq,
             .eq_strict,

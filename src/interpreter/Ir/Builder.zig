@@ -399,7 +399,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .update_expression => try b.todo("update expression"),
         .unary_expression => try b.todo("unary expression"),
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
-        .relational_expression => try b.todo("relational expression"),
+        .relational_expression => |*rel_expr| try b.lowerRelationalExpression(rel_expr),
         .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
         .logical_expression => try b.todo("logical expression"),
         .conditional_expression => try b.todo("conditional expression"),
@@ -421,6 +421,29 @@ fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Err
         .@"*" => .mul,
         .@"/" => .div,
         else => try b.todo("binary operator"),
+    };
+    return b.addInst(.{
+        .tag = tag,
+        .data = .{ .binary = .{
+            .lhs = lhs,
+            .rhs = rhs,
+        } },
+    });
+}
+
+fn lowerRelationalExpression(b: *Builder, rel_expr: *const ast.RelationalExpression) Error!Ir.Inst.Ref {
+    const lhs = switch (rel_expr.lhs) {
+        .expression => |expr| try b.lowerExpression(expr),
+        .private_identifier => try b.todo("private identifier"),
+    };
+    const rhs = try b.lowerExpression(rel_expr.rhs_expression);
+    const tag: Ir.Inst.Tag = switch (rel_expr.operator) {
+        .@"<" => .lt,
+        .@">" => .gt,
+        .@"<=" => .lt_eq,
+        .@">=" => .gt_eq,
+        .instanceof => .instanceof,
+        .in => .in,
     };
     return b.addInst(.{
         .tag = tag,

@@ -12,6 +12,7 @@ const String = types.String;
 const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
+const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
 const stringValueImpl = language.ast.stringValueImpl;
@@ -85,6 +86,12 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .mul => vm.executeMul(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .div => vm.executeDiv(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .lt => vm.executeLt(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .gt => vm.executeGt(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .lt_eq => vm.executeLtEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .gt_eq => vm.executeGtEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .instanceof => vm.executeInstanceOf(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .in => vm.executeIn(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .eq => vm.executeEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq => vm.executeNotEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -262,6 +269,110 @@ fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     }
 
     vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"/", rhs_value));
+}
+
+fn executeLt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() < rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() < rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    const result = try isLessThan(vm.agent, lhs_value, rhs_value, .left_first);
+    vm.load(dst, Value.from(result orelse false));
+}
+
+fn executeGt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() > rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() > rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    const result = try isLessThan(vm.agent, rhs_value, lhs_value, .right_first);
+    vm.load(dst, Value.from(result orelse false));
+}
+
+fn executeLtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() <= rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() <= rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    const result = try isLessThan(vm.agent, rhs_value, lhs_value, .right_first);
+    vm.load(dst, Value.from(!(result orelse true)));
+}
+
+fn executeGtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    // OPTIMIZATION: Fast path for number values
+    if (lhs_value.isNumber() and rhs_value.isNumber()) {
+        @branchHint(.likely);
+        if (lhs_value.__isI32() and rhs_value.__isI32()) {
+            vm.load(dst, Value.from(lhs_value.__asI32() >= rhs_value.__asI32()));
+        } else {
+            vm.load(dst, Value.from(lhs_value.__toF64() >= rhs_value.__toF64()));
+        }
+        return;
+    }
+
+    const result = try isLessThan(vm.agent, lhs_value, rhs_value, .left_first);
+    vm.load(dst, Value.from(!(result orelse true)));
+}
+
+fn executeInstanceOf(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    const result = try lhs_value.instanceofOperator(vm.agent, rhs_value);
+    vm.load(dst, Value.from(result));
+}
+
+fn executeIn(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+    const lhs_value = vm.store(lhs);
+    const rhs_value = vm.store(rhs);
+
+    if (!rhs_value.isObject()) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(
+            .type_error,
+            "Right-hand side of 'in' operator must be an object",
+            .{},
+        );
+    }
+
+    const result = try rhs_value.asObject().hasProperty(
+        vm.agent,
+        try lhs_value.toPropertyKey(vm.agent),
+    );
+    vm.load(dst, Value.from(result));
 }
 
 fn executeEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {

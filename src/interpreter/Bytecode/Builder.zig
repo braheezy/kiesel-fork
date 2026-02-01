@@ -86,6 +86,12 @@ pub fn build(b: *Builder) Error!Bytecode {
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
             .div => try b.lowerDiv(data.binary, dest),
+            .lt => try b.lowerLt(data.binary, dest),
+            .gt => try b.lowerGt(data.binary, dest),
+            .lt_eq => try b.lowerLtEq(data.binary, dest),
+            .gt_eq => try b.lowerGtEq(data.binary, dest),
+            .instanceof => try b.lowerInstanceof(data.binary, dest),
+            .in => try b.lowerIn(data.binary, dest),
             .eq => try b.lowerEq(data.binary, dest),
             .not_eq => try b.lowerNotEq(data.binary, dest),
             .eq_strict => try b.lowerEqStrict(data.binary, dest),
@@ -487,6 +493,42 @@ fn lowerDiv(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecod
     const lhs_reg = b.resolve(data.lhs);
     const rhs_reg = b.resolve(data.rhs);
     try b.emit(.{ .tag = .div, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerLt(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .lt, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerGt(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .gt, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerLtEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .lt_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerGtEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .gt_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerInstanceof(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .instanceof, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerIn(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .in, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
 }
 
 fn lowerEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
