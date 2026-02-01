@@ -65,6 +65,9 @@ pub fn computeLiveRanges(
             .not_eq,
             .eq_strict,
             .not_eq_strict,
+            .logical_and,
+            .logical_or,
+            .nullish_coalesce,
             => uses.appendSliceBounded(&.{
                 data.binary.lhs,
                 data.binary.rhs,

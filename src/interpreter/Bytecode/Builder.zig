@@ -96,6 +96,9 @@ pub fn build(b: *Builder) Error!Bytecode {
             .not_eq => try b.lowerNotEq(data.binary, dest),
             .eq_strict => try b.lowerEqStrict(data.binary, dest),
             .not_eq_strict => try b.lowerNotEqStrict(data.binary, dest),
+            .logical_and => try b.lowerLogicalAnd(data.binary, dest),
+            .logical_or => try b.lowerLogicalOr(data.binary, dest),
+            .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -173,10 +176,17 @@ const Block = struct {
         .offset = 0,
     };
 
+    const Condition = enum {
+        truthy,
+        falsy,
+        nullish,
+    };
+
     const Terminator = union(enum) {
         none,
         jump: *Block,
         branch: struct {
+            condition: Condition,
             condition_reg: Bytecode.Inst.Reg,
             then_block: *Block,
             else_block: *Block,
@@ -199,15 +209,20 @@ const Block = struct {
                 .data = .{ .i32 = 0 },
             }),
             .branch => |br| blk: {
-                const jump_if_false_size: u32 = Bytecode.Inst.encodedSize(.{
-                    .tag = .jump_if_false,
+                const jump_cond_tag: Bytecode.Inst.Tag = switch (br.condition) {
+                    .truthy => .jump_if_true,
+                    .falsy => .jump_if_false,
+                    .nullish => .jump_if_nullish,
+                };
+                const jump_cond_size: u32 = Bytecode.Inst.encodedSize(.{
+                    .tag = jump_cond_tag,
                     .data = .{ .reg_i32 = .{ br.condition_reg, 0 } },
                 });
-                const jump_size: u32 = if (br.then_block == next) 0 else Bytecode.Inst.encodedSize(.{
+                const jump_size: u32 = if (br.else_block == next) 0 else Bytecode.Inst.encodedSize(.{
                     .tag = .jump,
                     .data = .{ .i32 = 0 },
                 });
-                break :blk jump_if_false_size + jump_size;
+                break :blk jump_cond_size + jump_size;
             },
         };
     }
@@ -221,8 +236,8 @@ const Block = struct {
             .tag = .jump,
             .data = .{ .i32 = 0 },
         });
-        const jump_if_false_size = comptime Bytecode.Inst.encodedSize(.{
-            .tag = .jump_if_false,
+        const jump_cond_size = comptime Bytecode.Inst.encodedSize(.{
+            .tag = .jump_if_true,
             .data = .{ .reg_i32 = .{ .none, 0 } },
         });
 
@@ -237,21 +252,26 @@ const Block = struct {
                 }
             },
             .branch => |br| {
-                const after_jump_if_false = block.offset + block.size() + jump_if_false_size;
-                const else_relative: i32 = @as(i32, @intCast(br.else_block.offset)) - @as(i32, @intCast(after_jump_if_false));
+                const jump_cond_tag: Bytecode.Inst.Tag = switch (br.condition) {
+                    .truthy => .jump_if_true,
+                    .falsy => .jump_if_false,
+                    .nullish => .jump_if_nullish,
+                };
+                const after_jump_cond = block.offset + block.size() + jump_cond_size;
+                const then_relative: i32 = @as(i32, @intCast(br.then_block.offset)) - @as(i32, @intCast(after_jump_cond));
                 try (Bytecode.Inst{
-                    .tag = .jump_if_false,
+                    .tag = jump_cond_tag,
                     .data = .{ .reg_i32 = .{
                         br.condition_reg,
-                        else_relative,
+                        then_relative,
                     } },
                 }).encode(writer);
-                if (br.then_block != next) {
-                    const current_offset = after_jump_if_false;
-                    const then_relative: i32 = @as(i32, @intCast(br.then_block.offset)) - @as(i32, @intCast(current_offset + jump_size));
+                if (br.else_block != next) {
+                    const current_offset = after_jump_cond;
+                    const else_relative: i32 = @as(i32, @intCast(br.else_block.offset)) - @as(i32, @intCast(current_offset + jump_size));
                     try (Bytecode.Inst{
                         .tag = .jump,
-                        .data = .{ .i32 = then_relative },
+                        .data = .{ .i32 = else_relative },
                     }).encode(writer);
                 }
             },
@@ -285,9 +305,16 @@ fn jump(b: *Builder, target: *Block) void {
     b.current.?.terminator = .{ .jump = target };
 }
 
-fn branch(b: *Builder, condition_reg: Bytecode.Inst.Reg, then_block: *Block, else_block: *Block) void {
+fn branch(
+    b: *Builder,
+    condition: Block.Condition,
+    condition_reg: Bytecode.Inst.Reg,
+    then_block: *Block,
+    else_block: *Block,
+) void {
     std.debug.assert(!b.terminated());
     b.current.?.terminator = .{ .branch = .{
+        .condition = condition,
         .condition_reg = condition_reg,
         .then_block = then_block,
         .else_block = else_block,
@@ -374,7 +401,7 @@ fn lowerIf(b: *Builder, data: @FieldType(Ir.Inst.Data, "if"), dest: Bytecode.Ins
     const else_block = try b.createBlock();
     const merge_block = try b.createBlock();
 
-    b.branch(cond_reg, then_block, else_block);
+    b.branch(.truthy, cond_reg, then_block, else_block);
 
     b.switchToBlock(then_block);
     try b.emitMoveIfNeeded(then_ref, dest);
@@ -399,7 +426,7 @@ fn lowerWhile(b: *Builder, data: @FieldType(Ir.Inst.Data, "while"), dest: Byteco
 
     b.switchToBlock(test_block);
     const cond_reg = b.resolve(test_ref);
-    b.branch(cond_reg, body_block, exit_block);
+    b.branch(.truthy, cond_reg, body_block, exit_block);
 
     b.switchToBlock(body_block);
     try b.emitMoveIfNeeded(body_ref, dest);
@@ -422,7 +449,7 @@ fn lowerFor(b: *Builder, data: @FieldType(Ir.Inst.Data, "for"), dest: Bytecode.I
 
     b.switchToBlock(test_block);
     const cond_reg = b.resolve(test_ref);
-    b.branch(cond_reg, body_block, exit_block);
+    b.branch(.truthy, cond_reg, body_block, exit_block);
 
     b.switchToBlock(body_block);
     try b.emitMoveIfNeeded(body_ref, dest);
@@ -553,6 +580,54 @@ fn lowerNotEqStrict(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest:
     const lhs_reg = b.resolve(data.lhs);
     const rhs_reg = b.resolve(data.rhs);
     try b.emit(.{ .tag = .not_eq_strict, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerLogicalAnd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+
+    const rhs_block = try b.createBlock();
+    const merge_block = try b.createBlock();
+
+    try b.emitMoveIfNeeded(data.lhs, dest);
+    b.branch(.falsy, lhs_reg, merge_block, rhs_block);
+
+    b.switchToBlock(rhs_block);
+    try b.emitMoveIfNeeded(data.rhs, dest);
+    b.jump(merge_block);
+
+    b.switchToBlock(merge_block);
+}
+
+fn lowerLogicalOr(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+
+    const rhs_block = try b.createBlock();
+    const merge_block = try b.createBlock();
+
+    try b.emitMoveIfNeeded(data.lhs, dest);
+    b.branch(.truthy, lhs_reg, merge_block, rhs_block);
+
+    b.switchToBlock(rhs_block);
+    try b.emitMoveIfNeeded(data.rhs, dest);
+    b.jump(merge_block);
+
+    b.switchToBlock(merge_block);
+}
+
+fn lowerNullishCoalesce(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+
+    const rhs_block = try b.createBlock();
+    const merge_block = try b.createBlock();
+
+    try b.emitMoveIfNeeded(data.lhs, dest);
+    b.branch(.nullish, lhs_reg, rhs_block, merge_block);
+
+    b.switchToBlock(rhs_block);
+    try b.emitMoveIfNeeded(data.rhs, dest);
+    b.jump(merge_block);
+
+    b.switchToBlock(merge_block);
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

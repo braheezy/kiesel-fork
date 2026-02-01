@@ -46,6 +46,7 @@ pub fn constantFold(
             else => {},
         },
         .binary_expression => |*bin_expr| return constantFoldBinaryExpression(gpa, bin_expr),
+        .logical_expression => |*log_expr| return constantFoldLogicalExpression(gpa, log_expr),
         else => {},
     }
     return null;
@@ -136,6 +137,24 @@ fn constantFoldBinaryExpression(
                 },
                 else => {},
             }
+        }
+    }
+    return null;
+}
+
+fn constantFoldLogicalExpression(
+    gpa: std.mem.Allocator,
+    log_expr: *const ast.LogicalExpression,
+) std.mem.Allocator.Error!?Constant {
+    if (try constantFold(gpa, log_expr.lhs_expression)) |lhs| {
+        switch (log_expr.operator) {
+            .@"&&" => if (!lhs.isTruthy()) return lhs,
+            .@"||" => if (lhs.isTruthy()) return lhs,
+            .@"??" => if (!lhs.isNullish()) return lhs,
+        }
+        lhs.deinit(gpa);
+        if (try constantFold(gpa, log_expr.rhs_expression)) |rhs| {
+            return rhs;
         }
     }
     return null;

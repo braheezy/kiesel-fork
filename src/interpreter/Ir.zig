@@ -93,6 +93,10 @@ pub const Inst = struct {
         eq_strict,
         not_eq_strict,
 
+        logical_and,
+        logical_or,
+        nullish_coalesce,
+
         end,
     };
 
@@ -236,6 +240,9 @@ pub fn print(
             .not_eq,
             .eq_strict,
             .not_eq_strict,
+            .logical_and,
+            .logical_or,
+            .nullish_coalesce,
             => {
                 try cw.writeByte(' ');
                 try printRef(data.binary.lhs, cw, tty_config);

@@ -401,7 +401,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
         .relational_expression => |*rel_expr| try b.lowerRelationalExpression(rel_expr),
         .equality_expression => |*eq_expr| try b.lowerEqualityExpression(eq_expr),
-        .logical_expression => try b.todo("logical expression"),
+        .logical_expression => |*log_expr| try b.lowerLogicalExpression(log_expr),
         .conditional_expression => try b.todo("conditional expression"),
         .assignment_expression => try b.todo("assignment expression"),
         .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
@@ -462,6 +462,23 @@ fn lowerEqualityExpression(b: *Builder, eq_expr: *const ast.EqualityExpression) 
         .@"!=" => .not_eq,
         .@"===" => .eq_strict,
         .@"!==" => .not_eq_strict,
+    };
+    return b.addInst(.{
+        .tag = tag,
+        .data = .{ .binary = .{
+            .lhs = lhs,
+            .rhs = rhs,
+        } },
+    });
+}
+
+fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) Error!Ir.Inst.Ref {
+    const lhs = try b.lowerExpression(log_expr.lhs_expression);
+    const rhs = try b.lowerExpression(log_expr.rhs_expression);
+    const tag: Ir.Inst.Tag = switch (log_expr.operator) {
+        .@"&&" => .logical_and,
+        .@"||" => .logical_or,
+        .@"??" => .nullish_coalesce,
     };
     return b.addInst(.{
         .tag = tag,
