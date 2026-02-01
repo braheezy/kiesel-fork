@@ -1,5 +1,8 @@
 const module = @import("language/module.zig");
-const runtime = @import("language/runtime.zig");
+
+pub const ast = @import("language/ast.zig");
+pub const runtime = @import("language/runtime.zig");
+pub const tokenizer = @import("language/tokenizer.zig");
 
 pub const Diagnostics = @import("ptk").Diagnostics;
 pub const ExportEntry = SourceTextModule.ExportEntry;
@@ -28,7 +31,6 @@ pub const instantiateAsyncGeneratorFunctionObject = runtime.instantiateAsyncGene
 pub const instantiateGeneratorFunctionObject = runtime.instantiateGeneratorFunctionObject;
 pub const instantiateOrdinaryFunctionObject = runtime.instantiateOrdinaryFunctionObject;
 pub const parseJSONModule = SyntheticModule.parseJSONModule;
-pub const tokenizer = @import("language/tokenizer.zig");
 
 test {
     _ = module;

@@ -176,11 +176,13 @@ fn mainWithErrorHandling() Error!void {
         // however (and will print 'undefined').
         if (source_text.len == 0) continue;
 
+        const file_name = "repl";
+
         var diagnostics = Diagnostics.init(allocator);
         defer diagnostics.deinit();
         const script = Script.parse(source_text, realm, null, .{
             .diagnostics = &diagnostics,
-            .file_name = "repl",
+            .file_name = file_name,
         }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.ParseError => {
@@ -203,7 +205,7 @@ fn mainWithErrorHandling() Error!void {
             },
         };
 
-        if (script.evaluate()) |result| {
+        if (script.evaluate(file_name)) |result| {
             try stdout.print("{f}\n", .{result});
             try stdout.flush();
         } else |err| switch (err) {

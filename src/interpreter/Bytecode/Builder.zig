@@ -1,0 +1,493 @@
+const std = @import("std");
+
+const interpreter = @import("../../interpreter.zig");
+
+const Bytecode = interpreter.Bytecode;
+const Ir = interpreter.Ir;
+const Vm = interpreter.Vm;
+
+const LinearScanRegisterAllocation = @import("LinearScanRegisterAllocation.zig");
+
+const Builder = @This();
+
+gpa: std.mem.Allocator,
+ir: *const Ir,
+blocks: std.ArrayListUnmanaged(*Block),
+current: ?*Block,
+lsra: LinearScanRegisterAllocation,
+
+pub const Error = error{OutOfMemory};
+
+pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Builder {
+    const lsra: LinearScanRegisterAllocation = try .init(gpa, ir.live_ranges, Vm.num_regs);
+    return .{
+        .gpa = gpa,
+        .ir = ir,
+        .blocks = .empty,
+        .current = null,
+        .lsra = lsra,
+    };
+}
+
+pub fn deinit(b: *Builder) void {
+    for (b.blocks.items) |block| {
+        block.deinit(b.gpa);
+        b.gpa.destroy(block);
+    }
+    b.blocks.deinit(b.gpa);
+    b.lsra.deinit(b.gpa);
+}
+
+fn computeRPO(
+    gpa: std.mem.Allocator,
+    block: *Block,
+    visited: *std.AutoHashMapUnmanaged(*Block, void),
+    out: *std.ArrayListUnmanaged(*Block),
+) std.mem.Allocator.Error!void {
+    const gop = try visited.getOrPut(gpa, block);
+    if (gop.found_existing) return;
+
+    switch (block.terminator) {
+        .none, .noreturn => {},
+        .jump => |target| try computeRPO(gpa, target, visited, out),
+        .branch => |br| {
+            try computeRPO(gpa, br.else_block, visited, out);
+            try computeRPO(gpa, br.then_block, visited, out);
+        },
+    }
+
+    try out.insert(gpa, 0, block);
+}
+
+pub fn build(b: *Builder) Error!Bytecode {
+    const entry = try b.createBlock();
+    b.switchToBlock(entry);
+
+    // Lower alive instructions
+    for (b.ir.instructions.items(.tag), b.ir.instructions.items(.data), 0..) |tag, data, i| {
+        if (!b.ir.liveness.isSet(i)) continue;
+        const index: Ir.Inst.Index = @enumFromInt(i);
+        const dest = b.resolve(index.toRef());
+        switch (tag) {
+            .undefined => try b.lowerUndefined(dest),
+            .null => try b.lowerNull(dest),
+            .true => try b.lowerTrue(dest),
+            .false => try b.lowerFalse(dest),
+            .zero => try b.lowerZero(dest),
+            .one => try b.lowerOne(dest),
+            .number => try b.lowerNumber(data.number, dest),
+            .string => try b.lowerString(data.string, dest),
+            .big_int => try b.lowerBigInt(data.big_int, dest),
+            .@"if" => try b.lowerIf(data.@"if", dest),
+            .@"while" => try b.lowerWhile(data.@"while", dest),
+            .@"for" => try b.lowerFor(data.@"for", dest),
+            .loop => try b.lowerLoop(data.loop, dest),
+            .add => try b.lowerAdd(data.binary, dest),
+            .sub => try b.lowerSub(data.binary, dest),
+            .mul => try b.lowerMul(data.binary, dest),
+            .div => try b.lowerDiv(data.binary, dest),
+            .end => try b.lowerEnd(data.ref, dest),
+        }
+    }
+
+    // Order blocks in reverse post-order
+    var ordered: std.ArrayListUnmanaged(*Block) = .empty;
+    defer ordered.deinit(b.gpa);
+    var visited: std.AutoHashMapUnmanaged(*Block, void) = .empty;
+    defer visited.deinit(b.gpa);
+    try computeRPO(b.gpa, b.blocks.items[0], &visited, &ordered);
+
+    // Assign offsets
+    var offset: u32 = 0;
+    for (ordered.items, 0..) |block, i| {
+        block.offset = offset;
+        offset += block.size();
+        const next: ?*Block = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
+        offset += block.terminatorSize(next);
+    }
+
+    // Encode bytecode
+    var aw: std.Io.Writer.Allocating = .init(b.gpa);
+    errdefer aw.deinit();
+
+    for (ordered.items, 0..) |block, i| {
+        const next: ?*Block = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
+        block.encode(&aw.writer, next) catch |err| switch (err) {
+            error.WriteFailed => return error.OutOfMemory,
+        };
+    }
+
+    const name = try b.gpa.dupe(u8, b.ir.name);
+    errdefer b.gpa.free(name);
+
+    const code = try aw.toOwnedSlice();
+    errdefer b.gpa.free(code);
+
+    const strings = try b.gpa.alloc([]const u8, b.ir.strings.len);
+    errdefer b.gpa.free(strings);
+    // Ensure errdefer is valid mid-loop
+    @memset(strings, &.{});
+    for (b.ir.strings, 0..) |string, i| {
+        strings[i] = try b.gpa.dupe(u8, string);
+    }
+    errdefer for (strings) |string| b.gpa.free(string);
+
+    const big_ints = try b.gpa.alloc(std.math.big.int.Const, b.ir.big_ints.len);
+    errdefer b.gpa.free(big_ints);
+    // Ensure errdefer is valid mid-loop
+    @memset(big_ints, .{ .limbs = &.{}, .positive = true });
+    for (b.ir.big_ints, 0..) |big_int, i| {
+        big_ints[i] = .{
+            .limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs),
+            .positive = big_int.positive,
+        };
+    }
+    errdefer for (big_ints) |big_int| b.gpa.free(big_int.limbs);
+
+    return .{
+        .name = name,
+        .code = code,
+        .strings = strings,
+        .big_ints = big_ints,
+    };
+}
+
+const Block = struct {
+    instructions: std.ArrayListUnmanaged(Bytecode.Inst),
+    terminator: Terminator,
+    offset: u32,
+
+    const empty: Block = .{
+        .instructions = .empty,
+        .terminator = .none,
+        .offset = 0,
+    };
+
+    const Terminator = union(enum) {
+        none,
+        jump: *Block,
+        branch: struct {
+            condition_reg: Bytecode.Inst.Reg,
+            then_block: *Block,
+            else_block: *Block,
+        },
+        noreturn,
+    };
+
+    fn size(block: *const Block) u32 {
+        var total: u32 = 0;
+        for (block.instructions.items) |inst| total += inst.encodedSize();
+        return total;
+    }
+
+    fn terminatorSize(block: *const Block, next: ?*const Block) u32 {
+        return switch (block.terminator) {
+            .none => unreachable,
+            .noreturn => 0,
+            .jump => |target| if (target == next) 0 else Bytecode.Inst.encodedSize(.{
+                .tag = .jump,
+                .data = .{ .i32 = 0 },
+            }),
+            .branch => |br| blk: {
+                const jump_if_false_size: u32 = Bytecode.Inst.encodedSize(.{
+                    .tag = .jump_if_false,
+                    .data = .{ .reg_i32 = .{ br.condition_reg, 0 } },
+                });
+                const jump_size: u32 = if (br.then_block == next) 0 else Bytecode.Inst.encodedSize(.{
+                    .tag = .jump,
+                    .data = .{ .i32 = 0 },
+                });
+                break :blk jump_if_false_size + jump_size;
+            },
+        };
+    }
+
+    fn encode(block: *const Block, writer: *std.Io.Writer, next: ?*const Block) std.Io.Writer.Error!void {
+        for (block.instructions.items) |inst| {
+            try inst.encode(writer);
+        }
+
+        const jump_size = comptime Bytecode.Inst.encodedSize(.{
+            .tag = .jump,
+            .data = .{ .i32 = 0 },
+        });
+        const jump_if_false_size = comptime Bytecode.Inst.encodedSize(.{
+            .tag = .jump_if_false,
+            .data = .{ .reg_i32 = .{ .none, 0 } },
+        });
+
+        switch (block.terminator) {
+            .none => unreachable,
+            .noreturn => {},
+            .jump => |target| {
+                if (target != next) {
+                    const current_offset = block.offset + block.size();
+                    const target_relative: i32 = @as(i32, @intCast(target.offset)) - @as(i32, @intCast(current_offset + jump_size));
+                    try (Bytecode.Inst{ .tag = .jump, .data = .{ .i32 = target_relative } }).encode(writer);
+                }
+            },
+            .branch => |br| {
+                const after_jump_if_false = block.offset + block.size() + jump_if_false_size;
+                const else_relative: i32 = @as(i32, @intCast(br.else_block.offset)) - @as(i32, @intCast(after_jump_if_false));
+                try (Bytecode.Inst{
+                    .tag = .jump_if_false,
+                    .data = .{ .reg_i32 = .{
+                        br.condition_reg,
+                        else_relative,
+                    } },
+                }).encode(writer);
+                if (br.then_block != next) {
+                    const current_offset = after_jump_if_false;
+                    const then_relative: i32 = @as(i32, @intCast(br.then_block.offset)) - @as(i32, @intCast(current_offset + jump_size));
+                    try (Bytecode.Inst{
+                        .tag = .jump,
+                        .data = .{ .i32 = then_relative },
+                    }).encode(writer);
+                }
+            },
+        }
+    }
+
+    fn deinit(block: *Block, gpa: std.mem.Allocator) void {
+        block.instructions.deinit(gpa);
+    }
+};
+
+fn createBlock(b: *Builder) Error!*Block {
+    const block = try b.gpa.create(Block);
+    errdefer b.gpa.destroy(block);
+    block.* = .empty;
+    try b.blocks.append(b.gpa, block);
+    return block;
+}
+
+fn switchToBlock(b: *Builder, block: *Block) void {
+    if (b.current != null) std.debug.assert(b.terminated());
+    b.current = block;
+}
+
+fn terminated(b: *const Builder) bool {
+    return b.current.?.terminator != .none;
+}
+
+fn jump(b: *Builder, target: *Block) void {
+    std.debug.assert(!b.terminated());
+    b.current.?.terminator = .{ .jump = target };
+}
+
+fn branch(b: *Builder, condition_reg: Bytecode.Inst.Reg, then_block: *Block, else_block: *Block) void {
+    std.debug.assert(!b.terminated());
+    b.current.?.terminator = .{ .branch = .{
+        .condition_reg = condition_reg,
+        .then_block = then_block,
+        .else_block = else_block,
+    } };
+}
+
+fn @"noreturn"(b: *Builder) void {
+    std.debug.assert(!b.terminated());
+    b.current.?.terminator = .noreturn;
+}
+
+fn emit(b: *Builder, inst: Bytecode.Inst) Error!void {
+    try b.current.?.instructions.append(b.gpa, inst);
+}
+
+fn emitMoveIfNeeded(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const src = switch (ref) {
+        .none => return,
+        else => b.resolve(ref),
+    };
+    if (src != dest) {
+        try b.emit(.{ .tag = .move, .data = .{ .reg_reg = .{ dest, src } } });
+    }
+}
+
+fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Inst.Reg {
+    const index = ref.toIndex().?;
+    switch (b.lsra.allocations[@intFromEnum(index)]) {
+        .register => |reg| return reg,
+        .spilled => unreachable, // TODO: Handle spill slots
+        .none => unreachable, // Live instructions must have allocations
+    }
+}
+
+fn lowerUndefined(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
+}
+
+fn lowerNull(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_null, .data = .{ .reg = dest } });
+}
+
+fn lowerTrue(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_true, .data = .{ .reg = dest } });
+}
+
+fn lowerFalse(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_false, .data = .{ .reg = dest } });
+}
+
+fn lowerZero(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, 0 } } });
+}
+
+fn lowerOne(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, 1 } } });
+}
+
+fn lowerNumber(b: *Builder, n: f64, dest: Bytecode.Inst.Reg) Error!void {
+    if (n == @floor(n) and n >= std.math.minInt(i32) and n <= std.math.maxInt(i32) and !std.math.isNegativeZero(n)) {
+        try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } } });
+    } else {
+        try b.emit(.{ .tag = .load_number_f64, .data = .{ .reg_f64 = .{ dest, n } } });
+    }
+}
+
+fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const str_idx: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string));
+    try b.emit(.{ .tag = .load_string, .data = .{ .reg_string = .{ dest, str_idx } } });
+}
+
+fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const big_int_idx: Bytecode.Inst.BigIntIndex = @enumFromInt(@intFromEnum(big_int));
+    try b.emit(.{ .tag = .load_big_int, .data = .{ .reg_big_int = .{ dest, big_int_idx } } });
+}
+
+fn lowerIf(b: *Builder, data: @FieldType(Ir.Inst.Data, "if"), dest: Bytecode.Inst.Reg) Error!void {
+    const test_ref = data.@"test";
+    const then_ref = data.then;
+    const else_ref = data.@"else";
+
+    const cond_reg = b.resolve(test_ref);
+    const then_block = try b.createBlock();
+    const else_block = try b.createBlock();
+    const merge_block = try b.createBlock();
+
+    b.branch(cond_reg, then_block, else_block);
+
+    b.switchToBlock(then_block);
+    try b.emitMoveIfNeeded(then_ref, dest);
+    b.jump(merge_block);
+
+    b.switchToBlock(else_block);
+    try b.emitMoveIfNeeded(else_ref, dest);
+    b.jump(merge_block);
+
+    b.switchToBlock(merge_block);
+}
+
+fn lowerWhile(b: *Builder, data: @FieldType(Ir.Inst.Data, "while"), dest: Bytecode.Inst.Reg) Error!void {
+    const test_ref = data.@"test";
+    const body_ref = data.body;
+
+    const test_block = try b.createBlock();
+    const body_block = try b.createBlock();
+    const exit_block = try b.createBlock();
+
+    b.jump(test_block);
+
+    b.switchToBlock(test_block);
+    const cond_reg = b.resolve(test_ref);
+    b.branch(cond_reg, body_block, exit_block);
+
+    b.switchToBlock(body_block);
+    try b.emitMoveIfNeeded(body_ref, dest);
+    b.jump(test_block);
+
+    b.switchToBlock(exit_block);
+}
+
+fn lowerFor(b: *Builder, data: @FieldType(Ir.Inst.Data, "for"), dest: Bytecode.Inst.Reg) Error!void {
+    const test_ref = data.@"test";
+    const update_ref = data.update;
+    const body_ref = data.body;
+
+    const test_block = try b.createBlock();
+    const body_block = try b.createBlock();
+    const update_block = try b.createBlock();
+    const exit_block = try b.createBlock();
+
+    b.jump(test_block);
+
+    b.switchToBlock(test_block);
+    const cond_reg = b.resolve(test_ref);
+    b.branch(cond_reg, body_block, exit_block);
+
+    b.switchToBlock(body_block);
+    try b.emitMoveIfNeeded(body_ref, dest);
+    b.jump(update_block);
+
+    b.switchToBlock(update_block);
+    if (update_ref != .none) {
+        try b.emitMoveIfNeeded(update_ref, dest);
+    }
+    b.jump(test_block);
+
+    b.switchToBlock(exit_block);
+}
+
+fn lowerLoop(b: *Builder, data: @FieldType(Ir.Inst.Data, "loop"), dest: Bytecode.Inst.Reg) Error!void {
+    const body_ref = data.body;
+    const update_ref = data.update;
+
+    if (update_ref == .none) {
+        const body_block = try b.createBlock();
+        const exit_block = try b.createBlock();
+
+        b.jump(body_block);
+
+        b.switchToBlock(body_block);
+        try b.emitMoveIfNeeded(body_ref, dest);
+        b.jump(body_block);
+
+        b.switchToBlock(exit_block);
+    } else {
+        const body_block = try b.createBlock();
+        const update_block = try b.createBlock();
+        const exit_block = try b.createBlock();
+
+        b.jump(body_block);
+
+        b.switchToBlock(body_block);
+        try b.emitMoveIfNeeded(body_ref, dest);
+        b.jump(update_block);
+
+        b.switchToBlock(update_block);
+        try b.emitMoveIfNeeded(update_ref, dest);
+        b.jump(body_block);
+
+        b.switchToBlock(exit_block);
+    }
+}
+
+fn lowerAdd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .add, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerSub(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .sub, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerMul(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .mul, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerDiv(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
+    const lhs_reg = b.resolve(data.lhs);
+    const rhs_reg = b.resolve(data.rhs);
+    try b.emit(.{ .tag = .div, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+}
+
+fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    _ = dest;
+    const ret_reg = if (ref == .none) Bytecode.Inst.Reg.none else b.resolve(ref);
+    try b.emit(.{ .tag = .end, .data = .{ .reg = ret_reg } });
+    b.noreturn();
+}

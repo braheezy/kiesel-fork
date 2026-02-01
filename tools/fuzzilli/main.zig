@@ -91,7 +91,7 @@ fn reprl() !u8 {
             try realm.global_object.defineBuiltinFunction(&agent, "fuzzilli", fuzzilli, 2, realm);
 
             const script = Script.parse(data, realm, null, .{}) catch break :blk 1;
-            _ = script.evaluate() catch break :blk 1;
+            _ = script.evaluate("fuzzilli") catch break :blk 1;
             break :blk 0;
         };
 

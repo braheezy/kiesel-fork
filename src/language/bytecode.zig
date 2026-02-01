@@ -1,8 +1,10 @@
 const std = @import("std");
 
+const ast = @import("../language/ast.zig");
 const codegen = @import("bytecode/codegen.zig");
 const execution = @import("../execution.zig");
 const instructions = @import("bytecode/instructions.zig");
+const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
@@ -22,6 +24,7 @@ test {
 
 pub const Options = struct {
     contained_in_strict_mode_code: bool = false,
+    name: []const u8 = "unknown",
 };
 
 pub fn generateBytecode(
@@ -29,6 +32,7 @@ pub fn generateBytecode(
     ast_node: anytype,
     options: Options,
 ) Executable.Error!Executable {
+    // Functions always use the old interpreter for now, so only `generateAndRunBytecode` cjecks the flag.
     var executable = Executable.init(allocator);
 
     var ctx = codegen.Context.init();
@@ -59,6 +63,10 @@ pub fn generateAndRunBytecode(
     ast_node: anytype,
     options: Options,
 ) Agent.Error!Completion {
+    if (agent.options.new_interpreter) {
+        return generateAndRunNewInterpreter(agent, ast_node, options.name);
+    }
+
     var executable = generateBytecode(
         agent.gc_allocator,
         ast_node,
@@ -75,11 +83,62 @@ pub fn generateAndRunBytecode(
 
     if (agent.options.debug.print_bytecode) {
         const stdout = agent.platform.stdout;
-        executable.print(stdout, agent.platform.tty_config) catch {};
+        const tty_config = agent.platform.tty_config;
+        executable.print(stdout, tty_config) catch {};
         stdout.flush() catch {};
     }
 
     var vm = try Vm.init(agent, &executable);
     defer vm.deinit();
     return vm.run();
+}
+
+pub fn generateAndRunNewInterpreter(
+    agent: *Agent,
+    ast_node: anytype,
+    name: []const u8,
+) Agent.Error!Completion {
+    // TODO: Don't use the GC allocator for IR and bytecode generation
+    const gpa = agent.gc_allocator;
+
+    if (@TypeOf(ast_node) != ast.Script) {
+        return agent.throwException(.internal_error, "New interpreter only supports Script for now", .{});
+    }
+
+    var ir = ir: {
+        var builder: interpreter.Ir.Builder = .init(gpa, name, .{ .script = &ast_node });
+        defer builder.deinit();
+        break :ir builder.build() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.NotImplemented => return agent.throwException(.internal_error, "IR generation failed", .{}),
+        };
+    };
+    defer ir.deinit(gpa);
+
+    if (agent.options.debug.print_ir) {
+        const stdout = agent.platform.stdout;
+        const tty_config = agent.platform.tty_config;
+        ir.print(stdout, tty_config) catch {};
+        stdout.flush() catch {};
+    }
+
+    var bc = bc: {
+        var builder: interpreter.Bytecode.Builder = try .init(gpa, &ir);
+        defer builder.deinit();
+        break :bc try builder.build();
+    };
+    defer bc.deinit(gpa);
+
+    if (agent.options.debug.print_bytecode) {
+        const stdout = agent.platform.stdout;
+        const tty_config = agent.platform.tty_config;
+        bc.print(stdout, tty_config) catch {};
+        stdout.flush() catch {};
+    }
+
+    var vm: interpreter.Vm = try .init(gpa, agent, &bc);
+    defer vm.deinit(gpa);
+    const result = try vm.run();
+
+    return .normal(result);
 }

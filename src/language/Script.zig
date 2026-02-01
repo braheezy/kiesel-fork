@@ -73,7 +73,7 @@ pub fn parse(
 
 /// 16.1.6 ScriptEvaluation ( scriptRecord )
 /// https://tc39.es/ecma262/#sec-runtime-semantics-scriptevaluation
-pub fn evaluate(self: *Script) Agent.Error!Value {
+pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     const agent = self.realm.agent;
 
     // 1. Let globalEnv be scriptRecord.[[Realm]].[[GlobalEnv]].
@@ -118,7 +118,7 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of script).
         // b. If result is a normal completion and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, script, .{})) |completion|
+        if (generateAndRunBytecode(agent, script, .{ .name = name })) |completion|
             // i. Set result to NormalCompletion(undefined).
             break :blk completion.value orelse .undefined
         else |err|

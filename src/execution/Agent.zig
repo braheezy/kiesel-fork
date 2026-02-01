@@ -52,7 +52,9 @@ pub const Options = struct {
     debug: struct {
         print_ast: bool = false,
         print_bytecode: bool = false,
+        print_ir: bool = false,
     } = .{},
+    new_interpreter: bool = false,
 };
 
 pub const Error = std.mem.Allocator.Error || error{ExceptionThrown};
