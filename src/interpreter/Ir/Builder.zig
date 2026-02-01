@@ -189,10 +189,13 @@ fn lowerScript(b: *Builder, script: *const ast.Script) Error!Ir.Inst.Ref {
 fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir.Inst.Ref {
     var last: Ir.Inst.Ref = .none;
     for (stmt_list.items) |item| {
-        last = switch (item) {
+        const result = switch (item) {
             .statement => |stmt| try b.lowerStatement(stmt),
             .declaration => try b.todo("declaration"),
         };
+        if (result != .none) {
+            last = result;
+        }
     }
     return last;
 }

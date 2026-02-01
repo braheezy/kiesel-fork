@@ -134,14 +134,15 @@ test {
         \\  } while (0);
         \\}
         \\
-    , .{ .value = null },
+    , .{ .value = Value.from(6) },
         \\IR (test)
-        \\   0: number 6                [0..0] dead
-        \\   1: end                     [1..1]
+        \\   0: number 6                [0..1]
+        \\   1: end %0                  [1..1]
         \\
     ,
         \\Bytecode (test)
-        \\   0: end
+        \\   0: load_number_i32 r0, 6
+        \\   6: end r0
         \\
     );
 
