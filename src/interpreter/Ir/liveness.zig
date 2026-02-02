@@ -24,24 +24,17 @@ pub fn computeLiveness(
     while (it.next()) |i| {
         const tag = tags[i];
         switch (tag) {
-            .@"while",
-            .@"for",
-            .loop,
-            .delete,
-            .set_binding,
-            .set_binding_strict,
-            .delete_binding,
-            .increment_binding_prefix,
-            .increment_binding_prefix_strict,
-            .increment_binding_postfix,
-            .increment_binding_postfix_strict,
-            .decrement_binding_prefix,
-            .decrement_binding_prefix_strict,
-            .decrement_binding_postfix,
-            .decrement_binding_postfix_strict,
-            .end,
-            => try markLive(gpa, instructions, extras, &live, @enumFromInt(i)),
-            else => {},
+            .undefined,
+            .null,
+            .true,
+            .false,
+            .zero,
+            .one,
+            .number,
+            .string,
+            .big_int,
+            => {},
+            else => try markLive(gpa, instructions, extras, &live, @enumFromInt(i)),
         }
     }
 
