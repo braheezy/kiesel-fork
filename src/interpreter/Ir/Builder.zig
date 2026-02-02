@@ -414,7 +414,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .arrow_function => try b.todo("arrow function"),
             .async_arrow_function => try b.todo("async arrow function"),
         },
-        .member_expression => try b.todo("member expression"),
+        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr),
         .super_property => try b.todo("super property"),
         .meta_property => try b.todo("meta property"),
         .new_expression => try b.todo("new expression"),
@@ -530,32 +530,128 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
     });
 }
 
+fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression) Error!Ir.Inst.Ref {
+    const base = try b.lowerExpression(member_expr.expression);
+    switch (member_expr.property) {
+        .expression => |expr| {
+            if (try constantFold(b.gpa, expr)) |constant| {
+                defer constant.deinit(b.gpa);
+                if (constant.toIndex()) |index| {
+                    return b.addInst(.{
+                        .tag = .get_property_indexed,
+                        .data = .{ .get_property_indexed = .{
+                            .base = base,
+                            .index = index,
+                        } },
+                    });
+                }
+            }
+            const property = try b.lowerExpression(expr);
+            return b.addInst(.{
+                .tag = .get_property_computed,
+                .data = .{ .get_property_computed = .{
+                    .base = base,
+                    .property = property,
+                } },
+            });
+        },
+        .identifier => |identifier| {
+            const string_index = try b.internString(identifier);
+            return b.addInst(.{
+                .tag = .get_property,
+                .data = .{ .get_property = .{
+                    .base = base,
+                    .name = string_index,
+                } },
+            });
+        },
+        .private_identifier => try b.todo("private identifier in member expression"),
+    }
+}
+
 fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {
-    return switch (update_expr.expression.*) {
+    const update_type: Ir.Inst.UpdateType = switch (update_expr.type) {
+        .prefix => .prefix,
+        .postfix => .postfix,
+    };
+    const update_op: Ir.Inst.UpdateOp = switch (update_expr.operator) {
+        .@"++" => .increment,
+        .@"--" => .decrement,
+    };
+    switch (update_expr.expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
                 const string_index = try b.internString(identifier);
-
-                const tag: Ir.Inst.Tag = switch (update_expr.type) {
-                    .prefix => switch (update_expr.operator) {
-                        .@"++" => if (b.in_strict_mode) .increment_binding_prefix_strict else .increment_binding_prefix,
-                        .@"--" => if (b.in_strict_mode) .decrement_binding_prefix_strict else .decrement_binding_prefix,
-                    },
-                    .postfix => switch (update_expr.operator) {
-                        .@"++" => if (b.in_strict_mode) .increment_binding_postfix_strict else .increment_binding_postfix,
-                        .@"--" => if (b.in_strict_mode) .decrement_binding_postfix_strict else .decrement_binding_postfix,
-                    },
-                };
-
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode) .update_binding_strict else .update_binding;
                 return b.addInst(.{
                     .tag = tag,
-                    .data = .{ .string = string_index },
+                    .data = .{ .update_binding = .{
+                        .name = string_index,
+                        .update_op = update_op,
+                        .update_type = update_type,
+                    } },
                 });
             },
             else => try b.todo("non-identifier update expression"),
         },
+        .member_expression => |*member_expr| {
+            const base = try b.lowerExpression(member_expr.expression);
+            switch (member_expr.property) {
+                .identifier => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .update_property_strict
+                    else
+                        .update_property;
+                    return b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .update_property = .{
+                            .base = base,
+                            .name = string_index,
+                            .update_op = update_op,
+                            .update_type = update_type,
+                        } },
+                    });
+                },
+                .expression => |expr| {
+                    if (try constantFold(b.gpa, expr)) |constant| {
+                        defer constant.deinit(b.gpa);
+                        if (constant.toIndex()) |index| {
+                            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                                .update_property_indexed_strict
+                            else
+                                .update_property_indexed;
+                            return b.addInst(.{
+                                .tag = tag,
+                                .data = .{ .update_property_indexed = .{
+                                    .base = base,
+                                    .index = index,
+                                    .update_op = update_op,
+                                    .update_type = update_type,
+                                } },
+                            });
+                        }
+                    }
+                    const property = try b.lowerExpression(expr);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .update_property_computed_strict
+                    else
+                        .update_property_computed;
+                    return b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .update_property_computed = .{
+                            .base = base,
+                            .property = property,
+                            .update_op = update_op,
+                            .update_type = update_type,
+                        } },
+                    });
+                },
+                .private_identifier => try b.todo("private identifier update expression"),
+            }
+        },
         else => try b.todo("non-identifier update expression"),
-    };
+    }
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {
@@ -569,6 +665,57 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
             .tag = .delete_binding,
             .data = .{ .string = string_index },
         });
+    }
+    if (unary_expr.operator == .delete and unary_expr.expression.* == .member_expression) {
+        const member_expr = unary_expr.expression.member_expression;
+        const base = try b.lowerExpression(member_expr.expression);
+        switch (member_expr.property) {
+            .expression => |expr| {
+                if (try constantFold(b.gpa, expr)) |constant| {
+                    defer constant.deinit(b.gpa);
+                    if (constant.toIndex()) |index| {
+                        const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                            .delete_property_indexed_strict
+                        else
+                            .delete_property_indexed;
+                        return b.addInst(.{
+                            .tag = tag,
+                            .data = .{ .delete_property_indexed = .{
+                                .base = base,
+                                .index = index,
+                            } },
+                        });
+                    }
+                }
+                const property = try b.lowerExpression(expr);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .delete_property_computed_strict
+                else
+                    .delete_property_computed;
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .delete_property_computed = .{
+                        .base = base,
+                        .property = property,
+                    } },
+                });
+            },
+            .identifier => |identifier| {
+                const string_index = try b.internString(identifier);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .delete_property_strict
+                else
+                    .delete_property;
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .delete_property = .{
+                        .base = base,
+                        .name = string_index,
+                    } },
+                });
+            },
+            .private_identifier => try b.todo("private identifier in delete expression"),
+        }
     }
     const operand = try b.lowerExpression(unary_expr.expression);
     const tag: Ir.Inst.Tag = switch (unary_expr.operator) {
@@ -697,14 +844,16 @@ fn lowerAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpr
         try b.todo("compound assignment");
     }
 
-    const value = try b.lowerExpression(assign_expr.rhs_expression);
-
     return switch (assign_expr.lhs_expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
+                const value = try b.lowerExpression(assign_expr.rhs_expression);
                 const string_index = try b.internString(identifier);
                 return b.addInst(.{
-                    .tag = if (b.in_strict_mode) .set_binding_strict else .set_binding,
+                    .tag = if (b.in_strict_mode)
+                        .set_binding_strict
+                    else
+                        .set_binding,
                     .data = .{ .set_binding = .{
                         .name = string_index,
                         .value = value,
@@ -712,6 +861,62 @@ fn lowerAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpr
                 });
             },
             else => try b.todo("non-identifier lhs"),
+        },
+        .member_expression => |*member_expr| blk: {
+            const base = try b.lowerExpression(member_expr.expression);
+            switch (member_expr.property) {
+                .identifier => |identifier| {
+                    const value = try b.lowerExpression(assign_expr.rhs_expression);
+                    const string_index = try b.internString(identifier);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_property_strict
+                    else
+                        .set_property;
+                    break :blk b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property = .{
+                            .base = base,
+                            .name = string_index,
+                            .value = value,
+                        } },
+                    });
+                },
+                .expression => |expr| {
+                    if (try constantFold(b.gpa, expr)) |constant| {
+                        defer constant.deinit(b.gpa);
+                        if (constant.toIndex()) |index| {
+                            const value = try b.lowerExpression(assign_expr.rhs_expression);
+                            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                                .set_property_indexed_strict
+                            else
+                                .set_property_indexed;
+                            return b.addInst(.{
+                                .tag = tag,
+                                .data = .{ .set_property_indexed = .{
+                                    .base = base,
+                                    .index = index,
+                                    .value = value,
+                                } },
+                            });
+                        }
+                    }
+                    const property = try b.lowerExpression(expr);
+                    const value = try b.lowerExpression(assign_expr.rhs_expression);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_property_computed_strict
+                    else
+                        .set_property_computed;
+                    break :blk b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property_computed = .{
+                            .base = base,
+                            .property = property,
+                            .value = value,
+                        } },
+                    });
+                },
+                .private_identifier => try b.todo("private identifier in member assignment"),
+            }
         },
         else => try b.todo("non-identifier lhs"),
     };

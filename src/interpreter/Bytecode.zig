@@ -75,17 +75,56 @@ pub const Inst = struct {
         not_eq_strict,
 
         get_binding,
+        get_property,
+        get_property_computed,
+        get_property_indexed,
         set_binding,
         set_binding_strict,
-        delete_binding,
+        set_property,
+        set_property_strict,
+        set_property_computed,
+        set_property_computed_strict,
+        set_property_indexed,
+        set_property_indexed_strict,
         increment_binding_prefix,
         increment_binding_prefix_strict,
         increment_binding_postfix,
         increment_binding_postfix_strict,
+        increment_property_prefix,
+        increment_property_prefix_strict,
+        increment_property_postfix,
+        increment_property_postfix_strict,
+        increment_property_computed_prefix,
+        increment_property_computed_prefix_strict,
+        increment_property_computed_postfix,
+        increment_property_computed_postfix_strict,
+        increment_property_indexed_prefix,
+        increment_property_indexed_prefix_strict,
+        increment_property_indexed_postfix,
+        increment_property_indexed_postfix_strict,
         decrement_binding_prefix,
         decrement_binding_prefix_strict,
         decrement_binding_postfix,
         decrement_binding_postfix_strict,
+        decrement_property_prefix,
+        decrement_property_prefix_strict,
+        decrement_property_postfix,
+        decrement_property_postfix_strict,
+        decrement_property_computed_prefix,
+        decrement_property_computed_prefix_strict,
+        decrement_property_computed_postfix,
+        decrement_property_computed_postfix_strict,
+        decrement_property_indexed_prefix,
+        decrement_property_indexed_prefix_strict,
+        decrement_property_indexed_postfix,
+        decrement_property_indexed_postfix_strict,
+        delete_binding,
+        delete_property,
+        delete_property_strict,
+        delete_property_computed,
+        delete_property_computed_strict,
+        delete_property_indexed,
+        delete_property_indexed_strict,
     };
 
     pub const Data = union {
@@ -99,6 +138,7 @@ pub const Inst = struct {
         reg_u32: struct { Reg, u32 },
         reg_f64: struct { Reg, f64 },
         reg_string: struct { Reg, StringIndex },
+        reg_reg_string: struct { Reg, Reg, StringIndex },
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
         string_reg: struct { StringIndex, Reg },
@@ -165,6 +205,38 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(StringIndex, reader),
             } },
+            .get_property => .{ .reg_reg_string = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(StringIndex, reader),
+            } },
+            .set_property,
+            .set_property_strict,
+            => .{ .reg_reg_string = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(StringIndex, reader),
+            } },
+            .delete_property,
+            .delete_property_strict,
+            => .{ .reg_reg_string = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(StringIndex, reader),
+            } },
+            .increment_property_prefix,
+            .increment_property_prefix_strict,
+            .increment_property_postfix,
+            .increment_property_postfix_strict,
+            .decrement_property_prefix,
+            .decrement_property_prefix_strict,
+            .decrement_property_postfix,
+            .decrement_property_postfix_strict,
+            => .{ .reg_reg_string = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(StringIndex, reader),
+            } },
             .load_big_int => .{ .reg_big_int = .{
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(BigIntIndex, reader),
@@ -186,7 +258,31 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(Reg, reader),
             } },
-            .array_set => .{ .reg_reg_u32 = .{
+            .array_set,
+            .get_property_indexed,
+            .set_property_indexed,
+            .set_property_indexed_strict,
+            => .{ .reg_reg_u32 = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try reader.takeInt(u32, .little),
+            } },
+            .delete_property_indexed,
+            .delete_property_indexed_strict,
+            => .{ .reg_reg_u32 = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try reader.takeInt(u32, .little),
+            } },
+            .increment_property_indexed_prefix,
+            .increment_property_indexed_prefix_strict,
+            .increment_property_indexed_postfix,
+            .increment_property_indexed_postfix_strict,
+            .decrement_property_indexed_prefix,
+            .decrement_property_indexed_prefix_strict,
+            .decrement_property_indexed_postfix,
+            .decrement_property_indexed_postfix_strict,
+            => .{ .reg_reg_u32 = .{
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(Reg, reader),
                 try reader.takeInt(u32, .little),
@@ -197,6 +293,19 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
             } },
             .object_set_computed,
+            .get_property_computed,
+            .set_property_computed,
+            .set_property_computed_strict,
+            .delete_property_computed,
+            .delete_property_computed_strict,
+            .increment_property_computed_prefix,
+            .increment_property_computed_prefix_strict,
+            .increment_property_computed_postfix,
+            .increment_property_computed_postfix_strict,
+            .decrement_property_computed_prefix,
+            .decrement_property_computed_prefix_strict,
+            .decrement_property_computed_postfix,
+            .decrement_property_computed_postfix_strict,
             .add,
             .sub,
             .mul,
@@ -276,6 +385,38 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_string[0]), .little);
                 try writer.writeInt(u32, @intFromEnum(inst.data.reg_string[1]), .little);
             },
+            .get_property => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
+                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
+            },
+            .set_property,
+            .set_property_strict,
+            => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
+                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
+            },
+            .delete_property,
+            .delete_property_strict,
+            => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
+                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
+            },
+            .increment_property_prefix,
+            .increment_property_prefix_strict,
+            .increment_property_postfix,
+            .increment_property_postfix_strict,
+            .decrement_property_prefix,
+            .decrement_property_prefix_strict,
+            .decrement_property_postfix,
+            .decrement_property_postfix_strict,
+            => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
+                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
+            },
             .load_big_int => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_big_int[0]), .little);
                 try writer.writeInt(u32, @intFromEnum(inst.data.reg_big_int[1]), .little);
@@ -291,7 +432,31 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[0]), .little);
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[1]), .little);
             },
-            .array_set => {
+            .array_set,
+            .get_property_indexed,
+            .set_property_indexed,
+            .set_property_indexed_strict,
+            => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
+                try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
+            },
+            .delete_property_indexed,
+            .delete_property_indexed_strict,
+            => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
+                try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
+            },
+            .increment_property_indexed_prefix,
+            .increment_property_indexed_prefix_strict,
+            .increment_property_indexed_postfix,
+            .increment_property_indexed_postfix_strict,
+            .decrement_property_indexed_prefix,
+            .decrement_property_indexed_prefix_strict,
+            .decrement_property_indexed_postfix,
+            .decrement_property_indexed_postfix_strict,
+            => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
                 try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
@@ -308,6 +473,19 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.string_reg[1]), .little);
             },
             .object_set_computed,
+            .get_property_computed,
+            .set_property_computed,
+            .set_property_computed_strict,
+            .delete_property_computed,
+            .delete_property_computed_strict,
+            .increment_property_computed_prefix,
+            .increment_property_computed_prefix_strict,
+            .increment_property_computed_postfix,
+            .increment_property_computed_postfix_strict,
+            .decrement_property_computed_prefix,
+            .decrement_property_computed_prefix_strict,
+            .decrement_property_computed_postfix,
+            .decrement_property_computed_postfix_strict,
             .add,
             .sub,
             .mul,
@@ -440,6 +618,50 @@ pub fn print(
                 try writer.writeAll(", ");
                 try printData(@intFromEnum(inst.data.reg_string[1]), '@', .green, writer, tty_config);
             },
+            .get_property => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
+            },
+            .set_property,
+            .set_property_strict,
+            => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
+            },
+            .delete_property,
+            .delete_property_strict,
+            => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
+            },
+            .increment_property_prefix,
+            .increment_property_prefix_strict,
+            .increment_property_postfix,
+            .increment_property_postfix_strict,
+            .decrement_property_prefix,
+            .decrement_property_prefix_strict,
+            .decrement_property_postfix,
+            .decrement_property_postfix_strict,
+            => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
+            },
             .load_big_int => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg_big_int[0], 'r', .blue, writer, tty_config);
@@ -459,7 +681,37 @@ pub fn print(
                 try writer.writeAll(", ");
                 try printData(inst.data.reg_reg[1], 'r', .blue, writer, tty_config);
             },
-            .array_set => {
+            .array_set,
+            .get_property_indexed,
+            .set_property_indexed,
+            .set_property_indexed_strict,
+            => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
+            },
+            .increment_property_indexed_prefix,
+            .increment_property_indexed_prefix_strict,
+            .increment_property_indexed_postfix,
+            .increment_property_indexed_postfix_strict,
+            .decrement_property_indexed_prefix,
+            .decrement_property_indexed_prefix_strict,
+            .decrement_property_indexed_postfix,
+            .decrement_property_indexed_postfix_strict,
+            => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
+            },
+            .delete_property_indexed,
+            .delete_property_indexed_strict,
+            => {
                 try writer.writeByte(' ');
                 try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
                 try writer.writeAll(", ");
@@ -484,6 +736,19 @@ pub fn print(
                 try printData(inst.data.string_reg[1], 'r', .blue, writer, tty_config);
             },
             .object_set_computed,
+            .get_property_computed,
+            .set_property_computed,
+            .set_property_computed_strict,
+            .delete_property_computed,
+            .delete_property_computed_strict,
+            .increment_property_computed_prefix,
+            .increment_property_computed_prefix_strict,
+            .increment_property_computed_postfix,
+            .increment_property_computed_postfix_strict,
+            .decrement_property_computed_prefix,
+            .decrement_property_computed_prefix_strict,
+            .decrement_property_computed_postfix,
+            .decrement_property_computed_postfix_strict,
             .add,
             .sub,
             .mul,

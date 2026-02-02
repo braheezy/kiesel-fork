@@ -27,6 +27,18 @@ pub const Constant = union(enum) {
         };
     }
 
+    pub fn toIndex(constant: Constant) ?u32 {
+        switch (constant) {
+            .number => |n| {
+                if (n == @floor(n) and n >= 0 and n <= std.math.maxInt(u32)) {
+                    return @intFromFloat(n);
+                }
+            },
+            else => {},
+        }
+        return null;
+    }
+
     pub fn deinit(constant: Constant, gpa: std.mem.Allocator) void {
         switch (constant) {
             .big_int => |big_int| gpa.free(big_int.limbs),

@@ -117,17 +117,32 @@ pub const Inst = struct {
         nullish_coalesce,
 
         get_binding,
+        get_property,
+        get_property_computed,
+        get_property_indexed,
         set_binding,
         set_binding_strict,
+        set_property,
+        set_property_strict,
+        set_property_computed,
+        set_property_computed_strict,
+        set_property_indexed,
+        set_property_indexed_strict,
+        update_binding,
+        update_binding_strict,
+        update_property,
+        update_property_strict,
+        update_property_computed,
+        update_property_computed_strict,
+        update_property_indexed,
+        update_property_indexed_strict,
         delete_binding,
-        increment_binding_prefix,
-        increment_binding_prefix_strict,
-        increment_binding_postfix,
-        increment_binding_postfix_strict,
-        decrement_binding_prefix,
-        decrement_binding_prefix_strict,
-        decrement_binding_postfix,
-        decrement_binding_postfix_strict,
+        delete_property,
+        delete_property_strict,
+        delete_property_computed,
+        delete_property_computed_strict,
+        delete_property_indexed,
+        delete_property_indexed_strict,
 
         end,
     };
@@ -145,9 +160,25 @@ pub const Inst = struct {
         @"for": struct { @"test": Ref, update: Ref, body: Ref },
         loop: struct { body: Ref, update: Ref },
         binary: struct { lhs: Ref, rhs: Ref },
+        get_property: struct { base: Ref, name: StringIndex },
+        get_property_computed: struct { base: Ref, property: Ref },
+        get_property_indexed: struct { base: Ref, index: u32 },
         set_binding: struct { name: StringIndex, value: Ref },
+        set_property: struct { base: Ref, name: StringIndex, value: Ref },
+        set_property_computed: struct { base: Ref, property: Ref, value: Ref },
+        set_property_indexed: struct { base: Ref, index: u32, value: Ref },
+        update_binding: struct { name: StringIndex, update_op: UpdateOp, update_type: UpdateType },
+        update_property: struct { base: Ref, name: StringIndex, update_op: UpdateOp, update_type: UpdateType },
+        update_property_computed: struct { base: Ref, property: Ref, update_op: UpdateOp, update_type: UpdateType },
+        update_property_indexed: struct { base: Ref, index: u32, update_op: UpdateOp, update_type: UpdateType },
+        delete_property: struct { base: Ref, name: StringIndex },
+        delete_property_computed: struct { base: Ref, property: Ref },
+        delete_property_indexed: struct { base: Ref, index: u32 },
         ref: Ref,
     };
+
+    pub const UpdateOp = enum { increment, decrement };
+    pub const UpdateType = enum { prefix, postfix };
 
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
@@ -227,20 +258,171 @@ pub fn print(
             .string,
             .get_binding,
             .delete_binding,
-            .increment_binding_prefix,
-            .increment_binding_prefix_strict,
-            .increment_binding_postfix,
-            .increment_binding_postfix_strict,
-            .decrement_binding_prefix,
-            .decrement_binding_prefix_strict,
-            .decrement_binding_postfix,
-            .decrement_binding_postfix_strict,
             => {
                 const str = ir.strings[@intFromEnum(data.string)];
                 try cw.writeByte(' ');
                 try cw.flush();
                 try tty_config.setColor(writer, .yellow);
                 try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .update_binding,
+            .update_binding_strict,
+            => {
+                try cw.writeByte(' ');
+                try cw.print("{t} {t} ", .{
+                    data.update_binding.update_type,
+                    data.update_binding.update_op,
+                });
+                const str = ir.strings[@intFromEnum(data.update_binding.name)];
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .get_property => {
+                const str = ir.strings[@intFromEnum(data.get_property.name)];
+                try cw.writeByte(' ');
+                try printRef(data.get_property.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .get_property_computed => {
+                try cw.writeByte(' ');
+                try printRef(data.get_property_computed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.get_property_computed.property, cw, tty_config);
+            },
+            .get_property_indexed => {
+                try cw.writeByte(' ');
+                try printRef(data.get_property_indexed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("{d}", .{data.get_property_indexed.index});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .set_property,
+            .set_property_strict,
+            => {
+                const str = ir.strings[@intFromEnum(data.set_property.name)];
+                try cw.writeByte(' ');
+                try printRef(data.set_property.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+                try cw.print(", ", .{});
+                try printRef(data.set_property.value, cw, tty_config);
+            },
+            .set_property_computed,
+            .set_property_computed_strict,
+            => {
+                try cw.writeByte(' ');
+                try printRef(data.set_property_computed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.set_property_computed.property, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.set_property_computed.value, cw, tty_config);
+            },
+            .set_property_indexed,
+            .set_property_indexed_strict,
+            => {
+                try cw.writeByte(' ');
+                try printRef(data.set_property_indexed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("{d}", .{data.set_property_indexed.index});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+                try cw.print(", ", .{});
+                try printRef(data.set_property_indexed.value, cw, tty_config);
+            },
+            .update_property,
+            .update_property_strict,
+            => {
+                try cw.writeByte(' ');
+                try cw.print("{t} {t} ", .{
+                    data.update_property.update_type,
+                    data.update_property.update_op,
+                });
+                try printRef(data.update_property.base, cw, tty_config);
+                try cw.print(", ", .{});
+                const str = ir.strings[@intFromEnum(data.update_property.name)];
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .update_property_computed,
+            .update_property_computed_strict,
+            => {
+                try cw.writeByte(' ');
+                try cw.print("{t} {t} ", .{
+                    data.update_property_computed.update_type,
+                    data.update_property_computed.update_op,
+                });
+                try printRef(data.update_property_computed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.update_property_computed.property, cw, tty_config);
+            },
+            .update_property_indexed,
+            .update_property_indexed_strict,
+            => {
+                try cw.writeByte(' ');
+                try cw.print("{t} {t} ", .{
+                    data.update_property_indexed.update_type,
+                    data.update_property_indexed.update_op,
+                });
+                try printRef(data.update_property_indexed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("{d}", .{data.update_property_indexed.index});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .delete_property,
+            .delete_property_strict,
+            => {
+                const str = ir.strings[@intFromEnum(data.delete_property.name)];
+                try cw.writeByte(' ');
+                try printRef(data.delete_property.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("\"{s}\"", .{str});
+                try cw.flush();
+                try tty_config.setColor(writer, .reset);
+            },
+            .delete_property_computed,
+            .delete_property_computed_strict,
+            => {
+                try cw.writeByte(' ');
+                try printRef(data.delete_property_computed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.delete_property_computed.property, cw, tty_config);
+            },
+            .delete_property_indexed,
+            .delete_property_indexed_strict,
+            => {
+                try cw.writeByte(' ');
+                try printRef(data.delete_property_indexed.base, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.flush();
+                try tty_config.setColor(writer, .yellow);
+                try cw.print("{d}", .{data.delete_property_indexed.index});
                 try cw.flush();
                 try tty_config.setColor(writer, .reset);
             },

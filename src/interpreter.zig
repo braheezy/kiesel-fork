@@ -263,7 +263,7 @@ test {
         \\IR (test)
         \\   0: number 5                [0..1]
         \\   1: set_binding "x", %0     [1..1]
-        \\   2: increment_binding_prefix "x" [2..3]
+        \\   2: update_binding prefix increment "x" [2..3]
         \\   3: end %2                  [3..3]
         \\
     ,

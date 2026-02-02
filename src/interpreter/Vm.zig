@@ -121,17 +121,56 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
+                .get_property => vm.executeGetProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
+                .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .get_property_indexed => vm.executeGetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
-                .delete_binding => vm.executeDeleteBinding(data.reg_string[0], data.reg_string[1]),
+                .set_property => vm.executeSetProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], false),
+                .set_property_strict => vm.executeSetProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], true),
+                .set_property_computed => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], false),
+                .set_property_computed_strict => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
+                .set_property_indexed => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
+                .set_property_indexed_strict => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
                 .increment_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, false),
                 .increment_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, true),
                 .increment_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, false),
                 .increment_binding_postfix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, true),
+                .increment_property_prefix => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .increment, .prefix, false),
+                .increment_property_prefix_strict => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .increment, .prefix, true),
+                .increment_property_postfix => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .increment, .postfix, false),
+                .increment_property_postfix_strict => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .increment, .postfix, true),
+                .increment_property_computed_prefix => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .increment, .prefix, false),
+                .increment_property_computed_prefix_strict => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .increment, .prefix, true),
+                .increment_property_computed_postfix => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .increment, .postfix, false),
+                .increment_property_computed_postfix_strict => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .increment, .postfix, true),
+                .increment_property_indexed_prefix => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .increment, .prefix, false),
+                .increment_property_indexed_prefix_strict => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .increment, .prefix, true),
+                .increment_property_indexed_postfix => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .increment, .postfix, false),
+                .increment_property_indexed_postfix_strict => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .increment, .postfix, true),
                 .decrement_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .prefix, false),
                 .decrement_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .prefix, true),
                 .decrement_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .postfix, false),
                 .decrement_binding_postfix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .decrement, .postfix, true),
+                .decrement_property_prefix => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .decrement, .prefix, false),
+                .decrement_property_prefix_strict => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .decrement, .prefix, true),
+                .decrement_property_postfix => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .decrement, .postfix, false),
+                .decrement_property_postfix_strict => vm.executeUpdateProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], .decrement, .postfix, true),
+                .decrement_property_computed_prefix => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .decrement, .prefix, false),
+                .decrement_property_computed_prefix_strict => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .decrement, .prefix, true),
+                .decrement_property_computed_postfix => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .decrement, .postfix, false),
+                .decrement_property_computed_postfix_strict => vm.executeUpdatePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .decrement, .postfix, true),
+                .decrement_property_indexed_prefix => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .decrement, .prefix, false),
+                .decrement_property_indexed_prefix_strict => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .decrement, .prefix, true),
+                .decrement_property_indexed_postfix => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .decrement, .postfix, false),
+                .decrement_property_indexed_postfix_strict => vm.executeUpdatePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], .decrement, .postfix, true),
+                .delete_binding => vm.executeDeleteBinding(data.reg_string[0], data.reg_string[1]),
+                .delete_property => vm.executeDeleteProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], false),
+                .delete_property_strict => vm.executeDeleteProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2], true),
+                .delete_property_computed => vm.executeDeletePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], false),
+                .delete_property_computed_strict => vm.executeDeletePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
+                .delete_property_indexed => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
+                .delete_property_indexed_strict => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -760,6 +799,61 @@ fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.
     vm.load(dst, result);
 }
 
+fn executeGetProperty(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.Inst.StringIndex,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const result = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    vm.load(dst, result);
+}
+
+fn executeGetPropertyComputed(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    property_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const property_value = vm.store(property_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const result = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    vm.load(dst, result);
+}
+
+fn executeGetPropertyIndexed(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    index: u32,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(@as(u53, index));
+    const result = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    vm.load(dst, result);
+}
+
 fn executeSetBinding(
     vm: *Vm,
     name_index: Bytecode.Inst.StringIndex,
@@ -789,20 +883,78 @@ fn executeSetBinding(
     try env.setMutableBinding(vm.agent, name, value, strict);
 }
 
-fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+fn executeSetProperty(
+    vm: *Vm,
+    base_reg: Bytecode.Inst.Reg,
+    value_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.Inst.StringIndex,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const value = vm.store(value_reg);
 
-    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
-    while (!try env.hasBinding(vm.agent, name)) {
-        env = env.outerEnv() orelse {
-            @branchHint(.unlikely);
-            vm.load(dst, .true);
-            return;
-        };
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
     }
+}
 
-    const result = try env.deleteBinding(vm.agent, name);
-    vm.load(dst, Value.from(result));
+fn executeSetPropertyComputed(
+    vm: *Vm,
+    base_reg: Bytecode.Inst.Reg,
+    property_reg: Bytecode.Inst.Reg,
+    value_reg: Bytecode.Inst.Reg,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const property_value = vm.store(property_reg);
+    const value = vm.store(value_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
+    }
+}
+
+fn executeSetPropertyIndexed(
+    vm: *Vm,
+    base_reg: Bytecode.Inst.Reg,
+    value_reg: Bytecode.Inst.Reg,
+    index: u32,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const value = vm.store(value_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(@as(u53, @intCast(index)));
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
+    }
 }
 
 const UpdateOp = enum { increment, decrement };
@@ -812,7 +964,7 @@ fn executeUpdateBinding(
     vm: *Vm,
     dest: Bytecode.Inst.Reg,
     name_index: Bytecode.Inst.StringIndex,
-    comptime op: UpdateOp,
+    comptime update_op: UpdateOp,
     comptime update_type: UpdateType,
     comptime strict: bool,
 ) Agent.Error!void {
@@ -834,11 +986,11 @@ fn executeUpdateBinding(
     const old_numeric = try old_value.toNumeric(vm.agent);
 
     const new_value = switch (old_numeric) {
-        .number => |n| switch (op) {
+        .number => |n| switch (update_op) {
             .increment => Value.from(Number.add(n, Number.from(1))),
             .decrement => Value.from(Number.subtract(n, Number.from(1))),
         },
-        .big_int => |b| switch (op) {
+        .big_int => |b| switch (update_op) {
             .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
             .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
         },
@@ -854,4 +1006,247 @@ fn executeUpdateBinding(
         },
     };
     vm.load(dest, result);
+}
+
+fn executeUpdateProperty(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.Inst.StringIndex,
+    comptime update_op: UpdateOp,
+    comptime update_type: UpdateType,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const old_value = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    const old_numeric = try old_value.toNumeric(vm.agent);
+
+    const new_value = switch (old_numeric) {
+        .number => |n| switch (update_op) {
+            .increment => Value.from(Number.add(n, Number.from(1))),
+            .decrement => Value.from(Number.subtract(n, Number.from(1))),
+        },
+        .big_int => |b| switch (update_op) {
+            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
+            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
+        },
+    };
+
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        new_value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
+    }
+
+    const result = switch (update_type) {
+        .prefix => new_value,
+        .postfix => switch (old_numeric) {
+            .number => |n| Value.from(n),
+            .big_int => |b| Value.from(b),
+        },
+    };
+    vm.load(dest, result);
+}
+
+fn executeUpdatePropertyComputed(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    property_reg: Bytecode.Inst.Reg,
+    comptime update_op: UpdateOp,
+    comptime update_type: UpdateType,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const property_value = vm.store(property_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const old_value = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    const old_numeric = try old_value.toNumeric(vm.agent);
+
+    const new_value = switch (old_numeric) {
+        .number => |n| switch (update_op) {
+            .increment => Value.from(Number.add(n, Number.from(1))),
+            .decrement => Value.from(Number.subtract(n, Number.from(1))),
+        },
+        .big_int => |b| switch (update_op) {
+            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
+            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
+        },
+    };
+
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        new_value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
+    }
+
+    const result = switch (update_type) {
+        .prefix => new_value,
+        .postfix => switch (old_numeric) {
+            .number => |n| Value.from(n),
+            .big_int => |b| Value.from(b),
+        },
+    };
+    vm.load(dest, result);
+}
+
+fn executeUpdatePropertyIndexed(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    index: u32,
+    comptime update_op: UpdateOp,
+    comptime update_type: UpdateType,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(@as(u53, @intCast(index)));
+    const old_value = try base_object.internal_methods.get(
+        vm.agent,
+        base_object,
+        property_key,
+        base_value,
+    );
+    const old_numeric = try old_value.toNumeric(vm.agent);
+
+    const new_value = switch (old_numeric) {
+        .number => |n| switch (update_op) {
+            .increment => Value.from(Number.add(n, Number.from(1))),
+            .decrement => Value.from(Number.subtract(n, Number.from(1))),
+        },
+        .big_int => |b| switch (update_op) {
+            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
+            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
+        },
+    };
+
+    const success = try base_object.internal_methods.set(
+        vm.agent,
+        base_object,
+        property_key,
+        new_value,
+        base_value,
+    );
+    if (!success and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set property", .{});
+    }
+
+    const result = switch (update_type) {
+        .prefix => new_value,
+        .postfix => switch (old_numeric) {
+            .number => |n| Value.from(n),
+            .big_int => |b| Value.from(b),
+        },
+    };
+    vm.load(dest, result);
+}
+
+fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+
+    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            vm.load(dst, .true);
+            return;
+        };
+    }
+
+    const result = try env.deleteBinding(vm.agent, name);
+    vm.load(dst, Value.from(result));
+}
+
+fn executeDeleteProperty(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.Inst.StringIndex,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const delete_status = try base_object.internal_methods.delete(
+        vm.agent,
+        base_object,
+        property_key,
+    );
+    if (!delete_status and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not delete property", .{});
+    }
+    vm.load(dst, Value.from(delete_status));
+}
+
+fn executeDeletePropertyComputed(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    property_reg: Bytecode.Inst.Reg,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const property_value = vm.store(property_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const delete_status = try base_object.internal_methods.delete(
+        vm.agent,
+        base_object,
+        property_key,
+    );
+    if (!delete_status and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not delete property", .{});
+    }
+    vm.load(dst, Value.from(delete_status));
+}
+
+fn executeDeletePropertyIndexed(
+    vm: *Vm,
+    dst: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Inst.Reg,
+    index: u32,
+    comptime strict: bool,
+) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(@as(u53, index));
+    const delete_status = try base_object.internal_methods.delete(
+        vm.agent,
+        base_object,
+        property_key,
+    );
+    if (!delete_status and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not delete property", .{});
+    }
+    vm.load(dst, Value.from(delete_status));
 }

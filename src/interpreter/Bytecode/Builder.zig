@@ -117,17 +117,32 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
             .get_binding => try b.lowerGetBinding(data.string, dest),
+            .get_property => try b.lowerGetProperty(data.get_property, dest),
+            .get_property_computed => try b.lowerGetPropertyComputed(data.get_property_computed, dest),
+            .get_property_indexed => try b.lowerGetPropertyIndexed(data.get_property_indexed, dest),
             .set_binding => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, false, dest),
             .set_binding_strict => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, true, dest),
+            .set_property => try b.lowerSetProperty(data.set_property, false, dest),
+            .set_property_strict => try b.lowerSetProperty(data.set_property, true, dest),
+            .set_property_computed => try b.lowerSetPropertyComputed(data.set_property_computed, false, dest),
+            .set_property_computed_strict => try b.lowerSetPropertyComputed(data.set_property_computed, true, dest),
+            .set_property_indexed => try b.lowerSetPropertyIndexed(data.set_property_indexed, false, dest),
+            .set_property_indexed_strict => try b.lowerSetPropertyIndexed(data.set_property_indexed, true, dest),
+            .update_binding => try b.lowerUpdateBinding(data.update_binding.name, dest, data.update_binding.update_op, data.update_binding.update_type, false),
+            .update_binding_strict => try b.lowerUpdateBinding(data.update_binding.name, dest, data.update_binding.update_op, data.update_binding.update_type, true),
+            .update_property => try b.lowerUpdateProperty(data.update_property, dest, data.update_property.update_op, data.update_property.update_type, false),
+            .update_property_strict => try b.lowerUpdateProperty(data.update_property, dest, data.update_property.update_op, data.update_property.update_type, true),
+            .update_property_computed => try b.lowerUpdatePropertyComputed(data.update_property_computed, dest, data.update_property_computed.update_op, data.update_property_computed.update_type, false),
+            .update_property_computed_strict => try b.lowerUpdatePropertyComputed(data.update_property_computed, dest, data.update_property_computed.update_op, data.update_property_computed.update_type, true),
+            .update_property_indexed => try b.lowerUpdatePropertyIndexed(data.update_property_indexed, dest, data.update_property_indexed.update_op, data.update_property_indexed.update_type, false),
+            .update_property_indexed_strict => try b.lowerUpdatePropertyIndexed(data.update_property_indexed, dest, data.update_property_indexed.update_op, data.update_property_indexed.update_type, true),
             .delete_binding => try b.lowerDeleteBinding(data.string, dest),
-            .increment_binding_prefix => try b.lowerUpdateBinding(data.string, .increment, .prefix, false, dest),
-            .increment_binding_prefix_strict => try b.lowerUpdateBinding(data.string, .increment, .prefix, true, dest),
-            .increment_binding_postfix => try b.lowerUpdateBinding(data.string, .increment, .postfix, false, dest),
-            .increment_binding_postfix_strict => try b.lowerUpdateBinding(data.string, .increment, .postfix, true, dest),
-            .decrement_binding_prefix => try b.lowerUpdateBinding(data.string, .decrement, .prefix, false, dest),
-            .decrement_binding_prefix_strict => try b.lowerUpdateBinding(data.string, .decrement, .prefix, true, dest),
-            .decrement_binding_postfix => try b.lowerUpdateBinding(data.string, .decrement, .postfix, false, dest),
-            .decrement_binding_postfix_strict => try b.lowerUpdateBinding(data.string, .decrement, .postfix, true, dest),
+            .delete_property => try b.lowerDeleteProperty(data.delete_property, false, dest),
+            .delete_property_strict => try b.lowerDeleteProperty(data.delete_property, true, dest),
+            .delete_property_computed => try b.lowerDeletePropertyComputed(data.delete_property_computed, false, dest),
+            .delete_property_computed_strict => try b.lowerDeletePropertyComputed(data.delete_property_computed, true, dest),
+            .delete_property_indexed => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, false, dest),
+            .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -840,10 +855,51 @@ fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecod
     });
 }
 
+fn lowerGetProperty(b: *Builder, data: @FieldType(Ir.Inst.Data, "get_property"), dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
+    try b.emit(.{
+        .tag = .get_property,
+        .data = .{ .reg_reg_string = .{
+            dest,
+            base_reg,
+            bytecode_string_index,
+        } },
+    });
+}
+
+fn lowerGetPropertyComputed(b: *Builder, data: @FieldType(Ir.Inst.Data, "get_property_computed"), dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const property_reg = b.resolve(data.property);
+    try b.emit(.{
+        .tag = .get_property_computed,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            base_reg,
+            property_reg,
+        } },
+    });
+}
+
+fn lowerGetPropertyIndexed(b: *Builder, data: @FieldType(Ir.Inst.Data, "get_property_indexed"), dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    try b.emit(.{
+        .tag = .get_property_indexed,
+        .data = .{ .reg_reg_u32 = .{
+            dest,
+            base_reg,
+            data.index,
+        } },
+    });
+}
+
 fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
     const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
     const value_reg = b.resolve(value);
-    const tag: Bytecode.Inst.Tag = if (strict) .set_binding_strict else .set_binding;
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_binding_strict
+    else
+        .set_binding;
     try b.emit(.{
         .tag = tag,
         .data = .{ .string_reg = .{
@@ -854,23 +910,71 @@ fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Ins
     try b.emitMoveIfNeeded(value, dest);
 }
 
-fn lowerDeleteBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerSetProperty(b: *Builder, data: @FieldType(Ir.Inst.Data, "set_property"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const value_reg = b.resolve(data.value);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_property_strict
+    else
+        .set_property;
     try b.emit(.{
-        .tag = .delete_binding,
-        .data = .{ .reg_string = .{
-            dest,
-            bytecode_string_index,
+        .tag = tag,
+        .data = .{ .reg_reg_string = .{
+            base_reg,
+            value_reg,
+            @enumFromInt(@intFromEnum(data.name)),
         } },
     });
+    try b.emitMoveIfNeeded(data.value, dest);
 }
 
-const UpdateOp = enum { increment, decrement };
-const UpdateType = enum { prefix, postfix };
+fn lowerSetPropertyComputed(b: *Builder, data: @FieldType(Ir.Inst.Data, "set_property_computed"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const property_reg = b.resolve(data.property);
+    const value_reg = b.resolve(data.value);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_property_computed_strict
+    else
+        .set_property_computed;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_reg = .{
+            base_reg,
+            property_reg,
+            value_reg,
+        } },
+    });
+    try b.emitMoveIfNeeded(data.value, dest);
+}
 
-fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, op: UpdateOp, update_type: UpdateType, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetPropertyIndexed(b: *Builder, data: @FieldType(Ir.Inst.Data, "set_property_indexed"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const value_reg = b.resolve(data.value);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_property_indexed_strict
+    else
+        .set_property_indexed;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_u32 = .{
+            base_reg,
+            value_reg,
+            data.index,
+        } },
+    });
+    try b.emitMoveIfNeeded(data.value, dest);
+}
+
+fn lowerUpdateBinding(
+    b: *Builder,
+    string_index: Ir.Inst.StringIndex,
+    dest: Bytecode.Inst.Reg,
+    update_op: Ir.Inst.UpdateOp,
+    update_type: Ir.Inst.UpdateType,
+    strict: bool,
+) Error!void {
     const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
-    const tag: Bytecode.Inst.Tag = switch (op) {
+    const tag: Bytecode.Inst.Tag = switch (update_op) {
         .increment => switch (update_type) {
             .prefix => if (strict) .increment_binding_prefix_strict else .increment_binding_prefix,
             .postfix => if (strict) .increment_binding_postfix_strict else .increment_binding_postfix,
@@ -885,6 +989,154 @@ fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, op: Update
         .data = .{ .reg_string = .{
             dest,
             bytecode_string_index,
+        } },
+    });
+}
+
+fn lowerUpdateProperty(
+    b: *Builder,
+    data: @FieldType(Ir.Inst.Data, "update_property"),
+    dest: Bytecode.Inst.Reg,
+    update_op: Ir.Inst.UpdateOp,
+    update_type: Ir.Inst.UpdateType,
+    strict: bool,
+) Error!void {
+    const base_reg = b.resolve(data.base);
+    const tag: Bytecode.Inst.Tag = switch (update_op) {
+        .increment => switch (update_type) {
+            .prefix => if (strict) .increment_property_prefix_strict else .increment_property_prefix,
+            .postfix => if (strict) .increment_property_postfix_strict else .increment_property_postfix,
+        },
+        .decrement => switch (update_type) {
+            .prefix => if (strict) .decrement_property_prefix_strict else .decrement_property_prefix,
+            .postfix => if (strict) .decrement_property_postfix_strict else .decrement_property_postfix,
+        },
+    };
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_string = .{
+            dest,
+            base_reg,
+            @enumFromInt(@intFromEnum(data.name)),
+        } },
+    });
+}
+
+fn lowerUpdatePropertyComputed(
+    b: *Builder,
+    data: @FieldType(Ir.Inst.Data, "update_property_computed"),
+    dest: Bytecode.Inst.Reg,
+    update_op: Ir.Inst.UpdateOp,
+    update_type: Ir.Inst.UpdateType,
+    strict: bool,
+) Error!void {
+    const base_reg = b.resolve(data.base);
+    const property_reg = b.resolve(data.property);
+    const tag: Bytecode.Inst.Tag = switch (update_op) {
+        .increment => switch (update_type) {
+            .prefix => if (strict) .increment_property_computed_prefix_strict else .increment_property_computed_prefix,
+            .postfix => if (strict) .increment_property_computed_postfix_strict else .increment_property_computed_postfix,
+        },
+        .decrement => switch (update_type) {
+            .prefix => if (strict) .decrement_property_computed_prefix_strict else .decrement_property_computed_prefix,
+            .postfix => if (strict) .decrement_property_computed_postfix_strict else .decrement_property_computed_postfix,
+        },
+    };
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            base_reg,
+            property_reg,
+        } },
+    });
+}
+
+fn lowerUpdatePropertyIndexed(
+    b: *Builder,
+    data: @FieldType(Ir.Inst.Data, "update_property_indexed"),
+    dest: Bytecode.Inst.Reg,
+    update_op: Ir.Inst.UpdateOp,
+    update_type: Ir.Inst.UpdateType,
+    strict: bool,
+) Error!void {
+    const base_reg = b.resolve(data.base);
+    const tag: Bytecode.Inst.Tag = switch (update_op) {
+        .increment => switch (update_type) {
+            .prefix => if (strict) .increment_property_indexed_prefix_strict else .increment_property_indexed_prefix,
+            .postfix => if (strict) .increment_property_indexed_postfix_strict else .increment_property_indexed_postfix,
+        },
+        .decrement => switch (update_type) {
+            .prefix => if (strict) .decrement_property_indexed_prefix_strict else .decrement_property_indexed_prefix,
+            .postfix => if (strict) .decrement_property_indexed_postfix_strict else .decrement_property_indexed_postfix,
+        },
+    };
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_u32 = .{
+            dest,
+            base_reg,
+            data.index,
+        } },
+    });
+}
+
+fn lowerDeleteBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .delete_binding,
+        .data = .{ .reg_string = .{
+            dest,
+            bytecode_string_index,
+        } },
+    });
+}
+
+fn lowerDeleteProperty(b: *Builder, data: @FieldType(Ir.Inst.Data, "delete_property"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .delete_property_strict
+    else
+        .delete_property;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_string = .{
+            dest,
+            base_reg,
+            @enumFromInt(@intFromEnum(data.name)),
+        } },
+    });
+}
+
+fn lowerDeletePropertyComputed(b: *Builder, data: @FieldType(Ir.Inst.Data, "delete_property_computed"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const property_reg = b.resolve(data.property);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .delete_property_computed_strict
+    else
+        .delete_property_computed;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            base_reg,
+            property_reg,
+        } },
+    });
+}
+
+fn lowerDeletePropertyIndexed(b: *Builder, data: @FieldType(Ir.Inst.Data, "delete_property_indexed"), strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .delete_property_indexed_strict
+    else
+        .delete_property_indexed;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_u32 = .{
+            dest,
+            base_reg,
+            data.index,
         } },
     });
 }
