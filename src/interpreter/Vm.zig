@@ -123,6 +123,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
+                .delete_binding => vm.executeDeleteBinding(data.reg_string[0], data.reg_string[1]),
                 .increment_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, false),
                 .increment_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, true),
                 .increment_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, false),
@@ -744,6 +745,20 @@ fn executeSetBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex, value_reg: 
         };
     }
     return try env.setMutableBinding(vm.agent, name, value, strict);
+}
+
+fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.strings[@intFromEnum(name_index)];
+    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            vm.load(dst, .true);
+            return;
+        };
+    }
+    const result = try env.deleteBinding(vm.agent, name);
+    vm.load(dst, Value.from(result));
 }
 
 const UpdateOp = enum { increment, decrement };

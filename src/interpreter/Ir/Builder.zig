@@ -549,7 +549,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
 
                 return b.addInst(.{
                     .tag = tag,
-                    .data = .{ .update_binding = string_index },
+                    .data = .{ .string = string_index },
                 });
             },
             else => try b.todo("non-identifier update expression"),
@@ -559,6 +559,21 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {
+    if (unary_expr.operator == .delete and
+        unary_expr.expression.* == .primary_expression and
+        unary_expr.expression.primary_expression == .identifier_reference)
+    {
+        const identifier = unary_expr.expression.primary_expression.identifier_reference;
+        const gop = try b.strings.getOrPut(b.gpa, identifier);
+        if (!gop.found_existing) {
+            gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
+        }
+        const string_index: Ir.Inst.StringIndex = @enumFromInt(gop.index);
+        return b.addInst(.{
+            .tag = .delete_binding,
+            .data = .{ .string = string_index },
+        });
+    }
     const operand = try b.lowerExpression(unary_expr.expression);
     const tag: Ir.Inst.Tag = switch (unary_expr.operator) {
         .@"+" => .unary_plus,
@@ -567,7 +582,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
         .@"!" => .logical_not,
         .typeof => .typeof,
         .void => .void,
-        .delete => try b.todo("delete operator"),
+        .delete => .delete,
     };
     return b.addInst(.{
         .tag = tag,

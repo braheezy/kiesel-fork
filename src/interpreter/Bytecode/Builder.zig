@@ -90,6 +90,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
             .void => try b.lowerVoid(data.ref, dest),
+            .delete => try b.lowerDelete(data.ref, dest),
             .add => try b.lowerAdd(data.binary, dest),
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
@@ -118,14 +119,15 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_binding => try b.lowerGetBinding(data.string, dest),
             .set_binding => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, false, dest),
             .set_binding_strict => try b.lowerSetBinding(data.set_binding.name, data.set_binding.value, true, dest),
-            .increment_binding_prefix => try b.lowerUpdateBinding(data.update_binding, .increment, .prefix, false, dest),
-            .increment_binding_prefix_strict => try b.lowerUpdateBinding(data.update_binding, .increment, .prefix, true, dest),
-            .increment_binding_postfix => try b.lowerUpdateBinding(data.update_binding, .increment, .postfix, false, dest),
-            .increment_binding_postfix_strict => try b.lowerUpdateBinding(data.update_binding, .increment, .postfix, true, dest),
-            .decrement_binding_prefix => try b.lowerUpdateBinding(data.update_binding, .decrement, .prefix, false, dest),
-            .decrement_binding_prefix_strict => try b.lowerUpdateBinding(data.update_binding, .decrement, .prefix, true, dest),
-            .decrement_binding_postfix => try b.lowerUpdateBinding(data.update_binding, .decrement, .postfix, false, dest),
-            .decrement_binding_postfix_strict => try b.lowerUpdateBinding(data.update_binding, .decrement, .postfix, true, dest),
+            .delete_binding => try b.lowerDeleteBinding(data.string, dest),
+            .increment_binding_prefix => try b.lowerUpdateBinding(data.string, .increment, .prefix, false, dest),
+            .increment_binding_prefix_strict => try b.lowerUpdateBinding(data.string, .increment, .prefix, true, dest),
+            .increment_binding_postfix => try b.lowerUpdateBinding(data.string, .increment, .postfix, false, dest),
+            .increment_binding_postfix_strict => try b.lowerUpdateBinding(data.string, .increment, .postfix, true, dest),
+            .decrement_binding_prefix => try b.lowerUpdateBinding(data.string, .decrement, .prefix, false, dest),
+            .decrement_binding_prefix_strict => try b.lowerUpdateBinding(data.string, .decrement, .prefix, true, dest),
+            .decrement_binding_postfix => try b.lowerUpdateBinding(data.string, .decrement, .postfix, false, dest),
+            .decrement_binding_postfix_strict => try b.lowerUpdateBinding(data.string, .decrement, .postfix, true, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -799,6 +801,10 @@ fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
 }
 
+fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{ .tag = .load_true, .data = .{ .reg = dest } });
+}
+
 fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
     const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
     try b.emit(.{
@@ -822,6 +828,17 @@ fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Ins
         } },
     });
     try b.emitMoveIfNeeded(value, dest);
+}
+
+fn lowerDeleteBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .delete_binding,
+        .data = .{ .reg_string = .{
+            dest,
+            bytecode_string_index,
+        } },
+    });
 }
 
 const UpdateOp = enum { increment, decrement };

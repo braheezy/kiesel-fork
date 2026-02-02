@@ -125,7 +125,7 @@ fn constantFoldUnaryExpression(
                 };
                 return .{ .string = try gpa.dupe(u8, @"type") };
             },
-            .delete => {},
+            .delete => return .{ .boolean = true },
         }
     }
     return null;

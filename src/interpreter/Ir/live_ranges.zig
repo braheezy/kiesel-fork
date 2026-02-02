@@ -35,6 +35,7 @@ pub fn computeLiveRanges(
             .string,
             .big_int,
             .get_binding,
+            .delete_binding,
             .increment_binding_prefix,
             .increment_binding_prefix_strict,
             .increment_binding_postfix,
@@ -114,6 +115,7 @@ pub fn computeLiveRanges(
             .logical_not,
             .typeof,
             .void,
+            .delete,
             .end,
             => try uses.append(gpa, data.ref),
         }
