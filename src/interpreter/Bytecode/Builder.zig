@@ -359,13 +359,44 @@ fn emit(b: *Builder, inst: Bytecode.Inst) Error!void {
     try b.current.?.instructions.append(b.gpa, inst);
 }
 
+fn emitUnaryOp(
+    b: *Builder,
+    tag: Bytecode.Inst.Tag,
+    operand: Ir.Inst.Ref,
+    dest: Bytecode.Inst.Reg,
+) Error!void {
+    const operand_reg = b.resolve(operand);
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg = .{ dest, operand_reg } },
+    });
+}
+
+fn emitBinaryOp(
+    b: *Builder,
+    tag: Bytecode.Inst.Tag,
+    lhs: Ir.Inst.Ref,
+    rhs: Ir.Inst.Ref,
+    dest: Bytecode.Inst.Reg,
+) Error!void {
+    const lhs_reg = b.resolve(lhs);
+    const rhs_reg = b.resolve(rhs);
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } },
+    });
+}
+
 fn emitMoveIfNeeded(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     const src = switch (ref) {
         .none => return,
         else => b.resolve(ref),
     };
     if (src != dest) {
-        try b.emit(.{ .tag = .move, .data = .{ .reg_reg = .{ dest, src } } });
+        try b.emit(.{
+            .tag = .move,
+            .data = .{ .reg_reg = .{ dest, src } },
+        });
     }
 }
 
@@ -379,65 +410,101 @@ fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Inst.Reg {
 }
 
 fn lowerUndefined(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_undefined,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerNull(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_null, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_null,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerTrue(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_true, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_true,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerFalse(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_false, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_false,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerZero(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, 0 } } });
+    try b.emit(.{
+        .tag = .load_number_i32,
+        .data = .{ .reg_i32 = .{ dest, 0 } },
+    });
 }
 
 fn lowerOne(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, 1 } } });
+    try b.emit(.{
+        .tag = .load_number_i32,
+        .data = .{ .reg_i32 = .{ dest, 1 } },
+    });
 }
 
 fn lowerNumber(b: *Builder, n: f64, dest: Bytecode.Inst.Reg) Error!void {
     if (n == @floor(n) and n >= std.math.minInt(i32) and n <= std.math.maxInt(i32) and !std.math.isNegativeZero(n)) {
-        try b.emit(.{ .tag = .load_number_i32, .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } } });
+        try b.emit(.{
+            .tag = .load_number_i32,
+            .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } },
+        });
     } else {
-        try b.emit(.{ .tag = .load_number_f64, .data = .{ .reg_f64 = .{ dest, n } } });
+        try b.emit(.{
+            .tag = .load_number_f64,
+            .data = .{ .reg_f64 = .{ dest, n } },
+        });
     }
 }
 
 fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
     const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string));
-    try b.emit(.{ .tag = .load_string, .data = .{
-        .reg_string = .{ dest, string_index },
-    } });
+    try b.emit(.{
+        .tag = .load_string,
+        .data = .{
+            .reg_string = .{ dest, string_index },
+        },
+    });
 }
 
 fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Reg) Error!void {
     const big_int_index: Bytecode.Inst.BigIntIndex = @enumFromInt(@intFromEnum(big_int));
-    try b.emit(.{ .tag = .load_big_int, .data = .{
-        .reg_big_int = .{ dest, big_int_index },
-    } });
+    try b.emit(.{
+        .tag = .load_big_int,
+        .data = .{
+            .reg_big_int = .{ dest, big_int_index },
+        },
+    });
 }
 
 fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: Bytecode.Inst.Reg) Error!void {
     const extra_index = @intFromEnum(array_data.extra_index);
     const elements = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..array_data.len];
 
-    try b.emit(.{ .tag = .array_create, .data = .{
-        .reg_u32 = .{ dest, array_data.len },
-    } });
+    try b.emit(.{
+        .tag = .array_create,
+        .data = .{
+            .reg_u32 = .{ dest, array_data.len },
+        },
+    });
 
     for (elements, 0..) |elem, i| {
         if (elem == .none) continue; // Skip elisions
         const elem_reg = b.resolve(elem);
-        try b.emit(.{ .tag = .array_set, .data = .{
-            .reg_reg_u32 = .{ dest, elem_reg, @intCast(i) },
-        } });
+        try b.emit(.{
+            .tag = .array_set,
+            .data = .{
+                .reg_reg_u32 = .{ dest, elem_reg, @intCast(i) },
+            },
+        });
     }
 }
 
@@ -593,135 +660,91 @@ fn lowerLoop(b: *Builder, data: @FieldType(Ir.Inst.Data, "loop"), dest: Bytecode
 }
 
 fn lowerAdd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .add, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.add, data.lhs, data.rhs, dest);
 }
 
 fn lowerSub(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .sub, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.sub, data.lhs, data.rhs, dest);
 }
 
 fn lowerMul(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .mul, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.mul, data.lhs, data.rhs, dest);
 }
 
 fn lowerDiv(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .div, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.div, data.lhs, data.rhs, dest);
 }
 
 fn lowerRem(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .rem, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.rem, data.lhs, data.rhs, dest);
 }
 
 fn lowerExp(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .exp, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.exp, data.lhs, data.rhs, dest);
 }
 
 fn lowerShiftLeft(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .shift_left, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.shift_left, data.lhs, data.rhs, dest);
 }
 
 fn lowerShiftRight(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .shift_right, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.shift_right, data.lhs, data.rhs, dest);
 }
 
 fn lowerShiftRightUnsigned(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .shift_right_unsigned, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.shift_right_unsigned, data.lhs, data.rhs, dest);
 }
 
 fn lowerBitwiseAnd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .bitwise_and, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.bitwise_and, data.lhs, data.rhs, dest);
 }
 
 fn lowerBitwiseOr(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .bitwise_or, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.bitwise_or, data.lhs, data.rhs, dest);
 }
 
 fn lowerBitwiseXor(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .bitwise_xor, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.bitwise_xor, data.lhs, data.rhs, dest);
 }
 
 fn lowerLt(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .lt, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.lt, data.lhs, data.rhs, dest);
 }
 
 fn lowerGt(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .gt, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.gt, data.lhs, data.rhs, dest);
 }
 
 fn lowerLtEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .lt_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.lt_eq, data.lhs, data.rhs, dest);
 }
 
 fn lowerGtEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .gt_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.gt_eq, data.lhs, data.rhs, dest);
 }
 
 fn lowerInstanceof(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .instanceof, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.instanceof, data.lhs, data.rhs, dest);
 }
 
 fn lowerIn(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .in, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.in, data.lhs, data.rhs, dest);
 }
 
 fn lowerEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.eq, data.lhs, data.rhs, dest);
 }
 
 fn lowerNotEq(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .not_eq, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.not_eq, data.lhs, data.rhs, dest);
 }
 
 fn lowerEqStrict(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .eq_strict, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.eq_strict, data.lhs, data.rhs, dest);
 }
 
 fn lowerNotEqStrict(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-    const rhs_reg = b.resolve(data.rhs);
-    try b.emit(.{ .tag = .not_eq_strict, .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } } });
+    try b.emitBinaryOp(.not_eq_strict, data.lhs, data.rhs, dest);
 }
 
 fn lowerLogicalAnd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
@@ -773,36 +796,37 @@ fn lowerNullishCoalesce(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), d
 }
 
 fn lowerUnaryPlus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src_reg = b.resolve(ref);
-    try b.emit(.{ .tag = .to_number, .data = .{ .reg_reg = .{ dest, src_reg } } });
+    try b.emitUnaryOp(.to_number, ref, dest);
 }
 
 fn lowerUnaryMinus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src_reg = b.resolve(ref);
-    try b.emit(.{ .tag = .unary_minus, .data = .{ .reg_reg = .{ dest, src_reg } } });
+    try b.emitUnaryOp(.unary_minus, ref, dest);
 }
 
 fn lowerBitwiseNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src_reg = b.resolve(ref);
-    try b.emit(.{ .tag = .bitwise_not, .data = .{ .reg_reg = .{ dest, src_reg } } });
+    try b.emitUnaryOp(.bitwise_not, ref, dest);
 }
 
 fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src_reg = b.resolve(ref);
-    try b.emit(.{ .tag = .logical_not, .data = .{ .reg_reg = .{ dest, src_reg } } });
+    try b.emitUnaryOp(.logical_not, ref, dest);
 }
 
 fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src_reg = b.resolve(ref);
-    try b.emit(.{ .tag = .typeof, .data = .{ .reg_reg = .{ dest, src_reg } } });
+    try b.emitUnaryOp(.typeof, ref, dest);
 }
 
 fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_undefined, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_undefined,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{ .tag = .load_true, .data = .{ .reg = dest } });
+    try b.emit(.{
+        .tag = .load_true,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
@@ -868,6 +892,9 @@ fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, op: Update
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     _ = dest;
     const ret_reg = if (ref == .none) Bytecode.Inst.Reg.none else b.resolve(ref);
-    try b.emit(.{ .tag = .end, .data = .{ .reg = ret_reg } });
+    try b.emit(.{
+        .tag = .end,
+        .data = .{ .reg = ret_reg },
+    });
     b.noreturn();
 }

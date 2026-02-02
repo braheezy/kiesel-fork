@@ -133,6 +133,22 @@ fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
     return index.toRef();
 }
 
+fn internString(b: *Builder, string: []const u8) std.mem.Allocator.Error!Ir.Inst.StringIndex {
+    const gop = try b.strings.getOrPut(b.gpa, string);
+    if (!gop.found_existing) {
+        gop.key_ptr.* = try b.gpa.dupe(u8, string);
+    }
+    return @enumFromInt(gop.index);
+}
+
+fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.Error!Ir.Inst.BigIntIndex {
+    const gop = try b.big_ints.getOrPut(b.gpa, big_int);
+    if (!gop.found_existing) {
+        gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
+    }
+    return @enumFromInt(gop.index);
+}
+
 fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
     return switch (constant) {
         .undefined => b.addInst(.{
@@ -166,23 +182,17 @@ fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
             }
         },
         .big_int => |big_int| {
-            const gop = try b.big_ints.getOrPut(b.gpa, big_int);
-            if (!gop.found_existing) {
-                gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
-            }
+            const big_int_index = try b.internBigInt(big_int);
             return b.addInst(.{
                 .tag = .big_int,
-                .data = .{ .big_int = @enumFromInt(gop.index) },
+                .data = .{ .big_int = big_int_index },
             });
         },
         .string => |string| {
-            const gop = try b.strings.getOrPut(b.gpa, string);
-            if (!gop.found_existing) {
-                gop.key_ptr.* = try b.gpa.dupe(u8, string);
-            }
+            const string_index = try b.internString(string);
             return b.addInst(.{
                 .tag = .string,
-                .data = .{ .string = @enumFromInt(gop.index) },
+                .data = .{ .string = string_index },
             });
         },
     };
@@ -429,13 +439,10 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
 }
 
 fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.Ref {
-    const gop = try b.strings.getOrPut(b.gpa, identifier);
-    if (!gop.found_existing) {
-        gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
-    }
+    const string_index = try b.internString(identifier);
     return b.addInst(.{
         .tag = .get_binding,
-        .data = .{ .string = @enumFromInt(gop.index) },
+        .data = .{ .string = string_index },
     });
 }
 
@@ -477,14 +484,11 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .property_name_and_expression => |*prop| {
                 const key_ref = switch (prop.property_name) {
                     .literal_property_name => |literal| switch (literal) {
-                        .identifier => |id| blk: {
-                            const gop = try b.strings.getOrPut(b.gpa, id);
-                            if (!gop.found_existing) {
-                                gop.key_ptr.* = try b.gpa.dupe(u8, id);
-                            }
+                        .identifier => |identifier| blk: {
+                            const string_index = try b.internString(identifier);
                             break :blk try b.addInst(.{
                                 .tag = .string,
-                                .data = .{ .string = @enumFromInt(gop.index) },
+                                .data = .{ .string = string_index },
                             });
                         },
                         .string_literal => |str_lit| blk: {
@@ -530,11 +534,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
     return switch (update_expr.expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
-                const gop = try b.strings.getOrPut(b.gpa, identifier);
-                if (!gop.found_existing) {
-                    gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
-                }
-                const string_index: Ir.Inst.StringIndex = @enumFromInt(gop.index);
+                const string_index = try b.internString(identifier);
 
                 const tag: Ir.Inst.Tag = switch (update_expr.type) {
                     .prefix => switch (update_expr.operator) {
@@ -564,11 +564,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
         unary_expr.expression.primary_expression == .identifier_reference)
     {
         const identifier = unary_expr.expression.primary_expression.identifier_reference;
-        const gop = try b.strings.getOrPut(b.gpa, identifier);
-        if (!gop.found_existing) {
-            gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
-        }
-        const string_index: Ir.Inst.StringIndex = @enumFromInt(gop.index);
+        const string_index = try b.internString(identifier);
         return b.addInst(.{
             .tag = .delete_binding,
             .data = .{ .string = string_index },
@@ -706,14 +702,11 @@ fn lowerAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpr
     return switch (assign_expr.lhs_expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
-                const gop = try b.strings.getOrPut(b.gpa, identifier);
-                if (!gop.found_existing) {
-                    gop.key_ptr.* = try b.gpa.dupe(u8, identifier);
-                }
+                const string_index = try b.internString(identifier);
                 return b.addInst(.{
                     .tag = if (b.in_strict_mode) .set_binding_strict else .set_binding,
                     .data = .{ .set_binding = .{
-                        .name = @enumFromInt(gop.index),
+                        .name = string_index,
                         .value = value,
                     } },
                 });

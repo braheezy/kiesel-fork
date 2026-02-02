@@ -166,6 +166,14 @@ fn jump(_: *Vm, offset: i32, pc: *usize) void {
     }
 }
 
+fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) *const String {
+    return vm.strings[@intFromEnum(index)];
+}
+
+fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
+    return vm.big_ints[@intFromEnum(index)];
+}
+
 fn executeJump(vm: *Vm, offset: i32, pc: *usize) void {
     vm.jump(offset, pc);
 }
@@ -214,11 +222,13 @@ fn executeLoadNumberF64(vm: *Vm, reg: Bytecode.Inst.Reg, value: f64) void {
 }
 
 fn executeLoadString(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.StringIndex) void {
-    vm.load(reg, Value.from(vm.strings[@intFromEnum(index)]));
+    const string = vm.getString(index);
+    vm.load(reg, Value.from(string));
 }
 
 fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIntIndex) void {
-    vm.load(reg, Value.from(vm.big_ints[@intFromEnum(index)]));
+    const big_int = vm.getBigInt(index);
+    vm.load(reg, Value.from(big_int));
 }
 
 fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
@@ -275,17 +285,22 @@ fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Byt
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(src);
+
+    // OPTIMIZATION: Fast path for number values
     if (value.isNumber()) {
         @branchHint(.likely);
         vm.load(dst, value);
         return;
     }
+
     const number = try value.toNumber(vm.agent);
     vm.load(dst, Value.from(number));
 }
 
 fn executeUnaryMinus(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(src);
+
+    // OPTIMIZATION: Fast path for number values
     if (value.isNumber()) {
         @branchHint(.likely);
         if (value.__isI32()) {
@@ -298,6 +313,7 @@ fn executeUnaryMinus(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Ag
         vm.load(dst, Value.from(-value.__toF64()));
         return;
     }
+
     const numeric = try value.toNumeric(vm.agent);
     vm.load(dst, switch (numeric) {
         .number => |n| Value.from(n.unaryMinus()),
@@ -346,7 +362,8 @@ fn executeAdd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"+", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"+", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeSub(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -366,7 +383,8 @@ fn executeSub(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"-", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"-", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeMul(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -386,7 +404,8 @@ fn executeMul(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"*", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"*", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -400,7 +419,8 @@ fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"/", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"/", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeRem(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -423,7 +443,8 @@ fn executeRem(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"%", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"%", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeExp(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -443,7 +464,8 @@ fn executeExp(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"**", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"**", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeShiftLeft(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -458,7 +480,8 @@ fn executeShiftLeft(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"<<", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"<<", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeShiftRight(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -473,7 +496,8 @@ fn executeShiftRight(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -488,7 +512,8 @@ fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>>", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@">>>", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -502,7 +527,8 @@ fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"&", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"&", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -516,7 +542,8 @@ fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"|", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"|", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -530,7 +557,8 @@ fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
         return;
     }
 
-    vm.load(dst, try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"^", rhs_value));
+    const result = try applyStringOrNumericBinaryOperator(vm.agent, lhs_value, .@"^", rhs_value);
+    vm.load(dst, result);
 }
 
 fn executeLt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -652,7 +680,8 @@ fn executeEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytec
         return;
     }
 
-    vm.load(dst, Value.from(try isLooselyEqual(vm.agent, rhs_value, lhs_value)));
+    const result = try isLooselyEqual(vm.agent, rhs_value, lhs_value);
+    vm.load(dst, Value.from(result));
 }
 
 fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -670,7 +699,8 @@ fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: By
         return;
     }
 
-    vm.load(dst, Value.from(!try isLooselyEqual(vm.agent, rhs_value, lhs_value)));
+    const result = !try isLooselyEqual(vm.agent, rhs_value, lhs_value);
+    vm.load(dst, Value.from(result));
 }
 
 fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -688,7 +718,8 @@ fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs:
         return;
     }
 
-    vm.load(dst, Value.from(isStrictlyEqual(lhs_value, rhs_value)));
+    const result = isStrictlyEqual(lhs_value, rhs_value);
+    vm.load(dst, Value.from(result));
 }
 
 fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -706,11 +737,13 @@ fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, r
         return;
     }
 
-    vm.load(dst, Value.from(!isStrictlyEqual(lhs_value, rhs_value)));
+    const result = !isStrictlyEqual(lhs_value, rhs_value);
+    vm.load(dst, Value.from(result));
 }
 
 fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.strings[@intFromEnum(name_index)];
+    const name = vm.getString(name_index);
+
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
         env = env.outerEnv() orelse {
@@ -722,11 +755,18 @@ fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.
             );
         };
     }
-    vm.load(dst, try env.getBindingValue(vm.agent, name, true));
+
+    const result = try env.getBindingValue(vm.agent, name, true);
+    vm.load(dst, result);
 }
 
-fn executeSetBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg, strict: bool) Agent.Error!void {
-    const name = vm.strings[@intFromEnum(name_index)];
+fn executeSetBinding(
+    vm: *Vm,
+    name_index: Bytecode.Inst.StringIndex,
+    value_reg: Bytecode.Inst.Reg,
+    comptime strict: bool,
+) Agent.Error!void {
+    const name = vm.getString(name_index);
     const value = vm.store(value_reg);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -741,14 +781,17 @@ fn executeSetBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex, value_reg: 
                 );
             }
             const global_obj = vm.agent.getGlobalObject();
-            return try global_obj.set(vm.agent, PropertyKey.from(name), value, .ignore);
+            try global_obj.set(vm.agent, PropertyKey.from(name), value, .ignore);
+            return;
         };
     }
-    return try env.setMutableBinding(vm.agent, name, value, strict);
+
+    try env.setMutableBinding(vm.agent, name, value, strict);
 }
 
 fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.strings[@intFromEnum(name_index)];
+    const name = vm.getString(name_index);
+
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
         env = env.outerEnv() orelse {
@@ -757,6 +800,7 @@ fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.In
             return;
         };
     }
+
     const result = try env.deleteBinding(vm.agent, name);
     vm.load(dst, Value.from(result));
 }
@@ -772,7 +816,7 @@ fn executeUpdateBinding(
     comptime update_type: UpdateType,
     comptime strict: bool,
 ) Agent.Error!void {
-    const name = vm.strings[@intFromEnum(name_index)];
+    const name = vm.getString(name_index);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
@@ -785,6 +829,7 @@ fn executeUpdateBinding(
             );
         };
     }
+
     const old_value = try env.getBindingValue(vm.agent, name, strict);
     const old_numeric = try old_value.toNumeric(vm.agent);
 
