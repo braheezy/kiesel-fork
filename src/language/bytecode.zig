@@ -136,8 +136,8 @@ pub fn generateAndRunNewInterpreter(
         stdout.flush() catch {};
     }
 
-    var vm: interpreter.Vm = try .init(gpa, agent, &bc);
-    defer vm.deinit(gpa);
+    var vm: interpreter.Vm = try .init(agent, &bc);
+    defer vm.deinit();
     const result = try vm.run();
 
     return .normal(result);

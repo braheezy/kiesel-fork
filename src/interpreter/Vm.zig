@@ -35,18 +35,17 @@ regs: [num_regs]Value,
 pub const num_regs = 32;
 
 pub fn init(
-    gpa: std.mem.Allocator,
     agent: *Agent,
     bytecode: *const Bytecode,
 ) std.mem.Allocator.Error!Vm {
-    const strings = try gpa.alloc(*const String, bytecode.strings.len);
-    errdefer gpa.free(strings);
+    const strings = try agent.gc_allocator.alloc(*const String, bytecode.strings.len);
+    errdefer agent.gc_allocator.free(strings);
     for (bytecode.strings, 0..) |utf8, i| {
         strings[i] = try stringValueImpl(agent.gc_allocator, utf8);
     }
 
-    const big_ints = try gpa.alloc(*const BigInt, bytecode.big_ints.len);
-    errdefer gpa.free(big_ints);
+    const big_ints = try agent.gc_allocator.alloc(*const BigInt, bytecode.big_ints.len);
+    errdefer agent.gc_allocator.free(big_ints);
     for (bytecode.big_ints, 0..) |@"const", i| {
         const managed = try @"const".toManaged(agent.gc_allocator);
         big_ints[i] = try BigInt.fromManaged(agent, managed);
@@ -62,10 +61,10 @@ pub fn init(
     };
 }
 
-pub fn deinit(vm: *Vm, gpa: std.mem.Allocator) void {
-    // Values are GC-allocated, only free the arrays
-    gpa.free(vm.strings);
-    gpa.free(vm.big_ints);
+pub fn deinit(vm: *Vm) void {
+    // Values might outlive the VM and need to be GC'd, but we can free the arrays
+    vm.agent.gc_allocator.free(vm.strings);
+    vm.agent.gc_allocator.free(vm.big_ints);
 }
 
 pub fn run(vm: *Vm) Agent.Error!?Value {

@@ -68,8 +68,8 @@ fn testInterpreter(
     try agent.execution_context_stack.append(agent.gc_allocator, test_context);
     defer _ = agent.execution_context_stack.pop().?;
 
-    var vm: Vm = try .init(gpa, &agent, &bc);
-    defer vm.deinit(gpa);
+    var vm: Vm = try .init(&agent, &bc);
+    defer vm.deinit();
     const result = try vm.run();
     switch (expected_result) {
         .value => |expected| try std.testing.expectEqual(expected, result),
