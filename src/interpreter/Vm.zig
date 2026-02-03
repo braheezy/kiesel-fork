@@ -123,6 +123,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .not_eq => vm.executeNotEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .initialize_binding => vm.executeInitializeBinding(data.string_reg[0], data.string_reg[1]),
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .get_property => vm.executeGetProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
                 .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -807,6 +808,18 @@ fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, r
 
     const result = !isStrictlyEqual(lhs_value, rhs_value);
     vm.load(dst, Value.from(result));
+}
+
+fn executeInitializeBinding(
+    vm: *Vm,
+    name_index: Bytecode.Inst.StringIndex,
+    value_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const name = vm.getString(name_index);
+    const value = vm.store(value_reg);
+
+    const env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    try env.initializeBinding(vm.agent, name, value);
 }
 
 fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {

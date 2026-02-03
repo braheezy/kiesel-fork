@@ -117,6 +117,7 @@ pub const Inst = struct {
         logical_or,
         nullish_coalesce,
 
+        initialize_binding,
         get_binding,
         get_property,
         get_property_computed,
@@ -230,6 +231,7 @@ pub const Inst = struct {
         .logical_and = .binary,
         .logical_or = .binary,
         .nullish_coalesce = .binary,
+        .initialize_binding = .set_binding,
         .get_binding = .string,
         .get_property = .get_property,
         .get_property_computed = .get_property_computed,

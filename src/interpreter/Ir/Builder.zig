@@ -207,7 +207,7 @@ fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir
     for (stmt_list.items) |item| {
         const result = switch (item) {
             .statement => |stmt| try b.lowerStatement(stmt),
-            .declaration => try b.todo("declaration"),
+            .declaration => |decl| try b.lowerDeclaration(decl),
         };
         if (result != .none) {
             last = result;
@@ -240,6 +240,14 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .throw_statement => try b.todo("throw statement"),
         .try_statement => try b.todo("try statement"),
         .debugger_statement => .none,
+    };
+}
+
+fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref {
+    return switch (decl.*) {
+        .hoistable_declaration => try b.todo("hoistable declaration"),
+        .class_declaration => try b.todo("class declaration"),
+        .lexical_declaration => |*lex_decl| try b.lowerLexicalDeclaration(lex_decl),
     };
 }
 
@@ -422,6 +430,34 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
             .body = body,
         } },
     });
+}
+
+fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {
+    for (lex_decl.binding_list.items) |lex_binding| {
+        _ = try b.lowerLexicalBinding(lex_binding);
+    }
+    return .none;
+}
+
+fn lowerLexicalBinding(b: *Builder, lex_binding: ast.LexicalBinding) Error!Ir.Inst.Ref {
+    // GlobalDeclarationInstantiation is responsible for creating the bindings.
+    return switch (lex_binding) {
+        .binding_identifier => |binding| {
+            if (binding.initializer) |*init_expr| {
+                const value = try b.lowerExpression(init_expr);
+                const string_index = try b.internString(binding.binding_identifier);
+                return b.addInst(.{
+                    .tag = .initialize_binding,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = value,
+                    } },
+                });
+            }
+            return .none;
+        },
+        .binding_pattern => try b.todo("binding pattern in lexical binding"),
+    };
 }
 
 fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {

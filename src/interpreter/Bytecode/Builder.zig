@@ -118,6 +118,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_and => try b.lowerLogicalAnd(data.binary, dest),
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
+            .initialize_binding => try b.lowerInitializeBinding(data.set_binding.name, data.set_binding.value, dest),
             .get_binding => try b.lowerGetBinding(data.string, dest),
             .get_property => try b.lowerGetProperty(data.get_property, dest),
             .get_property_computed => try b.lowerGetPropertyComputed(data.get_property_computed, dest),
@@ -893,6 +894,19 @@ fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void 
 
 fn lowerSpread(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
+}
+
+fn lowerInitializeBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    const value_reg = b.resolve(value);
+    try b.emit(.{
+        .tag = .initialize_binding,
+        .data = .{ .string_reg = .{
+            bytecode_string_index,
+            value_reg,
+        } },
+    });
+    try b.emitMoveIfNeeded(value, dest);
 }
 
 fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {

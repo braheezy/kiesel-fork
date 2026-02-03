@@ -80,6 +80,7 @@ pub const Inst = struct {
         eq_strict,
         not_eq_strict,
 
+        initialize_binding,
         get_binding,
         get_property,
         get_property_computed,
@@ -210,6 +211,7 @@ pub const Inst = struct {
         .not_eq = .reg_reg_reg,
         .eq_strict = .reg_reg_reg,
         .not_eq_strict = .reg_reg_reg,
+        .initialize_binding = .string_reg,
         .get_binding = .reg_string,
         .get_property = .reg_reg_string,
         .get_property_computed = .reg_reg_reg,
