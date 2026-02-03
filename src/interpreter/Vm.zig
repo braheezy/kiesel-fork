@@ -197,7 +197,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
     }
 }
 
-fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
+fn store(vm: *const Vm, reg: Bytecode.Inst.Reg) Value {
     std.debug.assert(reg != .none);
     return vm.regs[@intFromEnum(reg)];
 }
@@ -215,11 +215,11 @@ fn jump(_: *Vm, offset: i32, pc: *usize) void {
     }
 }
 
-fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) *const String {
+fn getString(vm: *const Vm, index: Bytecode.Inst.StringIndex) *const String {
     return vm.strings[@intFromEnum(index)];
 }
 
-fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
+fn getBigInt(vm: *const Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
     return vm.big_ints[@intFromEnum(index)];
 }
 
@@ -284,12 +284,12 @@ fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
     vm.load(dest, vm.store(src));
 }
 
-fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, length: u32) Agent.Error!void {
+fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, length: u32) std.mem.Allocator.Error!void {
     const array = try arrayCreateFast(vm.agent, length);
     vm.load(dst, Value.from(&array.object));
 }
 
-fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
     const array_value = vm.store(array_reg);
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
@@ -301,7 +301,7 @@ fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.In
     );
 }
 
-fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) Agent.Error!void {
+fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) std.mem.Allocator.Error!void {
     const array_value = vm.store(array_reg);
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
@@ -322,12 +322,12 @@ fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Inst.Reg, value_reg: Bytecode
     }
 }
 
-fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
     const object = try ordinaryObjectCreateFast(vm.agent);
     vm.load(dst, Value.from(object));
 }
 
-fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
     const object_value = vm.store(object_reg);
     const property_value = vm.store(value_reg);
     const object = object_value.asObject();
@@ -764,7 +764,7 @@ fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: By
     vm.load(dst, Value.from(result));
 }
 
-fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -783,7 +783,7 @@ fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs:
     vm.load(dst, Value.from(result));
 }
 
-fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
