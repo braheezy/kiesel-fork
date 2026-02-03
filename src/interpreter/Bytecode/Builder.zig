@@ -507,22 +507,66 @@ fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: 
     const extra_index = @intFromEnum(array_data.extra_index);
     const elements = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..array_data.len];
 
-    try b.emit(.{
-        .tag = .array_create,
-        .data = .{
-            .reg_u32 = .{ dest, array_data.len },
-        },
-    });
+    const has_spread = for (elements) |elem| {
+        if (elem.toIndex()) |elem_index| {
+            if (b.ir.instructions.items(.tag)[@intFromEnum(elem_index)] == .spread) {
+                break true;
+            }
+        }
+    } else false;
 
-    for (elements, 0..) |elem, i| {
-        if (elem == .none) continue; // Skip elisions
-        const elem_reg = b.resolve(elem);
+    if (has_spread) {
         try b.emit(.{
-            .tag = .array_set,
+            .tag = .array_create,
             .data = .{
-                .reg_reg_u32 = .{ dest, elem_reg, @intCast(i) },
+                .reg_u32 = .{ dest, 0 },
             },
         });
+
+        for (elements) |elem| {
+            if (elem == .none) {
+                try b.emit(.{
+                    .tag = .array_push_hole,
+                    .data = .{ .reg = dest },
+                });
+                continue;
+            }
+            const elem_index = elem.toIndex().?;
+            const elem_tag = b.ir.instructions.items(.tag)[@intFromEnum(elem_index)];
+            const tag: Bytecode.Inst.Tag = switch (elem_tag) {
+                .spread => .array_spread,
+                else => .array_push,
+            };
+            const elem_reg = b.resolve(elem);
+            try b.emit(.{
+                .tag = tag,
+                .data = .{ .reg_reg = .{
+                    dest,
+                    elem_reg,
+                } },
+            });
+        }
+    } else {
+        try b.emit(.{
+            .tag = .array_create,
+            .data = .{ .reg_u32 = .{
+                dest,
+                array_data.len,
+            } },
+        });
+
+        for (elements, 0..) |elem, i| {
+            if (elem == .none) continue; // Skip elisions
+            const elem_reg = b.resolve(elem);
+            try b.emit(.{
+                .tag = .array_set,
+                .data = .{ .reg_reg_u32 = .{
+                    dest,
+                    elem_reg,
+                    @intCast(i),
+                } },
+            });
+        }
     }
 }
 

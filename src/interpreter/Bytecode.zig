@@ -41,6 +41,7 @@ pub const Inst = struct {
 
         array_create,
         array_push,
+        array_push_hole,
         array_set,
         array_spread,
 
@@ -192,6 +193,7 @@ pub const Inst = struct {
             .load_null,
             .load_true,
             .load_false,
+            .array_push_hole,
             .object_create,
             => .{ .reg = try takeEnumNonExhaustive(Reg, reader) },
             .jump => .{ .i32 = try reader.takeInt(i32, .little) },
@@ -413,6 +415,7 @@ pub const Inst = struct {
             .load_null,
             .load_true,
             .load_false,
+            .array_push_hole,
             .object_create,
             => try writer.writeInt(u8, @intFromEnum(inst.data.reg), .little),
             .jump => try writer.writeInt(i32, inst.data.i32, .little),
@@ -672,6 +675,7 @@ pub fn print(
             .load_null,
             .load_true,
             .load_false,
+            .array_push_hole,
             .object_create,
             => {
                 try writer.writeByte(' ');

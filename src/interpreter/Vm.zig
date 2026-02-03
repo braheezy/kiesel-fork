@@ -90,6 +90,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .move => vm.executeMove(data.reg_reg[0], data.reg_reg[1]),
                 .array_create => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
                 .array_push => vm.executeArrayPush(data.reg_reg[0], data.reg_reg[1]),
+                .array_push_hole => vm.executeArrayPushHole(data.reg),
                 .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .array_spread => vm.executeArraySpread(data.reg_reg[0], data.reg_reg[1]),
                 .object_create => vm.executeObjectCreate(data.reg),
@@ -299,6 +300,12 @@ fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.In
         PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
         elem_value,
     );
+}
+
+fn executeArrayPushHole(vm: *Vm, array_reg: Bytecode.Inst.Reg) void {
+    const array_value = vm.store(array_reg);
+    const array = array_value.asObject().as(builtins.Array);
+    array.fields.length += 1;
 }
 
 fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) std.mem.Allocator.Error!void {

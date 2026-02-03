@@ -454,7 +454,13 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
         const elem_ref: Ir.Inst.Ref = switch (elem) {
             .elision => .none,
             .expression => |*expr| try b.lowerExpression(expr),
-            .spread => try b.todo("spread operator in array literal"),
+            .spread => |*expr| blk: {
+                const value = try b.lowerExpression(expr);
+                break :blk try b.addInst(.{
+                    .tag = .spread,
+                    .data = .{ .ref = value },
+                });
+            },
         };
         try elements.append(b.gpa, elem_ref);
     }
