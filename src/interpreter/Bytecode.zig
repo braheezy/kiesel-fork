@@ -160,6 +160,117 @@ pub const Inst = struct {
         string_reg: struct { StringIndex, Reg },
     };
 
+    pub const data_tags = std.enums.directEnumArray(Tag, std.meta.FieldEnum(Data), 0, .{
+        .end = .reg,
+        .jump = .i32,
+        .jump_if_true = .reg_i32,
+        .jump_if_false = .reg_i32,
+        .jump_if_nullish = .reg_i32,
+        .load_undefined = .reg,
+        .load_null = .reg,
+        .load_true = .reg,
+        .load_false = .reg,
+        .load_number_i32 = .reg_i32,
+        .load_number_f64 = .reg_f64,
+        .load_string = .reg_string,
+        .load_big_int = .reg_big_int,
+        .move = .reg_reg,
+        .array_create = .reg_u32,
+        .array_push = .reg_reg,
+        .array_push_hole = .reg,
+        .array_set = .reg_reg_u32,
+        .array_spread = .reg_reg,
+        .object_create = .reg,
+        .object_set = .reg_string_reg,
+        .object_set_computed = .reg_reg_reg,
+        .to_number = .reg_reg,
+        .unary_minus = .reg_reg,
+        .bitwise_not = .reg_reg,
+        .logical_not = .reg_reg,
+        .typeof = .reg_reg,
+        .add = .reg_reg_reg,
+        .sub = .reg_reg_reg,
+        .mul = .reg_reg_reg,
+        .div = .reg_reg_reg,
+        .rem = .reg_reg_reg,
+        .exp = .reg_reg_reg,
+        .shift_left = .reg_reg_reg,
+        .shift_right = .reg_reg_reg,
+        .shift_right_unsigned = .reg_reg_reg,
+        .bitwise_and = .reg_reg_reg,
+        .bitwise_or = .reg_reg_reg,
+        .bitwise_xor = .reg_reg_reg,
+        .lt = .reg_reg_reg,
+        .gt = .reg_reg_reg,
+        .lt_eq = .reg_reg_reg,
+        .gt_eq = .reg_reg_reg,
+        .instanceof = .reg_reg_reg,
+        .in = .reg_reg_reg,
+        .eq = .reg_reg_reg,
+        .not_eq = .reg_reg_reg,
+        .eq_strict = .reg_reg_reg,
+        .not_eq_strict = .reg_reg_reg,
+        .get_binding = .reg_string,
+        .get_property = .reg_reg_string,
+        .get_property_computed = .reg_reg_reg,
+        .get_property_indexed = .reg_reg_u32,
+        .set_binding = .string_reg,
+        .set_binding_strict = .string_reg,
+        .set_property = .reg_reg_string,
+        .set_property_strict = .reg_reg_string,
+        .set_property_computed = .reg_reg_reg,
+        .set_property_computed_strict = .reg_reg_reg,
+        .set_property_indexed = .reg_reg_u32,
+        .set_property_indexed_strict = .reg_reg_u32,
+        .increment_binding_prefix = .reg_string,
+        .increment_binding_prefix_strict = .reg_string,
+        .increment_binding_postfix = .reg_string,
+        .increment_binding_postfix_strict = .reg_string,
+        .increment_property_prefix = .reg_reg_string,
+        .increment_property_prefix_strict = .reg_reg_string,
+        .increment_property_postfix = .reg_reg_string,
+        .increment_property_postfix_strict = .reg_reg_string,
+        .increment_property_computed_prefix = .reg_reg_reg,
+        .increment_property_computed_prefix_strict = .reg_reg_reg,
+        .increment_property_computed_postfix = .reg_reg_reg,
+        .increment_property_computed_postfix_strict = .reg_reg_reg,
+        .increment_property_indexed_prefix = .reg_reg_u32,
+        .increment_property_indexed_prefix_strict = .reg_reg_u32,
+        .increment_property_indexed_postfix = .reg_reg_u32,
+        .increment_property_indexed_postfix_strict = .reg_reg_u32,
+        .decrement_binding_prefix = .reg_string,
+        .decrement_binding_prefix_strict = .reg_string,
+        .decrement_binding_postfix = .reg_string,
+        .decrement_binding_postfix_strict = .reg_string,
+        .decrement_property_prefix = .reg_reg_string,
+        .decrement_property_prefix_strict = .reg_reg_string,
+        .decrement_property_postfix = .reg_reg_string,
+        .decrement_property_postfix_strict = .reg_reg_string,
+        .decrement_property_computed_prefix = .reg_reg_reg,
+        .decrement_property_computed_prefix_strict = .reg_reg_reg,
+        .decrement_property_computed_postfix = .reg_reg_reg,
+        .decrement_property_computed_postfix_strict = .reg_reg_reg,
+        .decrement_property_indexed_prefix = .reg_reg_u32,
+        .decrement_property_indexed_prefix_strict = .reg_reg_u32,
+        .decrement_property_indexed_postfix = .reg_reg_u32,
+        .decrement_property_indexed_postfix_strict = .reg_reg_u32,
+        .delete_binding = .reg_string,
+        .delete_property = .reg_reg_string,
+        .delete_property_strict = .reg_reg_string,
+        .delete_property_computed = .reg_reg_reg,
+        .delete_property_computed_strict = .reg_reg_reg,
+        .delete_property_indexed = .reg_reg_u32,
+        .delete_property_indexed_strict = .reg_reg_u32,
+        .call = .reg_reg_reg,
+        .call0 = .reg_reg,
+        .call1 = .reg_reg_reg,
+        .call2 = .reg_reg_reg_reg,
+        .call_property = .reg_reg_reg_reg,
+        .call_property0 = .reg_reg_reg,
+        .call_property1 = .reg_reg_reg_reg,
+        .call_property2 = .reg_reg_reg_reg_reg,
+    });
+
     pub const Reg = enum(u8) {
         /// Used for `end` instruction to indicate no register
         none = std.math.maxInt(u8),
@@ -186,443 +297,77 @@ pub const Inst = struct {
         };
     }
 
-    pub inline fn decodeData(reader: *std.Io.Reader, tag: Inst.Tag) std.Io.Reader.Error!Data {
-        return switch (tag) {
-            .end,
-            .load_undefined,
-            .load_null,
-            .load_true,
-            .load_false,
-            .array_push_hole,
-            .object_create,
-            => .{ .reg = try takeEnumNonExhaustive(Reg, reader) },
-            .jump => .{ .i32 = try reader.takeInt(i32, .little) },
-            .jump_if_true, .jump_if_false, .jump_if_nullish, .load_number_i32 => .{ .reg_i32 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try reader.takeInt(i32, .little),
-            } },
-            .array_create => .{ .reg_u32 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try reader.takeInt(u32, .little),
-            } },
-            .load_number_f64 => .{ .reg_f64 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                @bitCast(try reader.takeInt(u64, .little)),
-            } },
-            .load_string,
-            .get_binding,
-            .delete_binding,
-            .increment_binding_prefix,
-            .increment_binding_prefix_strict,
-            .increment_binding_postfix,
-            .increment_binding_postfix_strict,
-            .decrement_binding_prefix,
-            .decrement_binding_prefix_strict,
-            .decrement_binding_postfix,
-            .decrement_binding_postfix_strict,
-            => .{ .reg_string = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-            } },
-            .get_property => .{ .reg_reg_string = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-            } },
-            .set_property,
-            .set_property_strict,
-            => .{ .reg_reg_string = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-            } },
-            .delete_property,
-            .delete_property_strict,
-            => .{ .reg_reg_string = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-            } },
-            .increment_property_prefix,
-            .increment_property_prefix_strict,
-            .increment_property_postfix,
-            .increment_property_postfix_strict,
-            .decrement_property_prefix,
-            .decrement_property_prefix_strict,
-            .decrement_property_postfix,
-            .decrement_property_postfix_strict,
-            => .{ .reg_reg_string = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-            } },
-            .load_big_int => .{ .reg_big_int = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(BigIntIndex, reader),
-            } },
-            .set_binding,
-            .set_binding_strict,
-            => .{ .string_reg = .{
-                try takeEnumNonExhaustive(StringIndex, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .move,
-            .array_push,
-            .array_spread,
-            .to_number,
-            .unary_minus,
-            .bitwise_not,
-            .logical_not,
-            .typeof,
-            => .{ .reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .array_set,
-            .get_property_indexed,
-            .set_property_indexed,
-            .set_property_indexed_strict,
-            => .{ .reg_reg_u32 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try reader.takeInt(u32, .little),
-            } },
-            .delete_property_indexed,
-            .delete_property_indexed_strict,
-            => .{ .reg_reg_u32 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try reader.takeInt(u32, .little),
-            } },
-            .increment_property_indexed_prefix,
-            .increment_property_indexed_prefix_strict,
-            .increment_property_indexed_postfix,
-            .increment_property_indexed_postfix_strict,
-            .decrement_property_indexed_prefix,
-            .decrement_property_indexed_prefix_strict,
-            .decrement_property_indexed_postfix,
-            .decrement_property_indexed_postfix_strict,
-            => .{ .reg_reg_u32 = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try reader.takeInt(u32, .little),
-            } },
-            .call => .{ .reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call0 => .{ .reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call1 => .{ .reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call2 => .{ .reg_reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call_property => .{ .reg_reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call_property0 => .{ .reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call_property1 => .{ .reg_reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .call_property2 => .{ .reg_reg_reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .object_set => .{ .reg_string_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(StringIndex, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-            .object_set_computed,
-            .get_property_computed,
-            .set_property_computed,
-            .set_property_computed_strict,
-            .delete_property_computed,
-            .delete_property_computed_strict,
-            .increment_property_computed_prefix,
-            .increment_property_computed_prefix_strict,
-            .increment_property_computed_postfix,
-            .increment_property_computed_postfix_strict,
-            .decrement_property_computed_prefix,
-            .decrement_property_computed_prefix_strict,
-            .decrement_property_computed_postfix,
-            .decrement_property_computed_postfix_strict,
-            .add,
-            .sub,
-            .mul,
-            .div,
-            .rem,
-            .exp,
-            .shift_left,
-            .shift_right,
-            .shift_right_unsigned,
-            .bitwise_and,
-            .bitwise_or,
-            .bitwise_xor,
-            .lt,
-            .gt,
-            .lt_eq,
-            .gt_eq,
-            .instanceof,
-            .in,
-            .eq,
-            .not_eq,
-            .eq_strict,
-            .not_eq_strict,
-            => .{ .reg_reg_reg = .{
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-                try takeEnumNonExhaustive(Reg, reader),
-            } },
-        };
+    pub inline fn decodeData(reader: *std.Io.Reader, tag: Tag) std.Io.Reader.Error!Data {
+        const data_tag = data_tags[@intFromEnum(tag)];
+        switch (data_tag) {
+            inline else => |field| {
+                const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(field)));
+                const type_info = @typeInfo(FieldType);
+
+                if (FieldType == void) {
+                    return @unionInit(Data, @tagName(field), {});
+                }
+
+                if (type_info == .@"struct") {
+                    var result: FieldType = undefined;
+                    inline for (type_info.@"struct".fields, 0..) |struct_field, i| {
+                        result[i] = try decodeField(struct_field.type, reader);
+                    }
+                    return @unionInit(Data, @tagName(field), result);
+                }
+
+                return @unionInit(Data, @tagName(field), try decodeField(FieldType, reader));
+            },
+        }
     }
 
-    fn takeEnumNonExhaustive(comptime T: type, reader: *std.Io.Reader) std.Io.Reader.Error!T {
-        return reader.takeEnum(T, .little) catch |err| switch (err) {
-            error.InvalidEnumTag => unreachable,
-            else => |e| return e,
+    fn decodeField(comptime T: type, reader: *std.Io.Reader) std.Io.Reader.Error!T {
+        return switch (T) {
+            Reg,
+            StringIndex,
+            BigIntIndex,
+            => try reader.takeEnumNonexhaustive(T, .little),
+            i32 => try reader.takeInt(i32, .little),
+            u32 => try reader.takeInt(u32, .little),
+            f64 => @bitCast(try reader.takeInt(u64, .little)),
+            void => {},
+            else => comptime unreachable,
         };
     }
 
     pub fn encode(inst: Inst, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.writeInt(u8, @intFromEnum(inst.tag), .little);
-        switch (inst.tag) {
-            .end,
-            .load_undefined,
-            .load_null,
-            .load_true,
-            .load_false,
-            .array_push_hole,
-            .object_create,
-            => try writer.writeInt(u8, @intFromEnum(inst.data.reg), .little),
-            .jump => try writer.writeInt(i32, inst.data.i32, .little),
-            .jump_if_true,
-            .jump_if_false,
-            .jump_if_nullish,
-            .load_number_i32,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_i32[0]), .little);
-                try writer.writeInt(i32, inst.data.reg_i32[1], .little);
+        const data_tag = data_tags[@intFromEnum(inst.tag)];
+        switch (data_tag) {
+            inline else => |field| {
+                const field_value = @field(inst.data, @tagName(field));
+                const FieldType = @TypeOf(field_value);
+                const type_info = @typeInfo(FieldType);
+
+                if (FieldType == void) return;
+
+                if (type_info == .@"struct") {
+                    inline for (type_info.@"struct".fields, 0..) |struct_field, i| {
+                        try encodeField(struct_field.type, field_value[i], writer);
+                    }
+                } else {
+                    try encodeField(FieldType, field_value, writer);
+                }
             },
-            .array_create => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_u32[0]), .little);
-                try writer.writeInt(u32, inst.data.reg_u32[1], .little);
-            },
-            .load_number_f64 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_f64[0]), .little);
-                try writer.writeInt(u64, @bitCast(inst.data.reg_f64[1]), .little);
-            },
-            .load_string,
-            .get_binding,
-            .delete_binding,
-            .increment_binding_prefix,
-            .increment_binding_prefix_strict,
-            .increment_binding_postfix,
-            .increment_binding_postfix_strict,
-            .decrement_binding_prefix,
-            .decrement_binding_prefix_strict,
-            .decrement_binding_postfix,
-            .decrement_binding_postfix_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_string[0]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_string[1]), .little);
-            },
-            .get_property => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
-            },
-            .set_property,
-            .set_property_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
-            },
-            .delete_property,
-            .delete_property_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
-            },
-            .increment_property_prefix,
-            .increment_property_prefix_strict,
-            .increment_property_postfix,
-            .increment_property_postfix_strict,
-            .decrement_property_prefix,
-            .decrement_property_prefix_strict,
-            .decrement_property_postfix,
-            .decrement_property_postfix_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_string[1]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_reg_string[2]), .little);
-            },
-            .load_big_int => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_big_int[0]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_big_int[1]), .little);
-            },
-            .move,
-            .array_push,
-            .array_spread,
-            .to_number,
-            .unary_minus,
-            .bitwise_not,
-            .logical_not,
-            .typeof,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[1]), .little);
-            },
-            .array_set,
-            .get_property_indexed,
-            .set_property_indexed,
-            .set_property_indexed_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
-                try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
-            },
-            .delete_property_indexed,
-            .delete_property_indexed_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
-                try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
-            },
-            .increment_property_indexed_prefix,
-            .increment_property_indexed_prefix_strict,
-            .increment_property_indexed_postfix,
-            .increment_property_indexed_postfix_strict,
-            .decrement_property_indexed_prefix,
-            .decrement_property_indexed_prefix_strict,
-            .decrement_property_indexed_postfix,
-            .decrement_property_indexed_postfix_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
-                try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
-            },
-            .call => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
-            },
-            .call0 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[1]), .little);
-            },
-            .call1 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
-            },
-            .call2 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
-            },
-            .call_property => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
-            },
-            .call_property0 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
-            },
-            .call_property1 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
-            },
-            .call_property2 => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[2]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[3]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[4]), .little);
-            },
-            .object_set => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_string_reg[0]), .little);
-                try writer.writeInt(u32, @intFromEnum(inst.data.reg_string_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_string_reg[2]), .little);
-            },
-            .set_binding,
-            .set_binding_strict,
-            => {
-                try writer.writeInt(u32, @intFromEnum(inst.data.string_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.string_reg[1]), .little);
-            },
-            .object_set_computed,
-            .get_property_computed,
-            .set_property_computed,
-            .set_property_computed_strict,
-            .delete_property_computed,
-            .delete_property_computed_strict,
-            .increment_property_computed_prefix,
-            .increment_property_computed_prefix_strict,
-            .increment_property_computed_postfix,
-            .increment_property_computed_postfix_strict,
-            .decrement_property_computed_prefix,
-            .decrement_property_computed_prefix_strict,
-            .decrement_property_computed_postfix,
-            .decrement_property_computed_postfix_strict,
-            .add,
-            .sub,
-            .mul,
-            .div,
-            .rem,
-            .exp,
-            .shift_left,
-            .shift_right,
-            .shift_right_unsigned,
-            .bitwise_and,
-            .bitwise_or,
-            .bitwise_xor,
-            .lt,
-            .gt,
-            .lt_eq,
-            .gt_eq,
-            .instanceof,
-            .in,
-            .eq,
-            .not_eq,
-            .eq_strict,
-            .not_eq_strict,
-            => {
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
-                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
-            },
+        }
+    }
+
+    fn encodeField(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        switch (T) {
+            Reg => try writer.writeInt(u8, @intFromEnum(value), .little),
+            StringIndex,
+            BigIntIndex,
+            => try writer.writeInt(u32, @intFromEnum(value), .little),
+            i32 => try writer.writeInt(i32, value, .little),
+            u32 => try writer.writeInt(u32, value, .little),
+            f64 => try writer.writeInt(u64, @bitCast(value), .little),
+            void => {},
+            else => comptime unreachable,
         }
     }
 
@@ -670,317 +415,71 @@ pub fn print(
         try tty_config.setColor(writer, .cyan);
         try writer.print("{t}", .{inst.tag});
         try tty_config.setColor(writer, .reset);
-        switch (inst.tag) {
-            .load_undefined,
-            .load_null,
-            .load_true,
-            .load_false,
-            .array_push_hole,
-            .object_create,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg, 'r', .blue, writer, tty_config);
-            },
-            .jump => {
-                try writer.writeByte(' ');
-                try printData(inst.data.i32, null, .yellow, writer, tty_config);
-            },
-            .jump_if_true,
-            .jump_if_false,
-            .jump_if_nullish,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_i32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_i32[1], null, .yellow, writer, tty_config);
-            },
-            .load_number_i32 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_i32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_i32[1], null, .yellow, writer, tty_config);
-            },
-            .array_create => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_u32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_u32[1], null, .yellow, writer, tty_config);
-            },
-            .load_number_f64 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_f64[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_f64[1], null, .yellow, writer, tty_config);
-            },
-            .load_string,
-            .get_binding,
-            .delete_binding,
-            .increment_binding_prefix,
-            .increment_binding_prefix_strict,
-            .increment_binding_postfix,
-            .increment_binding_postfix_strict,
-            .decrement_binding_prefix,
-            .decrement_binding_prefix_strict,
-            .decrement_binding_postfix,
-            .decrement_binding_postfix_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_string[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_string[1]), '@', .green, writer, tty_config);
-            },
-            .get_property => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
-            },
-            .set_property,
-            .set_property_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
-            },
-            .delete_property,
-            .delete_property_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
-            },
-            .increment_property_prefix,
-            .increment_property_prefix_strict,
-            .increment_property_postfix,
-            .increment_property_postfix_strict,
-            .decrement_property_prefix,
-            .decrement_property_prefix_strict,
-            .decrement_property_postfix,
-            .decrement_property_postfix_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_string[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_string[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_reg_string[2]), '@', .green, writer, tty_config);
-            },
-            .load_big_int => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_big_int[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_big_int[1]), '@', .green, writer, tty_config);
-            },
-            .move,
-            .array_push,
-            .array_spread,
-            .to_number,
-            .unary_minus,
-            .bitwise_not,
-            .logical_not,
-            .typeof,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg[1], 'r', .blue, writer, tty_config);
-            },
-            .array_set,
-            .get_property_indexed,
-            .set_property_indexed,
-            .set_property_indexed_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
-            },
-            .increment_property_indexed_prefix,
-            .increment_property_indexed_prefix_strict,
-            .increment_property_indexed_postfix,
-            .increment_property_indexed_postfix_strict,
-            .decrement_property_indexed_prefix,
-            .decrement_property_indexed_prefix_strict,
-            .decrement_property_indexed_postfix,
-            .decrement_property_indexed_postfix_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
-            },
-            .delete_property_indexed,
-            .delete_property_indexed_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_u32[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
-            },
-            .call => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
-            },
-            .call0 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg[1], 'r', .blue, writer, tty_config);
-            },
-            .call1 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
-            },
-            .call2 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
-            },
-            .call_property => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
-            },
-            .call_property0 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
-            },
-            .call_property1 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
-            },
-            .call_property2 => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg_reg_reg[4], 'r', .blue, writer, tty_config);
-            },
-            .object_set => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_string_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(@intFromEnum(inst.data.reg_string_reg[1]), '@', .green, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_string_reg[2], 'r', .blue, writer, tty_config);
-            },
-            .set_binding,
-            .set_binding_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(@intFromEnum(inst.data.string_reg[0]), '@', .green, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.string_reg[1], 'r', .blue, writer, tty_config);
-            },
-            .object_set_computed,
-            .get_property_computed,
-            .set_property_computed,
-            .set_property_computed_strict,
-            .delete_property_computed,
-            .delete_property_computed_strict,
-            .increment_property_computed_prefix,
-            .increment_property_computed_prefix_strict,
-            .increment_property_computed_postfix,
-            .increment_property_computed_postfix_strict,
-            .decrement_property_computed_prefix,
-            .decrement_property_computed_prefix_strict,
-            .decrement_property_computed_postfix,
-            .decrement_property_computed_postfix_strict,
-            .add,
-            .sub,
-            .mul,
-            .div,
-            .rem,
-            .exp,
-            .shift_left,
-            .shift_right,
-            .shift_right_unsigned,
-            .bitwise_and,
-            .bitwise_or,
-            .bitwise_xor,
-            .lt,
-            .gt,
-            .lt_eq,
-            .gt_eq,
-            .instanceof,
-            .in,
-            .eq,
-            .not_eq,
-            .eq_strict,
-            .not_eq_strict,
-            => {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
-                try writer.writeAll(", ");
-                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
-            },
-            .end => if (inst.data.reg != .none) {
-                try writer.writeByte(' ');
-                try printData(inst.data.reg, 'r', .blue, writer, tty_config);
-            },
-        }
+
+        try printData(inst.tag, inst.data, writer, tty_config);
+
         try writer.writeByte('\n');
     }
 }
 
 fn printData(
-    value: anytype,
-    prefix: ?u8,
-    color: std.Io.tty.Color,
+    tag: Inst.Tag,
+    data: Inst.Data,
     writer: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
 ) PrintError!void {
-    try tty_config.setColor(writer, color);
-    if (prefix) |b| try writer.writeByte(b);
-    try writer.print("{d}", .{value});
-    try tty_config.setColor(writer, .reset);
+    const data_tag = Inst.data_tags[@intFromEnum(tag)];
+    if (data_tag == .none) return;
+    if (tag == .end and data.reg == .none) return;
+
+    try writer.writeByte(' ');
+    switch (data_tag) {
+        .none => {},
+        inline .i32,
+        .reg,
+        => |dt| {
+            const field_data = @field(data, @tagName(dt));
+            try printField(field_data, writer, tty_config);
+        },
+        inline else => |dt| {
+            const field_data = @field(data, @tagName(dt));
+            const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
+            inline for (field_type.fields, 0..) |struct_field, idx| {
+                if (idx > 0) try writer.writeAll(", ");
+                const value = @field(field_data, struct_field.name);
+                try printField(value, writer, tty_config);
+            }
+        },
+    }
+}
+
+fn printField(
+    value: anytype,
+    writer: *std.Io.Writer,
+    tty_config: std.Io.tty.Config,
+) PrintError!void {
+    const T = @TypeOf(value);
+    switch (T) {
+        i32,
+        u32,
+        f64,
+        => {
+            try tty_config.setColor(writer, .yellow);
+            try writer.print("{}", .{value});
+            try tty_config.setColor(writer, .reset);
+        },
+        Inst.Reg => {
+            try tty_config.setColor(writer, .blue);
+            try writer.print("r{d}", .{@intFromEnum(value)});
+            try tty_config.setColor(writer, .reset);
+        },
+        Inst.StringIndex,
+        Inst.BigIntIndex,
+        => {
+            try tty_config.setColor(writer, .green);
+            try writer.print("@{d}", .{@intFromEnum(value)});
+            try tty_config.setColor(writer, .reset);
+        },
+        else => comptime unreachable,
+    }
 }

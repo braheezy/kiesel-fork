@@ -100,7 +100,7 @@ test {
     ,
         .{ .value = null },
         \\IR (test)
-        \\   0: end                     [0..0]
+        \\   0: end                                                   [0..0]
         \\
     ,
         \\Bytecode (test)
@@ -115,8 +115,8 @@ test {
         \\
     , .{ .value = Value.from(42) },
         \\IR (test)
-        \\   0: number 42               [0..1]
-        \\   1: end %0                  [1..1]
+        \\   0: number 42                                             [0..1]
+        \\   1: end %0                                                [1..1]
         \\
     ,
         \\Bytecode (test)
@@ -133,10 +133,10 @@ test {
         \\
     , .{ .value = Value.from(42) },
         \\IR (test)
-        \\   0: number 40               [0..0] dead
-        \\   1: number 41               [1..1] dead
-        \\   2: number 42               [2..3]
-        \\   3: end %2                  [3..3]
+        \\   0: number 40                                             [0..0] dead
+        \\   1: number 41                                             [1..1] dead
+        \\   2: number 42                                             [2..3]
+        \\   3: end %2                                                [3..3]
         \\
     ,
         \\Bytecode (test)
@@ -155,8 +155,8 @@ test {
         \\
     , .{ .value = Value.from(6) },
         \\IR (test)
-        \\   0: number 6                [0..1]
-        \\   1: end %0                  [1..1]
+        \\   0: number 6                                              [0..1]
+        \\   1: end %0                                                [1..1]
         \\
     ,
         \\Bytecode (test)
@@ -171,15 +171,15 @@ test {
         \\
     , .ignore,
         \\IR (test)
-        \\   0: one                     [0..7]
-        \\   1: number 2                [1..3]
-        \\   2: number 3                [2..3]
-        \\   3: array [%1, %2]          [3..7]
-        \\   4: string "x"              [4..6]
-        \\   5: number 4                [5..6]
-        \\   6: object {%4: %5}         [6..7]
-        \\   7: array [%0, none, %3, %6] [7..8]
-        \\   8: end %7                  [8..8]
+        \\   0: one                                                   [0..7]
+        \\   1: number 2                                              [1..3]
+        \\   2: number 3                                              [2..3]
+        \\   3: array [%1, %2]                                        [3..7]
+        \\   4: string "x"                                            [4..6]
+        \\   5: number 4                                              [5..6]
+        \\   6: object {%4: %5}                                       [6..7]
+        \\   7: array [%0, none, %3, %6]                              [7..8]
+        \\   8: end %7                                                [8..8]
         \\
     ,
         \\Bytecode (test)
@@ -207,14 +207,14 @@ test {
         \\
     , .ignore,
         \\IR (test)
-        \\   0: string "a"              [0..6]
-        \\   1: one                     [1..6]
-        \\   2: number 2                [2..6]
-        \\   3: string "two"            [3..6]
-        \\   4: string "b"              [4..6]
-        \\   5: number 3                [5..6]
-        \\   6: object {%0: %1, %2: %3, %4: %5} [6..7]
-        \\   7: end %6                  [7..7]
+        \\   0: string "a"                                            [0..6]
+        \\   1: one                                                   [1..6]
+        \\   2: number 2                                              [2..6]
+        \\   3: string "two"                                          [3..6]
+        \\   4: string "b"                                            [4..6]
+        \\   5: number 3                                              [5..6]
+        \\   6: object {%0: %1, %2: %3, %4: %5}                       [6..7]
+        \\   7: end %6                                                [7..7]
         \\
     ,
         \\Bytecode (test)
@@ -239,10 +239,10 @@ test {
         \\
     , .{ .value = Value.from(42) },
         \\IR (test)
-        \\   0: number 42               [0..1]
-        \\   1: set_binding "x", %0     [1..1]
-        \\   2: get_binding "x"         [2..3]
-        \\   3: end %2                  [3..3]
+        \\   0: number 42                                             [0..1]
+        \\   1: set_binding "x", %0                                   [1..1]
+        \\   2: get_binding "x"                                       [2..3]
+        \\   3: end %2                                                [3..3]
         \\
     ,
         \\Bytecode (test)
@@ -261,10 +261,10 @@ test {
         \\
     , .{ .value = Value.from(6) },
         \\IR (test)
-        \\   0: number 5                [0..1]
-        \\   1: set_binding "x", %0     [1..1]
-        \\   2: update_binding prefix increment "x" [2..3]
-        \\   3: end %2                  [3..3]
+        \\   0: number 5                                              [0..1]
+        \\   1: set_binding "x", %0                                   [1..1]
+        \\   2: update_binding "x", increment, prefix                 [2..3]
+        \\   3: end %2                                                [3..3]
         \\
     ,
         \\Bytecode (test)
@@ -290,31 +290,31 @@ test {
     ,
         .{ .value = Value.from(9) },
         \\IR (test)
-        \\   0: get_binding "Math"      [0..2]
-        \\   1: get_property %0, "random" [1..2]
-        \\   2: call %1, %0, []         [2..2]
-        \\   3: get_binding "Number"    [3..5]
-        \\   4: string "1"              [4..5]
-        \\   5: call %3, none, [%4]     [5..5]
-        \\   6: get_binding "JSON"      [6..13]
-        \\   7: get_property %6, "stringify" [7..13]
-        \\   8: string "foo"            [8..10]
-        \\   9: string "bar"            [9..10]
-        \\  10: object {%8: %9}         [10..13]
-        \\  11: null                    [11..13]
-        \\  12: number 2                [12..13]
-        \\  13: call %7, %6, [%10, %11, %12] [13..13]
-        \\  14: get_binding "Math"      [14..23]
-        \\  15: get_property %14, "max" [15..23]
-        \\  16: one                     [16..23]
-        \\  17: number 5                [17..23]
-        \\  18: number 3                [18..20]
-        \\  19: number 9                [19..20]
-        \\  20: array [%18, %19]        [20..21]
-        \\  21: spread %20              [21..23]
-        \\  22: number 2                [22..23]
-        \\  23: call %15, %14, [%16, %17, %21, %22] [23..24]
-        \\  24: end %23                 [24..24]
+        \\   0: get_binding "Math"                                    [0..2]
+        \\   1: get_property %0, "random"                             [1..2]
+        \\   2: call %1, %0, []                                       [2..2]
+        \\   3: get_binding "Number"                                  [3..5]
+        \\   4: string "1"                                            [4..5]
+        \\   5: call %3, none, [%4]                                   [5..5]
+        \\   6: get_binding "JSON"                                    [6..13]
+        \\   7: get_property %6, "stringify"                          [7..13]
+        \\   8: string "foo"                                          [8..10]
+        \\   9: string "bar"                                          [9..10]
+        \\  10: object {%8: %9}                                       [10..13]
+        \\  11: null                                                  [11..13]
+        \\  12: number 2                                              [12..13]
+        \\  13: call %7, %6, [%10, %11, %12]                          [13..13]
+        \\  14: get_binding "Math"                                    [14..23]
+        \\  15: get_property %14, "max"                               [15..23]
+        \\  16: one                                                   [16..23]
+        \\  17: number 5                                              [17..23]
+        \\  18: number 3                                              [18..20]
+        \\  19: number 9                                              [19..20]
+        \\  20: array [%18, %19]                                      [20..21]
+        \\  21: spread %20                                            [21..23]
+        \\  22: number 2                                              [22..23]
+        \\  23: call %15, %14, [%16, %17, %21, %22]                   [23..24]
+        \\  24: end %23                                               [24..24]
         \\
     ,
         \\Bytecode (test)

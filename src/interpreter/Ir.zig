@@ -181,6 +181,86 @@ pub const Inst = struct {
         ref: Ref,
     };
 
+    pub const data_tags = std.enums.directEnumArray(Tag, std.meta.FieldEnum(Data), 0, .{
+        .undefined = .none,
+        .null = .none,
+        .true = .none,
+        .false = .none,
+        .zero = .none,
+        .one = .none,
+        .number = .number,
+        .string = .string,
+        .big_int = .big_int,
+        .array = .array,
+        .object = .object,
+        .@"if" = .@"if",
+        .@"while" = .@"while",
+        .@"for" = .@"for",
+        .loop = .loop,
+        .unary_plus = .ref,
+        .unary_minus = .ref,
+        .bitwise_not = .ref,
+        .logical_not = .ref,
+        .typeof = .ref,
+        .void = .ref,
+        .delete = .ref,
+        .spread = .ref,
+        .add = .binary,
+        .sub = .binary,
+        .mul = .binary,
+        .div = .binary,
+        .rem = .binary,
+        .exp = .binary,
+        .shift_left = .binary,
+        .shift_right = .binary,
+        .shift_right_unsigned = .binary,
+        .bitwise_and = .binary,
+        .bitwise_or = .binary,
+        .bitwise_xor = .binary,
+        .lt = .binary,
+        .gt = .binary,
+        .lt_eq = .binary,
+        .gt_eq = .binary,
+        .instanceof = .binary,
+        .in = .binary,
+        .eq = .binary,
+        .not_eq = .binary,
+        .eq_strict = .binary,
+        .not_eq_strict = .binary,
+        .logical_and = .binary,
+        .logical_or = .binary,
+        .nullish_coalesce = .binary,
+        .get_binding = .string,
+        .get_property = .get_property,
+        .get_property_computed = .get_property_computed,
+        .get_property_indexed = .get_property_indexed,
+        .set_binding = .set_binding,
+        .set_binding_strict = .set_binding,
+        .set_property = .set_property,
+        .set_property_strict = .set_property,
+        .set_property_computed = .set_property_computed,
+        .set_property_computed_strict = .set_property_computed,
+        .set_property_indexed = .set_property_indexed,
+        .set_property_indexed_strict = .set_property_indexed,
+        .update_binding = .update_binding,
+        .update_binding_strict = .update_binding,
+        .update_property = .update_property,
+        .update_property_strict = .update_property,
+        .update_property_computed = .update_property_computed,
+        .update_property_computed_strict = .update_property_computed,
+        .update_property_indexed = .update_property_indexed,
+        .update_property_indexed_strict = .update_property_indexed,
+        .delete_binding = .string,
+        .delete_property = .delete_property,
+        .delete_property_strict = .delete_property,
+        .delete_property_computed = .delete_property_computed,
+        .delete_property_computed_strict = .delete_property_computed,
+        .delete_property_indexed = .delete_property_indexed,
+        .delete_property_indexed_strict = .delete_property_indexed,
+        .call = .call,
+        .end = .ref,
+    });
+
     pub const UpdateOp = enum { increment, decrement };
     pub const UpdateType = enum { prefix, postfix };
 
@@ -208,6 +288,55 @@ pub const Inst = struct {
             return @enumFromInt(Ref.static_len + @intFromEnum(index));
         }
     };
+
+    pub fn collectRefs(
+        gpa: std.mem.Allocator,
+        tag: Tag,
+        data: Data,
+        extras: []const u32,
+        uses: *std.ArrayList(Ref),
+    ) std.mem.Allocator.Error!void {
+        const data_tag = data_tags[@intFromEnum(tag)];
+        switch (data_tag) {
+            .none,
+            .boolean,
+            .number,
+            .string,
+            .big_int,
+            => {},
+            .array => {
+                const extra_index = @intFromEnum(data.array.extra_index);
+                const elements = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.array.len];
+                for (elements) |elem| {
+                    if (elem != .none) try uses.append(gpa, elem);
+                }
+            },
+            .object => {
+                const extra_index = @intFromEnum(data.object.extra_index);
+                const pairs = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0 .. data.object.len * 2];
+                for (pairs) |ref| {
+                    if (ref != .none) try uses.append(gpa, ref);
+                }
+            },
+            .call => {
+                try uses.append(gpa, data.call.callee);
+                if (data.call.this_value != .none) try uses.append(gpa, data.call.this_value);
+                const extra_index = @intFromEnum(data.call.extra_index);
+                const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.call.len];
+                for (args) |arg| try uses.append(gpa, arg);
+            },
+            .ref => try uses.append(gpa, data.ref),
+            inline else => |dt| {
+                const field_data = @field(data, @tagName(dt));
+                const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
+                inline for (field_type.fields) |struct_field| {
+                    if (struct_field.type == Ref) {
+                        try uses.append(gpa, @field(field_data, struct_field.name));
+                    }
+                }
+            },
+        }
+    }
 };
 
 pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
@@ -243,334 +372,11 @@ pub fn print(
         try cw.flush();
         try tty_config.setColor(writer, .reset);
 
-        switch (tag) {
-            .undefined,
-            .null,
-            .true,
-            .false,
-            .zero,
-            .one,
-            => {},
-            .number => {
-                try cw.writeByte(' ');
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("{d}", .{data.number});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .string,
-            .get_binding,
-            .delete_binding,
-            => {
-                const str = ir.strings[@intFromEnum(data.string)];
-                try cw.writeByte(' ');
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .update_binding,
-            .update_binding_strict,
-            => {
-                try cw.writeByte(' ');
-                try cw.print("{t} {t} ", .{
-                    data.update_binding.update_type,
-                    data.update_binding.update_op,
-                });
-                const str = ir.strings[@intFromEnum(data.update_binding.name)];
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .get_property => {
-                const str = ir.strings[@intFromEnum(data.get_property.name)];
-                try cw.writeByte(' ');
-                try printRef(data.get_property.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .get_property_computed => {
-                try cw.writeByte(' ');
-                try printRef(data.get_property_computed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.get_property_computed.property, cw, tty_config);
-            },
-            .get_property_indexed => {
-                try cw.writeByte(' ');
-                try printRef(data.get_property_indexed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("{d}", .{data.get_property_indexed.index});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .set_property,
-            .set_property_strict,
-            => {
-                const str = ir.strings[@intFromEnum(data.set_property.name)];
-                try cw.writeByte(' ');
-                try printRef(data.set_property.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-                try cw.print(", ", .{});
-                try printRef(data.set_property.value, cw, tty_config);
-            },
-            .set_property_computed,
-            .set_property_computed_strict,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.set_property_computed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.set_property_computed.property, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.set_property_computed.value, cw, tty_config);
-            },
-            .set_property_indexed,
-            .set_property_indexed_strict,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.set_property_indexed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("{d}", .{data.set_property_indexed.index});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-                try cw.print(", ", .{});
-                try printRef(data.set_property_indexed.value, cw, tty_config);
-            },
-            .update_property,
-            .update_property_strict,
-            => {
-                try cw.writeByte(' ');
-                try cw.print("{t} {t} ", .{
-                    data.update_property.update_type,
-                    data.update_property.update_op,
-                });
-                try printRef(data.update_property.base, cw, tty_config);
-                try cw.print(", ", .{});
-                const str = ir.strings[@intFromEnum(data.update_property.name)];
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .update_property_computed,
-            .update_property_computed_strict,
-            => {
-                try cw.writeByte(' ');
-                try cw.print("{t} {t} ", .{
-                    data.update_property_computed.update_type,
-                    data.update_property_computed.update_op,
-                });
-                try printRef(data.update_property_computed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.update_property_computed.property, cw, tty_config);
-            },
-            .update_property_indexed,
-            .update_property_indexed_strict,
-            => {
-                try cw.writeByte(' ');
-                try cw.print("{t} {t} ", .{
-                    data.update_property_indexed.update_type,
-                    data.update_property_indexed.update_op,
-                });
-                try printRef(data.update_property_indexed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("{d}", .{data.update_property_indexed.index});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .delete_property,
-            .delete_property_strict,
-            => {
-                const str = ir.strings[@intFromEnum(data.delete_property.name)];
-                try cw.writeByte(' ');
-                try printRef(data.delete_property.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .delete_property_computed,
-            .delete_property_computed_strict,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.delete_property_computed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.delete_property_computed.property, cw, tty_config);
-            },
-            .delete_property_indexed,
-            .delete_property_indexed_strict,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.delete_property_indexed.base, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("{d}", .{data.delete_property_indexed.index});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .call => {
-                try cw.writeByte(' ');
-                try printRef(data.call.callee, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.call.this_value, cw, tty_config);
-                try cw.print(", ", .{});
-                try cw.writeByte('[');
-                const extra_index = @intFromEnum(data.call.extra_index);
-                const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.call.len];
-                for (args, 0..) |arg, j| {
-                    if (j > 0) try cw.writeAll(", ");
-                    try printRef(arg, cw, tty_config);
-                }
-                try cw.writeByte(']');
-            },
-            .big_int => {
-                const big_int = ir.big_ints[@intFromEnum(data.big_int)];
-                try cw.writeByte(' ');
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try big_int.formatNumber(cw, .{});
-                try cw.writeByte('n');
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-            },
-            .array => {
-                try cw.writeAll(" [");
-                const extra_index = @intFromEnum(data.array.extra_index);
-                const elements = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.array.len];
-                for (elements, 0..) |element, j| {
-                    if (j > 0) try cw.writeAll(", ");
-                    try printRef(element, cw, tty_config);
-                }
-                try cw.writeByte(']');
-            },
-            .object => {
-                try cw.writeAll(" {");
-                const extra_index = @intFromEnum(data.object.extra_index);
-                const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0 .. data.object.len * 2];
-                var pair_index: usize = 0;
-                while (pair_index < pairs.len) : (pair_index += 2) {
-                    if (pair_index > 0) try cw.writeAll(", ");
-                    try printRef(pairs[pair_index], cw, tty_config);
-                    try cw.writeAll(": ");
-                    try printRef(pairs[pair_index + 1], cw, tty_config);
-                }
-                try cw.writeByte('}');
-            },
-            .@"if" => {
-                try cw.writeByte(' ');
-                try printRef(data.@"if".@"test", cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.@"if".then, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.@"if".@"else", cw, tty_config);
-            },
-            .@"while" => {
-                try cw.writeByte(' ');
-                try printRef(data.@"while".@"test", cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.@"while".body, cw, tty_config);
-            },
-            .@"for" => {
-                try cw.writeByte(' ');
-                try printRef(data.@"for".@"test", cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.@"for".update, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.@"for".body, cw, tty_config);
-            },
-            .loop => {
-                try cw.writeByte(' ');
-                try printRef(data.loop.body, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.loop.update, cw, tty_config);
-            },
-            .add,
-            .sub,
-            .mul,
-            .div,
-            .rem,
-            .exp,
-            .shift_left,
-            .shift_right,
-            .shift_right_unsigned,
-            .bitwise_and,
-            .bitwise_or,
-            .bitwise_xor,
-            .lt,
-            .gt,
-            .lt_eq,
-            .gt_eq,
-            .instanceof,
-            .in,
-            .eq,
-            .not_eq,
-            .eq_strict,
-            .not_eq_strict,
-            .logical_and,
-            .logical_or,
-            .nullish_coalesce,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.binary.lhs, cw, tty_config);
-                try cw.print(", ", .{});
-                try printRef(data.binary.rhs, cw, tty_config);
-            },
-            .unary_plus,
-            .unary_minus,
-            .bitwise_not,
-            .logical_not,
-            .typeof,
-            .void,
-            .delete,
-            .spread,
-            => {
-                try cw.writeByte(' ');
-                try printRef(data.ref, cw, tty_config);
-            },
-            .set_binding,
-            .set_binding_strict,
-            => {
-                const str = ir.strings[@intFromEnum(data.set_binding.name)];
-                try cw.writeByte(' ');
-                try cw.flush();
-                try tty_config.setColor(writer, .yellow);
-                try cw.print("\"{s}\"", .{str});
-                try cw.flush();
-                try tty_config.setColor(writer, .reset);
-                try cw.writeAll(", ");
-                try printRef(data.set_binding.value, cw, tty_config);
-            },
-            .end => if (data.ref != .none) {
-                try cw.writeByte(' ');
-                try printRef(data.ref, cw, tty_config);
-            },
-        }
+        try printData(ir, tag, data, cw, tty_config);
 
         try cw.flush();
         const width = counting_writer.count;
-        const min_width = 30;
+        const min_width = 60;
         if (width < min_width) {
             _ = try writer.splatByte(' ', min_width - width);
         } else {
@@ -589,28 +395,144 @@ pub fn print(
     }
 }
 
-fn printRef(
-    ref: Inst.Ref,
+fn printData(
+    ir: *const Ir,
+    tag: Inst.Tag,
+    data: Inst.Data,
+    cw: *std.Io.Writer,
+    tty_config: std.Io.tty.Config,
+) PrintError!void {
+    const data_tag = Inst.data_tags[@intFromEnum(tag)];
+    if (data_tag == .none) return;
+    if (tag == .end and data.ref == .none) return;
+
+    try cw.writeByte(' ');
+    switch (data_tag) {
+        .none => {},
+        inline .boolean,
+        .number,
+        .string,
+        .big_int,
+        .ref,
+        => |dt| {
+            const field_data = @field(data, @tagName(dt));
+            try printField(ir, field_data, cw, tty_config);
+        },
+        .array => {
+            try cw.writeByte('[');
+            const extra_index = @intFromEnum(data.array.extra_index);
+            const elements = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.array.len];
+            for (elements, 0..) |element, j| {
+                if (j > 0) try cw.writeAll(", ");
+                try printField(ir, element, cw, tty_config);
+            }
+            try cw.writeByte(']');
+        },
+        .object => {
+            try cw.writeByte('{');
+            const extra_index = @intFromEnum(data.object.extra_index);
+            const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0 .. data.object.len * 2];
+            var pair_index: usize = 0;
+            while (pair_index < pairs.len) : (pair_index += 2) {
+                if (pair_index > 0) try cw.writeAll(", ");
+                try printField(ir, pairs[pair_index], cw, tty_config);
+                try cw.writeAll(": ");
+                try printField(ir, pairs[pair_index + 1], cw, tty_config);
+            }
+            try cw.writeByte('}');
+        },
+        .call => {
+            try printField(ir, data.call.callee, cw, tty_config);
+            try cw.writeAll(", ");
+            try printField(ir, data.call.this_value, cw, tty_config);
+            try cw.writeAll(", [");
+            const extra_index = @intFromEnum(data.call.extra_index);
+            const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.call.len];
+            for (args, 0..) |arg, j| {
+                if (j > 0) try cw.writeAll(", ");
+                try printField(ir, arg, cw, tty_config);
+            }
+            try cw.writeByte(']');
+        },
+        inline else => |field| {
+            const field_data = @field(data, @tagName(field));
+            const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
+            inline for (field_type.fields, 0..) |struct_field, i| {
+                if (i > 0) try cw.writeAll(", ");
+                const field_value = @field(field_data, struct_field.name);
+                try printField(ir, field_value, cw, tty_config);
+            }
+        },
+    }
+}
+
+fn printField(
+    ir: *const Ir,
+    value: anytype,
     cw: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
 ) PrintError!void {
     const counting_writer: *CountingWriter = @alignCast(@fieldParentPtr("writer", cw));
     const writer = counting_writer.out;
-    switch (ref) {
-        .none => {
+    const T = @TypeOf(value);
+    switch (T) {
+        bool,
+        u32,
+        i32,
+        f64,
+        => {
+            try cw.flush();
+            try tty_config.setColor(writer, .yellow);
+            try cw.print("{}", .{value});
+            try cw.flush();
+            try tty_config.setColor(writer, .reset);
+        },
+        Inst.Ref => if (value.toIndex()) |index| {
+            try cw.flush();
+            try tty_config.setColor(writer, .blue);
+            try cw.print("%{d}", .{@intFromEnum(index)});
+            try cw.flush();
+            try tty_config.setColor(writer, .reset);
+        } else {
             try cw.flush();
             try tty_config.setColor(writer, .dim);
             try cw.print("none", .{});
             try cw.flush();
             try tty_config.setColor(writer, .reset);
         },
-        else => {
-            const index = ref.toIndex().?;
+        Inst.StringIndex => {
+            const str = ir.strings[@intFromEnum(value)];
             try cw.flush();
-            try tty_config.setColor(writer, .blue);
-            try cw.print("%{d}", .{@intFromEnum(index)});
+            try tty_config.setColor(writer, .yellow);
+            try cw.print("\"{s}\"", .{str});
             try cw.flush();
             try tty_config.setColor(writer, .reset);
         },
+        Inst.BigIntIndex => {
+            const big_int = ir.big_ints[@intFromEnum(value)];
+            try cw.flush();
+            try tty_config.setColor(writer, .yellow);
+            try big_int.formatNumber(cw, .{});
+            try cw.writeByte('n');
+            try cw.flush();
+            try tty_config.setColor(writer, .reset);
+        },
+        Inst.ExtraIndex => {
+            try cw.flush();
+            try tty_config.setColor(writer, .yellow);
+            try cw.print("@{d}", .{@intFromEnum(value)});
+            try cw.flush();
+            try tty_config.setColor(writer, .reset);
+        },
+        Inst.UpdateOp,
+        Inst.UpdateType,
+        => {
+            try cw.flush();
+            try tty_config.setColor(writer, .magenta);
+            try cw.print("{t}", .{value});
+            try cw.flush();
+            try tty_config.setColor(writer, .reset);
+        },
+        else => comptime unreachable,
     }
 }
