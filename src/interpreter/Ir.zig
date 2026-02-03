@@ -86,6 +86,7 @@ pub const Inst = struct {
         typeof,
         void,
         delete,
+        spread,
 
         add,
         sub,
@@ -144,6 +145,8 @@ pub const Inst = struct {
         delete_property_indexed,
         delete_property_indexed_strict,
 
+        call,
+
         end,
     };
 
@@ -174,6 +177,7 @@ pub const Inst = struct {
         delete_property: struct { base: Ref, name: StringIndex },
         delete_property_computed: struct { base: Ref, property: Ref },
         delete_property_indexed: struct { base: Ref, index: u32 },
+        call: struct { callee: Ref, this_value: Ref, extra_index: ExtraIndex, len: u32 },
         ref: Ref,
     };
 
@@ -426,6 +430,21 @@ pub fn print(
                 try cw.flush();
                 try tty_config.setColor(writer, .reset);
             },
+            .call => {
+                try cw.writeByte(' ');
+                try printRef(data.call.callee, cw, tty_config);
+                try cw.print(", ", .{});
+                try printRef(data.call.this_value, cw, tty_config);
+                try cw.print(", ", .{});
+                try cw.writeByte('[');
+                const extra_index = @intFromEnum(data.call.extra_index);
+                const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.call.len];
+                for (args, 0..) |arg, j| {
+                    if (j > 0) try cw.writeAll(", ");
+                    try printRef(arg, cw, tty_config);
+                }
+                try cw.writeByte(']');
+            },
             .big_int => {
                 const big_int = ir.big_ints[@intFromEnum(data.big_int)];
                 try cw.writeByte(' ');
@@ -525,6 +544,7 @@ pub fn print(
             .typeof,
             .void,
             .delete,
+            .spread,
             => {
                 try cw.writeByte(' ');
                 try printRef(data.ref, cw, tty_config);

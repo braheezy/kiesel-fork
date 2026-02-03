@@ -414,11 +414,11 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .arrow_function => try b.todo("arrow function"),
             .async_arrow_function => try b.todo("async arrow function"),
         },
-        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr),
+        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, null),
         .super_property => try b.todo("super property"),
         .meta_property => try b.todo("meta property"),
         .new_expression => try b.todo("new expression"),
-        .call_expression => try b.todo("call expression"),
+        .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
         .super_call => try b.todo("super call"),
         .import_call => try b.todo("import call"),
         .optional_expression => try b.todo("optional expression"),
@@ -530,8 +530,9 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
     });
 }
 
-fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression) Error!Ir.Inst.Ref {
+fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, base_out: ?*Ir.Inst.Ref) Error!Ir.Inst.Ref {
     const base = try b.lowerExpression(member_expr.expression);
+    if (base_out) |ptr| ptr.* = base;
     switch (member_expr.property) {
         .expression => |expr| {
             if (try constantFold(b.gpa, expr)) |constant| {
@@ -567,6 +568,45 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression) 
         },
         .private_identifier => try b.todo("private identifier in member expression"),
     }
+}
+
+fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!Ir.Inst.Ref {
+    var this_value: Ir.Inst.Ref = .none;
+    const callee = switch (call_expr.expression.*) {
+        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, &this_value),
+        else => try b.lowerExpression(call_expr.expression),
+    };
+
+    var args: std.ArrayListUnmanaged(Ir.Inst.Ref) = try .initCapacity(b.gpa, call_expr.arguments.len);
+    defer args.deinit(b.gpa);
+
+    for (call_expr.arguments) |arg| {
+        const arg_ref: Ir.Inst.Ref = switch (arg) {
+            .expression => |*expr| try b.lowerExpression(expr),
+            .spread => |*expr| blk: {
+                const value = try b.lowerExpression(expr);
+                break :blk try b.addInst(.{
+                    .tag = .spread,
+                    .data = .{ .ref = value },
+                });
+            },
+        };
+        args.appendAssumeCapacity(arg_ref);
+    }
+
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const len: u32 = @intCast(args.items.len);
+    try b.extras.appendSlice(b.gpa, @ptrCast(args.items));
+
+    return b.addInst(.{
+        .tag = .call,
+        .data = .{ .call = .{
+            .callee = callee,
+            .this_value = this_value,
+            .extra_index = extra_index,
+            .len = len,
+        } },
+    });
 }
 
 fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {

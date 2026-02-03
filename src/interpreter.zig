@@ -278,4 +278,84 @@ test {
     try testInterpreter(std.testing.allocator, "x = 5; x++;", .{ .value = Value.from(5) }, null, null);
     try testInterpreter(std.testing.allocator, "x = 10; --x;", .{ .value = Value.from(9) }, null, null);
     try testInterpreter(std.testing.allocator, "x = 10; x--;", .{ .value = Value.from(10) }, null, null);
+
+    // Call expressions
+    try testInterpreter(
+        std.testing.allocator,
+        \\Math.random();
+        \\Number("1");
+        \\JSON.stringify({ foo: "bar" }, null, 2)
+        \\Math.max(1, 5, ...[3, 9], 2);
+        \\
+    ,
+        .{ .value = Value.from(9) },
+        \\IR (test)
+        \\   0: get_binding "Math"      [0..2]
+        \\   1: get_property %0, "random" [1..2]
+        \\   2: call %1, %0, []         [2..2]
+        \\   3: get_binding "Number"    [3..5]
+        \\   4: string "1"              [4..5]
+        \\   5: call %3, none, [%4]     [5..5]
+        \\   6: get_binding "JSON"      [6..13]
+        \\   7: get_property %6, "stringify" [7..13]
+        \\   8: string "foo"            [8..10]
+        \\   9: string "bar"            [9..10]
+        \\  10: object {%8: %9}         [10..13]
+        \\  11: null                    [11..13]
+        \\  12: number 2                [12..13]
+        \\  13: call %7, %6, [%10, %11, %12] [13..13]
+        \\  14: get_binding "Math"      [14..23]
+        \\  15: get_property %14, "max" [15..23]
+        \\  16: one                     [16..23]
+        \\  17: number 5                [17..23]
+        \\  18: number 3                [18..20]
+        \\  19: number 9                [19..20]
+        \\  20: array [%18, %19]        [20..21]
+        \\  21: spread %20              [21..23]
+        \\  22: number 2                [22..23]
+        \\  23: call %15, %14, [%16, %17, %21, %22] [23..24]
+        \\  24: end %23                 [24..24]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: get_binding r0, @0
+        \\   6: get_property r1, r0, @1
+        \\  13: call_property0 r2, r1, r0
+        \\  17: get_binding r0, @2
+        \\  23: load_string r1, @3
+        \\  29: call1 r2, r0, r1
+        \\  33: get_binding r0, @4
+        \\  39: get_property r1, r0, @5
+        \\  46: load_string r2, @6
+        \\  52: load_string r3, @7
+        \\  58: object_create r4
+        \\  60: object_set r4, @6, r3
+        \\  67: load_null r2
+        \\  69: load_number_i32 r3, 2
+        \\  75: array_create r31, 0
+        \\  81: array_push r31, r4
+        \\  84: array_push r31, r2
+        \\  87: array_push r31, r3
+        \\  90: call_property r5, r1, r0, r31
+        \\  95: get_binding r0, @0
+        \\ 101: get_property r1, r0, @8
+        \\ 108: load_number_i32 r2, 1
+        \\ 114: load_number_i32 r3, 5
+        \\ 120: load_number_i32 r4, 3
+        \\ 126: load_number_i32 r5, 9
+        \\ 132: array_create r6, 2
+        \\ 138: array_set r6, r4, 0
+        \\ 145: array_set r6, r5, 1
+        \\ 152: move r4, r6
+        \\ 155: load_number_i32 r5, 2
+        \\ 161: array_create r31, 0
+        \\ 167: array_push r31, r2
+        \\ 170: array_push r31, r3
+        \\ 173: array_spread r31, r6
+        \\ 176: array_push r31, r5
+        \\ 179: call_property r6, r1, r0, r31
+        \\ 184: end r6
+        \\
+        ,
+    );
 }

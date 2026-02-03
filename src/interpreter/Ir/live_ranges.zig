@@ -91,6 +91,13 @@ pub fn computeLiveRanges(
             .delete_property_indexed,
             .delete_property_indexed_strict,
             => try uses.append(gpa, data.delete_property_indexed.base),
+            .call => {
+                try uses.append(gpa, data.call.callee);
+                if (data.call.this_value != .none) try uses.append(gpa, data.call.this_value);
+                const extra_index = @intFromEnum(data.call.extra_index);
+                const args = @as([*]const Ir.Inst.Ref, @ptrCast(extras[extra_index..]))[0..data.call.len];
+                for (args) |arg| try uses.append(gpa, arg);
+            },
             .array => {
                 const extra_index = @intFromEnum(data.array.extra_index);
                 const elements = @as([*]const Ir.Inst.Ref, @ptrCast(extras[extra_index..]))[0..data.array.len];
@@ -159,6 +166,7 @@ pub fn computeLiveRanges(
             .typeof,
             .void,
             .delete,
+            .spread,
             .end,
             => try uses.append(gpa, data.ref),
         }

@@ -16,6 +16,8 @@ const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
+const evaluateCall = language.runtime.evaluateCall;
+const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
@@ -90,6 +92,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .array_create => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
                 .array_push => vm.executeArrayPush(data.reg_reg[0], data.reg_reg[1]),
                 .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
+                .array_spread => vm.executeArraySpread(data.reg_reg[0], data.reg_reg[1]),
                 .object_create => vm.executeObjectCreate(data.reg),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -171,6 +174,14 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .delete_property_computed_strict => vm.executeDeletePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
                 .delete_property_indexed => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
                 .delete_property_indexed_strict => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
+                .call => vm.executeCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .call0 => vm.executeCallN(0, data.reg_reg[0], data.reg_reg[1], .{}),
+                .call1 => vm.executeCallN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
+                .call2 => vm.executeCallN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
+                .call_property => vm.executeCallProperty(data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3]),
+                .call_property0 => vm.executeCallPropertyN(0, data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .{}),
+                .call_property1 => vm.executeCallPropertyN(1, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], .{data.reg_reg_reg_reg[3]}),
+                .call_property2 => vm.executeCallPropertyN(2, data.reg_reg_reg_reg_reg[0], data.reg_reg_reg_reg_reg[1], data.reg_reg_reg_reg_reg[2], .{ data.reg_reg_reg_reg_reg[3], data.reg_reg_reg_reg_reg[4] }),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -274,8 +285,8 @@ fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
     vm.load(dest, vm.store(src));
 }
 
-fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, capacity: u32) Agent.Error!void {
-    const array = try arrayCreateFast(vm.agent, capacity);
+fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, length: u32) Agent.Error!void {
+    const array = try arrayCreateFast(vm.agent, length);
     vm.load(dst, Value.from(&array.object));
 }
 
@@ -284,10 +295,11 @@ fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.In
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
     const index = array.fields.length;
-    try array.object.property_storage.indexed_properties.set(vm.agent.gc_allocator, index, .{
-        .value_or_accessor = .{ .value = elem_value },
-        .attributes = .all,
-    });
+    try array.object.createDataPropertyDirect(
+        vm.agent,
+        PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
+        elem_value,
+    );
 }
 
 fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) Agent.Error!void {
@@ -298,6 +310,17 @@ fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Ins
         .value_or_accessor = .{ .value = elem_value },
         .attributes = .all,
     });
+}
+
+fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const array_value = vm.store(array_reg);
+    const spread_value = vm.store(value_reg);
+    const array = array_value.asObject();
+    var iterator = try getIterator(vm.agent, spread_value, .sync);
+    var next_index: u53 = array.as(builtins.Array).fields.length;
+    while (try iterator.stepValue(vm.agent)) |next| : (next_index += 1) {
+        try array.createDataPropertyDirect(vm.agent, PropertyKey.from(next_index), next);
+    }
 }
 
 fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) Agent.Error!void {
@@ -1249,4 +1272,86 @@ fn executeDeletePropertyIndexed(
         return vm.agent.throwException(.type_error, "Could not delete property", .{});
     }
     vm.load(dst, Value.from(delete_status));
+}
+
+fn executeCall(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    callee_reg: Bytecode.Inst.Reg,
+    args_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const callee_value = vm.store(callee_reg);
+    const args_value = vm.store(args_reg);
+    const args_object = args_value.asObject();
+    const args_len = args_object.as(builtins.Array).fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
+    defer args_list.deinit(vm.agent.gc_allocator);
+    for (0..args_len) |i| {
+        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const arg = descriptor.value_or_accessor.value;
+        args_list.appendAssumeCapacity(arg);
+    }
+
+    const result = try evaluateCall(vm.agent, callee_value, .undefined, args_list.items);
+    vm.load(dest, result);
+}
+
+fn executeCallN(
+    vm: *Vm,
+    comptime N: comptime_int,
+    dest: Bytecode.Inst.Reg,
+    callee_reg: Bytecode.Inst.Reg,
+    arg_regs: [N]Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const callee_value = vm.store(callee_reg);
+
+    var args: [N]Value = undefined;
+    inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
+
+    const result = try evaluateCall(vm.agent, callee_value, .undefined, &args);
+    vm.load(dest, result);
+}
+
+fn executeCallProperty(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    callee_reg: Bytecode.Inst.Reg,
+    this_reg: Bytecode.Inst.Reg,
+    args_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const callee_value = vm.store(callee_reg);
+    const this_value = vm.store(this_reg);
+    const args_value = vm.store(args_reg);
+    const args_object = args_value.asObject();
+    const args_len = args_object.as(builtins.Array).fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
+    defer args_list.deinit(vm.agent.gc_allocator);
+    for (0..args_len) |i| {
+        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const arg = descriptor.value_or_accessor.value;
+        args_list.appendAssumeCapacity(arg);
+    }
+
+    const result = try evaluateCall(vm.agent, callee_value, this_value, args_list.items);
+    vm.load(dest, result);
+}
+
+fn executeCallPropertyN(
+    vm: *Vm,
+    comptime N: comptime_int,
+    dest: Bytecode.Inst.Reg,
+    callee_reg: Bytecode.Inst.Reg,
+    this_reg: Bytecode.Inst.Reg,
+    arg_regs: [N]Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const callee_value = vm.store(callee_reg);
+    const this_value = vm.store(this_reg);
+
+    var args: [N]Value = undefined;
+    inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
+
+    const result = try evaluateCall(vm.agent, callee_value, this_value, &args);
+    vm.load(dest, result);
 }

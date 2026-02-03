@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const interpreter = @import("../interpreter.zig");
+
+const Vm = interpreter.Vm;
+
 const Bytecode = @This();
 
 name: []const u8,
@@ -38,6 +42,7 @@ pub const Inst = struct {
         array_create,
         array_push,
         array_set,
+        array_spread,
 
         object_create,
         object_set,
@@ -125,6 +130,14 @@ pub const Inst = struct {
         delete_property_computed_strict,
         delete_property_indexed,
         delete_property_indexed_strict,
+        call,
+        call0,
+        call1,
+        call2,
+        call_property,
+        call_property0,
+        call_property1,
+        call_property2,
     };
 
     pub const Data = union {
@@ -133,6 +146,8 @@ pub const Inst = struct {
         reg: Reg,
         reg_reg: struct { Reg, Reg },
         reg_reg_reg: struct { Reg, Reg, Reg },
+        reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg },
+        reg_reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg, Reg },
         reg_reg_u32: struct { Reg, Reg, u32 },
         reg_i32: struct { Reg, i32 },
         reg_u32: struct { Reg, u32 },
@@ -147,6 +162,8 @@ pub const Inst = struct {
     pub const Reg = enum(u8) {
         /// Used for `end` instruction to indicate no register
         none = std.math.maxInt(u8),
+        /// Scratch register for temporary values, e.g. the call arguments array
+        scratch = Vm.num_regs - 1,
         _,
     };
 
@@ -249,6 +266,7 @@ pub const Inst = struct {
             } },
             .move,
             .array_push,
+            .array_spread,
             .to_number,
             .unary_minus,
             .bitwise_not,
@@ -286,6 +304,50 @@ pub const Inst = struct {
                 try takeEnumNonExhaustive(Reg, reader),
                 try takeEnumNonExhaustive(Reg, reader),
                 try reader.takeInt(u32, .little),
+            } },
+            .call => .{ .reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call0 => .{ .reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call1 => .{ .reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call2 => .{ .reg_reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call_property => .{ .reg_reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call_property0 => .{ .reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call_property1 => .{ .reg_reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+            } },
+            .call_property2 => .{ .reg_reg_reg_reg_reg = .{
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
+                try takeEnumNonExhaustive(Reg, reader),
             } },
             .object_set => .{ .reg_string_reg = .{
                 try takeEnumNonExhaustive(Reg, reader),
@@ -423,6 +485,7 @@ pub const Inst = struct {
             },
             .move,
             .array_push,
+            .array_spread,
             .to_number,
             .unary_minus,
             .bitwise_not,
@@ -460,6 +523,50 @@ pub const Inst = struct {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[0]), .little);
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_u32[1]), .little);
                 try writer.writeInt(u32, inst.data.reg_reg_u32[2], .little);
+            },
+            .call => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
+            },
+            .call0 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg[1]), .little);
+            },
+            .call1 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
+            },
+            .call2 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
+            },
+            .call_property => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
+            },
+            .call_property0 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg[2]), .little);
+            },
+            .call_property1 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[2]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg[3]), .little);
+            },
+            .call_property2 => {
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[0]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[1]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[2]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[3]), .little);
+                try writer.writeInt(u8, @intFromEnum(inst.data.reg_reg_reg_reg_reg[4]), .little);
             },
             .object_set => {
                 try writer.writeInt(u8, @intFromEnum(inst.data.reg_string_reg[0]), .little);
@@ -670,6 +777,7 @@ pub fn print(
             },
             .move,
             .array_push,
+            .array_spread,
             .to_number,
             .unary_minus,
             .bitwise_not,
@@ -718,6 +826,78 @@ pub fn print(
                 try printData(inst.data.reg_reg_u32[1], 'r', .blue, writer, tty_config);
                 try writer.writeAll(", ");
                 try printData(inst.data.reg_reg_u32[2], null, .yellow, writer, tty_config);
+            },
+            .call => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
+            },
+            .call0 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg[1], 'r', .blue, writer, tty_config);
+            },
+            .call1 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
+            },
+            .call2 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
+            },
+            .call_property => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
+            },
+            .call_property0 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg[2], 'r', .blue, writer, tty_config);
+            },
+            .call_property1 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
+            },
+            .call_property2 => {
+                try writer.writeByte(' ');
+                try printData(inst.data.reg_reg_reg_reg_reg[0], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg_reg[1], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg_reg[2], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg_reg[3], 'r', .blue, writer, tty_config);
+                try writer.writeAll(", ");
+                try printData(inst.data.reg_reg_reg_reg_reg[4], 'r', .blue, writer, tty_config);
             },
             .object_set => {
                 try writer.writeByte(' ');

@@ -19,7 +19,8 @@ lsra: LinearScanRegisterAllocation,
 pub const Error = error{OutOfMemory};
 
 pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Builder {
-    const lsra: LinearScanRegisterAllocation = try .init(gpa, ir.live_ranges, Vm.num_regs);
+    const usable_regs: u8 = Vm.num_regs - 1;
+    const lsra: LinearScanRegisterAllocation = try .init(gpa, ir.live_ranges, usable_regs);
     return .{
         .gpa = gpa,
         .ir = ir,
@@ -91,6 +92,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .typeof => try b.lowerTypeof(data.ref, dest),
             .void => try b.lowerVoid(data.ref, dest),
             .delete => try b.lowerDelete(data.ref, dest),
+            .spread => try b.lowerSpread(data.ref, dest),
             .add => try b.lowerAdd(data.binary, dest),
             .sub => try b.lowerSub(data.binary, dest),
             .mul => try b.lowerMul(data.binary, dest),
@@ -143,6 +145,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .delete_property_computed_strict => try b.lowerDeletePropertyComputed(data.delete_property_computed, true, dest),
             .delete_property_indexed => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, false, dest),
             .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
+            .call => try b.lowerCall(data.call, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -844,6 +847,10 @@ fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void 
     });
 }
 
+fn lowerSpread(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitMoveIfNeeded(ref, dest);
+}
+
 fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
     const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
     try b.emit(.{
@@ -1139,6 +1146,86 @@ fn lowerDeletePropertyIndexed(b: *Builder, data: @FieldType(Ir.Inst.Data, "delet
             data.index,
         } },
     });
+}
+
+fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode.Inst.Reg) Error!void {
+    const callee_reg = b.resolve(data.callee);
+    const this_reg = switch (data.this_value) {
+        .none => Bytecode.Inst.Reg.none,
+        else => |ref| b.resolve(ref),
+    };
+    const extra_index = @intFromEnum(data.extra_index);
+    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+
+    const has_spread = for (args) |arg| {
+        if (arg.toIndex()) |arg_index| {
+            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
+                break true;
+            }
+        }
+    } else false;
+
+    if (data.len <= 2 and !has_spread) {
+        try b.emit(switch (this_reg) {
+            .none => switch (data.len) {
+                0 => .{ .tag = .call0, .data = .{ .reg_reg = .{ dest, callee_reg } } },
+                1 => .{ .tag = .call1, .data = .{ .reg_reg_reg = .{ dest, callee_reg, b.resolve(args[0]) } } },
+                2 => .{ .tag = .call2, .data = .{ .reg_reg_reg_reg = .{ dest, callee_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+                else => unreachable,
+            },
+            else => switch (data.len) {
+                0 => .{ .tag = .call_property0, .data = .{ .reg_reg_reg = .{ dest, callee_reg, this_reg } } },
+                1 => .{ .tag = .call_property1, .data = .{ .reg_reg_reg_reg = .{ dest, callee_reg, this_reg, b.resolve(args[0]) } } },
+                2 => .{ .tag = .call_property2, .data = .{ .reg_reg_reg_reg_reg = .{ dest, callee_reg, this_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+                else => unreachable,
+            },
+        });
+        return;
+    }
+
+    const args_reg: Bytecode.Inst.Reg = .scratch;
+    try b.emit(.{
+        .tag = .array_create,
+        .data = .{ .reg_u32 = .{ args_reg, 0 } },
+    });
+    for (args) |arg| {
+        if (arg.toIndex()) |arg_index| {
+            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
+                const spread_ref = b.ir.instructions.items(.data)[@intFromEnum(arg_index)].ref;
+                const spread_reg = b.resolve(spread_ref);
+                try b.emit(.{
+                    .tag = .array_spread,
+                    .data = .{ .reg_reg = .{ args_reg, spread_reg } },
+                });
+                continue;
+            }
+        }
+        const arg_reg = b.resolve(arg);
+        try b.emit(.{
+            .tag = .array_push,
+            .data = .{ .reg_reg = .{ args_reg, arg_reg } },
+        });
+    }
+
+    switch (data.this_value) {
+        .none => try b.emit(.{
+            .tag = .call,
+            .data = .{ .reg_reg_reg = .{
+                dest,
+                callee_reg,
+                args_reg,
+            } },
+        }),
+        else => try b.emit(.{
+            .tag = .call_property,
+            .data = .{ .reg_reg_reg_reg = .{
+                dest,
+                callee_reg,
+                this_reg,
+                args_reg,
+            } },
+        }),
+    }
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
