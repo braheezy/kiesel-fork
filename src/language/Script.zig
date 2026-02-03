@@ -140,7 +140,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
 
 /// 16.1.7 GlobalDeclarationInstantiation ( script, env )
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
-fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
+pub fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
     // 1. Let lexNames be the LexicallyDeclaredNames of script.
     var lexical_names: std.ArrayList(ast.Identifier) = .empty;
     defer lexical_names.deinit(agent.gc_allocator);

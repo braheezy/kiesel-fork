@@ -219,7 +219,7 @@ fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir
 fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
     return switch (stmt.*) {
         .block_statement => |*block_stmt| try b.lowerBlockStatement(block_stmt),
-        .variable_statement => try b.todo("variable statement"),
+        .variable_statement => |*var_stmt| try b.lowerVariableStatement(var_stmt),
         .empty_statement => .none,
         .expression_statement => |expr_stmt| try b.lowerExpression(&expr_stmt.expression),
         .if_statement => |*if_stmt| try b.lowerIfStatement(if_stmt),
@@ -245,6 +245,38 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
 
 fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement) Error!Ir.Inst.Ref {
     return b.lowerStatementList(&block_stmt.block.statement_list);
+}
+
+fn lowerVariableStatement(b: *Builder, var_stmt: *const ast.VariableStatement) Error!Ir.Inst.Ref {
+    var last: Ir.Inst.Ref = .none;
+    for (var_stmt.variable_declaration_list.items) |var_decl| {
+        const result = try b.lowerVariableDeclaration(var_decl);
+        if (result != .none) {
+            last = result;
+        }
+    }
+    return last;
+}
+
+fn lowerVariableDeclaration(b: *Builder, var_decl: ast.VariableDeclaration) Error!Ir.Inst.Ref {
+    // GlobalDeclarationInstantiation is responsible for creating the bindings and initializing them to undefined.
+    return switch (var_decl) {
+        .binding_identifier => |binding| {
+            if (binding.initializer) |*init_expr| {
+                const value = try b.lowerExpression(init_expr);
+                const string_index = try b.internString(binding.binding_identifier);
+                return b.addInst(.{
+                    .tag = .set_binding,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = value,
+                    } },
+                });
+            }
+            return .none;
+        },
+        .binding_pattern => try b.todo("binding pattern in variable declaration"),
+    };
 }
 
 fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.Ref {

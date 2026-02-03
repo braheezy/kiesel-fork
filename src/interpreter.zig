@@ -25,6 +25,7 @@ fn testInterpreter(
 ) !void {
     const ast = @import("language/ast.zig");
     const Parser = @import("language/Parser.zig");
+    const Script = @import("language/Script.zig");
 
     var arena_instance: std.heap.ArenaAllocator = .init(gpa);
     defer arena_instance.deinit();
@@ -67,6 +68,8 @@ fn testInterpreter(
     };
     try agent.execution_context_stack.append(agent.gc_allocator, test_context);
     defer _ = agent.execution_context_stack.pop().?;
+
+    try Script.globalDeclarationInstantiation(&agent, script, realm.global_env);
 
     var vm: Vm = try .init(&agent, &bc);
     defer vm.deinit();
@@ -232,25 +235,34 @@ test {
         \\
     );
 
-    // Variable assignment
+    // Variable statements
     try testInterpreter(std.testing.allocator,
-        \\x = 42;
-        \\x;
+        \\var x = 10, y = 20;
+        \\x + y;
         \\
-    , .{ .value = Value.from(42) },
+    , .{ .value = Value.from(30) },
         \\IR (test)
-        \\   0: number 42                                             [0..1]
+        \\   0: number 10                                             [0..1]
         \\   1: set_binding "x", %0                                   [1..1]
-        \\   2: get_binding "x"                                       [2..3]
-        \\   3: end %2                                                [3..3]
+        \\   2: number 20                                             [2..3]
+        \\   3: set_binding "y", %2                                   [3..3]
+        \\   4: get_binding "x"                                       [4..6]
+        \\   5: get_binding "y"                                       [5..6]
+        \\   6: add %4, %5                                            [6..7]
+        \\   7: end %6                                                [7..7]
         \\
     ,
         \\Bytecode (test)
-        \\   0: load_number_i32 r0, 42
+        \\   0: load_number_i32 r0, 10
         \\   6: set_binding @0, r0
         \\  12: move r1, r0
-        \\  15: get_binding r0, @0
-        \\  21: end r0
+        \\  15: load_number_i32 r0, 20
+        \\  21: set_binding @1, r0
+        \\  27: move r1, r0
+        \\  30: get_binding r0, @0
+        \\  36: get_binding r1, @1
+        \\  42: add r2, r0, r1
+        \\  46: end r2
         \\
     );
 
