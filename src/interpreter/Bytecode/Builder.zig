@@ -86,8 +86,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .@"while" => try b.lowerWhile(data.@"while", dest),
             .@"for" => try b.lowerFor(data.@"for", dest),
             .loop => try b.lowerLoop(data.loop, dest),
-            .unary_plus => try b.lowerUnaryPlus(data.ref, dest),
-            .unary_minus => try b.lowerUnaryMinus(data.ref, dest),
+            .to_number => try b.lowerToNumber(data.ref, dest),
+            .negate => try b.lowerNegate(data.ref, dest),
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
@@ -767,6 +767,44 @@ fn lowerLoop(b: *Builder, data: @FieldType(Ir.Inst.Data, "loop"), dest: Bytecode
     }
 }
 
+fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.to_number, ref, dest);
+}
+
+fn lowerNegate(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.negate, ref, dest);
+}
+
+fn lowerBitwiseNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.bitwise_not, ref, dest);
+}
+
+fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.logical_not, ref, dest);
+}
+
+fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.typeof, ref, dest);
+}
+
+fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .load_undefined,
+        .data = .{ .reg = dest },
+    });
+}
+
+fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .load_true,
+        .data = .{ .reg = dest },
+    });
+}
+
+fn lowerSpread(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitMoveIfNeeded(ref, dest);
+}
+
 fn lowerAdd(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), dest: Bytecode.Inst.Reg) Error!void {
     try b.emitBinaryOp(.add, data.lhs, data.rhs, dest);
 }
@@ -901,44 +939,6 @@ fn lowerNullishCoalesce(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), d
     b.jump(merge_block);
 
     b.switchToBlock(merge_block);
-}
-
-fn lowerUnaryPlus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.to_number, ref, dest);
-}
-
-fn lowerUnaryMinus(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.unary_minus, ref, dest);
-}
-
-fn lowerBitwiseNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.bitwise_not, ref, dest);
-}
-
-fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.logical_not, ref, dest);
-}
-
-fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.typeof, ref, dest);
-}
-
-fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{
-        .tag = .load_undefined,
-        .data = .{ .reg = dest },
-    });
-}
-
-fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emit(.{
-        .tag = .load_true,
-        .data = .{ .reg = dest },
-    });
-}
-
-fn lowerSpread(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitMoveIfNeeded(ref, dest);
 }
 
 fn lowerInitializeBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

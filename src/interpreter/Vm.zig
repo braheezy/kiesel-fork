@@ -103,7 +103,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
-                .unary_minus => vm.executeUnaryMinus(data.reg_reg[0], data.reg_reg[1]),
+                .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
                 .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
@@ -378,19 +378,11 @@ fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(src);
-
-    // OPTIMIZATION: Fast path for number values
-    if (value.isNumber()) {
-        @branchHint(.likely);
-        vm.load(dst, value);
-        return;
-    }
-
     const number = try value.toNumber(vm.agent);
     vm.load(dst, Value.from(number));
 }
 
-fn executeUnaryMinus(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(src);
 
     // OPTIMIZATION: Fast path for number values

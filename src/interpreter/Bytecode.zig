@@ -52,7 +52,7 @@ pub const Inst = struct {
         resolve_this_binding,
 
         to_number,
-        unary_minus,
+        negate,
         bitwise_not,
         logical_not,
         typeof,
@@ -199,7 +199,7 @@ pub const Inst = struct {
         .object_set_computed = .reg_reg_reg,
         .resolve_this_binding = .reg,
         .to_number = .reg_reg,
-        .unary_minus = .reg_reg,
+        .negate = .reg_reg,
         .bitwise_not = .reg_reg,
         .logical_not = .reg_reg,
         .typeof = .reg_reg,

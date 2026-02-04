@@ -1100,8 +1100,8 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
     }
     const operand = try b.lowerExpression(unary_expr.expression);
     const tag: Ir.Inst.Tag = switch (unary_expr.operator) {
-        .@"+" => .unary_plus,
-        .@"-" => .unary_minus,
+        .@"+" => .to_number,
+        .@"-" => .negate,
         .@"~" => .bitwise_not,
         .@"!" => .logical_not,
         .typeof => .typeof,
