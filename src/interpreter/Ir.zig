@@ -38,20 +38,24 @@ const CountingWriter = struct {
     fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
         const cw: *CountingWriter = @alignCast(@fieldParentPtr("writer", w));
 
-        cw.count += w.end;
-        for (data[0 .. data.len - 1]) |slice| {
-            cw.count += slice.len;
-        }
-        cw.count += data[data.len - 1].len * splat;
-
         const aux = w.buffered();
         const aux_n = try cw.out.writeSplatHeader(aux, data, splat);
         if (aux_n < w.end) {
+            cw.count += aux_n;
             const remaining = w.buffer[aux_n..w.end];
             @memmove(w.buffer[0..remaining.len], remaining);
             w.end = remaining.len;
             return 0;
         }
+
+        const total = w.end + blk: {
+            var n: usize = 0;
+            for (data[0 .. data.len - 1]) |slice| n += slice.len;
+            n += data[data.len - 1].len * splat;
+            break :blk n;
+        };
+
+        cw.count += total;
         w.end = 0;
         return aux_n - aux.len;
     }
