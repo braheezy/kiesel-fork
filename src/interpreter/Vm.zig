@@ -34,6 +34,7 @@ bytecode: *const Bytecode,
 strings: []const *const String,
 big_ints: []const *const BigInt,
 regs: [num_regs]Value,
+cached_this_value: ?Value,
 
 pub const num_regs = 32;
 
@@ -61,6 +62,7 @@ pub fn init(
         .big_ints = big_ints,
         // Not initialized to catch invalid stores more easily
         .regs = undefined,
+        .cached_this_value = null,
     };
 }
 
@@ -99,6 +101,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .object_create => vm.executeObjectCreate(data.reg),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .unary_minus => vm.executeUnaryMinus(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
@@ -362,6 +365,15 @@ fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Byt
     const object = object_value.asObject();
     const property_key = try key_value.toPropertyKey(vm.agent);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
+}
+
+fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const this_value = vm.cached_this_value orelse blk: {
+        const this_value = try vm.agent.resolveThisBinding();
+        vm.cached_this_value = this_value;
+        break :blk this_value;
+    };
+    vm.load(reg, this_value);
 }
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {

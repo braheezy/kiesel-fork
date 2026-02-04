@@ -49,6 +49,8 @@ pub const Inst = struct {
         object_set,
         object_set_computed,
 
+        resolve_this_binding,
+
         to_number,
         unary_minus,
         bitwise_not,
@@ -195,6 +197,7 @@ pub const Inst = struct {
         .object_create = .reg,
         .object_set = .reg_string_reg,
         .object_set_computed = .reg_reg_reg,
+        .resolve_this_binding = .reg,
         .to_number = .reg_reg,
         .unary_minus = .reg_reg,
         .bitwise_not = .reg_reg,

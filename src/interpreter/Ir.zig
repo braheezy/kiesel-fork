@@ -73,6 +73,7 @@ pub const Inst = struct {
         big_int,
         array,
         object,
+        this,
 
         @"if",
         @"while",
@@ -203,6 +204,7 @@ pub const Inst = struct {
         .big_int = .big_int,
         .array = .array,
         .object = .object,
+        .this = .none,
         .@"if" = .@"if",
         .@"while" = .@"while",
         .@"for" = .@"for",

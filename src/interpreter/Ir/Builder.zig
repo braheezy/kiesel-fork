@@ -727,7 +727,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
     }
     return switch (expr.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
-            .this => try b.todo("this"),
+            .this => try b.lowerThis(),
             .identifier_reference => |identifier| try b.lowerIdentifierReference(identifier),
             .literal => unreachable, // Guaranteed to constant-fold
             .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
@@ -764,6 +764,13 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .tagged_template => try b.todo("tagged template"),
         .binding_pattern_for_assignment_expression => try b.todo("binding pattern for assignment expression"),
     };
+}
+
+fn lowerThis(b: *Builder) Error!Ir.Inst.Ref {
+    return b.addInst(.{
+        .tag = .this,
+        .data = .{ .none = {} },
+    });
 }
 
 fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.Ref {

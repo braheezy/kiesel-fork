@@ -81,6 +81,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .big_int => try b.lowerBigInt(data.big_int, dest),
             .array => try b.lowerArray(data.array, dest),
             .object => try b.lowerObject(data.object, dest),
+            .this => try b.lowerThis(dest),
             .@"if" => try b.lowerIf(data.@"if", dest),
             .@"while" => try b.lowerWhile(data.@"while", dest),
             .@"for" => try b.lowerFor(data.@"for", dest),
@@ -650,6 +651,13 @@ fn lowerObject(b: *Builder, object_data: @FieldType(Ir.Inst.Data, "object"), des
             });
         }
     }
+}
+
+fn lowerThis(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .resolve_this_binding,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerIf(b: *Builder, data: @FieldType(Ir.Inst.Data, "if"), dest: Bytecode.Inst.Reg) Error!void {
