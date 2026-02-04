@@ -146,7 +146,12 @@ pub fn build(b: *Builder) Error!Bytecode {
             .delete_property_computed_strict => try b.lowerDeletePropertyComputed(data.delete_property_computed, true, dest),
             .delete_property_indexed => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, false, dest),
             .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
+            .copy_data_properties => try b.lowerCopyDataProperties(data.copy_data_properties, dest),
             .call => try b.lowerCall(data.call, dest),
+            .get_iterator => try b.lowerGetIterator(data.ref, dest),
+            .iterator_step => try b.lowerIteratorStep(data.ref, dest),
+            .iterator_step_value => try b.lowerIteratorStepValue(data.ref, dest),
+            .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -1206,6 +1211,53 @@ fn lowerDeletePropertyIndexed(b: *Builder, data: @FieldType(Ir.Inst.Data, "delet
     });
 }
 
+fn lowerCopyDataProperties(b: *Builder, data: @FieldType(Ir.Inst.Data, "copy_data_properties"), dest: Bytecode.Inst.Reg) Error!void {
+    const source_reg = b.resolve(data.source);
+
+    if (data.len == 0) {
+        try b.emit(.{
+            .tag = .copy_data_properties,
+            .data = .{ .reg_reg_reg = .{
+                dest,
+                source_reg,
+                .none,
+            } },
+        });
+        return;
+    }
+
+    const extra_index = @intFromEnum(data.extra_index);
+    const excluded = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+
+    const excluded_reg: Bytecode.Inst.Reg = .scratch;
+    try b.emit(.{
+        .tag = .array_create,
+        .data = .{ .reg_u32 = .{
+            excluded_reg,
+            0,
+        } },
+    });
+    for (excluded) |prop| {
+        const prop_reg = b.resolve(prop);
+        try b.emit(.{
+            .tag = .array_push,
+            .data = .{ .reg_reg = .{
+                excluded_reg,
+                prop_reg,
+            } },
+        });
+    }
+
+    try b.emit(.{
+        .tag = .copy_data_properties,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            source_reg,
+            excluded_reg,
+        } },
+    });
+}
+
 fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode.Inst.Reg) Error!void {
     const callee_reg = b.resolve(data.callee);
     const this_reg = switch (data.this_value) {
@@ -1284,6 +1336,50 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
             } },
         }),
     }
+}
+
+fn lowerGetIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const value_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .get_iterator,
+        .data = .{ .reg_reg = .{
+            dest,
+            value_reg,
+        } },
+    });
+}
+
+fn lowerIteratorStep(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const iterator_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .iterator_step,
+        .data = .{ .reg_reg = .{
+            dest,
+            iterator_reg,
+        } },
+    });
+}
+
+fn lowerIteratorStepValue(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const iterator_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .iterator_step_value,
+        .data = .{ .reg_reg = .{
+            dest,
+            iterator_reg,
+        } },
+    });
+}
+
+fn lowerIteratorCollect(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const iterator_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .iterator_collect,
+        .data = .{ .reg_reg = .{
+            dest,
+            iterator_reg,
+        } },
+    });
 }
 
 fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

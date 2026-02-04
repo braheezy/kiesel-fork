@@ -132,6 +132,8 @@ pub const Inst = struct {
         delete_property_computed_strict,
         delete_property_indexed,
         delete_property_indexed_strict,
+        copy_data_properties,
+
         call,
         call0,
         call1,
@@ -140,6 +142,11 @@ pub const Inst = struct {
         call_property0,
         call_property1,
         call_property2,
+
+        get_iterator,
+        iterator_step,
+        iterator_step_value,
+        iterator_collect,
     };
 
     pub const Data = union {
@@ -263,6 +270,7 @@ pub const Inst = struct {
         .delete_property_computed_strict = .reg_reg_reg,
         .delete_property_indexed = .reg_reg_u32,
         .delete_property_indexed_strict = .reg_reg_u32,
+        .copy_data_properties = .reg_reg_reg,
         .call = .reg_reg_reg,
         .call0 = .reg_reg,
         .call1 = .reg_reg_reg,
@@ -271,6 +279,10 @@ pub const Inst = struct {
         .call_property0 = .reg_reg_reg,
         .call_property1 = .reg_reg_reg_reg,
         .call_property2 = .reg_reg_reg_reg_reg,
+        .get_iterator = .reg_reg,
+        .iterator_step = .reg_reg,
+        .iterator_step_value = .reg_reg,
+        .iterator_collect = .reg_reg,
     });
 
     pub const Reg = enum(u8) {

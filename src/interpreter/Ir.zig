@@ -145,8 +145,14 @@ pub const Inst = struct {
         delete_property_computed_strict,
         delete_property_indexed,
         delete_property_indexed_strict,
+        copy_data_properties,
 
         call,
+
+        get_iterator,
+        iterator_step,
+        iterator_step_value,
+        iterator_collect,
 
         end,
     };
@@ -178,6 +184,7 @@ pub const Inst = struct {
         delete_property: struct { base: Ref, name: StringIndex },
         delete_property_computed: struct { base: Ref, property: Ref },
         delete_property_indexed: struct { base: Ref, index: u32 },
+        copy_data_properties: struct { source: Ref, extra_index: ExtraIndex, len: u32 },
         call: struct { callee: Ref, this_value: Ref, extra_index: ExtraIndex, len: u32 },
         ref: Ref,
     };
@@ -259,7 +266,12 @@ pub const Inst = struct {
         .delete_property_computed_strict = .delete_property_computed,
         .delete_property_indexed = .delete_property_indexed,
         .delete_property_indexed_strict = .delete_property_indexed,
+        .copy_data_properties = .copy_data_properties,
         .call = .call,
+        .get_iterator = .ref,
+        .iterator_step = .ref,
+        .iterator_step_value = .ref,
+        .iterator_collect = .ref,
         .end = .ref,
     });
 
@@ -326,6 +338,14 @@ pub const Inst = struct {
                 const extra_index = @intFromEnum(data.call.extra_index);
                 const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.call.len];
                 for (args) |arg| try uses.append(gpa, arg);
+            },
+            .copy_data_properties => {
+                try uses.append(gpa, data.copy_data_properties.source);
+                const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
+                const excluded = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.copy_data_properties.len];
+                for (excluded) |prop| {
+                    if (prop != .none) try uses.append(gpa, prop);
+                }
             },
             .ref => try uses.append(gpa, data.ref),
             inline else => |dt| {
@@ -453,6 +473,17 @@ fn printData(
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
+            }
+            try cw.writeByte(']');
+        },
+        .copy_data_properties => {
+            try printField(ir, data.copy_data_properties.source, cw, tty_config);
+            try cw.writeAll(", [");
+            const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
+            const excluded = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.copy_data_properties.len];
+            for (excluded, 0..) |prop, j| {
+                if (j > 0) try cw.writeAll(", ");
+                try printField(ir, prop, cw, tty_config);
             }
             try cw.writeByte(']');
         },

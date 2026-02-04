@@ -370,4 +370,134 @@ test {
         \\
         ,
     );
+
+    // Destructuring assignment
+    try testInterpreter(std.testing.allocator,
+        \\const {a, ...rest} = {a: 1, b: 2, c: 3};
+        \\const [x, y] = [10, 20];
+        \\const {d: {e}} = {d: {e: 5}};
+        \\const {f = 99} = {f: undefined};
+        \\rest.b + x + e + f;
+        \\
+    , .{ .value = Value.from(116) },
+        \\IR (test)
+        \\   0: string "a"                                            [0..6]
+        \\   1: one                                                   [1..6]
+        \\   2: string "b"                                            [2..6]
+        \\   3: number 2                                              [3..6]
+        \\   4: string "c"                                            [4..6]
+        \\   5: number 3                                              [5..6]
+        \\   6: object {%0: %1, %2: %3, %4: %5}                       [6..10]
+        \\   7: get_property %6, "a"                                  [7..8]
+        \\   8: initialize_binding "a", %7                            [8..8]
+        \\   9: string "a"                                            [9..10]
+        \\  10: copy_data_properties %6, [%9]                         [10..11]
+        \\  11: initialize_binding "rest", %10                        [11..11]
+        \\  12: number 10                                             [12..14]
+        \\  13: number 20                                             [13..14]
+        \\  14: array [%12, %13]                                      [14..15]
+        \\  15: get_iterator %14                                      [15..18]
+        \\  16: iterator_step_value %15                               [16..17]
+        \\  17: initialize_binding "x", %16                           [17..17]
+        \\  18: iterator_step_value %15                               [18..19]
+        \\  19: initialize_binding "y", %18                           [19..19]
+        \\  20: string "d"                                            [20..24]
+        \\  21: string "e"                                            [21..23]
+        \\  22: number 5                                              [22..23]
+        \\  23: object {%21: %22}                                     [23..24]
+        \\  24: object {%20: %23}                                     [24..26]
+        \\  25: string "d"                                            [25..26]
+        \\  26: get_property_computed %24, %25                        [26..27]
+        \\  27: get_property %26, "e"                                 [27..28]
+        \\  28: initialize_binding "e", %27                           [28..28]
+        \\  29: string "f"                                            [29..31]
+        \\  30: get_binding "undefined"                               [30..31]
+        \\  31: object {%29: %30}                                     [31..32]
+        \\  32: get_property %31, "f"                                 [32..36]
+        \\  33: undefined                                             [33..34]
+        \\  34: eq_strict %32, %33                                    [34..36]
+        \\  35: number 99                                             [35..36]
+        \\  36: if %34, %35, %32                                      [36..37]
+        \\  37: initialize_binding "f", %36                           [37..37]
+        \\  38: get_binding "rest"                                    [38..39]
+        \\  39: get_property %38, "b"                                 [39..41]
+        \\  40: get_binding "x"                                       [40..41]
+        \\  41: add %39, %40                                          [41..43]
+        \\  42: get_binding "e"                                       [42..43]
+        \\  43: add %41, %42                                          [43..45]
+        \\  44: get_binding "f"                                       [44..45]
+        \\  45: add %43, %44                                          [45..46]
+        \\  46: end %45                                               [46..46]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_string r0, @0
+        \\   6: load_number_i32 r1, 1
+        \\  12: load_string r2, @1
+        \\  18: load_number_i32 r3, 2
+        \\  24: load_string r4, @2
+        \\  30: load_number_i32 r5, 3
+        \\  36: object_create r6
+        \\  38: object_set r6, @0, r1
+        \\  45: object_set r6, @1, r3
+        \\  52: object_set r6, @2, r5
+        \\  59: get_property r0, r6, @0
+        \\  66: initialize_binding @0, r0
+        \\  72: move r1, r0
+        \\  75: load_string r0, @0
+        \\  81: array_create r31, 0
+        \\  87: array_push r31, r0
+        \\  90: copy_data_properties r1, r6, r31
+        \\  94: initialize_binding @3, r1
+        \\ 100: move r0, r1
+        \\ 103: load_number_i32 r0, 10
+        \\ 109: load_number_i32 r1, 20
+        \\ 115: array_create r2, 2
+        \\ 121: array_set r2, r0, 0
+        \\ 128: array_set r2, r1, 1
+        \\ 135: get_iterator r0, r2
+        \\ 138: iterator_step_value r1, r0
+        \\ 141: initialize_binding @4, r1
+        \\ 147: move r2, r1
+        \\ 150: iterator_step_value r1, r0
+        \\ 153: initialize_binding @5, r1
+        \\ 159: move r0, r1
+        \\ 162: load_string r0, @6
+        \\ 168: load_string r1, @7
+        \\ 174: load_number_i32 r2, 5
+        \\ 180: object_create r3
+        \\ 182: object_set r3, @7, r2
+        \\ 189: object_create r1
+        \\ 191: object_set r1, @6, r3
+        \\ 198: load_string r0, @6
+        \\ 204: get_property_computed r2, r1, r0
+        \\ 208: get_property r0, r2, @7
+        \\ 215: initialize_binding @7, r0
+        \\ 221: move r1, r0
+        \\ 224: load_string r0, @8
+        \\ 230: get_binding r1, @9
+        \\ 236: object_create r2
+        \\ 238: object_set r2, @8, r1
+        \\ 245: get_property r0, r2, @8
+        \\ 252: load_undefined r1
+        \\ 254: eq_strict r2, r0, r1
+        \\ 258: load_number_i32 r1, 99
+        \\ 264: jump_if_true r2, 5
+        \\ 270: jump 8
+        \\ 275: move r3, r1
+        \\ 278: jump 3
+        \\ 283: move r3, r0
+        \\ 286: initialize_binding @8, r3
+        \\ 292: move r0, r3
+        \\ 295: get_binding r0, @3
+        \\ 301: get_property r1, r0, @1
+        \\ 308: get_binding r0, @4
+        \\ 314: add r2, r1, r0
+        \\ 318: get_binding r0, @7
+        \\ 324: add r1, r2, r0
+        \\ 328: get_binding r0, @8
+        \\ 334: add r2, r1, r0
+        \\ 338: end r2
+        \\
+    );
 }

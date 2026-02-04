@@ -16,11 +16,13 @@ const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
+const createArrayFromList = types.createArrayFromList;
 const evaluateCall = language.runtime.evaluateCall;
 const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = language.ast.stringValueImpl;
 
@@ -175,6 +177,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .delete_property_computed_strict => vm.executeDeletePropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
                 .delete_property_indexed => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
                 .delete_property_indexed_strict => vm.executeDeletePropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
+                .copy_data_properties => vm.executeCopyDataProperties(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .call => vm.executeCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .call0 => vm.executeCallN(0, data.reg_reg[0], data.reg_reg[1], .{}),
                 .call1 => vm.executeCallN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
@@ -183,6 +186,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .call_property0 => vm.executeCallPropertyN(0, data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .{}),
                 .call_property1 => vm.executeCallPropertyN(1, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], .{data.reg_reg_reg_reg[3]}),
                 .call_property2 => vm.executeCallPropertyN(2, data.reg_reg_reg_reg_reg[0], data.reg_reg_reg_reg_reg[1], data.reg_reg_reg_reg_reg[2], .{ data.reg_reg_reg_reg_reg[3], data.reg_reg_reg_reg_reg[4] }),
+                .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -1373,4 +1380,95 @@ fn executeCallPropertyN(
 
     const result = try evaluateCall(vm.agent, callee_value, this_value, &args);
     vm.load(dest, result);
+}
+
+fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(value_reg);
+    const iterator = try getIterator(vm.agent, value, .sync);
+
+    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
+
+    vm.load(dest, Value.from(iterator_obj));
+}
+
+fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+
+    var iterator: types.Iterator = .{
+        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
+        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
+        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
+    };
+
+    if (try iterator.step(vm.agent)) |next| {
+        vm.load(dest, Value.from(next));
+    } else {
+        vm.load(dest, .undefined);
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+    }
+}
+
+fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+
+    var iterator: types.Iterator = .{
+        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
+        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
+        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
+    };
+
+    if (try iterator.stepValue(vm.agent)) |next| {
+        vm.load(dest, next);
+    } else {
+        vm.load(dest, .undefined);
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+    }
+}
+
+fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+
+    var iterator: types.Iterator = .{
+        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
+        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
+        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
+    };
+
+    var values: std.ArrayList(Value) = .empty;
+    defer values.deinit(vm.agent.gc_allocator);
+    while (try iterator.stepValue(vm.agent)) |next| {
+        try values.append(vm.agent.gc_allocator, next);
+    }
+    iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+
+    const array = try createArrayFromList(vm.agent, values.items);
+    vm.load(dest, Value.from(&array.object));
+}
+
+fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytecode.Inst.Reg, excluded_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const source_value = vm.store(source_reg);
+
+    const target = try ordinaryObjectCreateFast(vm.agent);
+    if (excluded_reg == .none) {
+        const excluded_items: []const PropertyKey = &.{};
+        try target.copyDataProperties(vm.agent, source_value, excluded_items);
+    } else {
+        const excluded_object = vm.store(excluded_reg).asObject();
+        const excluded_len = excluded_object.as(builtins.Array).fields.length;
+
+        var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(vm.agent.gc_allocator, excluded_len);
+        defer excluded_items.deinit(vm.agent.gc_allocator);
+        for (0..excluded_len) |i| {
+            const descriptor = excluded_object.property_storage.indexed_properties.get(@intCast(i)).?;
+            const prop_key = PropertyKey.from(descriptor.value_or_accessor.value.asString());
+            excluded_items.appendAssumeCapacity(prop_key);
+        }
+
+        try target.copyDataProperties(vm.agent, source_value, excluded_items.items);
+    }
+
+    vm.load(dest, Value.from(target));
 }
