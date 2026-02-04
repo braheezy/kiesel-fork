@@ -384,9 +384,8 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
     if (for_stmt.initializer) |initializer| {
         _ = switch (initializer) {
             .expression => |*expr| try b.lowerExpression(expr),
-            .variable_statement,
-            .lexical_declaration,
-            => try b.todo("variable declarations in for loop"),
+            .variable_statement => |*var_stmt| try b.lowerVariableStatement(var_stmt),
+            .lexical_declaration => |*lex_decl| try b.lowerLexicalDeclaration(lex_decl),
         };
     }
 
