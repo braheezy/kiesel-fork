@@ -745,7 +745,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, null),
         .super_property => try b.todo("super property"),
         .meta_property => try b.todo("meta property"),
-        .new_expression => try b.todo("new expression"),
+        .new_expression => |*new_expr| try b.lowerNewExpression(new_expr),
         .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
         .super_call => try b.todo("super call"),
         .import_call => try b.todo("import call"),
@@ -877,17 +877,11 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
     }
 }
 
-fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!Ir.Inst.Ref {
-    var this_value: Ir.Inst.Ref = .none;
-    const callee = switch (call_expr.expression.*) {
-        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, &this_value),
-        else => try b.lowerExpression(call_expr.expression),
-    };
+fn lowerArguments(b: *Builder, arguments: ast.Arguments) Error!std.ArrayList(Ir.Inst.Ref) {
+    var args: std.ArrayList(Ir.Inst.Ref) = try .initCapacity(b.gpa, arguments.len);
+    errdefer args.deinit(b.gpa);
 
-    var args: std.ArrayListUnmanaged(Ir.Inst.Ref) = try .initCapacity(b.gpa, call_expr.arguments.len);
-    defer args.deinit(b.gpa);
-
-    for (call_expr.arguments) |arg| {
+    for (arguments) |arg| {
         const arg_ref: Ir.Inst.Ref = switch (arg) {
             .expression => |*expr| try b.lowerExpression(expr),
             .spread => |*expr| blk: {
@@ -900,6 +894,39 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
         };
         args.appendAssumeCapacity(arg_ref);
     }
+
+    return args;
+}
+
+fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.Inst.Ref {
+    const constructor = try b.lowerExpression(new_expr.expression);
+
+    var args = try b.lowerArguments(new_expr.arguments);
+    defer args.deinit(b.gpa);
+
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const len: u32 = @intCast(args.items.len);
+    try b.extras.appendSlice(b.gpa, @ptrCast(args.items));
+
+    return b.addInst(.{
+        .tag = .new,
+        .data = .{ .new = .{
+            .constructor = constructor,
+            .extra_index = extra_index,
+            .len = len,
+        } },
+    });
+}
+
+fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!Ir.Inst.Ref {
+    var this_value: Ir.Inst.Ref = .none;
+    const callee = switch (call_expr.expression.*) {
+        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, &this_value),
+        else => try b.lowerExpression(call_expr.expression),
+    };
+
+    var args = try b.lowerArguments(call_expr.arguments);
+    defer args.deinit(b.gpa);
 
     const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
     const len: u32 = @intCast(args.items.len);

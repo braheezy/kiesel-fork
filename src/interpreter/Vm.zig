@@ -18,6 +18,7 @@ const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumeric
 const arrayCreateFast = builtins.arrayCreateFast;
 const createArrayFromList = types.createArrayFromList;
 const evaluateCall = language.runtime.evaluateCall;
+const evaluateNew = language.runtime.evaluateNew;
 const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
@@ -186,6 +187,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .call_property0 => vm.executeCallPropertyN(0, data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .{}),
                 .call_property1 => vm.executeCallPropertyN(1, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], .{data.reg_reg_reg_reg[3]}),
                 .call_property2 => vm.executeCallPropertyN(2, data.reg_reg_reg_reg_reg[0], data.reg_reg_reg_reg_reg[1], data.reg_reg_reg_reg_reg[2], .{ data.reg_reg_reg_reg_reg[3], data.reg_reg_reg_reg_reg[4] }),
+                .new => vm.executeNew(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .new0 => vm.executeNewN(0, data.reg_reg[0], data.reg_reg[1], .{}),
+                .new1 => vm.executeNewN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
+                .new2 => vm.executeNewN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
                 .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
@@ -1379,6 +1384,45 @@ fn executeCallPropertyN(
     inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
 
     const result = try evaluateCall(vm.agent, callee_value, this_value, &args);
+    vm.load(dest, result);
+}
+
+fn executeNew(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    constructor_reg: Bytecode.Inst.Reg,
+    args_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const constructor = vm.store(constructor_reg);
+    const args_value = vm.store(args_reg);
+    const args_object = args_value.asObject();
+    const args_len = args_object.as(builtins.Array).fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
+    defer args_list.deinit(vm.agent.gc_allocator);
+    for (0..args_len) |i| {
+        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const arg = descriptor.value_or_accessor.value;
+        args_list.appendAssumeCapacity(arg);
+    }
+
+    const result = try evaluateNew(vm.agent, constructor, args_list.items);
+    vm.load(dest, result);
+}
+
+fn executeNewN(
+    vm: *Vm,
+    comptime N: comptime_int,
+    dest: Bytecode.Inst.Reg,
+    constructor_reg: Bytecode.Inst.Reg,
+    arg_regs: [N]Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const constructor = vm.store(constructor_reg);
+
+    var args: [N]Value = undefined;
+    inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
+
+    const result = try evaluateNew(vm.agent, constructor, &args);
     vm.load(dest, result);
 }
 

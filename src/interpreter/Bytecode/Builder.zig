@@ -148,6 +148,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
             .copy_data_properties => try b.lowerCopyDataProperties(data.copy_data_properties, dest),
             .call => try b.lowerCall(data.call, dest),
+            .new => try b.lowerNew(data.new, dest),
             .get_iterator => try b.lowerGetIterator(data.ref, dest),
             .iterator_step => try b.lowerIteratorStep(data.ref, dest),
             .iterator_step_value => try b.lowerIteratorStepValue(data.ref, dest),
@@ -420,6 +421,37 @@ fn emitMoveIfNeeded(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Erro
         try b.emit(.{
             .tag = .move,
             .data = .{ .reg_reg = .{ dest, src } },
+        });
+    }
+}
+
+fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .array_create,
+        .data = .{ .reg_u32 = .{ dest, 0 } },
+    });
+    for (args) |arg| {
+        if (arg.toIndex()) |arg_index| {
+            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
+                const spread_ref = b.ir.instructions.items(.data)[@intFromEnum(arg_index)].ref;
+                const spread_reg = b.resolve(spread_ref);
+                try b.emit(.{
+                    .tag = .array_spread,
+                    .data = .{ .reg_reg = .{
+                        dest,
+                        spread_reg,
+                    } },
+                });
+                continue;
+            }
+        }
+        const arg_reg = b.resolve(arg);
+        try b.emit(.{
+            .tag = .array_push,
+            .data = .{ .reg_reg = .{
+                dest,
+                arg_reg,
+            } },
         });
     }
 }
@@ -1294,28 +1326,7 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
     }
 
     const args_reg: Bytecode.Inst.Reg = .scratch;
-    try b.emit(.{
-        .tag = .array_create,
-        .data = .{ .reg_u32 = .{ args_reg, 0 } },
-    });
-    for (args) |arg| {
-        if (arg.toIndex()) |arg_index| {
-            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
-                const spread_ref = b.ir.instructions.items(.data)[@intFromEnum(arg_index)].ref;
-                const spread_reg = b.resolve(spread_ref);
-                try b.emit(.{
-                    .tag = .array_spread,
-                    .data = .{ .reg_reg = .{ args_reg, spread_reg } },
-                });
-                continue;
-            }
-        }
-        const arg_reg = b.resolve(arg);
-        try b.emit(.{
-            .tag = .array_push,
-            .data = .{ .reg_reg = .{ args_reg, arg_reg } },
-        });
-    }
+    try b.emitArgumentsArray(args, args_reg);
 
     switch (data.this_value) {
         .none => try b.emit(.{
@@ -1336,6 +1347,42 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
             } },
         }),
     }
+}
+
+fn lowerNew(b: *Builder, data: @FieldType(Ir.Inst.Data, "new"), dest: Bytecode.Inst.Reg) Error!void {
+    const constructor_reg = b.resolve(data.constructor);
+    const extra_index = @intFromEnum(data.extra_index);
+    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+
+    const has_spread = for (args) |arg| {
+        if (arg.toIndex()) |arg_index| {
+            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
+                break true;
+            }
+        }
+    } else false;
+
+    if (data.len <= 2 and !has_spread) {
+        try b.emit(switch (data.len) {
+            0 => .{ .tag = .new0, .data = .{ .reg_reg = .{ dest, constructor_reg } } },
+            1 => .{ .tag = .new1, .data = .{ .reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]) } } },
+            2 => .{ .tag = .new2, .data = .{ .reg_reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+            else => unreachable,
+        });
+        return;
+    }
+
+    const args_reg: Bytecode.Inst.Reg = .scratch;
+    try b.emitArgumentsArray(args, args_reg);
+
+    try b.emit(.{
+        .tag = .new,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            constructor_reg,
+            args_reg,
+        } },
+    });
 }
 
 fn lowerGetIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
