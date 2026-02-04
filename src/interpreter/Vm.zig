@@ -103,6 +103,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
+                .to_string => vm.executeToString(data.reg_reg[0], data.reg_reg[1]),
                 .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
@@ -380,6 +381,12 @@ fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agen
     const value = vm.store(src);
     const number = try value.toNumber(vm.agent);
     vm.load(dst, Value.from(number));
+}
+
+fn executeToString(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    const string = try value.toString(vm.agent);
+    vm.load(dst, Value.from(string));
 }
 
 fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {

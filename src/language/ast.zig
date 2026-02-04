@@ -500,7 +500,7 @@ pub const TemplateLiteral = struct {
         expression: Expression,
 
         /// Text span without head/middle/tail components.
-        fn templateValueChars(self: Span) []const u8 {
+        pub fn templateCharacters(self: Span) []const u8 {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             if (self.text[self.text.len - 1] == '`') {
                 return self.text[1 .. self.text.len - 1];
@@ -516,8 +516,7 @@ pub const TemplateLiteral = struct {
             self: Span,
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!*const String {
-            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
-            const text = self.templateValueChars();
+            const text = self.templateCharacters();
             if (std.mem.indexOf(u8, text, "\r") == null) {
                 return stringValueImpl(allocator, text);
             }
@@ -533,7 +532,7 @@ pub const TemplateLiteral = struct {
             self: Span,
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!*const String {
-            const text = self.templateValueChars();
+            const text = self.templateCharacters();
             if (std.mem.indexOf(u8, text, "\r") == null) {
                 return String.fromUtf8Alloc(allocator, text);
             }

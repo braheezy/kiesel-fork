@@ -81,6 +81,7 @@ pub const Inst = struct {
         loop,
 
         to_number,
+        to_string,
         negate,
         bitwise_not,
         logical_not,
@@ -210,6 +211,7 @@ pub const Inst = struct {
         .@"for" = .@"for",
         .loop = .loop,
         .to_number = .ref,
+        .to_string = .ref,
         .negate = .ref,
         .bitwise_not = .ref,
         .logical_not = .ref,

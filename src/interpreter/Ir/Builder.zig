@@ -738,7 +738,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .async_function_expression => try b.todo("async function expression"),
             .async_generator_expression => try b.todo("async generator expression"),
             .regular_expression_literal => try b.todo("regular expression literal"),
-            .template_literal => try b.todo("template literal"),
+            .template_literal => |*template_lit| try b.lowerTemplateLiteral(template_lit),
             .arrow_function => try b.todo("arrow function"),
             .async_arrow_function => try b.todo("async arrow function"),
         },
@@ -842,6 +842,51 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .len = len,
         } },
     });
+}
+
+fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) Error!Ir.Inst.Ref {
+    var result: Ir.Inst.Ref = .none;
+    for (template_lit.spans, 0..) |span, i| {
+        std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
+        const span_ref: Ir.Inst.Ref = switch (span) {
+            .expression => |expr| blk: {
+                const expr_ref = try b.lowerExpression(&expr);
+                break :blk try b.addInst(.{
+                    .tag = .to_string,
+                    .data = .{ .ref = expr_ref },
+                });
+            },
+            .text => blk: {
+                const normalized = try std.mem.replaceOwned(
+                    u8,
+                    b.gpa,
+                    span.templateCharacters(),
+                    "\r\n",
+                    "\n",
+                );
+                defer b.gpa.free(normalized);
+                _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
+                const string_index = try b.internString(normalized);
+                break :blk try b.addInst(.{
+                    .tag = .string,
+                    .data = .{ .string = string_index },
+                });
+            },
+        };
+
+        if (i == 0) {
+            result = span_ref;
+        } else {
+            result = try b.addInst(.{
+                .tag = .add,
+                .data = .{ .binary = .{
+                    .lhs = result,
+                    .rhs = span_ref,
+                } },
+            });
+        }
+    }
+    return result;
 }
 
 fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, base_out: ?*Ir.Inst.Ref) Error!Ir.Inst.Ref {

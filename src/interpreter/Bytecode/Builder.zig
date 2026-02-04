@@ -87,6 +87,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .@"for" => try b.lowerFor(data.@"for", dest),
             .loop => try b.lowerLoop(data.loop, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
+            .to_string => try b.lowerToString(data.ref, dest),
             .negate => try b.lowerNegate(data.ref, dest),
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
@@ -769,6 +770,10 @@ fn lowerLoop(b: *Builder, data: @FieldType(Ir.Inst.Data, "loop"), dest: Bytecode
 
 fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitUnaryOp(.to_number, ref, dest);
+}
+
+fn lowerToString(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.to_string, ref, dest);
 }
 
 fn lowerNegate(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
