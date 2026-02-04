@@ -413,21 +413,26 @@ test {
         \\  29: string "f"                                            [29..31]
         \\  30: get_binding "undefined"                               [30..31]
         \\  31: object {%29: %30}                                     [31..32]
-        \\  32: get_property %31, "f"                                 [32..36]
+        \\  32: get_property %31, "f"                                 [32..40]
         \\  33: undefined                                             [33..34]
-        \\  34: eq_strict %32, %33                                    [34..36]
-        \\  35: number 99                                             [35..36]
-        \\  36: if %34, %35, %32                                      [36..37]
-        \\  37: initialize_binding "f", %36                           [37..37]
-        \\  38: get_binding "rest"                                    [38..39]
-        \\  39: get_property %38, "b"                                 [39..41]
-        \\  40: get_binding "x"                                       [40..41]
-        \\  41: add %39, %40                                          [41..43]
-        \\  42: get_binding "e"                                       [42..43]
-        \\  43: add %41, %42                                          [43..45]
-        \\  44: get_binding "f"                                       [44..45]
-        \\  45: add %43, %44                                          [45..46]
-        \\  46: end %45                                               [46..46]
+        \\  34: eq_strict %32, %33                                    [34..35]
+        \\  35: br_cond %34, %36, %39                                 [35..35]
+        \\  36: label                                                 [36..36]
+        \\  37: number 99                                             [37..38]
+        \\  38: br %41, %37                                           [38..38]
+        \\  39: label                                                 [39..39]
+        \\  40: br %41, %32                                           [40..40]
+        \\  41: label                                                 [41..42]
+        \\  42: initialize_binding "f", %41                           [42..42]
+        \\  43: get_binding "rest"                                    [43..44]
+        \\  44: get_property %43, "b"                                 [44..46]
+        \\  45: get_binding "x"                                       [45..46]
+        \\  46: add %44, %45                                          [46..48]
+        \\  47: get_binding "e"                                       [47..48]
+        \\  48: add %46, %47                                          [48..50]
+        \\  49: get_binding "f"                                       [49..50]
+        \\  50: add %48, %49                                          [50..51]
+        \\  51: end %50                                               [51..51]
         \\
     ,
         \\Bytecode (test)
@@ -481,23 +486,141 @@ test {
         \\ 245: get_property r0, r2, @8
         \\ 252: load_undefined r1
         \\ 254: eq_strict r2, r0, r1
-        \\ 258: load_number_i32 r1, 99
-        \\ 264: jump_if_true r2, 5
-        \\ 270: jump 8
-        \\ 275: move r3, r1
-        \\ 278: jump 3
-        \\ 283: move r3, r0
-        \\ 286: initialize_binding @8, r3
-        \\ 292: move r0, r3
-        \\ 295: get_binding r0, @3
-        \\ 301: get_property r1, r0, @1
-        \\ 308: get_binding r0, @4
-        \\ 314: add r2, r1, r0
-        \\ 318: get_binding r0, @7
-        \\ 324: add r1, r2, r0
-        \\ 328: get_binding r0, @8
-        \\ 334: add r2, r1, r0
-        \\ 338: end r2
+        \\ 258: jump_if_true r2, 5
+        \\ 264: jump 14
+        \\ 269: load_number_i32 r1, 99
+        \\ 275: move r0, r1
+        \\ 278: jump 0
+        \\ 283: initialize_binding @8, r0
+        \\ 289: move r1, r0
+        \\ 292: get_binding r0, @3
+        \\ 298: get_property r1, r0, @1
+        \\ 305: get_binding r0, @4
+        \\ 311: add r2, r1, r0
+        \\ 315: get_binding r0, @7
+        \\ 321: add r1, r2, r0
+        \\ 325: get_binding r0, @8
+        \\ 331: add r2, r1, r0
+        \\ 335: end r2
+        \\
+    );
+
+    // Loops
+    try testInterpreter(std.testing.allocator,
+        \\var x = 0;
+        \\while(x < 3) { x = x + 1; }
+        \\do { x = x + 1; } while(x < 5);
+        \\for(var i = 0; i < 3; i++) { x = x + i; }
+        \\x;
+        \\
+    , .{ .value = Value.from(8) },
+        \\IR (test)
+        \\   0: zero                                                  [0..1]
+        \\   1: set_binding "x", %0                                   [1..1]
+        \\   2: undefined                                             [2..3]
+        \\   3: br %4, %2                                             [3..3]
+        \\   4: label                                                 [4..16]
+        \\   5: get_binding "x"                                       [5..7]
+        \\   6: number 3                                              [6..7]
+        \\   7: lt %5, %6                                             [7..8]
+        \\   8: br_cond %7, %9, %15                                   [8..8]
+        \\   9: label                                                 [9..9]
+        \\  10: get_binding "x"                                       [10..12]
+        \\  11: one                                                   [11..12]
+        \\  12: add %10, %11                                          [12..13]
+        \\  13: set_binding "x", %12                                  [13..14]
+        \\  14: br %4, %13                                            [14..14]
+        \\  15: label                                                 [15..15]
+        \\  16: br %17, %4                                            [16..16]
+        \\  17: label                                                 [17..17]
+        \\  18: label                                                 [18..30]
+        \\  19: get_binding "x"                                       [19..21]
+        \\  20: one                                                   [20..21]
+        \\  21: add %19, %20                                          [21..22]
+        \\  22: set_binding "x", %21                                  [22..23]
+        \\  23: br %24, %22                                           [23..23]
+        \\  24: label                                                 [24..32]
+        \\  25: get_binding "x"                                       [25..27]
+        \\  26: number 5                                              [26..27]
+        \\  27: lt %25, %26                                           [27..28]
+        \\  28: br_cond %27, %29, %31                                 [28..28]
+        \\  29: label                                                 [29..29]
+        \\  30: br %18, %24                                           [30..30]
+        \\  31: label                                                 [31..31]
+        \\  32: br %33, %24                                           [32..32]
+        \\  33: label                                                 [33..33]
+        \\  34: zero                                                  [34..35]
+        \\  35: set_binding "i", %34                                  [35..35]
+        \\  36: undefined                                             [36..37]
+        \\  37: br %38, %36                                           [37..37]
+        \\  38: label                                                 [38..51]
+        \\  39: get_binding "i"                                       [39..41]
+        \\  40: number 3                                              [40..41]
+        \\  41: lt %39, %40                                           [41..42]
+        \\  42: br_cond %41, %43, %50                                 [42..42]
+        \\  43: label                                                 [43..43]
+        \\  44: get_binding "x"                                       [44..46]
+        \\  45: get_binding "i"                                       [45..46]
+        \\  46: add %44, %45                                          [46..47]
+        \\  47: set_binding "x", %46                                  [47..49]
+        \\  48: update_binding "i", increment, postfix                [48..48]
+        \\  49: br %38, %47                                           [49..49]
+        \\  50: label                                                 [50..50]
+        \\  51: br %52, %38                                           [51..51]
+        \\  52: label                                                 [52..52]
+        \\  53: get_binding "x"                                       [53..54]
+        \\  54: end %53                                               [54..54]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 0
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: load_undefined r0
+        \\  17: get_binding r1, @0
+        \\  23: load_number_i32 r2, 3
+        \\  29: lt r3, r1, r2
+        \\  33: jump_if_true r3, 5
+        \\  39: jump 33
+        \\  44: get_binding r1, @0
+        \\  50: load_number_i32 r2, 1
+        \\  56: add r3, r1, r2
+        \\  60: set_binding @0, r3
+        \\  66: move r1, r3
+        \\  69: move r0, r1
+        \\  72: jump -60
+        \\  77: get_binding r1, @0
+        \\  83: load_number_i32 r2, 1
+        \\  89: add r3, r1, r2
+        \\  93: set_binding @0, r3
+        \\  99: move r1, r3
+        \\ 102: get_binding r2, @0
+        \\ 108: load_number_i32 r3, 5
+        \\ 114: lt r4, r2, r3
+        \\ 118: jump_if_true r4, 5
+        \\ 124: jump 8
+        \\ 129: move r0, r1
+        \\ 132: jump -60
+        \\ 137: move r0, r1
+        \\ 140: load_number_i32 r0, 0
+        \\ 146: set_binding @1, r0
+        \\ 152: move r1, r0
+        \\ 155: load_undefined r0
+        \\ 157: get_binding r1, @1
+        \\ 163: load_number_i32 r2, 3
+        \\ 169: lt r3, r1, r2
+        \\ 173: jump_if_true r3, 5
+        \\ 179: jump 39
+        \\ 184: get_binding r1, @0
+        \\ 190: get_binding r2, @1
+        \\ 196: add r3, r1, r2
+        \\ 200: set_binding @0, r3
+        \\ 206: move r1, r3
+        \\ 209: increment_binding_postfix r2, @1
+        \\ 215: move r0, r1
+        \\ 218: jump -66
+        \\ 223: get_binding r0, @0
+        \\ 229: end r0
         \\
     );
 }

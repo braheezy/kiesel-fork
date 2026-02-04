@@ -133,6 +133,31 @@ fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
     return index.toRef();
 }
 
+const Deferred = struct {
+    b: *Builder,
+    ref: Ir.Inst.Ref,
+
+    fn set(d: Deferred, data: Ir.Inst.Data) void {
+        const index = d.ref.toIndex().?;
+        d.b.instructions.slice().items(.data)[@intFromEnum(index)] = data;
+    }
+};
+
+fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferred {
+    const ref = try b.addInst(.{
+        .tag = tag,
+        .data = undefined,
+    });
+    return .{ .b = b, .ref = ref };
+}
+
+fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
+    return b.addInst(.{
+        .tag = .label,
+        .data = .{ .none = {} },
+    });
+}
+
 fn internString(b: *Builder, string: []const u8) std.mem.Allocator.Error!Ir.Inst.StringIndex {
     const gop = try b.strings.getOrPut(b.gpa, string);
     if (!gop.found_existing) {
@@ -304,50 +329,95 @@ fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.
             });
     }
 
-    const @"test" = try b.lowerExpression(&if_stmt.test_expression);
-    const then = try b.lowerStatement(if_stmt.consequent_statement);
-    const @"else" = if (if_stmt.alternate_statement) |stmt|
+    const test_result = try b.lowerExpression(&if_stmt.test_expression);
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const then_label = try b.addLabel();
+    const then_result = try b.lowerStatement(if_stmt.consequent_statement);
+    const then_br = try b.addInstDeferred(.br);
+
+    const else_label = try b.addLabel();
+    const else_result = if (if_stmt.alternate_statement) |stmt|
         try b.lowerStatement(stmt)
     else
-        try b.addInst(.{
-            .tag = .undefined,
-            .data = .{ .none = {} },
-        });
-    return b.addInst(.{
-        .tag = .@"if",
-        .data = .{ .@"if" = .{
-            .@"test" = @"test",
-            .then = then,
-            .@"else" = @"else",
-        } },
-    });
+        .none;
+    const else_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = test_result,
+        .then_target = then_label,
+        .else_target = else_label,
+    } });
+    then_br.set(.{ .br = .{
+        .target = end_label,
+        .value = then_result,
+    } });
+    else_br.set(.{ .br = .{
+        .target = end_label,
+        .value = else_result,
+    } });
+
+    return end_label;
 }
 
 fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement) Error!Ir.Inst.Ref {
-    const body = try b.lowerStatement(do_while_stmt.consequent_statement);
-
     if (try constantFold(b.gpa, &do_while_stmt.test_expression)) |constant| {
         defer constant.deinit(b.gpa);
         if (!constant.isTruthy()) {
-            return body;
+            return b.lowerStatement(do_while_stmt.consequent_statement);
         }
-        return b.addInst(.{
-            .tag = .loop,
-            .data = .{ .loop = .{
-                .body = body,
-                .update = .none,
+        const loop_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
+        });
+        _ = try b.lowerStatement(do_while_stmt.consequent_statement);
+        _ = try b.addInst(.{
+            .tag = .br,
+            .data = .{ .br = .{
+                .target = loop_label,
+                .value = .none,
             } },
         });
+        return loop_label;
     }
 
-    const @"test" = try b.lowerExpression(&do_while_stmt.test_expression);
-    return b.addInst(.{
-        .tag = .@"while",
-        .data = .{ .@"while" = .{
-            .@"test" = @"test",
-            .body = body,
-        } },
-    });
+    const body_label = try b.addLabel();
+    const body_result = try b.lowerStatement(do_while_stmt.consequent_statement);
+    const body_br = try b.addInstDeferred(.br);
+
+    const test_label = try b.addLabel();
+    const test_result = try b.lowerExpression(&do_while_stmt.test_expression);
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const continue_label = try b.addLabel();
+    const continue_br = try b.addInstDeferred(.br);
+
+    const exit_label = try b.addLabel();
+    const exit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    body_br.set(.{ .br = .{
+        .target = test_label,
+        .value = body_result,
+    } });
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = test_result,
+        .then_target = continue_label,
+        .else_target = exit_label,
+    } });
+    continue_br.set(.{ .br = .{
+        .target = body_label,
+        .value = test_label,
+    } });
+    exit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = test_label,
+    } });
+
+    return end_label;
 }
 
 fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error!Ir.Inst.Ref {
@@ -359,25 +429,59 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error
                 .data = .{ .none = {} },
             });
         }
-        const body = try b.lowerStatement(while_stmt.consequent_statement);
-        return b.addInst(.{
-            .tag = .loop,
-            .data = .{ .loop = .{
-                .body = body,
-                .update = .none,
+        const loop_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
+        });
+        _ = try b.lowerStatement(while_stmt.consequent_statement);
+        _ = try b.addInst(.{
+            .tag = .br,
+            .data = .{ .br = .{
+                .target = loop_label,
+                .value = .none,
             } },
         });
+        return loop_label;
     }
 
-    const @"test" = try b.lowerExpression(&while_stmt.test_expression);
-    const body = try b.lowerStatement(while_stmt.consequent_statement);
-    return b.addInst(.{
-        .tag = .@"while",
-        .data = .{ .@"while" = .{
-            .@"test" = @"test",
-            .body = body,
-        } },
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
     });
+    const entry_br = try b.addInstDeferred(.br);
+
+    const test_label = try b.addLabel();
+    const test_result = try b.lowerExpression(&while_stmt.test_expression);
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const body_label = try b.addLabel();
+    const body_result = try b.lowerStatement(while_stmt.consequent_statement);
+    const body_br = try b.addInstDeferred(.br);
+
+    const exit_label = try b.addLabel();
+    const exit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    entry_br.set(.{ .br = .{
+        .target = test_label,
+        .value = undefined_ref,
+    } });
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = test_result,
+        .then_target = body_label,
+        .else_target = exit_label,
+    } });
+    body_br.set(.{ .br = .{
+        .target = test_label,
+        .value = body_result,
+    } });
+    exit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = test_label,
+    } });
+
+    return end_label;
 }
 
 fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.Inst.Ref {
@@ -404,34 +508,69 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
     } else true;
 
     if (loop) {
-        const update: Ir.Inst.Ref = if (for_stmt.increment_expression) |*update_expr|
-            try b.lowerExpression(update_expr)
-        else
-            .none;
-        const body = try b.lowerStatement(for_stmt.consequent_statement);
-        return b.addInst(.{
-            .tag = .loop,
-            .data = .{ .loop = .{
-                .body = body,
-                .update = update,
+        const loop_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
+        });
+        _ = try b.lowerStatement(for_stmt.consequent_statement);
+
+        if (for_stmt.increment_expression) |*update_expr| {
+            _ = try b.lowerExpression(update_expr);
+        }
+
+        _ = try b.addInst(.{
+            .tag = .br,
+            .data = .{ .br = .{
+                .target = loop_label,
+                .value = .none,
             } },
         });
+        return loop_label;
     }
 
-    const @"test" = try b.lowerExpression(&for_stmt.test_expression.?);
-    const update: Ir.Inst.Ref = if (for_stmt.increment_expression) |*update_expr|
-        try b.lowerExpression(update_expr)
-    else
-        .none;
-    const body = try b.lowerStatement(for_stmt.consequent_statement);
-    return b.addInst(.{
-        .tag = .@"for",
-        .data = .{ .@"for" = .{
-            .@"test" = @"test",
-            .update = update,
-            .body = body,
-        } },
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
     });
+    const entry_br = try b.addInstDeferred(.br);
+
+    const test_label = try b.addLabel();
+    const test_result = try b.lowerExpression(&for_stmt.test_expression.?);
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const body_label = try b.addLabel();
+    const body_result = try b.lowerStatement(for_stmt.consequent_statement);
+
+    if (for_stmt.increment_expression) |*update_expr| {
+        _ = try b.lowerExpression(update_expr);
+    }
+
+    const body_br = try b.addInstDeferred(.br);
+
+    const exit_label = try b.addLabel();
+    const exit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    entry_br.set(.{ .br = .{
+        .target = test_label,
+        .value = undefined_ref,
+    } });
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = test_result,
+        .then_target = body_label,
+        .else_target = exit_label,
+    } });
+    body_br.set(.{ .br = .{
+        .target = test_label,
+        .value = body_result,
+    } });
+    exit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = test_label,
+    } });
+
+    return end_label;
 }
 
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {
@@ -508,15 +647,41 @@ fn lowerDefaultExpression(b: *Builder, value: Ir.Inst.Ref, default_expr: ?*const
                 }),
             } },
         });
-        const default_value = try b.lowerExpression(expr);
-        return b.addInst(.{
-            .tag = .@"if",
-            .data = .{ .@"if" = .{
-                .@"test" = is_undefined,
-                .then = default_value,
-                .@"else" = value,
-            } },
+        const br_cond = try b.addInstDeferred(.br_cond);
+
+        const then_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
         });
+        const default_value = try b.lowerExpression(expr);
+        const then_br = try b.addInstDeferred(.br);
+
+        const else_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
+        });
+        const else_br = try b.addInstDeferred(.br);
+
+        const end_label = try b.addInst(.{
+            .tag = .label,
+            .data = .{ .none = {} },
+        });
+
+        br_cond.set(.{ .br_cond = .{
+            .condition = is_undefined,
+            .then_target = then_label,
+            .else_target = else_label,
+        } });
+        then_br.set(.{ .br = .{
+            .target = end_label,
+            .value = default_value,
+        } });
+        else_br.set(.{ .br = .{
+            .target = end_label,
+            .value = value,
+        } });
+
+        return end_label;
     }
     return value;
 }
@@ -1251,17 +1416,34 @@ fn lowerConditionalExpression(b: *Builder, cond_expr: *const ast.ConditionalExpr
             try b.lowerExpression(cond_expr.alternate_expression);
     }
 
-    const @"test" = try b.lowerExpression(cond_expr.test_expression);
-    const then = try b.lowerExpression(cond_expr.consequent_expression);
-    const @"else" = try b.lowerExpression(cond_expr.alternate_expression);
-    return b.addInst(.{
-        .tag = .@"if",
-        .data = .{ .@"if" = .{
-            .@"test" = @"test",
-            .then = then,
-            .@"else" = @"else",
-        } },
-    });
+    const test_result = try b.lowerExpression(cond_expr.test_expression);
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const then_label = try b.addLabel();
+    const then_value = try b.lowerExpression(cond_expr.consequent_expression);
+    const then_br = try b.addInstDeferred(.br);
+
+    const else_label = try b.addLabel();
+    const else_value = try b.lowerExpression(cond_expr.alternate_expression);
+    const else_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = test_result,
+        .then_target = then_label,
+        .else_target = else_label,
+    } });
+    then_br.set(.{ .br = .{
+        .target = end_label,
+        .value = then_value,
+    } });
+    else_br.set(.{ .br = .{
+        .target = end_label,
+        .value = else_value,
+    } });
+
+    return end_label;
 }
 
 fn lowerAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpression) Error!Ir.Inst.Ref {

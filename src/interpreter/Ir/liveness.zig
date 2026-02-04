@@ -63,39 +63,23 @@ fn markReachable(
         const data = datas[i];
 
         switch (tag) {
-            .@"if" => {
-                if (data.@"if".then.toIndex()) |then_index| {
-                    if (!reachable.isSet(@intFromEnum(then_index))) {
-                        try worklist.append(gpa, then_index);
-                    }
+            .br => {
+                const target_index = data.br.target.toIndex().?;
+                if (!reachable.isSet(@intFromEnum(target_index))) {
+                    try worklist.append(gpa, target_index);
                 }
-                if (data.@"if".@"else".toIndex()) |else_index| {
-                    if (!reachable.isSet(@intFromEnum(else_index))) {
-                        try worklist.append(gpa, else_index);
-                    }
-                }
+                continue; // Unconditional branch never reaches next instruction
             },
-            .@"while" => {
-                if (data.@"while".body.toIndex()) |body_idx| {
-                    if (!reachable.isSet(@intFromEnum(body_idx))) {
-                        try worklist.append(gpa, body_idx);
-                    }
+            .br_cond => {
+                const then_index = data.br_cond.then_target.toIndex().?;
+                const else_index = data.br_cond.else_target.toIndex().?;
+                if (!reachable.isSet(@intFromEnum(then_index))) {
+                    try worklist.append(gpa, then_index);
                 }
-            },
-            .@"for" => {
-                if (data.@"for".body.toIndex()) |body_index| {
-                    if (!reachable.isSet(@intFromEnum(body_index))) {
-                        try worklist.append(gpa, body_index);
-                    }
+                if (!reachable.isSet(@intFromEnum(else_index))) {
+                    try worklist.append(gpa, else_index);
                 }
-            },
-            .loop => {
-                if (data.loop.body.toIndex()) |body_index| {
-                    if (!reachable.isSet(@intFromEnum(body_index))) {
-                        try worklist.append(gpa, body_index);
-                    }
-                }
-                continue; // Infinite loop never reaches next instruction
+                continue; // Conditional branch doesn't fall through
             },
             .end => continue,
             else => {},

@@ -15,6 +15,7 @@ ir: *const Ir,
 blocks: std.ArrayListUnmanaged(*Block),
 current: ?*Block,
 lsra: LinearScanRegisterAllocation,
+label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 
 pub const Error = error{OutOfMemory};
 
@@ -27,6 +28,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .blocks = .empty,
         .current = null,
         .lsra = lsra,
+        .label_blocks = .empty,
     };
 }
 
@@ -37,6 +39,7 @@ pub fn deinit(b: *Builder) void {
     }
     b.blocks.deinit(b.gpa);
     b.lsra.deinit(b.gpa);
+    b.label_blocks.deinit(b.gpa);
 }
 
 fn computeRPO(
@@ -64,6 +67,15 @@ pub fn build(b: *Builder) Error!Bytecode {
     const entry = try b.createBlock();
     b.switchToBlock(entry);
 
+    // Pre-create blocks for all labels
+    for (b.ir.instructions.items(.tag), 0..) |tag, i| {
+        if (!b.ir.liveness.isSet(i)) continue;
+        if (tag != .label) continue;
+        const index: Ir.Inst.Index = @enumFromInt(i);
+        const block = try b.createBlock();
+        try b.label_blocks.put(b.gpa, index.toRef(), block);
+    }
+
     // Lower alive instructions
     for (b.ir.instructions.items(.tag), b.ir.instructions.items(.data), 0..) |tag, data, i| {
         if (!b.ir.liveness.isSet(i)) continue;
@@ -82,10 +94,9 @@ pub fn build(b: *Builder) Error!Bytecode {
             .array => try b.lowerArray(data.array, dest),
             .object => try b.lowerObject(data.object, dest),
             .this => try b.lowerThis(dest),
-            .@"if" => try b.lowerIf(data.@"if", dest),
-            .@"while" => try b.lowerWhile(data.@"while", dest),
-            .@"for" => try b.lowerFor(data.@"for", dest),
-            .loop => try b.lowerLoop(data.loop, dest),
+            .label => try b.lowerLabel(dest, index.toRef()),
+            .br => try b.lowerBr(data.br, dest),
+            .br_cond => try b.lowerBrCond(data.br_cond, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
             .negate => try b.lowerNegate(data.ref, dest),
@@ -158,6 +169,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
+
+    std.debug.assert(b.terminated());
 
     // Order blocks in reverse post-order
     var ordered: std.ArrayListUnmanaged(*Block) = .empty;
@@ -661,111 +674,29 @@ fn lowerThis(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
     });
 }
 
-fn lowerIf(b: *Builder, data: @FieldType(Ir.Inst.Data, "if"), dest: Bytecode.Inst.Reg) Error!void {
-    const test_ref = data.@"test";
-    const then_ref = data.then;
-    const else_ref = data.@"else";
+fn lowerLabel(b: *Builder, dest: Bytecode.Inst.Reg, label_ref: Ir.Inst.Ref) Error!void {
+    _ = dest;
+    const label_block = b.label_blocks.get(label_ref).?;
+    if (!b.terminated()) {
+        b.jump(label_block);
+    }
+    b.switchToBlock(label_block);
+}
 
-    const cond_reg = b.resolve(test_ref);
-    const then_block = try b.createBlock();
-    const else_block = try b.createBlock();
-    const merge_block = try b.createBlock();
+fn lowerBr(b: *Builder, data: @FieldType(Ir.Inst.Data, "br"), dest: Bytecode.Inst.Reg) Error!void {
+    _ = dest;
+    const target_reg = b.resolve(data.target);
+    try b.emitMoveIfNeeded(data.value, target_reg);
+    const target_block = b.label_blocks.get(data.target).?;
+    b.jump(target_block);
+}
 
+fn lowerBrCond(b: *Builder, data: @FieldType(Ir.Inst.Data, "br_cond"), dest: Bytecode.Inst.Reg) Error!void {
+    _ = dest;
+    const then_block = b.label_blocks.get(data.then_target).?;
+    const else_block = b.label_blocks.get(data.else_target).?;
+    const cond_reg = b.resolve(data.condition);
     b.branch(.truthy, cond_reg, then_block, else_block);
-
-    b.switchToBlock(then_block);
-    try b.emitMoveIfNeeded(then_ref, dest);
-    b.jump(merge_block);
-
-    b.switchToBlock(else_block);
-    try b.emitMoveIfNeeded(else_ref, dest);
-    b.jump(merge_block);
-
-    b.switchToBlock(merge_block);
-}
-
-fn lowerWhile(b: *Builder, data: @FieldType(Ir.Inst.Data, "while"), dest: Bytecode.Inst.Reg) Error!void {
-    const test_ref = data.@"test";
-    const body_ref = data.body;
-
-    const test_block = try b.createBlock();
-    const body_block = try b.createBlock();
-    const exit_block = try b.createBlock();
-
-    b.jump(test_block);
-
-    b.switchToBlock(test_block);
-    const cond_reg = b.resolve(test_ref);
-    b.branch(.truthy, cond_reg, body_block, exit_block);
-
-    b.switchToBlock(body_block);
-    try b.emitMoveIfNeeded(body_ref, dest);
-    b.jump(test_block);
-
-    b.switchToBlock(exit_block);
-}
-
-fn lowerFor(b: *Builder, data: @FieldType(Ir.Inst.Data, "for"), dest: Bytecode.Inst.Reg) Error!void {
-    const test_ref = data.@"test";
-    const update_ref = data.update;
-    const body_ref = data.body;
-
-    const test_block = try b.createBlock();
-    const body_block = try b.createBlock();
-    const update_block = try b.createBlock();
-    const exit_block = try b.createBlock();
-
-    b.jump(test_block);
-
-    b.switchToBlock(test_block);
-    const cond_reg = b.resolve(test_ref);
-    b.branch(.truthy, cond_reg, body_block, exit_block);
-
-    b.switchToBlock(body_block);
-    try b.emitMoveIfNeeded(body_ref, dest);
-    b.jump(update_block);
-
-    b.switchToBlock(update_block);
-    if (update_ref != .none) {
-        try b.emitMoveIfNeeded(update_ref, dest);
-    }
-    b.jump(test_block);
-
-    b.switchToBlock(exit_block);
-}
-
-fn lowerLoop(b: *Builder, data: @FieldType(Ir.Inst.Data, "loop"), dest: Bytecode.Inst.Reg) Error!void {
-    const body_ref = data.body;
-    const update_ref = data.update;
-
-    if (update_ref == .none) {
-        const body_block = try b.createBlock();
-        const exit_block = try b.createBlock();
-
-        b.jump(body_block);
-
-        b.switchToBlock(body_block);
-        try b.emitMoveIfNeeded(body_ref, dest);
-        b.jump(body_block);
-
-        b.switchToBlock(exit_block);
-    } else {
-        const body_block = try b.createBlock();
-        const update_block = try b.createBlock();
-        const exit_block = try b.createBlock();
-
-        b.jump(body_block);
-
-        b.switchToBlock(body_block);
-        try b.emitMoveIfNeeded(body_ref, dest);
-        b.jump(update_block);
-
-        b.switchToBlock(update_block);
-        try b.emitMoveIfNeeded(update_ref, dest);
-        b.jump(body_block);
-
-        b.switchToBlock(exit_block);
-    }
 }
 
 fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

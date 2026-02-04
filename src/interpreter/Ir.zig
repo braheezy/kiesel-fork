@@ -79,10 +79,9 @@ pub const Inst = struct {
         object,
         this,
 
-        @"if",
-        @"while",
-        @"for",
-        loop,
+        label,
+        br,
+        br_cond,
 
         to_number,
         to_string,
@@ -172,10 +171,8 @@ pub const Inst = struct {
         big_int: BigIntIndex,
         array: struct { extra_index: ExtraIndex, len: u32 },
         object: struct { extra_index: ExtraIndex, len: u32 },
-        @"if": struct { @"test": Ref, then: Ref, @"else": Ref },
-        @"while": struct { @"test": Ref, body: Ref },
-        @"for": struct { @"test": Ref, update: Ref, body: Ref },
-        loop: struct { body: Ref, update: Ref },
+        br: struct { target: Ref, value: Ref },
+        br_cond: struct { condition: Ref, then_target: Ref, else_target: Ref },
         binary: struct { lhs: Ref, rhs: Ref },
         get_property: struct { base: Ref, name: StringIndex },
         get_property_computed: struct { base: Ref, property: Ref },
@@ -210,10 +207,9 @@ pub const Inst = struct {
         .array = .array,
         .object = .object,
         .this = .none,
-        .@"if" = .@"if",
-        .@"while" = .@"while",
-        .@"for" = .@"for",
-        .loop = .loop,
+        .label = .none,
+        .br = .br,
+        .br_cond = .br_cond,
         .to_number = .ref,
         .to_string = .ref,
         .negate = .ref,
@@ -414,6 +410,7 @@ pub fn print(
         try printData(ir, tag, data, cw, tty_config);
 
         try cw.flush();
+        try writer.flush();
         const width = counting_writer.count;
         const min_width = 60;
         if (width < min_width) {
