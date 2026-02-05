@@ -156,6 +156,8 @@ pub const Inst = struct {
         iterator_step,
         iterator_step_value,
         iterator_collect,
+
+        throw,
     };
 
     pub const Data = union {
@@ -300,6 +302,7 @@ pub const Inst = struct {
         .iterator_step = .reg_reg,
         .iterator_step_value = .reg_reg,
         .iterator_collect = .reg_reg,
+        .throw = .reg,
     });
 
     pub const Reg = enum(u8) {

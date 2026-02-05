@@ -334,7 +334,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .return_statement => try b.todo("return statement"),
         .with_statement => try b.todo("with statement"),
         .labelled_statement => |*lbl_stmt| try b.lowerLabelledStatement(lbl_stmt),
-        .throw_statement => try b.todo("throw statement"),
+        .throw_statement => |*throw_stmt| try b.lowerThrowStatement(throw_stmt),
         .try_statement => try b.todo("try statement"),
         .debugger_statement => .none,
     };
@@ -842,6 +842,14 @@ fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) E
         },
         .function_declaration => try b.todo("labelled function declaration"),
     };
+}
+
+fn lowerThrowStatement(b: *Builder, throw_stmt: *const ast.ThrowStatement) Error!Ir.Inst.Ref {
+    const value = try b.lowerExpression(&throw_stmt.expression);
+    return try b.addInst(.{
+        .tag = .throw,
+        .data = .{ .ref = value },
+    });
 }
 
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {

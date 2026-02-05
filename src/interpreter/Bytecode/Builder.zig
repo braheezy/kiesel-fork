@@ -167,6 +167,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .iterator_step => try b.lowerIteratorStep(data.ref, dest),
             .iterator_step_value => try b.lowerIteratorStepValue(data.ref, dest),
             .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
+            .throw => try b.lowerThrow(data.ref, dest),
             .end => try b.lowerEnd(data.ref, dest),
         }
     }
@@ -1384,6 +1385,15 @@ fn lowerIteratorCollect(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) 
             dest,
             iterator_reg,
         } },
+    });
+}
+
+fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    _ = dest;
+    const value_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .throw,
+        .data = .{ .reg = value_reg },
     });
 }
 

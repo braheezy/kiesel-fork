@@ -200,6 +200,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
+                .throw => vm.executeThrow(data.reg),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -1324,6 +1325,31 @@ fn executeDeletePropertyIndexed(
     vm.load(dst, Value.from(delete_status));
 }
 
+fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytecode.Inst.Reg, excluded_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const source_value = vm.store(source_reg);
+
+    const target = try ordinaryObjectCreateFast(vm.agent);
+    if (excluded_reg == .none) {
+        const excluded_items: []const PropertyKey = &.{};
+        try target.copyDataProperties(vm.agent, source_value, excluded_items);
+    } else {
+        const excluded_object = vm.store(excluded_reg).asObject();
+        const excluded_len = excluded_object.as(builtins.Array).fields.length;
+
+        var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(vm.agent.gc_allocator, excluded_len);
+        defer excluded_items.deinit(vm.agent.gc_allocator);
+        for (0..excluded_len) |i| {
+            const descriptor = excluded_object.property_storage.indexed_properties.get(@intCast(i)).?;
+            const prop_key = PropertyKey.from(descriptor.value_or_accessor.value.asString());
+            excluded_items.appendAssumeCapacity(prop_key);
+        }
+
+        try target.copyDataProperties(vm.agent, source_value, excluded_items.items);
+    }
+
+    vm.load(dest, Value.from(target));
+}
+
 fn executeCall(
     vm: *Vm,
     dest: Bytecode.Inst.Reg,
@@ -1511,27 +1537,11 @@ fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byteco
     vm.load(dest, Value.from(&array.object));
 }
 
-fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytecode.Inst.Reg, excluded_reg: Bytecode.Inst.Reg) Agent.Error!void {
-    const source_value = vm.store(source_reg);
-
-    const target = try ordinaryObjectCreateFast(vm.agent);
-    if (excluded_reg == .none) {
-        const excluded_items: []const PropertyKey = &.{};
-        try target.copyDataProperties(vm.agent, source_value, excluded_items);
-    } else {
-        const excluded_object = vm.store(excluded_reg).asObject();
-        const excluded_len = excluded_object.as(builtins.Array).fields.length;
-
-        var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(vm.agent.gc_allocator, excluded_len);
-        defer excluded_items.deinit(vm.agent.gc_allocator);
-        for (0..excluded_len) |i| {
-            const descriptor = excluded_object.property_storage.indexed_properties.get(@intCast(i)).?;
-            const prop_key = PropertyKey.from(descriptor.value_or_accessor.value.asString());
-            excluded_items.appendAssumeCapacity(prop_key);
-        }
-
-        try target.copyDataProperties(vm.agent, source_value, excluded_items.items);
-    }
-
-    vm.load(dest, Value.from(target));
+fn executeThrow(vm: *Vm, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(value_reg);
+    vm.agent.exception = .{
+        .value = value,
+        .stack_trace = try vm.agent.captureStackTrace(),
+    };
+    return error.ExceptionThrown;
 }

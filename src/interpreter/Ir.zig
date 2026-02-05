@@ -161,6 +161,8 @@ pub const Inst = struct {
         iterator_step_value,
         iterator_collect,
 
+        throw,
+
         end,
     };
 
@@ -282,6 +284,7 @@ pub const Inst = struct {
         .iterator_step = .ref,
         .iterator_step_value = .ref,
         .iterator_collect = .ref,
+        .throw = .ref,
         .end = .ref,
     });
 

@@ -13,6 +13,7 @@ pub const Vm = @import("interpreter/Vm.zig");
 
 const ExpectedResult = union(enum) {
     value: ?Value,
+    exception,
     ignore,
 };
 
@@ -73,10 +74,13 @@ fn testInterpreter(
 
     var vm: Vm = try .init(&agent, &bc);
     defer vm.deinit();
-    const result = try vm.run();
-    switch (expected_result) {
+    if (vm.run()) |result| switch (expected_result) {
         .value => |expected| try std.testing.expectEqual(expected, result),
+        .exception => return error.TestExpectedException,
         .ignore => {},
+    } else |err| switch (expected_result) {
+        .exception => try std.testing.expectEqual(error.ExceptionThrown, err),
+        else => return err,
     }
 
     var aw: std.Io.Writer.Allocating = .init(gpa);
@@ -927,6 +931,27 @@ test {
         \\ 180: move r0, r1
         \\ 183: get_binding r0, @0
         \\ 189: end r0
+        \\
+    );
+
+    // Throw statement
+    try testInterpreter(std.testing.allocator,
+        \\throw new Error("test");
+    , .exception,
+        \\IR (test)
+        \\   0: get_binding "Error"                                   [0..2]
+        \\   1: string "test"                                         [1..2]
+        \\   2: new %0, [%1]                                          [2..3]
+        \\   3: throw %2                                              [3..4]
+        \\   4: end %3                                                [4..4]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: get_binding r0, @0
+        \\   6: load_string r1, @1
+        \\  12: new1 r2, r0, r1
+        \\  16: throw r2
+        \\  18: end r0
         \\
     );
 }
