@@ -8,7 +8,6 @@ const libregexp = @import("libregexp");
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const gc = @import("../gc.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
@@ -33,11 +32,6 @@ pub const LreOpaque = struct {
     allocator: std.mem.Allocator,
 };
 
-var lre_alloc_sizes: if (!build_options.enable_libgc)
-    std.AutoHashMapUnmanaged(*const anyopaque, usize)
-else
-    void = if (!build_options.enable_libgc) .empty;
-
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
     // TODO: Implement stack overflow check
     return 0;
@@ -49,23 +43,24 @@ export fn lre_check_timeout(_: ?*anyopaque) c_int {
 }
 
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
+    // This doesn't provide the old allocation size needed when forwarding to the Zig allocator,
+    // so we allocate extra space to store the size before the usable allocation.
     const lre_opaque = @as(*LreOpaque, @ptrCast(@alignCast(@"opaque".?)));
-    const old_mem: []u8 = if (maybe_ptr) |ptr| blk: {
-        var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
-        old_mem.len = if (build_options.enable_libgc)
-            gc.size(old_mem.ptr)
-        else
-            lre_alloc_sizes.fetchRemove(ptr).?.value;
-        break :blk old_mem;
-    } else &.{};
-    const new_mem = lre_opaque.allocator.realloc(old_mem, size) catch return null;
-    if (!build_options.enable_libgc) {
-        lre_alloc_sizes.put(lre_opaque.allocator, new_mem.ptr, new_mem.len) catch {
-            lre_opaque.allocator.free(new_mem);
-            return null;
-        };
+    if (maybe_ptr) |ptr| {
+        const header_ptr = @as([*]align(@alignOf(usize)) u8, @ptrCast(@alignCast(ptr))) - @sizeOf(usize);
+        const old_size = @as(*usize, @ptrCast(header_ptr)).*;
+        const old_total_size = old_size + @sizeOf(usize);
+        const new_total_size = size + @sizeOf(usize);
+        const old_mem: []align(@alignOf(usize)) u8 = header_ptr[0..old_total_size];
+        const new_mem = lre_opaque.allocator.realloc(old_mem, new_total_size) catch return null;
+        @as(*usize, @ptrCast(new_mem.ptr)).* = size;
+        return new_mem.ptr + @sizeOf(usize);
+    } else {
+        const total_size = size + @sizeOf(usize);
+        const mem = lre_opaque.allocator.alignedAlloc(u8, .of(usize), total_size) catch return null;
+        @as(*usize, @ptrCast(mem.ptr)).* = size;
+        return mem.ptr + @sizeOf(usize);
     }
-    return new_mem.ptr;
 }
 
 pub const ParsedFlags = packed struct(u8) {
