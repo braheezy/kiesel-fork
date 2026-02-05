@@ -855,18 +855,21 @@ fn lowerLexicalBinding(b: *Builder, lex_binding: ast.LexicalBinding) Error!Ir.In
     // GlobalDeclarationInstantiation is responsible for creating the bindings.
     return switch (lex_binding) {
         .binding_identifier => |binding| {
-            if (binding.initializer) |*init_expr| {
-                const value = try b.lowerExpression(init_expr);
-                const string_index = try b.internString(binding.binding_identifier);
-                return b.addInst(.{
-                    .tag = .initialize_binding,
-                    .data = .{ .set_binding = .{
-                        .name = string_index,
-                        .value = value,
-                    } },
+            const value = if (binding.initializer) |*init_expr|
+                try b.lowerExpression(init_expr)
+            else
+                try b.addInst(.{
+                    .tag = .undefined,
+                    .data = .{ .none = {} },
                 });
-            }
-            return .none;
+            const string_index = try b.internString(binding.binding_identifier);
+            return b.addInst(.{
+                .tag = .initialize_binding,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = value,
+                } },
+            });
         },
         .binding_pattern => |pattern| {
             const value = try b.lowerExpression(&pattern.initializer);
