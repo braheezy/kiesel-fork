@@ -1295,10 +1295,12 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
                 });
             },
             .text => blk: {
+                const chars = span.templateCharacters();
+                if (chars.len == 0) continue;
                 const normalized = try std.mem.replaceOwned(
                     u8,
                     b.gpa,
-                    span.templateCharacters(),
+                    chars,
                     "\r\n",
                     "\n",
                 );
@@ -1312,7 +1314,7 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
             },
         };
 
-        if (i == 0) {
+        if (result == .none) {
             result = span_ref;
         } else {
             result = try b.addInst(.{
