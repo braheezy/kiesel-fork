@@ -21,6 +21,7 @@ instructions: std.MultiArrayList(Ir.Inst),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
 extras: std.ArrayListUnmanaged(u32),
+breakable_stack: std.ArrayListUnmanaged(*BreakableContext) = .empty,
 
 const Ast = union(enum) {
     script: *const ast.Script,
@@ -44,6 +45,52 @@ const BigIntContext = struct {
 fn BigIntArrayHashMapUnmanaged(comptime V: type) type {
     return std.ArrayHashMapUnmanaged(std.math.big.int.Const, V, BigIntContext, true);
 }
+
+const BreakableContext = struct {
+    label: ?[]const u8,
+    continue_target: JumpTarget,
+    break_target: JumpTarget,
+    result_ref: Ir.Inst.Ref,
+
+    const JumpTarget = union(enum) {
+        known: Ir.Inst.Ref,
+        deferred: std.ArrayListUnmanaged(DeferredJump),
+    };
+
+    const DeferredJump = struct {
+        inst: Deferred,
+        value: Ir.Inst.Ref,
+    };
+
+    fn deinit(ctx: *BreakableContext, gpa: std.mem.Allocator) void {
+        switch (ctx.continue_target) {
+            .known => {},
+            .deferred => |*list| list.deinit(gpa),
+        }
+        switch (ctx.break_target) {
+            .known => {},
+            .deferred => |*list| list.deinit(gpa),
+        }
+    }
+
+    fn setDeferredBreaks(ctx: *BreakableContext, target: Ir.Inst.Ref) void {
+        for (ctx.break_target.deferred.items) |jump| {
+            jump.inst.set(.{ .br = .{
+                .target = target,
+                .value = jump.value,
+            } });
+        }
+    }
+
+    fn setDeferredContinues(ctx: *BreakableContext, target: Ir.Inst.Ref) void {
+        for (ctx.continue_target.deferred.items) |jump| {
+            jump.inst.set(.{ .br = .{
+                .target = target,
+                .value = jump.value,
+            } });
+        }
+    }
+};
 
 pub const Error = error{ OutOfMemory, NotImplemented };
 
@@ -71,6 +118,11 @@ pub fn deinit(b: *Builder) void {
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
     b.extras.deinit(b.gpa);
+    for (b.breakable_stack.items) |ctx| {
+        ctx.deinit(b.gpa);
+        b.gpa.destroy(ctx);
+    }
+    b.breakable_stack.deinit(b.gpa);
 }
 
 pub fn build(b: *Builder) Error!Ir {
@@ -156,6 +208,34 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
         .tag = .label,
         .data = .{ .none = {} },
     });
+}
+
+fn pushBreakableContext(b: *Builder, ctx: BreakableContext) std.mem.Allocator.Error!*BreakableContext {
+    const heap_ctx = try b.gpa.create(BreakableContext);
+    heap_ctx.* = ctx;
+    try b.breakable_stack.append(b.gpa, heap_ctx);
+    return heap_ctx;
+}
+
+fn popBreakableContext(b: *Builder) void {
+    const ctx = b.breakable_stack.pop().?;
+    ctx.deinit(b.gpa);
+    b.gpa.destroy(ctx);
+}
+
+fn findBreakableContext(b: *Builder, label: ?[]const u8) *BreakableContext {
+    if (label) |l| {
+        var it = std.mem.reverseIterator(b.breakable_stack.items);
+        while (it.next()) |ctx| {
+            if (ctx.label) |ctx_label| {
+                if (std.mem.eql(u8, ctx_label, l)) {
+                    return ctx;
+                }
+            }
+        }
+        unreachable;
+    }
+    return b.breakable_stack.items[b.breakable_stack.items.len - 1];
 }
 
 fn internString(b: *Builder, string: []const u8) std.mem.Allocator.Error!Ir.Inst.StringIndex {
@@ -248,20 +328,12 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .empty_statement => .none,
         .expression_statement => |expr_stmt| try b.lowerExpression(&expr_stmt.expression),
         .if_statement => |*if_stmt| try b.lowerIfStatement(if_stmt),
-        .breakable_statement => |brk_stmt| switch (brk_stmt) {
-            .iteration_statement => |iter_stmt| switch (iter_stmt) {
-                .do_while_statement => |*do_while_stmt| try b.lowerDoWhileStatement(do_while_stmt),
-                .while_statement => |*while_stmt| try b.lowerWhileStatement(while_stmt),
-                .for_statement => |*for_stmt| try b.lowerForStatement(for_stmt),
-                .for_in_of_statement => try b.todo("for in/of statement"),
-            },
-            .switch_statement => try b.todo("switch statement"),
-        },
-        .continue_statement => try b.todo("continue statement"),
-        .break_statement => try b.todo("break statement"),
+        .breakable_statement => |*brk_stmt| try b.lowerBreakableStatement(brk_stmt, null),
+        .continue_statement => |*cont_stmt| try b.lowerContinueStatement(cont_stmt),
+        .break_statement => |*brk_stmt| try b.lowerBreakStatement(brk_stmt),
         .return_statement => try b.todo("return statement"),
         .with_statement => try b.todo("with statement"),
-        .labelled_statement => try b.todo("labelled statement"),
+        .labelled_statement => |*lbl_stmt| try b.lowerLabelledStatement(lbl_stmt),
         .throw_statement => try b.todo("throw statement"),
         .try_statement => try b.todo("try statement"),
         .debugger_statement => .none,
@@ -362,29 +434,50 @@ fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.
     return end_label;
 }
 
-fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement) Error!Ir.Inst.Ref {
-    if (try constantFold(b.gpa, &do_while_stmt.test_expression)) |constant| {
-        defer constant.deinit(b.gpa);
-        if (!constant.isTruthy()) {
-            return b.lowerStatement(do_while_stmt.consequent_statement);
-        }
-        const loop_label = try b.addInst(.{
-            .tag = .label,
-            .data = .{ .none = {} },
-        });
-        _ = try b.lowerStatement(do_while_stmt.consequent_statement);
-        _ = try b.addInst(.{
-            .tag = .br,
-            .data = .{ .br = .{
-                .target = loop_label,
-                .value = .none,
-            } },
-        });
-        return loop_label;
-    }
+fn lowerBreakableStatement(b: *Builder, brk_stmt: *const ast.BreakableStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
+    return switch (brk_stmt.*) {
+        .iteration_statement => |iter_stmt| switch (iter_stmt) {
+            .do_while_statement => |*do_while_stmt| try b.lowerDoWhileStatement(do_while_stmt, label),
+            .while_statement => |*while_stmt| try b.lowerWhileStatement(while_stmt, label),
+            .for_statement => |*for_stmt| try b.lowerForStatement(for_stmt, label),
+            .for_in_of_statement => try b.todo("for in/of statement"),
+        },
+        .switch_statement => try b.todo("switch statement"),
+    };
+}
 
+fn lowerBreakableStatementList(b: *Builder, stmt_list: *const ast.StatementList, ctx: *BreakableContext) Error!void {
+    for (stmt_list.items) |item| {
+        const result = switch (item) {
+            .statement => |stmt| try b.lowerStatement(stmt),
+            .declaration => |decl| try b.lowerDeclaration(decl),
+        };
+        if (result != .none) ctx.result_ref = result;
+    }
+}
+
+fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     const body_label = try b.addLabel();
-    const body_result = try b.lowerStatement(do_while_stmt.consequent_statement);
+
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
+
+    const breakable_ctx = try b.pushBreakableContext(.{
+        .label = label,
+        .continue_target = .{ .deferred = .empty },
+        .break_target = .{ .deferred = .empty },
+        .result_ref = undefined_ref,
+    });
+    defer b.popBreakableContext();
+
+    const stmt_list: *const ast.StatementList = switch (do_while_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
+        else => &.{ .items = &.{.{ .statement = do_while_stmt.consequent_statement }} },
+    };
+    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    const body_result = breakable_ctx.result_ref;
     const body_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
@@ -398,6 +491,9 @@ fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement
     const exit_br = try b.addInstDeferred(.br);
 
     const end_label = try b.addLabel();
+
+    breakable_ctx.setDeferredContinues(test_label);
+    breakable_ctx.setDeferredBreaks(end_label);
 
     body_br.set(.{ .br = .{
         .target = test_label,
@@ -420,7 +516,7 @@ fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement
     return end_label;
 }
 
-fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error!Ir.Inst.Ref {
+fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     if (try constantFold(b.gpa, &while_stmt.test_expression)) |constant| {
         defer constant.deinit(b.gpa);
         if (!constant.isTruthy()) {
@@ -429,19 +525,6 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error
                 .data = .{ .none = {} },
             });
         }
-        const loop_label = try b.addInst(.{
-            .tag = .label,
-            .data = .{ .none = {} },
-        });
-        _ = try b.lowerStatement(while_stmt.consequent_statement);
-        _ = try b.addInst(.{
-            .tag = .br,
-            .data = .{ .br = .{
-                .target = loop_label,
-                .value = .none,
-            } },
-        });
-        return loop_label;
     }
 
     const undefined_ref = try b.addInst(.{
@@ -455,13 +538,29 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const body_label = try b.addLabel();
-    const body_result = try b.lowerStatement(while_stmt.consequent_statement);
+
+    const breakable_ctx = try b.pushBreakableContext(.{
+        .label = label,
+        .continue_target = .{ .known = test_label },
+        .break_target = .{ .deferred = .empty },
+        .result_ref = undefined_ref,
+    });
+    defer b.popBreakableContext();
+
+    const stmt_list: *const ast.StatementList = switch (while_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
+        else => &.{ .items = &.{.{ .statement = while_stmt.consequent_statement }} },
+    };
+    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    const body_result = breakable_ctx.result_ref;
     const body_br = try b.addInstDeferred(.br);
 
     const exit_label = try b.addLabel();
     const exit_br = try b.addInstDeferred(.br);
 
     const end_label = try b.addLabel();
+
+    breakable_ctx.setDeferredBreaks(end_label);
 
     entry_br.set(.{ .br = .{
         .target = test_label,
@@ -484,7 +583,7 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement) Error
     return end_label;
 }
 
-fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.Inst.Ref {
+fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     if (for_stmt.initializer) |initializer| {
         _ = switch (initializer) {
             .expression => |*expr| try b.lowerExpression(expr),
@@ -493,7 +592,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
         };
     }
 
-    const loop = if (for_stmt.test_expression) |*test_expr| blk: {
+    if (for_stmt.test_expression) |*test_expr| {
         if (try constantFold(b.gpa, test_expr)) |constant| {
             defer constant.deinit(b.gpa);
             if (!constant.isTruthy()) {
@@ -502,30 +601,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
                     .data = .{ .none = {} },
                 });
             }
-            break :blk true;
         }
-        break :blk false;
-    } else true;
-
-    if (loop) {
-        const loop_label = try b.addInst(.{
-            .tag = .label,
-            .data = .{ .none = {} },
-        });
-        _ = try b.lowerStatement(for_stmt.consequent_statement);
-
-        if (for_stmt.increment_expression) |*update_expr| {
-            _ = try b.lowerExpression(update_expr);
-        }
-
-        _ = try b.addInst(.{
-            .tag = .br,
-            .data = .{ .br = .{
-                .target = loop_label,
-                .value = .none,
-            } },
-        });
-        return loop_label;
     }
 
     const undefined_ref = try b.addInst(.{
@@ -535,22 +611,47 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
     const entry_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
-    const test_result = try b.lowerExpression(&for_stmt.test_expression.?);
+    const test_result = if (for_stmt.test_expression) |*test_expr|
+        try b.lowerExpression(test_expr)
+    else
+        try b.addInst(.{
+            .tag = .true,
+            .data = .{ .none = {} },
+        });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const body_label = try b.addLabel();
-    const body_result = try b.lowerStatement(for_stmt.consequent_statement);
 
+    const breakable_ctx = try b.pushBreakableContext(.{
+        .label = label,
+        .continue_target = .{ .deferred = .empty },
+        .break_target = .{ .deferred = .empty },
+        .result_ref = undefined_ref,
+    });
+    defer b.popBreakableContext();
+
+    const stmt_list: *const ast.StatementList = switch (for_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
+        else => &.{ .items = &.{.{ .statement = for_stmt.consequent_statement }} },
+    };
+    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    const body_result = breakable_ctx.result_ref;
+
+    const body_br = try b.addInstDeferred(.br);
+
+    const continue_label = try b.addLabel();
     if (for_stmt.increment_expression) |*update_expr| {
         _ = try b.lowerExpression(update_expr);
     }
-
-    const body_br = try b.addInstDeferred(.br);
+    const continue_br = try b.addInstDeferred(.br);
 
     const exit_label = try b.addLabel();
     const exit_br = try b.addInstDeferred(.br);
 
     const end_label = try b.addLabel();
+
+    breakable_ctx.setDeferredContinues(continue_label);
+    breakable_ctx.setDeferredBreaks(end_label);
 
     entry_br.set(.{ .br = .{
         .target = test_label,
@@ -562,6 +663,10 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
         .else_target = exit_label,
     } });
     body_br.set(.{ .br = .{
+        .target = continue_label,
+        .value = body_result,
+    } });
+    continue_br.set(.{ .br = .{
         .target = test_label,
         .value = body_result,
     } });
@@ -571,6 +676,65 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement) Error!Ir.In
     } });
 
     return end_label;
+}
+
+fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) Error!Ir.Inst.Ref {
+    const ctx = b.findBreakableContext(cont_stmt.label);
+    const value = ctx.result_ref;
+    switch (ctx.continue_target) {
+        .known => |target| {
+            _ = try b.addInst(.{
+                .tag = .br,
+                .data = .{ .br = .{
+                    .target = target,
+                    .value = value,
+                } },
+            });
+        },
+        .deferred => |*list| {
+            const deferred = try b.addInstDeferred(.br);
+            try list.append(b.gpa, .{
+                .inst = deferred,
+                .value = value,
+            });
+        },
+    }
+    return .none;
+}
+
+fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
+    const ctx = b.findBreakableContext(brk_stmt.label);
+    const value = ctx.result_ref;
+    switch (ctx.break_target) {
+        .known => |target| {
+            _ = try b.addInst(.{
+                .tag = .br,
+                .data = .{ .br = .{
+                    .target = target,
+                    .value = value,
+                } },
+            });
+        },
+        .deferred => |*list| {
+            const deferred = try b.addInstDeferred(.br);
+            try list.append(b.gpa, .{
+                .inst = deferred,
+                .value = value,
+            });
+        },
+    }
+    return .none;
+}
+
+fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) Error!Ir.Inst.Ref {
+    const label = lbl_stmt.label_identifier;
+    return switch (lbl_stmt.labelled_item) {
+        .statement => |stmt| switch (stmt.*) {
+            .breakable_statement => |*brk_stmt| try b.lowerBreakableStatement(brk_stmt, label),
+            else => b.lowerStatement(stmt),
+        },
+        .function_declaration => try b.todo("labelled function declaration"),
+    };
 }
 
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {

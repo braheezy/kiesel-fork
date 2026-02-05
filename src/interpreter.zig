@@ -130,23 +130,34 @@ test {
 
     // Dead code elimination
     try testInterpreter(std.testing.allocator,
-        \\40;
-        \\41;
-        \\42;
+        \\1;
+        \\while (true) {
+        \\  2;
+        \\  break;
+        \\  3;
+        \\}
+        \\4;
         \\
-    , .{ .value = Value.from(42) },
+    , .{ .value = Value.from(4) },
         \\IR (test)
-        \\   0: number 40                                             [0..0] dead
-        \\   1: number 41                                             [1..1] dead
-        \\   2: number 42                                             [2..3]
-        \\   3: end %2                                                [3..3]
+        \\   0: one                                                   [0..0] dead
+        \\   1: undefined                                             [1..2]
+        \\   2: br %3, %1                                             [2..2]
+        \\   3: label                                                 [3..12]
+        \\   4: true                                                  [4..5]
+        \\   5: br_cond %4, %6, %11                                   [5..5]
+        \\   6: label                                                 [6..6]
+        \\   7: number 2                                              [7..8]
+        \\   8: br %13, %7                                            [8..8]
+        \\   9: number 3                                              [9..10] dead
+        \\  10: br %3, %9                                             [10..10] dead
+        \\  11: label                                                 [11..11]
+        \\  12: br %13, %3                                            [12..12]
+        \\  13: label                                                 [13..13]
+        \\  14: number 4                                              [14..15]
+        \\  15: end %14                                               [15..15]
         \\
-    ,
-        \\Bytecode (test)
-        \\   0: load_number_i32 r0, 42
-        \\   6: end r0
-        \\
-    );
+    , null);
 
     // Constant folding and propagation
     try testInterpreter(std.testing.allocator,
@@ -158,15 +169,21 @@ test {
         \\
     , .{ .value = Value.from(6) },
         \\IR (test)
-        \\   0: number 6                                              [0..1]
-        \\   1: end %0                                                [1..1]
+        \\   0: label                                                 [0..8]
+        \\   1: undefined                                             [1..1] dead
+        \\   2: number 6                                              [2..3]
+        \\   3: br %4, %2                                             [3..3]
+        \\   4: label                                                 [4..10]
+        \\   5: zero                                                  [5..6]
+        \\   6: br_cond %5, %7, %9                                    [6..6]
+        \\   7: label                                                 [7..7]
+        \\   8: br %0, %4                                             [8..8]
+        \\   9: label                                                 [9..9]
+        \\  10: br %11, %4                                            [10..10]
+        \\  11: label                                                 [11..12]
+        \\  12: end %11                                               [12..12]
         \\
-    ,
-        \\Bytecode (test)
-        \\   0: load_number_i32 r0, 6
-        \\   6: end r0
-        \\
-    );
+    , null);
 
     // Array literal
     try testInterpreter(std.testing.allocator,
@@ -533,43 +550,46 @@ test {
         \\  15: label                                                 [15..15]
         \\  16: br %17, %4                                            [16..16]
         \\  17: label                                                 [17..17]
-        \\  18: label                                                 [18..30]
-        \\  19: get_binding "x"                                       [19..21]
-        \\  20: one                                                   [20..21]
-        \\  21: add %19, %20                                          [21..22]
-        \\  22: set_binding "x", %21                                  [22..23]
-        \\  23: br %24, %22                                           [23..23]
-        \\  24: label                                                 [24..32]
-        \\  25: get_binding "x"                                       [25..27]
-        \\  26: number 5                                              [26..27]
-        \\  27: lt %25, %26                                           [27..28]
-        \\  28: br_cond %27, %29, %31                                 [28..28]
-        \\  29: label                                                 [29..29]
-        \\  30: br %18, %24                                           [30..30]
-        \\  31: label                                                 [31..31]
-        \\  32: br %33, %24                                           [32..32]
-        \\  33: label                                                 [33..33]
-        \\  34: zero                                                  [34..35]
-        \\  35: set_binding "i", %34                                  [35..35]
-        \\  36: undefined                                             [36..37]
-        \\  37: br %38, %36                                           [37..37]
-        \\  38: label                                                 [38..51]
-        \\  39: get_binding "i"                                       [39..41]
-        \\  40: number 3                                              [40..41]
-        \\  41: lt %39, %40                                           [41..42]
-        \\  42: br_cond %41, %43, %50                                 [42..42]
-        \\  43: label                                                 [43..43]
-        \\  44: get_binding "x"                                       [44..46]
-        \\  45: get_binding "i"                                       [45..46]
-        \\  46: add %44, %45                                          [46..47]
-        \\  47: set_binding "x", %46                                  [47..49]
-        \\  48: update_binding "i", increment, postfix                [48..48]
-        \\  49: br %38, %47                                           [49..49]
+        \\  18: label                                                 [18..31]
+        \\  19: undefined                                             [19..19] dead
+        \\  20: get_binding "x"                                       [20..22]
+        \\  21: one                                                   [21..22]
+        \\  22: add %20, %21                                          [22..23]
+        \\  23: set_binding "x", %22                                  [23..24]
+        \\  24: br %25, %23                                           [24..24]
+        \\  25: label                                                 [25..33]
+        \\  26: get_binding "x"                                       [26..28]
+        \\  27: number 5                                              [27..28]
+        \\  28: lt %26, %27                                           [28..29]
+        \\  29: br_cond %28, %30, %32                                 [29..29]
+        \\  30: label                                                 [30..30]
+        \\  31: br %18, %25                                           [31..31]
+        \\  32: label                                                 [32..32]
+        \\  33: br %34, %25                                           [33..33]
+        \\  34: label                                                 [34..34]
+        \\  35: zero                                                  [35..36]
+        \\  36: set_binding "i", %35                                  [36..36]
+        \\  37: undefined                                             [37..38]
+        \\  38: br %39, %37                                           [38..38]
+        \\  39: label                                                 [39..54]
+        \\  40: get_binding "i"                                       [40..42]
+        \\  41: number 3                                              [41..42]
+        \\  42: lt %40, %41                                           [42..43]
+        \\  43: br_cond %42, %44, %53                                 [43..43]
+        \\  44: label                                                 [44..44]
+        \\  45: get_binding "x"                                       [45..47]
+        \\  46: get_binding "i"                                       [46..47]
+        \\  47: add %45, %46                                          [47..48]
+        \\  48: set_binding "x", %47                                  [48..52]
+        \\  49: br %50, %48                                           [49..49]
         \\  50: label                                                 [50..50]
-        \\  51: br %52, %38                                           [51..51]
-        \\  52: label                                                 [52..52]
-        \\  53: get_binding "x"                                       [53..54]
-        \\  54: end %53                                               [54..54]
+        \\  51: update_binding "i", increment, postfix                [51..51]
+        \\  52: br %39, %48                                           [52..52]
+        \\  53: label                                                 [53..53]
+        \\  54: br %55, %39                                           [54..54]
+        \\  55: label                                                 [55..55]
+        \\  56: get_binding "x"                                       [56..57]
+        \\  57: end %56                                               [57..57]
         \\
     ,
         \\Bytecode (test)
@@ -610,17 +630,189 @@ test {
         \\ 163: load_number_i32 r2, 3
         \\ 169: lt r3, r1, r2
         \\ 173: jump_if_true r3, 5
-        \\ 179: jump 39
+        \\ 179: jump 42
         \\ 184: get_binding r1, @0
         \\ 190: get_binding r2, @1
         \\ 196: add r3, r1, r2
         \\ 200: set_binding @0, r3
         \\ 206: move r1, r3
-        \\ 209: increment_binding_postfix r2, @1
-        \\ 215: move r0, r1
-        \\ 218: jump -66
-        \\ 223: get_binding r0, @0
-        \\ 229: end r0
+        \\ 209: move r2, r1
+        \\ 212: increment_binding_postfix r2, @1
+        \\ 218: move r0, r1
+        \\ 221: jump -69
+        \\ 226: get_binding r0, @0
+        \\ 232: end r0
+        \\
+    );
+
+    // Break and continue
+    try testInterpreter(std.testing.allocator,
+        \\var x = 0;
+        \\while(true) { x = x + 1; if (x >= 5) break; }
+        \\for(;;) { x = x + 1; if (x >= 10) break; }
+        \\while(x < 20) { x = x + 1; if (x % 2 === 0) continue; x = x + 10; }
+        \\x;
+        \\
+    , .{ .value = Value.from(21) },
+        \\IR (test)
+        \\   0: zero                                                  [0..1]
+        \\   1: set_binding "x", %0                                   [1..1]
+        \\   2: undefined                                             [2..3]
+        \\   3: br %4, %2                                             [3..3]
+        \\   4: label                                                 [4..24]
+        \\   5: true                                                  [5..6]
+        \\   6: br_cond %5, %7, %23                                   [6..6]
+        \\   7: label                                                 [7..7]
+        \\   8: get_binding "x"                                       [8..10]
+        \\   9: one                                                   [9..10]
+        \\  10: add %8, %9                                            [10..11]
+        \\  11: set_binding "x", %10                                  [11..17]
+        \\  12: get_binding "x"                                       [12..14]
+        \\  13: number 5                                              [13..14]
+        \\  14: gt_eq %12, %13                                        [14..15]
+        \\  15: br_cond %14, %16, %19                                 [15..15]
+        \\  16: label                                                 [16..16]
+        \\  17: br %25, %11                                           [17..17]
+        \\  18: br %21, none                                          [18..18] dead
+        \\  19: label                                                 [19..19]
+        \\  20: br %21, none                                          [20..20]
+        \\  21: label                                                 [21..22]
+        \\  22: br %4, %21                                            [22..22]
+        \\  23: label                                                 [23..23]
+        \\  24: br %25, %4                                            [24..24]
+        \\  25: label                                                 [25..25]
+        \\  26: undefined                                             [26..27]
+        \\  27: br %28, %26                                           [27..27]
+        \\  28: label                                                 [28..50]
+        \\  29: true                                                  [29..30]
+        \\  30: br_cond %29, %31, %49                                 [30..30]
+        \\  31: label                                                 [31..31]
+        \\  32: get_binding "x"                                       [32..34]
+        \\  33: one                                                   [33..34]
+        \\  34: add %32, %33                                          [34..35]
+        \\  35: set_binding "x", %34                                  [35..41]
+        \\  36: get_binding "x"                                       [36..38]
+        \\  37: number 10                                             [37..38]
+        \\  38: gt_eq %36, %37                                        [38..39]
+        \\  39: br_cond %38, %40, %43                                 [39..39]
+        \\  40: label                                                 [40..40]
+        \\  41: br %51, %35                                           [41..41]
+        \\  42: br %45, none                                          [42..42] dead
+        \\  43: label                                                 [43..43]
+        \\  44: br %45, none                                          [44..44]
+        \\  45: label                                                 [45..48]
+        \\  46: br %47, %45                                           [46..46]
+        \\  47: label                                                 [47..47]
+        \\  48: br %28, %45                                           [48..48]
+        \\  49: label                                                 [49..49]
+        \\  50: br %51, %28                                           [50..50]
+        \\  51: label                                                 [51..51]
+        \\  52: undefined                                             [52..53]
+        \\  53: br %54, %52                                           [53..53]
+        \\  54: label                                                 [54..82]
+        \\  55: get_binding "x"                                       [55..57]
+        \\  56: number 20                                             [56..57]
+        \\  57: lt %55, %56                                           [57..58]
+        \\  58: br_cond %57, %59, %81                                 [58..58]
+        \\  59: label                                                 [59..59]
+        \\  60: get_binding "x"                                       [60..62]
+        \\  61: one                                                   [61..62]
+        \\  62: add %60, %61                                          [62..63]
+        \\  63: set_binding "x", %62                                  [63..71]
+        \\  64: get_binding "x"                                       [64..66]
+        \\  65: number 2                                              [65..66]
+        \\  66: rem %64, %65                                          [66..68]
+        \\  67: zero                                                  [67..68]
+        \\  68: eq_strict %66, %67                                    [68..69]
+        \\  69: br_cond %68, %70, %73                                 [69..69]
+        \\  70: label                                                 [70..70]
+        \\  71: br %54, %63                                           [71..71]
+        \\  72: br %75, none                                          [72..72] dead
+        \\  73: label                                                 [73..73]
+        \\  74: br %75, none                                          [74..74]
+        \\  75: label                                                 [75..75]
+        \\  76: get_binding "x"                                       [76..78]
+        \\  77: number 10                                             [77..78]
+        \\  78: add %76, %77                                          [78..79]
+        \\  79: set_binding "x", %78                                  [79..80]
+        \\  80: br %54, %79                                           [80..80]
+        \\  81: label                                                 [81..81]
+        \\  82: br %83, %54                                           [82..82]
+        \\  83: label                                                 [83..83]
+        \\  84: get_binding "x"                                       [84..85]
+        \\  85: end %84                                               [85..85]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 0
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: load_undefined r0
+        \\  17: load_true r1
+        \\  19: jump_if_true r1, 5
+        \\  25: jump 68
+        \\  30: get_binding r1, @0
+        \\  36: load_number_i32 r2, 1
+        \\  42: add r3, r1, r2
+        \\  46: set_binding @0, r3
+        \\  52: move r1, r3
+        \\  55: get_binding r2, @0
+        \\  61: load_number_i32 r3, 5
+        \\  67: gt_eq r4, r2, r3
+        \\  71: jump_if_true r4, 5
+        \\  77: jump 8
+        \\  82: move r0, r1
+        \\  85: jump 8
+        \\  90: move r0, r1
+        \\  93: jump -81
+        \\  98: load_undefined r0
+        \\ 100: load_true r1
+        \\ 102: jump_if_true r1, 5
+        \\ 108: jump 71
+        \\ 113: get_binding r1, @0
+        \\ 119: load_number_i32 r2, 1
+        \\ 125: add r3, r1, r2
+        \\ 129: set_binding @0, r3
+        \\ 135: move r1, r3
+        \\ 138: get_binding r2, @0
+        \\ 144: load_number_i32 r3, 10
+        \\ 150: gt_eq r4, r2, r3
+        \\ 154: jump_if_true r4, 5
+        \\ 160: jump 8
+        \\ 165: move r0, r1
+        \\ 168: jump 11
+        \\ 173: move r2, r1
+        \\ 176: move r0, r1
+        \\ 179: jump -84
+        \\ 184: load_undefined r0
+        \\ 186: get_binding r1, @0
+        \\ 192: load_number_i32 r2, 20
+        \\ 198: lt r3, r1, r2
+        \\ 202: jump_if_true r3, 5
+        \\ 208: jump 103
+        \\ 213: get_binding r1, @0
+        \\ 219: load_number_i32 r2, 1
+        \\ 225: add r3, r1, r2
+        \\ 229: set_binding @0, r3
+        \\ 235: move r1, r3
+        \\ 238: get_binding r2, @0
+        \\ 244: load_number_i32 r3, 2
+        \\ 250: rem r4, r2, r3
+        \\ 254: load_number_i32 r2, 0
+        \\ 260: eq_strict r3, r4, r2
+        \\ 264: jump_if_true r3, 5
+        \\ 270: jump 8
+        \\ 275: move r0, r1
+        \\ 278: jump -97
+        \\ 283: get_binding r1, @0
+        \\ 289: load_number_i32 r2, 10
+        \\ 295: add r3, r1, r2
+        \\ 299: set_binding @0, r3
+        \\ 305: move r1, r3
+        \\ 308: move r0, r1
+        \\ 311: jump -130
+        \\ 316: get_binding r0, @0
+        \\ 322: end r0
         \\
     );
 }
