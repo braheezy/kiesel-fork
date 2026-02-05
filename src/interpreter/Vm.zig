@@ -101,6 +101,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .object_create => vm.executeObjectCreate(data.reg),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .to_string => vm.executeToString(data.reg_reg[0], data.reg_reg[1]),
@@ -366,6 +367,13 @@ fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Byt
     const object = object_value.asObject();
     const property_key = try key_value.toPropertyKey(vm.agent);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
+}
+
+fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.Inst.StringIndex, flags_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const pattern = vm.getString(pattern_index);
+    const flags = vm.getString(flags_index);
+    const reg_exp = try builtins.regExpCreateFast(vm.agent, pattern, flags);
+    vm.load(dst, Value.from(&reg_exp.object));
 }
 
 fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {

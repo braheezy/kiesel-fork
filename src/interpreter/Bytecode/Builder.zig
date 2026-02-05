@@ -93,6 +93,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .big_int => try b.lowerBigInt(data.big_int, dest),
             .array => try b.lowerArray(data.array, dest),
             .object => try b.lowerObject(data.object, dest),
+            .reg_exp => try b.lowerRegExp(data.reg_exp, dest),
             .this => try b.lowerThis(dest),
             .label => try b.lowerLabel(dest, index.toRef()),
             .br => try b.lowerBr(data.br, dest),
@@ -665,6 +666,19 @@ fn lowerObject(b: *Builder, object_data: @FieldType(Ir.Inst.Data, "object"), des
             });
         }
     }
+}
+
+fn lowerRegExp(b: *Builder, data: @FieldType(Ir.Inst.Data, "reg_exp"), dest: Bytecode.Inst.Reg) Error!void {
+    const pattern_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.pattern));
+    const flags_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.flags));
+    try b.emit(.{
+        .tag = .reg_exp_create,
+        .data = .{ .reg_string_string = .{
+            dest,
+            pattern_index,
+            flags_index,
+        } },
+    });
 }
 
 fn lowerThis(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {

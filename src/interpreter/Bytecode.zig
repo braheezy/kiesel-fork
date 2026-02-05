@@ -49,6 +49,8 @@ pub const Inst = struct {
         object_set,
         object_set_computed,
 
+        reg_exp_create,
+
         resolve_this_binding,
 
         to_number,
@@ -172,6 +174,7 @@ pub const Inst = struct {
         reg_reg_string: struct { Reg, Reg, StringIndex },
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
+        reg_string_string: struct { Reg, StringIndex, StringIndex },
         string_reg: struct { StringIndex, Reg },
     };
 
@@ -198,6 +201,7 @@ pub const Inst = struct {
         .object_create = .reg,
         .object_set = .reg_string_reg,
         .object_set_computed = .reg_reg_reg,
+        .reg_exp_create = .reg_string_string,
         .resolve_this_binding = .reg,
         .to_number = .reg_reg,
         .to_string = .reg_reg,

@@ -77,6 +77,7 @@ pub const Inst = struct {
         big_int,
         array,
         object,
+        reg_exp,
         this,
 
         label,
@@ -171,6 +172,7 @@ pub const Inst = struct {
         big_int: BigIntIndex,
         array: struct { extra_index: ExtraIndex, len: u32 },
         object: struct { extra_index: ExtraIndex, len: u32 },
+        reg_exp: struct { pattern: StringIndex, flags: StringIndex },
         br: struct { target: Ref, value: Ref },
         br_cond: struct { condition: Ref, then_target: Ref, else_target: Ref },
         binary: struct { lhs: Ref, rhs: Ref },
@@ -206,6 +208,7 @@ pub const Inst = struct {
         .big_int = .big_int,
         .array = .array,
         .object = .object,
+        .reg_exp = .reg_exp,
         .this = .none,
         .label = .none,
         .br = .br,

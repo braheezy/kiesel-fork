@@ -1175,7 +1175,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .generator_expression => try b.todo("generator expression"),
             .async_function_expression => try b.todo("async function expression"),
             .async_generator_expression => try b.todo("async generator expression"),
-            .regular_expression_literal => try b.todo("regular expression literal"),
+            .regular_expression_literal => |*regexp_lit| try b.lowerRegularExpressionLiteral(regexp_lit),
             .template_literal => |*template_lit| try b.lowerTemplateLiteral(template_lit),
             .arrow_function => try b.todo("arrow function"),
             .async_arrow_function => try b.todo("async arrow function"),
@@ -1278,6 +1278,18 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
         .data = .{ .object = .{
             .extra_index = extra_index,
             .len = len,
+        } },
+    });
+}
+
+fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpressionLiteral) Error!Ir.Inst.Ref {
+    const pattern_index = try b.internString(regexp_lit.pattern);
+    const flags_index = try b.internString(regexp_lit.flags);
+    return b.addInst(.{
+        .tag = .reg_exp,
+        .data = .{ .reg_exp = .{
+            .pattern = pattern_index,
+            .flags = flags_index,
         } },
     });
 }

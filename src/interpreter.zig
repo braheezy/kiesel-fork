@@ -252,6 +252,22 @@ test {
         \\
     );
 
+    // Regular expression literal
+    try testInterpreter(std.testing.allocator,
+        \\/abc/gi;
+        \\
+    , .ignore,
+        \\IR (test)
+        \\   0: reg_exp "abc", "gi"                                   [0..1]
+        \\   1: end %0                                                [1..1]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: reg_exp_create r0, @0, @1
+        \\  10: end r0
+        \\
+    );
+
     // Variable statements
     try testInterpreter(std.testing.allocator,
         \\var x = 10, y = 20;
