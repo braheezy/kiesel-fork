@@ -442,7 +442,7 @@ fn lowerBreakableStatement(b: *Builder, brk_stmt: *const ast.BreakableStatement,
             .for_statement => |*for_stmt| try b.lowerForStatement(for_stmt, label),
             .for_in_of_statement => try b.todo("for in/of statement"),
         },
-        .switch_statement => try b.todo("switch statement"),
+        .switch_statement => |*switch_stmt| try b.lowerSwitchStatement(switch_stmt, label),
     };
 }
 
@@ -673,6 +673,113 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     exit_br.set(.{ .br = .{
         .target = end_label,
         .value = test_label,
+    } });
+
+    return end_label;
+}
+
+fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
+    const discriminant = try b.lowerExpression(&switch_stmt.expression);
+
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
+    const entry_br = try b.addInstDeferred(.br);
+
+    const breakable_ctx = try b.pushBreakableContext(.{
+        .label = label,
+        .continue_target = .{ .deferred = .empty },
+        .break_target = .{ .deferred = .empty },
+        .result_ref = undefined_ref,
+    });
+    defer b.popBreakableContext();
+
+    const items = switch_stmt.case_block.items;
+
+    var case_branches: std.ArrayListUnmanaged(struct { br_cond: Deferred, index: u32 }) = .empty;
+    defer case_branches.deinit(b.gpa);
+
+    var default_index: ?u32 = null;
+
+    const check_start = try b.addLabel();
+    for (items, 0..) |item, i| {
+        switch (item) {
+            .case_clause => |case_clause| {
+                const case_value = try b.lowerExpression(&case_clause.expression);
+                const condition = try b.addInst(.{
+                    .tag = .eq_strict,
+                    .data = .{ .binary = .{
+                        .lhs = discriminant,
+                        .rhs = case_value,
+                    } },
+                });
+                const case_br_cond = try b.addInstDeferred(.br_cond);
+                try case_branches.append(b.gpa, .{
+                    .br_cond = case_br_cond,
+                    .index = @intCast(i),
+                });
+
+                const next_check = try b.addLabel();
+                case_br_cond.set(.{ .br_cond = .{
+                    .condition = condition,
+                    .then_target = .none,
+                    .else_target = next_check,
+                } });
+            },
+            .default_clause => default_index = @intCast(i),
+        }
+    }
+    const default_br = try b.addInstDeferred(.br);
+
+    const body_labels = try b.gpa.alloc(Ir.Inst.Ref, items.len);
+    defer b.gpa.free(body_labels);
+    for (items, 0..) |item, i| {
+        body_labels[i] = try b.addLabel();
+        switch (item) {
+            .case_clause => |case_clause| try b.lowerBreakableStatementList(&case_clause.statement_list, breakable_ctx),
+            .default_clause => |default_clause| try b.lowerBreakableStatementList(&default_clause.statement_list, breakable_ctx),
+        }
+    }
+
+    const exit_br = try b.addInstDeferred(.br);
+    const end_label = try b.addLabel();
+
+    breakable_ctx.setDeferredBreaks(end_label);
+
+    // Forward continues to parent context
+    if (b.breakable_stack.items.len >= 2) {
+        const parent_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 2];
+        for (breakable_ctx.continue_target.deferred.items) |jump| {
+            switch (parent_ctx.continue_target) {
+                .known => |target| jump.inst.set(.{ .br = .{
+                    .target = target,
+                    .value = jump.value,
+                } }),
+                .deferred => |*list| try list.append(b.gpa, jump),
+            }
+        }
+    }
+
+    entry_br.set(.{ .br = .{
+        .target = check_start,
+        .value = undefined_ref,
+    } });
+    for (case_branches.items) |item| {
+        const inst_data = b.instructions.slice().items(.data)[@intFromEnum(item.br_cond.ref.toIndex().?)];
+        item.br_cond.set(.{ .br_cond = .{
+            .condition = inst_data.br_cond.condition,
+            .then_target = body_labels[item.index],
+            .else_target = inst_data.br_cond.else_target,
+        } });
+    }
+    default_br.set(.{ .br = .{
+        .target = if (default_index) |index| body_labels[index] else end_label,
+        .value = undefined_ref,
+    } });
+    exit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = breakable_ctx.result_ref,
     } });
 
     return end_label;

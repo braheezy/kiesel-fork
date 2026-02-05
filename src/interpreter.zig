@@ -815,4 +815,102 @@ test {
         \\ 322: end r0
         \\
     );
+
+    // Switch statement
+    try testInterpreter(std.testing.allocator,
+        \\var x = 0;
+        \\switch("b") {
+        \\    case "a": x = 1; break;
+        \\    case "b": x = 2;
+        \\    case "c": x = x + 3; break;
+        \\    default: x = 100;
+        \\}
+        \\x;
+        \\
+    , .{ .value = Value.from(5) },
+        \\IR (test)
+        \\   0: zero                                                  [0..1]
+        \\   1: set_binding "x", %0                                   [1..1]
+        \\   2: string "b"                                            [2..15]
+        \\   3: undefined                                             [3..18]
+        \\   4: br %5, %3                                             [4..4]
+        \\   5: label                                                 [5..5]
+        \\   6: string "a"                                            [6..7]
+        \\   7: eq_strict %2, %6                                      [7..8]
+        \\   8: br_cond %7, %19, %9                                   [8..8]
+        \\   9: label                                                 [9..9]
+        \\  10: string "b"                                            [10..11]
+        \\  11: eq_strict %2, %10                                     [11..12]
+        \\  12: br_cond %11, %23, %13                                 [12..12]
+        \\  13: label                                                 [13..13]
+        \\  14: string "c"                                            [14..15]
+        \\  15: eq_strict %2, %14                                     [15..16]
+        \\  16: br_cond %15, %26, %17                                 [16..16]
+        \\  17: label                                                 [17..17]
+        \\  18: br %32, %3                                            [18..18]
+        \\  19: label                                                 [19..19]
+        \\  20: one                                                   [20..21]
+        \\  21: set_binding "x", %20                                  [21..22]
+        \\  22: br %36, %21                                           [22..22]
+        \\  23: label                                                 [23..23]
+        \\  24: number 2                                              [24..25]
+        \\  25: set_binding "x", %24                                  [25..25]
+        \\  26: label                                                 [26..26]
+        \\  27: get_binding "x"                                       [27..29]
+        \\  28: number 3                                              [28..29]
+        \\  29: add %27, %28                                          [29..30]
+        \\  30: set_binding "x", %29                                  [30..31]
+        \\  31: br %36, %30                                           [31..31]
+        \\  32: label                                                 [32..32]
+        \\  33: number 100                                            [33..34]
+        \\  34: set_binding "x", %33                                  [34..35]
+        \\  35: br %36, %34                                           [35..35]
+        \\  36: label                                                 [36..36]
+        \\  37: get_binding "x"                                       [37..38]
+        \\  38: end %37                                               [38..38]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 0
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: load_string r0, @1
+        \\  21: load_undefined r1
+        \\  23: move r2, r1
+        \\  26: load_string r2, @2
+        \\  32: eq_strict r3, r0, r2
+        \\  36: jump_if_true r3, 5
+        \\  42: jump 23
+        \\  47: load_number_i32 r0, 1
+        \\  53: set_binding @0, r0
+        \\  59: move r1, r0
+        \\  62: move r0, r1
+        \\  65: jump 113
+        \\  70: load_string r2, @1
+        \\  76: eq_strict r3, r0, r2
+        \\  80: jump_if_true r3, 5
+        \\  86: jump 20
+        \\  91: load_number_i32 r0, 2
+        \\  97: set_binding @0, r0
+        \\ 103: move r1, r0
+        \\ 106: jump 21
+        \\ 111: load_string r2, @3
+        \\ 117: eq_strict r3, r0, r2
+        \\ 121: jump_if_true r3, 5
+        \\ 127: jump 30
+        \\ 132: get_binding r0, @0
+        \\ 138: load_number_i32 r1, 3
+        \\ 144: add r2, r0, r1
+        \\ 148: set_binding @0, r2
+        \\ 154: move r0, r2
+        \\ 157: jump 21
+        \\ 162: move r0, r1
+        \\ 165: load_number_i32 r0, 100
+        \\ 171: set_binding @0, r0
+        \\ 177: move r1, r0
+        \\ 180: move r0, r1
+        \\ 183: get_binding r0, @0
+        \\ 189: end r0
+        \\
+    );
 }
