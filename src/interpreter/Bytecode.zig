@@ -85,7 +85,12 @@ pub const Inst = struct {
         eq_strict,
         not_eq_strict,
 
+        push_scope,
+        pop_scope,
+        create_mutable_binding,
+        create_immutable_binding,
         initialize_binding,
+
         get_binding,
         get_property,
         get_property_computed,
@@ -177,6 +182,7 @@ pub const Inst = struct {
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
         reg_string_string: struct { Reg, StringIndex, StringIndex },
+        string: StringIndex,
         string_reg: struct { StringIndex, Reg },
     };
 
@@ -233,6 +239,10 @@ pub const Inst = struct {
         .not_eq = .reg_reg_reg,
         .eq_strict = .reg_reg_reg,
         .not_eq_strict = .reg_reg_reg,
+        .push_scope = .none,
+        .pop_scope = .none,
+        .create_mutable_binding = .string,
+        .create_immutable_binding = .string,
         .initialize_binding = .string_reg,
         .get_binding = .reg_string,
         .get_property = .reg_reg_string,
@@ -471,6 +481,7 @@ fn printData(
         .none => {},
         inline .i32,
         .reg,
+        .string,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
             try printField(field_data, writer, tty_config);

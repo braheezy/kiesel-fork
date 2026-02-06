@@ -303,6 +303,41 @@ test {
         \\
     );
 
+    // Lexical declarations
+    try testInterpreter(std.testing.allocator,
+        \\let a = 1;
+        \\{
+        \\  let a = 2;
+        \\}
+        \\a;
+    , .{ .value = Value.from(1) },
+        \\IR (test)
+        \\   0: one                                                   [0..1]
+        \\   1: initialize_binding "a", %0                            [1..1]
+        \\   2: push_scope                                            [2..2]
+        \\   3: create_mutable_binding "a"                            [3..3]
+        \\   4: number 2                                              [4..5]
+        \\   5: initialize_binding "a", %4                            [5..5]
+        \\   6: pop_scope                                             [6..6]
+        \\   7: get_binding "a"                                       [7..8]
+        \\   8: end %7                                                [8..8]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 1
+        \\   6: initialize_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: push_scope
+        \\  16: create_mutable_binding @0
+        \\  21: load_number_i32 r0, 2
+        \\  27: initialize_binding @0, r0
+        \\  33: move r1, r0
+        \\  36: pop_scope
+        \\  37: get_binding r0, @0
+        \\  43: end r0
+        \\
+    );
+
     // Increment/decrement operators
     try testInterpreter(std.testing.allocator,
         \\x = 5;

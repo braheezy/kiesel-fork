@@ -132,6 +132,10 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_and => try b.lowerLogicalAnd(data.binary, dest),
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
+            .push_scope => try b.lowerPushScope(),
+            .pop_scope => try b.lowerPopScope(),
+            .create_mutable_binding => try b.lowerCreateMutableBinding(data.string),
+            .create_immutable_binding => try b.lowerCreateImmutableBinding(data.string),
             .initialize_binding => try b.lowerInitializeBinding(data.set_binding.name, data.set_binding.value, dest),
             .get_binding => try b.lowerGetBinding(data.string, dest),
             .get_property => try b.lowerGetProperty(data.get_property, dest),
@@ -890,6 +894,36 @@ fn lowerNullishCoalesce(b: *Builder, data: @FieldType(Ir.Inst.Data, "binary"), d
     b.jump(merge_block);
 
     b.switchToBlock(merge_block);
+}
+
+fn lowerPushScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .push_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerPopScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .pop_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerCreateMutableBinding(b: *Builder, string_index: Ir.Inst.StringIndex) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .create_mutable_binding,
+        .data = .{ .string = bytecode_string_index },
+    });
+}
+
+fn lowerCreateImmutableBinding(b: *Builder, string_index: Ir.Inst.StringIndex) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .create_immutable_binding,
+        .data = .{ .string = bytecode_string_index },
+    });
 }
 
 fn lowerInitializeBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

@@ -22,6 +22,7 @@ strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
 extras: std.ArrayListUnmanaged(u32),
 breakable_stack: std.ArrayListUnmanaged(*BreakableContext) = .empty,
+scope_depth: u32 = 0,
 
 const Ast = union(enum) {
     script: *const ast.Script,
@@ -51,6 +52,7 @@ const BreakableContext = struct {
     continue_target: JumpTarget,
     break_target: JumpTarget,
     result_ref: Ir.Inst.Ref,
+    scope_depth: u32 = 0,
 
     const JumpTarget = union(enum) {
         known: Ir.Inst.Ref,
@@ -213,6 +215,7 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
 fn pushBreakableContext(b: *Builder, ctx: BreakableContext) std.mem.Allocator.Error!*BreakableContext {
     const heap_ctx = try b.gpa.create(BreakableContext);
     heap_ctx.* = ctx;
+    heap_ctx.scope_depth = b.scope_depth;
     try b.breakable_stack.append(b.gpa, heap_ctx);
     return heap_ctx;
 }
@@ -323,7 +326,7 @@ fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir
 
 fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
     return switch (stmt.*) {
-        .block_statement => |*block_stmt| try b.lowerBlockStatement(block_stmt),
+        .block_statement => |*block_stmt| try b.lowerBlockStatement(block_stmt, null),
         .variable_statement => |*var_stmt| try b.lowerVariableStatement(var_stmt),
         .empty_statement => .none,
         .expression_statement => |expr_stmt| try b.lowerExpression(&expr_stmt.expression),
@@ -348,8 +351,69 @@ fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref
     };
 }
 
-fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement) Error!Ir.Inst.Ref {
-    return b.lowerStatementList(&block_stmt.block.statement_list);
+fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement, breakable_ctx: ?*BreakableContext) Error!Ir.Inst.Ref {
+    const stmt_list = &block_stmt.block.statement_list;
+    const has_scope = stmt_list.hasLexicallyScopedDeclarations();
+
+    if (has_scope) {
+        _ = try b.addInst(.{
+            .tag = .push_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth += 1;
+
+        for (stmt_list.items) |item| {
+            const lex_decl = switch (item) {
+                .declaration => |decl| switch (decl.*) {
+                    .lexical_declaration => |*lex_decl| lex_decl,
+                    else => continue,
+                },
+                .statement => continue,
+            };
+            const tag: Ir.Inst.Tag = if (lex_decl.isConstantDeclaration())
+                .create_immutable_binding
+            else
+                .create_mutable_binding;
+            for (lex_decl.binding_list.items) |lex_binding| {
+                switch (lex_binding) {
+                    .binding_identifier => |binding| {
+                        const string_index = try b.internString(binding.binding_identifier);
+                        _ = try b.addInst(.{
+                            .tag = tag,
+                            .data = .{ .string = string_index },
+                        });
+                    },
+                    .binding_pattern => |pattern| {
+                        var bound_names: std.ArrayList(ast.Identifier) = .empty;
+                        defer bound_names.deinit(b.gpa);
+                        try pattern.binding_pattern.collectBoundNames(b.gpa, &bound_names);
+                        for (bound_names.items) |name| {
+                            const string_index = try b.internString(name);
+                            _ = try b.addInst(.{
+                                .tag = tag,
+                                .data = .{ .string = string_index },
+                            });
+                        }
+                    },
+                }
+            }
+        }
+    }
+
+    const result = if (breakable_ctx) |ctx| blk: {
+        try b.lowerBreakableStatementList(stmt_list, ctx);
+        break :blk ctx.result_ref;
+    } else try b.lowerStatementList(stmt_list);
+
+    if (has_scope) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
+
+    return result;
 }
 
 fn lowerVariableStatement(b: *Builder, var_stmt: *const ast.VariableStatement) Error!Ir.Inst.Ref {
@@ -472,11 +536,13 @@ fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement
     });
     defer b.popBreakableContext();
 
-    const stmt_list: *const ast.StatementList = switch (do_while_stmt.consequent_statement.*) {
-        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
-        else => &.{ .items = &.{.{ .statement = do_while_stmt.consequent_statement }} },
+    const body_block_stmt: *const ast.BlockStatement = switch (do_while_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| block_stmt,
+        else => &.{ .block = .{ .statement_list = .{ .items = &.{
+            .{ .statement = do_while_stmt.consequent_statement },
+        } } } },
     };
-    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    _ = try b.lowerBlockStatement(body_block_stmt, breakable_ctx);
     const body_result = breakable_ctx.result_ref;
     const body_br = try b.addInstDeferred(.br);
 
@@ -547,11 +613,13 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement, label
     });
     defer b.popBreakableContext();
 
-    const stmt_list: *const ast.StatementList = switch (while_stmt.consequent_statement.*) {
-        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
-        else => &.{ .items = &.{.{ .statement = while_stmt.consequent_statement }} },
+    const body_block_stmt: *const ast.BlockStatement = switch (while_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| block_stmt,
+        else => &.{ .block = .{ .statement_list = .{ .items = &.{
+            .{ .statement = while_stmt.consequent_statement },
+        } } } },
     };
-    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    _ = try b.lowerBlockStatement(body_block_stmt, breakable_ctx);
     const body_result = breakable_ctx.result_ref;
     const body_br = try b.addInstDeferred(.br);
 
@@ -630,11 +698,13 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     });
     defer b.popBreakableContext();
 
-    const stmt_list: *const ast.StatementList = switch (for_stmt.consequent_statement.*) {
-        .block_statement => |*block_stmt| &block_stmt.block.statement_list,
-        else => &.{ .items = &.{.{ .statement = for_stmt.consequent_statement }} },
+    const body_block_stmt: *const ast.BlockStatement = switch (for_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| block_stmt,
+        else => &.{ .block = .{ .statement_list = .{ .items = &.{
+            .{ .statement = for_stmt.consequent_statement },
+        } } } },
     };
-    try b.lowerBreakableStatementList(stmt_list, breakable_ctx);
+    _ = try b.lowerBlockStatement(body_block_stmt, breakable_ctx);
     const body_result = breakable_ctx.result_ref;
 
     const body_br = try b.addInstDeferred(.br);
@@ -788,6 +858,15 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
 fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) Error!Ir.Inst.Ref {
     const ctx = b.findBreakableContext(cont_stmt.label);
     const value = ctx.result_ref;
+
+    const scope_pops = b.scope_depth - ctx.scope_depth;
+    for (0..scope_pops) |_| {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+    }
+
     switch (ctx.continue_target) {
         .known => |target| {
             _ = try b.addInst(.{
@@ -812,6 +891,15 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
 fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
     const ctx = b.findBreakableContext(brk_stmt.label);
     const value = ctx.result_ref;
+
+    const scope_pops = b.scope_depth - ctx.scope_depth;
+    for (0..scope_pops) |_| {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+    }
+
     switch (ctx.break_target) {
         .known => |target| {
             _ = try b.addInst(.{

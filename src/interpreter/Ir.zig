@@ -123,7 +123,12 @@ pub const Inst = struct {
         logical_or,
         nullish_coalesce,
 
+        push_scope,
+        pop_scope,
+        create_mutable_binding,
+        create_immutable_binding,
         initialize_binding,
+
         get_binding,
         get_property,
         get_property_computed,
@@ -249,6 +254,10 @@ pub const Inst = struct {
         .logical_and = .binary,
         .logical_or = .binary,
         .nullish_coalesce = .binary,
+        .push_scope = .none,
+        .pop_scope = .none,
+        .create_mutable_binding = .string,
+        .create_immutable_binding = .string,
         .initialize_binding = .set_binding,
         .get_binding = .string,
         .get_property = .get_property,

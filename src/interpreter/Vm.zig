@@ -23,6 +23,7 @@ const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = language.ast.stringValueImpl;
@@ -131,6 +132,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .not_eq => vm.executeNotEq(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .push_scope => vm.executePushScope(),
+                .pop_scope => vm.executePopScope(),
+                .create_mutable_binding => vm.executeCreateMutableBinding(data.string),
+                .create_immutable_binding => vm.executeCreateImmutableBinding(data.string),
                 .initialize_binding => vm.executeInitializeBinding(data.string_reg[0], data.string_reg[1]),
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .get_property => vm.executeGetProperty(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
@@ -842,6 +847,32 @@ fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, r
     vm.load(dst, Value.from(result));
 }
 
+fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const old_env = execution_context.ecmascript_code.lexical_environment;
+    const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
+    execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+}
+
+fn executePopScope(vm: *Vm) void {
+    const execution_context = vm.agent.runningExecutionContext();
+    execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
+}
+
+fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
+    try env.createMutableBinding(vm.agent, name, false);
+}
+
+fn executeCreateImmutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
+    try env.createImmutableBinding(vm.agent, name, true);
+}
+
 fn executeInitializeBinding(
     vm: *Vm,
     name_index: Bytecode.Inst.StringIndex,
@@ -850,14 +881,16 @@ fn executeInitializeBinding(
     const name = vm.getString(name_index);
     const value = vm.store(value_reg);
 
-    const env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
     try env.initializeBinding(vm.agent, name, value);
 }
 
 fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
     const name = vm.getString(name_index);
 
-    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    const execution_context = vm.agent.runningExecutionContext();
+    var env = execution_context.ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
@@ -937,7 +970,8 @@ fn executeSetBinding(
     const name = vm.getString(name_index);
     const value = vm.store(value_reg);
 
-    var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
+    const execution_context = vm.agent.runningExecutionContext();
+    var env = execution_context.ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
