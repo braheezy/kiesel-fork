@@ -652,6 +652,48 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement, label
 }
 
 fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
+    const has_scope = if (for_stmt.initializer) |initializer|
+        initializer == .lexical_declaration
+    else
+        false;
+
+    if (has_scope) {
+        const lex_decl = &for_stmt.initializer.?.lexical_declaration;
+        _ = try b.addInst(.{
+            .tag = .push_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth += 1;
+
+        const binding_tag: Ir.Inst.Tag = if (lex_decl.isConstantDeclaration())
+            .create_immutable_binding
+        else
+            .create_mutable_binding;
+        for (lex_decl.binding_list.items) |lex_binding| {
+            switch (lex_binding) {
+                .binding_identifier => |binding| {
+                    const string_index = try b.internString(binding.binding_identifier);
+                    _ = try b.addInst(.{
+                        .tag = binding_tag,
+                        .data = .{ .string = string_index },
+                    });
+                },
+                .binding_pattern => |pattern| {
+                    var bound_names: std.ArrayList(ast.Identifier) = .empty;
+                    defer bound_names.deinit(b.gpa);
+                    try pattern.binding_pattern.collectBoundNames(b.gpa, &bound_names);
+                    for (bound_names.items) |name| {
+                        const string_index = try b.internString(name);
+                        _ = try b.addInst(.{
+                            .tag = binding_tag,
+                            .data = .{ .string = string_index },
+                        });
+                    }
+                },
+            }
+        }
+    }
+
     if (for_stmt.initializer) |initializer| {
         _ = switch (initializer) {
             .expression => |*expr| try b.lowerExpression(expr),
@@ -716,6 +758,15 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     const continue_br = try b.addInstDeferred(.br);
 
     const exit_label = try b.addLabel();
+
+    if (has_scope) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
+
     const exit_br = try b.addInstDeferred(.br);
 
     const end_label = try b.addLabel();
