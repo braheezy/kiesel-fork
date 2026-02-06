@@ -1834,8 +1834,8 @@ fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.
     try b.extras.appendSlice(b.gpa, @ptrCast(args.items));
 
     return b.addInst(.{
-        .tag = .new,
-        .data = .{ .new = .{
+        .tag = .construct,
+        .data = .{ .construct = .{
             .constructor = constructor,
             .extra_index = extra_index,
             .len = len,

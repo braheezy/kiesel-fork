@@ -203,10 +203,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .call_property0 => vm.executeCallPropertyN(0, data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .{}),
                 .call_property1 => vm.executeCallPropertyN(1, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], .{data.reg_reg_reg_reg[3]}),
                 .call_property2 => vm.executeCallPropertyN(2, data.reg_reg_reg_reg_reg[0], data.reg_reg_reg_reg_reg[1], data.reg_reg_reg_reg_reg[2], .{ data.reg_reg_reg_reg_reg[3], data.reg_reg_reg_reg_reg[4] }),
-                .new => vm.executeNew(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
-                .new0 => vm.executeNewN(0, data.reg_reg[0], data.reg_reg[1], .{}),
-                .new1 => vm.executeNewN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
-                .new2 => vm.executeNewN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
+                .construct => vm.executeConstruct(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .construct0 => vm.executeConstructN(0, data.reg_reg[0], data.reg_reg[1], .{}),
+                .construct1 => vm.executeConstructN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
+                .construct2 => vm.executeConstructN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
                 .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
                 .get_for_in_iterator => vm.executeGetForInIterator(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
@@ -1474,7 +1474,7 @@ fn executeCallPropertyN(
     vm.load(dest, result);
 }
 
-fn executeNew(
+fn executeConstruct(
     vm: *Vm,
     dest: Bytecode.Inst.Reg,
     constructor_reg: Bytecode.Inst.Reg,
@@ -1497,7 +1497,7 @@ fn executeNew(
     vm.load(dest, result);
 }
 
-fn executeNewN(
+fn executeConstructN(
     vm: *Vm,
     comptime N: comptime_int,
     dest: Bytecode.Inst.Reg,

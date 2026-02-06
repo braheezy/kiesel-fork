@@ -166,7 +166,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
             .copy_data_properties => try b.lowerCopyDataProperties(data.copy_data_properties, dest),
             .call => try b.lowerCall(data.call, dest),
-            .new => try b.lowerNew(data.new, dest),
+            .construct => try b.lowerConstruct(data.construct, dest),
             .get_iterator => try b.lowerGetIterator(data.ref, dest),
             .get_for_in_iterator => try b.lowerGetForInIterator(data.ref, dest),
             .iterator_step => try b.lowerIteratorStep(data.ref, dest),
@@ -1331,7 +1331,7 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
     }
 }
 
-fn lowerNew(b: *Builder, data: @FieldType(Ir.Inst.Data, "new"), dest: Bytecode.Inst.Reg) Error!void {
+fn lowerConstruct(b: *Builder, data: @FieldType(Ir.Inst.Data, "construct"), dest: Bytecode.Inst.Reg) Error!void {
     const constructor_reg = b.resolve(data.constructor);
     const extra_index = @intFromEnum(data.extra_index);
     const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
@@ -1346,9 +1346,9 @@ fn lowerNew(b: *Builder, data: @FieldType(Ir.Inst.Data, "new"), dest: Bytecode.I
 
     if (data.len <= 2 and !has_spread) {
         try b.emit(switch (data.len) {
-            0 => .{ .tag = .new0, .data = .{ .reg_reg = .{ dest, constructor_reg } } },
-            1 => .{ .tag = .new1, .data = .{ .reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]) } } },
-            2 => .{ .tag = .new2, .data = .{ .reg_reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+            0 => .{ .tag = .construct0, .data = .{ .reg_reg = .{ dest, constructor_reg } } },
+            1 => .{ .tag = .construct1, .data = .{ .reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]) } } },
+            2 => .{ .tag = .construct2, .data = .{ .reg_reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
             else => unreachable,
         });
         return;
@@ -1358,7 +1358,7 @@ fn lowerNew(b: *Builder, data: @FieldType(Ir.Inst.Data, "new"), dest: Bytecode.I
     try b.emitArgumentsArray(args, args_reg);
 
     try b.emit(.{
-        .tag = .new,
+        .tag = .construct,
         .data = .{ .reg_reg_reg = .{
             dest,
             constructor_reg,

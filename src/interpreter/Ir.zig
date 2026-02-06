@@ -159,7 +159,7 @@ pub const Inst = struct {
         copy_data_properties,
 
         call,
-        new,
+        construct,
 
         get_iterator,
         get_for_in_iterator,
@@ -201,7 +201,7 @@ pub const Inst = struct {
         delete_property_indexed: struct { base: Ref, index: u32 },
         copy_data_properties: struct { source: Ref, extra_index: ExtraIndex, len: u32 },
         call: struct { callee: Ref, this_value: Ref, extra_index: ExtraIndex, len: u32 },
-        new: struct { constructor: Ref, extra_index: ExtraIndex, len: u32 },
+        construct: struct { constructor: Ref, extra_index: ExtraIndex, len: u32 },
         ref: Ref,
     };
 
@@ -290,7 +290,7 @@ pub const Inst = struct {
         .delete_property_indexed_strict = .delete_property_indexed,
         .copy_data_properties = .copy_data_properties,
         .call = .call,
-        .new = .new,
+        .construct = .construct,
         .get_iterator = .ref,
         .get_for_in_iterator = .ref,
         .iterator_step = .ref,
@@ -365,10 +365,10 @@ pub const Inst = struct {
                 const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.call.len];
                 for (args) |arg| try uses.append(gpa, arg);
             },
-            .new => {
-                try uses.append(gpa, data.new.constructor);
-                const extra_index = @intFromEnum(data.new.extra_index);
-                const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.new.len];
+            .construct => {
+                try uses.append(gpa, data.construct.constructor);
+                const extra_index = @intFromEnum(data.construct.extra_index);
+                const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.construct.len];
                 for (args) |arg| try uses.append(gpa, arg);
             },
             .copy_data_properties => {
@@ -509,11 +509,11 @@ fn printData(
             }
             try cw.writeByte(']');
         },
-        .new => {
-            try printField(ir, data.new.constructor, cw, tty_config);
+        .construct => {
+            try printField(ir, data.construct.constructor, cw, tty_config);
             try cw.writeAll(", [");
-            const extra_index = @intFromEnum(data.new.extra_index);
-            const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.new.len];
+            const extra_index = @intFromEnum(data.construct.extra_index);
+            const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.construct.len];
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
