@@ -1621,7 +1621,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .await_expression => try b.todo("await expression"),
         .yield_expression => try b.todo("yield expression"),
         .tagged_template => try b.todo("tagged template"),
-        .binding_pattern_for_assignment_expression => try b.todo("binding pattern for assignment expression"),
+        .binding_pattern_for_assignment_expression => unreachable, // Only valid as assignment LHS
     };
 }
 
@@ -2257,6 +2257,10 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                 },
                 .private_identifier => try b.todo("private identifier in member assignment"),
             }
+        },
+        .binding_pattern_for_assignment_expression => |pattern| {
+            const value = try b.lowerExpression(assign_expr.rhs_expression);
+            return b.lowerDestructuringAssignment(pattern, value, .set);
         },
         else => try b.todo("non-identifier lhs"),
     }
