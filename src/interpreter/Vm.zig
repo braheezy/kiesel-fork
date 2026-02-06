@@ -108,6 +108,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .object_create => vm.executeObjectCreate(data.reg),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .object_spread => vm.executeObjectSpread(data.reg_reg[0], data.reg_reg[1]),
                 .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
@@ -381,6 +382,14 @@ fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Byt
     const object = object_value.asObject();
     const property_key = try key_value.toPropertyKey(vm.agent);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
+}
+
+fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const object_value = vm.store(object_reg);
+    const spread_value = vm.store(value_reg);
+    const object = object_value.asObject();
+    const excluded_items: []const PropertyKey = &.{};
+    try object.copyDataProperties(vm.agent, spread_value, excluded_items);
 }
 
 fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.Inst.StringIndex, flags_index: Bytecode.Inst.StringIndex) Agent.Error!void {

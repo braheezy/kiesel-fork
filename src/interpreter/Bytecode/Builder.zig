@@ -634,6 +634,19 @@ fn lowerObject(b: *Builder, object_data: @FieldType(Ir.Inst.Data, "object"), des
 
         const value_reg = b.resolve(value_ref);
 
+        if (key_ref == .none) {
+            const value_index = value_ref.toIndex().?;
+            std.debug.assert(b.ir.instructions.items(.tag)[@intFromEnum(value_index)] == .spread);
+            try b.emit(.{
+                .tag = .object_spread,
+                .data = .{ .reg_reg = .{
+                    dest,
+                    value_reg,
+                } },
+            });
+            continue;
+        }
+
         const key_index = key_ref.toIndex().?;
         const key_tag = b.ir.instructions.items(.tag)[@intFromEnum(key_index)];
         const key_data = b.ir.instructions.items(.data)[@intFromEnum(key_index)];

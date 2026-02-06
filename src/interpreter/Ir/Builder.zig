@@ -1678,8 +1678,28 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
 
     for (object_lit.property_definition_list.items) |prop_def| {
         switch (prop_def) {
-            .identifier_reference => try b.todo("identifier reference in object literal"),
-            .spread => try b.todo("spread in object literal"),
+            .identifier_reference => |identifier| {
+                const string_index = try b.internString(identifier);
+                const key_ref = try b.addInst(.{
+                    .tag = .string,
+                    .data = .{ .string = string_index },
+                });
+                const value_ref = try b.addInst(.{
+                    .tag = .get_binding,
+                    .data = .{ .string = string_index },
+                });
+                try pairs.append(b.gpa, key_ref);
+                try pairs.append(b.gpa, value_ref);
+            },
+            .spread => |*expr| {
+                const value_ref = try b.lowerExpression(expr);
+                const spread_ref = try b.addInst(.{
+                    .tag = .spread,
+                    .data = .{ .ref = value_ref },
+                });
+                try pairs.append(b.gpa, .none);
+                try pairs.append(b.gpa, spread_ref);
+            },
             .method_definition => try b.todo("method definition in object literal"),
             .property_name_and_expression => |*prop| {
                 const key_ref = try b.lowerPropertyName(prop.property_name);

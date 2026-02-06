@@ -230,32 +230,54 @@ test {
 
     // Object literal
     try testInterpreter(std.testing.allocator,
-        \\({a: 1, [2]: "two", b: 3});
+        \\var a = 1;
+        \\var o = {c: 2};
+        \\({a, [2]: "two", b: 3, ...o});
         \\
     , .ignore,
         \\IR (test)
-        \\   0: string "a"                                            [0..6]
-        \\   1: one                                                   [1..6]
-        \\   2: number 2                                              [2..6]
-        \\   3: string "two"                                          [3..6]
-        \\   4: string "b"                                            [4..6]
-        \\   5: number 3                                              [5..6]
-        \\   6: object {%0: %1, %2: %3, %4: %5}                       [6..7]
-        \\   7: end %6                                                [7..7]
+        \\   0: one                                                   [0..1]
+        \\   1: set_binding "a", %0                                   [1..1]
+        \\   2: string "c"                                            [2..4]
+        \\   3: number 2                                              [3..4]
+        \\   4: object {%2: %3}                                       [4..5]
+        \\   5: set_binding "o", %4                                   [5..5]
+        \\   6: string "a"                                            [6..14]
+        \\   7: get_binding "a"                                       [7..14]
+        \\   8: number 2                                              [8..14]
+        \\   9: string "two"                                          [9..14]
+        \\  10: string "b"                                            [10..14]
+        \\  11: number 3                                              [11..14]
+        \\  12: get_binding "o"                                       [12..13]
+        \\  13: spread %12                                            [13..14]
+        \\  14: object {%6: %7, %8: %9, %10: %11, none: %13}          [14..15]
+        \\  15: end %14                                               [15..15]
         \\
     ,
         \\Bytecode (test)
-        \\   0: load_string r0, @0
-        \\   6: load_number_i32 r1, 1
-        \\  12: load_number_i32 r2, 2
-        \\  18: load_string r3, @1
-        \\  24: load_string r4, @2
-        \\  30: load_number_i32 r5, 3
-        \\  36: object_create r6
-        \\  38: object_set r6, @0, r1
-        \\  45: object_set_computed r6, r2, r3
-        \\  49: object_set r6, @2, r5
-        \\  56: end r6
+        \\   0: load_number_i32 r0, 1
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: load_string r0, @1
+        \\  21: load_number_i32 r1, 2
+        \\  27: object_create r2
+        \\  29: object_set r2, @1, r1
+        \\  36: set_binding @2, r2
+        \\  42: move r0, r2
+        \\  45: load_string r0, @0
+        \\  51: get_binding r1, @0
+        \\  57: load_number_i32 r2, 2
+        \\  63: load_string r3, @3
+        \\  69: load_string r4, @4
+        \\  75: load_number_i32 r5, 3
+        \\  81: get_binding r6, @2
+        \\  87: move r7, r6
+        \\  90: object_create r6
+        \\  92: object_set r6, @0, r1
+        \\  99: object_set_computed r6, r2, r3
+        \\ 103: object_set r6, @4, r5
+        \\ 110: object_spread r6, r7
+        \\ 113: end r6
         \\
     );
 
