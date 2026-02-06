@@ -706,9 +706,10 @@ test {
         \\while(true) { x = x + 1; if (x >= 5) break; }
         \\for(;;) { x = x + 1; if (x >= 10) break; }
         \\while(x < 20) { x = x + 1; if (x % 2 === 0) continue; x = x + 10; }
+        \\foo: { x = x + 100; break foo; x = x + 200; }
         \\x;
         \\
-    , .{ .value = Value.from(21) },
+    , .{ .value = Value.from(121) },
         \\IR (test)
         \\   0: zero                                                  [0..1]
         \\   1: set_binding "x", %0                                   [1..1]
@@ -794,8 +795,19 @@ test {
         \\  81: label                                                 [81..81]
         \\  82: br %83, %54                                           [82..82]
         \\  83: label                                                 [83..83]
-        \\  84: get_binding "x"                                       [84..85]
-        \\  85: end %84                                               [85..85]
+        \\  84: undefined                                             [84..89]
+        \\  85: get_binding "x"                                       [85..87]
+        \\  86: number 100                                            [86..87]
+        \\  87: add %85, %86                                          [87..88]
+        \\  88: set_binding "x", %87                                  [88..88]
+        \\  89: br %94, %84                                           [89..89]
+        \\  90: get_binding "x"                                       [90..92] dead
+        \\  91: number 200                                            [91..92] dead
+        \\  92: add %90, %91                                          [92..93] dead
+        \\  93: set_binding "x", %92                                  [93..93] dead
+        \\  94: label                                                 [94..94]
+        \\  95: get_binding "x"                                       [95..96]
+        \\  96: end %95                                               [96..96]
         \\
     ,
         \\Bytecode (test)
@@ -866,8 +878,14 @@ test {
         \\ 305: move r1, r3
         \\ 308: move r0, r1
         \\ 311: jump -130
-        \\ 316: get_binding r0, @0
-        \\ 322: end r0
+        \\ 316: load_undefined r0
+        \\ 318: get_binding r1, @0
+        \\ 324: load_number_i32 r2, 100
+        \\ 330: add r3, r1, r2
+        \\ 334: set_binding @0, r3
+        \\ 340: move r1, r3
+        \\ 343: get_binding r0, @0
+        \\ 349: end r0
         \\
     );
 

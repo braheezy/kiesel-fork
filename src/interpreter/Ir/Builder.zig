@@ -926,7 +926,28 @@ fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) E
     return switch (lbl_stmt.labelled_item) {
         .statement => |stmt| switch (stmt.*) {
             .breakable_statement => |*brk_stmt| try b.lowerBreakableStatement(brk_stmt, label),
-            else => b.lowerStatement(stmt),
+            else => {
+                const undefined_ref = try b.addInst(.{
+                    .tag = .undefined,
+                    .data = .{ .none = {} },
+                });
+
+                const breakable_ctx = try b.pushBreakableContext(.{
+                    .label = label,
+                    .continue_target = .{ .deferred = .empty },
+                    .break_target = .{ .deferred = .empty },
+                    .result_ref = undefined_ref,
+                });
+                defer b.popBreakableContext();
+
+                const result = try b.lowerStatement(stmt);
+                if (result != .none) breakable_ctx.result_ref = result;
+
+                const end_label = try b.addLabel();
+                breakable_ctx.setDeferredBreaks(end_label);
+
+                return end_label;
+            },
         },
         .function_declaration => try b.todo("labelled function declaration"),
     };
