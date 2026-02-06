@@ -75,7 +75,10 @@ fn testInterpreter(
     var vm: Vm = try .init(&agent, &bc);
     defer vm.deinit();
     if (vm.run()) |result| switch (expected_result) {
-        .value => |expected| try std.testing.expectEqual(expected, result),
+        .value => |expected| if (expected != null) {
+            if (result == null) return error.TestExpectedEqual;
+            if (!expected.?.isStrictlyEqual(result.?)) return error.TestExpectedEqual;
+        } else if (result != null) return error.TestExpectedEqual,
         .exception => return error.TestExpectedException,
         .ignore => {},
     } else |err| switch (expected_result) {
@@ -1006,5 +1009,84 @@ test {
         \\  16: throw r2
         \\  18: end r0
         \\
+    );
+
+    // For-in/of statement
+    try testInterpreter(std.testing.allocator,
+        \\var sum = 0;
+        \\for (var x of [1, 2, 3]) {
+        \\  sum = sum + x;
+        \\}
+        \\sum;
+    , .{ .value = Value.from(6) },
+        \\IR (test)
+        \\   0: zero                                                  [0..1]
+        \\   1: set_binding "sum", %0                                 [1..1]
+        \\   2: one                                                   [2..5]
+        \\   3: number 2                                              [3..5]
+        \\   4: number 3                                              [4..5]
+        \\   5: array [%2, %3, %4]                                    [5..7]
+        \\   6: undefined                                             [6..8]
+        \\   7: get_iterator %5                                       [7..19]
+        \\   8: br %9, %6                                             [8..8]
+        \\   9: label                                                 [9..21]
+        \\  10: iterator_step_value %7                                [10..14]
+        \\  11: iterator_is_done %7                                   [11..12]
+        \\  12: br_cond %11, %20, %13                                 [12..12]
+        \\  13: label                                                 [13..13]
+        \\  14: set_binding "x", %10                                  [14..14]
+        \\  15: get_binding "sum"                                     [15..17]
+        \\  16: get_binding "x"                                       [16..17]
+        \\  17: add %15, %16                                          [17..18]
+        \\  18: set_binding "sum", %17                                [18..19]
+        \\  19: br %9, %18                                            [19..19]
+        \\  20: label                                                 [20..20]
+        \\  21: br %22, %9                                            [21..21]
+        \\  22: label                                                 [22..22]
+        \\  23: get_binding "sum"                                     [23..24]
+        \\  24: end %23                                               [24..24]
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: load_number_i32 r0, 0
+        \\   6: set_binding @0, r0
+        \\  12: move r1, r0
+        \\  15: load_number_i32 r0, 1
+        \\  21: load_number_i32 r1, 2
+        \\  27: load_number_i32 r2, 3
+        \\  33: array_create r3, 3
+        \\  39: array_set r3, r0, 0
+        \\  46: array_set r3, r1, 1
+        \\  53: array_set r3, r2, 2
+        \\  60: load_undefined r0
+        \\  62: get_iterator r1, r3
+        \\  65: iterator_step_value r2, r1
+        \\  68: iterator_is_done r3, r1
+        \\  71: jump_if_true r3, 5
+        \\  77: jump 8
+        \\  82: get_binding r0, @0
+        \\  88: end r0
+        \\  90: set_binding @1, r2
+        \\  96: move r3, r2
+        \\  99: get_binding r2, @0
+        \\ 105: get_binding r3, @1
+        \\ 111: add r4, r2, r3
+        \\ 115: set_binding @0, r4
+        \\ 121: move r2, r4
+        \\ 124: move r0, r2
+        \\ 127: jump -67
+        \\
+    );
+
+    // For-in/of with member expression LHS
+    try testInterpreter(
+        std.testing.allocator,
+        \\var x = {};
+        \\for (x.last in {a: 1, b: 2, c: 3});
+        \\x.last;
+    ,
+        .{ .value = Value.from("c") },
+        null,
+        null,
     );
 }

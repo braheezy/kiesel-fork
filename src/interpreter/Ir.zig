@@ -162,8 +162,10 @@ pub const Inst = struct {
         new,
 
         get_iterator,
+        get_for_in_iterator,
         iterator_step,
         iterator_step_value,
+        iterator_is_done,
         iterator_collect,
 
         throw,
@@ -290,8 +292,10 @@ pub const Inst = struct {
         .call = .call,
         .new = .new,
         .get_iterator = .ref,
+        .get_for_in_iterator = .ref,
         .iterator_step = .ref,
         .iterator_step_value = .ref,
+        .iterator_is_done = .ref,
         .iterator_collect = .ref,
         .throw = .ref,
         .end = .ref,

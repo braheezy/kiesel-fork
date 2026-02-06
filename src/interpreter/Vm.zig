@@ -5,6 +5,7 @@ const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
@@ -17,13 +18,16 @@ const Value = types.Value;
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
 const createArrayFromList = types.createArrayFromList;
+const createForInIterator = builtins.createForInIterator;
 const evaluateCall = language.runtime.evaluateCall;
 const evaluateNew = language.runtime.evaluateNew;
 const getIterator = types.getIterator;
+const getIteratorDirect = types.getIteratorDirect;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
+const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = language.ast.stringValueImpl;
@@ -202,8 +206,10 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .new1 => vm.executeNewN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
                 .new2 => vm.executeNewN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
                 .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
+                .get_for_in_iterator => vm.executeGetForInIterator(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_is_done => vm.executeIteratorIsDone(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
                 .end => return if (data.reg != .none) vm.store(data.reg) else null,
@@ -1517,6 +1523,20 @@ fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst
     vm.load(dest, Value.from(iterator_obj));
 }
 
+fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(value_reg);
+    const object = value.toObject(vm.agent) catch |err| try noexcept(err);
+    const for_in_iterator = try createForInIterator(vm.agent, object);
+    const iterator = try getIteratorDirect(vm.agent, &for_in_iterator.object);
+
+    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
+
+    vm.load(dest, Value.from(iterator_obj));
+}
+
 fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
@@ -1549,6 +1569,12 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byte
         vm.load(dest, .undefined);
         iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
     }
+}
+
+fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+    const done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done"));
+    vm.load(dest, done);
 }
 
 fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {

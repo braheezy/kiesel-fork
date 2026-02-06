@@ -504,7 +504,7 @@ fn lowerBreakableStatement(b: *Builder, brk_stmt: *const ast.BreakableStatement,
             .do_while_statement => |*do_while_stmt| try b.lowerDoWhileStatement(do_while_stmt, label),
             .while_statement => |*while_stmt| try b.lowerWhileStatement(while_stmt, label),
             .for_statement => |*for_stmt| try b.lowerForStatement(for_stmt, label),
-            .for_in_of_statement => try b.todo("for in/of statement"),
+            .for_in_of_statement => |*for_in_of_stmt| try b.lowerForInOfStatement(for_in_of_stmt, label),
         },
         .switch_statement => |*switch_stmt| try b.lowerSwitchStatement(switch_stmt, label),
     };
@@ -737,6 +737,259 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
         .value = body_result,
     } });
     continue_br.set(.{ .br = .{
+        .target = test_label,
+        .value = body_result,
+    } });
+    exit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = test_label,
+    } });
+
+    return end_label;
+}
+
+fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
+    const expr_value = try b.lowerExpression(&for_in_of_stmt.expression);
+
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
+
+    var skip_br_cond: Deferred = undefined;
+    var skip_condition: Ir.Inst.Ref = .none;
+    var setup_label: Ir.Inst.Ref = undefined;
+
+    if (for_in_of_stmt.type == .in) {
+        const null_ref = try b.addInst(.{
+            .tag = .null,
+            .data = .{ .none = {} },
+        });
+        skip_condition = try b.addInst(.{
+            .tag = .eq,
+            .data = .{ .binary = .{
+                .lhs = expr_value,
+                .rhs = null_ref,
+            } },
+        });
+        skip_br_cond = try b.addInstDeferred(.br_cond);
+        setup_label = try b.addLabel();
+    }
+
+    const iterator = switch (for_in_of_stmt.type) {
+        .in => try b.addInst(.{
+            .tag = .get_for_in_iterator,
+            .data = .{ .ref = expr_value },
+        }),
+        .of => try b.addInst(.{
+            .tag = .get_iterator,
+            .data = .{ .ref = expr_value },
+        }),
+        .async_of => try b.todo("async for-of"),
+    };
+
+    const entry_br = try b.addInstDeferred(.br);
+
+    const test_label = try b.addLabel();
+
+    const next_value = try b.addInst(.{
+        .tag = .iterator_step_value,
+        .data = .{ .ref = iterator },
+    });
+    const is_done = try b.addInst(.{
+        .tag = .iterator_is_done,
+        .data = .{ .ref = iterator },
+    });
+    const test_br_cond = try b.addInstDeferred(.br_cond);
+
+    const body_label = try b.addLabel();
+
+    const breakable_ctx = try b.pushBreakableContext(.{
+        .label = label,
+        .continue_target = .{ .deferred = .empty },
+        .break_target = .{ .deferred = .empty },
+        .result_ref = undefined_ref,
+    });
+    defer b.popBreakableContext();
+
+    switch (for_in_of_stmt.initializer) {
+        .expression => |*expr| switch (expr.*) {
+            .primary_expression => |prim_expr| switch (prim_expr) {
+                .identifier_reference => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    _ = try b.addInst(.{
+                        .tag = if (b.in_strict_mode) .set_binding_strict else .set_binding,
+                        .data = .{ .set_binding = .{
+                            .name = string_index,
+                            .value = next_value,
+                        } },
+                    });
+                },
+                else => unreachable,
+            },
+            .member_expression => |*member_expr| {
+                const base = try b.lowerExpression(member_expr.expression);
+                switch (member_expr.property) {
+                    .identifier => |identifier| {
+                        const string_index = try b.internString(identifier);
+                        const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                            .set_property_strict
+                        else
+                            .set_property;
+                        _ = try b.addInst(.{
+                            .tag = tag,
+                            .data = .{ .set_property = .{
+                                .base = base,
+                                .name = string_index,
+                                .value = next_value,
+                            } },
+                        });
+                    },
+                    .expression => |prop_expr| blk: {
+                        if (try constantFold(b.gpa, prop_expr)) |constant| {
+                            defer constant.deinit(b.gpa);
+                            if (constant.toIndex()) |index| {
+                                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                                    .set_property_indexed_strict
+                                else
+                                    .set_property_indexed;
+                                _ = try b.addInst(.{
+                                    .tag = tag,
+                                    .data = .{ .set_property_indexed = .{
+                                        .base = base,
+                                        .index = index,
+                                        .value = next_value,
+                                    } },
+                                });
+                                break :blk;
+                            }
+                        }
+                        const property = try b.lowerExpression(prop_expr);
+                        const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                            .set_property_computed_strict
+                        else
+                            .set_property_computed;
+                        _ = try b.addInst(.{
+                            .tag = tag,
+                            .data = .{ .set_property_computed = .{
+                                .base = base,
+                                .property = property,
+                                .value = next_value,
+                            } },
+                        });
+                    },
+                    .private_identifier => try b.todo("private identifier in for-in/of LHS"),
+                }
+            },
+            .super_property => try b.todo("super property in for-in/of LHS"),
+            else => unreachable,
+        },
+        .for_binding => |for_binding| switch (for_binding) {
+            .binding_identifier => |identifier| {
+                const string_index = try b.internString(identifier);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_binding_strict
+                else
+                    .set_binding;
+                _ = try b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = next_value,
+                    } },
+                });
+            },
+            .binding_pattern => |pattern| {
+                _ = try b.lowerDestructuringAssignment(pattern, next_value, .set);
+            },
+        },
+        .for_declaration => |for_decl| {
+            _ = try b.addInst(.{
+                .tag = .push_scope,
+                .data = .{ .none = {} },
+            });
+            b.scope_depth += 1;
+
+            const tag: Ir.Inst.Tag = switch (for_decl.type) {
+                .let => .create_mutable_binding,
+                .@"const" => .create_immutable_binding,
+            };
+            switch (for_decl.for_binding) {
+                .binding_identifier => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    _ = try b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .string = string_index },
+                    });
+                    _ = try b.addInst(.{
+                        .tag = .initialize_binding,
+                        .data = .{ .set_binding = .{
+                            .name = string_index,
+                            .value = next_value,
+                        } },
+                    });
+                },
+                .binding_pattern => |pattern| {
+                    var bound_names: std.ArrayList(ast.Identifier) = .empty;
+                    defer bound_names.deinit(b.gpa);
+                    try pattern.collectBoundNames(b.gpa, &bound_names);
+                    for (bound_names.items) |name| {
+                        const string_index = try b.internString(name);
+                        _ = try b.addInst(.{
+                            .tag = tag,
+                            .data = .{ .string = string_index },
+                        });
+                    }
+                    _ = try b.lowerDestructuringAssignment(pattern, next_value, .initialize);
+                },
+            }
+        },
+    }
+
+    const body_block_stmt: *const ast.BlockStatement = switch (for_in_of_stmt.consequent_statement.*) {
+        .block_statement => |*block_stmt| block_stmt,
+        else => &.{ .block = .{ .statement_list = .{ .items = &.{
+            .{ .statement = for_in_of_stmt.consequent_statement },
+        } } } },
+    };
+    _ = try b.lowerBlockStatement(body_block_stmt, breakable_ctx);
+
+    if (for_in_of_stmt.initializer == .for_declaration) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
+
+    const body_result = breakable_ctx.result_ref;
+    const body_br = try b.addInstDeferred(.br);
+
+    const exit_label = try b.addLabel();
+    const exit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    breakable_ctx.setDeferredContinues(test_label);
+    breakable_ctx.setDeferredBreaks(end_label);
+
+    if (for_in_of_stmt.type == .in) {
+        skip_br_cond.set(.{ .br_cond = .{
+            .condition = skip_condition,
+            .then_target = end_label,
+            .else_target = setup_label,
+        } });
+    }
+    entry_br.set(.{ .br = .{
+        .target = test_label,
+        .value = undefined_ref,
+    } });
+    test_br_cond.set(.{ .br_cond = .{
+        .condition = is_done,
+        .then_target = exit_label,
+        .else_target = body_label,
+    } });
+    body_br.set(.{ .br = .{
         .target = test_label,
         .value = body_result,
     } });

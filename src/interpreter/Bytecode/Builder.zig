@@ -168,8 +168,10 @@ pub fn build(b: *Builder) Error!Bytecode {
             .call => try b.lowerCall(data.call, dest),
             .new => try b.lowerNew(data.new, dest),
             .get_iterator => try b.lowerGetIterator(data.ref, dest),
+            .get_for_in_iterator => try b.lowerGetForInIterator(data.ref, dest),
             .iterator_step => try b.lowerIteratorStep(data.ref, dest),
             .iterator_step_value => try b.lowerIteratorStepValue(data.ref, dest),
+            .iterator_is_done => try b.lowerIteratorIsDone(data.ref, dest),
             .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
             .throw => try b.lowerThrow(data.ref, dest),
             .end => try b.lowerEnd(data.ref, dest),
@@ -1389,6 +1391,17 @@ fn lowerGetIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Erro
     });
 }
 
+fn lowerGetForInIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const value_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .get_for_in_iterator,
+        .data = .{ .reg_reg = .{
+            dest,
+            value_reg,
+        } },
+    });
+}
+
 fn lowerIteratorStep(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     const iterator_reg = b.resolve(ref);
     try b.emit(.{
@@ -1404,6 +1417,17 @@ fn lowerIteratorStepValue(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg
     const iterator_reg = b.resolve(ref);
     try b.emit(.{
         .tag = .iterator_step_value,
+        .data = .{ .reg_reg = .{
+            dest,
+            iterator_reg,
+        } },
+    });
+}
+
+fn lowerIteratorIsDone(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const iterator_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .iterator_is_done,
         .data = .{ .reg_reg = .{
             dest,
             iterator_reg,

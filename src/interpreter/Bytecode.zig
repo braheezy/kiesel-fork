@@ -158,8 +158,10 @@ pub const Inst = struct {
         new2,
 
         get_iterator,
+        get_for_in_iterator,
         iterator_step,
         iterator_step_value,
+        iterator_is_done,
         iterator_collect,
 
         throw,
@@ -309,8 +311,10 @@ pub const Inst = struct {
         .new1 = .reg_reg_reg,
         .new2 = .reg_reg_reg_reg,
         .get_iterator = .reg_reg,
+        .get_for_in_iterator = .reg_reg,
         .iterator_step = .reg_reg,
         .iterator_step_value = .reg_reg,
+        .iterator_is_done = .reg_reg,
         .iterator_collect = .reg_reg,
         .throw = .reg,
     });

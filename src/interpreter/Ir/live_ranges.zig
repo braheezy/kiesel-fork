@@ -20,7 +20,11 @@ pub fn computeLiveRanges(
         live_range.* = .{ .start = @intCast(i), .end = @intCast(i) };
     }
 
-    for (instructions.items(.tag), instructions.items(.data), 0..) |tag, data, inst_index| {
+    const tags = instructions.items(.tag);
+    const datas = instructions.items(.data);
+
+    // Pass 1: Compute live ranges from direct uses
+    for (tags, datas, 0..) |tag, data, inst_index| {
         var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
         defer uses.deinit(gpa);
         try Ir.Inst.collectRefs(gpa, tag, data, extras, &uses);
@@ -28,6 +32,36 @@ pub fn computeLiveRanges(
         for (uses.items) |use| {
             if (use.toIndex()) |index| {
                 const live_range = &live_ranges[@intFromEnum(index)];
+                live_range.end = @max(live_range.end, @as(u32, @intCast(inst_index)));
+            }
+        }
+    }
+
+    // Pass 2: Extend live ranges across back-edges
+    for (tags, datas, 0..) |tag, data, inst_index| {
+        const index = switch (tag) {
+            .br => blk: {
+                if (data.br.target.toIndex()) |target_index| {
+                    if (@intFromEnum(target_index) < inst_index) {
+                        break :blk target_index;
+                    }
+                }
+                continue;
+            },
+            .br_cond => {
+                // br_cond currently only creates forward jumps
+                if (data.br_cond.then_target.toIndex()) |target_index| {
+                    std.debug.assert(@intFromEnum(target_index) >= inst_index);
+                }
+                if (data.br_cond.else_target.toIndex()) |target_index| {
+                    std.debug.assert(@intFromEnum(target_index) >= inst_index);
+                }
+                continue;
+            },
+            else => continue,
+        };
+        for (live_ranges) |*live_range| {
+            if (live_range.start <= @intFromEnum(index) and live_range.end >= @intFromEnum(index)) {
                 live_range.end = @max(live_range.end, @as(u32, @intCast(inst_index)));
             }
         }
