@@ -78,17 +78,19 @@ pub fn deinit(vm: *Vm) void {
 }
 
 pub fn run(vm: *Vm) Agent.Error!?Value {
-    var reader: std.Io.Reader = .fixed(vm.bytecode.code);
-    const pc = &reader.seek;
+    const code = vm.bytecode.code;
+    var pc: usize = 0;
 
-    loop: switch (Bytecode.Inst.decodeTag(&reader) catch unreachable) {
+    loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
         inline else => |tag| {
-            const data = Bytecode.Inst.decodeData(&reader, tag) catch unreachable;
+            @setEvalBranchQuota(100_000);
+            const data = Bytecode.Inst.decodeData(code[pc + 1 ..], tag);
+            pc += comptime Bytecode.Inst.encodedSize(tag);
             const maybe_error = switch (tag) {
-                .jump => vm.executeJump(data.i32, pc),
-                .jump_if_true => vm.executeJumpIfTrue(data.reg_i32[0], data.reg_i32[1], pc),
-                .jump_if_false => vm.executeJumpIfFalse(data.reg_i32[0], data.reg_i32[1], pc),
-                .jump_if_nullish => vm.executeJumpIfNullish(data.reg_i32[0], data.reg_i32[1], pc),
+                .jump => vm.executeJump(data.i32, &pc),
+                .jump_if_true => vm.executeJumpIfTrue(data.reg_i32[0], data.reg_i32[1], &pc),
+                .jump_if_false => vm.executeJumpIfFalse(data.reg_i32[0], data.reg_i32[1], &pc),
+                .jump_if_nullish => vm.executeJumpIfNullish(data.reg_i32[0], data.reg_i32[1], &pc),
                 .load_undefined => vm.executeLoadUndefined(data.reg),
                 .load_null => vm.executeLoadNull(data.reg),
                 .load_true => vm.executeLoadTrue(data.reg),
@@ -223,7 +225,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 },
                 else => comptime unreachable,
             }
-            continue :loop Bytecode.Inst.decodeTag(&reader) catch unreachable;
+            continue :loop Bytecode.Inst.decodeTag(code[pc..]);
         },
     }
 }

@@ -330,22 +330,18 @@ pub const Inst = struct {
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
 
-    pub const DecodeError = std.Io.Reader.Error || error{InvalidTag};
-
-    pub fn decode(reader: *std.Io.Reader) DecodeError!Inst {
-        const tag = try decodeTag(reader);
-        const data = try decodeData(reader, tag);
+    pub fn decode(code: []const u8) ?Inst {
+        if (code.len == 0) return null;
+        const tag = std.enums.fromInt(Tag, code[0]) orelse return null;
+        const data = decodeData(code[1..], tag);
         return .{ .tag = tag, .data = data };
     }
 
-    pub inline fn decodeTag(reader: *std.Io.Reader) DecodeError!Tag {
-        return reader.takeEnum(Tag, .little) catch |err| switch (err) {
-            error.ReadFailed, error.EndOfStream => |e| return e,
-            error.InvalidEnumTag => return error.InvalidTag,
-        };
+    pub inline fn decodeTag(code: []const u8) Tag {
+        return @enumFromInt(code[0]);
     }
 
-    pub inline fn decodeData(reader: *std.Io.Reader, tag: Tag) std.Io.Reader.Error!Data {
+    pub inline fn decodeData(code: []const u8, tag: Tag) Data {
         const data_tag = data_tags[@intFromEnum(tag)];
         switch (data_tag) {
             inline else => |field| {
@@ -358,26 +354,28 @@ pub const Inst = struct {
 
                 if (type_info == .@"struct") {
                     var result: FieldType = undefined;
+                    var offset: usize = 0;
                     inline for (type_info.@"struct".fields, 0..) |struct_field, i| {
-                        result[i] = try decodeField(struct_field.type, reader);
+                        result[i] = decodeField(struct_field.type, code[offset..]);
+                        offset += @sizeOf(struct_field.type);
                     }
                     return @unionInit(Data, @tagName(field), result);
                 }
 
-                return @unionInit(Data, @tagName(field), try decodeField(FieldType, reader));
+                return @unionInit(Data, @tagName(field), decodeField(FieldType, code));
             },
         }
     }
 
-    fn decodeField(comptime T: type, reader: *std.Io.Reader) std.Io.Reader.Error!T {
+    inline fn decodeField(comptime T: type, code: []const u8) T {
         return switch (T) {
-            Reg,
+            Reg => @enumFromInt(code[0]),
             StringIndex,
             BigIntIndex,
-            => try reader.takeEnumNonexhaustive(T, .little),
-            i32 => try reader.takeInt(i32, .little),
-            u32 => try reader.takeInt(u32, .little),
-            f64 => @bitCast(try reader.takeInt(u64, .little)),
+            => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
+            i32 => std.mem.readInt(i32, code[0..4], .little),
+            u32 => std.mem.readInt(u32, code[0..4], .little),
+            f64 => @bitCast(std.mem.readInt(u64, code[0..8], .little)),
             void => {},
             else => comptime unreachable,
         };
@@ -419,12 +417,23 @@ pub const Inst = struct {
         }
     }
 
-    pub fn encodedSize(inst: Inst) u4 {
-        var buffer: [16]u8 = undefined;
-        var dw: std.Io.Writer.Discarding = .init(&buffer);
-        const writer = &dw.writer;
-        inst.encode(writer) catch unreachable;
-        return @intCast(dw.fullCount());
+    pub fn encodedSize(tag: Tag) u4 {
+        const encoded_sizes = comptime blk: {
+            var sizes: [@typeInfo(Tag).@"enum".fields.len]u4 = @splat(1);
+            for (0..sizes.len) |i| {
+                const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(data_tags[i])));
+                const type_info = @typeInfo(FieldType);
+                if (type_info == .@"struct") {
+                    for (type_info.@"struct".fields) |f| {
+                        sizes[i] += @sizeOf(f.type);
+                    }
+                } else {
+                    sizes[i] += @sizeOf(FieldType);
+                }
+            }
+            break :blk sizes;
+        };
+        return encoded_sizes[@intFromEnum(tag)];
     }
 };
 
@@ -445,20 +454,16 @@ pub fn print(
     try tty_config.setColor(writer, .bold);
     try writer.print("Bytecode ({s})\n", .{bc.name});
     try tty_config.setColor(writer, .reset);
-    var reader: std.Io.Reader = .fixed(bc.code);
-    while (true) {
-        const offset = reader.seek;
-        const inst = Inst.decode(&reader) catch |err| switch (err) {
-            error.ReadFailed => unreachable,
-            error.EndOfStream => break,
-            error.InvalidTag => {
-                try tty_config.setColor(writer, .red);
-                const tag = reader.peekByte() catch unreachable;
-                try writer.print("Invalid instruction tag: {d}\n", .{tag});
-                try tty_config.setColor(writer, .reset);
-                break;
-            },
+    var i: usize = 0;
+    while (i < bc.code.len) {
+        const offset = i;
+        const inst = Inst.decode(bc.code[i..]) orelse {
+            try tty_config.setColor(writer, .red);
+            try writer.print("Invalid instruction tag: {d}\n", .{bc.code[i]});
+            try tty_config.setColor(writer, .reset);
+            break;
         };
+        i += Inst.encodedSize(inst.tag);
         try writer.print("{d: >4}: ", .{offset});
         try tty_config.setColor(writer, .cyan);
         try writer.print("{t}", .{inst.tag});

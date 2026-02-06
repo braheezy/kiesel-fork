@@ -273,7 +273,9 @@ const Block = struct {
 
     fn size(block: *const Block) u32 {
         var total: u32 = 0;
-        for (block.instructions.items) |inst| total += inst.encodedSize();
+        for (block.instructions.items) |inst| {
+            total += Bytecode.Inst.encodedSize(inst.tag);
+        }
         return total;
     }
 
@@ -281,24 +283,15 @@ const Block = struct {
         return switch (block.terminator) {
             .none => unreachable,
             .noreturn => 0,
-            .jump => |target| if (target == next) 0 else Bytecode.Inst.encodedSize(.{
-                .tag = .jump,
-                .data = .{ .i32 = 0 },
-            }),
+            .jump => |target| if (target == next) 0 else Bytecode.Inst.encodedSize(.jump),
             .branch => |br| blk: {
                 const jump_cond_tag: Bytecode.Inst.Tag = switch (br.condition) {
                     .truthy => .jump_if_true,
                     .falsy => .jump_if_false,
                     .nullish => .jump_if_nullish,
                 };
-                const jump_cond_size: u32 = Bytecode.Inst.encodedSize(.{
-                    .tag = jump_cond_tag,
-                    .data = .{ .reg_i32 = .{ br.condition_reg, 0 } },
-                });
-                const jump_size: u32 = if (br.else_block == next) 0 else Bytecode.Inst.encodedSize(.{
-                    .tag = .jump,
-                    .data = .{ .i32 = 0 },
-                });
+                const jump_cond_size: u32 = Bytecode.Inst.encodedSize(jump_cond_tag);
+                const jump_size: u32 = if (br.else_block == next) 0 else Bytecode.Inst.encodedSize(.jump);
                 break :blk jump_cond_size + jump_size;
             },
         };
@@ -309,14 +302,8 @@ const Block = struct {
             try inst.encode(writer);
         }
 
-        const jump_size = comptime Bytecode.Inst.encodedSize(.{
-            .tag = .jump,
-            .data = .{ .i32 = 0 },
-        });
-        const jump_cond_size = comptime Bytecode.Inst.encodedSize(.{
-            .tag = .jump_if_true,
-            .data = .{ .reg_i32 = .{ .none, 0 } },
-        });
+        const jump_size = comptime Bytecode.Inst.encodedSize(.jump);
+        const jump_cond_size = comptime Bytecode.Inst.encodedSize(.jump_if_true);
 
         switch (block.terminator) {
             .none => unreachable,
