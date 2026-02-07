@@ -54,6 +54,7 @@ pub const Inst = struct {
 
         to_number,
         to_string,
+        to_object,
         negate,
         bitwise_not,
         logical_not,
@@ -85,6 +86,7 @@ pub const Inst = struct {
         not_eq_strict,
 
         push_scope,
+        push_with_scope,
         pop_scope,
         create_mutable_binding,
         create_immutable_binding,
@@ -215,6 +217,7 @@ pub const Inst = struct {
         .resolve_this_binding = .reg,
         .to_number = .reg_reg,
         .to_string = .reg_reg,
+        .to_object = .reg_reg,
         .negate = .reg_reg,
         .bitwise_not = .reg_reg,
         .logical_not = .reg_reg,
@@ -242,6 +245,7 @@ pub const Inst = struct {
         .eq_strict = .reg_reg_reg,
         .not_eq_strict = .reg_reg_reg,
         .push_scope = .none,
+        .push_with_scope = .reg,
         .pop_scope = .none,
         .create_mutable_binding = .string,
         .create_immutable_binding = .string,

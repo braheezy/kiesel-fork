@@ -86,6 +86,7 @@ pub const Inst = struct {
 
         to_number,
         to_string,
+        to_object,
         negate,
         bitwise_not,
         logical_not,
@@ -124,6 +125,7 @@ pub const Inst = struct {
         nullish_coalesce,
 
         push_scope,
+        push_with_scope,
         pop_scope,
         create_mutable_binding,
         create_immutable_binding,
@@ -223,6 +225,7 @@ pub const Inst = struct {
         .br_cond = .br_cond,
         .to_number = .ref,
         .to_string = .ref,
+        .to_object = .ref,
         .negate = .ref,
         .bitwise_not = .ref,
         .logical_not = .ref,
@@ -256,6 +259,7 @@ pub const Inst = struct {
         .logical_or = .binary,
         .nullish_coalesce = .binary,
         .push_scope = .none,
+        .push_with_scope = .ref,
         .pop_scope = .none,
         .create_mutable_binding = .string,
         .create_immutable_binding = .string,

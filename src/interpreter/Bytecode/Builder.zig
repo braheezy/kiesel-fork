@@ -100,6 +100,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .br_cond => try b.lowerBrCond(data.br_cond, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
+            .to_object => try b.lowerToObject(data.ref, dest),
             .negate => try b.lowerNegate(data.ref, dest),
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
@@ -133,6 +134,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
             .push_scope => try b.lowerPushScope(),
+            .push_with_scope => try b.lowerPushWithScope(data.ref),
             .pop_scope => try b.lowerPopScope(),
             .create_mutable_binding => try b.lowerCreateMutableBinding(data.string),
             .create_immutable_binding => try b.lowerCreateImmutableBinding(data.string),
@@ -728,6 +730,10 @@ fn lowerToString(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!v
     try b.emitUnaryOp(.to_string, ref, dest);
 }
 
+fn lowerToObject(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.to_object, ref, dest);
+}
+
 fn lowerNegate(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitUnaryOp(.negate, ref, dest);
 }
@@ -902,6 +908,14 @@ fn lowerPushScope(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .push_scope,
         .data = .{ .none = {} },
+    });
+}
+
+fn lowerPushWithScope(b: *Builder, ref: Ir.Inst.Ref) Error!void {
+    const object_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .push_with_scope,
+        .data = .{ .reg = object_reg },
     });
 }
 

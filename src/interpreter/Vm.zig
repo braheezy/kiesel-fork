@@ -27,6 +27,7 @@ const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
+const newObjectEnvironment = execution.newObjectEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
@@ -113,6 +114,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .to_string => vm.executeToString(data.reg_reg[0], data.reg_reg[1]),
+                .to_object => vm.executeToObject(data.reg_reg[0], data.reg_reg[1]),
                 .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
@@ -140,6 +142,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .push_scope => vm.executePushScope(),
+                .push_with_scope => vm.executePushWithScope(data.reg),
                 .pop_scope => vm.executePopScope(),
                 .create_mutable_binding => vm.executeCreateMutableBinding(data.string),
                 .create_immutable_binding => vm.executeCreateImmutableBinding(data.string),
@@ -418,6 +421,12 @@ fn executeToString(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agen
     const value = vm.store(src);
     const string = try value.toString(vm.agent);
     vm.load(dst, Value.from(string));
+}
+
+fn executeToObject(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    const object = try value.toObject(vm.agent);
+    vm.load(dst, Value.from(object));
 }
 
 fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
@@ -869,6 +878,14 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+}
+
+fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+    const object = vm.store(object_reg).asObject();
+    const execution_context = vm.agent.runningExecutionContext();
+    const old_env = execution_context.ecmascript_code.lexical_environment;
+    const env = try newObjectEnvironment(vm.agent.gc_allocator, object, true, old_env);
+    execution_context.ecmascript_code.lexical_environment = .{ .object_environment = env };
 }
 
 fn executePopScope(vm: *Vm) void {

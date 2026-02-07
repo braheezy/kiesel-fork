@@ -337,7 +337,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .continue_statement => |*cont_stmt| try b.lowerContinueStatement(cont_stmt),
         .break_statement => |*brk_stmt| try b.lowerBreakStatement(brk_stmt),
         .return_statement => try b.todo("return statement"),
-        .with_statement => try b.todo("with statement"),
+        .with_statement => |with_stmt| try b.lowerWithStatement(with_stmt),
         .labelled_statement => |*lbl_stmt| try b.lowerLabelledStatement(lbl_stmt),
         .throw_statement => |*throw_stmt| try b.lowerThrowStatement(throw_stmt),
         .try_statement => try b.todo("try statement"),
@@ -1225,6 +1225,30 @@ fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!I
         },
     }
     return .none;
+}
+
+fn lowerWithStatement(b: *Builder, with_stmt: ast.WithStatement) Error!Ir.Inst.Ref {
+    const value = try b.lowerExpression(&with_stmt.expression);
+    const object = try b.addInst(.{
+        .tag = .to_object,
+        .data = .{ .ref = value },
+    });
+
+    _ = try b.addInst(.{
+        .tag = .push_with_scope,
+        .data = .{ .ref = object },
+    });
+    b.scope_depth += 1;
+
+    const result = try b.lowerStatement(with_stmt.statement);
+
+    _ = try b.addInst(.{
+        .tag = .pop_scope,
+        .data = .{ .none = {} },
+    });
+    b.scope_depth -= 1;
+
+    return result;
 }
 
 fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) Error!Ir.Inst.Ref {
