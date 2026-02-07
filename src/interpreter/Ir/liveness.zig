@@ -81,7 +81,7 @@ fn markReachable(
                 }
                 continue; // Conditional branch doesn't fall through
             },
-            .end => continue,
+            .@"return" => continue,
             else => {},
         }
         if (i + 1 < instructions.len and !reachable.isSet(i + 1)) {

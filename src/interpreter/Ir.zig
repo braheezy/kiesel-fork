@@ -169,8 +169,7 @@ pub const Inst = struct {
         iterator_collect,
 
         throw,
-
-        end,
+        @"return",
     };
 
     pub const Data = union {
@@ -298,7 +297,7 @@ pub const Inst = struct {
         .iterator_is_done = .ref,
         .iterator_collect = .ref,
         .throw = .ref,
-        .end = .ref,
+        .@"return" = .ref,
     });
 
     pub const UpdateOp = enum { increment, decrement };
@@ -459,7 +458,6 @@ fn printData(
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
-    if (tag == .end and data.ref == .none) return;
 
     try cw.writeByte(' ');
     switch (data_tag) {

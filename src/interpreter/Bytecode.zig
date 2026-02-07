@@ -22,8 +22,6 @@ pub const Inst = struct {
     data: Data,
 
     pub const Tag = enum(u8) {
-        end,
-
         jump,
         jump_if_true,
         jump_if_false,
@@ -166,6 +164,7 @@ pub const Inst = struct {
         iterator_collect,
 
         throw,
+        @"return",
     };
 
     pub const Data = union {
@@ -190,7 +189,6 @@ pub const Inst = struct {
     };
 
     pub const data_tags = std.enums.directEnumArray(Tag, std.meta.FieldEnum(Data), 0, .{
-        .end = .reg,
         .jump = .i32,
         .jump_if_true = .reg_i32,
         .jump_if_false = .reg_i32,
@@ -319,6 +317,7 @@ pub const Inst = struct {
         .iterator_is_done = .reg_reg,
         .iterator_collect = .reg_reg,
         .throw = .reg,
+        .@"return" = .reg,
     });
 
     pub const Reg = enum(u8) {
@@ -485,7 +484,7 @@ fn printData(
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
-    if (tag == .end and data.reg == .none) return;
+    if (tag == .@"return" and data.reg == .none) return;
 
     try writer.writeByte(' ');
     switch (data_tag) {

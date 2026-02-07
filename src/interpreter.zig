@@ -110,11 +110,11 @@ test {
     ,
         .{ .value = null },
         \\IR (test)
-        \\   0: end                                                   [0..0]
+        \\   0: return none                                           [0..0]
         \\
     ,
         \\Bytecode (test)
-        \\   0: end
+        \\   0: return
         \\
         ,
     );
@@ -126,12 +126,12 @@ test {
     , .{ .value = Value.from(42) },
         \\IR (test)
         \\   0: number 42                                             [0..1]
-        \\   1: end %0                                                [1..1]
+        \\   1: return %0                                             [1..1]
         \\
     ,
         \\Bytecode (test)
         \\   0: load_number_i32 r0, 42
-        \\   6: end r0
+        \\   6: return r0
         \\
     );
 
@@ -162,7 +162,7 @@ test {
         \\  12: br %13, %3                                            [12..12]
         \\  13: label                                                 [13..13]
         \\  14: number 4                                              [14..15]
-        \\  15: end %14                                               [15..15]
+        \\  15: return %14                                            [15..15]
         \\
     , null);
 
@@ -188,7 +188,7 @@ test {
         \\   9: label                                                 [9..9]
         \\  10: br %11, %4                                            [10..10]
         \\  11: label                                                 [11..12]
-        \\  12: end %11                                               [12..12]
+        \\  12: return %11                                            [12..12]
         \\
     , null);
 
@@ -206,7 +206,7 @@ test {
         \\   5: number 4                                              [5..6]
         \\   6: object {%4: %5}                                       [6..7]
         \\   7: array [%0, none, %3, %6]                              [7..8]
-        \\   8: end %7                                                [8..8]
+        \\   8: return %7                                             [8..8]
         \\
     ,
         \\Bytecode (test)
@@ -224,7 +224,7 @@ test {
         \\  65: array_set r1, r0, 0
         \\  72: array_set r1, r3, 2
         \\  79: array_set r1, r4, 3
-        \\  86: end r1
+        \\  86: return r1
         \\
     );
 
@@ -251,7 +251,7 @@ test {
         \\  12: get_binding "o"                                       [12..13]
         \\  13: spread %12                                            [13..14]
         \\  14: object {%6: %7, %8: %9, %10: %11, none: %13}          [14..15]
-        \\  15: end %14                                               [15..15]
+        \\  15: return %14                                            [15..15]
         \\
     ,
         \\Bytecode (test)
@@ -277,7 +277,7 @@ test {
         \\  99: object_set_computed r6, r2, r3
         \\ 103: object_set r6, @4, r5
         \\ 110: object_spread r6, r7
-        \\ 113: end r6
+        \\ 113: return r6
         \\
     );
 
@@ -288,12 +288,12 @@ test {
     , .ignore,
         \\IR (test)
         \\   0: reg_exp "abc", "gi"                                   [0..1]
-        \\   1: end %0                                                [1..1]
+        \\   1: return %0                                             [1..1]
         \\
     ,
         \\Bytecode (test)
         \\   0: reg_exp_create r0, @0, @1
-        \\  10: end r0
+        \\  10: return r0
         \\
     );
 
@@ -311,7 +311,7 @@ test {
         \\   4: get_binding "x"                                       [4..6]
         \\   5: get_binding "y"                                       [5..6]
         \\   6: add %4, %5                                            [6..7]
-        \\   7: end %6                                                [7..7]
+        \\   7: return %6                                             [7..7]
         \\
     ,
         \\Bytecode (test)
@@ -324,7 +324,7 @@ test {
         \\  30: get_binding r0, @0
         \\  36: get_binding r1, @1
         \\  42: add r2, r0, r1
-        \\  46: end r2
+        \\  46: return r2
         \\
     );
 
@@ -345,7 +345,7 @@ test {
         \\   5: initialize_binding "a", %4                            [5..5]
         \\   6: pop_scope                                             [6..6]
         \\   7: get_binding "a"                                       [7..8]
-        \\   8: end %7                                                [8..8]
+        \\   8: return %7                                             [8..8]
         \\
     ,
         \\Bytecode (test)
@@ -359,7 +359,7 @@ test {
         \\  33: move r1, r0
         \\  36: pop_scope
         \\  37: get_binding r0, @0
-        \\  43: end r0
+        \\  43: return r0
         \\
     );
 
@@ -373,7 +373,7 @@ test {
         \\   0: number 5                                              [0..1]
         \\   1: set_binding "x", %0                                   [1..1]
         \\   2: update_binding "x", increment, prefix                 [2..3]
-        \\   3: end %2                                                [3..3]
+        \\   3: return %2                                             [3..3]
         \\
     ,
         \\Bytecode (test)
@@ -381,7 +381,7 @@ test {
         \\   6: set_binding @0, r0
         \\  12: move r1, r0
         \\  15: increment_binding_prefix r0, @0
-        \\  21: end r0
+        \\  21: return r0
         \\
     );
     try testInterpreter(std.testing.allocator, "x = 5; x++;", .{ .value = Value.from(5) }, null, null);
@@ -423,7 +423,7 @@ test {
         \\  21: spread %20                                            [21..23]
         \\  22: number 2                                              [22..23]
         \\  23: call %15, %14, [%16, %17, %21, %22]                   [23..24]
-        \\  24: end %23                                               [24..24]
+        \\  24: return %23                                            [24..24]
         \\
     ,
         \\Bytecode (test)
@@ -463,7 +463,7 @@ test {
         \\ 173: array_spread r31, r6
         \\ 176: array_push r31, r5
         \\ 179: call_property r6, r1, r0, r31
-        \\ 184: end r6
+        \\ 184: return r6
         \\
         ,
     );
@@ -529,7 +529,7 @@ test {
         \\  48: add %46, %47                                          [48..50]
         \\  49: get_binding "f"                                       [49..50]
         \\  50: add %48, %49                                          [50..51]
-        \\  51: end %50                                               [51..51]
+        \\  51: return %50                                            [51..51]
         \\
     ,
         \\Bytecode (test)
@@ -598,7 +598,7 @@ test {
         \\ 321: add r1, r2, r0
         \\ 325: get_binding r0, @8
         \\ 331: add r2, r1, r0
-        \\ 335: end r2
+        \\ 335: return r2
         \\
     );
 
@@ -669,7 +669,7 @@ test {
         \\  54: br %55, %39                                           [54..54]
         \\  55: label                                                 [55..55]
         \\  56: get_binding "x"                                       [56..57]
-        \\  57: end %56                                               [57..57]
+        \\  57: return %56                                            [57..57]
         \\
     ,
         \\Bytecode (test)
@@ -721,7 +721,7 @@ test {
         \\ 218: move r0, r1
         \\ 221: jump -69
         \\ 226: get_binding r0, @0
-        \\ 232: end r0
+        \\ 232: return r0
         \\
     );
 
@@ -832,7 +832,7 @@ test {
         \\  93: set_binding "x", %92                                  [93..93] dead
         \\  94: label                                                 [94..94]
         \\  95: get_binding "x"                                       [95..96]
-        \\  96: end %95                                               [96..96]
+        \\  96: return %95                                            [96..96]
         \\
     ,
         \\Bytecode (test)
@@ -910,7 +910,7 @@ test {
         \\ 334: set_binding @0, r3
         \\ 340: move r1, r3
         \\ 343: get_binding r0, @0
-        \\ 349: end r0
+        \\ 349: return r0
         \\
     );
 
@@ -965,7 +965,7 @@ test {
         \\  35: br %36, %34                                           [35..35]
         \\  36: label                                                 [36..36]
         \\  37: get_binding "x"                                       [37..38]
-        \\  38: end %37                                               [38..38]
+        \\  38: return %37                                            [38..38]
         \\
     ,
         \\Bytecode (test)
@@ -1008,7 +1008,7 @@ test {
         \\ 177: move r1, r0
         \\ 180: move r0, r1
         \\ 183: get_binding r0, @0
-        \\ 189: end r0
+        \\ 189: return r0
         \\
     );
 
@@ -1021,7 +1021,7 @@ test {
         \\   1: string "test"                                         [1..2]
         \\   2: construct %0, [%1]                                    [2..3]
         \\   3: throw %2                                              [3..4]
-        \\   4: end %3                                                [4..4]
+        \\   4: return %3                                             [4..4]
         \\
     ,
         \\Bytecode (test)
@@ -1029,7 +1029,7 @@ test {
         \\   6: load_string r1, @1
         \\  12: construct1 r2, r0, r1
         \\  16: throw r2
-        \\  18: end r0
+        \\  18: return r0
         \\
     );
 
@@ -1066,7 +1066,7 @@ test {
         \\  21: br %22, %9                                            [21..21]
         \\  22: label                                                 [22..22]
         \\  23: get_binding "sum"                                     [23..24]
-        \\  24: end %23                                               [24..24]
+        \\  24: return %23                                            [24..24]
         \\
     ,
         \\Bytecode (test)
@@ -1087,7 +1087,7 @@ test {
         \\  71: jump_if_true r3, 5
         \\  77: jump 8
         \\  82: get_binding r0, @0
-        \\  88: end r0
+        \\  88: return r0
         \\  90: set_binding @1, r2
         \\  96: move r3, r2
         \\  99: get_binding r2, @0

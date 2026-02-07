@@ -215,7 +215,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .iterator_is_done => vm.executeIteratorIsDone(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
-                .end => return if (data.reg != .none) vm.store(data.reg) else null,
+                .@"return" => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},

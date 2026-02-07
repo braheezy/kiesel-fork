@@ -133,7 +133,7 @@ pub fn build(b: *Builder) Error!Ir {
         .module => try b.todo("module"),
     };
     _ = try b.addInst(.{
-        .tag = .end,
+        .tag = .@"return",
         .data = .{ .ref = result },
     });
 

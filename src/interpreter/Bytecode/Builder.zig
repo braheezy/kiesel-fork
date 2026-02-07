@@ -174,7 +174,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .iterator_is_done => try b.lowerIteratorIsDone(data.ref, dest),
             .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
             .throw => try b.lowerThrow(data.ref, dest),
-            .end => try b.lowerEnd(data.ref, dest),
+            .@"return" => try b.lowerReturn(data.ref, dest),
         }
     }
 
@@ -1455,11 +1455,11 @@ fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
     });
 }
 
-fn lowerEnd(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     _ = dest;
     const ret_reg = if (ref == .none) Bytecode.Inst.Reg.none else b.resolve(ref);
     try b.emit(.{
-        .tag = .end,
+        .tag = .@"return",
         .data = .{ .reg = ret_reg },
     });
     b.noreturn();
