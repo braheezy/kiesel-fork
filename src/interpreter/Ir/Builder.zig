@@ -1937,7 +1937,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                     } },
                 });
             },
-            else => try b.todo("non-identifier update expression"),
+            else => unreachable,
         },
         .member_expression => |*member_expr| {
             const base = try b.lowerExpression(member_expr.expression);
@@ -1994,6 +1994,13 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                 },
                 .private_identifier => try b.todo("private identifier update expression"),
             }
+        },
+        .call_expression => |*call_expr| {
+            _ = try b.lowerCallExpression(call_expr);
+            return b.addInst(.{
+                .tag = .throw_reference_error,
+                .data = .{ .none = {} },
+            });
         },
         else => try b.todo("non-identifier update expression"),
     }
@@ -2226,7 +2233,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                     } },
                 });
             },
-            else => try b.todo("non-identifier lhs"),
+            else => unreachable,
         },
         .member_expression => |*member_expr| {
             const base = try b.lowerExpression(member_expr.expression);
@@ -2288,6 +2295,13 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
             const value = try b.lowerExpression(assign_expr.rhs_expression);
             return b.lowerDestructuringAssignment(pattern, value, .set);
         },
+        .call_expression => |*call_expr| {
+            _ = try b.lowerCallExpression(call_expr);
+            return b.addInst(.{
+                .tag = .throw_reference_error,
+                .data = .{ .none = {} },
+            });
+        },
         else => try b.todo("non-identifier lhs"),
     }
 }
@@ -2332,7 +2346,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                     } },
                 });
             },
-            else => try b.todo("non-identifier compound assignment lhs"),
+            else => unreachable,
         },
         .member_expression => |*member_expr| {
             const base = try b.lowerExpression(member_expr.expression);
@@ -2432,6 +2446,13 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                 .private_identifier => try b.todo("private identifier in binary compound assignment"),
             }
         },
+        .call_expression => |*call_expr| {
+            _ = try b.lowerCallExpression(call_expr);
+            return b.addInst(.{
+                .tag = .throw_reference_error,
+                .data = .{ .none = {} },
+            });
+        },
         else => try b.todo("non-identifier lhs in binary compound assignment"),
     }
 }
@@ -2455,7 +2476,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                     .data = .{ .string = string_index },
                 });
             },
-            else => return try b.todo("non-identifier logical compound assignment lhs"),
+            else => unreachable,
         },
         .member_expression => |*member_expr| blk: {
             const base = try b.lowerExpression(member_expr.expression);

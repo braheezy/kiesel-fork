@@ -166,6 +166,7 @@ pub const Inst = struct {
         iterator_collect,
 
         throw,
+        throw_reference_error,
         @"return",
     };
 
@@ -321,6 +322,7 @@ pub const Inst = struct {
         .iterator_is_done = .reg_reg,
         .iterator_collect = .reg_reg,
         .throw = .reg,
+        .throw_reference_error = .none,
         .@"return" = .reg,
     });
 

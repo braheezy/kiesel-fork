@@ -218,6 +218,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .iterator_is_done => vm.executeIteratorIsDone(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
+                .throw_reference_error => vm.executeThrowReferenceError(),
                 .@"return" => return if (data.reg != .none) vm.store(data.reg) else null,
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -1632,4 +1633,9 @@ fn executeThrow(vm: *Vm, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
         .stack_trace = try vm.agent.captureStackTrace(),
     };
     return error.ExceptionThrown;
+}
+
+fn executeThrowReferenceError(vm: *Vm) Agent.Error!void {
+    // Only emitted for web-compat assignment
+    return vm.agent.throwException(.reference_error, "Invalid assignment to function call", .{});
 }

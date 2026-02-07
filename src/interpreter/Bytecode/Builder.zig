@@ -176,6 +176,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .iterator_is_done => try b.lowerIteratorIsDone(data.ref, dest),
             .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
             .throw => try b.lowerThrow(data.ref, dest),
+            .throw_reference_error => try b.lowerThrowReferenceError(dest),
             .@"return" => try b.lowerReturn(data.ref, dest),
         }
     }
@@ -1466,6 +1467,15 @@ fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
     try b.emit(.{
         .tag = .throw,
         .data = .{ .reg = value_reg },
+    });
+    b.noreturn();
+}
+
+fn lowerThrowReferenceError(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    _ = dest;
+    try b.emit(.{
+        .tag = .throw_reference_error,
+        .data = .{ .none = {} },
     });
     b.noreturn();
 }

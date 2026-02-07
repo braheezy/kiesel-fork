@@ -82,6 +82,7 @@ fn markReachable(
                 continue; // Conditional branch doesn't fall through
             },
             .throw,
+            .throw_reference_error,
             .@"return",
             => continue,
             else => {},
