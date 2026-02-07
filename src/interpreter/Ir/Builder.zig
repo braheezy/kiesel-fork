@@ -21,8 +21,8 @@ instructions: std.MultiArrayList(Ir.Inst),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
 extras: std.ArrayListUnmanaged(u32),
-breakable_stack: std.ArrayListUnmanaged(*BreakableContext) = .empty,
-scope_depth: u32 = 0,
+breakable_stack: std.ArrayListUnmanaged(*BreakableContext),
+scope_depth: u32,
 
 const Ast = union(enum) {
     script: *const ast.Script,
@@ -110,6 +110,8 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .strings = .empty,
         .big_ints = .empty,
         .extras = .empty,
+        .breakable_stack = .empty,
+        .scope_depth = 0,
     };
 }
 
