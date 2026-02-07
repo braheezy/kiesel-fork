@@ -1021,7 +1021,7 @@ test {
         \\   1: string "test"                                         [1..2]
         \\   2: construct %0, [%1]                                    [2..3]
         \\   3: throw %2                                              [3..4]
-        \\   4: return %3                                             [4..4]
+        \\   4: return %3                                             [4..4] dead
         \\
     ,
         \\Bytecode (test)
@@ -1029,7 +1029,6 @@ test {
         \\   6: load_string r1, @1
         \\  12: construct1 r2, r0, r1
         \\  16: throw r2
-        \\  18: return r0
         \\
     );
 

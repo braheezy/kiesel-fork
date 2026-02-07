@@ -1453,6 +1453,7 @@ fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
         .tag = .throw,
         .data = .{ .reg = value_reg },
     });
+    b.noreturn();
 }
 
 fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
