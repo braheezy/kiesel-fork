@@ -7,7 +7,7 @@ const Ir = interpreter.Ir;
 pub fn computeLiveness(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
-    extras: []const u32,
+    extra: []const u32,
 ) std.mem.Allocator.Error!std.DynamicBitSetUnmanaged {
     var reachable: std.DynamicBitSetUnmanaged = try .initEmpty(gpa, instructions.len);
     defer reachable.deinit(gpa);
@@ -34,7 +34,7 @@ pub fn computeLiveness(
             .string,
             .big_int,
             => {},
-            else => try markLive(gpa, instructions, extras, &live, @enumFromInt(i)),
+            else => try markLive(gpa, instructions, extra, &live, @enumFromInt(i)),
         }
     }
 
@@ -96,7 +96,7 @@ fn markReachable(
 fn markLive(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
-    extras: []const u32,
+    extra: []const u32,
     live: *std.DynamicBitSetUnmanaged,
     start: Ir.Inst.Index,
 ) std.mem.Allocator.Error!void {
@@ -117,7 +117,7 @@ fn markLive(
 
         var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
         defer uses.deinit(gpa);
-        try Ir.Inst.collectRefs(gpa, tag, data, extras, &uses);
+        try Ir.Inst.collectRefs(gpa, tag, data, extra, &uses);
 
         for (uses.items) |use| {
             if (use.toIndex()) |use_index| {

@@ -556,7 +556,7 @@ fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Re
 
 fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: Bytecode.Inst.Reg) Error!void {
     const extra_index = @intFromEnum(array_data.extra_index);
-    const elements = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..array_data.len];
+    const elements = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extra[extra_index..]))[0..array_data.len];
 
     const has_spread = for (elements) |elem| {
         if (elem.toIndex()) |elem_index| {
@@ -623,7 +623,7 @@ fn lowerArray(b: *Builder, array_data: @FieldType(Ir.Inst.Data, "array"), dest: 
 
 fn lowerObject(b: *Builder, object_data: @FieldType(Ir.Inst.Data, "object"), dest: Bytecode.Inst.Reg) Error!void {
     const extra_index = @intFromEnum(object_data.extra_index);
-    const pairs = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0 .. object_data.len * 2];
+    const pairs = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extra[extra_index..]))[0 .. object_data.len * 2];
 
     try b.emit(.{
         .tag = .object_create,
@@ -1269,7 +1269,7 @@ fn lowerCopyDataProperties(b: *Builder, data: @FieldType(Ir.Inst.Data, "copy_dat
     }
 
     const extra_index = @intFromEnum(data.extra_index);
-    const excluded = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+    const excluded = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extra[extra_index..]))[0..data.len];
 
     const excluded_reg: Bytecode.Inst.Reg = .scratch;
     try b.emit(.{
@@ -1307,7 +1307,7 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
         else => |ref| b.resolve(ref),
     };
     const extra_index = @intFromEnum(data.extra_index);
-    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extra[extra_index..]))[0..data.len];
 
     const has_spread = for (args) |arg| {
         if (arg.toIndex()) |arg_index| {
@@ -1362,7 +1362,7 @@ fn lowerCall(b: *Builder, data: @FieldType(Ir.Inst.Data, "call"), dest: Bytecode
 fn lowerConstruct(b: *Builder, data: @FieldType(Ir.Inst.Data, "construct"), dest: Bytecode.Inst.Reg) Error!void {
     const constructor_reg = b.resolve(data.constructor);
     const extra_index = @intFromEnum(data.extra_index);
-    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extras[extra_index..]))[0..data.len];
+    const args = @as([*]const Ir.Inst.Ref, @ptrCast(b.ir.extra[extra_index..]))[0..data.len];
 
     const has_spread = for (args) |arg| {
         if (arg.toIndex()) |arg_index| {

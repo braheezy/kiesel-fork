@@ -18,9 +18,9 @@ name: []const u8,
 root_node: Ast,
 in_strict_mode: bool,
 instructions: std.MultiArrayList(Ir.Inst),
+extra: std.ArrayListUnmanaged(u32),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
-extras: std.ArrayListUnmanaged(u32),
 breakable_stack: std.ArrayListUnmanaged(*BreakableContext),
 scope_depth: u32,
 
@@ -107,9 +107,9 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .root_node = root_node,
         .in_strict_mode = in_strict_mode,
         .instructions = .empty,
+        .extra = .empty,
         .strings = .empty,
         .big_ints = .empty,
-        .extras = .empty,
         .breakable_stack = .empty,
         .scope_depth = 0,
     };
@@ -117,11 +117,11 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
 
 pub fn deinit(b: *Builder) void {
     b.instructions.deinit(b.gpa);
+    b.extra.deinit(b.gpa);
     for (b.strings.keys()) |string| b.gpa.free(string);
     b.strings.deinit(b.gpa);
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
-    b.extras.deinit(b.gpa);
     for (b.breakable_stack.items) |ctx| {
         ctx.deinit(b.gpa);
         b.gpa.destroy(ctx);
@@ -145,13 +145,13 @@ pub fn build(b: *Builder) Error!Ir {
     var instructions = b.instructions.toOwnedSlice();
     errdefer instructions.deinit(b.gpa);
 
-    const extras = try b.extras.toOwnedSlice(b.gpa);
-    errdefer b.gpa.free(extras);
+    const extra = try b.extra.toOwnedSlice(b.gpa);
+    errdefer b.gpa.free(extra);
 
-    var liveness = try computeLiveness(b.gpa, instructions, extras);
+    var liveness = try computeLiveness(b.gpa, instructions, extra);
     errdefer liveness.deinit(b.gpa);
 
-    const live_ranges = try computeLiveRanges(b.gpa, instructions, extras);
+    const live_ranges = try computeLiveRanges(b.gpa, instructions, extra);
     errdefer b.gpa.free(live_ranges);
 
     const strings = try b.gpa.dupe([]const u8, b.strings.keys());
@@ -167,11 +167,11 @@ pub fn build(b: *Builder) Error!Ir {
     return .{
         .name = name,
         .instructions = instructions,
+        .extra = extra,
         .liveness = liveness,
         .live_ranges = live_ranges,
         .strings = strings,
         .big_ints = big_ints,
-        .extras = extras,
     };
 }
 
@@ -1574,9 +1574,9 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
                 .binding_rest_property => {},
             };
 
-            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
             const len: u32 = @intCast(excluded_names.items.len);
-            try b.extras.appendSlice(b.gpa, @ptrCast(excluded_names.items));
+            try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
             const rest_obj = try b.addInst(.{
                 .tag = .copy_data_properties,
@@ -1685,9 +1685,9 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
         try elements.append(b.gpa, elem_ref);
     }
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
     const len: u32 = @intCast(elements.items.len);
-    try b.extras.appendSlice(b.gpa, @ptrCast(elements.items));
+    try b.extra.appendSlice(b.gpa, @ptrCast(elements.items));
 
     return b.addInst(.{
         .tag = .array,
@@ -1736,9 +1736,9 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
         }
     }
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
     const len: u32 = @intCast(pairs.items.len / 2);
-    try b.extras.appendSlice(b.gpa, @ptrCast(pairs.items));
+    try b.extra.appendSlice(b.gpa, @ptrCast(pairs.items));
 
     return b.addInst(.{
         .tag = .object,
@@ -1875,9 +1875,9 @@ fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.
     var args = try b.lowerArguments(new_expr.arguments);
     defer args.deinit(b.gpa);
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
     const len: u32 = @intCast(args.items.len);
-    try b.extras.appendSlice(b.gpa, @ptrCast(args.items));
+    try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
 
     return b.addInst(.{
         .tag = .construct,
@@ -1899,9 +1899,9 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     var args = try b.lowerArguments(call_expr.arguments);
     defer args.deinit(b.gpa);
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extras.items.len);
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
     const len: u32 = @intCast(args.items.len);
-    try b.extras.appendSlice(b.gpa, @ptrCast(args.items));
+    try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
 
     return b.addInst(.{
         .tag = .call,

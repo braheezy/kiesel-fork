@@ -12,7 +12,7 @@ pub const LiveRange = struct {
 pub fn computeLiveRanges(
     gpa: std.mem.Allocator,
     instructions: std.MultiArrayList(Ir.Inst).Slice,
-    extras: []const u32,
+    extra: []const u32,
 ) std.mem.Allocator.Error![]LiveRange {
     var live_ranges = try gpa.alloc(LiveRange, instructions.len);
 
@@ -27,7 +27,7 @@ pub fn computeLiveRanges(
     for (tags, datas, 0..) |tag, data, inst_index| {
         var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
         defer uses.deinit(gpa);
-        try Ir.Inst.collectRefs(gpa, tag, data, extras, &uses);
+        try Ir.Inst.collectRefs(gpa, tag, data, extra, &uses);
 
         for (uses.items) |use| {
             if (use.toIndex()) |index| {

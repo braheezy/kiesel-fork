@@ -4,11 +4,11 @@ pub const Ir = @This();
 
 name: []const u8,
 instructions: std.MultiArrayList(Inst).Slice,
+extra: []const u32,
 liveness: std.DynamicBitSetUnmanaged,
 live_ranges: []const LiveRange,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
-extras: []const u32,
 
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
@@ -338,7 +338,7 @@ pub const Inst = struct {
         gpa: std.mem.Allocator,
         tag: Tag,
         data: Data,
-        extras: []const u32,
+        extra: []const u32,
         uses: *std.ArrayList(Ref),
     ) std.mem.Allocator.Error!void {
         const data_tag = data_tags[@intFromEnum(tag)];
@@ -351,14 +351,14 @@ pub const Inst = struct {
             => {},
             .array => {
                 const extra_index = @intFromEnum(data.array.extra_index);
-                const elements = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.array.len];
+                const elements = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.array.len];
                 for (elements) |elem| {
                     if (elem != .none) try uses.append(gpa, elem);
                 }
             },
             .object => {
                 const extra_index = @intFromEnum(data.object.extra_index);
-                const pairs = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0 .. data.object.len * 2];
+                const pairs = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0 .. data.object.len * 2];
                 for (pairs) |ref| {
                     if (ref != .none) try uses.append(gpa, ref);
                 }
@@ -367,19 +367,19 @@ pub const Inst = struct {
                 try uses.append(gpa, data.call.callee);
                 if (data.call.this_value != .none) try uses.append(gpa, data.call.this_value);
                 const extra_index = @intFromEnum(data.call.extra_index);
-                const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.call.len];
+                const args = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.call.len];
                 for (args) |arg| try uses.append(gpa, arg);
             },
             .construct => {
                 try uses.append(gpa, data.construct.constructor);
                 const extra_index = @intFromEnum(data.construct.extra_index);
-                const args = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.construct.len];
+                const args = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.construct.len];
                 for (args) |arg| try uses.append(gpa, arg);
             },
             .copy_data_properties => {
                 try uses.append(gpa, data.copy_data_properties.source);
                 const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
-                const excluded = @as([*]const Ref, @ptrCast(extras.ptr + extra_index))[0..data.copy_data_properties.len];
+                const excluded = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.copy_data_properties.len];
                 for (excluded) |prop| {
                     if (prop != .none) try uses.append(gpa, prop);
                 }
@@ -401,13 +401,13 @@ pub const Inst = struct {
 pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.name);
     ir.instructions.deinit(gpa);
+    gpa.free(ir.extra);
     ir.liveness.deinit(gpa);
     gpa.free(ir.live_ranges);
     for (ir.strings) |string| gpa.free(string);
     gpa.free(ir.strings);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
-    gpa.free(ir.extras);
 }
 
 pub fn print(
@@ -480,7 +480,7 @@ fn printData(
         .array => {
             try cw.writeByte('[');
             const extra_index = @intFromEnum(data.array.extra_index);
-            const elements = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.array.len];
+            const elements = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.array.len];
             for (elements, 0..) |element, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, element, cw, tty_config);
@@ -490,7 +490,7 @@ fn printData(
         .object => {
             try cw.writeByte('{');
             const extra_index = @intFromEnum(data.object.extra_index);
-            const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0 .. data.object.len * 2];
+            const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0 .. data.object.len * 2];
             var pair_index: usize = 0;
             while (pair_index < pairs.len) : (pair_index += 2) {
                 if (pair_index > 0) try cw.writeAll(", ");
@@ -506,7 +506,7 @@ fn printData(
             try printField(ir, data.call.this_value, cw, tty_config);
             try cw.writeAll(", [");
             const extra_index = @intFromEnum(data.call.extra_index);
-            const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.call.len];
+            const args = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.call.len];
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
@@ -517,7 +517,7 @@ fn printData(
             try printField(ir, data.construct.constructor, cw, tty_config);
             try cw.writeAll(", [");
             const extra_index = @intFromEnum(data.construct.extra_index);
-            const args = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.construct.len];
+            const args = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.construct.len];
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
@@ -528,7 +528,7 @@ fn printData(
             try printField(ir, data.copy_data_properties.source, cw, tty_config);
             try cw.writeAll(", [");
             const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
-            const excluded = @as([*]const Inst.Ref, @ptrCast(ir.extras[extra_index..]))[0..data.copy_data_properties.len];
+            const excluded = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.copy_data_properties.len];
             for (excluded, 0..) |prop, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, prop, cw, tty_config);
