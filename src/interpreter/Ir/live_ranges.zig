@@ -11,23 +11,21 @@ pub const LiveRange = struct {
 
 pub fn computeLiveRanges(
     gpa: std.mem.Allocator,
-    instructions: std.MultiArrayList(Ir.Inst).Slice,
-    extra: []const u32,
+    ir: *const Ir,
 ) std.mem.Allocator.Error![]LiveRange {
-    var live_ranges = try gpa.alloc(LiveRange, instructions.len);
+    var live_ranges = try gpa.alloc(LiveRange, ir.instructions.len);
 
     for (live_ranges, 0..) |*live_range, i| {
         live_range.* = .{ .start = @intCast(i), .end = @intCast(i) };
     }
 
-    const tags = instructions.items(.tag);
-    const datas = instructions.items(.data);
-
     // Pass 1: Compute live ranges from direct uses
-    for (tags, datas, 0..) |tag, data, inst_index| {
+    for (0..ir.instructions.len) |inst_index| {
+        const inst = ir.instructions.get(inst_index);
+
         var uses: std.ArrayList(Ir.Inst.Ref) = .empty;
         defer uses.deinit(gpa);
-        try Ir.Inst.collectRefs(gpa, tag, data, extra, &uses);
+        try inst.collectRefs(ir, gpa, &uses);
 
         for (uses.items) |use| {
             if (use.toIndex()) |index| {
@@ -38,10 +36,11 @@ pub fn computeLiveRanges(
     }
 
     // Pass 2: Extend live ranges across back-edges
-    for (tags, datas, 0..) |tag, data, inst_index| {
-        const index = switch (tag) {
+    for (0..ir.instructions.len) |inst_index| {
+        const inst = ir.instructions.get(inst_index);
+        const index = switch (inst.tag) {
             .br => blk: {
-                if (data.br.target.toIndex()) |target_index| {
+                if (inst.data.br.target.toIndex()) |target_index| {
                     if (@intFromEnum(target_index) < inst_index) {
                         break :blk target_index;
                     }
@@ -50,10 +49,11 @@ pub fn computeLiveRanges(
             },
             .br_cond => {
                 // br_cond currently only creates forward jumps
-                if (data.br_cond.then_target.toIndex()) |target_index| {
+                const extra = ir.extraData(Ir.Inst.BrCond, inst.data.br_cond);
+                if (extra.data.then_target.toIndex()) |target_index| {
                     std.debug.assert(@intFromEnum(target_index) >= inst_index);
                 }
-                if (data.br_cond.else_target.toIndex()) |target_index| {
+                if (extra.data.else_target.toIndex()) |target_index| {
                     std.debug.assert(@intFromEnum(target_index) >= inst_index);
                 }
                 continue;

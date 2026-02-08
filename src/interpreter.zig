@@ -372,7 +372,7 @@ test {
         \\IR (test)
         \\   0: number 5                                              [0..1]
         \\   1: set_binding "x", %0                                   [1..1]
-        \\   2: update_binding "x", increment, prefix                 [2..3]
+        \\   2: update_binding "x", increment_prefix                  [2..3]
         \\   3: return %2                                             [3..3]
         \\
     ,
@@ -663,7 +663,7 @@ test {
         \\  48: set_binding "x", %47                                  [48..52]
         \\  49: br %50, %48                                           [49..49]
         \\  50: label                                                 [50..50]
-        \\  51: update_binding "i", increment, postfix                [51..51]
+        \\  51: update_binding "i", increment_postfix                 [51..51]
         \\  52: br %39, %48                                           [52..52]
         \\  53: label                                                 [53..53]
         \\  54: br %55, %39                                           [54..54]

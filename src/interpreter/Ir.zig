@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 pub const Ir = @This();
@@ -5,10 +6,10 @@ pub const Ir = @This();
 name: []const u8,
 instructions: std.MultiArrayList(Inst).Slice,
 extra: []const u32,
-liveness: std.DynamicBitSetUnmanaged,
-live_ranges: []const LiveRange,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
+liveness: std.DynamicBitSetUnmanaged,
+live_ranges: []const LiveRange,
 
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
@@ -177,34 +178,44 @@ pub const Inst = struct {
 
     pub const Data = union {
         none: void,
+        ref: Ref,
         boolean: bool,
         number: f64,
         string: StringIndex,
         big_int: BigIntIndex,
-        array: struct { extra_index: ExtraIndex, len: u32 },
-        object: struct { extra_index: ExtraIndex, len: u32 },
-        reg_exp: struct { pattern: StringIndex, flags: StringIndex },
-        br: struct { target: Ref, value: Ref },
-        br_cond: struct { condition: Ref, then_target: Ref, else_target: Ref },
-        binary: struct { lhs: Ref, rhs: Ref },
-        get_property: struct { base: Ref, name: StringIndex },
-        get_property_computed: struct { base: Ref, property: Ref },
-        get_property_indexed: struct { base: Ref, index: u32 },
-        set_binding: struct { name: StringIndex, value: Ref },
-        set_property: struct { base: Ref, name: StringIndex, value: Ref },
-        set_property_computed: struct { base: Ref, property: Ref, value: Ref },
-        set_property_indexed: struct { base: Ref, index: u32, value: Ref },
-        update_binding: struct { name: StringIndex, update_op: UpdateOp, update_type: UpdateType },
-        update_property: struct { base: Ref, name: StringIndex, update_op: UpdateOp, update_type: UpdateType },
-        update_property_computed: struct { base: Ref, property: Ref, update_op: UpdateOp, update_type: UpdateType },
-        update_property_indexed: struct { base: Ref, index: u32, update_op: UpdateOp, update_type: UpdateType },
-        delete_property: struct { base: Ref, name: StringIndex },
-        delete_property_computed: struct { base: Ref, property: Ref },
-        delete_property_indexed: struct { base: Ref, index: u32 },
-        copy_data_properties: struct { source: Ref, extra_index: ExtraIndex, len: u32 },
-        call: struct { callee: Ref, this_value: Ref, extra_index: ExtraIndex, len: u32 },
-        construct: struct { constructor: Ref, extra_index: ExtraIndex, len: u32 },
-        ref: Ref,
+        array: Array,
+        object: Object,
+        reg_exp: RegExp,
+        br: Br,
+        br_cond: ExtraIndex,
+        binary: Binary,
+        get_property: GetProperty,
+        get_property_computed: GetPropertyComputed,
+        get_property_indexed: GetPropertyIndexed,
+        set_binding: SetBinding,
+        set_property: ExtraIndex,
+        set_property_computed: ExtraIndex,
+        set_property_indexed: ExtraIndex,
+        update_binding: UpdateBinding,
+        update_property: ExtraIndex,
+        update_property_computed: ExtraIndex,
+        update_property_indexed: ExtraIndex,
+        delete_property: DeleteProperty,
+        delete_property_computed: DeletePropertyComputed,
+        delete_property_indexed: DeletePropertyIndexed,
+        copy_data_properties: ExtraIndex,
+        call: ExtraIndex,
+        construct: ExtraIndex,
+
+        // Make sure we don't accidentally add a field to make this union
+        // bigger than expected. Note that in safety builds, Zig is allowed
+        // to insert a secret field for safety checks.
+        comptime {
+            switch (builtin.mode) {
+                .ReleaseFast, .ReleaseSmall => std.debug.assert(@sizeOf(Data) == 8),
+                else => {},
+            }
+        }
     };
 
     pub const data_tags = std.enums.directEnumArray(Tag, std.meta.FieldEnum(Data), 0, .{
@@ -306,12 +317,43 @@ pub const Inst = struct {
         .@"return" = .ref,
     });
 
-    pub const UpdateOp = enum { increment, decrement };
-    pub const UpdateType = enum { prefix, postfix };
-
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
     pub const ExtraIndex = enum(u32) { _ };
+
+    // Inline data types (8 bytes)
+    pub const Array = struct { extra_index: ExtraIndex, len: u32 };
+    pub const Object = struct { extra_index: ExtraIndex, len: u32 };
+    pub const RegExp = struct { pattern: StringIndex, flags: StringIndex };
+    pub const Br = struct { target: Ref, value: Ref };
+    pub const Binary = struct { lhs: Ref, rhs: Ref };
+    pub const GetProperty = struct { base: Ref, name: StringIndex };
+    pub const GetPropertyComputed = struct { base: Ref, property: Ref };
+    pub const GetPropertyIndexed = struct { base: Ref, index: u32 };
+    pub const SetBinding = struct { name: StringIndex, value: Ref };
+    pub const UpdateBinding = struct { name: StringIndex, update_op: UpdateOp };
+    pub const DeleteProperty = struct { base: Ref, name: StringIndex };
+    pub const DeletePropertyComputed = struct { base: Ref, property: Ref };
+    pub const DeletePropertyIndexed = struct { base: Ref, index: u32 };
+
+    // Extra data types (>8 bytes)
+    pub const BrCond = struct { condition: Ref, then_target: Ref, else_target: Ref };
+    pub const SetProperty = struct { base: Ref, name: StringIndex, value: Ref };
+    pub const SetPropertyComputed = struct { base: Ref, property: Ref, value: Ref };
+    pub const SetPropertyIndexed = struct { base: Ref, index: u32, value: Ref };
+    pub const UpdateProperty = struct { base: Ref, name: StringIndex, update_op: UpdateOp };
+    pub const UpdatePropertyComputed = struct { base: Ref, property: Ref, update_op: UpdateOp };
+    pub const UpdatePropertyIndexed = struct { base: Ref, index: u32, update_op: UpdateOp };
+    pub const Call = struct { callee: Ref, this_value: Ref, args_len: u32 };
+    pub const Construct = struct { constructor: Ref, args_len: u32 };
+    pub const CopyDataProperties = struct { source: Ref, excluded_len: u32 };
+
+    pub const UpdateOp = enum(u32) {
+        increment_prefix,
+        increment_postfix,
+        decrement_prefix,
+        decrement_postfix,
+    };
 
     pub const Ref = enum(u32) {
         none,
@@ -335,13 +377,12 @@ pub const Inst = struct {
     };
 
     pub fn collectRefs(
+        inst: Inst,
+        ir: *const Ir,
         gpa: std.mem.Allocator,
-        tag: Tag,
-        data: Data,
-        extra: []const u32,
         uses: *std.ArrayList(Ref),
     ) std.mem.Allocator.Error!void {
-        const data_tag = data_tags[@intFromEnum(tag)];
+        const data_tag = data_tags[@intFromEnum(inst.tag)];
         switch (data_tag) {
             .none,
             .boolean,
@@ -349,48 +390,65 @@ pub const Inst = struct {
             .string,
             .big_int,
             => {},
+            .ref => try uses.append(gpa, inst.data.ref),
             .array => {
-                const extra_index = @intFromEnum(data.array.extra_index);
-                const elements = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.array.len];
+                const elements = ir.refSlice(inst.data.array.extra_index, inst.data.array.len);
                 for (elements) |elem| {
                     if (elem != .none) try uses.append(gpa, elem);
                 }
             },
             .object => {
-                const extra_index = @intFromEnum(data.object.extra_index);
-                const pairs = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0 .. data.object.len * 2];
+                const pairs = ir.refSlice(inst.data.object.extra_index, inst.data.object.len * 2);
                 for (pairs) |ref| {
                     if (ref != .none) try uses.append(gpa, ref);
                 }
             },
             .call => {
-                try uses.append(gpa, data.call.callee);
-                if (data.call.this_value != .none) try uses.append(gpa, data.call.this_value);
-                const extra_index = @intFromEnum(data.call.extra_index);
-                const args = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.call.len];
+                const extra = ir.extraData(Call, inst.data.call);
+                try uses.append(gpa, extra.data.callee);
+                if (extra.data.this_value != .none) try uses.append(gpa, extra.data.this_value);
+                const args = ir.refSlice(extra.end, extra.data.args_len);
                 for (args) |arg| try uses.append(gpa, arg);
             },
             .construct => {
-                try uses.append(gpa, data.construct.constructor);
-                const extra_index = @intFromEnum(data.construct.extra_index);
-                const args = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.construct.len];
+                const extra = ir.extraData(Construct, inst.data.construct);
+                try uses.append(gpa, extra.data.constructor);
+                const args = ir.refSlice(extra.end, extra.data.args_len);
                 for (args) |arg| try uses.append(gpa, arg);
             },
             .copy_data_properties => {
-                try uses.append(gpa, data.copy_data_properties.source);
-                const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
-                const excluded = @as([*]const Ref, @ptrCast(extra.ptr + extra_index))[0..data.copy_data_properties.len];
+                const extra = ir.extraData(CopyDataProperties, inst.data.copy_data_properties);
+                try uses.append(gpa, extra.data.source);
+                const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
                 for (excluded) |prop| {
                     if (prop != .none) try uses.append(gpa, prop);
                 }
             },
-            .ref => try uses.append(gpa, data.ref),
             inline else => |dt| {
-                const field_data = @field(data, @tagName(dt));
-                const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
-                inline for (field_type.fields) |struct_field| {
-                    if (struct_field.type == Ref) {
-                        try uses.append(gpa, @field(field_data, struct_field.name));
+                const field_data = @field(inst.data, @tagName(dt));
+                const FieldType = @TypeOf(field_data);
+                if (FieldType == ExtraIndex) {
+                    const ExtraType = switch (dt) {
+                        .br_cond => BrCond,
+                        .set_property => SetProperty,
+                        .set_property_computed => SetPropertyComputed,
+                        .set_property_indexed => SetPropertyIndexed,
+                        .update_property => UpdateProperty,
+                        .update_property_computed => UpdatePropertyComputed,
+                        .update_property_indexed => UpdatePropertyIndexed,
+                        else => unreachable,
+                    };
+                    const extra = ir.extraData(ExtraType, field_data);
+                    inline for (@typeInfo(ExtraType).@"struct".fields) |extra_field| {
+                        if (extra_field.type == Ref) {
+                            try uses.append(gpa, @field(extra.data, extra_field.name));
+                        }
+                    }
+                } else {
+                    inline for (@typeInfo(FieldType).@"struct".fields) |struct_field| {
+                        if (struct_field.type == Ref) {
+                            try uses.append(gpa, @field(field_data, struct_field.name));
+                        }
                     }
                 }
             },
@@ -402,12 +460,41 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.name);
     ir.instructions.deinit(gpa);
     gpa.free(ir.extra);
-    ir.liveness.deinit(gpa);
-    gpa.free(ir.live_ranges);
     for (ir.strings) |string| gpa.free(string);
     gpa.free(ir.strings);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
+    ir.liveness.deinit(gpa);
+    gpa.free(ir.live_ranges);
+}
+
+pub fn ExtraData(comptime T: type) type {
+    return struct { data: T, end: Inst.ExtraIndex };
+}
+
+pub fn extraData(ir: *const Ir, comptime T: type, extra_index: Inst.ExtraIndex) ExtraData(T) {
+    const fields = @typeInfo(T).@"struct".fields;
+    var i: usize = @intFromEnum(extra_index);
+    var result: T = undefined;
+    inline for (fields) |field| {
+        @field(result, field.name) = switch (field.type) {
+            u32 => ir.extra[i],
+            Inst.Ref,
+            Inst.StringIndex,
+            Inst.UpdateOp,
+            => @enumFromInt(ir.extra[i]),
+            else => unreachable,
+        };
+        i += 1;
+    }
+    return .{
+        .data = result,
+        .end = @enumFromInt(i),
+    };
+}
+
+pub fn refSlice(ir: *const Ir, start: Inst.ExtraIndex, len: u32) []const Inst.Ref {
+    return @ptrCast(ir.extra[@intFromEnum(start)..][0..len]);
 }
 
 pub fn print(
@@ -479,8 +566,7 @@ fn printData(
         },
         .array => {
             try cw.writeByte('[');
-            const extra_index = @intFromEnum(data.array.extra_index);
-            const elements = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.array.len];
+            const elements = ir.refSlice(data.array.extra_index, data.array.len);
             for (elements, 0..) |element, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, element, cw, tty_config);
@@ -489,8 +575,7 @@ fn printData(
         },
         .object => {
             try cw.writeByte('{');
-            const extra_index = @intFromEnum(data.object.extra_index);
-            const pairs = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0 .. data.object.len * 2];
+            const pairs = ir.refSlice(data.object.extra_index, data.object.len * 2);
             var pair_index: usize = 0;
             while (pair_index < pairs.len) : (pair_index += 2) {
                 if (pair_index > 0) try cw.writeAll(", ");
@@ -501,12 +586,12 @@ fn printData(
             try cw.writeByte('}');
         },
         .call => {
-            try printField(ir, data.call.callee, cw, tty_config);
+            const extra = ir.extraData(Inst.Call, data.call);
+            try printField(ir, extra.data.callee, cw, tty_config);
             try cw.writeAll(", ");
-            try printField(ir, data.call.this_value, cw, tty_config);
+            try printField(ir, extra.data.this_value, cw, tty_config);
             try cw.writeAll(", [");
-            const extra_index = @intFromEnum(data.call.extra_index);
-            const args = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.call.len];
+            const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
@@ -514,10 +599,10 @@ fn printData(
             try cw.writeByte(']');
         },
         .construct => {
-            try printField(ir, data.construct.constructor, cw, tty_config);
+            const extra = ir.extraData(Inst.Construct, data.construct);
+            try printField(ir, extra.data.constructor, cw, tty_config);
             try cw.writeAll(", [");
-            const extra_index = @intFromEnum(data.construct.extra_index);
-            const args = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.construct.len];
+            const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, arg, cw, tty_config);
@@ -525,23 +610,42 @@ fn printData(
             try cw.writeByte(']');
         },
         .copy_data_properties => {
-            try printField(ir, data.copy_data_properties.source, cw, tty_config);
+            const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
+            try printField(ir, extra.data.source, cw, tty_config);
             try cw.writeAll(", [");
-            const extra_index = @intFromEnum(data.copy_data_properties.extra_index);
-            const excluded = @as([*]const Inst.Ref, @ptrCast(ir.extra[extra_index..]))[0..data.copy_data_properties.len];
+            const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
             for (excluded, 0..) |prop, j| {
                 if (j > 0) try cw.writeAll(", ");
                 try printField(ir, prop, cw, tty_config);
             }
             try cw.writeByte(']');
         },
-        inline else => |field| {
-            const field_data = @field(data, @tagName(field));
-            const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
-            inline for (field_type.fields, 0..) |struct_field, i| {
-                if (i > 0) try cw.writeAll(", ");
-                const field_value = @field(field_data, struct_field.name);
-                try printField(ir, field_value, cw, tty_config);
+        inline else => |dt| {
+            const field_data = @field(data, @tagName(dt));
+            const FieldType = @TypeOf(field_data);
+            if (FieldType == Inst.ExtraIndex) {
+                const ExtraType = switch (dt) {
+                    .br_cond => Inst.BrCond,
+                    .set_property => Inst.SetProperty,
+                    .set_property_computed => Inst.SetPropertyComputed,
+                    .set_property_indexed => Inst.SetPropertyIndexed,
+                    .update_property => Inst.UpdateProperty,
+                    .update_property_computed => Inst.UpdatePropertyComputed,
+                    .update_property_indexed => Inst.UpdatePropertyIndexed,
+                    else => unreachable,
+                };
+                const extra = ir.extraData(ExtraType, field_data);
+                const extra_fields = @typeInfo(ExtraType).@"struct".fields;
+                inline for (extra_fields, 0..) |extra_field, j| {
+                    if (j > 0) try cw.writeAll(", ");
+                    try printField(ir, @field(extra.data, extra_field.name), cw, tty_config);
+                }
+            } else {
+                const struct_fields = @typeInfo(FieldType).@"struct".fields;
+                inline for (struct_fields, 0..) |struct_field, j| {
+                    if (j > 0) try cw.writeAll(", ");
+                    try printField(ir, @field(field_data, struct_field.name), cw, tty_config);
+                }
             }
         },
     }
@@ -605,9 +709,7 @@ fn printField(
             try cw.flush();
             try tty_config.setColor(writer, .reset);
         },
-        Inst.UpdateOp,
-        Inst.UpdateType,
-        => {
+        Inst.UpdateOp => {
             try cw.flush();
             try tty_config.setColor(writer, .magenta);
             try cw.print("{t}", .{value});

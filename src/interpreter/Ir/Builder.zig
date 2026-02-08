@@ -148,12 +148,6 @@ pub fn build(b: *Builder) Error!Ir {
     const extra = try b.extra.toOwnedSlice(b.gpa);
     errdefer b.gpa.free(extra);
 
-    var liveness = try computeLiveness(b.gpa, instructions, extra);
-    errdefer liveness.deinit(b.gpa);
-
-    const live_ranges = try computeLiveRanges(b.gpa, instructions, extra);
-    errdefer b.gpa.free(live_ranges);
-
     const strings = try b.gpa.dupe([]const u8, b.strings.keys());
     errdefer b.gpa.free(strings);
     b.strings.clearRetainingCapacity(); // Transfer ownership
@@ -164,15 +158,23 @@ pub fn build(b: *Builder) Error!Ir {
     b.big_ints.clearRetainingCapacity(); // Transfer ownership
     errdefer for (big_ints) |big_int| b.gpa.free(big_int.limbs);
 
-    return .{
+    var ir: Ir = .{
         .name = name,
         .instructions = instructions,
         .extra = extra,
-        .liveness = liveness,
-        .live_ranges = live_ranges,
         .strings = strings,
         .big_ints = big_ints,
+        .liveness = undefined,
+        .live_ranges = undefined,
     };
+
+    ir.liveness = try computeLiveness(b.gpa, &ir);
+    errdefer ir.liveness.deinit(b.gpa);
+
+    ir.live_ranges = try computeLiveRanges(b.gpa, &ir);
+    errdefer b.gpa.free(ir.live_ranges);
+
+    return ir;
 }
 
 fn todo(_: *Builder, msg: []const u8) Error!noreturn {
@@ -191,20 +193,44 @@ fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
 
 const Deferred = struct {
     b: *Builder,
-    ref: Ir.Inst.Ref,
+    index: Ir.Inst.Index,
 
-    fn set(d: Deferred, data: Ir.Inst.Data) void {
-        const index = d.ref.toIndex().?;
-        d.b.instructions.slice().items(.data)[@intFromEnum(index)] = data;
+    const Data = union {
+        br: Ir.Inst.Br,
+        br_cond: Ir.Inst.BrCond,
+    };
+
+    fn set(d: Deferred, data: Data) void {
+        const slice = d.b.instructions.slice();
+        const i = @intFromEnum(d.index);
+        switch (slice.items(.tag)[i]) {
+            .br_cond => {
+                const ei = @intFromEnum(slice.items(.data)[i].br_cond);
+                d.b.extra.items[ei] = @intFromEnum(data.br_cond.condition);
+                d.b.extra.items[ei + 1] = @intFromEnum(data.br_cond.then_target);
+                d.b.extra.items[ei + 2] = @intFromEnum(data.br_cond.else_target);
+            },
+            .br => slice.items(.data)[i] = .{ .br = data.br },
+            else => unreachable,
+        }
     }
 };
 
 fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferred {
+    const data: Ir.Inst.Data = switch (tag) {
+        .br_cond => blk: {
+            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+            try b.extra.appendNTimes(b.gpa, undefined, 3);
+            break :blk .{ .br_cond = extra_index };
+        },
+        .br => .{ .br = undefined },
+        else => unreachable,
+    };
     const ref = try b.addInst(.{
         .tag = tag,
-        .data = undefined,
+        .data = data,
     });
-    return .{ .b = b, .ref = ref };
+    return .{ .b = b, .index = ref.toIndex().? };
 }
 
 fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
@@ -212,6 +238,24 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
         .tag = .label,
         .data = .{ .none = {} },
     });
+}
+
+fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.Inst.ExtraIndex {
+    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+    const fields = @typeInfo(T).@"struct".fields;
+    try b.extra.ensureUnusedCapacity(b.gpa, fields.len);
+    inline for (fields) |field| {
+        const value = @field(extra, field.name);
+        b.extra.appendAssumeCapacity(switch (field.type) {
+            u32 => value,
+            Ir.Inst.Ref,
+            Ir.Inst.StringIndex,
+            Ir.Inst.UpdateOp,
+            => @intFromEnum(value),
+            else => unreachable,
+        });
+    }
+    return extra_index;
 }
 
 fn pushBreakableContext(b: *Builder, ctx: BreakableContext) std.mem.Allocator.Error!*BreakableContext {
@@ -889,13 +933,14 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                             .set_property_strict
                         else
                             .set_property;
+                        const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                            .base = base,
+                            .name = string_index,
+                            .value = next_value,
+                        });
                         _ = try b.addInst(.{
                             .tag = tag,
-                            .data = .{ .set_property = .{
-                                .base = base,
-                                .name = string_index,
-                                .value = next_value,
-                            } },
+                            .data = .{ .set_property = extra_index },
                         });
                     },
                     .expression => |prop_expr| blk: {
@@ -906,13 +951,14 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                                     .set_property_indexed_strict
                                 else
                                     .set_property_indexed;
+                                const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                                    .base = base,
+                                    .index = index,
+                                    .value = next_value,
+                                });
                                 _ = try b.addInst(.{
                                     .tag = tag,
-                                    .data = .{ .set_property_indexed = .{
-                                        .base = base,
-                                        .index = index,
-                                        .value = next_value,
-                                    } },
+                                    .data = .{ .set_property_indexed = extra_index },
                                 });
                                 break :blk;
                             }
@@ -922,13 +968,14 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                             .set_property_computed_strict
                         else
                             .set_property_computed;
+                        const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                            .base = base,
+                            .property = property,
+                            .value = next_value,
+                        });
                         _ = try b.addInst(.{
                             .tag = tag,
-                            .data = .{ .set_property_computed = .{
-                                .base = base,
-                                .property = property,
-                                .value = next_value,
-                            } },
+                            .data = .{ .set_property_computed = extra_index },
                         });
                     },
                     .private_identifier => try b.todo("private identifier in for-in/of LHS"),
@@ -1142,12 +1189,10 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
         .value = undefined_ref,
     } });
     for (case_branches.items) |item| {
-        const inst_data = b.instructions.slice().items(.data)[@intFromEnum(item.br_cond.ref.toIndex().?)];
-        item.br_cond.set(.{ .br_cond = .{
-            .condition = inst_data.br_cond.condition,
-            .then_target = body_labels[item.index],
-            .else_target = inst_data.br_cond.else_target,
-        } });
+        const inst = b.instructions.get(@intFromEnum(item.br_cond.index));
+        const extra_index = @intFromEnum(inst.data.br_cond);
+        // Set then_target which was initialized as .none
+        b.extra.items[extra_index + 1] = @intFromEnum(body_labels[item.index]);
     }
     default_br.set(.{ .br = .{
         .target = if (default_index) |index| body_labels[index] else end_label,
@@ -1575,16 +1620,14 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
             };
 
             const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-            const len: u32 = @intCast(excluded_names.items.len);
+            const excluded_len: u32 = @intCast(excluded_names.items.len);
+            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, excluded_len);
             try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
             const rest_obj = try b.addInst(.{
                 .tag = .copy_data_properties,
-                .data = .{ .copy_data_properties = .{
-                    .source = object,
-                    .extra_index = extra_index,
-                    .len = len,
-                } },
+                .data = .{ .copy_data_properties = extra_index },
             });
 
             const string_index = try b.internString(rest_property.binding_identifier);
@@ -1875,17 +1918,15 @@ fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.
     var args = try b.lowerArguments(new_expr.arguments);
     defer args.deinit(b.gpa);
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const len: u32 = @intCast(args.items.len);
+    const extra_index = try b.addExtra(Ir.Inst.Construct, .{
+        .constructor = constructor,
+        .args_len = @intCast(args.items.len),
+    });
     try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
 
     return b.addInst(.{
         .tag = .construct,
-        .data = .{ .construct = .{
-            .constructor = constructor,
-            .extra_index = extra_index,
-            .len = len,
-        } },
+        .data = .{ .construct = extra_index },
     });
 }
 
@@ -1899,29 +1940,29 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     var args = try b.lowerArguments(call_expr.arguments);
     defer args.deinit(b.gpa);
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const len: u32 = @intCast(args.items.len);
+    const extra_index = try b.addExtra(Ir.Inst.Call, .{
+        .callee = callee,
+        .this_value = this_value,
+        .args_len = @intCast(args.items.len),
+    });
     try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
 
     return b.addInst(.{
         .tag = .call,
-        .data = .{ .call = .{
-            .callee = callee,
-            .this_value = this_value,
-            .extra_index = extra_index,
-            .len = len,
-        } },
+        .data = .{ .call = extra_index },
     });
 }
 
 fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {
-    const update_type: Ir.Inst.UpdateType = switch (update_expr.type) {
-        .prefix => .prefix,
-        .postfix => .postfix,
-    };
     const update_op: Ir.Inst.UpdateOp = switch (update_expr.operator) {
-        .@"++" => .increment,
-        .@"--" => .decrement,
+        .@"++" => switch (update_expr.type) {
+            .prefix => .increment_prefix,
+            .postfix => .increment_postfix,
+        },
+        .@"--" => switch (update_expr.type) {
+            .prefix => .decrement_prefix,
+            .postfix => .decrement_postfix,
+        },
     };
     switch (update_expr.expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
@@ -1933,7 +1974,6 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                     .data = .{ .update_binding = .{
                         .name = string_index,
                         .update_op = update_op,
-                        .update_type = update_type,
                     } },
                 });
             },
@@ -1948,14 +1988,14 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                         .update_property_strict
                     else
                         .update_property;
+                    const extra_index = try b.addExtra(Ir.Inst.UpdateProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .update_op = update_op,
+                    });
                     return b.addInst(.{
                         .tag = tag,
-                        .data = .{ .update_property = .{
-                            .base = base,
-                            .name = string_index,
-                            .update_op = update_op,
-                            .update_type = update_type,
-                        } },
+                        .data = .{ .update_property = extra_index },
                     });
                 },
                 .expression => |expr| {
@@ -1966,14 +2006,14 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                                 .update_property_indexed_strict
                             else
                                 .update_property_indexed;
+                            const extra_index = try b.addExtra(Ir.Inst.UpdatePropertyIndexed, .{
+                                .base = base,
+                                .index = index,
+                                .update_op = update_op,
+                            });
                             return b.addInst(.{
                                 .tag = tag,
-                                .data = .{ .update_property_indexed = .{
-                                    .base = base,
-                                    .index = index,
-                                    .update_op = update_op,
-                                    .update_type = update_type,
-                                } },
+                                .data = .{ .update_property_indexed = extra_index },
                             });
                         }
                     }
@@ -1982,14 +2022,14 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                         .update_property_computed_strict
                     else
                         .update_property_computed;
+                    const extra_index = try b.addExtra(Ir.Inst.UpdatePropertyComputed, .{
+                        .base = base,
+                        .property = property,
+                        .update_op = update_op,
+                    });
                     return b.addInst(.{
                         .tag = tag,
-                        .data = .{ .update_property_computed = .{
-                            .base = base,
-                            .property = property,
-                            .update_op = update_op,
-                            .update_type = update_type,
-                        } },
+                        .data = .{ .update_property_computed = extra_index },
                     });
                 },
                 .private_identifier => try b.todo("private identifier update expression"),
@@ -2245,13 +2285,14 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                         .set_property_strict
                     else
                         .set_property;
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = value,
+                    });
                     return b.addInst(.{
                         .tag = tag,
-                        .data = .{ .set_property = .{
-                            .base = base,
-                            .name = string_index,
-                            .value = value,
-                        } },
+                        .data = .{ .set_property = extra_index },
                     });
                 },
                 .expression => |expr| {
@@ -2263,13 +2304,14 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                                 .set_property_indexed_strict
                             else
                                 .set_property_indexed;
+                            const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                                .base = base,
+                                .index = index,
+                                .value = value,
+                            });
                             return b.addInst(.{
                                 .tag = tag,
-                                .data = .{ .set_property_indexed = .{
-                                    .base = base,
-                                    .index = index,
-                                    .value = value,
-                                } },
+                                .data = .{ .set_property_indexed = extra_index },
                             });
                         }
                     }
@@ -2279,13 +2321,14 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                         .set_property_computed_strict
                     else
                         .set_property_computed;
+                    const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                        .base = base,
+                        .property = property,
+                        .value = value,
+                    });
                     return b.addInst(.{
                         .tag = tag,
-                        .data = .{ .set_property_computed = .{
-                            .base = base,
-                            .property = property,
-                            .value = value,
-                        } },
+                        .data = .{ .set_property_computed = extra_index },
                     });
                 },
                 .private_identifier => try b.todo("private identifier in member assignment"),
@@ -2372,13 +2415,14 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                         .set_property_strict
                     else
                         .set_property;
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = result,
+                    });
                     return b.addInst(.{
                         .tag = set_tag,
-                        .data = .{ .set_property = .{
-                            .base = base,
-                            .name = string_index,
-                            .value = result,
-                        } },
+                        .data = .{ .set_property = extra_index },
                     });
                 },
                 .expression => |expr| {
@@ -2404,13 +2448,14 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                                 .set_property_indexed_strict
                             else
                                 .set_property_indexed;
+                            const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                                .base = base,
+                                .index = index,
+                                .value = result,
+                            });
                             return b.addInst(.{
                                 .tag = set_tag,
-                                .data = .{ .set_property_indexed = .{
-                                    .base = base,
-                                    .index = index,
-                                    .value = result,
-                                } },
+                                .data = .{ .set_property_indexed = extra_index },
                             });
                         }
                     }
@@ -2434,13 +2479,14 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                         .set_property_computed_strict
                     else
                         .set_property_computed;
+                    const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                        .base = base,
+                        .property = property,
+                        .value = result,
+                    });
                     return b.addInst(.{
                         .tag = set_tag,
-                        .data = .{ .set_property_computed = .{
-                            .base = base,
-                            .property = property,
-                            .value = result,
-                        } },
+                        .data = .{ .set_property_computed = extra_index },
                     });
                 },
                 .private_identifier => try b.todo("private identifier in binary compound assignment"),
@@ -2582,13 +2628,14 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                 .set_property_strict
             else
                 .set_property;
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = p.base,
+                .name = p.name,
+                .value = rhs,
+            });
             _ = try b.addInst(.{
                 .tag = tag,
-                .data = .{ .set_property = .{
-                    .base = p.base,
-                    .name = p.name,
-                    .value = rhs,
-                } },
+                .data = .{ .set_property = extra_index },
             });
         },
         .property_indexed => |p| {
@@ -2596,13 +2643,14 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                 .set_property_indexed_strict
             else
                 .set_property_indexed;
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                .base = p.base,
+                .index = p.index,
+                .value = rhs,
+            });
             _ = try b.addInst(.{
                 .tag = tag,
-                .data = .{ .set_property_indexed = .{
-                    .base = p.base,
-                    .index = p.index,
-                    .value = rhs,
-                } },
+                .data = .{ .set_property_indexed = extra_index },
             });
         },
         .property_computed => |p| {
@@ -2610,13 +2658,14 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                 .set_property_computed_strict
             else
                 .set_property_computed;
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                .base = p.base,
+                .property = p.property,
+                .value = rhs,
+            });
             _ = try b.addInst(.{
                 .tag = tag,
-                .data = .{ .set_property_computed = .{
-                    .base = p.base,
-                    .property = p.property,
-                    .value = rhs,
-                } },
+                .data = .{ .set_property_computed = extra_index },
             });
         },
     }
