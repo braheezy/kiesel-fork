@@ -1102,6 +1102,40 @@ fn executeSetPropertyIndexed(
 
 const UpdateOp = enum { increment, decrement };
 const UpdateType = enum { prefix, postfix };
+const UpdateValues = struct {
+    old_value_numeric: Value,
+    new_value: Value,
+};
+
+inline fn computeUpdateValues(agent: *Agent, old_value: Value, comptime update_op: UpdateOp) Agent.Error!UpdateValues {
+    if (old_value.__isI32()) {
+        @branchHint(.likely);
+        const func = switch (update_op) {
+            .increment => std.math.add,
+            .decrement => std.math.sub,
+        };
+        if (func(i32, old_value.__asI32(), 1)) |result| {
+            return .{ .old_value_numeric = old_value, .new_value = Value.from(result) };
+        } else |_| {}
+    }
+    const numeric = try old_value.toNumeric(agent);
+    return switch (numeric) {
+        .number => |n| .{
+            .old_value_numeric = Value.from(n),
+            .new_value = Value.from(switch (update_op) {
+                .increment => Number.add(n, Number.from(1)),
+                .decrement => Number.subtract(n, Number.from(1)),
+            }),
+        },
+        .big_int => |b| .{
+            .old_value_numeric = Value.from(b),
+            .new_value = Value.from(switch (update_op) {
+                .increment => try BigInt.add(b, agent, .one),
+                .decrement => try BigInt.subtract(b, agent, .one),
+            }),
+        },
+    };
+}
 
 fn executeUpdateBinding(
     vm: *Vm,
@@ -1126,27 +1160,13 @@ fn executeUpdateBinding(
     }
 
     const old_value = try env.getBindingValue(vm.agent, name, strict);
-    const old_numeric = try old_value.toNumeric(vm.agent);
+    const update = try computeUpdateValues(vm.agent, old_value, update_op);
 
-    const new_value = switch (old_numeric) {
-        .number => |n| switch (update_op) {
-            .increment => Value.from(Number.add(n, Number.from(1))),
-            .decrement => Value.from(Number.subtract(n, Number.from(1))),
-        },
-        .big_int => |b| switch (update_op) {
-            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
-            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
-        },
-    };
-
-    try env.setMutableBinding(vm.agent, name, new_value, strict);
+    try env.setMutableBinding(vm.agent, name, update.new_value, strict);
 
     const result = switch (update_type) {
-        .prefix => new_value,
-        .postfix => switch (old_numeric) {
-            .number => |n| Value.from(n),
-            .big_int => |b| Value.from(b),
-        },
+        .prefix => update.new_value,
+        .postfix => update.old_value_numeric,
     };
     vm.load(dest, result);
 }
@@ -1169,24 +1189,13 @@ fn executeUpdateProperty(
         property_key,
         base_value,
     );
-    const old_numeric = try old_value.toNumeric(vm.agent);
-
-    const new_value = switch (old_numeric) {
-        .number => |n| switch (update_op) {
-            .increment => Value.from(Number.add(n, Number.from(1))),
-            .decrement => Value.from(Number.subtract(n, Number.from(1))),
-        },
-        .big_int => |b| switch (update_op) {
-            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
-            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
-        },
-    };
+    const update = try computeUpdateValues(vm.agent, old_value, update_op);
 
     const success = try base_object.internal_methods.set(
         vm.agent,
         base_object,
         property_key,
-        new_value,
+        update.new_value,
         base_value,
     );
     if (!success and strict) {
@@ -1195,11 +1204,8 @@ fn executeUpdateProperty(
     }
 
     const result = switch (update_type) {
-        .prefix => new_value,
-        .postfix => switch (old_numeric) {
-            .number => |n| Value.from(n),
-            .big_int => |b| Value.from(b),
-        },
+        .prefix => update.new_value,
+        .postfix => update.old_value_numeric,
     };
     vm.load(dest, result);
 }
@@ -1223,24 +1229,13 @@ fn executeUpdatePropertyComputed(
         property_key,
         base_value,
     );
-    const old_numeric = try old_value.toNumeric(vm.agent);
-
-    const new_value = switch (old_numeric) {
-        .number => |n| switch (update_op) {
-            .increment => Value.from(Number.add(n, Number.from(1))),
-            .decrement => Value.from(Number.subtract(n, Number.from(1))),
-        },
-        .big_int => |b| switch (update_op) {
-            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
-            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
-        },
-    };
+    const update = try computeUpdateValues(vm.agent, old_value, update_op);
 
     const success = try base_object.internal_methods.set(
         vm.agent,
         base_object,
         property_key,
-        new_value,
+        update.new_value,
         base_value,
     );
     if (!success and strict) {
@@ -1249,11 +1244,8 @@ fn executeUpdatePropertyComputed(
     }
 
     const result = switch (update_type) {
-        .prefix => new_value,
-        .postfix => switch (old_numeric) {
-            .number => |n| Value.from(n),
-            .big_int => |b| Value.from(b),
-        },
+        .prefix => update.new_value,
+        .postfix => update.old_value_numeric,
     };
     vm.load(dest, result);
 }
@@ -1276,24 +1268,13 @@ fn executeUpdatePropertyIndexed(
         property_key,
         base_value,
     );
-    const old_numeric = try old_value.toNumeric(vm.agent);
-
-    const new_value = switch (old_numeric) {
-        .number => |n| switch (update_op) {
-            .increment => Value.from(Number.add(n, Number.from(1))),
-            .decrement => Value.from(Number.subtract(n, Number.from(1))),
-        },
-        .big_int => |b| switch (update_op) {
-            .increment => Value.from(try BigInt.add(b, vm.agent, .one)),
-            .decrement => Value.from(try BigInt.subtract(b, vm.agent, .one)),
-        },
-    };
+    const update = try computeUpdateValues(vm.agent, old_value, update_op);
 
     const success = try base_object.internal_methods.set(
         vm.agent,
         base_object,
         property_key,
-        new_value,
+        update.new_value,
         base_value,
     );
     if (!success and strict) {
@@ -1302,11 +1283,8 @@ fn executeUpdatePropertyIndexed(
     }
 
     const result = switch (update_type) {
-        .prefix => new_value,
-        .postfix => switch (old_numeric) {
-            .number => |n| Value.from(n),
-            .big_int => |b| Value.from(b),
-        },
+        .prefix => update.new_value,
+        .postfix => update.old_value_numeric,
     };
     vm.load(dest, result);
 }
