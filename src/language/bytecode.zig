@@ -119,6 +119,7 @@ pub fn generateAndRunNewInterpreter(
         const stdout = agent.platform.stdout;
         const tty_config = agent.platform.tty_config;
         ir.print(stdout, tty_config) catch {};
+        stdout.writeByte('\n') catch {};
         stdout.flush() catch {};
     }
 
@@ -133,6 +134,7 @@ pub fn generateAndRunNewInterpreter(
         const stdout = agent.platform.stdout;
         const tty_config = agent.platform.tty_config;
         bc.print(stdout, tty_config) catch {};
+        stdout.writeByte('\n') catch {};
         stdout.flush() catch {};
     }
 

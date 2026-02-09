@@ -14,54 +14,6 @@ live_ranges: []const LiveRange,
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
 
-pub const PrintError =
-    std.Io.Writer.Error ||
-    std.Io.tty.Config.SetColorError;
-
-const CountingWriter = struct {
-    out: *std.Io.Writer,
-    count: usize,
-    writer: std.Io.Writer,
-
-    fn init(out: *std.Io.Writer, buffer: []u8) CountingWriter {
-        return .{
-            .out = out,
-            .count = 0,
-            .writer = .{
-                .buffer = buffer,
-                .vtable = &.{
-                    .drain = drain,
-                },
-            },
-        };
-    }
-
-    fn drain(w: *std.Io.Writer, data: []const []const u8, splat: usize) std.Io.Writer.Error!usize {
-        const cw: *CountingWriter = @alignCast(@fieldParentPtr("writer", w));
-
-        const aux = w.buffered();
-        const aux_n = try cw.out.writeSplatHeader(aux, data, splat);
-        if (aux_n < w.end) {
-            cw.count += aux_n;
-            const remaining = w.buffer[aux_n..w.end];
-            @memmove(w.buffer[0..remaining.len], remaining);
-            w.end = remaining.len;
-            return 0;
-        }
-
-        const total = w.end + blk: {
-            var n: usize = 0;
-            for (data[0 .. data.len - 1]) |slice| n += slice.len;
-            n += data[data.len - 1].len * splat;
-            break :blk n;
-        };
-
-        cw.count += total;
-        w.end = 0;
-        return aux_n - aux.len;
-    }
-};
-
 pub const Inst = struct {
     tag: Tag,
     data: Data,
@@ -376,6 +328,26 @@ pub const Inst = struct {
         }
     };
 
+    pub const Format = struct {
+        inst: Inst,
+        ir: *const Ir,
+        tty_config: std.Io.tty.Config,
+
+        pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            f.tty_config.setColor(writer, .cyan) catch {};
+            try writer.print("{t}", .{f.inst.tag});
+            f.tty_config.setColor(writer, .reset) catch {};
+            printData(f.ir, f.inst.tag, f.inst.data, writer, f.tty_config) catch |err| switch (err) {
+                error.Unexpected => {},
+                error.WriteFailed => return error.WriteFailed,
+            };
+        }
+    };
+
+    pub fn fmt(inst: Inst, ir: *const Ir, tty_config: std.Io.tty.Config) Format {
+        return .{ .inst = inst, .ir = ir, .tty_config = tty_config };
+    }
+
     pub fn collectRefs(
         inst: Inst,
         ir: *const Ir,
@@ -497,6 +469,10 @@ pub fn refSlice(ir: *const Ir, start: Inst.ExtraIndex, len: u32) []const Inst.Re
     return @ptrCast(ir.extra[@intFromEnum(start)..][0..len]);
 }
 
+pub const PrintError =
+    std.Io.Writer.Error ||
+    std.Io.tty.Config.SetColorError;
+
 pub fn print(
     ir: *const Ir,
     writer: *std.Io.Writer,
@@ -505,40 +481,25 @@ pub fn print(
     try tty_config.setColor(writer, .bold);
     try writer.print("IR ({s})\n", .{ir.name});
     try tty_config.setColor(writer, .reset);
-    for (ir.instructions.items(.tag), ir.instructions.items(.data), 0..) |tag, data, i| {
-        var buffer: [256]u8 = undefined;
-        var counting_writer = CountingWriter.init(writer, &buffer);
-        const cw = &counting_writer.writer;
-
-        try cw.print("{d: >4}: ", .{i});
-
-        try cw.flush();
-        try tty_config.setColor(writer, .cyan);
-        try cw.print("{t}", .{tag});
-        try cw.flush();
-        try tty_config.setColor(writer, .reset);
-
-        try printData(ir, tag, data, cw, tty_config);
-
-        try cw.flush();
-        try writer.flush();
-        const width = counting_writer.count;
-        const min_width = 60;
-        if (width < min_width) {
-            _ = try writer.splatByte(' ', min_width - width);
-        } else {
-            try writer.writeByte(' ');
-        }
-
+    for (0..ir.instructions.len) |i| {
+        const inst = ir.instructions.get(i);
         const live_range = ir.live_ranges[i];
         const is_live = ir.liveness.isSet(i);
 
+        var buf: [16]u8 = undefined;
+        const label = std.fmt.bufPrint(&buf, "%{d}", .{i}) catch unreachable;
+        try writer.print("{s: >4}: ", .{label});
+
         try tty_config.setColor(writer, .dim);
-        try writer.print("[{d}..{d}]", .{ live_range.start, live_range.end });
-        if (!is_live) try writer.writeAll(" dead");
+        try writer.print("[{d: >3}..{d: <3}] {s: >4}", .{
+            live_range.start,
+            live_range.end,
+            if (is_live) "" else "dead",
+        });
+        _ = try writer.splatByte(' ', 15);
         try tty_config.setColor(writer, .reset);
 
-        try writer.print("\n", .{});
+        try writer.print("{f}\n", .{inst.fmt(ir, tty_config)});
     }
 }
 
@@ -546,13 +507,13 @@ fn printData(
     ir: *const Ir,
     tag: Inst.Tag,
     data: Inst.Data,
-    cw: *std.Io.Writer,
+    writer: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
 
-    try cw.writeByte(' ');
+    try writer.writeByte(' ');
     switch (data_tag) {
         .none => {},
         inline .boolean,
@@ -562,63 +523,63 @@ fn printData(
         .ref,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
-            try printField(ir, field_data, cw, tty_config);
+            try printField(ir, field_data, writer, tty_config);
         },
         .array => {
-            try cw.writeByte('[');
+            try writer.writeByte('[');
             const elements = ir.refSlice(data.array.extra_index, data.array.len);
             for (elements, 0..) |element, j| {
-                if (j > 0) try cw.writeAll(", ");
-                try printField(ir, element, cw, tty_config);
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, element, writer, tty_config);
             }
-            try cw.writeByte(']');
+            try writer.writeByte(']');
         },
         .object => {
-            try cw.writeByte('{');
+            try writer.writeByte('{');
             const pairs = ir.refSlice(data.object.extra_index, data.object.len * 2);
             var pair_index: usize = 0;
             while (pair_index < pairs.len) : (pair_index += 2) {
-                if (pair_index > 0) try cw.writeAll(", ");
-                try printField(ir, pairs[pair_index], cw, tty_config);
-                try cw.writeAll(": ");
-                try printField(ir, pairs[pair_index + 1], cw, tty_config);
+                if (pair_index > 0) try writer.writeAll(", ");
+                try printField(ir, pairs[pair_index], writer, tty_config);
+                try writer.writeAll(": ");
+                try printField(ir, pairs[pair_index + 1], writer, tty_config);
             }
-            try cw.writeByte('}');
+            try writer.writeByte('}');
         },
         .call => {
             const extra = ir.extraData(Inst.Call, data.call);
-            try printField(ir, extra.data.callee, cw, tty_config);
-            try cw.writeAll(", ");
-            try printField(ir, extra.data.this_value, cw, tty_config);
-            try cw.writeAll(", [");
+            try printField(ir, extra.data.callee, writer, tty_config);
+            try writer.writeAll(", ");
+            try printField(ir, extra.data.this_value, writer, tty_config);
+            try writer.writeAll(", [");
             const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
-                if (j > 0) try cw.writeAll(", ");
-                try printField(ir, arg, cw, tty_config);
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, arg, writer, tty_config);
             }
-            try cw.writeByte(']');
+            try writer.writeByte(']');
         },
         .construct => {
             const extra = ir.extraData(Inst.Construct, data.construct);
-            try printField(ir, extra.data.constructor, cw, tty_config);
-            try cw.writeAll(", [");
+            try printField(ir, extra.data.constructor, writer, tty_config);
+            try writer.writeAll(", [");
             const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
-                if (j > 0) try cw.writeAll(", ");
-                try printField(ir, arg, cw, tty_config);
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, arg, writer, tty_config);
             }
-            try cw.writeByte(']');
+            try writer.writeByte(']');
         },
         .copy_data_properties => {
             const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
-            try printField(ir, extra.data.source, cw, tty_config);
-            try cw.writeAll(", [");
+            try printField(ir, extra.data.source, writer, tty_config);
+            try writer.writeAll(", [");
             const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
             for (excluded, 0..) |prop, j| {
-                if (j > 0) try cw.writeAll(", ");
-                try printField(ir, prop, cw, tty_config);
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, prop, writer, tty_config);
             }
-            try cw.writeByte(']');
+            try writer.writeByte(']');
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
@@ -637,14 +598,14 @@ fn printData(
                 const extra = ir.extraData(ExtraType, field_data);
                 const extra_fields = @typeInfo(ExtraType).@"struct".fields;
                 inline for (extra_fields, 0..) |extra_field, j| {
-                    if (j > 0) try cw.writeAll(", ");
-                    try printField(ir, @field(extra.data, extra_field.name), cw, tty_config);
+                    if (j > 0) try writer.writeAll(", ");
+                    try printField(ir, @field(extra.data, extra_field.name), writer, tty_config);
                 }
             } else {
                 const struct_fields = @typeInfo(FieldType).@"struct".fields;
                 inline for (struct_fields, 0..) |struct_field, j| {
-                    if (j > 0) try cw.writeAll(", ");
-                    try printField(ir, @field(field_data, struct_field.name), cw, tty_config);
+                    if (j > 0) try writer.writeAll(", ");
+                    try printField(ir, @field(field_data, struct_field.name), writer, tty_config);
                 }
             }
         },
@@ -654,66 +615,60 @@ fn printData(
 fn printField(
     ir: *const Ir,
     value: anytype,
-    cw: *std.Io.Writer,
+    writer: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
 ) PrintError!void {
-    const counting_writer: *CountingWriter = @alignCast(@fieldParentPtr("writer", cw));
-    const writer = counting_writer.out;
     const T = @TypeOf(value);
     switch (T) {
-        bool,
+        bool => {
+            try tty_config.setColor(writer, .blue);
+            try writer.print("{}", .{value});
+            try tty_config.setColor(writer, .reset);
+        },
         u32,
         i32,
         f64,
         => {
-            try cw.flush();
-            try tty_config.setColor(writer, .yellow);
-            try cw.print("{}", .{value});
-            try cw.flush();
+            try tty_config.setColor(writer, .magenta);
+            try writer.print("{}", .{value});
             try tty_config.setColor(writer, .reset);
         },
         Inst.Ref => if (value.toIndex()) |index| {
-            try cw.flush();
             try tty_config.setColor(writer, .blue);
-            try cw.print("%{d}", .{@intFromEnum(index)});
-            try cw.flush();
+            try writer.print("%{d}", .{@intFromEnum(index)});
             try tty_config.setColor(writer, .reset);
         } else {
-            try cw.flush();
             try tty_config.setColor(writer, .dim);
-            try cw.print("none", .{});
-            try cw.flush();
+            try writer.print("none", .{});
             try tty_config.setColor(writer, .reset);
         },
+        // ExtraIndex should be handled in `printData()`
         Inst.StringIndex => {
             const str = ir.strings[@intFromEnum(value)];
-            try cw.flush();
             try tty_config.setColor(writer, .yellow);
-            try cw.print("\"{s}\"", .{str});
-            try cw.flush();
+            try writer.print("@{d}", .{@intFromEnum(value)});
             try tty_config.setColor(writer, .reset);
+            try writer.writeAll(" (");
+            try tty_config.setColor(writer, .green);
+            try writer.print("\"{s}\"", .{str});
+            try tty_config.setColor(writer, .reset);
+            try writer.writeByte(')');
         },
         Inst.BigIntIndex => {
             const big_int = ir.big_ints[@intFromEnum(value)];
-            try cw.flush();
             try tty_config.setColor(writer, .yellow);
-            try big_int.formatNumber(cw, .{});
-            try cw.writeByte('n');
-            try cw.flush();
+            try writer.print("@{d}", .{@intFromEnum(value)});
             try tty_config.setColor(writer, .reset);
-        },
-        Inst.ExtraIndex => {
-            try cw.flush();
-            try tty_config.setColor(writer, .yellow);
-            try cw.print("@{d}", .{@intFromEnum(value)});
-            try cw.flush();
+            try writer.writeAll(" (");
+            try tty_config.setColor(writer, .magenta);
+            try big_int.formatNumber(writer, .{});
+            try writer.writeByte('n');
             try tty_config.setColor(writer, .reset);
+            try writer.writeByte(')');
         },
         Inst.UpdateOp => {
-            try cw.flush();
-            try tty_config.setColor(writer, .magenta);
-            try cw.print("{t}", .{value});
-            try cw.flush();
+            try tty_config.setColor(writer, .blue);
+            try writer.print("{t}", .{value});
             try tty_config.setColor(writer, .reset);
         },
         else => comptime unreachable,

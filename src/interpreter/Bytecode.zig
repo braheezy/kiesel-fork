@@ -337,17 +337,50 @@ pub const Inst = struct {
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
 
-    pub fn decode(code: []const u8) ?Inst {
-        if (code.len == 0) return null;
-        const tag = std.enums.fromInt(Tag, code[0]) orelse return null;
-        const data = decodeData(code[1..], tag);
-        return .{ .tag = tag, .data = data };
+    pub const Format = struct {
+        inst: Inst,
+        bc: *const Bytecode,
+        tty_config: std.Io.tty.Config,
+
+        pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            f.tty_config.setColor(writer, .cyan) catch {};
+            try writer.print("{t}", .{f.inst.tag});
+            f.tty_config.setColor(writer, .reset) catch {};
+            printData(f.bc, f.inst.tag, f.inst.data, writer, f.tty_config) catch |err| switch (err) {
+                error.Unexpected => {},
+                error.WriteFailed => return error.WriteFailed,
+            };
+        }
+    };
+
+    pub fn fmt(inst: Inst, bc: *const Bytecode, tty_config: std.Io.tty.Config) Format {
+        return .{ .inst = inst, .bc = bc, .tty_config = tty_config };
     }
 
+    /// Decode an instruction from the given bytecode slice.
+    ///
+    /// Returns a tuple containing the decoded instruction and the number of
+    /// consumed bytes, or `null` if decoding fails.
+    pub fn decode(code: []const u8) ?struct { Inst, u4 } {
+        if (code.len == 0) return null;
+        const tag = std.enums.fromInt(Tag, code[0]) orelse return null;
+        const size = encodedSize(tag);
+        if (code.len < size) return null;
+        const data = decodeData(code[1..], tag);
+        const inst: Inst = .{ .tag = tag, .data = data };
+        return .{ inst, size };
+    }
+
+    /// Decode an instruction tag from the given bytecode slice.
+    ///
+    /// Assumes the slice is non-empty and the first byte is a valid tag.
     pub inline fn decodeTag(code: []const u8) Tag {
         return @enumFromInt(code[0]);
     }
 
+    /// Decode instruction data from the given bytecode slice.
+    ///
+    /// Assumes the slice has enough bytes.
     pub inline fn decodeData(code: []const u8, tag: Tag) Data {
         const data_tag = data_tags[@intFromEnum(tag)];
         switch (data_tag) {
@@ -454,6 +487,33 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.big_ints);
 }
 
+pub const Iterator = struct {
+    code: []const u8,
+    offset: u32,
+
+    pub const Entry = struct {
+        offset: u32,
+        inst: Bytecode.Inst,
+    };
+
+    pub fn next(it: *Iterator) error{InvalidInstruction}!?Entry {
+        if (it.offset >= it.code.len) return null;
+        const inst, const size = Bytecode.Inst.decode(it.code[it.offset..]) orelse {
+            return error.InvalidInstruction;
+        };
+        const offset = it.offset;
+        it.offset += size;
+        return .{ .offset = offset, .inst = inst };
+    }
+};
+
+pub fn iterator(bc: *const Bytecode) Iterator {
+    return .{
+        .code = bc.code,
+        .offset = 0,
+    };
+}
+
 pub fn print(
     bc: *const Bytecode,
     writer: *std.Io.Writer,
@@ -462,28 +522,32 @@ pub fn print(
     try tty_config.setColor(writer, .bold);
     try writer.print("Bytecode ({s})\n", .{bc.name});
     try tty_config.setColor(writer, .reset);
-    var i: usize = 0;
-    while (i < bc.code.len) {
-        const offset = i;
-        const inst = Inst.decode(bc.code[i..]) orelse {
+    var it = bc.iterator();
+    while (it.next() catch |err| switch (err) {
+        error.InvalidInstruction => {
             try tty_config.setColor(writer, .red);
-            try writer.print("Invalid instruction tag: {d}\n", .{bc.code[i]});
+            try writer.print("Invalid instruction at offset {d}\n", .{it.offset});
             try tty_config.setColor(writer, .reset);
-            break;
-        };
-        i += Inst.encodedSize(inst.tag);
-        try writer.print("{d: >4}: ", .{offset});
-        try tty_config.setColor(writer, .cyan);
-        try writer.print("{t}", .{inst.tag});
+            return;
+        },
+    }) |entry| {
+        const size = it.offset - entry.offset;
+
+        try writer.print("{d: >4}: ", .{entry.offset});
+
+        try tty_config.setColor(writer, .dim);
+        for (bc.code[entry.offset..][0..size]) |byte| {
+            try writer.print("{x:0>2} ", .{byte});
+        }
+        _ = try writer.splatByte(' ', (10 - size) * 3);
         try tty_config.setColor(writer, .reset);
 
-        try printData(inst.tag, inst.data, writer, tty_config);
-
-        try writer.writeByte('\n');
+        try writer.print("{f}\n", .{entry.inst.fmt(bc, tty_config)});
     }
 }
 
 fn printData(
+    bc: *const Bytecode,
     tag: Inst.Tag,
     data: Inst.Data,
     writer: *std.Io.Writer,
@@ -501,7 +565,7 @@ fn printData(
         .string,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
-            try printField(field_data, writer, tty_config);
+            try printField(bc, field_data, writer, tty_config);
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
@@ -509,13 +573,14 @@ fn printData(
             inline for (field_type.fields, 0..) |struct_field, idx| {
                 if (idx > 0) try writer.writeAll(", ");
                 const value = @field(field_data, struct_field.name);
-                try printField(value, writer, tty_config);
+                try printField(bc, value, writer, tty_config);
             }
         },
     }
 }
 
 fn printField(
+    bc: *const Bytecode,
     value: anytype,
     writer: *std.Io.Writer,
     tty_config: std.Io.tty.Config,
@@ -526,7 +591,7 @@ fn printField(
         u32,
         f64,
         => {
-            try tty_config.setColor(writer, .yellow);
+            try tty_config.setColor(writer, .magenta);
             try writer.print("{}", .{value});
             try tty_config.setColor(writer, .reset);
         },
@@ -535,12 +600,28 @@ fn printField(
             try writer.print("r{d}", .{@intFromEnum(value)});
             try tty_config.setColor(writer, .reset);
         },
-        Inst.StringIndex,
-        Inst.BigIntIndex,
-        => {
-            try tty_config.setColor(writer, .green);
+        Inst.StringIndex => {
+            const str = bc.strings[@intFromEnum(value)];
+            try tty_config.setColor(writer, .yellow);
             try writer.print("@{d}", .{@intFromEnum(value)});
             try tty_config.setColor(writer, .reset);
+            try writer.writeAll(" (");
+            try tty_config.setColor(writer, .green);
+            try writer.print("\"{s}\"", .{str});
+            try tty_config.setColor(writer, .reset);
+            try writer.writeByte(')');
+        },
+        Inst.BigIntIndex => {
+            const big_int = bc.big_ints[@intFromEnum(value)];
+            try tty_config.setColor(writer, .yellow);
+            try writer.print("@{d}", .{@intFromEnum(value)});
+            try tty_config.setColor(writer, .reset);
+            try writer.writeAll(" (");
+            try tty_config.setColor(writer, .magenta);
+            try big_int.formatNumber(writer, .{});
+            try writer.writeByte('n');
+            try tty_config.setColor(writer, .reset);
+            try writer.writeByte(')');
         },
         else => comptime unreachable,
     }
