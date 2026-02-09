@@ -183,7 +183,7 @@ pub const OptionalExpression = struct {
     };
 
     expression: *Expression,
-    property: Property,
+    properties: []const Property,
 };
 
 /// https://tc39.es/ecma262/#prod-Literal
@@ -855,10 +855,13 @@ pub const Expression = union(enum) {
                 .identifier => false,
                 .private_identifier => true,
             },
-            .optional_expression => |optional_expression| switch (optional_expression.property) {
-                .expression => |expression| expression.endsWithPrivateIdentifier(),
-                .arguments, .identifier => false,
-                .private_identifier => true,
+            .optional_expression => |optional_expression| {
+                const last = optional_expression.properties[optional_expression.properties.len - 1];
+                return switch (last) {
+                    .expression => |expression| expression.endsWithPrivateIdentifier(),
+                    .arguments, .identifier => false,
+                    .private_identifier => true,
+                };
             },
             else => false,
         };

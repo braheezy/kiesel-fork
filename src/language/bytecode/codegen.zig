@@ -1104,9 +1104,11 @@ pub fn codegenOptionalExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    const first_property = node.properties[0];
+
     // 1. Let baseReference be ? Evaluation of OptionalExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference) and node.property == .arguments) {
+    if (node.expression.analyze(.is_reference) and first_property == .arguments) {
         // Only `load_this_value_for_evaluate_call` needs a reference on the stack, all other
         // cases use `*_direct` instructions.
         try executable.addInstruction(.dup_reference, {});
@@ -1126,7 +1128,7 @@ pub fn codegenOptionalExpression(
     // a. Return undefined.
     jump_conditional.getPtr().consequent = try executable.nextInstructionIndex();
     try executable.addInstruction(.store, {}); // Drop baseValue from the stack
-    if (node.expression.analyze(.is_reference) and node.property == .arguments) {
+    if (node.expression.analyze(.is_reference) and first_property == .arguments) {
         try executable.addInstruction(.pop_reference, {});
     }
     try executable.addInstructionWithConstant(.store_constant, .undefined);
@@ -1135,51 +1137,105 @@ pub fn codegenOptionalExpression(
     // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
     jump_conditional.getPtr().alternate = try executable.nextInstructionIndex();
 
-    switch (node.property) {
-        // OptionalChain : ?. Arguments
-        .arguments => |arguments| {
-            if (node.expression.analyze(.is_reference)) {
-                try executable.addInstruction(.load_this_value_for_evaluate_call, {});
+    for (node.properties, 0..) |property, i| {
+        const next_is_call = i + 1 < node.properties.len and node.properties[i + 1] == .arguments;
+
+        switch (property) {
+            // OptionalChain : ?. Arguments
+            .arguments => |arguments| {
+                // 1. Let thisChain be this OptionalChain.
+                // 2. Let tailCall be IsInTailPosition(thisChain).
+                // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
+                if (i == 0) {
+                    if (node.expression.analyze(.is_reference)) {
+                        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
+                    } else {
+                        try executable.addInstructionWithConstant(.load_constant, .undefined);
+                    }
+                }
+                try executable.addInstruction(.evaluate_call, .{
+                    .arguments = try codegenArguments(arguments, executable, ctx),
+                });
+            },
+
+            // OptionalChain : ?. [ Expression ]
+            .expression => |expression| {
+                // 1. Let strict be IsStrict(this OptionalChain).
+                // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
+                if (next_is_call) {
+                    try codegenExpressionAndGetValue(expression.*, executable, ctx);
+                    try executable.addInstruction(.load, {});
+                    try executable.addInstruction(.evaluate_property_access_with_expression_key, .{
+                        .strict = ctx.contained_in_strict_mode_code,
+                    });
+                } else {
+                    try codegenExpressionAndGetValue(expression.*, executable, ctx);
+                    try executable.addInstruction(.load, {});
+                    try executable.addInstruction(.evaluate_property_access_with_expression_key_direct, {});
+                }
+            },
+
+            // OptionalChain : ?. IdentifierName
+            .identifier => |identifier| {
+                // 1. Let strict be IsStrict(this OptionalChain).
+                // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
+                if (next_is_call) {
+                    try executable.addInstruction(.evaluate_property_access_with_identifier_key, .{
+                        .strict = ctx.contained_in_strict_mode_code,
+                        .identifier = try executable.addIdentifier(identifier),
+                        .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                    });
+                } else {
+                    try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
+                        .identifier = try executable.addIdentifier(identifier),
+                        .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
+                    });
+                }
+            },
+
+            // OptionalChain : ?. PrivateIdentifier
+            .private_identifier => |private_identifier| {
+                // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
+                // 2. Return MakePrivateReference(baseValue, fieldNameString).
+                if (next_is_call) {
+                    try executable.addInstructionWithIdentifier(
+                        .make_private_reference,
+                        private_identifier,
+                    );
+                } else {
+                    try executable.addInstructionWithIdentifier(
+                        .make_private_reference_direct,
+                        private_identifier,
+                    );
+                }
+            },
+        }
+
+        if (i < node.properties.len - 1) {
+            if (next_is_call) {
+                switch (property) {
+                    .identifier, .expression, .private_identifier => {
+                        try executable.addInstruction(.dup_reference, {});
+                        try executable.addInstruction(.get_value, {});
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstruction(.load_this_value_for_evaluate_call, {});
+                    },
+                    .arguments => {
+                        try executable.addInstruction(.load, {});
+                        try executable.addInstructionWithConstant(.load_constant, .undefined);
+                    },
+                }
             } else {
-                try executable.addInstructionWithConstant(.load_constant, .undefined);
+                switch (property) {
+                    .identifier, .expression, .private_identifier => {
+                        try executable.addInstruction(.load, {});
+                    },
+                    .arguments => {
+                        try executable.addInstruction(.load, {});
+                    },
+                }
             }
-
-            // 1. Let thisChain be this OptionalChain.
-            // 2. Let tailCall be IsInTailPosition(thisChain).
-            // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
-            try executable.addInstruction(.evaluate_call, .{
-                .arguments = try codegenArguments(arguments, executable, ctx),
-            });
-        },
-
-        // OptionalChain : ?. [ Expression ]
-        .expression => |expression| {
-            // 1. Let strict be IsStrict(this OptionalChain).
-            // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-            try codegenExpressionAndGetValue(expression.*, executable, ctx);
-            try executable.addInstruction(.load, {});
-            try executable.addInstruction(.evaluate_property_access_with_expression_key_direct, {});
-        },
-
-        // OptionalChain : ?. IdentifierName
-        .identifier => |identifier| {
-            // 1. Let strict be IsStrict(this OptionalChain).
-            // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstruction(.evaluate_property_access_with_identifier_key_direct, .{
-                .identifier = try executable.addIdentifier(identifier),
-                .property_lookup_cache_index = ctx.addPropertyLookupCacheIndex(),
-            });
-        },
-
-        // OptionalChain : ?. PrivateIdentifier
-        .private_identifier => |private_identifier| {
-            // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
-            // 2. Return MakePrivateReference(baseValue, fieldNameString).
-            try executable.addInstructionWithIdentifier(
-                .make_private_reference_direct,
-                private_identifier,
-            );
-        },
+        }
     }
 
     end_jump.getPtr().* = try executable.nextInstructionIndex();

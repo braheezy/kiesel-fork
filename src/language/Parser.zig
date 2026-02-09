@@ -1175,25 +1175,45 @@ pub fn acceptOptionalExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    var properties: std.ArrayList(ast.OptionalExpression.Property) = .empty;
+    defer properties.deinit(self.allocator);
+
     _ = try self.core.accept(RuleSet.is(.@"?."));
-    const property: ast.OptionalExpression.Property = if (self.acceptArguments()) |arguments|
-        .{ .arguments = arguments }
-    else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| blk: {
-        const property_expression = try self.allocator.create(ast.Expression);
-        errdefer self.allocator.destroy(property_expression);
-        property_expression.* = try self.acceptExpression(.{});
-        _ = try self.core.accept(RuleSet.is(.@"]"));
-        break :blk .{ .expression = property_expression };
-    } else |_| if (self.acceptIdentifierName()) |identifier|
-        .{ .identifier = identifier }
-    else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
-        .{ .private_identifier = private_identifier }
-    else |_|
-        return error.UnexpectedToken;
+    try properties.append(self.allocator, try self.acceptOptionalExpressionProperty());
+
+    while (try self.core.peek()) |next_token| {
+        const property = switch (next_token.type) {
+            .@"(", .@"[" => try self.acceptOptionalExpressionProperty(),
+            .@"." => blk: {
+                _ = self.core.accept(RuleSet.is(.@".")) catch unreachable;
+                break :blk try self.acceptOptionalExpressionProperty();
+            },
+            else => break,
+        };
+        try properties.append(self.allocator, property);
+    }
+
     // Defer heap allocation of expression until we know this is an OptionalExpression
     const expression = try self.allocator.create(ast.Expression);
     expression.* = primary_expression;
-    return .{ .expression = expression, .property = property };
+    return .{ .expression = expression, .properties = try properties.toOwnedSlice(self.allocator) };
+}
+
+fn acceptOptionalExpressionProperty(self: *Parser) AcceptError!ast.OptionalExpression.Property {
+    if (self.acceptArguments()) |arguments|
+        return .{ .arguments = arguments }
+    else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
+        const expr = try self.allocator.create(ast.Expression);
+        errdefer self.allocator.destroy(expr);
+        expr.* = try self.acceptExpression(.{});
+        _ = try self.core.accept(RuleSet.is(.@"]"));
+        return .{ .expression = expr };
+    } else |_| if (self.acceptIdentifierName()) |identifier|
+        return .{ .identifier = identifier }
+    else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
+        return .{ .private_identifier = private_identifier }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptUpdateExpression(

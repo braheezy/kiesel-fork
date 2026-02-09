@@ -110,15 +110,17 @@ pub fn printOptionalExpression(node: ast.OptionalExpression, writer: *std.Io.Wri
     try print("OptionalExpression", writer, indentation);
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
-    try print("property:", writer, indentation + 1);
-    switch (node.property) {
-        .expression => |expression| try printExpression(expression.*, writer, indentation + 2),
-        .identifier => |identifier| try print(identifier, writer, indentation + 2),
-        .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 2),
-        .arguments => |arguments| {
-            try print("arguments:", writer, indentation + 2);
-            try printArguments(arguments, writer, indentation + 3);
-        },
+    try print("properties:", writer, indentation + 1);
+    for (node.properties) |property| {
+        switch (property) {
+            .expression => |expression| try printExpression(expression.*, writer, indentation + 2),
+            .identifier => |identifier| try print(identifier, writer, indentation + 2),
+            .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 2),
+            .arguments => |arguments| {
+                try print("arguments:", writer, indentation + 2);
+                try printArguments(arguments, writer, indentation + 3);
+            },
+        }
     }
 }
 
