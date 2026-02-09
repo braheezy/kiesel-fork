@@ -1769,10 +1769,11 @@ pub fn acceptSequenceExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     var expressions: std.ArrayList(ast.Expression) = .empty;
     errdefer expressions.deinit(self.allocator);
     while (self.core.accept(RuleSet.is(.@","))) |_| {
-        const expression = try self.acceptExpression(.{});
+        const expression = try self.acceptExpression(ctx);
         try expressions.append(self.allocator, expression);
     } else |_| if (expressions.items.len == 0) return error.UnexpectedToken;
     try expressions.insert(self.allocator, 0, primary_expression);
