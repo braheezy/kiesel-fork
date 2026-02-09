@@ -84,7 +84,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
 
     loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
         inline else => |tag| {
-            @setEvalBranchQuota(100_000);
+            @setEvalBranchQuota(2_000);
             const data = Bytecode.Inst.decodeData(code[pc + 1 ..], tag);
             pc += comptime Bytecode.Inst.encodedSize(tag);
             const maybe_error = switch (tag) {

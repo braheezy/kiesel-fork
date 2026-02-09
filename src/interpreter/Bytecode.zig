@@ -425,23 +425,24 @@ pub const Inst = struct {
     }
 
     pub fn encodedSize(tag: Tag) u4 {
-        const encoded_sizes = comptime blk: {
-            var sizes: [@typeInfo(Tag).@"enum".fields.len]u4 = @splat(1);
-            for (0..sizes.len) |i| {
-                const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(data_tags[i])));
-                const type_info = @typeInfo(FieldType);
-                if (type_info == .@"struct") {
-                    for (type_info.@"struct".fields) |f| {
-                        sizes[i] += @sizeOf(f.type);
-                    }
-                } else {
-                    sizes[i] += @sizeOf(FieldType);
-                }
-            }
-            break :blk sizes;
-        };
         return encoded_sizes[@intFromEnum(tag)];
     }
+
+    const encoded_sizes = blk: {
+        var sizes: [@typeInfo(Tag).@"enum".fields.len]u4 = @splat(1);
+        for (0..sizes.len) |i| {
+            const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(data_tags[i])));
+            const type_info = @typeInfo(FieldType);
+            if (type_info == .@"struct") {
+                for (type_info.@"struct".fields) |f| {
+                    sizes[i] += @sizeOf(f.type);
+                }
+            } else {
+                sizes[i] += @sizeOf(FieldType);
+            }
+        }
+        break :blk sizes;
+    };
 };
 
 pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
