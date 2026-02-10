@@ -169,6 +169,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .copy_data_properties => try b.lowerCopyDataProperties(data.copy_data_properties, dest),
             .call => try b.lowerCall(data.call, dest),
             .construct => try b.lowerConstruct(data.construct, dest),
+            .get_template_object => try b.lowerGetTemplateObject(data.get_template_object, dest),
             .get_iterator => try b.lowerGetIterator(data.ref, dest),
             .get_for_in_iterator => try b.lowerGetForInIterator(data.ref, dest),
             .iterator_step => try b.lowerIteratorStep(data.ref, dest),
@@ -1351,6 +1352,22 @@ fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
             dest,
             constructor_reg,
             args_reg,
+        } },
+    });
+}
+
+fn lowerGetTemplateObject(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.GetTemplateObject, extra_index);
+    const cooked_reg = b.resolve(extra.data.cooked);
+    const raw_reg = b.resolve(extra.data.raw);
+
+    try b.emit(.{
+        .tag = .get_template_object,
+        .data = .{ .reg_reg_reg_u16 = .{
+            dest,
+            cooked_reg,
+            raw_reg,
+            @intCast(extra.data.id),
         } },
     });
 }

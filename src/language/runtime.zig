@@ -90,7 +90,7 @@ pub fn getTemplateObject(
 
     // 2. Let templateRegistry be realm.[[TemplateMap]].
     // 3. For each element e of templateRegistry, do
-    if (realm.template_map.get(template_literal)) |template| {
+    if (realm.template_map.get(@intFromPtr(template_literal))) |template| {
         // a. If e.[[Site]] is the same Parse Node as templateLiteral, then
         //     i. Return e.[[Array]].
         return template;
@@ -177,7 +177,7 @@ pub fn getTemplateObject(
     _ = template.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
-    try realm.template_map.putNoClobber(agent.gc_allocator, template_literal, template);
+    try realm.template_map.putNoClobber(agent.gc_allocator, @intFromPtr(template_literal), template);
 
     // 17. Return template.
     return template;

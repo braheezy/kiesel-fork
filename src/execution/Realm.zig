@@ -3,7 +3,6 @@
 
 const std = @import("std");
 
-const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const language = @import("../language.zig");
@@ -41,7 +40,7 @@ global_object: *Object,
 global_env: *GlobalEnvironment,
 
 /// [[TemplateMap]]
-template_map: std.AutoHashMapUnmanaged(*ast.TemplateLiteral, *builtins.Array),
+template_map: std.AutoHashMapUnmanaged(u64, *builtins.Array),
 
 /// [[LoadedModules]]
 loaded_modules: ModuleRequest.HashMapUnmanaged(Module),

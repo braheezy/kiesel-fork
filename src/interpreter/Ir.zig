@@ -116,6 +116,8 @@ pub const Inst = struct {
         call,
         construct,
 
+        get_template_object,
+
         get_iterator,
         get_for_in_iterator,
         iterator_step,
@@ -158,6 +160,7 @@ pub const Inst = struct {
         copy_data_properties: ExtraIndex,
         call: ExtraIndex,
         construct: ExtraIndex,
+        get_template_object: ExtraIndex,
 
         // Make sure we don't accidentally add a field to make this union
         // bigger than expected. Note that in safety builds, Zig is allowed
@@ -258,6 +261,7 @@ pub const Inst = struct {
         .copy_data_properties = .copy_data_properties,
         .call = .call,
         .construct = .construct,
+        .get_template_object = .get_template_object,
         .get_iterator = .ref,
         .get_for_in_iterator = .ref,
         .iterator_step = .ref,
@@ -296,9 +300,10 @@ pub const Inst = struct {
     pub const UpdateProperty = struct { base: Ref, name: StringIndex, update_op: UpdateOp };
     pub const UpdatePropertyComputed = struct { base: Ref, property: Ref, update_op: UpdateOp };
     pub const UpdatePropertyIndexed = struct { base: Ref, index: u32, update_op: UpdateOp };
+    pub const CopyDataProperties = struct { source: Ref, excluded_len: u32 };
     pub const Call = struct { callee: Ref, this_value: Ref, args_len: u32 };
     pub const Construct = struct { constructor: Ref, args_len: u32 };
-    pub const CopyDataProperties = struct { source: Ref, excluded_len: u32 };
+    pub const GetTemplateObject = struct { cooked: Ref, raw: Ref, id: u32 };
 
     pub const UpdateOp = enum(u32) {
         increment_prefix,
@@ -375,6 +380,14 @@ pub const Inst = struct {
                     if (ref != .none) try uses.append(gpa, ref);
                 }
             },
+            .copy_data_properties => {
+                const extra = ir.extraData(CopyDataProperties, inst.data.copy_data_properties);
+                try uses.append(gpa, extra.data.source);
+                const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
+                for (excluded) |prop| {
+                    if (prop != .none) try uses.append(gpa, prop);
+                }
+            },
             .call => {
                 const extra = ir.extraData(Call, inst.data.call);
                 try uses.append(gpa, extra.data.callee);
@@ -388,13 +401,10 @@ pub const Inst = struct {
                 const args = ir.refSlice(extra.end, extra.data.args_len);
                 for (args) |arg| try uses.append(gpa, arg);
             },
-            .copy_data_properties => {
-                const extra = ir.extraData(CopyDataProperties, inst.data.copy_data_properties);
-                try uses.append(gpa, extra.data.source);
-                const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
-                for (excluded) |prop| {
-                    if (prop != .none) try uses.append(gpa, prop);
-                }
+            .get_template_object => {
+                const extra = ir.extraData(GetTemplateObject, inst.data.get_template_object);
+                try uses.append(gpa, extra.data.cooked);
+                try uses.append(gpa, extra.data.raw);
             },
             inline else => |dt| {
                 const field_data = @field(inst.data, @tagName(dt));
@@ -546,6 +556,17 @@ fn printData(
             }
             try writer.writeByte('}');
         },
+        .copy_data_properties => {
+            const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
+            try printField(ir, extra.data.source, writer, tty_config);
+            try writer.writeAll(", [");
+            const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
+            for (excluded, 0..) |prop, j| {
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, prop, writer, tty_config);
+            }
+            try writer.writeByte(']');
+        },
         .call => {
             const extra = ir.extraData(Inst.Call, data.call);
             try printField(ir, extra.data.callee, writer, tty_config);
@@ -570,16 +591,13 @@ fn printData(
             }
             try writer.writeByte(']');
         },
-        .copy_data_properties => {
-            const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
-            try printField(ir, extra.data.source, writer, tty_config);
-            try writer.writeAll(", [");
-            const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
-            for (excluded, 0..) |prop, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, prop, writer, tty_config);
-            }
-            try writer.writeByte(']');
+        .get_template_object => {
+            const extra = ir.extraData(Inst.GetTemplateObject, data.get_template_object);
+            try printField(ir, extra.data.cooked, writer, tty_config);
+            try writer.writeAll(", ");
+            try printField(ir, extra.data.raw, writer, tty_config);
+            try writer.writeAll(", ");
+            try printField(ir, extra.data.id, writer, tty_config);
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));

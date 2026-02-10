@@ -158,6 +158,8 @@ pub const Inst = struct {
         construct1,
         construct2,
 
+        get_template_object,
+
         get_iterator,
         get_for_in_iterator,
         iterator_step,
@@ -179,6 +181,7 @@ pub const Inst = struct {
         reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg },
         reg_reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg, Reg },
         reg_reg_u32: struct { Reg, Reg, u32 },
+        reg_reg_reg_u16: struct { Reg, Reg, Reg, u16 },
         reg_i32: struct { Reg, i32 },
         reg_u32: struct { Reg, u32 },
         reg_f64: struct { Reg, f64 },
@@ -315,6 +318,7 @@ pub const Inst = struct {
         .construct0 = .reg_reg,
         .construct1 = .reg_reg_reg,
         .construct2 = .reg_reg_reg_reg,
+        .get_template_object = .reg_reg_reg_u16,
         .get_iterator = .reg_reg,
         .get_for_in_iterator = .reg_reg,
         .iterator_step = .reg_reg,
@@ -413,6 +417,7 @@ pub const Inst = struct {
             StringIndex,
             BigIntIndex,
             => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
+            u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
             u32 => std.mem.readInt(u32, code[0..4], .little),
             f64 => @bitCast(std.mem.readInt(u64, code[0..8], .little)),
@@ -449,6 +454,7 @@ pub const Inst = struct {
             StringIndex,
             BigIntIndex,
             => try writer.writeInt(u32, @intFromEnum(value), .little),
+            u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
             u32 => try writer.writeInt(u32, value, .little),
             f64 => try writer.writeInt(u64, @bitCast(value), .little),
@@ -587,6 +593,7 @@ fn printField(
 ) PrintError!void {
     const T = @TypeOf(value);
     switch (T) {
+        u16,
         i32,
         u32,
         f64,

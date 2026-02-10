@@ -211,6 +211,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .construct0 => vm.executeConstructN(0, data.reg_reg[0], data.reg_reg[1], .{}),
                 .construct1 => vm.executeConstructN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
                 .construct2 => vm.executeConstructN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
+                .get_template_object => vm.executeGetTemplateObject(data.reg_reg_reg_u16[0], data.reg_reg_reg_u16[1], data.reg_reg_reg_u16[2], data.reg_reg_reg_u16[3]),
                 .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
                 .get_for_in_iterator => vm.executeGetForInIterator(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
@@ -1516,6 +1517,32 @@ fn executeConstructN(
 
     const result = try evaluateNew(vm.agent, constructor, &args);
     vm.load(dest, result);
+}
+
+fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Bytecode.Inst.Reg, raw_reg: Bytecode.Inst.Reg, template_id: u16) Agent.Error!void {
+    const realm = vm.agent.currentRealm();
+    const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&vm.bytecode));
+
+    const gop = try realm.template_map.getOrPut(vm.agent.gc_allocator, cache_key);
+    if (gop.found_existing) {
+        vm.load(dest, Value.from(&gop.value_ptr.*.object));
+        return;
+    }
+
+    const cooked = vm.store(cooked_reg).asObject();
+    const raw = vm.store(raw_reg).asObject();
+
+    _ = raw.setIntegrityLevel(vm.agent, .frozen) catch |err| try noexcept(err);
+
+    try cooked.definePropertyDirect(vm.agent, PropertyKey.from("raw"), .{
+        .value_or_accessor = .{ .value = Value.from(raw) },
+        .attributes = .none,
+    });
+    _ = cooked.setIntegrityLevel(vm.agent, .frozen) catch |err| try noexcept(err);
+
+    gop.value_ptr.* = cooked.as(builtins.Array);
+
+    vm.load(dest, Value.from(cooked));
 }
 
 fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {

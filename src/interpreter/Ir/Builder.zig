@@ -23,6 +23,7 @@ strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
 breakable_stack: std.ArrayListUnmanaged(*BreakableContext),
 scope_depth: u32,
+template_object_count: u16,
 
 const Ast = union(enum) {
     script: *const ast.Script,
@@ -112,6 +113,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .big_ints = .empty,
         .breakable_stack = .empty,
         .scope_depth = 0,
+        .template_object_count = 0,
     };
 }
 
@@ -1689,7 +1691,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
         .await_expression => try b.todo("await expression"),
         .yield_expression => try b.todo("yield expression"),
-        .tagged_template => try b.todo("tagged template"),
+        .tagged_template => |*tagged_template| try b.lowerTaggedTemplate(tagged_template),
         .binding_pattern_for_assignment_expression => unreachable, // Only valid as assignment LHS
     };
 }
@@ -2819,4 +2821,112 @@ fn lowerSequenceExpression(b: *Builder, seq_expr: *const ast.SequenceExpression)
         last = try b.lowerExpression(expr);
     }
     return last;
+}
+
+fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) Error!Ir.Inst.Ref {
+    var this_value: Ir.Inst.Ref = .none;
+    const callee = switch (tagged_template.expression.*) {
+        .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, &this_value),
+        else => try b.lowerExpression(tagged_template.expression),
+    };
+
+    const template_literal = &tagged_template.template_literal;
+
+    var cooked_indices: std.ArrayList(Ir.Inst.StringIndex) = .empty;
+    defer cooked_indices.deinit(b.gpa);
+    var raw_indices: std.ArrayList(Ir.Inst.StringIndex) = .empty;
+    defer raw_indices.deinit(b.gpa);
+
+    for (template_literal.spans, 0..) |span, i| {
+        if (i % 2 != 0) {
+            std.debug.assert(span == .expression);
+            continue;
+        }
+
+        const text = span.templateCharacters();
+        const normalized = try std.mem.replaceOwned(u8, b.gpa, text, "\r\n", "\n");
+        defer b.gpa.free(normalized);
+        _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
+
+        try cooked_indices.append(b.gpa, try b.internString(normalized));
+
+        // NOTE: The VM processes escape sequences when converting from UTF-8 to ASCII/UTF-16,
+        //       so for raw strings we need to escape backslashes before interning.
+        const raw_escaped = try std.mem.replaceOwned(u8, b.gpa, normalized, "\\", "\\\\");
+        defer b.gpa.free(raw_escaped);
+        try raw_indices.append(b.gpa, try b.internString(raw_escaped));
+    }
+
+    const cooked_array = blk: {
+        const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+        for (cooked_indices.items) |string_index| {
+            const ref = try b.addInst(.{ .tag = .string, .data = .{
+                .string = string_index,
+            } });
+            try b.extra.append(b.gpa, @intFromEnum(ref));
+        }
+        break :blk try b.addInst(.{
+            .tag = .array,
+            .data = .{ .array = .{
+                .extra_index = extra_index,
+                .len = @intCast(cooked_indices.items.len),
+            } },
+        });
+    };
+
+    const raw_array = blk: {
+        const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+        for (raw_indices.items) |string_index| {
+            const ref = try b.addInst(.{ .tag = .string, .data = .{
+                .string = string_index,
+            } });
+            try b.extra.append(b.gpa, @intFromEnum(ref));
+        }
+        break :blk try b.addInst(.{
+            .tag = .array,
+            .data = .{ .array = .{
+                .extra_index = extra_index,
+                .len = @intCast(raw_indices.items.len),
+            } },
+        });
+    };
+
+    const template_id = b.template_object_count;
+    b.template_object_count += 1;
+    const get_template_object_extra_index = try b.addExtra(Ir.Inst.GetTemplateObject, .{
+        .cooked = cooked_array,
+        .raw = raw_array,
+        .id = template_id,
+    });
+
+    const template_object = try b.addInst(.{
+        .tag = .get_template_object,
+        .data = .{ .get_template_object = get_template_object_extra_index },
+    });
+
+    const substitution_count = template_literal.spans.len / 2;
+    var args: std.ArrayList(Ir.Inst.Ref) = try .initCapacity(b.gpa, 1 + substitution_count);
+    defer args.deinit(b.gpa);
+    args.appendAssumeCapacity(template_object);
+
+    for (template_literal.spans, 0..) |span, i| {
+        if (i % 2 == 0) {
+            std.debug.assert(span == .text);
+            continue;
+        }
+        const expr_ref = try b.lowerExpression(&span.expression);
+        args.appendAssumeCapacity(expr_ref);
+    }
+
+    const call_extra_index = try b.addExtra(Ir.Inst.Call, .{
+        .callee = callee,
+        .this_value = this_value,
+        .args_len = @intCast(args.items.len),
+    });
+    try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
+
+    return b.addInst(.{
+        .tag = .call,
+        .data = .{ .call = call_extra_index },
+    });
 }
