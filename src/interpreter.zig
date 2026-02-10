@@ -1110,4 +1110,83 @@ test {
         null,
         null,
     );
+
+    // Optional expression
+    try testInterpreter(std.testing.allocator,
+        \\var o = {a: {b: 123}};
+        \\o.x?.y ?? o.a?.["b"];
+    , .{ .value = Value.from(123) },
+        \\IR (test)
+        \\  %0: [  0..4  ]                    string @0 ("a")
+        \\  %1: [  1..3  ]                    string @1 ("b")
+        \\  %2: [  2..3  ]                    number 123
+        \\  %3: [  3..4  ]                    object {%1: %2}
+        \\  %4: [  4..5  ]                    object {%0: %3}
+        \\  %5: [  5..5  ]                    set_binding @2 ("o"), %4
+        \\  %6: [  6..7  ]                    get_binding @2 ("o")
+        \\  %7: [  7..12 ]                    get_property %6, @3 ("x")
+        \\  %8: [  8..9  ]                    null
+        \\  %9: [  9..10 ]                    eq %7, %8
+        \\ %10: [ 10..10 ]                    br_cond %9, %14, %11
+        \\ %11: [ 11..11 ]                    label
+        \\ %12: [ 12..13 ]                    get_property %7, @4 ("y")
+        \\ %13: [ 13..13 ]                    br %17, %12
+        \\ %14: [ 14..14 ]                    label
+        \\ %15: [ 15..16 ]                    undefined
+        \\ %16: [ 16..16 ]                    br %17, %15
+        \\ %17: [ 17..31 ]                    label
+        \\ %18: [ 18..19 ]                    get_binding @2 ("o")
+        \\ %19: [ 19..25 ]                    get_property %18, @0 ("a")
+        \\ %20: [ 20..21 ]                    null
+        \\ %21: [ 21..22 ]                    eq %19, %20
+        \\ %22: [ 22..22 ]                    br_cond %21, %27, %23
+        \\ %23: [ 23..23 ]                    label
+        \\ %24: [ 24..25 ]                    string @1 ("b")
+        \\ %25: [ 25..26 ]                    get_property_computed %19, %24
+        \\ %26: [ 26..26 ]                    br %30, %25
+        \\ %27: [ 27..27 ]                    label
+        \\ %28: [ 28..29 ]                    undefined
+        \\ %29: [ 29..29 ]                    br %30, %28
+        \\ %30: [ 30..31 ]                    label
+        \\ %31: [ 31..32 ]                    nullish_coalesce %17, %30
+        \\ %32: [ 32..32 ]                    return %31
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: 0a 00 00 00 00 00             load_string r0, @0 ("a")
+        \\   6: 0a 01 01 00 00 00             load_string r1, @1 ("b")
+        \\  12: 08 02 7b 00 00 00             load_number_i32 r2, 123
+        \\  18: 12 03                         object_create r3
+        \\  20: 13 03 01 00 00 00 02          object_set r3, @1 ("b"), r2
+        \\  27: 12 01                         object_create r1
+        \\  29: 13 01 00 00 00 00 03          object_set r1, @0 ("a"), r3
+        \\  36: 3f 02 00 00 00 01             set_binding @2 ("o"), r1
+        \\  42: 0c 00 01                      move r0, r1
+        \\  45: 3b 00 02 00 00 00             get_binding r0, @2 ("o")
+        \\  51: 3c 01 00 03 00 00 00          get_property r1, r0, @3 ("x")
+        \\  58: 05 00                         load_null r0
+        \\  60: 31 02 01 00                   eq r2, r1, r0
+        \\  64: 01 02 05 00 00 00             jump_if_true r2, 5
+        \\  70: 00 07 00 00 00                jump 7
+        \\  75: 04 00                         load_undefined r0
+        \\  77: 00 07 00 00 00                jump 7
+        \\  82: 3c 00 01 04 00 00 00          get_property r0, r1, @4 ("y")
+        \\  89: 3b 01 02 00 00 00             get_binding r1, @2 ("o")
+        \\  95: 3c 02 01 00 00 00 00          get_property r2, r1, @0 ("a")
+        \\ 102: 05 01                         load_null r1
+        \\ 104: 31 03 02 01                   eq r3, r2, r1
+        \\ 108: 01 03 05 00 00 00             jump_if_true r3, 5
+        \\ 114: 00 07 00 00 00                jump 7
+        \\ 119: 04 01                         load_undefined r1
+        \\ 121: 00 0d 00 00 00                jump 13
+        \\ 126: 0a 01 01 00 00 00             load_string r1, @1 ("b")
+        \\ 132: 3d 03 02 01                   get_property_computed r3, r2, r1
+        \\ 136: 0c 01 03                      move r1, r3
+        \\ 139: 0c 02 00                      move r2, r0
+        \\ 142: 03 00 05 00 00 00             jump_if_nullish r0, 5
+        \\ 148: 00 03 00 00 00                jump 3
+        \\ 153: 0c 02 01                      move r2, r1
+        \\ 156: 83 02                         return r2
+        \\
+    );
 }

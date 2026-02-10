@@ -1677,7 +1677,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
         .super_call => try b.todo("super call"),
         .import_call => try b.todo("import call"),
-        .optional_expression => try b.todo("optional expression"),
+        .optional_expression => |*opt_expr| try b.lowerOptionalExpression(opt_expr),
         .update_expression => |*update_expr| try b.lowerUpdateExpression(update_expr),
         .unary_expression => |*unary_expr| try b.lowerUnaryExpression(unary_expr),
         .binary_expression => |*bin_expr| try b.lowerBinaryExpression(bin_expr),
@@ -1951,6 +1951,125 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
         .tag = .call,
         .data = .{ .call = extra_index },
     });
+}
+
+fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression) Error!Ir.Inst.Ref {
+    const first_property = opt_expr.properties[0];
+
+    var this_value: Ir.Inst.Ref = .none;
+    const base = switch (opt_expr.expression.*) {
+        .member_expression => |*member_expr| blk: {
+            if (first_property == .arguments) {
+                break :blk try b.lowerMemberExpression(member_expr, &this_value);
+            } else {
+                break :blk try b.lowerMemberExpression(member_expr, null);
+            }
+        },
+        else => try b.lowerExpression(opt_expr.expression),
+    };
+
+    const null_ref = try b.addInst(.{
+        .tag = .null,
+        .data = .{ .none = {} },
+    });
+    const is_nullish = try b.addInst(.{
+        .tag = .eq,
+        .data = .{ .binary = .{
+            .lhs = base,
+            .rhs = null_ref,
+        } },
+    });
+    const nullish_br = try b.addInstDeferred(.br_cond);
+
+    const properties_label = try b.addLabel();
+
+    var current = base;
+    for (opt_expr.properties, 0..) |property, i| {
+        const next_is_call = i + 1 < opt_expr.properties.len and opt_expr.properties[i + 1] == .arguments;
+
+        current = switch (property) {
+            .arguments => |arguments| blk: {
+                var args = try b.lowerArguments(arguments);
+                defer args.deinit(b.gpa);
+
+                const extra_index = try b.addExtra(Ir.Inst.Call, .{
+                    .callee = current,
+                    .this_value = this_value,
+                    .args_len = @intCast(args.items.len),
+                });
+                try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
+
+                this_value = .none;
+                break :blk try b.addInst(.{
+                    .tag = .call,
+                    .data = .{ .call = extra_index },
+                });
+            },
+            .expression => |expr| blk: {
+                if (next_is_call) this_value = current;
+
+                if (try constantFold(b.gpa, expr)) |constant| {
+                    defer constant.deinit(b.gpa);
+                    if (constant.toIndex()) |index| {
+                        break :blk try b.addInst(.{
+                            .tag = .get_property_indexed,
+                            .data = .{ .get_property_indexed = .{
+                                .base = current,
+                                .index = index,
+                            } },
+                        });
+                    }
+                }
+                const prop = try b.lowerExpression(expr);
+                break :blk try b.addInst(.{
+                    .tag = .get_property_computed,
+                    .data = .{ .get_property_computed = .{
+                        .base = current,
+                        .property = prop,
+                    } },
+                });
+            },
+            .identifier => |identifier| blk: {
+                if (next_is_call) this_value = current;
+
+                const string_index = try b.internString(identifier);
+                break :blk try b.addInst(.{
+                    .tag = .get_property,
+                    .data = .{ .get_property = .{
+                        .base = current,
+                        .name = string_index,
+                    } },
+                });
+            },
+            .private_identifier => try b.todo("private identifier in optional expression"),
+        };
+    }
+    const properties_br = try b.addInstDeferred(.br);
+
+    const short_circuit_label = try b.addLabel();
+    const undefined_ref = try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
+    const short_circuit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    nullish_br.set(.{ .br_cond = .{
+        .condition = is_nullish,
+        .then_target = short_circuit_label,
+        .else_target = properties_label,
+    } });
+    properties_br.set(.{ .br = .{
+        .target = end_label,
+        .value = current,
+    } });
+    short_circuit_br.set(.{ .br = .{
+        .target = end_label,
+        .value = undefined_ref,
+    } });
+
+    return end_label;
 }
 
 fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {
