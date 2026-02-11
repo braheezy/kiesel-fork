@@ -34,7 +34,7 @@ pub fn init(
     errdefer gpa.free(allocations);
     @memset(allocations, .none);
 
-    var active: std.ArrayListUnmanaged(ActiveRange) = .empty;
+    var active: std.ArrayList(ActiveRange) = .empty;
     defer active.deinit(gpa);
 
     var free_regs: std.bit_set.DynamicBitSetUnmanaged = try .initFull(gpa, num_regs);

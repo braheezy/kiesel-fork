@@ -376,7 +376,7 @@ fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.
     const object_value = vm.store(object_reg);
     const property_value = vm.store(value_reg);
     const object = object_value.asObject();
-    const property_key = PropertyKey.from(vm.strings[@intFromEnum(key_index)]);
+    const property_key = PropertyKey.from(vm.getString(key_index));
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
 }
 
@@ -1087,7 +1087,7 @@ fn executeSetPropertyIndexed(
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(@as(u53, @intCast(index)));
+    const property_key = PropertyKey.from(@as(u53, index));
     const success = try base_object.internal_methods.set(
         vm.agent,
         base_object,
@@ -1262,7 +1262,7 @@ fn executeUpdatePropertyIndexed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(@as(u53, @intCast(index)));
+    const property_key = PropertyKey.from(@as(u53, index));
     const old_value = try base_object.internal_methods.get(
         vm.agent,
         base_object,

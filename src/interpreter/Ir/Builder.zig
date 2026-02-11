@@ -18,11 +18,11 @@ name: []const u8,
 root_node: Ast,
 in_strict_mode: bool,
 instructions: std.MultiArrayList(Ir.Inst),
-extra: std.ArrayListUnmanaged(u32),
+extra: std.ArrayList(u32),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
-breakable_stack: std.ArrayListUnmanaged(*BreakableContext),
-scope_depth: u32,
+breakable_stack: std.ArrayList(*BreakableContext),
+scope_depth: u16,
 template_object_count: u16,
 
 const Ast = union(enum) {
@@ -53,11 +53,11 @@ const BreakableContext = struct {
     continue_target: JumpTarget,
     break_target: JumpTarget,
     result_ref: Ir.Inst.Ref,
-    scope_depth: u32 = 0,
+    scope_depth: u16 = 0,
 
     const JumpTarget = union(enum) {
         known: Ir.Inst.Ref,
-        deferred: std.ArrayListUnmanaged(DeferredJump),
+        deferred: std.ArrayList(DeferredJump),
     };
 
     const DeferredJump = struct {
@@ -1122,7 +1122,7 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
 
     const items = switch_stmt.case_block.items;
 
-    var case_branches: std.ArrayListUnmanaged(struct { br_cond: Deferred, index: u32 }) = .empty;
+    var case_branches: std.ArrayList(struct { br_cond: Deferred, index: u32 }) = .empty;
     defer case_branches.deinit(b.gpa);
 
     var default_index: ?u32 = null;
@@ -1712,7 +1712,7 @@ fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.R
 }
 
 fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.Inst.Ref {
-    var elements: std.ArrayListUnmanaged(Ir.Inst.Ref) = .empty;
+    var elements: std.ArrayList(Ir.Inst.Ref) = .empty;
     defer elements.deinit(b.gpa);
 
     for (array_lit.element_list) |elem| {
@@ -1744,7 +1744,7 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
 }
 
 fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!Ir.Inst.Ref {
-    var pairs: std.ArrayListUnmanaged(Ir.Inst.Ref) = .empty;
+    var pairs: std.ArrayList(Ir.Inst.Ref) = .empty;
     defer pairs.deinit(b.gpa);
 
     for (object_lit.property_definition_list.items) |prop_def| {

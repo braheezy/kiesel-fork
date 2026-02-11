@@ -12,7 +12,7 @@ const Builder = @This();
 
 gpa: std.mem.Allocator,
 ir: *const Ir,
-blocks: std.ArrayListUnmanaged(*Block),
+blocks: std.ArrayList(*Block),
 current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
@@ -46,7 +46,7 @@ fn computeRPO(
     gpa: std.mem.Allocator,
     block: *Block,
     visited: *std.AutoHashMapUnmanaged(*Block, void),
-    out: *std.ArrayListUnmanaged(*Block),
+    out: *std.ArrayList(*Block),
 ) std.mem.Allocator.Error!void {
     const gop = try visited.getOrPut(gpa, block);
     if (gop.found_existing) return;
@@ -185,7 +185,7 @@ pub fn build(b: *Builder) Error!Bytecode {
     std.debug.assert(b.terminated());
 
     // Order blocks in reverse post-order
-    var ordered: std.ArrayListUnmanaged(*Block) = .empty;
+    var ordered: std.ArrayList(*Block) = .empty;
     defer ordered.deinit(b.gpa);
     var visited: std.AutoHashMapUnmanaged(*Block, void) = .empty;
     defer visited.deinit(b.gpa);
@@ -217,26 +217,26 @@ pub fn build(b: *Builder) Error!Bytecode {
     const code = try aw.toOwnedSlice();
     errdefer b.gpa.free(code);
 
-    const strings = try b.gpa.alloc([]const u8, b.ir.strings.len);
-    errdefer b.gpa.free(strings);
-    // Ensure errdefer is valid mid-loop
-    @memset(strings, &.{});
-    for (b.ir.strings, 0..) |string, i| {
-        strings[i] = try b.gpa.dupe(u8, string);
+    var strings_list: std.ArrayList([]const u8) = try .initCapacity(b.gpa, b.ir.strings.len);
+    defer strings_list.deinit(b.gpa);
+    errdefer for (strings_list.items) |string| b.gpa.free(string);
+    for (b.ir.strings) |string| {
+        const cloned = try b.gpa.dupe(u8, string);
+        strings_list.appendAssumeCapacity(cloned);
     }
-    errdefer for (strings) |string| b.gpa.free(string);
+    const strings = try strings_list.toOwnedSlice(b.gpa);
 
-    const big_ints = try b.gpa.alloc(std.math.big.int.Const, b.ir.big_ints.len);
-    errdefer b.gpa.free(big_ints);
-    // Ensure errdefer is valid mid-loop
-    @memset(big_ints, .{ .limbs = &.{}, .positive = true });
-    for (b.ir.big_ints, 0..) |big_int, i| {
-        big_ints[i] = .{
+    var big_ints_list: std.ArrayList(std.math.big.int.Const) = try .initCapacity(b.gpa, b.ir.big_ints.len);
+    defer big_ints_list.deinit(b.gpa);
+    errdefer for (big_ints_list.items) |big_int| b.gpa.free(big_int.limbs);
+    for (b.ir.big_ints) |big_int| {
+        const cloned: std.math.big.int.Const = .{
             .limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs),
             .positive = big_int.positive,
         };
+        big_ints_list.appendAssumeCapacity(cloned);
     }
-    errdefer for (big_ints) |big_int| b.gpa.free(big_int.limbs);
+    const big_ints = try big_ints_list.toOwnedSlice(b.gpa);
 
     return .{
         .name = name,
@@ -247,7 +247,7 @@ pub fn build(b: *Builder) Error!Bytecode {
 }
 
 const Block = struct {
-    instructions: std.ArrayListUnmanaged(Bytecode.Inst),
+    instructions: std.ArrayList(Bytecode.Inst),
     terminator: Terminator,
     offset: u32,
 
