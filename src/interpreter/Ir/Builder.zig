@@ -1869,6 +1869,16 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
                         } },
                     });
                 }
+                if (constant == .string) {
+                    const string_index = try b.internString(constant.string);
+                    return b.addInst(.{
+                        .tag = .get_property,
+                        .data = .{ .get_property = .{
+                            .base = base,
+                            .name = string_index,
+                        } },
+                    });
+                }
             }
             const property = try b.lowerExpression(expr);
             return b.addInst(.{
@@ -2018,6 +2028,16 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
                             .data = .{ .get_property_indexed = .{
                                 .base = current,
                                 .index = index,
+                            } },
+                        });
+                    }
+                    if (constant == .string) {
+                        const string_index = try b.internString(constant.string);
+                        break :blk try b.addInst(.{
+                            .tag = .get_property,
+                            .data = .{ .get_property = .{
+                                .base = current,
+                                .name = string_index,
                             } },
                         });
                     }
@@ -2579,6 +2599,37 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                                 .data = .{ .set_property_indexed = extra_index },
                             });
                         }
+                        if (constant == .string) {
+                            const string_index = try b.internString(constant.string);
+                            const current_value = try b.addInst(.{
+                                .tag = .get_property,
+                                .data = .{ .get_property = .{
+                                    .base = base,
+                                    .name = string_index,
+                                } },
+                            });
+                            const rhs = try b.lowerExpression(assign_expr.rhs_expression);
+                            const result = try b.addInst(.{
+                                .tag = binary_tag,
+                                .data = .{ .binary = .{
+                                    .lhs = current_value,
+                                    .rhs = rhs,
+                                } },
+                            });
+                            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                                .set_property_strict
+                            else
+                                .set_property;
+                            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                                .base = base,
+                                .name = string_index,
+                                .value = result,
+                            });
+                            return b.addInst(.{
+                                .tag = set_tag,
+                                .data = .{ .set_property = extra_index },
+                            });
+                        }
                     }
                     const property = try b.lowerExpression(expr);
                     const current_value = try b.addInst(.{
@@ -2675,6 +2726,20 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                                 .data = .{ .get_property_indexed = .{
                                     .base = base,
                                     .index = index,
+                                } },
+                            });
+                        }
+                        if (constant == .string) {
+                            const string_index = try b.internString(constant.string);
+                            lhs = .{ .property = .{
+                                .base = base,
+                                .name = string_index,
+                            } };
+                            break :blk try b.addInst(.{
+                                .tag = .get_property,
+                                .data = .{ .get_property = .{
+                                    .base = base,
+                                    .name = string_index,
                                 } },
                             });
                         }
