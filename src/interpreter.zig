@@ -1,10 +1,13 @@
 const std = @import("std");
 
 const execution = @import("execution.zig");
+const language = @import("language.zig");
 const types = @import("types.zig");
 
 const Agent = execution.Agent;
+const Parser = language.Parser;
 const Realm = execution.Realm;
+const Script = language.Script;
 const Value = types.Value;
 
 pub const Bytecode = @import("interpreter/Bytecode.zig");
@@ -24,15 +27,11 @@ fn testInterpreter(
     expected_ir: ?[]const u8,
     expected_bc: ?[]const u8,
 ) !void {
-    const ast = @import("language/ast.zig");
-    const Parser = @import("language/Parser.zig");
-    const Script = @import("language/Script.zig");
-
     var arena_instance: std.heap.ArenaAllocator = .init(gpa);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
 
-    const script = try Parser.parse(ast.Script, arena, source, .{});
+    const script = try Parser.parse(language.ast.Script, arena, source, .{});
 
     var ir = ir: {
         var builder: Ir.Builder = .init(gpa, "test", .{ .script = &script });
