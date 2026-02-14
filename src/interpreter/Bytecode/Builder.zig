@@ -187,6 +187,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_argument => try b.lowerGetArgument(data.argument, dest),
             .get_rest_arguments => try b.lowerGetRestArguments(data.argument, dest),
             .get_new_target => try b.lowerGetNewTarget(dest),
+            .getter => try b.lowerGetter(data.ref, dest),
+            .setter => try b.lowerSetter(data.ref, dest),
         }
     }
 
@@ -660,20 +662,61 @@ fn lowerObject(b: *Builder, data: Ir.Inst.Object, dest: Bytecode.Inst.Reg) Error
         const key_ref = pairs[i];
         const value_ref = pairs[i + 1];
         const value_index = value_ref.toIndex().?;
-        const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
+        const value_inst = b.ir.instructions.get(@intFromEnum(value_index));
 
         const value_reg = b.resolve(value_ref);
 
-        switch (value_tag) {
-            .spread => {
-                std.debug.assert(key_ref == .none);
+        if (value_inst.tag == .spread) {
+            std.debug.assert(key_ref == .none);
+            try b.emit(.{
+                .tag = .object_spread,
+                .data = .{ .reg_reg = .{
+                    dest,
+                    value_reg,
+                } },
+            });
+            continue;
+        }
+
+        const key_index = key_ref.toIndex().?;
+        const key_inst = b.ir.instructions.get(@intFromEnum(key_index));
+
+        switch (value_inst.tag) {
+            .getter, .setter => {
                 try b.emit(.{
-                    .tag = .object_spread,
+                    .tag = .set_home_object,
                     .data = .{ .reg_reg = .{
-                        dest,
                         value_reg,
+                        dest,
                     } },
                 });
+
+                const set_tag: Bytecode.Inst.Tag = if (key_inst.tag == .string)
+                    (if (value_inst.tag == .getter) .object_set_getter else .object_set_setter)
+                else
+                    (if (value_inst.tag == .getter) .object_set_getter_computed else .object_set_setter_computed);
+
+                if (key_inst.tag == .string) {
+                    const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_inst.data.string));
+                    try b.emit(.{
+                        .tag = set_tag,
+                        .data = .{ .reg_string_reg = .{
+                            dest,
+                            string_index,
+                            value_reg,
+                        } },
+                    });
+                } else {
+                    const key_reg = b.resolve(key_ref);
+                    try b.emit(.{
+                        .tag = set_tag,
+                        .data = .{ .reg_reg_reg = .{
+                            dest,
+                            key_reg,
+                            value_reg,
+                        } },
+                    });
+                }
                 continue;
             },
             .create_function => {
@@ -688,12 +731,8 @@ fn lowerObject(b: *Builder, data: Ir.Inst.Object, dest: Bytecode.Inst.Reg) Error
             else => {},
         }
 
-        const key_index = key_ref.toIndex().?;
-        const key_tag = b.ir.instructions.items(.tag)[@intFromEnum(key_index)];
-        const key_data = b.ir.instructions.items(.data)[@intFromEnum(key_index)];
-
-        if (key_tag == .string) {
-            const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_data.string));
+        if (key_inst.tag == .string) {
+            const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_inst.data.string));
             try b.emit(.{
                 .tag = .object_set,
                 .data = .{ .reg_string_reg = .{
@@ -1568,4 +1607,12 @@ fn lowerGetNewTarget(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
         .tag = .get_new_target,
         .data = .{ .reg = dest },
     });
+}
+
+fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitMoveIfNeeded(ref, dest);
+}
+
+fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitMoveIfNeeded(ref, dest);
 }

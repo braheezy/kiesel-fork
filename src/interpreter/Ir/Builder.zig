@@ -2002,7 +2002,33 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     .private_identifier => try b.todo("private identifier in object method"),
                 };
                 const method_ref = switch (method_def.method) {
-                    .get, .set => try b.todo("getter/setter in object literal"),
+                    .get, .set => |f| blk: {
+                        const source_text = try b.internString(f.source_text);
+                        const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
+                            method_def.class_element_name.property_name.literal_property_name == .identifier)
+                        name: {
+                            const prefix: []const u8 = if (method_def.method == .get) "get " else "set ";
+                            const ident = method_def.class_element_name.property_name.literal_property_name.identifier;
+                            const prefixed = try std.fmt.allocPrint(b.gpa, "{s}{s}", .{ prefix, ident });
+                            defer b.gpa.free(prefixed);
+                            break :name .{ .default = try b.internString(prefixed) };
+                        } else .none;
+                        const function_index = try b.addFunction(.{
+                            .source_text = source_text,
+                            .name = name,
+                            .parameters = f.formal_parameters,
+                            .body = f.function_body,
+                            .kind = .normal,
+                        });
+                        const func_ref = try b.addInst(.{
+                            .tag = .create_function,
+                            .data = .{ .create_function = function_index },
+                        });
+                        break :blk try b.addInst(.{
+                            .tag = if (method_def.method == .get) .getter else .setter,
+                            .data = .{ .ref = func_ref },
+                        });
+                    },
                     inline else => |f, tag| blk: {
                         const source_text = try b.internString(f.source_text);
                         const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and

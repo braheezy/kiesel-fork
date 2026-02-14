@@ -163,6 +163,9 @@ pub const Inst = struct {
         get_argument,
         get_rest_arguments,
         get_new_target,
+
+        getter,
+        setter,
     };
 
     pub const Data = union {
@@ -316,6 +319,8 @@ pub const Inst = struct {
         .get_argument = .argument,
         .get_rest_arguments = .argument,
         .get_new_target = .none,
+        .getter = .ref,
+        .setter = .ref,
     });
 
     pub const StringIndex = enum(u32) { _ };
