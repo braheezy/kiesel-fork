@@ -2607,6 +2607,17 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {
+    if (unary_expr.operator == .typeof and
+        unary_expr.expression.* == .primary_expression and
+        unary_expr.expression.primary_expression == .identifier_reference)
+    {
+        const identifier = unary_expr.expression.primary_expression.identifier_reference;
+        const string_index = try b.internString(identifier);
+        return b.addInst(.{
+            .tag = .typeof_binding,
+            .data = .{ .string = string_index },
+        });
+    }
     if (unary_expr.operator == .delete and
         unary_expr.expression.* == .primary_expression and
         unary_expr.expression.primary_expression == .identifier_reference)

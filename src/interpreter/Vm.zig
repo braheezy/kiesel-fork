@@ -142,6 +142,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
                 .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
+                .typeof_binding => vm.executeTypeofBinding(data.reg_string[0], data.reg_string[1]),
                 .add => vm.executeAdd(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .mul => vm.executeMul(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -582,6 +583,23 @@ fn executeLogicalNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) vo
 
 fn executeTypeof(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
     const value = vm.store(src);
+    vm.load(dst, Value.from(value.typeof()));
+}
+
+fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+
+    const execution_context = vm.agent.runningExecutionContext();
+    var env = execution_context.ecmascript_code.lexical_environment;
+    while (!try env.hasBinding(vm.agent, name)) {
+        env = env.outerEnv() orelse {
+            @branchHint(.unlikely);
+            vm.load(dst, Value.from("undefined"));
+            return;
+        };
+    }
+
+    const value = try env.getBindingValue(vm.agent, name, true);
     vm.load(dst, Value.from(value.typeof()));
 }
 

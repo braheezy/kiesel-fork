@@ -88,6 +88,7 @@ pub const Inst = struct {
         bitwise_not,
         logical_not,
         typeof,
+        typeof_binding,
 
         add,
         sub,
@@ -274,6 +275,7 @@ pub const Inst = struct {
         .bitwise_not = .reg_reg,
         .logical_not = .reg_reg,
         .typeof = .reg_reg,
+        .typeof_binding = .reg_string,
         .add = .reg_reg_reg,
         .sub = .reg_reg_reg,
         .mul = .reg_reg_reg,

@@ -105,6 +105,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
+            .typeof_binding => try b.lowerTypeofBinding(data.string, dest),
             .void => try b.lowerVoid(data.ref, dest),
             .delete => try b.lowerDelete(data.ref, dest),
             .spread => try b.lowerSpread(data.ref, dest),
@@ -829,6 +830,17 @@ fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error
 
 fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitUnaryOp(.typeof, ref, dest);
+}
+
+fn lowerTypeofBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+    try b.emit(.{
+        .tag = .typeof_binding,
+        .data = .{ .reg_string = .{
+            dest,
+            bytecode_string_index,
+        } },
+    });
 }
 
 fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
