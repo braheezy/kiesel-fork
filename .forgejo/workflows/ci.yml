@@ -187,8 +187,10 @@ jobs:
         run: |
           # Building with Intl almost doubles the size, let's try to keep the final blob
           # reasonably small - as a result we build this twice
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          # ReleaseSmall is used to get some additional size savings and because it appears
+          # to be less memory hungry. See: https://codeberg.org/ziglang/zig/issues/31215
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall -Denable-intl=false -Denable-temporal=false
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Build kiesel-freebsd-aarch64
         run: |
