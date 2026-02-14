@@ -462,6 +462,46 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
     return Value.from(promise_capability.promise);
 }
 
+/// 13.3.12.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
+pub fn evaluateImportMeta(agent: *Agent) std.mem.Allocator.Error!Value {
+    // 1. Let module be GetActiveScriptOrModule().
+    // 2. Assert: module is a Source Text Module Record.
+    var module = agent.getActiveScriptOrModule().?.module.source_text_module;
+
+    // 3. Let importMeta be module.[[ImportMeta]].
+    // 4. If importMeta is empty, then
+    if (module.import_meta) |import_meta| {
+        // 5. Else,
+        //     a. Assert: importMeta is an Object.
+        //     b. Return importMeta.
+        return Value.from(import_meta);
+    }
+
+    // a. Set importMeta to OrdinaryObjectCreate(null).
+    const import_meta = try ordinaryObjectCreate(agent, null);
+
+    // b. Let importMetaValues be HostGetImportMetaProperties(module).
+    var import_meta_values = try agent.host_hooks.hostGetImportMetaProperties(agent, module);
+    defer import_meta_values.deinit(agent.gc_allocator);
+
+    // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
+    var it = import_meta_values.iterator();
+    while (it.next()) |entry| {
+        // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
+        try import_meta.createDataPropertyDirect(agent, entry.key_ptr.*, entry.value_ptr.*);
+    }
+
+    // d. Perform HostFinalizeImportMeta(importMeta, module).
+    agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
+
+    // e. Set module.[[ImportMeta]] to importMeta.
+    module.import_meta = import_meta;
+
+    // f. Return importMeta.
+    return Value.from(import_meta);
+}
+
 /// CallExpression : CoverCallExpressionAndAsyncArrowHead
 /// Step 6.a.
 pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.Error!Value {

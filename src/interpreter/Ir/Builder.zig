@@ -142,7 +142,7 @@ pub fn deinit(b: *Builder) void {
 pub fn build(b: *Builder) Error!Ir {
     const result = switch (b.root_node) {
         .script => |script| try b.lowerScript(script),
-        .module => try b.todo("module"),
+        .module => |module| try b.lowerModule(module),
         .function => |function| try b.lowerFunction(function.parameters, function.body),
     };
     _ = try b.addInst(.{
@@ -386,6 +386,48 @@ fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
 
 fn lowerScript(b: *Builder, script: *const ast.Script) Error!Ir.Inst.Ref {
     return b.lowerStatementList(&script.statement_list);
+}
+
+fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
+    for (module.module_item_list.items) |module_item| {
+        switch (module_item) {
+            // InitializeEnvironment is responsible for creating the bindings.
+            .import_declaration => {},
+            .export_declaration => |export_decl| _ = try b.lowerExportDeclaration(export_decl),
+            .statement_list_item => |stmt_list_item| switch (stmt_list_item) {
+                .statement => |stmt| _ = try b.lowerStatement(stmt),
+                .declaration => |decl| _ = try b.lowerDeclaration(decl),
+            },
+        }
+    }
+    return .none;
+}
+
+fn lowerExportDeclaration(b: *Builder, node: ast.ExportDeclaration) Error!Ir.Inst.Ref {
+    switch (node) {
+        .export_from,
+        .named_exports,
+        => return .none,
+        .variable_statement => |*var_stmt| return b.lowerVariableStatement(var_stmt),
+        .declaration => |decl| return b.lowerDeclaration(decl),
+        .default_hoistable_declaration => return .none, // Handled by InitializeEnvironment
+        .default_class_declaration => try b.todo("export default class"),
+        .default_expression => |*expr| {
+            const value = try b.lowerExpression(expr);
+            const string_index = try b.internString("*default*");
+            if (expr.isAnonymousFunctionDefinition()) {
+                b.setAnonymousFunctionName(value, string_index);
+            }
+            _ = try b.addInst(.{
+                .tag = .initialize_binding,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = value,
+                } },
+            });
+            return .none;
+        },
+    }
 }
 
 fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, function_body: *const ast.FunctionBody) Error!Ir.Inst.Ref {
@@ -1900,12 +1942,12 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .super_property => try b.todo("super property"),
         .meta_property => |meta_prop| switch (meta_prop) {
             .new_target => try b.lowerNewTarget(),
-            .import_meta => try b.todo("import.meta"),
+            .import_meta => try b.lowerImportMeta(),
         },
         .new_expression => |*new_expr| try b.lowerNewExpression(new_expr),
         .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
         .super_call => try b.todo("super call"),
-        .import_call => try b.todo("import call"),
+        .import_call => |*import_call| try b.lowerImportCall(import_call),
         .optional_expression => |*opt_expr| try b.lowerOptionalExpression(opt_expr),
         .update_expression => |*update_expr| try b.lowerUpdateExpression(update_expr),
         .unary_expression => |*unary_expr| try b.lowerUnaryExpression(unary_expr),
@@ -2270,6 +2312,13 @@ fn lowerNewTarget(b: *Builder) Error!Ir.Inst.Ref {
     });
 }
 
+fn lowerImportMeta(b: *Builder) Error!Ir.Inst.Ref {
+    return b.addInst(.{
+        .tag = .get_import_meta,
+        .data = .{ .none = {} },
+    });
+}
+
 fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.Inst.Ref {
     const constructor = try b.lowerExpression(new_expr.expression);
 
@@ -2317,6 +2366,21 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     return b.addInst(.{
         .tag = tag,
         .data = .{ .call = extra_index },
+    });
+}
+
+fn lowerImportCall(b: *Builder, import_call: *const ast.ImportCall) Error!Ir.Inst.Ref {
+    const specifier = try b.lowerExpression(import_call.specifier_expression);
+    const options = if (import_call.options_expression) |expr|
+        try b.lowerExpression(expr)
+    else
+        try b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        });
+    return b.addInst(.{
+        .tag = .import_call,
+        .data = .{ .binary = .{ .lhs = specifier, .rhs = options } },
     });
 }
 

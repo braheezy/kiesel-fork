@@ -24,6 +24,8 @@ const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const directEval = language.runtime.directEval;
 const evaluateCall = language.runtime.evaluateCall;
+const evaluateImportCall = language.runtime.evaluateImportCall;
+const evaluateImportMeta = language.runtime.evaluateImportMeta;
 const evaluateNew = language.runtime.evaluateNew;
 const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
@@ -251,6 +253,8 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
                 .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
                 .get_new_target => vm.executeGetNewTarget(data.reg),
+                .import_call => try vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .get_import_meta => try vm.executeGetImportMeta(data.reg),
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},
@@ -1889,4 +1893,16 @@ fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Inst.Reg) void {
     else
         .undefined;
     vm.load(reg, value);
+}
+
+fn executeImportCall(vm: *Vm, dest: Bytecode.Inst.Reg, specifier_reg: Bytecode.Inst.Reg, options_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const specifier = vm.store(specifier_reg);
+    const options = vm.store(options_reg);
+    const result = try evaluateImportCall(vm.agent, specifier, options);
+    vm.load(dest, result);
+}
+
+fn executeGetImportMeta(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+    const result = try evaluateImportMeta(vm.agent);
+    vm.load(dest, result);
 }

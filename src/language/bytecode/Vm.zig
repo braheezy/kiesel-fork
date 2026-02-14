@@ -31,6 +31,7 @@ const directEval = runtime.directEval;
 const evaluateCall = runtime.evaluateCall;
 const evaluateCallGetThisValue = runtime.evaluateCallGetThisValue;
 const evaluateImportCall = runtime.evaluateImportCall;
+const evaluateImportMeta = runtime.evaluateImportMeta;
 const evaluateNew = runtime.evaluateNew;
 const getIterator = types.getIterator;
 const getSuperConstructor = runtime.getSuperConstructor;
@@ -49,7 +50,6 @@ const methodDefinitionEvaluation = runtime.methodDefinitionEvaluation;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
 const noexcept = utils.noexcept;
-const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const yield = builtins.yield;
 
@@ -1143,51 +1143,8 @@ fn executeGetNewTarget(self: *Vm) void {
         .undefined;
 }
 
-/// 13.3.12.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
 fn executeGetOrCreateImportMeta(self: *Vm) std.mem.Allocator.Error!void {
-    // 1. Let module be GetActiveScriptOrModule().
-    // 2. Assert: module is a Source Text Module Record.
-    var module = self.agent.getActiveScriptOrModule().?.module.source_text_module;
-
-    // 3. Let importMeta be module.[[ImportMeta]].
-    // 4. If importMeta is empty, then
-    if (module.import_meta == null) {
-        // a. Set importMeta to OrdinaryObjectCreate(null).
-        const import_meta = try ordinaryObjectCreate(self.agent, null);
-
-        // b. Let importMetaValues be HostGetImportMetaProperties(module).
-        var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(
-            self.agent,
-            module,
-        );
-        defer import_meta_values.deinit(self.agent.gc_allocator);
-
-        // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
-        var it = import_meta_values.iterator();
-        while (it.next()) |entry| {
-            // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
-            try import_meta.createDataPropertyDirect(
-                self.agent,
-                entry.key_ptr.*,
-                entry.value_ptr.*,
-            );
-        }
-
-        // d. Perform HostFinalizeImportMeta(importMeta, module).
-        self.agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
-
-        // e. Set module.[[ImportMeta]] to importMeta.
-        module.import_meta = import_meta;
-
-        // f. Return importMeta.
-        self.result = Value.from(import_meta);
-    } else {
-        // 5. Else,
-        // a. Assert: importMeta is an Object.
-        // b. Return importMeta.
-        self.result = Value.from(module.import_meta.?);
-    }
+    self.result = try evaluateImportMeta(self.agent);
 }
 
 fn executeGetTemplateObject(

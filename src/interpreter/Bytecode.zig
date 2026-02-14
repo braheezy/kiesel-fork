@@ -209,6 +209,9 @@ pub const Inst = struct {
         get_argument,
         get_rest_arguments,
         get_new_target,
+
+        import_call,
+        get_import_meta,
     };
 
     pub const Data = union {
@@ -382,6 +385,8 @@ pub const Inst = struct {
         .get_argument = .reg_u16,
         .get_rest_arguments = .reg_u16,
         .get_new_target = .reg,
+        .import_call = .reg_reg_reg,
+        .get_import_meta = .reg,
     });
 
     pub const Reg = enum(u8) {

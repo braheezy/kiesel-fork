@@ -166,6 +166,9 @@ pub const Inst = struct {
 
         getter,
         setter,
+
+        import_call,
+        get_import_meta,
     };
 
     pub const Data = union {
@@ -321,6 +324,8 @@ pub const Inst = struct {
         .get_new_target = .none,
         .getter = .ref,
         .setter = .ref,
+        .import_call = .binary,
+        .get_import_meta = .none,
     });
 
     pub const StringIndex = enum(u32) { _ };

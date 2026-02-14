@@ -189,6 +189,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_new_target => try b.lowerGetNewTarget(dest),
             .getter => try b.lowerGetter(data.ref, dest),
             .setter => try b.lowerSetter(data.ref, dest),
+            .import_call => try b.lowerImportCall(data.binary, dest),
+            .get_import_meta => try b.lowerGetImportMeta(dest),
         }
     }
 
@@ -1615,4 +1617,24 @@ fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
 
 fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
+}
+
+fn lowerImportCall(b: *Builder, binary: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+    const specifier = b.resolve(binary.lhs);
+    const options = b.resolve(binary.rhs);
+    try b.emit(.{
+        .tag = .import_call,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            specifier,
+            options,
+        } },
+    });
+}
+
+fn lowerGetImportMeta(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .get_import_meta,
+        .data = .{ .reg = dest },
+    });
 }
