@@ -160,6 +160,7 @@ pub const Inst = struct {
         create_mapped_arguments_object,
         get_argument,
         get_rest_arguments,
+        get_new_target,
     };
 
     pub const Data = union {
@@ -310,6 +311,7 @@ pub const Inst = struct {
         .create_mapped_arguments_object = .none,
         .get_argument = .argument,
         .get_rest_arguments = .argument,
+        .get_new_target = .none,
     });
 
     pub const StringIndex = enum(u32) { _ };

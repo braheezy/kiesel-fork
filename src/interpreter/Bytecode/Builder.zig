@@ -184,6 +184,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .create_mapped_arguments_object => try b.lowerCreateMappedArgumentsObject(dest),
             .get_argument => try b.lowerGetArgument(data.argument, dest),
             .get_rest_arguments => try b.lowerGetRestArguments(data.argument, dest),
+            .get_new_target => try b.lowerGetNewTarget(dest),
         }
     }
 
@@ -1539,5 +1540,12 @@ fn lowerGetRestArguments(b: *Builder, start_index: u16, dest: Bytecode.Inst.Reg)
     try b.emit(.{
         .tag = .get_rest_arguments,
         .data = .{ .reg_u16 = .{ dest, start_index } },
+    });
+}
+
+fn lowerGetNewTarget(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .get_new_target,
+        .data = .{ .reg = dest },
     });
 }

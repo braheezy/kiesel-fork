@@ -202,6 +202,7 @@ pub const Inst = struct {
         create_mapped_arguments_object,
         get_argument,
         get_rest_arguments,
+        get_new_target,
     };
 
     pub const Data = union {
@@ -368,6 +369,7 @@ pub const Inst = struct {
         .create_mapped_arguments_object = .reg,
         .get_argument = .reg_u16,
         .get_rest_arguments = .reg_u16,
+        .get_new_target = .reg,
     });
 
     pub const Reg = enum(u8) {

@@ -1898,7 +1898,10 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         },
         .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, null),
         .super_property => try b.todo("super property"),
-        .meta_property => try b.todo("meta property"),
+        .meta_property => |meta_prop| switch (meta_prop) {
+            .new_target => try b.lowerNewTarget(),
+            .import_meta => try b.todo("import.meta"),
+        },
         .new_expression => |*new_expr| try b.lowerNewExpression(new_expr),
         .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
         .super_call => try b.todo("super call"),
@@ -2232,6 +2235,13 @@ fn lowerArguments(b: *Builder, arguments: ast.Arguments) Error!std.ArrayList(Ir.
     }
 
     return args;
+}
+
+fn lowerNewTarget(b: *Builder) Error!Ir.Inst.Ref {
+    return b.addInst(.{
+        .tag = .get_new_target,
+        .data = .{ .none = {} },
+    });
 }
 
 fn lowerNewExpression(b: *Builder, new_expr: *const ast.NewExpression) Error!Ir.Inst.Ref {

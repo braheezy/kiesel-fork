@@ -243,6 +243,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .create_mapped_arguments_object => try vm.executeCreateMappedArgumentsObject(data.reg),
                 .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
                 .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
+                .get_new_target => vm.executeGetNewTarget(data.reg),
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},
@@ -1819,4 +1820,12 @@ fn executeGetRestArguments(vm: *Vm, dest: Bytecode.Inst.Reg, start_index: u16) s
     const rest_args = frame.arguments[@min(start_index, frame.arguments.len)..];
     const array = try createArrayFromList(vm.agent, rest_args);
     vm.load(dest, Value.from(&array.object));
+}
+
+fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+    const value: Value = if (vm.agent.getNewTarget()) |new_target|
+        Value.from(new_target)
+    else
+        .undefined;
+    vm.load(reg, value);
 }
