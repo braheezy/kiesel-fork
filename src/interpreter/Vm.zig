@@ -254,8 +254,8 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
                 .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
                 .get_new_target => vm.executeGetNewTarget(data.reg),
-                .import_call => try vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
-                .get_import_meta => try vm.executeGetImportMeta(data.reg),
+                .import_call => vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .get_import_meta => vm.executeGetImportMeta(data.reg),
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},
