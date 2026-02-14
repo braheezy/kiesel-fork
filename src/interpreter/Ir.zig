@@ -140,6 +140,8 @@ pub const Inst = struct {
         copy_data_properties,
 
         call,
+        call_direct_eval,
+        call_direct_eval_strict,
         construct,
 
         get_template_object,
@@ -295,6 +297,8 @@ pub const Inst = struct {
         .delete_property_indexed_strict = .delete_property_indexed,
         .copy_data_properties = .copy_data_properties,
         .call = .call,
+        .call_direct_eval = .call,
+        .call_direct_eval_strict = .call,
         .construct = .construct,
         .get_template_object = .get_template_object,
         .get_iterator = .ref,
@@ -432,7 +436,8 @@ pub const Inst = struct {
                     if (prop != .none) try uses.append(gpa, prop);
                 }
             },
-            .call => {
+            .call,
+            => {
                 const extra = ir.extraData(Call, inst.data.call);
                 try uses.append(gpa, extra.data.callee);
                 if (extra.data.this_value != .none) try uses.append(gpa, extra.data.this_value);

@@ -2279,8 +2279,17 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     });
     try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
 
+    const is_direct_eval = call_expr.expression.* == .primary_expression and
+        call_expr.expression.primary_expression == .identifier_reference and
+        std.mem.eql(u8, call_expr.expression.primary_expression.identifier_reference, "eval");
+
+    const tag: Ir.Inst.Tag = if (is_direct_eval)
+        (if (b.in_strict_mode) .call_direct_eval_strict else .call_direct_eval)
+    else
+        .call;
+
     return b.addInst(.{
-        .tag = .call,
+        .tag = tag,
         .data = .{ .call = extra_index },
     });
 }

@@ -168,6 +168,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .delete_property_indexed_strict => try b.lowerDeletePropertyIndexed(data.delete_property_indexed, true, dest),
             .copy_data_properties => try b.lowerCopyDataProperties(data.copy_data_properties, dest),
             .call => try b.lowerCall(data.call, dest),
+            .call_direct_eval => try b.lowerCallDirectEval(data.call, dest, false),
+            .call_direct_eval_strict => try b.lowerCallDirectEval(data.call, dest, true),
             .construct => try b.lowerConstruct(data.construct, dest),
             .get_template_object => try b.lowerGetTemplateObject(data.get_template_object, dest),
             .get_iterator => try b.lowerGetIterator(data.ref, dest),
@@ -1355,6 +1357,24 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
             } },
         }),
     }
+}
+
+fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg, strict: bool) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.Call, data);
+    const callee_reg = b.resolve(extra.data.callee);
+    const args = b.ir.refSlice(extra.end, extra.data.args_len);
+
+    const args_reg: Bytecode.Inst.Reg = .scratch;
+    try b.emitArgumentsArray(args, args_reg);
+
+    try b.emit(.{
+        .tag = if (strict) .call_direct_eval_strict else .call_direct_eval,
+        .data = .{ .reg_reg_reg = .{
+            dest,
+            callee_reg,
+            args_reg,
+        } },
+    });
 }
 
 fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {

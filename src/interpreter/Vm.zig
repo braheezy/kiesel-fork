@@ -22,6 +22,7 @@ const createArrayFromList = types.createArrayFromList;
 const createForInIterator = builtins.createForInIterator;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
+const directEval = language.runtime.directEval;
 const evaluateCall = language.runtime.evaluateCall;
 const evaluateNew = language.runtime.evaluateNew;
 const getIterator = types.getIterator;
@@ -223,6 +224,8 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .call_property0 => vm.executeCallPropertyN(0, data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], .{}),
                 .call_property1 => vm.executeCallPropertyN(1, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], data.reg_reg_reg_reg[2], .{data.reg_reg_reg_reg[3]}),
                 .call_property2 => vm.executeCallPropertyN(2, data.reg_reg_reg_reg_reg[0], data.reg_reg_reg_reg_reg[1], data.reg_reg_reg_reg_reg[2], .{ data.reg_reg_reg_reg_reg[3], data.reg_reg_reg_reg_reg[4] }),
+                .call_direct_eval => vm.executeCallDirectEval(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], false),
+                .call_direct_eval_strict => vm.executeCallDirectEval(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
                 .construct => vm.executeConstruct(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .construct0 => vm.executeConstructN(0, data.reg_reg[0], data.reg_reg[1], .{}),
                 .construct1 => vm.executeConstructN(1, data.reg_reg_reg[0], data.reg_reg_reg[1], .{data.reg_reg_reg[2]}),
@@ -1556,6 +1559,36 @@ fn executeCallPropertyN(
     inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
 
     const result = try evaluateCall(vm.agent, callee_value, this_value, &args);
+    vm.load(dest, result);
+}
+
+fn executeCallDirectEval(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    callee_reg: Bytecode.Inst.Reg,
+    args_reg: Bytecode.Inst.Reg,
+    strict: bool,
+) Agent.Error!void {
+    const callee_value = vm.store(callee_reg);
+    const args_value = vm.store(args_reg);
+    const args_object = args_value.asObject();
+    const args_len = args_object.as(builtins.Array).fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
+    defer args_list.deinit(vm.agent.gc_allocator);
+    for (0..args_len) |i| {
+        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const arg = descriptor.value_or_accessor.value;
+        args_list.appendAssumeCapacity(arg);
+    }
+
+    const realm = vm.agent.currentRealm();
+    const eval = try realm.intrinsics.@"%eval%"();
+
+    const result = if (callee_value.sameValue(Value.from(eval)))
+        try directEval(vm.agent, args_list.items, strict)
+    else
+        try evaluateCall(vm.agent, callee_value, .undefined, args_list.items);
     vm.load(dest, result);
 }
 
