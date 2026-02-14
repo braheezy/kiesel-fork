@@ -7,6 +7,7 @@ const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -109,6 +110,8 @@ pub const ECMAScriptFunction = MakeObject(.{
 
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
+
+        cached_bytecode: ?*const interpreter.Bytecode = null,
 
         cached_arguments_executable: ?*Executable = null,
         cached_body_executable: ?*Executable = null,
@@ -217,6 +220,8 @@ pub const ECMAScriptFunction = MakeObject(.{
             arguments: Arguments,
             maybe_environment: ?Environment,
         ) Agent.Error!void {
+            std.debug.assert(!agent.options.new_interpreter);
+
             // OPTIMIZATION: If there are no parameters we don't need to do anything.
             if (self.formal_parameters.items.len == 0) return;
 
@@ -353,6 +358,8 @@ pub const ECMAScriptFunction = MakeObject(.{
         }
 
         pub fn evaluateBody(self: *@This(), agent: *Agent, maybe_vm: ?*Vm) Agent.Error!Completion {
+            std.debug.assert(!agent.options.new_interpreter);
+
             // OPTIMIZATION: If the body is empty we can directly return a normal completion.
             if (self.ecmascript_code.statement_list.items.len == 0) {
                 return Completion.normal(null);
@@ -390,6 +397,22 @@ pub const ECMAScriptFunction = MakeObject(.{
                 defer vm.deinit();
                 return vm.run();
             }
+        }
+
+        pub fn compile(self: *@This(), agent: *Agent, name: []const u8) Agent.Error!*const interpreter.Bytecode {
+            if (self.cached_bytecode) |bc| return bc;
+
+            const bc = try agent.gc_allocator.create(interpreter.Bytecode);
+            errdefer agent.gc_allocator.destroy(bc);
+            bc.* = try interpreter.compile(agent, name, .{
+                .function = .{
+                    .parameters = &self.formal_parameters,
+                    .body = &self.ecmascript_code,
+                },
+            });
+
+            self.cached_bytecode = bc;
+            return bc;
         }
     },
     .tag = .ecmascript_function,
@@ -589,6 +612,18 @@ fn evaluateFunctionBody(
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
 ) Agent.Error!Value {
+    if (agent.options.new_interpreter) {
+        const name_value = function.object.getPropertyValueDirect(PropertyKey.from("name"));
+        const name = try name_value.asString().toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(name);
+        const bc = try function.fields.compile(agent, name);
+        const vm = agent.active_vm.?;
+        try vm.pushCallFrame(bc, arguments_list.values);
+        errdefer vm.popCallFrame();
+        const result = try vm.run();
+        return result orelse .undefined;
+    }
+
     // FunctionBody : FunctionStatementList
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
@@ -1265,6 +1300,8 @@ fn functionDeclarationInstantiation(
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
 ) Agent.Error!void {
+    std.debug.assert(!agent.options.new_interpreter);
+
     // 1. Let calleeContext be the running execution context.
     var callee_context = agent.runningExecutionContext();
 

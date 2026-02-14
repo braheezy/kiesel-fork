@@ -1,18 +1,44 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub const Ir = @This();
+const ast = @import("../language/ast.zig");
+
+const Ir = @This();
 
 name: []const u8,
 instructions: std.MultiArrayList(Inst).Slice,
 extra: []const u32,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
+functions: []const Function,
 liveness: std.DynamicBitSetUnmanaged,
 live_ranges: []const LiveRange,
 
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
+
+pub const Function = struct {
+    source_text: Inst.StringIndex,
+    name: Name,
+    parameters: ast.FormalParameters,
+    body: ast.FunctionBody,
+    kind: Kind,
+
+    pub const Name = union(enum) {
+        none,
+        identifier: Inst.StringIndex,
+        default: Inst.StringIndex,
+    };
+
+    pub const Kind = enum {
+        normal,
+        arrow,
+        generator,
+        async,
+        async_arrow,
+        async_generator,
+    };
+};
 
 pub const Inst = struct {
     tag: Tag,
@@ -128,6 +154,12 @@ pub const Inst = struct {
         throw,
         throw_reference_error,
         @"return",
+
+        create_function,
+        create_unmapped_arguments_object,
+        create_mapped_arguments_object,
+        get_argument,
+        get_rest_arguments,
     };
 
     pub const Data = union {
@@ -161,6 +193,8 @@ pub const Inst = struct {
         call: ExtraIndex,
         construct: ExtraIndex,
         get_template_object: ExtraIndex,
+        create_function: FunctionIndex,
+        argument: u16,
 
         // Make sure we don't accidentally add a field to make this union
         // bigger than expected. Note that in safety builds, Zig is allowed
@@ -271,10 +305,16 @@ pub const Inst = struct {
         .throw = .ref,
         .throw_reference_error = .none,
         .@"return" = .ref,
+        .create_function = .create_function,
+        .create_unmapped_arguments_object = .none,
+        .create_mapped_arguments_object = .none,
+        .get_argument = .argument,
+        .get_rest_arguments = .argument,
     });
 
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
+    pub const FunctionIndex = enum(u32) { _ };
     pub const ExtraIndex = enum(u32) { _ };
 
     // Inline data types (8 bytes)
@@ -366,6 +406,8 @@ pub const Inst = struct {
             .number,
             .string,
             .big_int,
+            .argument,
+            .create_function,
             => {},
             .ref => try uses.append(gpa, inst.data.ref),
             .array => {
@@ -446,6 +488,7 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.strings);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
+    gpa.free(ir.functions);
     ir.liveness.deinit(gpa);
     gpa.free(ir.live_ranges);
 }
@@ -531,6 +574,8 @@ fn printData(
         .string,
         .big_int,
         .ref,
+        .argument,
+        .create_function,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
             try printField(ir, field_data, writer, tty_config);
@@ -643,6 +688,7 @@ fn printField(
             try writer.print("{}", .{value});
             try tty_config.setColor(writer, .reset);
         },
+        u16,
         u32,
         i32,
         f64,
@@ -683,6 +729,11 @@ fn printField(
             try writer.writeByte('n');
             try tty_config.setColor(writer, .reset);
             try writer.writeByte(')');
+        },
+        Inst.FunctionIndex => {
+            try tty_config.setColor(writer, .yellow);
+            try writer.print("@{d}", .{@intFromEnum(value)});
+            try tty_config.setColor(writer, .reset);
         },
         Inst.UpdateOp => {
             try tty_config.setColor(writer, .blue);

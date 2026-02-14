@@ -64,7 +64,11 @@ pub fn generateAndRunBytecode(
     options: Options,
 ) Agent.Error!Completion {
     if (agent.options.new_interpreter) {
-        return generateAndRunNewInterpreter(agent, ast_node, options.name);
+        if (@TypeOf(ast_node) != ast.Script) {
+            return agent.throwException(.internal_error, "New interpreter only supports Script for now", .{});
+        }
+        const result = try interpreter.compileAndRun(agent, .{ .script = &ast_node }, options.name);
+        return .normal(result);
     }
 
     var executable = generateBytecode(
@@ -91,56 +95,4 @@ pub fn generateAndRunBytecode(
     var vm = try Vm.init(agent, &executable);
     defer vm.deinit();
     return vm.run();
-}
-
-pub fn generateAndRunNewInterpreter(
-    agent: *Agent,
-    ast_node: anytype,
-    name: []const u8,
-) Agent.Error!Completion {
-    // TODO: Don't use the GC allocator for IR and bytecode generation
-    const gpa = agent.gc_allocator;
-
-    if (@TypeOf(ast_node) != ast.Script) {
-        return agent.throwException(.internal_error, "New interpreter only supports Script for now", .{});
-    }
-
-    var ir = ir: {
-        var builder: interpreter.Ir.Builder = .init(gpa, name, .{ .script = &ast_node });
-        defer builder.deinit();
-        break :ir builder.build() catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.NotImplemented => return agent.throwException(.internal_error, "IR generation failed", .{}),
-        };
-    };
-    defer ir.deinit(gpa);
-
-    if (agent.options.debug.print_ir) {
-        const stdout = agent.platform.stdout;
-        const tty_config = agent.platform.tty_config;
-        ir.print(stdout, tty_config) catch {};
-        stdout.writeByte('\n') catch {};
-        stdout.flush() catch {};
-    }
-
-    var bc = bc: {
-        var builder: interpreter.Bytecode.Builder = try .init(gpa, &ir);
-        defer builder.deinit();
-        break :bc try builder.build();
-    };
-    defer bc.deinit(gpa);
-
-    if (agent.options.debug.print_bytecode) {
-        const stdout = agent.platform.stdout;
-        const tty_config = agent.platform.tty_config;
-        bc.print(stdout, tty_config) catch {};
-        stdout.writeByte('\n') catch {};
-        stdout.flush() catch {};
-    }
-
-    var vm: interpreter.Vm = try .init(agent, &bc);
-    defer vm.deinit();
-    const result = try vm.run();
-
-    return .normal(result);
 }

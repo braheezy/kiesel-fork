@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const ast = @import("../language/ast.zig");
 const interpreter = @import("../interpreter.zig");
 
 const Vm = interpreter.Vm;
@@ -10,12 +11,36 @@ name: []const u8,
 code: []const u8,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
+functions: []const Function,
 
 pub const Builder = @import("Bytecode/Builder.zig");
 
 pub const PrintError =
     std.Io.Writer.Error ||
     std.Io.tty.Config.SetColorError;
+
+pub const Function = struct {
+    source_text: Inst.StringIndex,
+    name: Name,
+    parameters: ast.FormalParameters,
+    body: ast.FunctionBody,
+    kind: Kind,
+
+    pub const Name = union(enum) {
+        none,
+        identifier: Inst.StringIndex,
+        default: Inst.StringIndex,
+    };
+
+    pub const Kind = enum {
+        normal,
+        arrow,
+        generator,
+        async,
+        async_arrow,
+        async_generator,
+    };
+};
 
 pub const Inst = struct {
     tag: Tag,
@@ -170,6 +195,13 @@ pub const Inst = struct {
         throw,
         throw_reference_error,
         @"return",
+
+        create_function,
+        set_home_object,
+        create_unmapped_arguments_object,
+        create_mapped_arguments_object,
+        get_argument,
+        get_rest_arguments,
     };
 
     pub const Data = union {
@@ -182,6 +214,7 @@ pub const Inst = struct {
         reg_reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg, Reg },
         reg_reg_u32: struct { Reg, Reg, u32 },
         reg_reg_reg_u16: struct { Reg, Reg, Reg, u16 },
+        reg_u16: struct { Reg, u16 },
         reg_i32: struct { Reg, i32 },
         reg_u32: struct { Reg, u32 },
         reg_f64: struct { Reg, f64 },
@@ -190,6 +223,7 @@ pub const Inst = struct {
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
         reg_string_string: struct { Reg, StringIndex, StringIndex },
+        reg_function: struct { Reg, FunctionIndex },
         string: StringIndex,
         string_reg: struct { StringIndex, Reg },
     };
@@ -328,6 +362,12 @@ pub const Inst = struct {
         .throw = .reg,
         .throw_reference_error = .none,
         .@"return" = .reg,
+        .create_function = .reg_function,
+        .set_home_object = .reg_reg,
+        .create_unmapped_arguments_object = .reg,
+        .create_mapped_arguments_object = .reg,
+        .get_argument = .reg_u16,
+        .get_rest_arguments = .reg_u16,
     });
 
     pub const Reg = enum(u8) {
@@ -340,6 +380,7 @@ pub const Inst = struct {
 
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
+    pub const FunctionIndex = enum(u32) { _ };
 
     pub const Format = struct {
         inst: Inst,
@@ -416,6 +457,7 @@ pub const Inst = struct {
             Reg => @enumFromInt(code[0]),
             StringIndex,
             BigIntIndex,
+            FunctionIndex,
             => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
@@ -453,6 +495,7 @@ pub const Inst = struct {
             Reg => try writer.writeInt(u8, @intFromEnum(value), .little),
             StringIndex,
             BigIntIndex,
+            FunctionIndex,
             => try writer.writeInt(u32, @intFromEnum(value), .little),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
@@ -491,6 +534,7 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.strings);
     for (bc.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(bc.big_ints);
+    gpa.free(bc.functions);
 }
 
 pub const Iterator = struct {
@@ -629,6 +673,11 @@ fn printField(
             try writer.writeByte('n');
             try tty_config.setColor(writer, .reset);
             try writer.writeByte(')');
+        },
+        Inst.FunctionIndex => {
+            try tty_config.setColor(writer, .yellow);
+            try writer.print("@{d}", .{@intFromEnum(value)});
+            try tty_config.setColor(writer, .reset);
         },
         else => comptime unreachable,
     }

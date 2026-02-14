@@ -21,13 +21,18 @@ instructions: std.MultiArrayList(Ir.Inst),
 extra: std.ArrayList(u32),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
+functions: std.ArrayList(Ir.Function),
 breakable_stack: std.ArrayList(*BreakableContext),
 scope_depth: u16,
 template_object_count: u16,
 
-const Ast = union(enum) {
+pub const Ast = union(enum) {
     script: *const ast.Script,
     module: *const ast.Module,
+    function: struct {
+        parameters: *const ast.FormalParameters,
+        body: *const ast.FunctionBody,
+    },
 };
 
 const BigIntContext = struct {
@@ -101,6 +106,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
     const in_strict_mode = switch (root_node) {
         .script => |script| script.scriptIsStrict(),
         .module => true,
+        .function => |function| function.body.strict,
     };
     return .{
         .gpa = gpa,
@@ -111,6 +117,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .extra = .empty,
         .strings = .empty,
         .big_ints = .empty,
+        .functions = .empty,
         .breakable_stack = .empty,
         .scope_depth = 0,
         .template_object_count = 0,
@@ -124,6 +131,7 @@ pub fn deinit(b: *Builder) void {
     b.strings.deinit(b.gpa);
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
+    b.functions.deinit(b.gpa);
     for (b.breakable_stack.items) |ctx| {
         ctx.deinit(b.gpa);
         b.gpa.destroy(ctx);
@@ -135,6 +143,7 @@ pub fn build(b: *Builder) Error!Ir {
     const result = switch (b.root_node) {
         .script => |script| try b.lowerScript(script),
         .module => try b.todo("module"),
+        .function => |function| try b.lowerFunction(function.parameters, function.body),
     };
     _ = try b.addInst(.{
         .tag = .@"return",
@@ -160,12 +169,16 @@ pub fn build(b: *Builder) Error!Ir {
     b.big_ints.clearRetainingCapacity(); // Transfer ownership
     errdefer for (big_ints) |big_int| b.gpa.free(big_int.limbs);
 
+    const functions = try b.functions.toOwnedSlice(b.gpa);
+    errdefer b.gpa.free(functions);
+
     var ir: Ir = .{
         .name = name,
         .instructions = instructions,
         .extra = extra,
         .strings = strings,
         .big_ints = big_ints,
+        .functions = functions,
         .liveness = undefined,
         .live_ranges = undefined,
     };
@@ -258,6 +271,23 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
         });
     }
     return extra_index;
+}
+
+fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Inst.FunctionIndex {
+    const index: Ir.Inst.FunctionIndex = @enumFromInt(b.functions.items.len);
+    try b.functions.append(b.gpa, function);
+    return index;
+}
+
+fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.Inst.StringIndex) void {
+    const index = ref.toIndex().?;
+    const inst = b.instructions.get(@intFromEnum(index));
+    std.debug.assert(inst.tag == .create_function);
+    const function_index = inst.data.create_function;
+    const function = &b.functions.items[@intFromEnum(function_index)];
+    if (function.name == .none) {
+        function.name = .{ .default = string_index };
+    }
 }
 
 fn pushBreakableContext(b: *Builder, ctx: BreakableContext) std.mem.Allocator.Error!*BreakableContext {
@@ -358,6 +388,181 @@ fn lowerScript(b: *Builder, script: *const ast.Script) Error!Ir.Inst.Ref {
     return b.lowerStatementList(&script.statement_list);
 }
 
+fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, function_body: *const ast.FunctionBody) Error!Ir.Inst.Ref {
+    var declared_names: std.StringArrayHashMapUnmanaged(void) = .empty;
+    defer declared_names.deinit(b.gpa);
+    var has_duplicates = false;
+
+    for (formal_parameters.items) |item| switch (item) {
+        .formal_parameter => |param| switch (param.binding_element) {
+            .single_name_binding => |binding| {
+                const gop = try declared_names.getOrPut(b.gpa, binding.binding_identifier);
+                if (gop.found_existing) {
+                    has_duplicates = true;
+                } else {
+                    const string_index = try b.internString(binding.binding_identifier);
+                    _ = try b.addInst(.{
+                        .tag = .create_mutable_binding,
+                        .data = .{ .string = string_index },
+                    });
+                }
+            },
+            .binding_pattern_and_expression => |bpe| {
+                var bound_names: std.ArrayList(ast.Identifier) = .empty;
+                defer bound_names.deinit(b.gpa);
+                try bpe.binding_pattern.collectBoundNames(b.gpa, &bound_names);
+                for (bound_names.items) |name| {
+                    const gop = try declared_names.getOrPut(b.gpa, name);
+                    if (gop.found_existing) {
+                        has_duplicates = true;
+                    } else {
+                        const string_index = try b.internString(name);
+                        _ = try b.addInst(.{
+                            .tag = .create_mutable_binding,
+                            .data = .{ .string = string_index },
+                        });
+                    }
+                }
+            },
+        },
+        .function_rest_parameter => |rest_param| switch (rest_param.binding_rest_element) {
+            .binding_identifier => |identifier| {
+                const gop = try declared_names.getOrPut(b.gpa, identifier);
+                if (gop.found_existing) {
+                    has_duplicates = true;
+                } else {
+                    const string_index = try b.internString(identifier);
+                    _ = try b.addInst(.{
+                        .tag = .create_mutable_binding,
+                        .data = .{ .string = string_index },
+                    });
+                }
+            },
+            .binding_pattern => |*pattern| {
+                var bound_names: std.ArrayList(ast.Identifier) = .empty;
+                defer bound_names.deinit(b.gpa);
+                try pattern.collectBoundNames(b.gpa, &bound_names);
+                for (bound_names.items) |name| {
+                    const gop = try declared_names.getOrPut(b.gpa, name);
+                    if (gop.found_existing) {
+                        has_duplicates = true;
+                    } else {
+                        const string_index = try b.internString(name);
+                        _ = try b.addInst(.{
+                            .tag = .create_mutable_binding,
+                            .data = .{ .string = string_index },
+                        });
+                    }
+                }
+            },
+        },
+    };
+
+    if (has_duplicates) {
+        const undefined_ref = try b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        });
+        for (declared_names.keys()) |name| {
+            const string_index = try b.internString(name);
+            _ = try b.addInst(.{
+                .tag = .initialize_binding,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = undefined_ref,
+                } },
+            });
+        }
+    }
+
+    const binding_tag: Ir.Inst.Tag = if (has_duplicates) .set_binding else .initialize_binding;
+    const binding_op: BindingOp = if (has_duplicates) .set else .initialize;
+
+    for (formal_parameters.items, 0..) |item, i| switch (item) {
+        .formal_parameter => |param| switch (param.binding_element) {
+            .single_name_binding => |binding| {
+                const string_index = try b.internString(binding.binding_identifier);
+                const arg_value = try b.addInst(.{
+                    .tag = .get_argument,
+                    .data = .{ .argument = @intCast(i) },
+                });
+                const value = try b.lowerDefaultExpression(arg_value, if (binding.initializer) |*expr| expr else null);
+                if (binding.initializer != null and binding.initializer.?.isAnonymousFunctionDefinition()) {
+                    b.setAnonymousFunctionName(value, string_index);
+                }
+                _ = try b.addInst(.{
+                    .tag = binding_tag,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = value,
+                    } },
+                });
+            },
+            .binding_pattern_and_expression => |bpe| {
+                const arg_value = try b.addInst(.{
+                    .tag = .get_argument,
+                    .data = .{ .argument = @intCast(i) },
+                });
+                const value = try b.lowerDefaultExpression(arg_value, if (bpe.initializer) |*expr| expr else null);
+                _ = try b.lowerDestructuringAssignment(&bpe.binding_pattern, value, binding_op);
+            },
+        },
+        .function_rest_parameter => |rest_param| switch (rest_param.binding_rest_element) {
+            .binding_identifier => |identifier| {
+                const string_index = try b.internString(identifier);
+                const rest_value = try b.addInst(.{
+                    .tag = .get_rest_arguments,
+                    .data = .{ .argument = @intCast(i) },
+                });
+                _ = try b.addInst(.{
+                    .tag = binding_tag,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = rest_value,
+                    } },
+                });
+            },
+            .binding_pattern => |*pattern| {
+                const rest_value = try b.addInst(.{
+                    .tag = .get_rest_arguments,
+                    .data = .{ .argument = @intCast(i) },
+                });
+                _ = try b.lowerDestructuringAssignment(pattern, rest_value, binding_op);
+            },
+        },
+    };
+
+    if ((formal_parameters.arguments_object_needed or function_body.arguments_object_needed) and
+        !declared_names.contains("arguments"))
+    {
+        const binding_kind: Ir.Inst.Tag = if (b.in_strict_mode) .create_immutable_binding else .create_mutable_binding;
+        const arguments_string = try b.internString("arguments");
+        _ = try b.addInst(.{
+            .tag = binding_kind,
+            .data = .{ .string = arguments_string },
+        });
+        const arguments_object_tag: Ir.Inst.Tag = if (b.in_strict_mode or !formal_parameters.isSimpleParameterList())
+            .create_unmapped_arguments_object
+        else
+            .create_mapped_arguments_object;
+        const arguments_object = try b.addInst(.{
+            .tag = arguments_object_tag,
+            .data = .{ .none = {} },
+        });
+        _ = try b.addInst(.{
+            .tag = .initialize_binding,
+            .data = .{ .set_binding = .{
+                .name = arguments_string,
+                .value = arguments_object,
+            } },
+        });
+    }
+
+    _ = try b.lowerStatementList(&function_body.statement_list);
+    // Implicit return is added in `build()`
+    return .none;
+}
+
 fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir.Inst.Ref {
     var last: Ir.Inst.Ref = .none;
     for (stmt_list.items) |item| {
@@ -382,7 +587,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .breakable_statement => |*brk_stmt| try b.lowerBreakableStatement(brk_stmt, null),
         .continue_statement => |*cont_stmt| try b.lowerContinueStatement(cont_stmt),
         .break_statement => |*brk_stmt| try b.lowerBreakStatement(brk_stmt),
-        .return_statement => try b.todo("return statement"),
+        .return_statement => |*ret_stmt| try b.lowerReturnStatement(ret_stmt),
         .with_statement => |*with_stmt| try b.lowerWithStatement(with_stmt),
         .labelled_statement => |*lbl_stmt| try b.lowerLabelledStatement(lbl_stmt),
         .throw_statement => |*throw_stmt| try b.lowerThrowStatement(throw_stmt),
@@ -393,7 +598,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
 
 fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref {
     return switch (decl.*) {
-        .hoistable_declaration => try b.todo("hoistable declaration"),
+        .hoistable_declaration => .none, // Handled by GDI/FDI before execution
         .class_declaration => try b.todo("class declaration"),
         .lexical_declaration => |*lex_decl| try b.lowerLexicalDeclaration(lex_decl),
     };
@@ -482,6 +687,9 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
             if (binding.initializer) |*init_expr| {
                 const value = try b.lowerExpression(init_expr);
                 const string_index = try b.internString(binding.binding_identifier);
+                if (init_expr.isAnonymousFunctionDefinition()) {
+                    b.setAnonymousFunctionName(value, string_index);
+                }
                 return b.addInst(.{
                     .tag = .set_binding,
                     .data = .{ .set_binding = .{
@@ -1274,6 +1482,18 @@ fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!I
     return .none;
 }
 
+fn lowerReturnStatement(b: *Builder, ret_stmt: *const ast.ReturnStatement) Error!Ir.Inst.Ref {
+    const value = if (ret_stmt.expression) |*expr|
+        try b.lowerExpression(expr)
+    else
+        Ir.Inst.Ref.none;
+    _ = try b.addInst(.{
+        .tag = .@"return",
+        .data = .{ .ref = value },
+    });
+    return .none;
+}
+
 fn lowerWithStatement(b: *Builder, with_stmt: *const ast.WithStatement) Error!Ir.Inst.Ref {
     const value = try b.lowerExpression(&with_stmt.expression);
     const object = try b.addInst(.{
@@ -1332,10 +1552,11 @@ fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) E
 
 fn lowerThrowStatement(b: *Builder, throw_stmt: *const ast.ThrowStatement) Error!Ir.Inst.Ref {
     const value = try b.lowerExpression(&throw_stmt.expression);
-    return try b.addInst(.{
+    _ = try b.addInst(.{
         .tag = .throw,
         .data = .{ .ref = value },
     });
+    return .none;
 }
 
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {
@@ -1357,6 +1578,9 @@ fn lowerLexicalBinding(b: *Builder, lex_binding: *const ast.LexicalBinding) Erro
                     .data = .{ .none = {} },
                 });
             const string_index = try b.internString(binding.binding_identifier);
+            if (binding.initializer != null and binding.initializer.?.isAnonymousFunctionDefinition()) {
+                b.setAnonymousFunctionName(value, string_index);
+            }
             return b.addInst(.{
                 .tag = .initialize_binding,
                 .data = .{ .set_binding = .{
@@ -1662,15 +1886,15 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .literal => unreachable, // Guaranteed to constant-fold
             .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
             .object_literal => |*object_lit| try b.lowerObjectLiteral(object_lit),
-            .function_expression => try b.todo("function expression"),
+            .function_expression => |*func_expr| try b.lowerFunctionExpression(func_expr),
             .class_expression => try b.todo("class expression"),
-            .generator_expression => try b.todo("generator expression"),
-            .async_function_expression => try b.todo("async function expression"),
-            .async_generator_expression => try b.todo("async generator expression"),
+            .generator_expression => |*gen_expr| try b.lowerFunctionExpression(gen_expr),
+            .async_function_expression => |*async_expr| try b.lowerFunctionExpression(async_expr),
+            .async_generator_expression => |*async_gen_expr| try b.lowerFunctionExpression(async_gen_expr),
             .regular_expression_literal => |*regexp_lit| try b.lowerRegularExpressionLiteral(regexp_lit),
             .template_literal => |*template_lit| try b.lowerTemplateLiteral(template_lit),
-            .arrow_function => try b.todo("arrow function"),
-            .async_arrow_function => try b.todo("async arrow function"),
+            .arrow_function => |*arrow_func| try b.lowerArrowFunction(arrow_func),
+            .async_arrow_function => |*async_arrow_func| try b.lowerArrowFunction(async_arrow_func),
         },
         .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, null),
         .super_property => try b.todo("super property"),
@@ -1759,8 +1983,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     .tag = .get_binding,
                     .data = .{ .string = string_index },
                 });
-                try pairs.append(b.gpa, key_ref);
-                try pairs.append(b.gpa, value_ref);
+                try pairs.appendSlice(b.gpa, &.{ key_ref, value_ref });
             },
             .spread => |*expr| {
                 const value_ref = try b.lowerExpression(expr);
@@ -1768,13 +1991,53 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     .tag = .spread,
                     .data = .{ .ref = value_ref },
                 });
-                try pairs.append(b.gpa, .none);
-                try pairs.append(b.gpa, spread_ref);
+                try pairs.appendSlice(b.gpa, &.{ .none, spread_ref });
             },
-            .method_definition => try b.todo("method definition in object literal"),
+            .method_definition => |method_def| {
+                const key_ref = switch (method_def.class_element_name) {
+                    .property_name => |*property_name| try b.lowerPropertyName(property_name),
+                    .private_identifier => try b.todo("private identifier in object method"),
+                };
+                const method_ref = switch (method_def.method) {
+                    .get, .set => try b.todo("getter/setter in object literal"),
+                    inline else => |f, tag| blk: {
+                        const source_text = try b.internString(f.source_text);
+                        const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
+                            method_def.class_element_name.property_name.literal_property_name == .identifier)
+                            .{ .default = try b.internString(method_def.class_element_name.property_name.literal_property_name.identifier) }
+                        else
+                            .none;
+                        const function_index = try b.addFunction(.{
+                            .source_text = source_text,
+                            .name = name,
+                            .parameters = f.formal_parameters,
+                            .body = f.function_body,
+                            .kind = switch (tag) {
+                                .method => .normal,
+                                .generator => .generator,
+                                .async => .async,
+                                .async_generator => .async_generator,
+                                .get, .set => unreachable,
+                            },
+                        });
+                        break :blk try b.addInst(.{
+                            .tag = .create_function,
+                            .data = .{ .create_function = function_index },
+                        });
+                    },
+                };
+                try pairs.appendSlice(b.gpa, &.{ key_ref, method_ref });
+            },
             .property_name_and_expression => |*prop| {
                 const key_ref = try b.lowerPropertyName(&prop.property_name);
                 const value_ref = try b.lowerExpression(&prop.expression);
+                if (prop.property_name == .literal_property_name and
+                    prop.property_name.literal_property_name == .identifier and
+                    prop.expression.isAnonymousFunctionDefinition())
+                {
+                    const string_index = try b.internString(prop.property_name.literal_property_name.identifier);
+                    b.setAnonymousFunctionName(value_ref, string_index);
+                }
                 try pairs.append(b.gpa, key_ref);
                 try pairs.append(b.gpa, value_ref);
             },
@@ -1791,6 +2054,32 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .extra_index = extra_index,
             .len = len,
         } },
+    });
+}
+
+fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
+    const source_text = try b.internString(func_expr.source_text);
+    const name: Ir.Function.Name = if (func_expr.identifier) |identifier|
+        .{ .identifier = try b.internString(identifier) }
+    else
+        .none;
+
+    const function_index = try b.addFunction(.{
+        .source_text = source_text,
+        .name = name,
+        .parameters = func_expr.formal_parameters,
+        .body = func_expr.function_body,
+        .kind = switch (func_expr.function_body.type) {
+            .normal => .normal,
+            .generator => .generator,
+            .async => .async,
+            .async_generator => .async_generator,
+        },
+    });
+
+    return b.addInst(.{
+        .tag = .create_function,
+        .data = .{ .create_function = function_index },
     });
 }
 
@@ -1851,6 +2140,27 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
         }
     }
     return result;
+}
+
+fn lowerArrowFunction(b: *Builder, arrow_func: anytype) Error!Ir.Inst.Ref {
+    const source_text = try b.internString(arrow_func.source_text);
+
+    const function_index = try b.addFunction(.{
+        .source_text = source_text,
+        .name = .none,
+        .parameters = arrow_func.formal_parameters,
+        .body = arrow_func.function_body,
+        .kind = switch (arrow_func.function_body.type) {
+            .normal => .arrow,
+            .async => .async_arrow,
+            .generator, .async_generator => unreachable,
+        },
+    });
+
+    return b.addInst(.{
+        .tag = .create_function,
+        .data = .{ .create_function = function_index },
+    });
 }
 
 fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, base_out: ?*Ir.Inst.Ref) Error!Ir.Inst.Ref {
@@ -2403,6 +2713,9 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
             .identifier_reference => |identifier| {
                 const value = try b.lowerExpression(assign_expr.rhs_expression);
                 const string_index = try b.internString(identifier);
+                if (assign_expr.rhs_expression.isAnonymousFunctionDefinition()) {
+                    b.setAnonymousFunctionName(value, string_index);
+                }
                 return b.addInst(.{
                     .tag = if (b.in_strict_mode)
                         .set_binding_strict

@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
@@ -19,67 +20,82 @@ const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumeric
 const arrayCreateFast = builtins.arrayCreateFast;
 const createArrayFromList = types.createArrayFromList;
 const createForInIterator = builtins.createForInIterator;
+const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
+const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const evaluateCall = language.runtime.evaluateCall;
 const evaluateNew = language.runtime.evaluateNew;
 const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
+const instantiateArrowFunctionExpression = language.runtime.instantiateArrowFunctionExpression;
+const instantiateAsyncArrowFunctionExpression = language.runtime.instantiateAsyncArrowFunctionExpression;
+const instantiateAsyncFunctionExpression = language.runtime.instantiateAsyncFunctionExpression;
+const instantiateAsyncGeneratorFunctionExpression = language.runtime.instantiateAsyncGeneratorFunctionExpression;
+const instantiateGeneratorFunctionExpression = language.runtime.instantiateGeneratorFunctionExpression;
+const instantiateOrdinaryFunctionExpression = language.runtime.instantiateOrdinaryFunctionExpression;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
-const stringValueImpl = language.ast.stringValueImpl;
+const stringValueImpl = ast.stringValueImpl;
 
 const Vm = @This();
 
 agent: *Agent,
-bytecode: *const Bytecode,
-strings: []const *const String,
-big_ints: []const *const BigInt,
-regs: [num_regs]Value,
-cached_this_value: ?Value,
+call_stack: std.ArrayList(CallFrame),
+constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
 
 pub const num_regs = 32;
+
+const CallFrame = struct {
+    bytecode: *const Bytecode,
+    constants: Constants,
+    regs: [num_regs]Value,
+    arguments: []const Value,
+    cached_this_value: ?Value,
+};
+
+const constants_align = @max(@alignOf(String), @alignOf(BigInt));
+const Constants = []const *align(constants_align) const anyopaque;
 
 pub fn init(
     agent: *Agent,
     bytecode: *const Bytecode,
-) std.mem.Allocator.Error!Vm {
-    const strings = try agent.gc_allocator.alloc(*const String, bytecode.strings.len);
-    errdefer agent.gc_allocator.free(strings);
-    for (bytecode.strings, 0..) |utf8, i| {
-        strings[i] = try stringValueImpl(agent.gc_allocator, utf8);
-    }
-
-    const big_ints = try agent.gc_allocator.alloc(*const BigInt, bytecode.big_ints.len);
-    errdefer agent.gc_allocator.free(big_ints);
-    for (bytecode.big_ints, 0..) |@"const", i| {
-        const managed = try @"const".toManaged(agent.gc_allocator);
-        big_ints[i] = try BigInt.fromManaged(agent, managed);
-    }
-
-    return .{
+) Agent.Error!Vm {
+    var vm: Vm = .{
         .agent = agent,
-        .bytecode = bytecode,
-        .strings = strings,
-        .big_ints = big_ints,
-        // Not initialized to catch invalid stores more easily
-        .regs = undefined,
-        .cached_this_value = null,
+        .call_stack = .empty,
+        .constants_cache = .empty,
     };
+    try vm.pushCallFrame(bytecode, &.{});
+    return vm;
 }
 
 pub fn deinit(vm: *Vm) void {
-    // Values might outlive the VM and need to be GC'd, but we can free the arrays
-    vm.agent.gc_allocator.free(vm.strings);
-    vm.agent.gc_allocator.free(vm.big_ints);
+    std.debug.assert(vm.call_stack.items.len == 1);
+    const frame = vm.currentCallFrame();
+    std.debug.assert(frame.arguments.len == 0);
+    vm.call_stack.deinit(vm.agent.gc_allocator);
+
+    var it = vm.constants_cache.iterator();
+    while (it.next()) |entry| {
+        // Values might outlive the VM and need to be GC'd, but we can free the array
+        vm.agent.gc_allocator.free(entry.value_ptr.*);
+    }
+    vm.constants_cache.deinit(vm.agent.gc_allocator);
 }
 
 pub fn run(vm: *Vm) Agent.Error!?Value {
-    const code = vm.bytecode.code;
+    const previous_vm = vm.agent.active_vm;
+    vm.agent.active_vm = vm;
+    defer vm.agent.active_vm = previous_vm;
+
+    const frame = vm.currentCallFrame();
+    var code = frame.bytecode.code;
     var pc: usize = 0;
 
     loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
@@ -220,7 +236,13 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
                 .throw_reference_error => vm.executeThrowReferenceError(),
-                .@"return" => return if (data.reg != .none) vm.store(data.reg) else null,
+                .@"return" => return vm.executeReturn(data.reg),
+                .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
+                .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
+                .create_unmapped_arguments_object => try vm.executeCreateUnmappedArgumentsObject(data.reg),
+                .create_mapped_arguments_object => try vm.executeCreateMappedArgumentsObject(data.reg),
+                .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
+                .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
             };
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},
@@ -236,14 +258,62 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
     }
 }
 
-fn store(vm: *const Vm, reg: Bytecode.Inst.Reg) Value {
+pub fn pushCallFrame(
+    vm: *Vm,
+    callee_bytecode: *const Bytecode,
+    args: []const Value,
+) Agent.Error!void {
+    const args_owned = try vm.agent.gc_allocator.dupe(Value, args);
+    errdefer vm.agent.gc_allocator.free(args_owned);
+
+    const constants_gop = try vm.constants_cache.getOrPut(vm.agent.gc_allocator, callee_bytecode);
+    if (!constants_gop.found_existing) {
+        const total_len = callee_bytecode.strings.len + callee_bytecode.big_ints.len;
+        const Ptr = @typeInfo(Constants).pointer.child;
+        const constants = try vm.agent.gc_allocator.alloc(Ptr, total_len);
+        errdefer vm.agent.gc_allocator.free(constants);
+
+        for (callee_bytecode.strings, constants[0..callee_bytecode.strings.len]) |utf8, *slot| {
+            slot.* = @ptrCast(try stringValueImpl(vm.agent.gc_allocator, utf8));
+        }
+        for (callee_bytecode.big_ints, constants[callee_bytecode.strings.len..]) |@"const", *slot| {
+            const managed = try @"const".toManaged(vm.agent.gc_allocator);
+            slot.* = @ptrCast(@alignCast(try BigInt.fromManaged(vm.agent, managed)));
+        }
+
+        constants_gop.value_ptr.* = constants;
+    }
+
+    try vm.call_stack.append(vm.agent.gc_allocator, .{
+        .bytecode = callee_bytecode,
+        .constants = constants_gop.value_ptr.*,
+        .regs = undefined,
+        .arguments = args_owned,
+        .cached_this_value = null,
+    });
+}
+
+pub fn popCallFrame(vm: *Vm) void {
+    std.debug.assert(vm.call_stack.items.len > 1);
+
+    const frame = vm.call_stack.pop().?;
+    vm.agent.gc_allocator.free(frame.arguments);
+}
+
+fn currentCallFrame(vm: *Vm) *CallFrame {
+    return &vm.call_stack.items[vm.call_stack.items.len - 1];
+}
+
+fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
     std.debug.assert(reg != .none);
-    return vm.regs[@intFromEnum(reg)];
+    const frame = vm.currentCallFrame();
+    return frame.regs[@intFromEnum(reg)];
 }
 
 fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
     std.debug.assert(reg != .none);
-    vm.regs[@intFromEnum(reg)] = value;
+    const frame = vm.currentCallFrame();
+    frame.regs[@intFromEnum(reg)] = value;
 }
 
 fn jump(_: *Vm, offset: i32, pc: *usize) void {
@@ -254,12 +324,19 @@ fn jump(_: *Vm, offset: i32, pc: *usize) void {
     }
 }
 
-fn getString(vm: *const Vm, index: Bytecode.Inst.StringIndex) *const String {
-    return vm.strings[@intFromEnum(index)];
+fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) *const String {
+    const frame = vm.currentCallFrame();
+    return @ptrCast(frame.constants[@intFromEnum(index)]);
 }
 
-fn getBigInt(vm: *const Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
-    return vm.big_ints[@intFromEnum(index)];
+fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
+    const frame = vm.currentCallFrame();
+    return @ptrCast(frame.constants[frame.bytecode.strings.len + @intFromEnum(index)]);
+}
+
+fn getFunction(vm: *Vm, index: Bytecode.Inst.FunctionIndex) Bytecode.Function {
+    const frame = vm.currentCallFrame();
+    return frame.bytecode.functions[@intFromEnum(index)];
 }
 
 fn executeJump(vm: *Vm, offset: i32, pc: *usize) void {
@@ -405,9 +482,10 @@ fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.
 }
 
 fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
-    const this_value = vm.cached_this_value orelse blk: {
+    const frame = vm.currentCallFrame();
+    const this_value = frame.cached_this_value orelse blk: {
         const this_value = try vm.agent.resolveThisBinding();
-        vm.cached_this_value = this_value;
+        frame.cached_this_value = this_value;
         break :blk this_value;
     };
     vm.load(reg, this_value);
@@ -1521,7 +1599,8 @@ fn executeConstructN(
 
 fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Bytecode.Inst.Reg, raw_reg: Bytecode.Inst.Reg, template_id: u16) Agent.Error!void {
     const realm = vm.agent.currentRealm();
-    const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&vm.bytecode));
+    const frame = vm.currentCallFrame();
+    const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&frame.bytecode));
 
     const gop = try realm.template_map.getOrPut(vm.agent.gc_allocator, cache_key);
     if (gop.found_existing) {
@@ -1643,4 +1722,101 @@ fn executeThrow(vm: *Vm, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
 fn executeThrowReferenceError(vm: *Vm) Agent.Error!void {
     // Only emitted for web-compat assignment
     return vm.agent.throwException(.reference_error, "Invalid assignment to function call", .{});
+}
+
+fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) ?Value {
+    const return_value: ?Value = if (reg != .none) vm.store(reg) else null;
+    if (vm.call_stack.items.len > 1) vm.popCallFrame();
+    return return_value;
+}
+
+fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
+    const function = vm.getFunction(function_index);
+    const source_text = try vm.getString(function.source_text).toUtf8(vm.agent.gc_allocator);
+    const identifier: ?[]const u8 = switch (function.name) {
+        .identifier => |name_index| try vm.getString(name_index).toUtf8(vm.agent.gc_allocator),
+        .none, .default => null,
+    };
+    const default_name: ?[]const u8 = switch (function.name) {
+        .default => |name_index| try vm.getString(name_index).toUtf8(vm.agent.gc_allocator),
+        .none, .identifier => null,
+    };
+    const function_obj = switch (function.kind) {
+        .normal => try instantiateOrdinaryFunctionExpression(vm.agent, .{
+            .identifier = identifier,
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+        .arrow => try instantiateArrowFunctionExpression(vm.agent, .{
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+        .generator => try instantiateGeneratorFunctionExpression(vm.agent, .{
+            .identifier = identifier,
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+        .async => try instantiateAsyncFunctionExpression(vm.agent, .{
+            .identifier = identifier,
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+        .async_arrow => try instantiateAsyncArrowFunctionExpression(vm.agent, .{
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+        .async_generator => try instantiateAsyncGeneratorFunctionExpression(vm.agent, .{
+            .identifier = identifier,
+            .formal_parameters = function.parameters,
+            .function_body = function.body,
+            .source_text = source_text,
+        }, default_name),
+    };
+    vm.load(dest, Value.from(&function_obj.object));
+}
+
+fn executeSetHomeObject(vm: *Vm, function_reg: Bytecode.Inst.Reg, home_object_reg: Bytecode.Inst.Reg) void {
+    const function_value = vm.store(function_reg);
+    const home_object_value = vm.store(home_object_reg);
+    const function = function_value.asObject().as(builtins.ECMAScriptFunction);
+    makeMethod(function, home_object_value.asObject());
+}
+
+fn executeCreateUnmappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+    const frame = vm.currentCallFrame();
+    const arguments = try createUnmappedArgumentsObject(vm.agent, frame.arguments);
+    vm.load(dest, Value.from(&arguments.object));
+}
+
+fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+    const frame = vm.currentCallFrame();
+    const execution_context = vm.agent.runningExecutionContext();
+    const function = execution_context.origin.function.as(builtins.ECMAScriptFunction);
+    const arguments = try createMappedArgumentsObject(
+        vm.agent,
+        &function.object,
+        function.fields.formal_parameters,
+        frame.arguments,
+        execution_context.ecmascript_code.lexical_environment,
+    );
+    vm.load(dest, Value.from(&arguments.object));
+}
+
+fn executeGetArgument(vm: *Vm, dest: Bytecode.Inst.Reg, arg_index: u16) void {
+    const frame = vm.currentCallFrame();
+    const args = frame.arguments;
+    const value: Value = if (arg_index < args.len) args[arg_index] else .undefined;
+    vm.load(dest, value);
+}
+
+fn executeGetRestArguments(vm: *Vm, dest: Bytecode.Inst.Reg, start_index: u16) std.mem.Allocator.Error!void {
+    const frame = vm.currentCallFrame();
+    const rest_args = frame.arguments[@min(start_index, frame.arguments.len)..];
+    const array = try createArrayFromList(vm.agent, rest_args);
+    vm.load(dest, Value.from(&array.object));
 }

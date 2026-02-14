@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const ast = @import("language/ast.zig");
 const execution = @import("execution.zig");
 const language = @import("language.zig");
 const types = @import("types.zig");
@@ -13,6 +14,68 @@ const Value = types.Value;
 pub const Bytecode = @import("interpreter/Bytecode.zig");
 pub const Ir = @import("interpreter/Ir.zig");
 pub const Vm = @import("interpreter/Vm.zig");
+
+pub fn compile(
+    agent: *Agent,
+    name: []const u8,
+    ast_node: Ir.Builder.Ast,
+) Agent.Error!Bytecode {
+    // TODO: Don't use the GC allocator for IR generation
+    const gpa = agent.gc_allocator;
+
+    var ir = ir: {
+        var builder: Ir.Builder = .init(gpa, name, ast_node);
+        defer builder.deinit();
+        break :ir builder.build() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.NotImplemented => return agent.throwException(.internal_error, "IR generation failed", .{}),
+        };
+    };
+    defer ir.deinit(gpa);
+
+    if (agent.options.debug.print_ir) {
+        const stdout = agent.platform.stdout;
+        const tty_config = agent.platform.tty_config;
+        ir.print(stdout, tty_config) catch {};
+        stdout.writeByte('\n') catch {};
+        stdout.flush() catch {};
+    }
+
+    var bc = bc: {
+        var builder: Bytecode.Builder = try .init(gpa, &ir);
+        defer builder.deinit();
+        break :bc try builder.build();
+    };
+    errdefer bc.deinit(gpa);
+
+    if (agent.options.debug.print_bytecode) {
+        const stdout = agent.platform.stdout;
+        const tty_config = agent.platform.tty_config;
+        bc.print(stdout, tty_config) catch {};
+        stdout.writeByte('\n') catch {};
+        stdout.flush() catch {};
+    }
+
+    return bc;
+}
+
+pub fn compileAndRun(
+    agent: *Agent,
+    ast_node: union(enum) {
+        script: *const ast.Script,
+        module: *const ast.Module,
+    },
+    name: []const u8,
+) Agent.Error!?Value {
+    var bc = try compile(agent, name, switch (ast_node) {
+        inline else => |s, tag| @unionInit(Ir.Builder.Ast, @tagName(tag), s),
+    });
+    defer bc.deinit(agent.gc_allocator);
+
+    var vm: Vm = try .init(agent, &bc);
+    defer vm.deinit();
+    return try vm.run();
+}
 
 const ExpectedResult = union(enum) {
     value: ?Value,
@@ -55,11 +118,20 @@ fn testInterpreter(
     try Realm.initializeHostDefinedRealm(&agent, .{});
 
     const realm = agent.currentRealm();
+
+    const script_record = try agent.gc_allocator.create(Script);
+    script_record.* = .{
+        .realm = realm,
+        .ecmascript_code = script,
+        .loaded_modules = .empty,
+        .host_defined = .null_pointer,
+    };
+
     const test_context = try agent.gc_allocator.create(execution.ExecutionContext);
     test_context.* = .{
         .origin = .script,
         .realm = realm,
-        .script_or_module = null,
+        .script_or_module = .{ .script = script_record },
         .ecmascript_code = .{
             .variable_environment = .{ .global_environment = realm.global_env },
             .lexical_environment = .{ .global_environment = realm.global_env },
@@ -1019,8 +1091,8 @@ test {
         \\  %0: [  0..2  ]                    get_binding @0 ("Error")
         \\  %1: [  1..2  ]                    string @1 ("test")
         \\  %2: [  2..3  ]                    construct %0, [%1]
-        \\  %3: [  3..4  ]                    throw %2
-        \\  %4: [  4..4  ] dead               return %3
+        \\  %3: [  3..3  ]                    throw %2
+        \\  %4: [  4..4  ] dead               return none
         \\
     ,
         \\Bytecode (test)
@@ -1224,4 +1296,26 @@ test {
         \\  95: 84 04                         return r4
         \\
     );
+
+    // Functions
+    try testInterpreter(std.testing.allocator,
+        \\var f = ({a}, b = 0, ...rest) => a + b + rest.length;
+        \\f({a: 1}, 2, 3, 4);
+        \\
+    , .{ .value = Value.from(5) }, null, null);
+
+    // Arguments object
+    try testInterpreter(std.testing.allocator,
+        \\function mapped(a) {
+        \\  a = 99;
+        \\  return arguments[0];
+        \\}
+        \\function unmapped(a) {
+        \\  "use strict";
+        \\  a = 99;
+        \\  return arguments[0];
+        \\}
+        \\mapped(1) - unmapped(1);
+        \\
+    , .{ .value = Value.from(98) }, null, null);
 }

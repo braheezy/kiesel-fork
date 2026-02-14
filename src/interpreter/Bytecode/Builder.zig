@@ -179,6 +179,11 @@ pub fn build(b: *Builder) Error!Bytecode {
             .throw => try b.lowerThrow(data.ref, dest),
             .throw_reference_error => try b.lowerThrowReferenceError(dest),
             .@"return" => try b.lowerReturn(data.ref, dest),
+            .create_function => try b.lowerCreateFunction(data.create_function, dest),
+            .create_unmapped_arguments_object => try b.lowerCreateUnmappedArgumentsObject(dest),
+            .create_mapped_arguments_object => try b.lowerCreateMappedArgumentsObject(dest),
+            .get_argument => try b.lowerGetArgument(data.argument, dest),
+            .get_rest_arguments => try b.lowerGetRestArguments(data.argument, dest),
         }
     }
 
@@ -238,11 +243,29 @@ pub fn build(b: *Builder) Error!Bytecode {
     }
     const big_ints = try big_ints_list.toOwnedSlice(b.gpa);
 
+    var functions_list: std.ArrayList(Bytecode.Function) = try .initCapacity(b.gpa, b.ir.functions.len);
+    defer functions_list.deinit(b.gpa);
+    for (b.ir.functions) |function| {
+        functions_list.appendAssumeCapacity(.{
+            .source_text = @enumFromInt(@intFromEnum(function.source_text)),
+            .name = switch (function.name) {
+                .none => .none,
+                .identifier => |s| .{ .identifier = @enumFromInt(@intFromEnum(s)) },
+                .default => |s| .{ .default = @enumFromInt(@intFromEnum(s)) },
+            },
+            .parameters = function.parameters,
+            .body = function.body,
+            .kind = @enumFromInt(@intFromEnum(function.kind)),
+        });
+    }
+    const functions = try functions_list.toOwnedSlice(b.gpa);
+
     return .{
         .name = name,
         .code = code,
         .strings = strings,
         .big_ints = big_ints,
+        .functions = functions,
     };
 }
 
@@ -633,20 +656,33 @@ fn lowerObject(b: *Builder, data: Ir.Inst.Object, dest: Bytecode.Inst.Reg) Error
     while (i < pairs.len) : (i += 2) {
         const key_ref = pairs[i];
         const value_ref = pairs[i + 1];
+        const value_index = value_ref.toIndex().?;
+        const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
 
         const value_reg = b.resolve(value_ref);
 
-        if (key_ref == .none) {
-            const value_index = value_ref.toIndex().?;
-            std.debug.assert(b.ir.instructions.items(.tag)[@intFromEnum(value_index)] == .spread);
-            try b.emit(.{
-                .tag = .object_spread,
-                .data = .{ .reg_reg = .{
-                    dest,
-                    value_reg,
-                } },
-            });
-            continue;
+        switch (value_tag) {
+            .spread => {
+                std.debug.assert(key_ref == .none);
+                try b.emit(.{
+                    .tag = .object_spread,
+                    .data = .{ .reg_reg = .{
+                        dest,
+                        value_reg,
+                    } },
+                });
+                continue;
+            },
+            .create_function => {
+                try b.emit(.{
+                    .tag = .set_home_object,
+                    .data = .{ .reg_reg = .{
+                        value_reg,
+                        dest,
+                    } },
+                });
+            },
+            else => {},
         }
 
         const key_index = key_ref.toIndex().?;
@@ -1465,4 +1501,43 @@ fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
         .data = .{ .reg = ret_reg },
     });
     b.noreturn();
+}
+
+fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_function_index: Bytecode.Inst.FunctionIndex = @enumFromInt(@intFromEnum(function_index));
+    try b.emit(.{
+        .tag = .create_function,
+        .data = .{ .reg_function = .{
+            dest,
+            bytecode_function_index,
+        } },
+    });
+}
+
+fn lowerCreateUnmappedArgumentsObject(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .create_unmapped_arguments_object,
+        .data = .{ .reg = dest },
+    });
+}
+
+fn lowerCreateMappedArgumentsObject(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .create_mapped_arguments_object,
+        .data = .{ .reg = dest },
+    });
+}
+
+fn lowerGetArgument(b: *Builder, arg_index: u16, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .get_argument,
+        .data = .{ .reg_u16 = .{ dest, arg_index } },
+    });
+}
+
+fn lowerGetRestArguments(b: *Builder, start_index: u16, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .get_rest_arguments,
+        .data = .{ .reg_u16 = .{ dest, start_index } },
+    });
 }

@@ -6,6 +6,7 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
+const interpreter = @import("../interpreter.zig");
 const pretty_printing = @import("../pretty_printing.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -29,7 +30,7 @@ const Agent = @This();
 gc_allocator: std.mem.Allocator,
 gc_allocator_atomic: std.mem.Allocator,
 options: Options,
-exception: ?Exception = null,
+exception: ?Exception,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: String.HashMapUnmanaged(*const Symbol),
 host_hooks: HostHooks,
@@ -38,6 +39,7 @@ queued_jobs: std.ArrayList(QueuedJob),
 empty_shape: *Object.Shape,
 string_cache: String.Cache,
 platform: *const Platform,
+active_vm: ?*interpreter.Vm,
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
@@ -73,6 +75,7 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
         .gc_allocator = platform.gc_allocator,
         .gc_allocator_atomic = platform.gc_allocator_atomic,
         .options = options,
+        .exception = null,
         .well_known_symbols = .init,
         .global_symbol_registry = .empty,
         .host_hooks = .{},
@@ -81,6 +84,7 @@ pub fn init(platform: *const Agent.Platform, options: Options) std.mem.Allocator
         .empty_shape = try .init(platform.gc_allocator),
         .string_cache = .empty,
         .platform = platform,
+        .active_vm = null,
     };
 }
 

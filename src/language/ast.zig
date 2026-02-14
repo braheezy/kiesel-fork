@@ -762,6 +762,27 @@ pub const Expression = union(enum) {
     /// Modern problems (binding pattern LHS) require modern solutions (fake expression type)
     binding_pattern_for_assignment_expression: BindingPattern,
 
+    /// 8.4.3 Static Semantics: IsAnonymousFunctionDefinition ( expr )
+    /// https://tc39.es/ecma262/#sec-isanonymousfunctiondefinition
+    pub fn isAnonymousFunctionDefinition(self: Expression) bool {
+        // 1. If IsFunctionDefinition of expr is false, return false.
+        // 2. Let hasName be HasName of expr.
+        // 3. If hasName is true, return false.
+        // 4. Return true.
+        return switch (self) {
+            .primary_expression => |prim_expr| switch (prim_expr) {
+                .function_expression => |func_expr| func_expr.identifier == null,
+                .generator_expression => |gen_expr| gen_expr.identifier == null,
+                .async_function_expression => |async_expr| async_expr.identifier == null,
+                .async_generator_expression => |async_gen_expr| async_gen_expr.identifier == null,
+                .arrow_function => true,
+                .async_arrow_function => true,
+                else => false,
+            },
+            else => false,
+        };
+    }
+
     /// 8.6.4 Static Semantics: AssignmentTargetType
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype
     pub fn assignmentTargetType(self: Expression, is_strict: ?bool) enum { simple, web_compat, invalid } {
