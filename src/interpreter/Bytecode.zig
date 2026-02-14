@@ -545,7 +545,7 @@ pub fn print(
         for (bc.code[entry.offset..][0..size]) |byte| {
             try writer.print("{x:0>2} ", .{byte});
         }
-        _ = try writer.splatByte(' ', (10 - size) * 3);
+        _ = try writer.splatByteAll(' ', (10 - size) * 3);
         try tty_config.setColor(writer, .reset);
 
         try writer.print("{f}\n", .{entry.inst.fmt(bc, tty_config)});
