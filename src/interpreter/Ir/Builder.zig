@@ -34,6 +34,10 @@ pub const Ast = union(enum) {
         parameters: *const ast.FormalParameters,
         body: *const ast.FunctionBody,
     },
+    eval: struct {
+        script: *const ast.Script,
+        strict: bool,
+    },
 };
 
 const BigIntContext = struct {
@@ -109,6 +113,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .script => |script| script.scriptIsStrict(),
         .module => true,
         .function => |function| function.body.strict,
+        .eval => |eval| eval.strict or eval.script.scriptIsStrict(),
     };
     return .{
         .gpa = gpa,
@@ -149,6 +154,7 @@ pub fn build(b: *Builder) Error!Ir {
         .script => |script| try b.lowerScript(script),
         .module => |module| try b.lowerModule(module),
         .function => |function| try b.lowerFunction(function.parameters, function.body),
+        .eval => |eval| try b.lowerScript(eval.script),
     };
     _ = try b.addInst(.{
         .tag = .@"return",

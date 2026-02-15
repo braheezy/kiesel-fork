@@ -65,11 +65,20 @@ pub fn compileAndRun(
     ast_node: union(enum) {
         script: *const ast.Script,
         module: *const ast.Module,
+        eval: struct {
+            script: *const ast.Script,
+            strict: bool,
+        },
     },
     name: []const u8,
 ) Agent.Error!?Value {
     var bc = try compile(agent, name, switch (ast_node) {
-        inline else => |s, tag| @unionInit(Ir.Builder.Ast, @tagName(tag), s),
+        .script => |s| .{ .script = s },
+        .module => |m| .{ .module = m },
+        .eval => |e| .{ .eval = .{
+            .script = e.script,
+            .strict = e.strict,
+        } },
     });
     defer bc.deinit(agent.gc_allocator);
 

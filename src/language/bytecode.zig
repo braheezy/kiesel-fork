@@ -65,7 +65,10 @@ pub fn generateAndRunBytecode(
 ) Agent.Error!Completion {
     if (agent.options.new_interpreter) {
         const result = switch (@TypeOf(ast_node)) {
-            ast.Script => try interpreter.compileAndRun(agent, .{ .script = &ast_node }, options.name),
+            ast.Script => try interpreter.compileAndRun(agent, if (options.contained_in_strict_mode_code)
+                .{ .eval = .{ .script = &ast_node, .strict = true } }
+            else
+                .{ .script = &ast_node }, options.name),
             ast.Module => try interpreter.compileAndRun(agent, .{ .module = &ast_node }, options.name),
             else => return agent.throwException(.internal_error, "New interpreter only supports Script and Module for now", .{}),
         };
