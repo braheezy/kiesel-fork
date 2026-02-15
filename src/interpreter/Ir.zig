@@ -198,6 +198,13 @@ pub const Inst = struct {
         set_super_property_computed,
         set_super_property_computed_strict,
 
+        push_private_scope,
+        pop_private_scope,
+        create_private_element,
+        get_private_element,
+        set_private_element,
+        has_private_element,
+
         import_call,
         get_import_meta,
     };
@@ -372,6 +379,12 @@ pub const Inst = struct {
         .set_super_property_strict = .set_property,
         .set_super_property_computed = .set_property_computed,
         .set_super_property_computed_strict = .set_property_computed,
+        .push_private_scope = .none,
+        .pop_private_scope = .none,
+        .create_private_element = .string,
+        .get_private_element = .get_property,
+        .set_private_element = .set_property,
+        .has_private_element = .binary,
         .import_call = .binary,
         .get_import_meta = .none,
     });

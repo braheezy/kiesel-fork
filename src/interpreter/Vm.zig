@@ -13,6 +13,7 @@ const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
 const Iterator = types.Iterator;
 const Number = types.Number;
+const PrivateName = types.PrivateName;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
@@ -45,6 +46,7 @@ const isStrictlyEqual = types.isStrictlyEqual;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
+const newPrivateEnvironment = execution.newPrivateEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
@@ -275,6 +277,12 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .set_super_property_strict => vm.executeSetSuperProperty(data.reg_string[0], data.reg_string[1], true),
                 .set_super_property_computed => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], false),
                 .set_super_property_computed_strict => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], true),
+                .create_private_element => vm.executeCreatePrivateElement(data.reg_string[0], data.reg_string[1]),
+                .push_private_scope => try vm.executePushPrivateScope(),
+                .pop_private_scope => vm.executePopPrivateScope(),
+                .get_private_element => vm.executeGetPrivateElement(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
+                .set_private_element => vm.executeSetPrivateElement(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
+                .has_private_element => vm.executeHasPrivateElement(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .import_call => vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_import_meta => vm.executeGetImportMeta(data.reg),
             };
@@ -2166,6 +2174,78 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Inst.Reg, val
         @branchHint(.unlikely);
         return vm.agent.throwException(.type_error, "Could not set super property", .{});
     }
+}
+
+fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+    const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
+
+    const execution_context = vm.agent.runningExecutionContext();
+    const private_env = execution_context.ecmascript_code.private_environment.?;
+    const private_name = try PrivateName.init(vm.agent.gc_allocator, name);
+
+    try private_env.names.putNoClobber(vm.agent.gc_allocator, name_utf8, private_name);
+    vm.load(dest, Value.from(private_name.symbol));
+}
+
+fn executePushPrivateScope(vm: *Vm) std.mem.Allocator.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const private_env = try newPrivateEnvironment(
+        vm.agent.gc_allocator,
+        execution_context.ecmascript_code.private_environment,
+    );
+    execution_context.ecmascript_code.private_environment = private_env;
+}
+
+fn executePopPrivateScope(vm: *Vm) void {
+    const execution_context = vm.agent.runningExecutionContext();
+    execution_context.ecmascript_code.private_environment = execution_context.ecmascript_code.private_environment.?.outer_private_environment;
+}
+
+fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const name = vm.getString(name_index);
+    const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
+    defer vm.agent.gc_allocator.free(name_utf8);
+
+    const execution_context = vm.agent.runningExecutionContext();
+    const private_env = execution_context.ecmascript_code.private_environment.?;
+    const private_name = private_env.resolvePrivateIdentifier(name_utf8);
+
+    const base_object = try base_value.toObject(vm.agent);
+    const result = try base_object.privateGet(vm.agent, private_name);
+    vm.load(dest, result);
+}
+
+fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const base_value = vm.store(base_reg);
+    const value = vm.store(value_reg);
+    const name = vm.getString(name_index);
+    const identifier = try name.toUtf8(vm.agent.gc_allocator);
+    defer vm.agent.gc_allocator.free(identifier);
+
+    const private_environment = vm.agent.runningExecutionContext().ecmascript_code.private_environment.?;
+    const private_name = private_environment.resolvePrivateIdentifier(identifier);
+
+    const base_object = try base_value.toObject(vm.agent);
+    try base_object.privateSet(vm.agent, private_name, value);
+}
+
+fn executeHasPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, symbol_reg: Bytecode.Inst.Reg, object_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const symbol_value = vm.store(symbol_reg);
+    const object_value = vm.store(object_reg);
+
+    if (!object_value.isObject()) {
+        return vm.agent.throwException(
+            .type_error,
+            "Right-hand side of 'in' operator must be an object",
+            .{},
+        );
+    }
+
+    const private_name = symbol_value.toPrivateName().?;
+    const result = object_value.asObject().privateElementFind(private_name) != null;
+    vm.load(dest, Value.from(result));
 }
 
 fn executeImportCall(vm: *Vm, dest: Bytecode.Inst.Reg, specifier_reg: Bytecode.Inst.Reg, options_reg: Bytecode.Inst.Reg) Agent.Error!void {

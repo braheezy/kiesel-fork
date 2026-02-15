@@ -1246,7 +1246,18 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                             .data = .{ .set_property_computed = extra_index },
                         });
                     },
-                    .private_identifier => try b.todo("private identifier in for-in/of LHS"),
+                    .private_identifier => |private_identifier| {
+                        const string_index = try b.internString(private_identifier);
+                        const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                            .base = base,
+                            .name = string_index,
+                            .value = next_value,
+                        });
+                        _ = try b.addInst(.{
+                            .tag = .set_private_element,
+                            .data = .{ .set_property = extra_index },
+                        });
+                    },
                 }
             },
             .super_property => |super_prop| switch (super_prop) {
@@ -1691,6 +1702,11 @@ fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) E
         .{ .default = try b.internString("default") };
 
     const heritage = try b.lowerClassHeritage(class_decl.class_tail.class_heritage);
+
+    _ = try b.addInst(.{
+        .tag = .push_private_scope,
+        .data = .{ .none = {} },
+    });
     const element_names = try b.lowerClassElementNames(&class_decl.class_tail.class_body);
 
     const class_index = try b.addClass(.{
@@ -1703,6 +1719,10 @@ fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) E
     const value = try b.addInst(.{
         .tag = .create_class,
         .data = .{ .create_class = class_index },
+    });
+    _ = try b.addInst(.{
+        .tag = .pop_private_scope,
+        .data = .{ .none = {} },
     });
     if (class_decl.identifier) |identifier| {
         const string_index = try b.internString(identifier);
@@ -2157,7 +2177,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .method_definition => |method_def| {
                 const key_ref = switch (method_def.class_element_name) {
                     .property_name => |*property_name| try b.lowerPropertyName(property_name),
-                    .private_identifier => try b.todo("private identifier in object method"),
+                    .private_identifier => unreachable,
                 };
                 const method_ref = switch (method_def.method) {
                     .get, .set => |f| blk: {
@@ -2252,6 +2272,11 @@ fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Err
         .none;
 
     const heritage = try b.lowerClassHeritage(class_expr.class_tail.class_heritage);
+
+    _ = try b.addInst(.{
+        .tag = .push_private_scope,
+        .data = .{ .none = {} },
+    });
     const element_names = try b.lowerClassElementNames(&class_expr.class_tail.class_body);
 
     const class_index = try b.addClass(.{
@@ -2261,10 +2286,15 @@ fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Err
         .heritage = heritage,
         .element_names = element_names,
     });
-    return b.addInst(.{
+    const result = try b.addInst(.{
         .tag = .create_class,
         .data = .{ .create_class = class_index },
     });
+    _ = try b.addInst(.{
+        .tag = .pop_private_scope,
+        .data = .{ .none = {} },
+    });
+    return result;
 }
 
 fn lowerClassHeritage(b: *Builder, class_heritage: ?*const ast.Expression) Error!Ir.Inst.Ref {
@@ -2276,14 +2306,16 @@ fn lowerClassHeritage(b: *Builder, class_heritage: ?*const ast.Expression) Error
 
 fn lowerClassElementNames(b: *Builder, class_body: *const ast.ClassBody) Error![]const Ir.Inst.Ref {
     var names: std.ArrayList(Ir.Inst.Ref) = .empty;
+    var private_names: std.StringHashMapUnmanaged(Ir.Inst.Ref) = .empty;
+    defer private_names.deinit(b.gpa);
     for (class_body.class_element_list.items) |class_element| {
         switch (class_element.classElementKind()) {
             .constructor_method, .empty => continue,
             .non_constructor_method => {},
         }
         const name_ref: Ir.Inst.Ref = switch (class_element) {
-            .method_definition, .static_method_definition => |method_def| try b.lowerClassElementName(&method_def.class_element_name),
-            .field_definition, .static_field_definition => |field_def| try b.lowerClassElementName(&field_def.class_element_name),
+            .method_definition, .static_method_definition => |method_def| try b.lowerClassElementName(&method_def.class_element_name, &private_names),
+            .field_definition, .static_field_definition => |field_def| try b.lowerClassElementName(&field_def.class_element_name, &private_names),
             .class_static_block, .empty_statement => .none,
         };
         try names.append(b.gpa, name_ref);
@@ -2291,10 +2323,22 @@ fn lowerClassElementNames(b: *Builder, class_body: *const ast.ClassBody) Error![
     return names.toOwnedSlice(b.gpa);
 }
 
-fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElementName) Error!Ir.Inst.Ref {
+fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElementName, private_names: *std.StringHashMapUnmanaged(Ir.Inst.Ref)) Error!Ir.Inst.Ref {
     return switch (class_element_name.*) {
         .property_name => |*property_name| try b.lowerPropertyName(property_name),
-        .private_identifier => try b.todo("private identifier in class element name"),
+        .private_identifier => |private_identifier| {
+            const gop = try private_names.getOrPut(b.gpa, private_identifier);
+            if (gop.found_existing) {
+                return gop.value_ptr.*;
+            }
+            const string_index = try b.internString(private_identifier);
+            const ref = try b.addInst(.{
+                .tag = .create_private_element,
+                .data = .{ .string = string_index },
+            });
+            gop.value_ptr.* = ref;
+            return ref;
+        },
     };
 }
 
@@ -2450,7 +2494,16 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
                 } },
             });
         },
-        .private_identifier => try b.todo("private identifier in member expression"),
+        .private_identifier => |private_identifier| {
+            const string_index = try b.internString(private_identifier);
+            return b.addInst(.{
+                .tag = .get_private_element,
+                .data = .{ .get_property = .{
+                    .base = base,
+                    .name = string_index,
+                } },
+            });
+        },
     }
 }
 
@@ -2688,7 +2741,16 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
                     } },
                 });
             },
-            .private_identifier => try b.todo("private identifier in optional expression"),
+            .private_identifier => |private_identifier| blk: {
+                const string_index = try b.internString(private_identifier);
+                break :blk try b.addInst(.{
+                    .tag = .get_private_element,
+                    .data = .{ .get_property = .{
+                        .base = current,
+                        .name = string_index,
+                    } },
+                });
+            },
         };
     }
     const properties_br = try b.addInstDeferred(.br);
@@ -2798,7 +2860,45 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                         .data = .{ .update_property_computed = extra_index },
                     });
                 },
-                .private_identifier => try b.todo("private identifier update expression"),
+                .private_identifier => |private_identifier| {
+                    const string_index = try b.internString(private_identifier);
+                    const current_value = try b.addInst(.{
+                        .tag = .get_private_element,
+                        .data = .{ .get_property = .{
+                            .base = base,
+                            .name = string_index,
+                        } },
+                    });
+                    const to_numeric = try b.addInst(.{
+                        .tag = .to_numeric,
+                        .data = .{ .ref = current_value },
+                    });
+                    const one = try b.addInst(.{
+                        .tag = .one,
+                        .data = .{ .none = {} },
+                    });
+                    const tag: Ir.Inst.Tag = switch (update_expr.operator) {
+                        .@"++" => .add,
+                        .@"--" => .sub,
+                    };
+                    const new_value = try b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .binary = .{
+                            .lhs = to_numeric,
+                            .rhs = one,
+                        } },
+                    });
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = new_value,
+                    });
+                    _ = try b.addInst(.{
+                        .tag = .set_private_element,
+                        .data = .{ .set_property = extra_index },
+                    });
+                    return if (update_expr.type == .prefix) new_value else to_numeric;
+                },
             }
         },
         .call_expression => |*call_expr| {
@@ -2965,7 +3065,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
                     } },
                 });
             },
-            .private_identifier => try b.todo("private identifier in delete expression"),
+            .private_identifier => unreachable,
         }
     }
     const operand = try b.lowerExpression(unary_expr.expression);
@@ -3011,26 +3111,42 @@ fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Err
 }
 
 fn lowerRelationalExpression(b: *Builder, rel_expr: *const ast.RelationalExpression) Error!Ir.Inst.Ref {
-    const lhs = switch (rel_expr.lhs) {
-        .expression => |expr| try b.lowerExpression(expr),
-        .private_identifier => try b.todo("private identifier"),
-    };
-    const rhs = try b.lowerExpression(rel_expr.rhs_expression);
-    const tag: Ir.Inst.Tag = switch (rel_expr.operator) {
-        .@"<" => .lt,
-        .@">" => .gt,
-        .@"<=" => .lt_eq,
-        .@">=" => .gt_eq,
-        .instanceof => .instanceof,
-        .in => .in,
-    };
-    return b.addInst(.{
-        .tag = tag,
-        .data = .{ .binary = .{
-            .lhs = lhs,
-            .rhs = rhs,
-        } },
-    });
+    switch (rel_expr.lhs) {
+        .expression => |expr| {
+            const lhs = try b.lowerExpression(expr);
+            const rhs = try b.lowerExpression(rel_expr.rhs_expression);
+            const tag: Ir.Inst.Tag = switch (rel_expr.operator) {
+                .@"<" => .lt,
+                .@">" => .gt,
+                .@"<=" => .lt_eq,
+                .@">=" => .gt_eq,
+                .instanceof => .instanceof,
+                .in => .in,
+            };
+            return b.addInst(.{
+                .tag = tag,
+                .data = .{ .binary = .{
+                    .lhs = lhs,
+                    .rhs = rhs,
+                } },
+            });
+        },
+        .private_identifier => |private_identifier| {
+            const string_index = try b.internString(private_identifier);
+            const name = try b.addInst(.{
+                .tag = .create_private_element,
+                .data = .{ .string = string_index },
+            });
+            const rhs = try b.lowerExpression(rel_expr.rhs_expression);
+            return b.addInst(.{
+                .tag = .has_private_element,
+                .data = .{ .binary = .{
+                    .lhs = name,
+                    .rhs = rhs,
+                } },
+            });
+        },
+    }
 }
 
 fn lowerEqualityExpression(b: *Builder, eq_expr: *const ast.EqualityExpression) Error!Ir.Inst.Ref {
@@ -3193,7 +3309,19 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                         .data = .{ .set_property_computed = extra_index },
                     });
                 },
-                .private_identifier => try b.todo("private identifier in member assignment"),
+                .private_identifier => |private_identifier| {
+                    const string_index = try b.internString(private_identifier);
+                    const value = try b.lowerExpression(assign_expr.rhs_expression);
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = value,
+                    });
+                    return b.addInst(.{
+                        .tag = .set_private_element,
+                        .data = .{ .set_property = extra_index },
+                    });
+                },
             }
         },
         .super_property => |super_prop| switch (super_prop) {
@@ -3418,7 +3546,33 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                         .data = .{ .set_property_computed = extra_index },
                     });
                 },
-                .private_identifier => try b.todo("private identifier in binary compound assignment"),
+                .private_identifier => |private_identifier| {
+                    const string_index = try b.internString(private_identifier);
+                    const current_value = try b.addInst(.{
+                        .tag = .get_private_element,
+                        .data = .{ .get_property = .{
+                            .base = base,
+                            .name = string_index,
+                        } },
+                    });
+                    const rhs = try b.lowerExpression(assign_expr.rhs_expression);
+                    const result = try b.addInst(.{
+                        .tag = binary_tag,
+                        .data = .{ .binary = .{
+                            .lhs = current_value,
+                            .rhs = rhs,
+                        } },
+                    });
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = result,
+                    });
+                    return b.addInst(.{
+                        .tag = .set_private_element,
+                        .data = .{ .set_property = extra_index },
+                    });
+                },
             }
         },
         .super_property => |super_prop| switch (super_prop) {
@@ -3498,6 +3652,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
         property_computed: struct { base: Ir.Inst.Ref, property: Ir.Inst.Ref },
         super_property: Ir.Inst.StringIndex,
         super_property_computed: Ir.Inst.Ref,
+        private_element: struct { base: Ir.Inst.Ref, name: Ir.Inst.StringIndex },
     };
 
     var lhs: Lhs = undefined;
@@ -3574,7 +3729,20 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                         } },
                     });
                 },
-                .private_identifier => return try b.todo("private identifier in logical compound assignment"),
+                .private_identifier => |private_identifier| {
+                    const string_index = try b.internString(private_identifier);
+                    lhs = .{ .private_element = .{
+                        .base = base,
+                        .name = string_index,
+                    } };
+                    break :blk try b.addInst(.{
+                        .tag = .get_private_element,
+                        .data = .{ .get_property = .{
+                            .base = base,
+                            .name = string_index,
+                        } },
+                    });
+                },
             }
         },
         .super_property => |super_prop| blk: {
@@ -3719,6 +3887,17 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             _ = try b.addInst(.{
                 .tag = tag,
                 .data = .{ .set_property_computed = extra_index },
+            });
+        },
+        .private_element => |p| {
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = p.base,
+                .name = p.name,
+                .value = rhs,
+            });
+            _ = try b.addInst(.{
+                .tag = .set_private_element,
+                .data = .{ .set_property = extra_index },
             });
         },
     }

@@ -2077,16 +2077,24 @@ pub fn classDefinitionEvaluation(
     }
 
     // 4. Let outerPrivateEnvironment be the running execution context's PrivateEnvironment.
-    const outer_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 5. Let classPrivateEnvironment be NewPrivateEnvironment(outerPrivateEnvironment).
-    const class_private_environment = try newPrivateEnvironment(
-        agent.gc_allocator,
-        outer_private_environment,
-    );
+    var outer_private_environment: ?*PrivateEnvironment = undefined;
+    var class_private_environment: *PrivateEnvironment = undefined;
+
+    if (pre_evaluated_element_names != null and agent.runningExecutionContext().ecmascript_code.private_environment != null) {
+        class_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment.?;
+        outer_private_environment = class_private_environment.outer_private_environment;
+    } else {
+        outer_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment;
+        class_private_environment = try newPrivateEnvironment(
+            agent.gc_allocator,
+            outer_private_environment,
+        );
+    }
 
     // 6. If ClassBody is present, then
-    if (class_tail.class_body.class_element_list.items.len != 0) {
+    if (pre_evaluated_element_names == null and class_tail.class_body.class_element_list.items.len != 0) {
         const private_bound_identifiers = try class_tail.class_body.privateBoundIdentifiers(agent.gc_allocator);
         defer agent.gc_allocator.free(private_bound_identifiers);
 
@@ -2386,7 +2394,9 @@ pub fn classDefinitionEvaluation(
             agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
             // ii. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+            if (pre_evaluated_element_names == null) {
+                agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+            }
 
             // iii. Return ? element.
             return err;
@@ -2528,7 +2538,9 @@ pub fn classDefinitionEvaluation(
         // c. If result is an abrupt completion, then
         _ = result catch |err| {
             // i. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+            if (pre_evaluated_element_names == null) {
+                agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+            }
 
             // ii. Return ? result.
             return err;
@@ -2536,7 +2548,9 @@ pub fn classDefinitionEvaluation(
     }
 
     // 33. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-    agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+    if (pre_evaluated_element_names == null) {
+        agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
+    }
 
     // 34. Return F.
     return function;

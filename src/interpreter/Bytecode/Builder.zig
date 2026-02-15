@@ -204,6 +204,12 @@ pub fn build(b: *Builder) Error!Bytecode {
             .set_super_property_strict => try b.lowerSetSuperProperty(data.set_property, true, dest),
             .set_super_property_computed => try b.lowerSetSuperPropertyComputed(data.set_property_computed, false, dest),
             .set_super_property_computed_strict => try b.lowerSetSuperPropertyComputed(data.set_property_computed, true, dest),
+            .create_private_element => try b.lowerCreatePrivateElement(data.string, dest),
+            .push_private_scope => try b.lowerPushPrivateScope(),
+            .pop_private_scope => try b.lowerPopPrivateScope(),
+            .get_private_element => try b.lowerGetPrivateElement(data.get_property, dest),
+            .set_private_element => try b.lowerSetPrivateElement(data.set_property, dest),
+            .has_private_element => try b.lowerHasPrivateElement(data.binary, dest),
             .import_call => try b.lowerImportCall(data.binary, dest),
             .get_import_meta => try b.lowerGetImportMeta(dest),
         }
@@ -1802,6 +1808,61 @@ fn lowerSetSuperPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, comptime
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);
+}
+
+fn lowerPushPrivateScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .push_private_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerPopPrivateScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .pop_private_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerCreatePrivateElement(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .create_private_element,
+        .data = .{ .reg_string = .{
+            dest,
+            @enumFromInt(@intFromEnum(string_index)),
+        } },
+    });
+}
+
+fn lowerGetPrivateElement(b: *Builder, data: Ir.Inst.GetProperty, dest: Bytecode.Inst.Reg) Error!void {
+    const base_reg = b.resolve(data.base);
+    try b.emit(.{
+        .tag = .get_private_element,
+        .data = .{ .reg_reg_string = .{
+            dest,
+            base_reg,
+            @enumFromInt(@intFromEnum(data.name)),
+        } },
+    });
+}
+
+fn lowerSetPrivateElement(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
+    const base_reg = b.resolve(extra.data.base);
+    const value_reg = b.resolve(extra.data.value);
+    try b.emit(.{
+        .tag = .set_private_element,
+        .data = .{ .reg_string_reg = .{
+            base_reg,
+            @enumFromInt(@intFromEnum(extra.data.name)),
+            value_reg,
+        } },
+    });
+    try b.emitMoveIfNeeded(extra.data.value, dest);
+}
+
+fn lowerHasPrivateElement(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitBinaryOp(.has_private_element, data.lhs, data.rhs, dest);
 }
 
 fn lowerImportCall(b: *Builder, binary: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {

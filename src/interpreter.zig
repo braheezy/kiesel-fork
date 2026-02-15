@@ -1377,8 +1377,9 @@ test {
     // Classes
     try testInterpreter(std.testing.allocator,
         \\class Foo {
-        \\  constructor(x) { this.x = x; }
-        \\  getX() { return this.x; }
+        \\  #x;
+        \\  constructor(x) { this.#x = x; }
+        \\  getX() { return this.#x; }
         \\}
         \\class Bar extends Foo {
         \\  constructor(x) { super(x); }
