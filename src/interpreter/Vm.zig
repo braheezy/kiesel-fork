@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
+const Iterator = types.Iterator;
 const Number = types.Number;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
@@ -243,9 +244,11 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .construct2 => vm.executeConstructN(2, data.reg_reg_reg_reg[0], data.reg_reg_reg_reg[1], .{ data.reg_reg_reg_reg[2], data.reg_reg_reg_reg[3] }),
                 .get_template_object => vm.executeGetTemplateObject(data.reg_reg_reg_u16[0], data.reg_reg_reg_u16[1], data.reg_reg_reg_u16[2], data.reg_reg_reg_u16[3]),
                 .get_iterator => vm.executeGetIterator(data.reg_reg[0], data.reg_reg[1]),
+                .get_async_iterator => vm.executeGetAsyncIterator(data.reg_reg[0], data.reg_reg[1]),
                 .get_for_in_iterator => vm.executeGetForInIterator(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_step_value_async => vm.executeIteratorStepValueAsync(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_is_done => vm.executeIteratorIsDone(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
@@ -1737,6 +1740,18 @@ fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst
     vm.load(dest, Value.from(iterator_obj));
 }
 
+fn executeGetAsyncIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(value_reg);
+    const iterator = try getIterator(vm.agent, value, .async);
+
+    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
+    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
+
+    vm.load(dest, Value.from(iterator_obj));
+}
+
 fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const object = value.toObject(vm.agent) catch |err| try noexcept(err);
@@ -1754,7 +1769,7 @@ fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode
 fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
-    var iterator: types.Iterator = .{
+    var iterator: Iterator = .{
         .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
         .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
         .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
@@ -1771,7 +1786,7 @@ fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.
 fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
-    var iterator: types.Iterator = .{
+    var iterator: Iterator = .{
         .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
         .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
         .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
@@ -1785,6 +1800,52 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byte
     }
 }
 
+fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+
+    const iterator_inner = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject();
+    const next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod"));
+
+    // Implements steps 6.a-f. of ForIn/OfBodyEvaluation for async iterators.
+    // https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
+
+    // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+    const next_result = next_method.call(vm.agent, Value.from(iterator_inner), &.{}) catch |err| {
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        return err;
+    };
+
+    // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+    const awaited_result = await(vm.agent, next_result) catch |err| {
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        return err;
+    };
+
+    // c. If nextResult is not an Object, throw a TypeError exception.
+    if (!awaited_result.isObject()) {
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        return vm.agent.throwException(.type_error, "{f} is not an Object", .{awaited_result});
+    }
+
+    // d. Let done be ? IteratorComplete(nextResult).
+    const done = try Iterator.complete(vm.agent, awaited_result.asObject());
+
+    // e. If done is true, return V.
+    if (done) {
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        vm.load(dest, .undefined);
+        return;
+    }
+
+    // f. Let nextValue be ? IteratorValue(nextResult).
+    const value = Iterator.value(vm.agent, awaited_result.asObject()) catch |err| {
+        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        return err;
+    };
+
+    vm.load(dest, value);
+}
+
 fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     const done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done"));
@@ -1794,7 +1855,7 @@ fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecod
 fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
-    var iterator: types.Iterator = .{
+    var iterator: Iterator = .{
         .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
         .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
         .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),

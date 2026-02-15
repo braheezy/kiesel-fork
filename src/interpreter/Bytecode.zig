@@ -193,9 +193,11 @@ pub const Inst = struct {
         get_template_object,
 
         get_iterator,
+        get_async_iterator,
         get_for_in_iterator,
         iterator_step,
         iterator_step_value,
+        iterator_step_value_async,
         iterator_is_done,
         iterator_collect,
 
@@ -374,9 +376,11 @@ pub const Inst = struct {
         .construct2 = .reg_reg_reg_reg,
         .get_template_object = .reg_reg_reg_u16,
         .get_iterator = .reg_reg,
+        .get_async_iterator = .reg_reg,
         .get_for_in_iterator = .reg_reg,
         .iterator_step = .reg_reg,
         .iterator_step_value = .reg_reg,
+        .iterator_step_value_async = .reg_reg,
         .iterator_is_done = .reg_reg,
         .iterator_collect = .reg_reg,
         .throw = .reg,

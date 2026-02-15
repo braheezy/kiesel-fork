@@ -1125,24 +1125,21 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         setup_label = try b.addLabel();
     }
 
-    const iterator = switch (for_in_of_stmt.type) {
-        .in => try b.addInst(.{
-            .tag = .get_for_in_iterator,
-            .data = .{ .ref = expr_value },
-        }),
-        .of => try b.addInst(.{
-            .tag = .get_iterator,
-            .data = .{ .ref = expr_value },
-        }),
-        .async_of => try b.todo("async for-of"),
-    };
+    const iterator = try b.addInst(.{
+        .tag = switch (for_in_of_stmt.type) {
+            .in => .get_for_in_iterator,
+            .of => .get_iterator,
+            .async_of => .get_async_iterator,
+        },
+        .data = .{ .ref = expr_value },
+    });
 
     const entry_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
 
     const next_value = try b.addInst(.{
-        .tag = .iterator_step_value,
+        .tag = if (for_in_of_stmt.type == .async_of) .iterator_step_value_async else .iterator_step_value,
         .data = .{ .ref = iterator },
     });
     const is_done = try b.addInst(.{
