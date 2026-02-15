@@ -33,8 +33,8 @@ const evaluateCallGetThisValue = runtime.evaluateCallGetThisValue;
 const evaluateImportCall = runtime.evaluateImportCall;
 const evaluateImportMeta = runtime.evaluateImportMeta;
 const evaluateNew = runtime.evaluateNew;
+const evaluateSuperCall = runtime.evaluateSuperCall;
 const getIterator = types.getIterator;
-const getSuperConstructor = runtime.getSuperConstructor;
 const getTemplateObject = runtime.getTemplateObject;
 const initializeBoundName = runtime.initializeBoundName;
 const instantiateArrowFunctionExpression = runtime.instantiateArrowFunctionExpression;
@@ -1039,50 +1039,9 @@ fn executeEvaluatePropertyAccessWithIdentifierKeyDirect(
     }
 }
 
-/// 13.3.7.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
 fn executeEvaluateSuperCall(self: *Vm, args: Instruction.Arguments) Agent.Error!void {
-    // 1. Let newTarget be GetNewTarget().
-    const new_target = self.agent.getNewTarget();
-
-    // 2. Assert: newTarget is a constructor.
-    std.debug.assert(new_target.?.internal_methods.construct != null);
-
-    // 3. Let func be GetSuperConstructor().
-    const function = try getSuperConstructor(self.agent);
-    const function_value: Value = if (function) |f| Value.from(f) else .null;
-
-    // 4. Let argList be ? ArgumentListEvaluation of Arguments.
     const arguments = try self.getArguments(args);
-
-    // 5. If IsConstructor(func) is false, throw a TypeError exception.
-    if (!function_value.isConstructor()) {
-        return self.agent.throwException(
-            .type_error,
-            "{f} is not a constructor",
-            .{function_value},
-        );
-    }
-
-    // 6. Let result be ? Construct(func, argList, newTarget).
-    var result = try function.?.construct(self.agent, arguments, new_target);
-
-    // 7. Let thisER be GetThisEnvironment().
-    const this_environment = self.agent.getThisEnvironment();
-
-    // 8. Assert: thisER is a Function Environment Record.
-    // 9. Perform ? BindThisValue(thisER, result).
-    try this_environment.function_environment.bindThisValue(self.agent, Value.from(result));
-
-    // 10. Let F be thisER.[[FunctionObject]].
-    // 11. Assert: F is an ECMAScript function object.
-    const constructor = &this_environment.function_environment.function_object.object;
-
-    // 12. Perform ? InitializeInstanceElements(result, F).
-    try result.initializeInstanceElements(self.agent, constructor);
-
-    // 13. Return result.
-    self.result = Value.from(result);
+    self.result = try evaluateSuperCall(self.agent, arguments);
 }
 
 fn executeForDeclarationBindingInstantiation(

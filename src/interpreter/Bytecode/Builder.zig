@@ -99,6 +99,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .br => try b.lowerBr(data.br, dest),
             .br_cond => try b.lowerBrCond(data.br_cond, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
+            .to_numeric => try b.lowerToNumeric(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
             .to_object => try b.lowerToObject(data.ref, dest),
             .negate => try b.lowerNegate(data.ref, dest),
@@ -196,6 +197,13 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_new_target => try b.lowerGetNewTarget(dest),
             .getter => try b.lowerGetter(data.ref, dest),
             .setter => try b.lowerSetter(data.ref, dest),
+            .super_call => try b.lowerSuperCall(data.super_call, dest),
+            .get_super_property => try b.lowerGetSuperProperty(data.string, dest),
+            .get_super_property_computed => try b.lowerGetSuperPropertyComputed(data.ref, dest),
+            .set_super_property => try b.lowerSetSuperProperty(data.set_property, false, dest),
+            .set_super_property_strict => try b.lowerSetSuperProperty(data.set_property, true, dest),
+            .set_super_property_computed => try b.lowerSetSuperPropertyComputed(data.set_property_computed, false, dest),
+            .set_super_property_computed_strict => try b.lowerSetSuperPropertyComputed(data.set_property_computed, true, dest),
             .import_call => try b.lowerImportCall(data.binary, dest),
             .get_import_meta => try b.lowerGetImportMeta(dest),
         }
@@ -840,6 +848,10 @@ fn lowerBrCond(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) E
 
 fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitUnaryOp(.to_number, ref, dest);
+}
+
+fn lowerToNumeric(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitUnaryOp(.to_numeric, ref, dest);
 }
 
 fn lowerToString(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
@@ -1724,6 +1736,72 @@ fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
 
 fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
+}
+
+fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SuperCall, data);
+    const args = b.ir.refSlice(extra.end, extra.data.args_len);
+
+    const args_reg: Bytecode.Inst.Reg = .scratch;
+    try b.emitArgumentsArray(args, args_reg);
+
+    try b.emit(.{
+        .tag = .super_call,
+        .data = .{ .reg_reg = .{
+            dest,
+            args_reg,
+        } },
+    });
+}
+
+fn lowerGetSuperProperty(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .get_super_property,
+        .data = .{ .reg_string = .{ dest, @as(Bytecode.Inst.StringIndex, @enumFromInt(@intFromEnum(string_index))) } },
+    });
+}
+
+fn lowerGetSuperPropertyComputed(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const property_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .get_super_property_computed,
+        .data = .{ .reg_reg = .{ dest, property_reg } },
+    });
+}
+
+fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
+    const value_reg = b.resolve(extra.data.value);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_super_property_strict
+    else
+        .set_super_property;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_string = .{
+            value_reg,
+            @enumFromInt(@intFromEnum(extra.data.name)),
+        } },
+    });
+    try b.emitMoveIfNeeded(extra.data.value, dest);
+}
+
+fn lowerSetSuperPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
+    const property_reg = b.resolve(extra.data.property);
+    const value_reg = b.resolve(extra.data.value);
+    const tag: Bytecode.Inst.Tag = if (strict)
+        .set_super_property_computed_strict
+    else
+        .set_super_property_computed;
+    try b.emit(.{
+        .tag = tag,
+        .data = .{ .reg_reg = .{
+            property_reg,
+            value_reg,
+        } },
+    });
+    try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
 fn lowerImportCall(b: *Builder, binary: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {

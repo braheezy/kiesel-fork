@@ -254,6 +254,52 @@ pub fn evaluateCall(
     return function.callAssumeCallable(agent, this_value, arguments);
 }
 
+/// 13.3.7.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+pub fn evaluateSuperCall(agent: *Agent, args: []const Value) Agent.Error!Value {
+    // SuperCall : super Arguments
+    // 1. Let newTarget be GetNewTarget().
+    const new_target = agent.getNewTarget();
+
+    // 2. Assert: newTarget is a constructor.
+    std.debug.assert(new_target.?.internal_methods.construct != null);
+
+    // 3. Let func be GetSuperConstructor().
+    const function = try getSuperConstructor(agent);
+    const function_value: Value = if (function) |f| Value.from(f) else .null;
+
+    // 4. Let argList be ? ArgumentListEvaluation of Arguments.
+
+    // 5. If IsConstructor(func) is false, throw a TypeError exception.
+    if (!function_value.isConstructor()) {
+        return agent.throwException(
+            .type_error,
+            "{f} is not a constructor",
+            .{function_value},
+        );
+    }
+
+    // 6. Let result be ? Construct(func, argList, newTarget).
+    const result = try function.?.construct(agent, args, new_target);
+
+    // 7. Let thisER be GetThisEnvironment().
+    const this_environment = agent.getThisEnvironment();
+
+    // 8. Assert: thisER is a Function Environment Record.
+    // 9. Perform ? BindThisValue(thisER, result).
+    try this_environment.function_environment.bindThisValue(agent, Value.from(result));
+
+    // 10. Let F be thisER.[[FunctionObject]].
+    // 11. Assert: F is an ECMAScript function object.
+    const constructor = &this_environment.function_environment.function_object.object;
+
+    // 12. Perform ? InitializeInstanceElements(result, F).
+    try result.initializeInstanceElements(agent, constructor);
+
+    // 13. Return result.
+    return Value.from(result);
+}
+
 /// 13.3.7.2 GetSuperConstructor ( )
 /// https://tc39.es/ecma262/#sec-getsuperconstructor
 pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {

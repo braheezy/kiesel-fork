@@ -79,6 +79,7 @@ pub const Inst = struct {
         br_cond,
 
         to_number,
+        to_numeric,
         to_string,
         to_object,
         negate,
@@ -189,6 +190,14 @@ pub const Inst = struct {
         getter,
         setter,
 
+        super_call,
+        get_super_property,
+        get_super_property_computed,
+        set_super_property,
+        set_super_property_strict,
+        set_super_property_computed,
+        set_super_property_computed_strict,
+
         import_call,
         get_import_meta,
     };
@@ -227,6 +236,7 @@ pub const Inst = struct {
         create_function: FunctionIndex,
         create_class: ClassIndex,
         argument: u16,
+        super_call: ExtraIndex,
 
         // Make sure we don't accidentally add a field to make this union
         // bigger than expected. Note that in safety builds, Zig is allowed
@@ -257,6 +267,7 @@ pub const Inst = struct {
         .br = .br,
         .br_cond = .br_cond,
         .to_number = .ref,
+        .to_numeric = .ref,
         .to_string = .ref,
         .to_object = .ref,
         .negate = .ref,
@@ -354,6 +365,13 @@ pub const Inst = struct {
         .get_new_target = .none,
         .getter = .ref,
         .setter = .ref,
+        .super_call = .super_call,
+        .get_super_property = .string,
+        .get_super_property_computed = .ref,
+        .set_super_property = .set_property,
+        .set_super_property_strict = .set_property,
+        .set_super_property_computed = .set_property_computed,
+        .set_super_property_computed_strict = .set_property_computed,
         .import_call = .binary,
         .get_import_meta = .none,
     });
@@ -391,6 +409,7 @@ pub const Inst = struct {
     pub const Call = struct { callee: Ref, this_value: Ref, args_len: u32 };
     pub const Construct = struct { constructor: Ref, args_len: u32 };
     pub const GetTemplateObject = struct { cooked: Ref, raw: Ref, id: u32 };
+    pub const SuperCall = struct { args_len: u32 };
 
     pub const UpdateOp = enum(u32) {
         increment_prefix,
@@ -502,6 +521,11 @@ pub const Inst = struct {
                 for (class.element_names) |name_ref| {
                     if (name_ref != .none) try uses.append(gpa, name_ref);
                 }
+            },
+            .super_call => {
+                const extra = ir.extraData(SuperCall, inst.data.super_call);
+                const args = ir.refSlice(extra.end, extra.data.args_len);
+                for (args) |arg| try uses.append(gpa, arg);
             },
             inline else => |dt| {
                 const field_data = @field(inst.data, @tagName(dt));
@@ -714,6 +738,16 @@ fn printData(
                 }
                 try writer.writeByte(']');
             }
+        },
+        .super_call => {
+            const extra = ir.extraData(Inst.SuperCall, data.super_call);
+            try writer.writeByte('[');
+            const args = ir.refSlice(extra.end, extra.data.args_len);
+            for (args, 0..) |arg, j| {
+                if (j > 0) try writer.writeAll(", ");
+                try printField(ir, arg, writer, tty_config);
+            }
+            try writer.writeByte(']');
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));

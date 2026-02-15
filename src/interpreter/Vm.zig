@@ -30,6 +30,7 @@ const evaluateCall = language.runtime.evaluateCall;
 const evaluateImportCall = language.runtime.evaluateImportCall;
 const evaluateImportMeta = language.runtime.evaluateImportMeta;
 const evaluateNew = language.runtime.evaluateNew;
+const evaluateSuperCall = language.runtime.evaluateSuperCall;
 const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
 const instantiateArrowFunctionExpression = language.runtime.instantiateArrowFunctionExpression;
@@ -142,6 +143,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
+                .to_numeric => vm.executeToNumeric(data.reg_reg[0], data.reg_reg[1]),
                 .to_string => vm.executeToString(data.reg_reg[0], data.reg_reg[1]),
                 .to_object => vm.executeToObject(data.reg_reg[0], data.reg_reg[1]),
                 .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
@@ -266,6 +268,13 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
                 .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
                 .get_new_target => vm.executeGetNewTarget(data.reg),
+                .super_call => vm.executeSuperCall(data.reg_reg[0], data.reg_reg[1]),
+                .get_super_property => vm.executeGetSuperProperty(data.reg_string[0], data.reg_string[1]),
+                .get_super_property_computed => vm.executeGetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1]),
+                .set_super_property => vm.executeSetSuperProperty(data.reg_string[0], data.reg_string[1], false),
+                .set_super_property_strict => vm.executeSetSuperProperty(data.reg_string[0], data.reg_string[1], true),
+                .set_super_property_computed => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], false),
+                .set_super_property_computed_strict => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], true),
                 .import_call => vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_import_meta => vm.executeGetImportMeta(data.reg),
             };
@@ -560,6 +569,15 @@ fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agen
     const value = vm.store(src);
     const number = try value.toNumber(vm.agent);
     vm.load(dst, Value.from(number));
+}
+
+fn executeToNumeric(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(src);
+    const numeric = try value.toNumeric(vm.agent);
+    vm.load(dst, switch (numeric) {
+        .number => |number| Value.from(number),
+        .big_int => |big_int| Value.from(big_int),
+    });
 }
 
 fn executeToString(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
@@ -2061,6 +2079,93 @@ fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Inst.Reg) void {
     else
         .undefined;
     vm.load(reg, value);
+}
+
+fn executeSuperCall(
+    vm: *Vm,
+    dest: Bytecode.Inst.Reg,
+    args_reg: Bytecode.Inst.Reg,
+) Agent.Error!void {
+    const args_value = vm.store(args_reg);
+    const args_object = args_value.asObject();
+    const args_len = args_object.as(builtins.Array).fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
+    defer args_list.deinit(vm.agent.gc_allocator);
+    for (0..args_len) |i| {
+        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const arg = descriptor.value_or_accessor.value;
+        args_list.appendAssumeCapacity(arg);
+    }
+
+    const result = try evaluateSuperCall(vm.agent, args_list.items);
+    vm.load(dest, result);
+}
+
+fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const env = vm.agent.getThisEnvironment();
+    const actual_this = try env.getThisBinding(vm.agent);
+    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base_value: Value = switch (base) {
+        .undefined => .undefined,
+        .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
+    };
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const result = try base_object.internal_methods.get(vm.agent, base_object, property_key, actual_this);
+    vm.load(dest, result);
+}
+
+fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Inst.Reg, property_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const property_value = vm.store(property_reg);
+    const env = vm.agent.getThisEnvironment();
+    const actual_this = try env.getThisBinding(vm.agent);
+    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base_value: Value = switch (base) {
+        .undefined => .undefined,
+        .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
+    };
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const result = try base_object.internal_methods.get(vm.agent, base_object, property_key, actual_this);
+    vm.load(dest, result);
+}
+
+fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, comptime strict: bool) Agent.Error!void {
+    const value = vm.store(value_reg);
+    const env = vm.agent.getThisEnvironment();
+    const actual_this = try env.getThisBinding(vm.agent);
+    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base_value: Value = switch (base) {
+        .undefined => .undefined,
+        .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
+    };
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = PropertyKey.from(vm.getString(name_index));
+    const succeeded = try base_object.internal_methods.set(vm.agent, base_object, property_key, value, actual_this);
+    if (!succeeded and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set super property", .{});
+    }
+}
+
+fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg, comptime strict: bool) Agent.Error!void {
+    const property_value = vm.store(property_reg);
+    const value = vm.store(value_reg);
+    const env = vm.agent.getThisEnvironment();
+    const actual_this = try env.getThisBinding(vm.agent);
+    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base_value: Value = switch (base) {
+        .undefined => .undefined,
+        .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
+    };
+    const base_object = try base_value.toObject(vm.agent);
+    const property_key = try property_value.toPropertyKey(vm.agent);
+    const succeeded = try base_object.internal_methods.set(vm.agent, base_object, property_key, value, actual_this);
+    if (!succeeded and strict) {
+        @branchHint(.unlikely);
+        return vm.agent.throwException(.type_error, "Could not set super property", .{});
+    }
 }
 
 fn executeImportCall(vm: *Vm, dest: Bytecode.Inst.Reg, specifier_reg: Bytecode.Inst.Reg, options_reg: Bytecode.Inst.Reg) Agent.Error!void {

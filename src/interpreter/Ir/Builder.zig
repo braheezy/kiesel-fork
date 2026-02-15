@@ -1249,7 +1249,40 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     .private_identifier => try b.todo("private identifier in for-in/of LHS"),
                 }
             },
-            .super_property => try b.todo("super property in for-in/of LHS"),
+            .super_property => |super_prop| switch (super_prop) {
+                .identifier => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_super_property_strict
+                    else
+                        .set_super_property;
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = .none,
+                        .name = string_index,
+                        .value = next_value,
+                    });
+                    _ = try b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property = extra_index },
+                    });
+                },
+                .expression => |prop_expr| {
+                    const property = try b.lowerExpression(prop_expr);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_super_property_computed_strict
+                    else
+                        .set_super_property_computed;
+                    const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                        .base = .none,
+                        .property = property,
+                        .value = next_value,
+                    });
+                    _ = try b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property_computed = extra_index },
+                    });
+                },
+            },
             else => unreachable,
         },
         .for_binding => |for_binding| switch (for_binding) {
@@ -2022,14 +2055,14 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .async_arrow_function => |*async_arrow_func| try b.lowerArrowFunction(async_arrow_func),
         },
         .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, null),
-        .super_property => try b.todo("super property"),
+        .super_property => |*super_prop| try b.lowerSuperProperty(super_prop, null),
         .meta_property => |meta_prop| switch (meta_prop) {
             .new_target => try b.lowerNewTarget(),
             .import_meta => try b.lowerImportMeta(),
         },
         .new_expression => |*new_expr| try b.lowerNewExpression(new_expr),
         .call_expression => |*call_expr| try b.lowerCallExpression(call_expr),
-        .super_call => try b.todo("super call"),
+        .super_call => |*super_call| try b.lowerSuperCall(super_call),
         .import_call => |*import_call| try b.lowerImportCall(import_call),
         .optional_expression => |*opt_expr| try b.lowerOptionalExpression(opt_expr),
         .update_expression => |*update_expr| try b.lowerUpdateExpression(update_expr),
@@ -2442,6 +2475,26 @@ fn lowerArguments(b: *Builder, arguments: ast.Arguments) Error!std.ArrayList(Ir.
     return args;
 }
 
+fn lowerSuperProperty(b: *Builder, super_prop: *const ast.SuperProperty, base_out: ?*Ir.Inst.Ref) Error!Ir.Inst.Ref {
+    if (base_out) |ptr| ptr.* = try b.lowerThis();
+    return switch (super_prop.*) {
+        .identifier => |identifier| blk: {
+            const string_index = try b.internString(identifier);
+            break :blk try b.addInst(.{
+                .tag = .get_super_property,
+                .data = .{ .string = string_index },
+            });
+        },
+        .expression => |expr| blk: {
+            const property = try b.lowerExpression(expr);
+            break :blk try b.addInst(.{
+                .tag = .get_super_property_computed,
+                .data = .{ .ref = property },
+            });
+        },
+    };
+}
+
 fn lowerNewTarget(b: *Builder) Error!Ir.Inst.Ref {
     return b.addInst(.{
         .tag = .get_new_target,
@@ -2478,6 +2531,7 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     var this_value: Ir.Inst.Ref = .none;
     const callee = switch (call_expr.expression.*) {
         .member_expression => |*member_expr| try b.lowerMemberExpression(member_expr, &this_value),
+        .super_property => |*super_prop| try b.lowerSuperProperty(super_prop, &this_value),
         else => try b.lowerExpression(call_expr.expression),
     };
 
@@ -2503,6 +2557,21 @@ fn lowerCallExpression(b: *Builder, call_expr: *const ast.CallExpression) Error!
     return b.addInst(.{
         .tag = tag,
         .data = .{ .call = extra_index },
+    });
+}
+
+fn lowerSuperCall(b: *Builder, super_call: *const ast.SuperCall) Error!Ir.Inst.Ref {
+    var args = try b.lowerArguments(super_call.arguments);
+    defer args.deinit(b.gpa);
+
+    const extra_index = try b.addExtra(Ir.Inst.SuperCall, .{
+        .args_len = @intCast(args.items.len),
+    });
+    try b.extra.appendSlice(b.gpa, @ptrCast(args.items));
+
+    return b.addInst(.{
+        .tag = .super_call,
+        .data = .{ .super_call = extra_index },
     });
 }
 
@@ -2739,7 +2808,89 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                 .data = .{ .none = {} },
             });
         },
-        else => try b.todo("non-identifier update expression"),
+        .super_property => |super_prop| switch (super_prop) {
+            .identifier => |identifier| {
+                const string_index = try b.internString(identifier);
+                const current_value = try b.addInst(.{
+                    .tag = .get_super_property,
+                    .data = .{ .string = string_index },
+                });
+                const to_numeric = try b.addInst(.{
+                    .tag = .to_numeric,
+                    .data = .{ .ref = current_value },
+                });
+                const one = try b.addInst(.{
+                    .tag = .one,
+                    .data = .{ .none = {} },
+                });
+                const tag: Ir.Inst.Tag = switch (update_expr.operator) {
+                    .@"++" => .add,
+                    .@"--" => .sub,
+                };
+                const new_value = try b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .binary = .{
+                        .lhs = to_numeric,
+                        .rhs = one,
+                    } },
+                });
+                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                    .base = .none,
+                    .name = string_index,
+                    .value = new_value,
+                });
+                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_strict
+                else
+                    .set_super_property;
+                _ = try b.addInst(.{
+                    .tag = set_tag,
+                    .data = .{ .set_property = extra_index },
+                });
+                return if (update_expr.type == .prefix) new_value else to_numeric;
+            },
+            .expression => |expr| {
+                const property = try b.lowerExpression(expr);
+                const current_value = try b.addInst(.{
+                    .tag = .get_super_property_computed,
+                    .data = .{ .ref = property },
+                });
+                const to_numeric = try b.addInst(.{
+                    .tag = .to_numeric,
+                    .data = .{ .ref = current_value },
+                });
+                const one = try b.addInst(.{
+                    .tag = .one,
+                    .data = .{ .none = {} },
+                });
+                const tag: Ir.Inst.Tag = switch (update_expr.operator) {
+                    .@"++" => .add,
+                    .@"--" => .sub,
+                };
+                const new_value = try b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .binary = .{
+                        .lhs = to_numeric,
+                        .rhs = one,
+                    } },
+                });
+                const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                    .base = .none,
+                    .property = property,
+                    .value = new_value,
+                });
+                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_computed_strict
+                else
+                    .set_super_property_computed;
+                _ = try b.addInst(.{
+                    .tag = set_tag,
+                    .data = .{ .set_property_computed = extra_index },
+                });
+                return if (update_expr.type == .prefix) new_value else to_numeric;
+            },
+        },
+        else => unreachable,
     }
 }
 
@@ -3045,6 +3196,42 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                 .private_identifier => try b.todo("private identifier in member assignment"),
             }
         },
+        .super_property => |super_prop| switch (super_prop) {
+            .identifier => |identifier| {
+                const value = try b.lowerExpression(assign_expr.rhs_expression);
+                const string_index = try b.internString(identifier);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_strict
+                else
+                    .set_super_property;
+                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                    .base = .none,
+                    .name = string_index,
+                    .value = value,
+                });
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_property = extra_index },
+                });
+            },
+            .expression => |prop_expr| {
+                const property = try b.lowerExpression(prop_expr);
+                const value = try b.lowerExpression(assign_expr.rhs_expression);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_computed_strict
+                else
+                    .set_super_property_computed;
+                const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                    .base = .none,
+                    .property = property,
+                    .value = value,
+                });
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_property_computed = extra_index },
+                });
+            },
+        },
         .binding_pattern_for_assignment_expression => |*pattern| {
             const value = try b.lowerExpression(assign_expr.rhs_expression);
             return b.lowerDestructuringAssignment(pattern, value, .set);
@@ -3056,7 +3243,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                 .data = .{ .none = {} },
             });
         },
-        else => try b.todo("non-identifier lhs"),
+        else => unreachable,
     }
 }
 
@@ -3234,6 +3421,64 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                 .private_identifier => try b.todo("private identifier in binary compound assignment"),
             }
         },
+        .super_property => |super_prop| switch (super_prop) {
+            .identifier => |identifier| {
+                const string_index = try b.internString(identifier);
+                const current_value = try b.addInst(.{
+                    .tag = .get_super_property,
+                    .data = .{ .string = string_index },
+                });
+                const rhs = try b.lowerExpression(assign_expr.rhs_expression);
+                const result = try b.addInst(.{
+                    .tag = binary_tag,
+                    .data = .{ .binary = .{
+                        .lhs = current_value,
+                        .rhs = rhs,
+                    } },
+                });
+                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_strict
+                else
+                    .set_super_property;
+                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                    .base = .none,
+                    .name = string_index,
+                    .value = result,
+                });
+                return b.addInst(.{
+                    .tag = set_tag,
+                    .data = .{ .set_property = extra_index },
+                });
+            },
+            .expression => |expr| {
+                const property = try b.lowerExpression(expr);
+                const current_value = try b.addInst(.{
+                    .tag = .get_super_property_computed,
+                    .data = .{ .ref = property },
+                });
+                const rhs = try b.lowerExpression(assign_expr.rhs_expression);
+                const result = try b.addInst(.{
+                    .tag = binary_tag,
+                    .data = .{ .binary = .{
+                        .lhs = current_value,
+                        .rhs = rhs,
+                    } },
+                });
+                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_computed_strict
+                else
+                    .set_super_property_computed;
+                const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                    .base = .none,
+                    .property = property,
+                    .value = result,
+                });
+                return b.addInst(.{
+                    .tag = set_tag,
+                    .data = .{ .set_property_computed = extra_index },
+                });
+            },
+        },
         .call_expression => |*call_expr| {
             _ = try b.lowerCallExpression(call_expr);
             return b.addInst(.{
@@ -3241,7 +3486,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                 .data = .{ .none = {} },
             });
         },
-        else => try b.todo("non-identifier lhs in binary compound assignment"),
+        else => unreachable,
     }
 }
 
@@ -3251,6 +3496,8 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
         property: struct { base: Ir.Inst.Ref, name: Ir.Inst.StringIndex },
         property_indexed: struct { base: Ir.Inst.Ref, index: u32 },
         property_computed: struct { base: Ir.Inst.Ref, property: Ir.Inst.Ref },
+        super_property: Ir.Inst.StringIndex,
+        super_property_computed: Ir.Inst.Ref,
     };
 
     var lhs: Lhs = undefined;
@@ -3330,7 +3577,27 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                 .private_identifier => return try b.todo("private identifier in logical compound assignment"),
             }
         },
-        else => return try b.todo("non-identifier lhs in logical compound assignment"),
+        .super_property => |super_prop| blk: {
+            switch (super_prop) {
+                .identifier => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    lhs = .{ .super_property = string_index };
+                    break :blk try b.addInst(.{
+                        .tag = .get_super_property,
+                        .data = .{ .string = string_index },
+                    });
+                },
+                .expression => |expr| {
+                    const property = try b.lowerExpression(expr);
+                    lhs = .{ .super_property_computed = property };
+                    break :blk try b.addInst(.{
+                        .tag = .get_super_property_computed,
+                        .data = .{ .ref = property },
+                    });
+                },
+            }
+        },
+        else => unreachable,
     };
 
     var condition: Ir.Inst.Ref = undefined;
@@ -3417,6 +3684,36 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
                 .base = p.base,
                 .property = p.property,
+                .value = rhs,
+            });
+            _ = try b.addInst(.{
+                .tag = tag,
+                .data = .{ .set_property_computed = extra_index },
+            });
+        },
+        .super_property => |string_index| {
+            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_super_property_strict
+            else
+                .set_super_property;
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = .none,
+                .name = string_index,
+                .value = rhs,
+            });
+            _ = try b.addInst(.{
+                .tag = tag,
+                .data = .{ .set_property = extra_index },
+            });
+        },
+        .super_property_computed => |property| {
+            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_super_property_computed_strict
+            else
+                .set_super_property_computed;
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                .base = .none,
+                .property = property,
                 .value = rhs,
             });
             _ = try b.addInst(.{
