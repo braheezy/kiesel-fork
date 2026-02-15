@@ -1790,12 +1790,13 @@ fn classFieldDefinitionEvaluation(
     agent: *Agent,
     field_definition: ast.FieldDefinition,
     home_object: *Object,
+    pre_evaluated_name: ?Value,
 ) Agent.Error!ClassFieldDefinition {
     const realm = agent.currentRealm();
 
     // 1. Let name be ? Evaluation of ClassElementName.
     const name: PropertyKeyOrPrivateName = blk: {
-        const value = (try generateAndRunBytecode(
+        const value = pre_evaluated_name orelse (try generateAndRunBytecode(
             agent,
             field_definition.class_element_name,
             .{},
@@ -1855,6 +1856,9 @@ fn classFieldDefinitionEvaluation(
 
         // g. Set initializer.[[ClassFieldInitializerName]] to name.
         initializer_function.fields.class_field_initializer_name = name;
+
+        // NOTE: The spec does not set a function name but we rely on it for IR/bytecode metadata.
+        try setFunctionName(agent, &initializer_function.object, name, null);
 
         break :blk initializer_function;
     } else blk: {
@@ -1917,6 +1921,9 @@ fn classStaticBlockDefinitionEvaluation(
     // 6. Perform MakeMethod(bodyFunction, homeObject).
     makeMethod(body_function, home_object);
 
+    // NOTE: The spec does not set a function name but we rely on it for IR/bytecode metadata.
+    try setFunctionName(agent, &body_function.object, PropertyKey.from(""), null);
+
     // 7. Return the ClassStaticBlockDefinition Record { [[BodyFunction]]: bodyFunction }.
     return .{ .body_function = body_function };
 }
@@ -1927,6 +1934,7 @@ fn classElementEvaluation(
     agent: *Agent,
     class_element: ast.ClassElement,
     object: *Object,
+    pre_evaluated_name: ?Value,
 ) Agent.Error!?union(enum) {
     class_field_definition: ClassFieldDefinition,
     class_static_block_definition: ClassStaticBlockDefinition,
@@ -1945,6 +1953,7 @@ fn classElementEvaluation(
                     agent,
                     field_definition,
                     object,
+                    pre_evaluated_name,
                 ),
             };
         },
@@ -1956,7 +1965,7 @@ fn classElementEvaluation(
         .static_method_definition,
         => |method_definition| {
             // 1. Return ? MethodDefinitionEvaluation of MethodDefinition with arguments object and false.
-            const property_name = (try generateAndRunBytecode(
+            const property_name = pre_evaluated_name orelse (try generateAndRunBytecode(
                 agent,
                 method_definition.class_element_name,
                 .{},
@@ -2000,6 +2009,8 @@ pub fn classDefinitionEvaluation(
     class_binding: ?*const String,
     class_name: *const String,
     source_text: []const u8,
+    pre_evaluated_heritage: ?Value,
+    pre_evaluated_element_names: ?[]const Value,
 ) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
@@ -2068,19 +2079,27 @@ pub fn classDefinitionEvaluation(
         // b. NOTE: The running execution context's PrivateEnvironment is outerPrivateEnvironment
         //    when evaluating ClassHeritage.
         // c. Let superclassRef be Completion(Evaluation of ClassHeritage).
-        const superclass_ref = generateAndRunBytecode(
-            agent,
-            ast.ExpressionStatement{ .expression = class_tail.class_heritage.?.* },
-            .{},
-        );
+        const superclass = if (pre_evaluated_heritage) |heritage| blk: {
+            // d. Set the running execution context's LexicalEnvironment to env.
+            agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
-        // d. Set the running execution context's LexicalEnvironment to env.
-        agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
+            // e. Let superclass be ? GetValue(? superclassRef).
+            break :blk heritage;
+        } else blk: {
+            const superclass_ref = generateAndRunBytecode(
+                agent,
+                ast.ExpressionStatement{ .expression = class_tail.class_heritage.?.* },
+                .{},
+            );
 
-        // e. Let superclass be ? GetValue(? superclassRef).
-        // NOTE: Wrapping the Expression node in a ExpressionStatement above ensures a get_value
-        //       instruction is emitted for references.
-        const superclass = (try superclass_ref).value.?;
+            // d. Set the running execution context's LexicalEnvironment to env.
+            agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
+
+            // e. Let superclass be ? GetValue(? superclassRef).
+            // NOTE: Wrapping the Expression node in a ExpressionStatement above ensures a get_value
+            //       instruction is emitted for references.
+            break :blk (try superclass_ref).value.?;
+        };
 
         // f. If superclass is null, then
         if (superclass.isNull()) {
@@ -2298,15 +2317,20 @@ pub fn classDefinitionEvaluation(
     defer static_elements.deinit(agent.gc_allocator);
 
     // 26. For each ClassElement e of elements, do
-    for (elements) |class_element| {
+    for (elements, 0..) |class_element, element_index| {
+        const pre_evaluated_name: ?Value = if (pre_evaluated_element_names) |names|
+            names[element_index]
+        else
+            null;
+
         // a. If IsStatic of e is false, then
         const element_or_error = if (!class_element.isStatic()) blk: {
             // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
-            break :blk classElementEvaluation(agent, class_element, prototype);
+            break :blk classElementEvaluation(agent, class_element, prototype, pre_evaluated_name);
         } else blk: {
             // b. Else,
             // i. Let element be Completion(ClassElementEvaluation of e with argument F).
-            break :blk classElementEvaluation(agent, class_element, function);
+            break :blk classElementEvaluation(agent, class_element, function, pre_evaluated_name);
         };
 
         // c. If element is an abrupt completion, then
@@ -2494,6 +2518,8 @@ pub fn bindingClassDeclarationEvaluation(
             class_name,
             class_name,
             source_text,
+            null,
+            null,
         );
 
         // 4. Let env be the running execution context's LexicalEnvironment.
@@ -2518,6 +2544,8 @@ pub fn bindingClassDeclarationEvaluation(
             null,
             String.fromLiteral("default"),
             source_text,
+            null,
+            null,
         );
     }
 }

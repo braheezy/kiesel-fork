@@ -11,6 +11,7 @@ extra: []const u32,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
+classes: []const Class,
 liveness: std.DynamicBitSetUnmanaged,
 live_ranges: []const LiveRange,
 
@@ -37,6 +38,20 @@ pub const Function = struct {
         async,
         async_arrow,
         async_generator,
+    };
+};
+
+pub const Class = struct {
+    source_text: Inst.StringIndex,
+    name: Name,
+    class_tail: ast.ClassTail,
+    heritage: Inst.Ref,
+    element_names: []const Inst.Ref,
+
+    pub const Name = union(enum) {
+        none,
+        identifier: Inst.StringIndex,
+        default: Inst.StringIndex,
     };
 };
 
@@ -164,6 +179,7 @@ pub const Inst = struct {
         yield,
 
         create_function,
+        create_class,
         create_unmapped_arguments_object,
         create_mapped_arguments_object,
         get_argument,
@@ -209,6 +225,7 @@ pub const Inst = struct {
         construct: ExtraIndex,
         get_template_object: ExtraIndex,
         create_function: FunctionIndex,
+        create_class: ClassIndex,
         argument: u16,
 
         // Make sure we don't accidentally add a field to make this union
@@ -329,6 +346,7 @@ pub const Inst = struct {
         .await = .ref,
         .yield = .ref,
         .create_function = .create_function,
+        .create_class = .create_class,
         .create_unmapped_arguments_object = .none,
         .create_mapped_arguments_object = .none,
         .get_argument = .argument,
@@ -343,6 +361,7 @@ pub const Inst = struct {
     pub const StringIndex = enum(u32) { _ };
     pub const BigIntIndex = enum(u32) { _ };
     pub const FunctionIndex = enum(u32) { _ };
+    pub const ClassIndex = enum(u32) { _ };
     pub const ExtraIndex = enum(u32) { _ };
 
     // Inline data types (8 bytes)
@@ -477,6 +496,13 @@ pub const Inst = struct {
                 try uses.append(gpa, extra.data.cooked);
                 try uses.append(gpa, extra.data.raw);
             },
+            .create_class => {
+                const class = ir.classes[@intFromEnum(inst.data.create_class)];
+                if (class.heritage != .none) try uses.append(gpa, class.heritage);
+                for (class.element_names) |name_ref| {
+                    if (name_ref != .none) try uses.append(gpa, name_ref);
+                }
+            },
             inline else => |dt| {
                 const field_data = @field(inst.data, @tagName(dt));
                 const FieldType = @TypeOf(field_data);
@@ -518,6 +544,8 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
     gpa.free(ir.functions);
+    for (ir.classes) |class| gpa.free(class.element_names);
+    gpa.free(ir.classes);
     ir.liveness.deinit(gpa);
     gpa.free(ir.live_ranges);
 }
@@ -673,6 +701,20 @@ fn printData(
             try writer.writeAll(", ");
             try printField(ir, extra.data.id, writer, tty_config);
         },
+        .create_class => {
+            const class = ir.classes[@intFromEnum(data.create_class)];
+            try printField(ir, data.create_class, writer, tty_config);
+            try writer.writeAll(", ");
+            try printField(ir, class.heritage, writer, tty_config);
+            if (class.element_names.len > 0) {
+                try writer.writeAll(", [");
+                for (class.element_names, 0..) |name_ref, j| {
+                    if (j > 0) try writer.writeAll(", ");
+                    try printField(ir, name_ref, writer, tty_config);
+                }
+                try writer.writeByte(']');
+            }
+        },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
             const FieldType = @TypeOf(field_data);
@@ -759,7 +801,9 @@ fn printField(
             try tty_config.setColor(writer, .reset);
             try writer.writeByte(')');
         },
-        Inst.FunctionIndex => {
+        Inst.FunctionIndex,
+        Inst.ClassIndex,
+        => {
             try tty_config.setColor(writer, .yellow);
             try writer.print("@{d}", .{@intFromEnum(value)});
             try tty_config.setColor(writer, .reset);

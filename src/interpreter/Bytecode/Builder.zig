@@ -188,6 +188,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .await => try b.lowerAwait(data.ref, dest),
             .yield => try b.lowerYield(data.ref, dest),
             .create_function => try b.lowerCreateFunction(data.create_function, dest),
+            .create_class => try b.lowerCreateClass(data.create_class, dest),
             .create_unmapped_arguments_object => try b.lowerCreateUnmappedArgumentsObject(dest),
             .create_mapped_arguments_object => try b.lowerCreateMappedArgumentsObject(dest),
             .get_argument => try b.lowerGetArgument(data.argument, dest),
@@ -273,12 +274,40 @@ pub fn build(b: *Builder) Error!Bytecode {
     }
     const functions = try functions_list.toOwnedSlice(b.gpa);
 
+    var classes_list: std.ArrayList(Bytecode.Class) = try .initCapacity(b.gpa, b.ir.classes.len);
+    defer classes_list.deinit(b.gpa);
+    for (b.ir.classes) |class| {
+        const element_name_regs = try b.gpa.alloc(Bytecode.Inst.Reg, class.element_names.len);
+        for (class.element_names, element_name_regs) |name_ref, *reg| {
+            reg.* = switch (name_ref) {
+                .none => .none,
+                else => b.resolve(name_ref),
+            };
+        }
+        classes_list.appendAssumeCapacity(.{
+            .source_text = @enumFromInt(@intFromEnum(class.source_text)),
+            .name = switch (class.name) {
+                .none => .none,
+                .identifier => |s| .{ .identifier = @enumFromInt(@intFromEnum(s)) },
+                .default => |s| .{ .default = @enumFromInt(@intFromEnum(s)) },
+            },
+            .class_tail = class.class_tail,
+            .heritage = switch (class.heritage) {
+                .none => .none,
+                else => b.resolve(class.heritage),
+            },
+            .element_names = element_name_regs,
+        });
+    }
+    const classes = try classes_list.toOwnedSlice(b.gpa);
+
     return .{
         .name = name,
         .code = code,
         .strings = strings,
         .big_ints = big_ints,
         .functions = functions,
+        .classes = classes,
     };
 }
 
@@ -1639,6 +1668,17 @@ fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest:
         .data = .{ .reg_function = .{
             dest,
             bytecode_function_index,
+        } },
+    });
+}
+
+fn lowerCreateClass(b: *Builder, class_index: Ir.Inst.ClassIndex, dest: Bytecode.Inst.Reg) Error!void {
+    const bytecode_class_index: Bytecode.Inst.ClassIndex = @enumFromInt(@intFromEnum(class_index));
+    try b.emit(.{
+        .tag = .create_class,
+        .data = .{ .reg_class = .{
+            dest,
+            bytecode_class_index,
         } },
     });
 }

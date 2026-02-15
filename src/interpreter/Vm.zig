@@ -20,6 +20,7 @@ const Value = types.Value;
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
 const await = builtins.await;
+const classDefinitionEvaluation = language.runtime.classDefinitionEvaluation;
 const createArrayFromList = types.createArrayFromList;
 const createForInIterator = builtins.createForInIterator;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
@@ -258,6 +259,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .await => try vm.executeAwait(data.reg),
                 .yield => return vm.executeYield(data.reg, &pc),
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
+                .create_class => vm.executeCreateClass(data.reg_class[0], data.reg_class[1]),
                 .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
                 .create_unmapped_arguments_object => try vm.executeCreateUnmappedArgumentsObject(data.reg),
                 .create_mapped_arguments_object => try vm.executeCreateMappedArgumentsObject(data.reg),
@@ -371,6 +373,11 @@ fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
 fn getFunction(vm: *Vm, index: Bytecode.Inst.FunctionIndex) Bytecode.Function {
     const frame = vm.currentCallFrame();
     return frame.bytecode.functions[@intFromEnum(index)];
+}
+
+fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
+    const frame = vm.currentCallFrame();
+    return frame.bytecode.classes[@intFromEnum(index)];
 }
 
 fn executeJump(vm: *Vm, offset: i32, pc: *usize) void {
@@ -1969,6 +1976,42 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
         }, default_name),
     };
     vm.load(dest, Value.from(&function_obj.object));
+}
+
+fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
+    const class = vm.getClass(class_index);
+    const source_text = try vm.getString(class.source_text).toUtf8(vm.agent.gc_allocator);
+    const class_binding: ?*const String = switch (class.name) {
+        .identifier => |name_index| vm.getString(name_index),
+        .none, .default => null,
+    };
+    const class_name: *const String = switch (class.name) {
+        .identifier => |name_index| vm.getString(name_index),
+        .default => |name_index| vm.getString(name_index),
+        .none => .empty,
+    };
+    const heritage: ?Value = switch (class.heritage) {
+        .none => null,
+        else => vm.store(class.heritage),
+    };
+    const element_names = try vm.agent.gc_allocator.alloc(Value, class.element_names.len);
+    defer vm.agent.gc_allocator.free(element_names);
+    for (class.element_names, element_names) |name_reg, *value| {
+        value.* = switch (name_reg) {
+            .none => .undefined,
+            else => vm.store(name_reg),
+        };
+    }
+    const class_obj = try classDefinitionEvaluation(
+        vm.agent,
+        class.class_tail,
+        class_binding,
+        class_name,
+        source_text,
+        heritage,
+        element_names,
+    );
+    vm.load(dest, Value.from(class_obj));
 }
 
 fn executeSetHomeObject(vm: *Vm, function_reg: Bytecode.Inst.Reg, home_object_reg: Bytecode.Inst.Reg) void {

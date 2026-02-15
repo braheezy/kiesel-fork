@@ -1373,4 +1373,15 @@ test {
         \\f();
         \\
     , .{ .promise = .{ .fulfilled = Value.from(6) } }, null, null);
+
+    // Classes
+    try testInterpreter(std.testing.allocator,
+        \\class Foo {
+        \\  constructor(x) { this.x = x; }
+        \\  getX() { return this.x; }
+        \\}
+        \\var f = new Foo(42);
+        \\f.getX();
+        \\
+    , .{ .value = Value.from(42) }, null, null);
 }

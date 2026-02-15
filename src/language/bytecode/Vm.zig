@@ -450,6 +450,8 @@ fn executeClassDefinitionEvaluation(
             class_name,
             class_name,
             source_text,
+            null,
+            null,
         );
         self.result = Value.from(value);
     }
@@ -465,6 +467,8 @@ fn executeClassDefinitionEvaluation(
             null,
             .empty,
             source_text,
+            null,
+            null,
         );
         self.result = Value.from(value);
     }

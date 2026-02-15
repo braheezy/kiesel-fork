@@ -22,6 +22,7 @@ extra: std.ArrayList(u32),
 strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMapUnmanaged(void),
 functions: std.ArrayList(Ir.Function),
+classes: std.ArrayList(Ir.Class),
 breakable_stack: std.ArrayList(*BreakableContext),
 scope_depth: u16,
 template_object_count: u16,
@@ -119,6 +120,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
         .strings = .empty,
         .big_ints = .empty,
         .functions = .empty,
+        .classes = .empty,
         .breakable_stack = .empty,
         .scope_depth = 0,
         .template_object_count = 0,
@@ -133,6 +135,8 @@ pub fn deinit(b: *Builder) void {
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
     b.functions.deinit(b.gpa);
+    for (b.classes.items) |class| b.gpa.free(class.element_names);
+    b.classes.deinit(b.gpa);
     for (b.breakable_stack.items) |ctx| {
         ctx.deinit(b.gpa);
         b.gpa.destroy(ctx);
@@ -173,6 +177,12 @@ pub fn build(b: *Builder) Error!Ir {
     const functions = try b.functions.toOwnedSlice(b.gpa);
     errdefer b.gpa.free(functions);
 
+    const classes = try b.classes.toOwnedSlice(b.gpa);
+    errdefer {
+        for (classes) |class| b.gpa.free(class.element_names);
+        b.gpa.free(classes);
+    }
+
     var ir: Ir = .{
         .name = name,
         .instructions = instructions,
@@ -180,6 +190,7 @@ pub fn build(b: *Builder) Error!Ir {
         .strings = strings,
         .big_ints = big_ints,
         .functions = functions,
+        .classes = classes,
         .liveness = undefined,
         .live_ranges = undefined,
     };
@@ -277,6 +288,12 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
 fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Inst.FunctionIndex {
     const index: Ir.Inst.FunctionIndex = @enumFromInt(b.functions.items.len);
     try b.functions.append(b.gpa, function);
+    return index;
+}
+
+fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Inst.ClassIndex {
+    const index: Ir.Inst.ClassIndex = @enumFromInt(b.classes.items.len);
+    try b.classes.append(b.gpa, class);
     return index;
 }
 
@@ -394,7 +411,7 @@ fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
         switch (module_item) {
             // InitializeEnvironment is responsible for creating the bindings.
             .import_declaration => {},
-            .export_declaration => |export_decl| _ = try b.lowerExportDeclaration(export_decl),
+            .export_declaration => |*export_decl| _ = try b.lowerExportDeclaration(export_decl),
             .statement_list_item => |stmt_list_item| switch (stmt_list_item) {
                 .statement => |stmt| _ = try b.lowerStatement(stmt),
                 .declaration => |decl| _ = try b.lowerDeclaration(decl),
@@ -404,15 +421,15 @@ fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
     return .none;
 }
 
-fn lowerExportDeclaration(b: *Builder, node: ast.ExportDeclaration) Error!Ir.Inst.Ref {
-    switch (node) {
+fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration) Error!Ir.Inst.Ref {
+    switch (export_decl.*) {
         .export_from,
         .named_exports,
         => return .none,
         .variable_statement => |*var_stmt| return b.lowerVariableStatement(var_stmt),
         .declaration => |decl| return b.lowerDeclaration(decl),
         .default_hoistable_declaration => return .none, // Handled by InitializeEnvironment
-        .default_class_declaration => try b.todo("export default class"),
+        .default_class_declaration => |*class_decl| return b.lowerClassDeclaration(class_decl),
         .default_expression => |*expr| {
             const value = try b.lowerExpression(expr);
             const string_index = try b.internString("*default*");
@@ -642,7 +659,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
 fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref {
     return switch (decl.*) {
         .hoistable_declaration => .none, // Handled by GDI/FDI before execution
-        .class_declaration => try b.todo("class declaration"),
+        .class_declaration => |*class_decl| try b.lowerClassDeclaration(class_decl),
         .lexical_declaration => |*lex_decl| try b.lowerLexicalDeclaration(lex_decl),
     };
 }
@@ -1633,6 +1650,40 @@ fn lowerThrowStatement(b: *Builder, throw_stmt: *const ast.ThrowStatement) Error
     return .none;
 }
 
+fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) Error!Ir.Inst.Ref {
+    const source_text = try b.internString(class_decl.source_text);
+    const name: Ir.Class.Name = if (class_decl.identifier) |identifier|
+        .{ .identifier = try b.internString(identifier) }
+    else
+        .{ .default = try b.internString("default") };
+
+    const heritage = try b.lowerClassHeritage(class_decl.class_tail.class_heritage);
+    const element_names = try b.lowerClassElementNames(&class_decl.class_tail.class_body);
+
+    const class_index = try b.addClass(.{
+        .source_text = source_text,
+        .name = name,
+        .class_tail = class_decl.class_tail,
+        .heritage = heritage,
+        .element_names = element_names,
+    });
+    const value = try b.addInst(.{
+        .tag = .create_class,
+        .data = .{ .create_class = class_index },
+    });
+    if (class_decl.identifier) |identifier| {
+        const string_index = try b.internString(identifier);
+        _ = try b.addInst(.{
+            .tag = .initialize_binding,
+            .data = .{ .set_binding = .{
+                .name = string_index,
+                .value = value,
+            } },
+        });
+    }
+    return value;
+}
+
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {
     for (lex_decl.binding_list.items) |*lex_binding| {
         _ = try b.lowerLexicalBinding(lex_binding);
@@ -1961,7 +2012,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
             .array_literal => |*array_lit| try b.lowerArrayLiteral(array_lit),
             .object_literal => |*object_lit| try b.lowerObjectLiteral(object_lit),
             .function_expression => |*func_expr| try b.lowerFunctionExpression(func_expr),
-            .class_expression => try b.todo("class expression"),
+            .class_expression => |*class_expr| try b.lowerClassExpression(class_expr),
             .generator_expression => |*gen_expr| try b.lowerFunctionExpression(gen_expr),
             .async_function_expression => |*async_expr| try b.lowerFunctionExpression(async_expr),
             .async_generator_expression => |*async_gen_expr| try b.lowerFunctionExpression(async_gen_expr),
@@ -2158,6 +2209,60 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
             .len = len,
         } },
     });
+}
+
+fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Error!Ir.Inst.Ref {
+    const source_text = try b.internString(class_expr.source_text);
+    const name: Ir.Class.Name = if (class_expr.identifier) |identifier|
+        .{ .identifier = try b.internString(identifier) }
+    else
+        .none;
+
+    const heritage = try b.lowerClassHeritage(class_expr.class_tail.class_heritage);
+    const element_names = try b.lowerClassElementNames(&class_expr.class_tail.class_body);
+
+    const class_index = try b.addClass(.{
+        .source_text = source_text,
+        .name = name,
+        .class_tail = class_expr.class_tail,
+        .heritage = heritage,
+        .element_names = element_names,
+    });
+    return b.addInst(.{
+        .tag = .create_class,
+        .data = .{ .create_class = class_index },
+    });
+}
+
+fn lowerClassHeritage(b: *Builder, class_heritage: ?*const ast.Expression) Error!Ir.Inst.Ref {
+    if (class_heritage) |heritage| {
+        return b.lowerExpression(heritage);
+    }
+    return .none;
+}
+
+fn lowerClassElementNames(b: *Builder, class_body: *const ast.ClassBody) Error![]const Ir.Inst.Ref {
+    var names: std.ArrayList(Ir.Inst.Ref) = .empty;
+    for (class_body.class_element_list.items) |class_element| {
+        switch (class_element.classElementKind()) {
+            .constructor_method, .empty => continue,
+            .non_constructor_method => {},
+        }
+        const name_ref: Ir.Inst.Ref = switch (class_element) {
+            .method_definition, .static_method_definition => |method_def| try b.lowerClassElementName(&method_def.class_element_name),
+            .field_definition, .static_field_definition => |field_def| try b.lowerClassElementName(&field_def.class_element_name),
+            .class_static_block, .empty_statement => .none,
+        };
+        try names.append(b.gpa, name_ref);
+    }
+    return names.toOwnedSlice(b.gpa);
+}
+
+fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElementName) Error!Ir.Inst.Ref {
+    return switch (class_element_name.*) {
+        .property_name => |*property_name| try b.lowerPropertyName(property_name),
+        .private_identifier => try b.todo("private identifier in class element name"),
+    };
 }
 
 fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
