@@ -6,6 +6,7 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
@@ -124,6 +125,8 @@ pub const Generator = MakeObject(.{
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) Agent.Error!*Object,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
+            saved_frame: ?interpreter.Vm.CallFrame = null,
+            saved_frame_args: ?[]const Value = null,
         },
     },
     .tag = .generator,
@@ -159,6 +162,66 @@ pub fn generatorStart(
 
             // b. Let acGenerator be the Generator component of acGenContext.
             const closure_generator = closure_generator_context.generator.generator;
+
+            if (agent_.options.new_interpreter) {
+                const vm = agent_.active_vm.?;
+
+                if (closure_generator.fields.evaluation_state.saved_frame) |*frame| {
+                    switch (resume_completion.type) {
+                        .normal => {
+                            frame.regs[@intFromEnum(frame.yield_reg)] = resume_completion.value orelse .undefined;
+                        },
+                        .@"return" => {
+                            _ = agent_.execution_context_stack.pop().?;
+                            closure_generator.fields.generator_state = .completed;
+                            agent_.gc_allocator.free(frame.arguments);
+                            closure_generator.fields.evaluation_state = undefined;
+                            return createIteratorResultObject(agent_, resume_completion.value.?, true);
+                        },
+                        .throw => {
+                            _ = agent_.execution_context_stack.pop().?;
+                            closure_generator.fields.generator_state = .completed;
+                            agent_.gc_allocator.free(frame.arguments);
+                            closure_generator.fields.evaluation_state = undefined;
+                            agent_.exception = .{
+                                .value = resume_completion.value.?,
+                                .stack_trace = try agent_.captureStackTrace(),
+                            };
+                            return error.ExceptionThrown;
+                        },
+                        else => unreachable,
+                    }
+                    try vm.restoreGeneratorFrame(frame.*);
+                } else {
+                    const name_value = generator_function_.object.getPropertyValueDirect(types.PropertyKey.from("name"));
+                    const name = try name_value.asString().toUtf8(agent_.gc_allocator);
+                    defer agent_.gc_allocator.free(name);
+                    const bc = try generator_function_.fields.compile(agent_, name);
+                    const args = closure_generator.fields.evaluation_state.saved_frame_args.?;
+                    try vm.pushCallFrame(bc, args);
+                    agent_.gc_allocator.free(args);
+                    closure_generator.fields.evaluation_state.saved_frame_args = null;
+                }
+
+                const result = vm.run() catch |err| {
+                    _ = agent_.execution_context_stack.pop().?;
+                    closure_generator.fields.generator_state = .completed;
+                    closure_generator.fields.evaluation_state = undefined;
+                    return err;
+                };
+
+                if (closure_generator.fields.evaluation_state.suspension_result) |suspension_result| {
+                    closure_generator.fields.evaluation_state.saved_frame = vm.saveGeneratorFrame();
+                    closure_generator.fields.evaluation_state.suspension_result = null;
+                    return suspension_result.asObject();
+                }
+
+                _ = agent_.execution_context_stack.pop().?;
+                closure_generator.fields.generator_state = .completed;
+                closure_generator.fields.evaluation_state = undefined;
+                const result_value: Value = result orelse .undefined;
+                return createIteratorResultObject(agent_, result_value, true);
+            }
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
@@ -331,7 +394,11 @@ pub fn generatorResumeAbrupt(
     if (state == .suspended_start) {
         // a. Set generator.[[GeneratorState]] to completed.
         generator.fields.generator_state = .completed;
-        generator.fields.evaluation_state.vm.deinit();
+        if (generator.fields.evaluation_state.saved_frame_args) |args| {
+            agent.gc_allocator.free(args);
+        } else {
+            generator.fields.evaluation_state.vm.deinit();
+        }
 
         // b. NOTE: Once a generator enters the completed state it never leaves it and its associated
         //    execution context is never resumed. Any execution state associated with generator can be

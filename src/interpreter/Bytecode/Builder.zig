@@ -182,6 +182,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .throw => try b.lowerThrow(data.ref, dest),
             .throw_reference_error => try b.lowerThrowReferenceError(dest),
             .@"return" => try b.lowerReturn(data.ref, dest),
+            .await => try b.lowerAwait(data.ref, dest),
+            .yield => try b.lowerYield(data.ref, dest),
             .create_function => try b.lowerCreateFunction(data.create_function, dest),
             .create_unmapped_arguments_object => try b.lowerCreateUnmappedArgumentsObject(dest),
             .create_mapped_arguments_object => try b.lowerCreateMappedArgumentsObject(dest),
@@ -1575,6 +1577,26 @@ fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
         .data = .{ .reg = ret_reg },
     });
     b.noreturn();
+}
+
+fn lowerAwait(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emitMoveIfNeeded(ref, dest);
+    try b.emit(.{
+        .tag = .await,
+        .data = .{ .reg = dest },
+    });
+}
+
+fn lowerYield(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    if (ref == .none) {
+        try b.lowerUndefined(dest);
+    } else {
+        try b.emitMoveIfNeeded(ref, dest);
+    }
+    try b.emit(.{
+        .tag = .yield,
+        .data = .{ .reg = dest },
+    });
 }
 
 fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest: Bytecode.Inst.Reg) Error!void {

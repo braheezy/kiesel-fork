@@ -649,7 +649,9 @@ fn evaluateGeneratorBody(
 ) Agent.Error!Value {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    try functionDeclarationInstantiation(agent, function, arguments_list);
+    if (!agent.options.new_interpreter) {
+        try functionDeclarationInstantiation(agent, function, arguments_list);
+    }
 
     // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorPrototype%",
     //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
@@ -670,6 +672,10 @@ fn evaluateGeneratorBody(
     // 5. Perform GeneratorStart(G, FunctionBody).
     try generatorStart(agent, generator, function);
 
+    if (agent.options.new_interpreter) {
+        generator.fields.evaluation_state.saved_frame_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
+    }
+
     // 6. Return ReturnCompletion(G).
     return Value.from(&generator.object);
 }
@@ -683,7 +689,9 @@ fn evaluateAsyncGeneratorBody(
 ) Agent.Error!Value {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    try functionDeclarationInstantiation(agent, function, arguments_list);
+    if (!agent.options.new_interpreter) {
+        try functionDeclarationInstantiation(agent, function, arguments_list);
+    }
 
     // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject,
     //    "%AsyncGeneratorPrototype%", « [[AsyncGeneratorState]], [[AsyncGeneratorContext]],
@@ -706,6 +714,10 @@ fn evaluateAsyncGeneratorBody(
     // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
     try asyncGeneratorStart(agent, generator, function);
 
+    if (agent.options.new_interpreter) {
+        generator.fields.evaluation_state.saved_frame_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
+    }
+
     // 6. Return ReturnCompletion(generator).
     return Value.from(&generator.object);
 }
@@ -727,25 +739,30 @@ fn evaluateAsyncFunctionBody(
     ) catch |err| try noexcept(err);
 
     // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
-    functionDeclarationInstantiation(agent, function, arguments_list) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+    if (!agent.options.new_interpreter) {
+        functionDeclarationInstantiation(agent, function, arguments_list) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
 
-        // 3. If completion is an abrupt completion, then
-        error.ExceptionThrown => {
-            const exception = agent.clearException();
+            // 3. If completion is an abrupt completion, then
+            error.ExceptionThrown => {
+                const exception = agent.clearException();
 
-            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
-                agent,
-                .undefined,
-                &.{exception.value},
-            ) catch |err_| try noexcept(err_);
-        },
-    };
+                // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
+                _ = Value.from(promise_capability.reject).callAssumeCallable(
+                    agent,
+                    .undefined,
+                    &.{exception.value},
+                ) catch |err_| try noexcept(err_);
+            },
+        };
+    }
 
     // 4. Else,
     //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
-    try asyncFunctionStart(agent, promise_capability, .{ .ecmascript_function = function });
+    try asyncFunctionStart(agent, promise_capability, .{ .ecmascript_function = .{
+        .function = function,
+        .arguments = arguments_list.values,
+    } });
 
     // 5. Return ReturnCompletion(promiseCapability.[[Promise]]).
     return Value.from(promise_capability.promise);

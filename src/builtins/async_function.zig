@@ -141,7 +141,10 @@ pub fn asyncFunctionStart(
 }
 
 const AsyncBody = union(enum) {
-    ecmascript_function: *builtins.ECMAScriptFunction,
+    ecmascript_function: struct {
+        function: *builtins.ECMAScriptFunction,
+        arguments: []const Value,
+    },
     abstract_closure: struct {
         func: *const fn (*Agent, SafePointer) Agent.Error!Completion,
         captures: SafePointer,
@@ -176,7 +179,20 @@ pub fn asyncBlockStart(
             //     i. Assert: asyncBody is an Abstract Closure with no parameters.
             //     ii. Let result be Completion(asyncBody()).
             const result = switch (async_body_) {
-                .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_, null),
+                .ecmascript_function => |ef| blk: {
+                    if (agent_.options.new_interpreter) {
+                        const name_value = ef.function.object.getPropertyValueDirect(types.PropertyKey.from("name"));
+                        const name = try name_value.asString().toUtf8(agent_.gc_allocator);
+                        defer agent_.gc_allocator.free(name);
+                        const bc = ef.function.fields.compile(agent_, name) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        const vm = agent_.active_vm.?;
+                        vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        const result = vm.run() catch |err| break :blk @as(Agent.Error!Completion, err);
+                        const result_value: Value = result orelse .undefined;
+                        break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value));
+                    }
+                    break :blk ef.function.fields.evaluateBody(agent_, null);
+                },
                 .abstract_closure => |abstract_closure| abstract_closure.func(agent_, abstract_closure.captures),
                 .module => |module| generateAndRunBytecode(agent_, module, .{}),
             };

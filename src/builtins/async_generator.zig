@@ -6,6 +6,7 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -16,6 +17,7 @@ const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
@@ -165,6 +167,11 @@ pub const prototype = struct {
         if (state == .suspended_start or state == .completed) {
             // a. Set generator.[[AsyncGeneratorState]] to draining-queue.
             generator.fields.async_generator_state = .draining_queue;
+            if (state == .suspended_start) {
+                if (generator.fields.evaluation_state.saved_frame_args) |args| {
+                    agent.gc_allocator.free(args);
+                }
+            }
 
             // b. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
@@ -213,6 +220,9 @@ pub const prototype = struct {
         if (state == .suspended_start) {
             // a. Set generator.[[AsyncGeneratorState]] to completed.
             generator.fields.async_generator_state = .completed;
+            if (generator.fields.evaluation_state.saved_frame_args) |args| {
+                agent.gc_allocator.free(args);
+            }
 
             // b. Set state to completed.
             state = .completed;
@@ -279,6 +289,8 @@ pub const AsyncGenerator = MakeObject(.{
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
+            saved_frame: ?interpreter.Vm.CallFrame = null,
+            saved_frame_args: ?[]const Value = null,
         },
     },
     .tag = .async_generator,
@@ -324,6 +336,90 @@ pub fn asyncGeneratorStart(
 
             // b. Let acGenerator be the Generator component of acGenContext.
             const closure_generator = closure_generator_context.generator.async_generator;
+
+            if (agent_.options.new_interpreter) {
+                const vm = agent_.active_vm.?;
+
+                if (closure_generator.fields.evaluation_state.saved_frame) |*frame| {
+                    switch (resume_completion.type) {
+                        .normal => {
+                            frame.regs[@intFromEnum(frame.yield_reg)] = resume_completion.value orelse .undefined;
+                        },
+                        .@"return" => {
+                            _ = agent_.execution_context_stack.pop().?;
+                            closure_generator.fields.async_generator_state = .draining_queue;
+                            agent_.gc_allocator.free(frame.arguments);
+                            closure_generator.fields.evaluation_state = undefined;
+
+                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
+                            try asyncGeneratorDrainQueue(agent_, closure_generator);
+                            return;
+                        },
+                        .throw => {
+                            _ = agent_.execution_context_stack.pop().?;
+                            closure_generator.fields.async_generator_state = .draining_queue;
+                            agent_.gc_allocator.free(frame.arguments);
+                            closure_generator.fields.evaluation_state = undefined;
+
+                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);
+                            try asyncGeneratorDrainQueue(agent_, closure_generator);
+                            return;
+                        },
+                        else => unreachable,
+                    }
+                    try vm.restoreGeneratorFrame(frame.*);
+                } else {
+                    const name_value = generator_function_.object.getPropertyValueDirect(PropertyKey.from("name"));
+                    const name = try name_value.asString().toUtf8(agent_.gc_allocator);
+                    defer agent_.gc_allocator.free(name);
+                    const bc = generator_function_.fields.compile(agent_, name) catch |err| switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.ExceptionThrown => {
+                            _ = agent_.execution_context_stack.pop().?;
+                            closure_generator.fields.async_generator_state = .draining_queue;
+                            closure_generator.fields.evaluation_state = undefined;
+                            const exception = agent_.clearException();
+                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
+                            try asyncGeneratorDrainQueue(agent_, closure_generator);
+                            return;
+                        },
+                    };
+                    const args = closure_generator.fields.evaluation_state.saved_frame_args.?;
+                    try vm.pushCallFrame(bc, args);
+                    agent_.gc_allocator.free(args);
+                    closure_generator.fields.evaluation_state.saved_frame_args = null;
+                }
+
+                const result = vm.run() catch |err| {
+                    _ = agent_.execution_context_stack.pop().?;
+                    closure_generator.fields.async_generator_state = .draining_queue;
+                    closure_generator.fields.evaluation_state = undefined;
+
+                    switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.ExceptionThrown => {
+                            const exception = agent_.clearException();
+                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
+                            try asyncGeneratorDrainQueue(agent_, closure_generator);
+                            return;
+                        },
+                    }
+                };
+
+                if (closure_generator.fields.evaluation_state.suspension_result) |_| {
+                    closure_generator.fields.evaluation_state.saved_frame = vm.saveGeneratorFrame();
+                    closure_generator.fields.evaluation_state.suspension_result = null;
+                    return;
+                }
+
+                _ = agent_.execution_context_stack.pop().?;
+                closure_generator.fields.async_generator_state = .draining_queue;
+                closure_generator.fields.evaluation_state = undefined;
+                const result_value: Value = result orelse .undefined;
+                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
+                try asyncGeneratorDrainQueue(agent_, closure_generator);
+                return;
+            }
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {

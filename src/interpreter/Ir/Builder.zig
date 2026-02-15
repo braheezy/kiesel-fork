@@ -1958,8 +1958,8 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .conditional_expression => |*cond_expr| try b.lowerConditionalExpression(cond_expr),
         .assignment_expression => |*assign_expr| try b.lowerAssignmentExpression(assign_expr),
         .sequence_expression => |*seq_expr| try b.lowerSequenceExpression(seq_expr),
-        .await_expression => try b.todo("await expression"),
-        .yield_expression => try b.todo("yield expression"),
+        .await_expression => |*await_expr| try b.lowerAwaitExpression(await_expr),
+        .yield_expression => |*yield_expr| try b.lowerYieldExpression(yield_expr),
         .tagged_template => |*tagged_template| try b.lowerTaggedTemplate(tagged_template),
         .binding_pattern_for_assignment_expression => unreachable, // Only valid as assignment LHS
     };
@@ -3319,6 +3319,25 @@ fn lowerSequenceExpression(b: *Builder, seq_expr: *const ast.SequenceExpression)
         last = try b.lowerExpression(expr);
     }
     return last;
+}
+
+fn lowerAwaitExpression(b: *Builder, await_expr: *const ast.AwaitExpression) Error!Ir.Inst.Ref {
+    const value = try b.lowerExpression(await_expr.expression);
+    return b.addInst(.{
+        .tag = .await,
+        .data = .{ .ref = value },
+    });
+}
+
+fn lowerYieldExpression(b: *Builder, yield_expr: *const ast.YieldExpression) Error!Ir.Inst.Ref {
+    const value = if (yield_expr.expression) |expr|
+        try b.lowerExpression(expr)
+    else
+        Ir.Inst.Ref.none;
+    return b.addInst(.{
+        .tag = .yield,
+        .data = .{ .ref = value },
+    });
 }
 
 fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) Error!Ir.Inst.Ref {

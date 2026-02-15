@@ -157,6 +157,8 @@ pub const Inst = struct {
         throw,
         throw_reference_error,
         @"return",
+        await,
+        yield,
 
         create_function,
         create_unmapped_arguments_object,
@@ -318,6 +320,8 @@ pub const Inst = struct {
         .throw = .ref,
         .throw_reference_error = .none,
         .@"return" = .ref,
+        .await = .ref,
+        .yield = .ref,
         .create_function = .create_function,
         .create_unmapped_arguments_object = .none,
         .create_mapped_arguments_object = .none,

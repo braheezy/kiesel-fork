@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const ast = @import("language/ast.zig");
+const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
 const language = @import("language.zig");
 const types = @import("types.zig");
@@ -79,6 +80,7 @@ pub fn compileAndRun(
 
 const ExpectedResult = union(enum) {
     value: ?Value,
+    promise: struct { fulfilled: Value },
     exception,
     ignore,
 };
@@ -150,6 +152,12 @@ fn testInterpreter(
             if (result == null) return error.TestExpectedEqual;
             if (!expected.?.isStrictlyEqual(result.?)) return error.TestExpectedEqual;
         } else if (result != null) return error.TestExpectedEqual,
+        .promise => |expected| {
+            agent.drainJobQueue();
+            const promise = (result orelse return error.TestExpectedEqual).asObject().as(builtins.Promise);
+            try std.testing.expectEqual(.fulfilled, promise.fields.promise_state);
+            if (!expected.fulfilled.isStrictlyEqual(promise.fields.promise_result)) return error.TestExpectedEqual;
+        },
         .exception => return error.TestExpectedException,
         .ignore => {},
     } else |err| switch (expected_result) {
@@ -1329,4 +1337,40 @@ test {
         \\o.x;
         \\
     , .{ .value = Value.from(42) }, null, null);
+
+    // Generator
+    try testInterpreter(std.testing.allocator,
+        \\function* g() {
+        \\  yield 1;
+        \\  yield 2;
+        \\  yield 3;
+        \\}
+        \\function f() {
+        \\  var gen = g();
+        \\  var a = gen.next();
+        \\  var b = gen.next();
+        \\  var c = gen.next();
+        \\  return a.value + b.value + c.value;
+        \\}
+        \\f();
+        \\
+    , .{ .value = Value.from(6) }, null, null);
+
+    // Async Generator
+    try testInterpreter(std.testing.allocator,
+        \\async function* g() {
+        \\  yield 1;
+        \\  yield 2;
+        \\  yield 3;
+        \\}
+        \\async function f() {
+        \\  var gen = g();
+        \\  var a = await gen.next();
+        \\  var b = await gen.next();
+        \\  var c = await gen.next();
+        \\  return a.value + b.value + c.value;
+        \\}
+        \\f();
+        \\
+    , .{ .promise = .{ .fulfilled = Value.from(6) } }, null, null);
 }

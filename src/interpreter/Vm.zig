@@ -18,6 +18,7 @@ const Value = types.Value;
 
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
+const await = builtins.await;
 const createArrayFromList = types.createArrayFromList;
 const createForInIterator = builtins.createForInIterator;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
@@ -45,6 +46,7 @@ const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = ast.stringValueImpl;
+const yield = builtins.yield;
 
 const Vm = @This();
 
@@ -54,12 +56,14 @@ constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
 
 pub const num_regs = 32;
 
-const CallFrame = struct {
+pub const CallFrame = struct {
     bytecode: *const Bytecode,
     constants: Constants,
     regs: [num_regs]Value,
     arguments: []const Value,
     cached_this_value: ?Value,
+    saved_pc: usize,
+    yield_reg: Bytecode.Inst.Reg,
 };
 
 const constants_align = @max(@alignOf(String), @alignOf(BigInt));
@@ -99,7 +103,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
 
     const frame = vm.currentCallFrame();
     var code = frame.bytecode.code;
-    var pc: usize = 0;
+    var pc: usize = frame.saved_pc;
 
     loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
         inline else => |tag| {
@@ -247,6 +251,8 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .throw => vm.executeThrow(data.reg),
                 .throw_reference_error => vm.executeThrowReferenceError(),
                 .@"return" => return vm.executeReturn(data.reg),
+                .await => try vm.executeAwait(data.reg),
+                .yield => return vm.executeYield(data.reg, &pc),
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
                 .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
                 .create_unmapped_arguments_object => try vm.executeCreateUnmappedArgumentsObject(data.reg),
@@ -275,7 +281,7 @@ pub fn pushCallFrame(
     vm: *Vm,
     callee_bytecode: *const Bytecode,
     args: []const Value,
-) Agent.Error!void {
+) std.mem.Allocator.Error!void {
     const args_owned = try vm.agent.gc_allocator.dupe(Value, args);
     errdefer vm.agent.gc_allocator.free(args_owned);
 
@@ -303,6 +309,8 @@ pub fn pushCallFrame(
         .regs = undefined,
         .arguments = args_owned,
         .cached_this_value = null,
+        .saved_pc = 0,
+        .yield_reg = .none,
     });
 }
 
@@ -311,6 +319,15 @@ pub fn popCallFrame(vm: *Vm) void {
 
     const frame = vm.call_stack.pop().?;
     vm.agent.gc_allocator.free(frame.arguments);
+}
+
+pub fn saveGeneratorFrame(vm: *Vm) CallFrame {
+    std.debug.assert(vm.call_stack.items.len > 1);
+    return vm.call_stack.pop().?;
+}
+
+pub fn restoreGeneratorFrame(vm: *Vm, frame: CallFrame) std.mem.Allocator.Error!void {
+    try vm.call_stack.append(vm.agent.gc_allocator, frame);
 }
 
 fn currentCallFrame(vm: *Vm) *CallFrame {
@@ -1812,6 +1829,21 @@ fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) ?Value {
     const return_value: ?Value = if (reg != .none) vm.store(reg) else null;
     if (vm.call_stack.items.len > 1) vm.popCallFrame();
     return return_value;
+}
+
+fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(reg);
+    const result = try await(vm.agent, value);
+    vm.load(reg, result);
+}
+
+fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: *const usize) Agent.Error!?Value {
+    const value = vm.store(reg);
+    const frame = vm.currentCallFrame();
+    frame.saved_pc = pc.*;
+    frame.yield_reg = reg;
+    _ = try yield(vm.agent, value);
+    return null;
 }
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {

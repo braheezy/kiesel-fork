@@ -202,6 +202,8 @@ pub const Inst = struct {
         throw,
         throw_reference_error,
         @"return",
+        await,
+        yield,
 
         create_function,
         set_home_object,
@@ -380,6 +382,8 @@ pub const Inst = struct {
         .throw = .reg,
         .throw_reference_error = .none,
         .@"return" = .reg,
+        .await = .reg,
+        .yield = .reg,
         .create_function = .reg_function,
         .set_home_object = .reg_reg,
         .create_unmapped_arguments_object = .reg,
