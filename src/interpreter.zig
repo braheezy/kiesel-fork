@@ -899,19 +899,20 @@ test {
         \\ %81: [ 81..81 ]                    label
         \\ %82: [ 82..82 ]                    br %83, %54
         \\ %83: [ 83..83 ]                    label
-        \\ %84: [ 84..89 ]                    undefined
+        \\ %84: [ 84..84 ] dead               undefined
         \\ %85: [ 85..87 ]                    get_binding @0 ("x")
         \\ %86: [ 86..87 ]                    number 100
         \\ %87: [ 87..88 ]                    add %85, %86
-        \\ %88: [ 88..88 ]                    set_binding @0 ("x"), %87
-        \\ %89: [ 89..89 ]                    br %94, %84
+        \\ %88: [ 88..89 ]                    set_binding @0 ("x"), %87
+        \\ %89: [ 89..89 ]                    br %95, %88
         \\ %90: [ 90..92 ] dead               get_binding @0 ("x")
         \\ %91: [ 91..92 ] dead               number 200
         \\ %92: [ 92..93 ] dead               add %90, %91
-        \\ %93: [ 93..93 ] dead               set_binding @0 ("x"), %92
-        \\ %94: [ 94..94 ]                    label
-        \\ %95: [ 95..96 ]                    get_binding @0 ("x")
-        \\ %96: [ 96..96 ]                    return %95
+        \\ %93: [ 93..94 ] dead               set_binding @0 ("x"), %92
+        \\ %94: [ 94..94 ] dead               br %95, %93
+        \\ %95: [ 95..95 ]                    label
+        \\ %96: [ 96..97 ]                    get_binding @0 ("x")
+        \\ %97: [ 97..97 ]                    return %96
         \\
     ,
         \\Bytecode (test)
@@ -982,14 +983,13 @@ test {
         \\ 305: 0c 01 03                      move r1, r3
         \\ 308: 0c 00 01                      move r0, r1
         \\ 311: 00 7e ff ff ff                jump -130
-        \\ 316: 04 00                         load_undefined r0
-        \\ 318: 41 01 00 00 00 00             get_binding r1, @0 ("x")
-        \\ 324: 08 02 64 00 00 00             load_number_i32 r2, 100
-        \\ 330: 25 03 01 02                   add r3, r1, r2
-        \\ 334: 45 00 00 00 00 03             set_binding @0 ("x"), r3
-        \\ 340: 0c 01 03                      move r1, r3
-        \\ 343: 41 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 349: 8f 00                         return r0
+        \\ 316: 41 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 322: 08 01 64 00 00 00             load_number_i32 r1, 100
+        \\ 328: 25 02 00 01                   add r2, r0, r1
+        \\ 332: 45 00 00 00 00 02             set_binding @0 ("x"), r2
+        \\ 338: 0c 00 02                      move r0, r2
+        \\ 341: 41 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 347: 8f 00                         return r0
         \\
     );
 

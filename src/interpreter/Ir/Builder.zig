@@ -1672,16 +1672,26 @@ fn lowerLabelledStatement(b: *Builder, lbl_stmt: *const ast.LabelledStatement) E
                 });
                 defer b.popBreakableContext();
 
-                const result = try b.lowerStatement(stmt);
+                const result = switch (stmt.*) {
+                    .block_statement => |*block_stmt| try b.lowerBlockStatement(block_stmt, breakable_ctx),
+                    else => try b.lowerStatement(stmt),
+                };
                 if (result != .none) breakable_ctx.result_ref = result;
+
+                const result_br = try b.addInstDeferred(.br);
 
                 const end_label = try b.addLabel();
                 breakable_ctx.setDeferredBreaks(end_label);
 
+                result_br.set(.{ .br = .{
+                    .target = end_label,
+                    .value = breakable_ctx.result_ref,
+                } });
+
                 return end_label;
             },
         },
-        .function_declaration => try b.todo("labelled function declaration"),
+        .function_declaration => .none, // Handled by GDI/FDI before execution
     };
 }
 
