@@ -59,6 +59,7 @@ const BreakableContext = struct {
     break_target: JumpTarget,
     result_ref: Ir.Inst.Ref,
     scope_depth: u16 = 0,
+    iterator_ref: Ir.Inst.Ref = .none,
 
     const JumpTarget = union(enum) {
         known: Ir.Inst.Ref,
@@ -1155,6 +1156,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .continue_target = .{ .deferred = .empty },
         .break_target = .{ .deferred = .empty },
         .result_ref = undefined_ref,
+        .iterator_ref = if (for_in_of_stmt.type != .in) iterator else .none,
     });
     defer b.popBreakableContext();
 
@@ -1459,6 +1461,17 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
     const ctx = b.findBreakableContext(cont_stmt.label);
     const value = ctx.result_ref;
 
+    var it = std.mem.reverseIterator(b.breakable_stack.items);
+    while (it.next()) |c| {
+        if (c == ctx) break;
+        if (c.iterator_ref != .none) {
+            _ = try b.addInst(.{
+                .tag = .iterator_close,
+                .data = .{ .ref = c.iterator_ref },
+            });
+        }
+    }
+
     const scope_pops = b.scope_depth - ctx.scope_depth;
     for (0..scope_pops) |_| {
         _ = try b.addInst(.{
@@ -1491,6 +1504,17 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
 fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
     const ctx = b.findBreakableContext(brk_stmt.label);
     const value = ctx.result_ref;
+
+    var it = std.mem.reverseIterator(b.breakable_stack.items);
+    while (it.next()) |c| {
+        if (c.iterator_ref != .none) {
+            _ = try b.addInst(.{
+                .tag = .iterator_close,
+                .data = .{ .ref = c.iterator_ref },
+            });
+        }
+        if (c == ctx) break;
+    }
 
     const scope_pops = b.scope_depth - ctx.scope_depth;
     for (0..scope_pops) |_| {
@@ -1526,6 +1550,17 @@ fn lowerReturnStatement(b: *Builder, ret_stmt: *const ast.ReturnStatement) Error
         try b.lowerExpression(expr)
     else
         Ir.Inst.Ref.none;
+
+    var it = std.mem.reverseIterator(b.breakable_stack.items);
+    while (it.next()) |ctx| {
+        if (ctx.iterator_ref != .none) {
+            _ = try b.addInst(.{
+                .tag = .iterator_close,
+                .data = .{ .ref = ctx.iterator_ref },
+            });
+        }
+    }
+
     _ = try b.addInst(.{
         .tag = .@"return",
         .data = .{ .ref = value },

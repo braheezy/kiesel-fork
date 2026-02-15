@@ -193,7 +193,7 @@ test {
         \\
     ,
         \\Bytecode (test)
-        \\   0: 8b ff                         return
+        \\   0: 8e ff                         return
         \\
         ,
     );
@@ -210,7 +210,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 2a 00 00 00             load_number_i32 r0, 42
-        \\   6: 8b 00                         return r0
+        \\   6: 8e 00                         return r0
         \\
     );
 
@@ -303,7 +303,7 @@ test {
         \\  65: 10 01 00 00 00 00 00          array_set r1, r0, 0
         \\  72: 10 01 03 02 00 00 00          array_set r1, r3, 2
         \\  79: 10 01 04 03 00 00 00          array_set r1, r4, 3
-        \\  86: 8b 01                         return r1
+        \\  86: 8e 01                         return r1
         \\
     );
 
@@ -356,7 +356,7 @@ test {
         \\  99: 14 06 02 03                   object_set_computed r6, r2, r3
         \\ 103: 13 06 04 00 00 00 05          object_set r6, @4 ("b"), r5
         \\ 110: 19 06 07                      object_spread r6, r7
-        \\ 113: 8b 06                         return r6
+        \\ 113: 8e 06                         return r6
         \\
     );
 
@@ -372,7 +372,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 1a 00 00 00 00 00 01 00 00 00 reg_exp_create r0, @0 ("abc"), @1 ("gi")
-        \\  10: 8b 00                         return r0
+        \\  10: 8e 00                         return r0
         \\
     );
 
@@ -403,7 +403,7 @@ test {
         \\  30: 40 00 00 00 00 00             get_binding r0, @0 ("x")
         \\  36: 40 01 01 00 00 00             get_binding r1, @1 ("y")
         \\  42: 24 02 00 01                   add r2, r0, r1
-        \\  46: 8b 02                         return r2
+        \\  46: 8e 02                         return r2
         \\
     );
 
@@ -438,7 +438,7 @@ test {
         \\  33: 0c 01 00                      move r1, r0
         \\  36: 3c                            pop_scope
         \\  37: 40 00 00 00 00 00             get_binding r0, @0 ("a")
-        \\  43: 8b 00                         return r0
+        \\  43: 8e 00                         return r0
         \\
     );
 
@@ -460,7 +460,7 @@ test {
         \\   6: 44 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 4c 00 00 00 00 00             increment_binding_prefix r0, @0 ("x")
-        \\  21: 8b 00                         return r0
+        \\  21: 8e 00                         return r0
         \\
     );
     try testInterpreter(std.testing.allocator, "x = 5; x++;", .{ .value = Value.from(5) }, null, null);
@@ -542,7 +542,7 @@ test {
         \\ 173: 11 1f 06                      array_spread r31, r6
         \\ 176: 0e 1f 05                      array_push r31, r5
         \\ 179: 78 06 01 00 1f                call_property r6, r1, r0, r31
-        \\ 184: 8b 06                         return r6
+        \\ 184: 8e 06                         return r6
         \\
         ,
     );
@@ -637,10 +637,10 @@ test {
         \\ 121: 10 02 00 00 00 00 00          array_set r2, r0, 0
         \\ 128: 10 02 01 01 00 00 00          array_set r2, r1, 1
         \\ 135: 83 00 02                      get_iterator r0, r2
-        \\ 138: 86 01 00                      iterator_step_value r1, r0
+        \\ 138: 87 01 00                      iterator_step_value r1, r0
         \\ 141: 3f 04 00 00 00 01             initialize_binding @4 ("x"), r1
         \\ 147: 0c 02 01                      move r2, r1
-        \\ 150: 86 01 00                      iterator_step_value r1, r0
+        \\ 150: 87 01 00                      iterator_step_value r1, r0
         \\ 153: 3f 05 00 00 00 01             initialize_binding @5 ("y"), r1
         \\ 159: 0c 00 01                      move r0, r1
         \\ 162: 0a 00 06 00 00 00             load_string r0, @6 ("d")
@@ -677,7 +677,7 @@ test {
         \\ 321: 24 01 02 00                   add r1, r2, r0
         \\ 325: 40 00 08 00 00 00             get_binding r0, @8 ("f")
         \\ 331: 24 02 01 00                   add r2, r1, r0
-        \\ 335: 8b 02                         return r2
+        \\ 335: 8e 02                         return r2
         \\
     );
 
@@ -800,7 +800,7 @@ test {
         \\ 218: 0c 00 01                      move r0, r1
         \\ 221: 00 bb ff ff ff                jump -69
         \\ 226: 40 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 232: 8b 00                         return r0
+        \\ 232: 8e 00                         return r0
         \\
     );
 
@@ -989,7 +989,7 @@ test {
         \\ 334: 44 00 00 00 00 03             set_binding @0 ("x"), r3
         \\ 340: 0c 01 03                      move r1, r3
         \\ 343: 40 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 349: 8b 00                         return r0
+        \\ 349: 8e 00                         return r0
         \\
     );
 
@@ -1087,7 +1087,7 @@ test {
         \\ 177: 0c 01 00                      move r1, r0
         \\ 180: 0c 00 01                      move r0, r1
         \\ 183: 40 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 189: 8b 00                         return r0
+        \\ 189: 8e 00                         return r0
         \\
     );
 
@@ -1107,7 +1107,7 @@ test {
         \\   0: 40 00 00 00 00 00             get_binding r0, @0 ("Error")
         \\   6: 0a 01 01 00 00 00             load_string r1, @1 ("test")
         \\  12: 80 02 00 01                   construct1 r2, r0, r1
-        \\  16: 89 02                         throw r2
+        \\  16: 8c 02                         throw r2
         \\
     );
 
@@ -1160,12 +1160,12 @@ test {
         \\  53: 10 03 02 02 00 00 00          array_set r3, r2, 2
         \\  60: 04 00                         load_undefined r0
         \\  62: 83 01 03                      get_iterator r1, r3
-        \\  65: 86 02 01                      iterator_step_value r2, r1
-        \\  68: 87 03 01                      iterator_is_done r3, r1
+        \\  65: 87 02 01                      iterator_step_value r2, r1
+        \\  68: 8a 03 01                      iterator_is_done r3, r1
         \\  71: 01 03 05 00 00 00             jump_if_true r3, 5
         \\  77: 00 08 00 00 00                jump 8
         \\  82: 40 00 00 00 00 00             get_binding r0, @0 ("sum")
-        \\  88: 8b 00                         return r0
+        \\  88: 8e 00                         return r0
         \\  90: 44 01 00 00 00 02             set_binding @1 ("x"), r2
         \\  96: 0c 03 02                      move r3, r2
         \\  99: 40 02 00 00 00 00             get_binding r2, @0 ("sum")
@@ -1262,7 +1262,7 @@ test {
         \\ 136: 03 00 05 00 00 00             jump_if_nullish r0, 5
         \\ 142: 00 03 00 00 00                jump 3
         \\ 147: 0c 02 01                      move r2, r1
-        \\ 150: 8b 02                         return r2
+        \\ 150: 8e 02                         return r2
         \\
     );
 
@@ -1301,7 +1301,7 @@ test {
         \\  77: 82 02 04 05 00 00             get_template_object r2, r4, r5, 0
         \\  83: 0a 03 04 00 00 00             load_string r3, @4 ("b")
         \\  89: 7b 04 01 00 02 03             call_property2 r4, r1, r0, r2, r3
-        \\  95: 8b 04                         return r4
+        \\  95: 8e 04                         return r4
         \\
     );
 

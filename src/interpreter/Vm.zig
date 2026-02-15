@@ -249,6 +249,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .iterator_step => vm.executeIteratorStep(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value => vm.executeIteratorStepValue(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_step_value_async => vm.executeIteratorStepValueAsync(data.reg_reg[0], data.reg_reg[1]),
+                .iterator_close => vm.executeIteratorClose(data.reg),
                 .iterator_is_done => vm.executeIteratorIsDone(data.reg_reg[0], data.reg_reg[1]),
                 .iterator_collect => vm.executeIteratorCollect(data.reg_reg[0], data.reg_reg[1]),
                 .throw => vm.executeThrow(data.reg),
@@ -1844,6 +1845,19 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg:
     };
 
     vm.load(dest, value);
+}
+
+fn executeIteratorClose(vm: *Vm, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const iterator_obj = vm.store(iterator_reg).asObject();
+    const done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean();
+    if (done) return;
+
+    var iterator: Iterator = .{
+        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
+        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
+        .done = false,
+    };
+    try iterator.close(vm.agent, @as(Agent.Error!void, {}));
 }
 
 fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) void {

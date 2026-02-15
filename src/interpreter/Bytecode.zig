@@ -198,6 +198,7 @@ pub const Inst = struct {
         iterator_step,
         iterator_step_value,
         iterator_step_value_async,
+        iterator_close,
         iterator_is_done,
         iterator_collect,
 
@@ -381,6 +382,7 @@ pub const Inst = struct {
         .iterator_step = .reg_reg,
         .iterator_step_value = .reg_reg,
         .iterator_step_value_async = .reg_reg,
+        .iterator_close = .reg,
         .iterator_is_done = .reg_reg,
         .iterator_collect = .reg_reg,
         .throw = .reg,

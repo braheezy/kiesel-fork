@@ -153,6 +153,7 @@ pub const Inst = struct {
         iterator_step,
         iterator_step_value,
         iterator_step_value_async,
+        iterator_close,
         iterator_is_done,
         iterator_collect,
 
@@ -319,6 +320,7 @@ pub const Inst = struct {
         .iterator_step = .ref,
         .iterator_step_value = .ref,
         .iterator_step_value_async = .ref,
+        .iterator_close = .ref,
         .iterator_is_done = .ref,
         .iterator_collect = .ref,
         .throw = .ref,
