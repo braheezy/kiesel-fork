@@ -136,6 +136,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_or => try b.lowerLogicalOr(data.binary, dest),
             .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
             .push_scope => try b.lowerPushScope(),
+            .push_var_scope => try b.lowerPushVarScope(),
             .push_with_scope => try b.lowerPushWithScope(data.ref),
             .pop_scope => try b.lowerPopScope(),
             .create_mutable_binding => try b.lowerCreateMutableBinding(data.string),
@@ -1052,6 +1053,13 @@ fn lowerNullishCoalesce(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.R
 fn lowerPushScope(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .push_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerPushVarScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .push_var_scope,
         .data = .{ .none = {} },
     });
 }

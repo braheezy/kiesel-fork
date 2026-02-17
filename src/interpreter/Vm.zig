@@ -176,6 +176,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .push_scope => vm.executePushScope(),
+                .push_var_scope => vm.executePushVarScope(),
                 .push_with_scope => vm.executePushWithScope(data.reg),
                 .pop_scope => vm.executePopScope(),
                 .create_mutable_binding => vm.executeCreateMutableBinding(data.string),
@@ -260,13 +261,13 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .throw => vm.executeThrow(data.reg),
                 .throw_reference_error => vm.executeThrowReferenceError(),
                 .@"return" => return vm.executeReturn(data.reg),
-                .await => try vm.executeAwait(data.reg),
+                .await => vm.executeAwait(data.reg),
                 .yield => return vm.executeYield(data.reg, &pc),
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
                 .create_class => vm.executeCreateClass(data.reg_class[0], data.reg_class[1]),
                 .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
-                .create_unmapped_arguments_object => try vm.executeCreateUnmappedArgumentsObject(data.reg),
-                .create_mapped_arguments_object => try vm.executeCreateMappedArgumentsObject(data.reg),
+                .create_unmapped_arguments_object => vm.executeCreateUnmappedArgumentsObject(data.reg),
+                .create_mapped_arguments_object => vm.executeCreateMappedArgumentsObject(data.reg),
                 .get_argument => vm.executeGetArgument(data.reg_u16[0], data.reg_u16[1]),
                 .get_rest_arguments => vm.executeGetRestArguments(data.reg_u16[0], data.reg_u16[1]),
                 .get_new_target => vm.executeGetNewTarget(data.reg),
@@ -278,7 +279,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .set_super_property_computed => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], false),
                 .set_super_property_computed_strict => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], true),
                 .create_private_element => vm.executeCreatePrivateElement(data.reg_string[0], data.reg_string[1]),
-                .push_private_scope => try vm.executePushPrivateScope(),
+                .push_private_scope => vm.executePushPrivateScope(),
                 .pop_private_scope => vm.executePopPrivateScope(),
                 .get_private_element => vm.executeGetPrivateElement(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
                 .set_private_element => vm.executeSetPrivateElement(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
@@ -1066,6 +1067,14 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+}
+
+fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const old_env = execution_context.ecmascript_code.lexical_environment;
+    const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
+    execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    execution_context.ecmascript_code.variable_environment = .{ .declarative_environment = env };
 }
 
 fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {

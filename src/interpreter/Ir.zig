@@ -121,6 +121,7 @@ pub const Inst = struct {
         nullish_coalesce,
 
         push_scope,
+        push_var_scope,
         push_with_scope,
         pop_scope,
         create_mutable_binding,
@@ -311,6 +312,7 @@ pub const Inst = struct {
         .logical_or = .binary,
         .nullish_coalesce = .binary,
         .push_scope = .none,
+        .push_var_scope = .none,
         .push_with_scope = .ref,
         .pop_scope = .none,
         .create_mutable_binding = .string,

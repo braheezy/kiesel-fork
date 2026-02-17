@@ -132,6 +132,7 @@ pub const Inst = struct {
         not_eq_strict,
 
         push_scope,
+        push_var_scope,
         push_with_scope,
         pop_scope,
         create_mutable_binding,
@@ -340,6 +341,7 @@ pub const Inst = struct {
             .eq_strict = .reg_reg_reg,
             .not_eq_strict = .reg_reg_reg,
             .push_scope = .none,
+            .push_var_scope = .none,
             .push_with_scope = .reg,
             .pop_scope = .none,
             .create_mutable_binding = .string,

@@ -202,7 +202,7 @@ test {
         \\
     ,
         \\Bytecode (test)
-        \\   0: 8f ff                         return
+        \\   0: 90 ff                         return
         \\
         ,
     );
@@ -219,7 +219,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 2a 00 00 00             load_number_i32 r0, 42
-        \\   6: 8f 00                         return r0
+        \\   6: 90 00                         return r0
         \\
     );
 
@@ -312,7 +312,7 @@ test {
         \\  65: 10 01 00 00 00 00 00          array_set r1, r0, 0
         \\  72: 10 01 03 02 00 00 00          array_set r1, r3, 2
         \\  79: 10 01 04 03 00 00 00          array_set r1, r4, 3
-        \\  86: 8f 01                         return r1
+        \\  86: 90 01                         return r1
         \\
     );
 
@@ -344,28 +344,28 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 01 00 00 00             load_number_i32 r0, 1
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("a"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("a"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 0a 00 01 00 00 00             load_string r0, @1 ("c")
         \\  21: 08 01 02 00 00 00             load_number_i32 r1, 2
         \\  27: 12 02                         object_create r2
         \\  29: 13 02 01 00 00 00 01          object_set r2, @1 ("c"), r1
-        \\  36: 45 02 00 00 00 02             set_binding @2 ("o"), r2
+        \\  36: 46 02 00 00 00 02             set_binding @2 ("o"), r2
         \\  42: 0c 00 02                      move r0, r2
         \\  45: 0a 00 00 00 00 00             load_string r0, @0 ("a")
-        \\  51: 41 01 00 00 00 00             get_binding r1, @0 ("a")
+        \\  51: 42 01 00 00 00 00             get_binding r1, @0 ("a")
         \\  57: 08 02 02 00 00 00             load_number_i32 r2, 2
         \\  63: 0a 03 03 00 00 00             load_string r3, @3 ("two")
         \\  69: 0a 04 04 00 00 00             load_string r4, @4 ("b")
         \\  75: 08 05 03 00 00 00             load_number_i32 r5, 3
-        \\  81: 41 06 02 00 00 00             get_binding r6, @2 ("o")
+        \\  81: 42 06 02 00 00 00             get_binding r6, @2 ("o")
         \\  87: 0c 07 06                      move r7, r6
         \\  90: 12 06                         object_create r6
         \\  92: 13 06 00 00 00 00 01          object_set r6, @0 ("a"), r1
         \\  99: 14 06 02 03                   object_set_computed r6, r2, r3
         \\ 103: 13 06 04 00 00 00 05          object_set r6, @4 ("b"), r5
         \\ 110: 19 06 07                      object_spread r6, r7
-        \\ 113: 8f 06                         return r6
+        \\ 113: 90 06                         return r6
         \\
     );
 
@@ -381,7 +381,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 1a 00 00 00 00 00 01 00 00 00 reg_exp_create r0, @0 ("abc"), @1 ("gi")
-        \\  10: 8f 00                         return r0
+        \\  10: 90 00                         return r0
         \\
     );
 
@@ -404,15 +404,15 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 0a 00 00 00             load_number_i32 r0, 10
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 08 00 14 00 00 00             load_number_i32 r0, 20
-        \\  21: 45 01 00 00 00 00             set_binding @1 ("y"), r0
+        \\  21: 46 01 00 00 00 00             set_binding @1 ("y"), r0
         \\  27: 0c 01 00                      move r1, r0
-        \\  30: 41 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\  36: 41 01 01 00 00 00             get_binding r1, @1 ("y")
+        \\  30: 42 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\  36: 42 01 01 00 00 00             get_binding r1, @1 ("y")
         \\  42: 25 02 00 01                   add r2, r0, r1
-        \\  46: 8f 02                         return r2
+        \\  46: 90 02                         return r2
         \\
     );
 
@@ -438,16 +438,16 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 01 00 00 00             load_number_i32 r0, 1
-        \\   6: 40 00 00 00 00 00             initialize_binding @0 ("a"), r0
+        \\   6: 41 00 00 00 00 00             initialize_binding @0 ("a"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 3b                            push_scope
-        \\  16: 3e 00 00 00 00                create_mutable_binding @0 ("a")
+        \\  16: 3f 00 00 00 00                create_mutable_binding @0 ("a")
         \\  21: 08 00 02 00 00 00             load_number_i32 r0, 2
-        \\  27: 40 00 00 00 00 00             initialize_binding @0 ("a"), r0
+        \\  27: 41 00 00 00 00 00             initialize_binding @0 ("a"), r0
         \\  33: 0c 01 00                      move r1, r0
-        \\  36: 3d                            pop_scope
-        \\  37: 41 00 00 00 00 00             get_binding r0, @0 ("a")
-        \\  43: 8f 00                         return r0
+        \\  36: 3e                            pop_scope
+        \\  37: 42 00 00 00 00 00             get_binding r0, @0 ("a")
+        \\  43: 90 00                         return r0
         \\
     );
 
@@ -466,10 +466,10 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 05 00 00 00             load_number_i32 r0, 5
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
-        \\  15: 4d 00 00 00 00 00             increment_binding_prefix r0, @0 ("x")
-        \\  21: 8f 00                         return r0
+        \\  15: 4e 00 00 00 00 00             increment_binding_prefix r0, @0 ("x")
+        \\  21: 90 00                         return r0
         \\
     );
     try testInterpreter(std.testing.allocator, "x = 5; x++;", .{ .value = Value.from(5) }, null, null);
@@ -515,14 +515,14 @@ test {
         \\
     ,
         \\Bytecode (test)
-        \\   0: 41 00 00 00 00 00             get_binding r0, @0 ("Math")
-        \\   6: 42 01 00 01 00 00 00          get_property r1, r0, @1 ("random")
-        \\  13: 7a 02 01 00                   call_property0 r2, r1, r0
-        \\  17: 41 00 02 00 00 00             get_binding r0, @2 ("Number")
+        \\   0: 42 00 00 00 00 00             get_binding r0, @0 ("Math")
+        \\   6: 43 01 00 01 00 00 00          get_property r1, r0, @1 ("random")
+        \\  13: 7b 02 01 00                   call_property0 r2, r1, r0
+        \\  17: 42 00 02 00 00 00             get_binding r0, @2 ("Number")
         \\  23: 0a 01 03 00 00 00             load_string r1, @3 ("1")
-        \\  29: 77 02 00 01                   call1 r2, r0, r1
-        \\  33: 41 00 04 00 00 00             get_binding r0, @4 ("JSON")
-        \\  39: 42 01 00 05 00 00 00          get_property r1, r0, @5 ("stringify")
+        \\  29: 78 02 00 01                   call1 r2, r0, r1
+        \\  33: 42 00 04 00 00 00             get_binding r0, @4 ("JSON")
+        \\  39: 43 01 00 05 00 00 00          get_property r1, r0, @5 ("stringify")
         \\  46: 0a 02 06 00 00 00             load_string r2, @6 ("foo")
         \\  52: 0a 03 07 00 00 00             load_string r3, @7 ("bar")
         \\  58: 12 04                         object_create r4
@@ -533,9 +533,9 @@ test {
         \\  81: 0e 1f 04                      array_push r31, r4
         \\  84: 0e 1f 02                      array_push r31, r2
         \\  87: 0e 1f 03                      array_push r31, r3
-        \\  90: 79 05 01 00 1f                call_property r5, r1, r0, r31
-        \\  95: 41 00 00 00 00 00             get_binding r0, @0 ("Math")
-        \\ 101: 42 01 00 08 00 00 00          get_property r1, r0, @8 ("max")
+        \\  90: 7a 05 01 00 1f                call_property r5, r1, r0, r31
+        \\  95: 42 00 00 00 00 00             get_binding r0, @0 ("Math")
+        \\ 101: 43 01 00 08 00 00 00          get_property r1, r0, @8 ("max")
         \\ 108: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\ 114: 08 03 05 00 00 00             load_number_i32 r3, 5
         \\ 120: 08 04 03 00 00 00             load_number_i32 r4, 3
@@ -550,8 +550,8 @@ test {
         \\ 170: 0e 1f 03                      array_push r31, r3
         \\ 173: 11 1f 06                      array_spread r31, r6
         \\ 176: 0e 1f 05                      array_push r31, r5
-        \\ 179: 79 06 01 00 1f                call_property r6, r1, r0, r31
-        \\ 184: 8f 06                         return r6
+        \\ 179: 7a 06 01 00 1f                call_property r6, r1, r0, r31
+        \\ 184: 90 06                         return r6
         \\
         ,
     );
@@ -631,26 +631,26 @@ test {
         \\  38: 13 06 00 00 00 00 01          object_set r6, @0 ("a"), r1
         \\  45: 13 06 01 00 00 00 03          object_set r6, @1 ("b"), r3
         \\  52: 13 06 02 00 00 00 05          object_set r6, @2 ("c"), r5
-        \\  59: 42 00 06 00 00 00 00          get_property r0, r6, @0 ("a")
-        \\  66: 40 00 00 00 00 00             initialize_binding @0 ("a"), r0
+        \\  59: 43 00 06 00 00 00 00          get_property r0, r6, @0 ("a")
+        \\  66: 41 00 00 00 00 00             initialize_binding @0 ("a"), r0
         \\  72: 0c 01 00                      move r1, r0
         \\  75: 0a 00 00 00 00 00             load_string r0, @0 ("a")
         \\  81: 0d 1f 00 00 00 00             array_create r31, 0
         \\  87: 0e 1f 00                      array_push r31, r0
-        \\  90: 74 01 06 1f                   copy_data_properties r1, r6, r31
-        \\  94: 40 03 00 00 00 01             initialize_binding @3 ("rest"), r1
+        \\  90: 75 01 06 1f                   copy_data_properties r1, r6, r31
+        \\  94: 41 03 00 00 00 01             initialize_binding @3 ("rest"), r1
         \\ 100: 0c 00 01                      move r0, r1
         \\ 103: 08 00 0a 00 00 00             load_number_i32 r0, 10
         \\ 109: 08 01 14 00 00 00             load_number_i32 r1, 20
         \\ 115: 0d 02 02 00 00 00             array_create r2, 2
         \\ 121: 10 02 00 00 00 00 00          array_set r2, r0, 0
         \\ 128: 10 02 01 01 00 00 00          array_set r2, r1, 1
-        \\ 135: 84 00 02                      get_iterator r0, r2
-        \\ 138: 88 01 00                      iterator_step_value r1, r0
-        \\ 141: 40 04 00 00 00 01             initialize_binding @4 ("x"), r1
+        \\ 135: 85 00 02                      get_iterator r0, r2
+        \\ 138: 89 01 00                      iterator_step_value r1, r0
+        \\ 141: 41 04 00 00 00 01             initialize_binding @4 ("x"), r1
         \\ 147: 0c 02 01                      move r2, r1
-        \\ 150: 88 01 00                      iterator_step_value r1, r0
-        \\ 153: 40 05 00 00 00 01             initialize_binding @5 ("y"), r1
+        \\ 150: 89 01 00                      iterator_step_value r1, r0
+        \\ 153: 41 05 00 00 00 01             initialize_binding @5 ("y"), r1
         \\ 159: 0c 00 01                      move r0, r1
         \\ 162: 0a 00 06 00 00 00             load_string r0, @6 ("d")
         \\ 168: 0a 01 07 00 00 00             load_string r1, @7 ("e")
@@ -660,15 +660,15 @@ test {
         \\ 189: 12 01                         object_create r1
         \\ 191: 13 01 06 00 00 00 03          object_set r1, @6 ("d"), r3
         \\ 198: 0a 00 06 00 00 00             load_string r0, @6 ("d")
-        \\ 204: 43 02 01 00                   get_property_computed r2, r1, r0
-        \\ 208: 42 00 02 07 00 00 00          get_property r0, r2, @7 ("e")
-        \\ 215: 40 07 00 00 00 00             initialize_binding @7 ("e"), r0
+        \\ 204: 44 02 01 00                   get_property_computed r2, r1, r0
+        \\ 208: 43 00 02 07 00 00 00          get_property r0, r2, @7 ("e")
+        \\ 215: 41 07 00 00 00 00             initialize_binding @7 ("e"), r0
         \\ 221: 0c 01 00                      move r1, r0
         \\ 224: 0a 00 08 00 00 00             load_string r0, @8 ("f")
-        \\ 230: 41 01 09 00 00 00             get_binding r1, @9 ("undefined")
+        \\ 230: 42 01 09 00 00 00             get_binding r1, @9 ("undefined")
         \\ 236: 12 02                         object_create r2
         \\ 238: 13 02 08 00 00 00 01          object_set r2, @8 ("f"), r1
-        \\ 245: 42 00 02 08 00 00 00          get_property r0, r2, @8 ("f")
+        \\ 245: 43 00 02 08 00 00 00          get_property r0, r2, @8 ("f")
         \\ 252: 04 01                         load_undefined r1
         \\ 254: 39 02 00 01                   eq_strict r2, r0, r1
         \\ 258: 01 02 05 00 00 00             jump_if_true r2, 5
@@ -676,17 +676,17 @@ test {
         \\ 269: 08 01 63 00 00 00             load_number_i32 r1, 99
         \\ 275: 0c 00 01                      move r0, r1
         \\ 278: 00 00 00 00 00                jump 0
-        \\ 283: 40 08 00 00 00 00             initialize_binding @8 ("f"), r0
+        \\ 283: 41 08 00 00 00 00             initialize_binding @8 ("f"), r0
         \\ 289: 0c 01 00                      move r1, r0
-        \\ 292: 41 00 03 00 00 00             get_binding r0, @3 ("rest")
-        \\ 298: 42 01 00 01 00 00 00          get_property r1, r0, @1 ("b")
-        \\ 305: 41 00 04 00 00 00             get_binding r0, @4 ("x")
+        \\ 292: 42 00 03 00 00 00             get_binding r0, @3 ("rest")
+        \\ 298: 43 01 00 01 00 00 00          get_property r1, r0, @1 ("b")
+        \\ 305: 42 00 04 00 00 00             get_binding r0, @4 ("x")
         \\ 311: 25 02 01 00                   add r2, r1, r0
-        \\ 315: 41 00 07 00 00 00             get_binding r0, @7 ("e")
+        \\ 315: 42 00 07 00 00 00             get_binding r0, @7 ("e")
         \\ 321: 25 01 02 00                   add r1, r2, r0
-        \\ 325: 41 00 08 00 00 00             get_binding r0, @8 ("f")
+        \\ 325: 42 00 08 00 00 00             get_binding r0, @8 ("f")
         \\ 331: 25 02 01 00                   add r2, r1, r0
-        \\ 335: 8f 02                         return r2
+        \\ 335: 90 02                         return r2
         \\
     );
 
@@ -762,27 +762,27 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 00 00 00 00             load_number_i32 r0, 0
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 04 00                         load_undefined r0
-        \\  17: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\  17: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\  23: 08 02 03 00 00 00             load_number_i32 r2, 3
         \\  29: 31 03 01 02                   lt r3, r1, r2
         \\  33: 01 03 05 00 00 00             jump_if_true r3, 5
         \\  39: 00 21 00 00 00                jump 33
-        \\  44: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\  44: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\  50: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\  56: 25 03 01 02                   add r3, r1, r2
-        \\  60: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\  60: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\  66: 0c 01 03                      move r1, r3
         \\  69: 0c 00 01                      move r0, r1
         \\  72: 00 c4 ff ff ff                jump -60
-        \\  77: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\  77: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\  83: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\  89: 25 03 01 02                   add r3, r1, r2
-        \\  93: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\  93: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\  99: 0c 01 03                      move r1, r3
-        \\ 102: 41 02 00 00 00 00             get_binding r2, @0 ("x")
+        \\ 102: 42 02 00 00 00 00             get_binding r2, @0 ("x")
         \\ 108: 08 03 05 00 00 00             load_number_i32 r3, 5
         \\ 114: 31 04 02 03                   lt r4, r2, r3
         \\ 118: 01 04 05 00 00 00             jump_if_true r4, 5
@@ -791,25 +791,25 @@ test {
         \\ 132: 00 c4 ff ff ff                jump -60
         \\ 137: 0c 00 01                      move r0, r1
         \\ 140: 08 00 00 00 00 00             load_number_i32 r0, 0
-        \\ 146: 45 01 00 00 00 00             set_binding @1 ("i"), r0
+        \\ 146: 46 01 00 00 00 00             set_binding @1 ("i"), r0
         \\ 152: 0c 01 00                      move r1, r0
         \\ 155: 04 00                         load_undefined r0
-        \\ 157: 41 01 01 00 00 00             get_binding r1, @1 ("i")
+        \\ 157: 42 01 01 00 00 00             get_binding r1, @1 ("i")
         \\ 163: 08 02 03 00 00 00             load_number_i32 r2, 3
         \\ 169: 31 03 01 02                   lt r3, r1, r2
         \\ 173: 01 03 05 00 00 00             jump_if_true r3, 5
         \\ 179: 00 2a 00 00 00                jump 42
-        \\ 184: 41 01 00 00 00 00             get_binding r1, @0 ("x")
-        \\ 190: 41 02 01 00 00 00             get_binding r2, @1 ("i")
+        \\ 184: 42 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\ 190: 42 02 01 00 00 00             get_binding r2, @1 ("i")
         \\ 196: 25 03 01 02                   add r3, r1, r2
-        \\ 200: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\ 200: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\ 206: 0c 01 03                      move r1, r3
         \\ 209: 0c 02 01                      move r2, r1
-        \\ 212: 4f 02 01 00 00 00             increment_binding_postfix r2, @1 ("i")
+        \\ 212: 50 02 01 00 00 00             increment_binding_postfix r2, @1 ("i")
         \\ 218: 0c 00 01                      move r0, r1
         \\ 221: 00 bb ff ff ff                jump -69
-        \\ 226: 41 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 232: 8f 00                         return r0
+        \\ 226: 42 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 232: 90 00                         return r0
         \\
     );
 
@@ -926,18 +926,18 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 00 00 00 00             load_number_i32 r0, 0
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 04 00                         load_undefined r0
         \\  17: 06 01                         load_true r1
         \\  19: 01 01 05 00 00 00             jump_if_true r1, 5
         \\  25: 00 44 00 00 00                jump 68
-        \\  30: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\  30: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\  36: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\  42: 25 03 01 02                   add r3, r1, r2
-        \\  46: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\  46: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\  52: 0c 01 03                      move r1, r3
-        \\  55: 41 02 00 00 00 00             get_binding r2, @0 ("x")
+        \\  55: 42 02 00 00 00 00             get_binding r2, @0 ("x")
         \\  61: 08 03 05 00 00 00             load_number_i32 r3, 5
         \\  67: 34 04 02 03                   gt_eq r4, r2, r3
         \\  71: 01 04 05 00 00 00             jump_if_true r4, 5
@@ -950,12 +950,12 @@ test {
         \\ 100: 06 01                         load_true r1
         \\ 102: 01 01 05 00 00 00             jump_if_true r1, 5
         \\ 108: 00 47 00 00 00                jump 71
-        \\ 113: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\ 113: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\ 119: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\ 125: 25 03 01 02                   add r3, r1, r2
-        \\ 129: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\ 129: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\ 135: 0c 01 03                      move r1, r3
-        \\ 138: 41 02 00 00 00 00             get_binding r2, @0 ("x")
+        \\ 138: 42 02 00 00 00 00             get_binding r2, @0 ("x")
         \\ 144: 08 03 0a 00 00 00             load_number_i32 r3, 10
         \\ 150: 34 04 02 03                   gt_eq r4, r2, r3
         \\ 154: 01 04 05 00 00 00             jump_if_true r4, 5
@@ -966,17 +966,17 @@ test {
         \\ 176: 0c 00 01                      move r0, r1
         \\ 179: 00 ac ff ff ff                jump -84
         \\ 184: 04 00                         load_undefined r0
-        \\ 186: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\ 186: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\ 192: 08 02 14 00 00 00             load_number_i32 r2, 20
         \\ 198: 31 03 01 02                   lt r3, r1, r2
         \\ 202: 01 03 05 00 00 00             jump_if_true r3, 5
         \\ 208: 00 67 00 00 00                jump 103
-        \\ 213: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\ 213: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\ 219: 08 02 01 00 00 00             load_number_i32 r2, 1
         \\ 225: 25 03 01 02                   add r3, r1, r2
-        \\ 229: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\ 229: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\ 235: 0c 01 03                      move r1, r3
-        \\ 238: 41 02 00 00 00 00             get_binding r2, @0 ("x")
+        \\ 238: 42 02 00 00 00 00             get_binding r2, @0 ("x")
         \\ 244: 08 03 02 00 00 00             load_number_i32 r3, 2
         \\ 250: 29 04 02 03                   rem r4, r2, r3
         \\ 254: 08 02 00 00 00 00             load_number_i32 r2, 0
@@ -985,20 +985,20 @@ test {
         \\ 270: 00 08 00 00 00                jump 8
         \\ 275: 0c 00 01                      move r0, r1
         \\ 278: 00 9f ff ff ff                jump -97
-        \\ 283: 41 01 00 00 00 00             get_binding r1, @0 ("x")
+        \\ 283: 42 01 00 00 00 00             get_binding r1, @0 ("x")
         \\ 289: 08 02 0a 00 00 00             load_number_i32 r2, 10
         \\ 295: 25 03 01 02                   add r3, r1, r2
-        \\ 299: 45 00 00 00 00 03             set_binding @0 ("x"), r3
+        \\ 299: 46 00 00 00 00 03             set_binding @0 ("x"), r3
         \\ 305: 0c 01 03                      move r1, r3
         \\ 308: 0c 00 01                      move r0, r1
         \\ 311: 00 7e ff ff ff                jump -130
-        \\ 316: 41 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 316: 42 00 00 00 00 00             get_binding r0, @0 ("x")
         \\ 322: 08 01 64 00 00 00             load_number_i32 r1, 100
         \\ 328: 25 02 00 01                   add r2, r0, r1
-        \\ 332: 45 00 00 00 00 02             set_binding @0 ("x"), r2
+        \\ 332: 46 00 00 00 00 02             set_binding @0 ("x"), r2
         \\ 338: 0c 00 02                      move r0, r2
-        \\ 341: 41 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 347: 8f 00                         return r0
+        \\ 341: 42 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 347: 90 00                         return r0
         \\
     );
 
@@ -1058,7 +1058,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 00 00 00 00             load_number_i32 r0, 0
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 0a 00 01 00 00 00             load_string r0, @1 ("b")
         \\  21: 04 01                         load_undefined r1
@@ -1068,7 +1068,7 @@ test {
         \\  36: 01 03 05 00 00 00             jump_if_true r3, 5
         \\  42: 00 17 00 00 00                jump 23
         \\  47: 08 00 01 00 00 00             load_number_i32 r0, 1
-        \\  53: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\  53: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\  59: 0c 01 00                      move r1, r0
         \\  62: 0c 00 01                      move r0, r1
         \\  65: 00 71 00 00 00                jump 113
@@ -1077,26 +1077,26 @@ test {
         \\  80: 01 03 05 00 00 00             jump_if_true r3, 5
         \\  86: 00 14 00 00 00                jump 20
         \\  91: 08 00 02 00 00 00             load_number_i32 r0, 2
-        \\  97: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\  97: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\ 103: 0c 01 00                      move r1, r0
         \\ 106: 00 15 00 00 00                jump 21
         \\ 111: 0a 02 03 00 00 00             load_string r2, @3 ("c")
         \\ 117: 39 03 00 02                   eq_strict r3, r0, r2
         \\ 121: 01 03 05 00 00 00             jump_if_true r3, 5
         \\ 127: 00 1e 00 00 00                jump 30
-        \\ 132: 41 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 132: 42 00 00 00 00 00             get_binding r0, @0 ("x")
         \\ 138: 08 01 03 00 00 00             load_number_i32 r1, 3
         \\ 144: 25 02 00 01                   add r2, r0, r1
-        \\ 148: 45 00 00 00 00 02             set_binding @0 ("x"), r2
+        \\ 148: 46 00 00 00 00 02             set_binding @0 ("x"), r2
         \\ 154: 0c 00 02                      move r0, r2
         \\ 157: 00 15 00 00 00                jump 21
         \\ 162: 0c 00 01                      move r0, r1
         \\ 165: 08 00 64 00 00 00             load_number_i32 r0, 100
-        \\ 171: 45 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\ 171: 46 00 00 00 00 00             set_binding @0 ("x"), r0
         \\ 177: 0c 01 00                      move r1, r0
         \\ 180: 0c 00 01                      move r0, r1
-        \\ 183: 41 00 00 00 00 00             get_binding r0, @0 ("x")
-        \\ 189: 8f 00                         return r0
+        \\ 183: 42 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 189: 90 00                         return r0
         \\
     );
 
@@ -1113,10 +1113,10 @@ test {
         \\
     ,
         \\Bytecode (test)
-        \\   0: 41 00 00 00 00 00             get_binding r0, @0 ("Error")
+        \\   0: 42 00 00 00 00 00             get_binding r0, @0 ("Error")
         \\   6: 0a 01 01 00 00 00             load_string r1, @1 ("test")
-        \\  12: 81 02 00 01                   construct1 r2, r0, r1
-        \\  16: 8d 02                         throw r2
+        \\  12: 82 02 00 01                   construct1 r2, r0, r1
+        \\  16: 8e 02                         throw r2
         \\
     );
 
@@ -1158,7 +1158,7 @@ test {
     ,
         \\Bytecode (test)
         \\   0: 08 00 00 00 00 00             load_number_i32 r0, 0
-        \\   6: 45 00 00 00 00 00             set_binding @0 ("sum"), r0
+        \\   6: 46 00 00 00 00 00             set_binding @0 ("sum"), r0
         \\  12: 0c 01 00                      move r1, r0
         \\  15: 08 00 01 00 00 00             load_number_i32 r0, 1
         \\  21: 08 01 02 00 00 00             load_number_i32 r1, 2
@@ -1168,19 +1168,19 @@ test {
         \\  46: 10 03 01 01 00 00 00          array_set r3, r1, 1
         \\  53: 10 03 02 02 00 00 00          array_set r3, r2, 2
         \\  60: 04 00                         load_undefined r0
-        \\  62: 84 01 03                      get_iterator r1, r3
-        \\  65: 88 02 01                      iterator_step_value r2, r1
-        \\  68: 8b 03 01                      iterator_is_done r3, r1
+        \\  62: 85 01 03                      get_iterator r1, r3
+        \\  65: 89 02 01                      iterator_step_value r2, r1
+        \\  68: 8c 03 01                      iterator_is_done r3, r1
         \\  71: 01 03 05 00 00 00             jump_if_true r3, 5
         \\  77: 00 08 00 00 00                jump 8
-        \\  82: 41 00 00 00 00 00             get_binding r0, @0 ("sum")
-        \\  88: 8f 00                         return r0
-        \\  90: 45 01 00 00 00 02             set_binding @1 ("x"), r2
+        \\  82: 42 00 00 00 00 00             get_binding r0, @0 ("sum")
+        \\  88: 90 00                         return r0
+        \\  90: 46 01 00 00 00 02             set_binding @1 ("x"), r2
         \\  96: 0c 03 02                      move r3, r2
-        \\  99: 41 02 00 00 00 00             get_binding r2, @0 ("sum")
-        \\ 105: 41 03 01 00 00 00             get_binding r3, @1 ("x")
+        \\  99: 42 02 00 00 00 00             get_binding r2, @0 ("sum")
+        \\ 105: 42 03 01 00 00 00             get_binding r3, @1 ("x")
         \\ 111: 25 04 02 03                   add r4, r2, r3
-        \\ 115: 45 00 00 00 00 04             set_binding @0 ("sum"), r4
+        \\ 115: 46 00 00 00 00 04             set_binding @0 ("sum"), r4
         \\ 121: 0c 02 04                      move r2, r4
         \\ 124: 0c 00 02                      move r0, r2
         \\ 127: 00 bd ff ff ff                jump -67
@@ -1247,31 +1247,31 @@ test {
         \\  20: 13 03 01 00 00 00 02          object_set r3, @1 ("b"), r2
         \\  27: 12 01                         object_create r1
         \\  29: 13 01 00 00 00 00 03          object_set r1, @0 ("a"), r3
-        \\  36: 45 02 00 00 00 01             set_binding @2 ("o"), r1
+        \\  36: 46 02 00 00 00 01             set_binding @2 ("o"), r1
         \\  42: 0c 00 01                      move r0, r1
-        \\  45: 41 00 02 00 00 00             get_binding r0, @2 ("o")
-        \\  51: 42 01 00 03 00 00 00          get_property r1, r0, @3 ("x")
+        \\  45: 42 00 02 00 00 00             get_binding r0, @2 ("o")
+        \\  51: 43 01 00 03 00 00 00          get_property r1, r0, @3 ("x")
         \\  58: 05 00                         load_null r0
         \\  60: 37 02 01 00                   eq r2, r1, r0
         \\  64: 01 02 05 00 00 00             jump_if_true r2, 5
         \\  70: 00 07 00 00 00                jump 7
         \\  75: 04 00                         load_undefined r0
         \\  77: 00 07 00 00 00                jump 7
-        \\  82: 42 00 01 04 00 00 00          get_property r0, r1, @4 ("y")
-        \\  89: 41 01 02 00 00 00             get_binding r1, @2 ("o")
-        \\  95: 42 02 01 00 00 00 00          get_property r2, r1, @0 ("a")
+        \\  82: 43 00 01 04 00 00 00          get_property r0, r1, @4 ("y")
+        \\  89: 42 01 02 00 00 00             get_binding r1, @2 ("o")
+        \\  95: 43 02 01 00 00 00 00          get_property r2, r1, @0 ("a")
         \\ 102: 05 01                         load_null r1
         \\ 104: 37 03 02 01                   eq r3, r2, r1
         \\ 108: 01 03 05 00 00 00             jump_if_true r3, 5
         \\ 114: 00 07 00 00 00                jump 7
         \\ 119: 04 01                         load_undefined r1
         \\ 121: 00 07 00 00 00                jump 7
-        \\ 126: 42 01 02 01 00 00 00          get_property r1, r2, @1 ("b")
+        \\ 126: 43 01 02 01 00 00 00          get_property r1, r2, @1 ("b")
         \\ 133: 0c 02 00                      move r2, r0
         \\ 136: 03 00 05 00 00 00             jump_if_nullish r0, 5
         \\ 142: 00 03 00 00 00                jump 3
         \\ 147: 0c 02 01                      move r2, r1
-        \\ 150: 8f 02                         return r2
+        \\ 150: 90 02                         return r2
         \\
     );
 
@@ -1295,8 +1295,8 @@ test {
         \\
     ,
         \\Bytecode (test)
-        \\   0: 41 00 00 00 00 00             get_binding r0, @0 ("String")
-        \\   6: 42 01 00 01 00 00 00          get_property r1, r0, @1 ("raw")
+        \\   0: 42 00 00 00 00 00             get_binding r0, @0 ("String")
+        \\   6: 43 01 00 01 00 00 00          get_property r1, r0, @1 ("raw")
         \\  13: 0a 02 02 00 00 00             load_string r2, @2 ("a")
         \\  19: 0a 03 03 00 00 00             load_string r3, @3 ("c")
         \\  25: 0d 04 02 00 00 00             array_create r4, 2
@@ -1307,10 +1307,10 @@ test {
         \\  57: 0d 05 02 00 00 00             array_create r5, 2
         \\  63: 10 05 02 00 00 00 00          array_set r5, r2, 0
         \\  70: 10 05 03 01 00 00 00          array_set r5, r3, 1
-        \\  77: 83 02 04 05 00 00             get_template_object r2, r4, r5, 0
+        \\  77: 84 02 04 05 00 00             get_template_object r2, r4, r5, 0
         \\  83: 0a 03 04 00 00 00             load_string r3, @4 ("b")
-        \\  89: 7c 04 01 00 02 03             call_property2 r4, r1, r0, r2, r3
-        \\  95: 8f 04                         return r4
+        \\  89: 7d 04 01 00 02 03             call_property2 r4, r1, r0, r2, r3
+        \\  95: 90 04                         return r4
         \\
     );
 
