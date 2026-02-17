@@ -193,10 +193,7 @@ pub fn generatorStart(
                     }
                     try vm.restoreGeneratorFrame(frame.*);
                 } else {
-                    const name_value = generator_function_.object.getPropertyValueDirect(types.PropertyKey.from("name"));
-                    const name = try name_value.asString().toUtf8(agent_.gc_allocator);
-                    defer agent_.gc_allocator.free(name);
-                    const bc = try generator_function_.fields.compile(agent_, name);
+                    const bc = try generator_function_.fields.compile(agent_);
                     const args = closure_generator.fields.evaluation_state.saved_frame_args.?;
                     try vm.pushCallFrame(bc, args);
                     agent_.gc_allocator.free(args);

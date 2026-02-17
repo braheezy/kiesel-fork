@@ -399,8 +399,14 @@ pub const ECMAScriptFunction = MakeObject(.{
             }
         }
 
-        pub fn compile(self: *@This(), agent: *Agent, name: []const u8) Agent.Error!*const interpreter.Bytecode {
+        pub fn compile(self: *@This(), agent: *Agent) Agent.Error!*const interpreter.Bytecode {
             if (self.cached_bytecode) |bc| return bc;
+
+            const function: *ECMAScriptFunction = @fieldParentPtr("fields", self);
+            const object = &function.object;
+            const name_value = object.getPropertyValueDirect(PropertyKey.from("name"));
+            const name = try name_value.asString().toUtf8(agent.gc_allocator);
+            defer agent.gc_allocator.free(name);
 
             const bc = try agent.gc_allocator.create(interpreter.Bytecode);
             errdefer agent.gc_allocator.destroy(bc);
@@ -613,10 +619,7 @@ fn evaluateFunctionBody(
     arguments_list: Arguments,
 ) Agent.Error!Value {
     if (agent.options.new_interpreter) {
-        const name_value = function.object.getPropertyValueDirect(PropertyKey.from("name"));
-        const name = try name_value.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(name);
-        const bc = try function.fields.compile(agent, name);
+        const bc = try function.fields.compile(agent);
         const vm = agent.active_vm.?;
         try vm.pushCallFrame(bc, arguments_list.values);
         errdefer vm.popCallFrame();

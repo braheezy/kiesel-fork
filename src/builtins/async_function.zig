@@ -181,10 +181,7 @@ pub fn asyncBlockStart(
             const result = switch (async_body_) {
                 .ecmascript_function => |ef| blk: {
                     if (agent_.options.new_interpreter) {
-                        const name_value = ef.function.object.getPropertyValueDirect(types.PropertyKey.from("name"));
-                        const name = try name_value.asString().toUtf8(agent_.gc_allocator);
-                        defer agent_.gc_allocator.free(name);
-                        const bc = ef.function.fields.compile(agent_, name) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
                         const vm = agent_.active_vm.?;
                         vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
                         const result = vm.run() catch |err| break :blk @as(Agent.Error!Completion, err);

@@ -17,7 +17,6 @@ const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
-const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const Vm = bytecode.Vm;
@@ -369,10 +368,7 @@ pub fn asyncGeneratorStart(
                     }
                     try vm.restoreGeneratorFrame(frame.*);
                 } else {
-                    const name_value = generator_function_.object.getPropertyValueDirect(PropertyKey.from("name"));
-                    const name = try name_value.asString().toUtf8(agent_.gc_allocator);
-                    defer agent_.gc_allocator.free(name);
-                    const bc = generator_function_.fields.compile(agent_, name) catch |err| switch (err) {
+                    const bc = generator_function_.fields.compile(agent_) catch |err| switch (err) {
                         error.OutOfMemory => return error.OutOfMemory,
                         error.ExceptionThrown => {
                             _ = agent_.execution_context_stack.pop().?;
