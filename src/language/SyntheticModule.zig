@@ -217,8 +217,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
     const realm = agent.currentRealm();
 
     // 1. Let moduleContext be a new ECMAScript code execution context.
-    const module_context = try agent.gc_allocator.create(ExecutionContext);
-    module_context.* = .{
+    var module_context: ExecutionContext = .{
         // 2. Set the Function of moduleContext to null.
         .origin = .module,
 
@@ -243,7 +242,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
 
     // 8. Push moduleContext onto the execution context stack; moduleContext is now the running
     //    execution context.
-    try agent.execution_context_stack.append(agent.gc_allocator, module_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, &module_context);
 
     // 9. Let steps be module.[[EvaluationSteps]].
     const steps = self.evaluation_steps;

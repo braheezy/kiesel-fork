@@ -144,7 +144,11 @@ pub fn generatorStart(
     std.debug.assert(generator.fields.generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
-    const generator_context = agent.runningExecutionContext();
+    // NOTE: The running execution context may be stack-allocated by the caller, so we replace it
+    //       with a heap-allocated one here since generators store it for later resumption.
+    const generator_context = try agent.gc_allocator.create(ExecutionContext);
+    generator_context.* = agent.runningExecutionContext().*;
+    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = generator_context;
 
     // 3. Set the Generator component of genContext to generator.
     generator_context.generator = .{ .generator = generator };

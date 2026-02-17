@@ -167,8 +167,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 19. If runningContext is not already suspended, suspend runningContext.
 
     // 20. Let evalContext be a new ECMAScript code execution context.
-    const eval_context = try agent.gc_allocator.create(ExecutionContext);
-    eval_context.* = .{
+    var eval_context: ExecutionContext = .{
         // 21. Set evalContext's Function to null.
         .origin = .eval,
 
@@ -192,7 +191,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
     // 27. Push evalContext onto the execution context stack; evalContext is now the running
     //     execution context.
-    try agent.execution_context_stack.append(agent.gc_allocator, eval_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, &eval_context);
 
     // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv, strictEval)).
     const result_no_value = evalDeclarationInstantiation(

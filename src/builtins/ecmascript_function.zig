@@ -441,10 +441,11 @@ fn call(
     // NOTE: This is only used to restore the context, which is a simple pop().
 
     // 2. Let calleeContext be PrepareForOrdinaryCall(F, undefined).
-    const callee_context = try prepareForOrdinaryCall(agent, function, null);
+    var callee_context: ExecutionContext = undefined;
+    try prepareForOrdinaryCall(agent, function, null, &callee_context);
 
     // 3. Assert: calleeContext is now the running execution context.
-    std.debug.assert(callee_context == agent.runningExecutionContext());
+    std.debug.assert(&callee_context == agent.runningExecutionContext());
 
     // 4. If F.[[IsClassConstructor]] is true, then
     if (function.fields.is_class_constructor) {
@@ -461,7 +462,7 @@ fn call(
     }
 
     // 5. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
-    try ordinaryCallBindThis(agent, function, callee_context, this_argument);
+    try ordinaryCallBindThis(agent, function, &callee_context, this_argument);
 
     // 6. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
     const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
@@ -481,7 +482,8 @@ fn prepareForOrdinaryCall(
     agent: *Agent,
     function: *ECMAScriptFunction,
     new_target: ?*Object,
-) std.mem.Allocator.Error!*ExecutionContext {
+    callee_context: *ExecutionContext,
+) std.mem.Allocator.Error!void {
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to suspend the context, which we don't do yet.
 
@@ -489,7 +491,6 @@ fn prepareForOrdinaryCall(
     const local_env = try newFunctionEnvironment(agent.gc_allocator, function, new_target);
 
     // 2. Let calleeContext be a new ECMAScript code execution context.
-    const callee_context = try agent.gc_allocator.create(ExecutionContext);
     callee_context.* = .{
         // 3. Set the Function of calleeContext to F.
         .origin = .{ .function = &function.object },
@@ -520,7 +521,6 @@ fn prepareForOrdinaryCall(
 
     // 13. NOTE: Any exception objects produced after this point are associated with calleeRealm.
     // 14. Return calleeContext.
-    return callee_context;
 }
 
 /// 10.2.1.2 OrdinaryCallBindThis ( F, calleeContext, thisArgument )
@@ -805,15 +805,16 @@ fn construct(
     }
 
     // 4. Let calleeContext be PrepareForOrdinaryCall(F, newTarget).
-    const callee_context = try prepareForOrdinaryCall(agent, function, new_target);
+    var callee_context: ExecutionContext = undefined;
+    try prepareForOrdinaryCall(agent, function, new_target, &callee_context);
 
     // 5. Assert: calleeContext is now the running execution context.
-    std.debug.assert(callee_context == agent.runningExecutionContext());
+    std.debug.assert(&callee_context == agent.runningExecutionContext());
 
     // 6. If kind is base, then
     if (kind == .base) {
         // a. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
-        try ordinaryCallBindThis(agent, function, callee_context, Value.from(this_argument));
+        try ordinaryCallBindThis(agent, function, &callee_context, Value.from(this_argument));
 
         // b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
         const initialize_result = this_argument.initializeInstanceElements(

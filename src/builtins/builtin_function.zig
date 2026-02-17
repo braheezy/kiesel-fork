@@ -114,8 +114,7 @@ pub fn builtinCallOrConstruct(
     // 2. If callerContext is not already suspended, suspend callerContext.
 
     // 3. Let calleeContext be a new execution context.
-    const callee_context = try agent.gc_allocator.create(ExecutionContext);
-    callee_context.* = .{
+    var callee_context: ExecutionContext = .{
         // 4. Set the Function of calleeContext to F.
         .origin = .{ .function = &builtin_function.object },
 
@@ -133,7 +132,7 @@ pub fn builtinCallOrConstruct(
 
     // 9. Push calleeContext onto the execution context stack; calleeContext is now the running
     //    execution context.
-    try agent.execution_context_stack.append(agent.gc_allocator, callee_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, &callee_context);
 
     // 10. If F.[[Async]] is true, then
     if (builtin_function.fields.async) {

@@ -80,8 +80,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     const global_env = self.realm.global_env;
 
     // 1. Let scriptContext be a new ECMAScript code execution context.
-    const script_context = try agent.gc_allocator.create(ExecutionContext);
-    script_context.* = .{
+    var script_context: ExecutionContext = .{
         // 3. Set the Function of scriptContext to null.
         .origin = .script,
 
@@ -106,7 +105,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     // 9. Suspend the running execution context.
 
     // 10. Push scriptContext onto the execution context stack; scriptContext is now the running execution context.
-    try agent.execution_context_stack.append(agent.gc_allocator, script_context);
+    try agent.execution_context_stack.append(agent.gc_allocator, &script_context);
 
     // 11. Let script be scriptRecord.[[ECMAScriptCode]].
     const script = self.ecmascript_code;
