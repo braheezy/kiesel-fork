@@ -344,14 +344,14 @@ pub fn asyncGeneratorStart(
                 const vm = agent_.active_vm.?;
 
                 const result = if (closure_generator.fields.evaluation_state.suspension) |*suspension| blk: {
+                    defer agent_.gc_allocator.free(suspension.stack);
                     switch (resume_completion.type) {
                         .normal => {
-                            suspension.regs[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
+                            suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
                         },
                         .@"return" => {
                             _ = agent_.execution_context_stack.pop().?;
                             closure_generator.fields.async_generator_state = .draining_queue;
-                            agent_.gc_allocator.free(suspension.arguments);
                             closure_generator.fields.evaluation_state = undefined;
 
                             try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
@@ -361,7 +361,6 @@ pub fn asyncGeneratorStart(
                         .throw => {
                             _ = agent_.execution_context_stack.pop().?;
                             closure_generator.fields.async_generator_state = .draining_queue;
-                            agent_.gc_allocator.free(suspension.arguments);
                             closure_generator.fields.evaluation_state = undefined;
 
                             try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);

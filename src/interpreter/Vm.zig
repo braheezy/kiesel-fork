@@ -56,6 +56,7 @@ const yield = builtins.yield;
 const Vm = @This();
 
 agent: *Agent,
+stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
 constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
 
@@ -64,14 +65,20 @@ pub const num_regs = 32;
 pub const CallFrame = struct {
     bytecode: *const Bytecode,
     constants: Constants,
-    regs: [num_regs]Value,
-    arguments: []const Value,
+    stack_base: u32,
+    regs_len: u16,
+    arguments_len: u16,
     cached_this_value: ?Value,
+
+    pub fn stackLen(frame: *const CallFrame) usize {
+        return frame.regs_len + frame.arguments_len;
+    }
 };
 
 pub const GeneratorSuspension = struct {
-    regs: [num_regs]Value,
-    arguments: []const Value,
+    stack: []Value,
+    regs_len: u16,
+    arguments_len: u16,
     cached_this_value: ?Value,
     saved_pc: usize,
     yield_reg: Bytecode.Inst.Reg,
@@ -95,6 +102,7 @@ pub fn init(
 ) Agent.Error!Vm {
     var vm: Vm = .{
         .agent = agent,
+        .stack = .empty,
         .call_stack = .empty,
         .constants_cache = .empty,
     };
@@ -103,9 +111,12 @@ pub fn init(
 }
 
 pub fn deinit(vm: *Vm) void {
-    std.debug.assert(vm.call_stack.items.len == 1);
     const frame = vm.currentCallFrame();
-    std.debug.assert(frame.arguments.len == 0);
+    std.debug.assert(frame.stack_base == 0);
+    std.debug.assert(frame.arguments_len == 0);
+    std.debug.assert(vm.stack.items.len == frame.stackLen());
+    std.debug.assert(vm.call_stack.items.len == 1);
+    vm.stack.deinit(vm.agent.gc_allocator);
     vm.call_stack.deinit(vm.agent.gc_allocator);
 
     var it = vm.constants_cache.iterator();
@@ -322,11 +333,20 @@ pub fn @"resume"(
     suspension: GeneratorSuspension,
 ) Agent.Error!RunResult {
     const constants = vm.constants_cache.get(callee_bytecode).?;
+
+    const regs_len = suspension.regs_len;
+    const arguments_len = suspension.arguments_len;
+    std.debug.assert(suspension.stack.len == regs_len + arguments_len);
+
+    const stack_base: u32 = @intCast(vm.stack.items.len);
+    try vm.stack.appendSlice(vm.agent.gc_allocator, suspension.stack);
+
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
         .constants = constants,
-        .regs = suspension.regs,
-        .arguments = suspension.arguments,
+        .stack_base = stack_base,
+        .regs_len = regs_len,
+        .arguments_len = arguments_len,
         .cached_this_value = suspension.cached_this_value,
     });
     return vm.run(.{ .start_pc = suspension.saved_pc });
@@ -337,9 +357,6 @@ pub fn pushCallFrame(
     callee_bytecode: *const Bytecode,
     args: []const Value,
 ) std.mem.Allocator.Error!void {
-    const args_owned = try vm.agent.gc_allocator.dupe(Value, args);
-    errdefer vm.agent.gc_allocator.free(args_owned);
-
     const constants_gop = try vm.constants_cache.getOrPut(vm.agent.gc_allocator, callee_bytecode);
     if (!constants_gop.found_existing) {
         const total_len = callee_bytecode.strings.len + callee_bytecode.big_ints.len;
@@ -357,12 +374,19 @@ pub fn pushCallFrame(
 
         constants_gop.value_ptr.* = constants;
     }
+    const constants = constants_gop.value_ptr.*;
+
+    const stack_base: u32 = @intCast(vm.stack.items.len);
+    try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, num_regs + args.len);
+    vm.stack.appendNTimesAssumeCapacity(undefined, num_regs);
+    vm.stack.appendSliceAssumeCapacity(args);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
-        .constants = constants_gop.value_ptr.*,
-        .regs = undefined,
-        .arguments = args_owned,
+        .constants = constants,
+        .stack_base = stack_base,
+        .regs_len = num_regs,
+        .arguments_len = @intCast(args.len),
         .cached_this_value = null,
     });
 }
@@ -371,23 +395,34 @@ pub fn popCallFrame(vm: *Vm) void {
     std.debug.assert(vm.call_stack.items.len > 1);
 
     const frame = vm.call_stack.pop().?;
-    vm.agent.gc_allocator.free(frame.arguments);
+    const stack_len = frame.stackLen();
+    vm.stack.shrinkRetainingCapacity(vm.stack.items.len - stack_len);
 }
 
 fn currentCallFrame(vm: *Vm) *CallFrame {
     return &vm.call_stack.items[vm.call_stack.items.len - 1];
 }
 
+fn regs(vm: *Vm) []Value {
+    const frame = vm.currentCallFrame();
+    const regs_start = frame.stack_base;
+    return vm.stack.items[regs_start..][0..frame.regs_len];
+}
+
+fn arguments(vm: *Vm) []const Value {
+    const frame = vm.currentCallFrame();
+    const args_start = frame.stack_base + frame.regs_len;
+    return vm.stack.items[args_start..][0..frame.arguments_len];
+}
+
 fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
     std.debug.assert(reg != .none);
-    const frame = vm.currentCallFrame();
-    return frame.regs[@intFromEnum(reg)];
+    return vm.regs()[@intFromEnum(reg)];
 }
 
 fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
     std.debug.assert(reg != .none);
-    const frame = vm.currentCallFrame();
-    frame.regs[@intFromEnum(reg)] = value;
+    vm.regs()[@intFromEnum(reg)] = value;
 }
 
 fn jump(_: *Vm, offset: i32, pc: *usize) void {
@@ -1979,10 +2014,20 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: usize) Agent.Error!RunResul
     _ = try yield(vm.agent, value);
 
     std.debug.assert(vm.call_stack.items.len > 1);
-    const frame = vm.call_stack.pop().?;
+    const frame = vm.currentCallFrame();
+    const stack_start = frame.stack_base;
+    const stack_len = frame.stackLen();
+    const stack = try vm.agent.gc_allocator.dupe(
+        Value,
+        vm.stack.items[stack_start..][0..stack_len],
+    );
+
+    vm.popCallFrame();
+
     return .{ .yield = .{
-        .regs = frame.regs,
-        .arguments = frame.arguments,
+        .stack = stack,
+        .regs_len = frame.regs_len,
+        .arguments_len = frame.arguments_len,
         .cached_this_value = frame.cached_this_value,
         .saved_pc = pc,
         .yield_reg = reg,
@@ -2083,35 +2128,32 @@ fn executeSetHomeObject(vm: *Vm, function_reg: Bytecode.Inst.Reg, home_object_re
 }
 
 fn executeCreateUnmappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
-    const frame = vm.currentCallFrame();
-    const arguments = try createUnmappedArgumentsObject(vm.agent, frame.arguments);
-    vm.load(dest, Value.from(&arguments.object));
+    const arguments_object = try createUnmappedArgumentsObject(vm.agent, vm.arguments());
+    vm.load(dest, Value.from(&arguments_object.object));
 }
 
 fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
-    const frame = vm.currentCallFrame();
     const execution_context = vm.agent.runningExecutionContext();
     const function = execution_context.origin.function.as(builtins.ECMAScriptFunction);
-    const arguments = try createMappedArgumentsObject(
+    const arguments_object = try createMappedArgumentsObject(
         vm.agent,
         &function.object,
         function.fields.formal_parameters,
-        frame.arguments,
+        vm.arguments(),
         execution_context.ecmascript_code.lexical_environment,
     );
-    vm.load(dest, Value.from(&arguments.object));
+    vm.load(dest, Value.from(&arguments_object.object));
 }
 
 fn executeGetArgument(vm: *Vm, dest: Bytecode.Inst.Reg, arg_index: u16) void {
-    const frame = vm.currentCallFrame();
-    const args = frame.arguments;
+    const args = vm.arguments();
     const value: Value = if (arg_index < args.len) args[arg_index] else .undefined;
     vm.load(dest, value);
 }
 
 fn executeGetRestArguments(vm: *Vm, dest: Bytecode.Inst.Reg, start_index: u16) std.mem.Allocator.Error!void {
-    const frame = vm.currentCallFrame();
-    const rest_args = frame.arguments[@min(start_index, frame.arguments.len)..];
+    const args = vm.arguments();
+    const rest_args = args[@min(start_index, args.len)..];
     const array = try createArrayFromList(vm.agent, rest_args);
     vm.load(dest, Value.from(&array.object));
 }
