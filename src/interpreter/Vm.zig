@@ -67,8 +67,23 @@ pub const CallFrame = struct {
     regs: [num_regs]Value,
     arguments: []const Value,
     cached_this_value: ?Value,
+};
+
+pub const GeneratorSuspension = struct {
+    regs: [num_regs]Value,
+    arguments: []const Value,
+    cached_this_value: ?Value,
     saved_pc: usize,
     yield_reg: Bytecode.Inst.Reg,
+};
+
+pub const RunResult = union(enum) {
+    @"return": ?Value,
+    yield: GeneratorSuspension,
+};
+
+pub const RunOptions = struct {
+    start_pc: usize = 0,
 };
 
 const constants_align = @max(@alignOf(String), @alignOf(BigInt));
@@ -101,14 +116,14 @@ pub fn deinit(vm: *Vm) void {
     vm.constants_cache.deinit(vm.agent.gc_allocator);
 }
 
-pub fn run(vm: *Vm) Agent.Error!?Value {
+pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
     const previous_vm = vm.agent.active_vm;
     vm.agent.active_vm = vm;
     defer vm.agent.active_vm = previous_vm;
 
     const frame = vm.currentCallFrame();
     var code = frame.bytecode.code;
-    var pc: usize = frame.saved_pc;
+    var pc: usize = options.start_pc;
 
     loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
         inline else => |tag| {
@@ -262,7 +277,7 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
                 .throw_reference_error => vm.executeThrowReferenceError(),
                 .@"return" => return vm.executeReturn(data.reg),
                 .await => vm.executeAwait(data.reg),
-                .yield => return vm.executeYield(data.reg, &pc),
+                .yield => return vm.executeYield(data.reg, pc),
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
                 .create_class => vm.executeCreateClass(data.reg_class[0], data.reg_class[1]),
                 .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
@@ -301,6 +316,22 @@ pub fn run(vm: *Vm) Agent.Error!?Value {
     }
 }
 
+pub fn @"resume"(
+    vm: *Vm,
+    callee_bytecode: *const Bytecode,
+    suspension: GeneratorSuspension,
+) Agent.Error!RunResult {
+    const constants = vm.constants_cache.get(callee_bytecode).?;
+    try vm.call_stack.append(vm.agent.gc_allocator, .{
+        .bytecode = callee_bytecode,
+        .constants = constants,
+        .regs = suspension.regs,
+        .arguments = suspension.arguments,
+        .cached_this_value = suspension.cached_this_value,
+    });
+    return vm.run(.{ .start_pc = suspension.saved_pc });
+}
+
 pub fn pushCallFrame(
     vm: *Vm,
     callee_bytecode: *const Bytecode,
@@ -333,8 +364,6 @@ pub fn pushCallFrame(
         .regs = undefined,
         .arguments = args_owned,
         .cached_this_value = null,
-        .saved_pc = 0,
-        .yield_reg = .none,
     });
 }
 
@@ -343,15 +372,6 @@ pub fn popCallFrame(vm: *Vm) void {
 
     const frame = vm.call_stack.pop().?;
     vm.agent.gc_allocator.free(frame.arguments);
-}
-
-pub fn saveGeneratorFrame(vm: *Vm) CallFrame {
-    std.debug.assert(vm.call_stack.items.len > 1);
-    return vm.call_stack.pop().?;
-}
-
-pub fn restoreGeneratorFrame(vm: *Vm, frame: CallFrame) std.mem.Allocator.Error!void {
-    try vm.call_stack.append(vm.agent.gc_allocator, frame);
 }
 
 fn currentCallFrame(vm: *Vm) *CallFrame {
@@ -1942,10 +1962,10 @@ fn executeThrowReferenceError(vm: *Vm) Agent.Error!void {
     return vm.agent.throwException(.reference_error, "Invalid assignment to function call", .{});
 }
 
-fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) ?Value {
+fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) RunResult {
     const return_value: ?Value = if (reg != .none) vm.store(reg) else null;
     if (vm.call_stack.items.len > 1) vm.popCallFrame();
-    return return_value;
+    return .{ .@"return" = return_value };
 }
 
 fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
@@ -1954,13 +1974,19 @@ fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
     vm.load(reg, result);
 }
 
-fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: *const usize) Agent.Error!?Value {
+fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: usize) Agent.Error!RunResult {
     const value = vm.store(reg);
-    const frame = vm.currentCallFrame();
-    frame.saved_pc = pc.*;
-    frame.yield_reg = reg;
     _ = try yield(vm.agent, value);
-    return null;
+
+    std.debug.assert(vm.call_stack.items.len > 1);
+    const frame = vm.call_stack.pop().?;
+    return .{ .yield = .{
+        .regs = frame.regs,
+        .arguments = frame.arguments,
+        .cached_this_value = frame.cached_this_value,
+        .saved_pc = pc,
+        .yield_reg = reg,
+    } };
 }
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {

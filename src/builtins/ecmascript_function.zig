@@ -623,8 +623,11 @@ fn evaluateFunctionBody(
         const vm = agent.active_vm.?;
         try vm.pushCallFrame(bc, arguments_list.values);
         errdefer vm.popCallFrame();
-        const result = try vm.run();
-        return result orelse .undefined;
+        const result = try vm.run(.{});
+        return switch (result) {
+            .@"return" => |value| value orelse .undefined,
+            .yield => unreachable,
+        };
     }
 
     // FunctionBody : FunctionStatementList
@@ -676,7 +679,7 @@ fn evaluateGeneratorBody(
     try generatorStart(agent, generator, function);
 
     if (agent.options.new_interpreter) {
-        generator.fields.evaluation_state.saved_frame_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
+        generator.fields.evaluation_state.initial_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
     }
 
     // 6. Return ReturnCompletion(G).
@@ -718,7 +721,7 @@ fn evaluateAsyncGeneratorBody(
     try asyncGeneratorStart(agent, generator, function);
 
     if (agent.options.new_interpreter) {
-        generator.fields.evaluation_state.saved_frame_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
+        generator.fields.evaluation_state.initial_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
     }
 
     // 6. Return ReturnCompletion(generator).

@@ -184,8 +184,11 @@ pub fn asyncBlockStart(
                         const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
                         const vm = agent_.active_vm.?;
                         vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
-                        const result = vm.run() catch |err| break :blk @as(Agent.Error!Completion, err);
-                        const result_value: Value = result orelse .undefined;
+                        const result = vm.run(.{}) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        const result_value: Value = switch (result) {
+                            .@"return" => |value| value orelse .undefined,
+                            .yield => unreachable,
+                        };
                         break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value));
                     }
                     break :blk ef.function.fields.evaluateBody(agent_, null);

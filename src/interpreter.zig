@@ -84,7 +84,11 @@ pub fn compileAndRun(
 
     var vm: Vm = try .init(agent, &bc);
     defer vm.deinit();
-    return try vm.run();
+    const result = try vm.run(.{});
+    return switch (result) {
+        .@"return" => |value| value,
+        .yield => unreachable,
+    };
 }
 
 const ExpectedResult = union(enum) {
@@ -123,7 +127,10 @@ fn testInterpreter(
 
     const platform: Agent.Platform = .default();
     defer platform.deinit();
-    var agent: Agent = try .init(&platform, .{});
+    var agent: Agent = try .init(&platform, .{
+        // Ensure generator code paths use new interpreter
+        .new_interpreter = true,
+    });
     defer agent.deinit();
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
@@ -156,7 +163,14 @@ fn testInterpreter(
 
     var vm: Vm = try .init(&agent, &bc);
     defer vm.deinit();
-    if (vm.run()) |result| switch (expected_result) {
+
+    // Agent.Error!RunResult -> Agent.Error!?Value
+    const unwrapped = if (vm.run(.{})) |result| switch (result) {
+        .@"return" => |value| value,
+        .yield => unreachable,
+    } else |err| err;
+
+    if (unwrapped) |result| switch (expected_result) {
         .value => |expected| if (expected != null) {
             if (result == null) return error.TestExpectedEqual;
             if (!expected.?.isStrictlyEqual(result.?)) return error.TestExpectedEqual;

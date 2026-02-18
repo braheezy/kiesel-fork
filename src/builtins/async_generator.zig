@@ -167,7 +167,7 @@ pub const prototype = struct {
             // a. Set generator.[[AsyncGeneratorState]] to draining-queue.
             generator.fields.async_generator_state = .draining_queue;
             if (state == .suspended_start) {
-                if (generator.fields.evaluation_state.saved_frame_args) |args| {
+                if (generator.fields.evaluation_state.initial_args) |args| {
                     agent.gc_allocator.free(args);
                 }
             }
@@ -219,7 +219,7 @@ pub const prototype = struct {
         if (state == .suspended_start) {
             // a. Set generator.[[AsyncGeneratorState]] to completed.
             generator.fields.async_generator_state = .completed;
-            if (generator.fields.evaluation_state.saved_frame_args) |args| {
+            if (generator.fields.evaluation_state.initial_args) |args| {
                 agent.gc_allocator.free(args);
             }
 
@@ -288,8 +288,8 @@ pub const AsyncGenerator = MakeObject(.{
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
-            saved_frame: ?interpreter.Vm.CallFrame = null,
-            saved_frame_args: ?[]const Value = null,
+            suspension: ?interpreter.Vm.GeneratorSuspension = null,
+            initial_args: ?[]const Value = null,
         },
     },
     .tag = .async_generator,
@@ -343,15 +343,15 @@ pub fn asyncGeneratorStart(
             if (agent_.options.new_interpreter) {
                 const vm = agent_.active_vm.?;
 
-                if (closure_generator.fields.evaluation_state.saved_frame) |*frame| {
+                const result = if (closure_generator.fields.evaluation_state.suspension) |*suspension| blk: {
                     switch (resume_completion.type) {
                         .normal => {
-                            frame.regs[@intFromEnum(frame.yield_reg)] = resume_completion.value orelse .undefined;
+                            suspension.regs[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
                         },
                         .@"return" => {
                             _ = agent_.execution_context_stack.pop().?;
                             closure_generator.fields.async_generator_state = .draining_queue;
-                            agent_.gc_allocator.free(frame.arguments);
+                            agent_.gc_allocator.free(suspension.arguments);
                             closure_generator.fields.evaluation_state = undefined;
 
                             try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
@@ -361,7 +361,7 @@ pub fn asyncGeneratorStart(
                         .throw => {
                             _ = agent_.execution_context_stack.pop().?;
                             closure_generator.fields.async_generator_state = .draining_queue;
-                            agent_.gc_allocator.free(frame.arguments);
+                            agent_.gc_allocator.free(suspension.arguments);
                             closure_generator.fields.evaluation_state = undefined;
 
                             try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);
@@ -370,55 +370,63 @@ pub fn asyncGeneratorStart(
                         },
                         else => unreachable,
                     }
-                    try vm.restoreGeneratorFrame(frame.*);
-                } else {
+                    const bc = generator_function_.fields.cached_bytecode.?;
+                    break :blk vm.@"resume"(bc, suspension.*) catch |err| {
+                        _ = agent_.execution_context_stack.pop().?;
+                        closure_generator.fields.async_generator_state = .draining_queue;
+                        closure_generator.fields.evaluation_state = undefined;
+
+                        switch (err) {
+                            error.OutOfMemory => return error.OutOfMemory,
+                            error.ExceptionThrown => {
+                                const exception = agent_.clearException();
+                                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
+                                try asyncGeneratorDrainQueue(agent_, closure_generator);
+                                return;
+                            },
+                        }
+                    };
+                } else blk: {
                     const bc = generator_function_.fields.compile(agent_) catch |err| switch (err) {
                         error.OutOfMemory => return error.OutOfMemory,
-                        error.ExceptionThrown => {
-                            _ = agent_.execution_context_stack.pop().?;
-                            closure_generator.fields.async_generator_state = .draining_queue;
-                            closure_generator.fields.evaluation_state = undefined;
-                            const exception = agent_.clearException();
-                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
-                            try asyncGeneratorDrainQueue(agent_, closure_generator);
-                            return;
-                        },
+                        error.ExceptionThrown => unreachable,
                     };
-                    const args = closure_generator.fields.evaluation_state.saved_frame_args.?;
+                    const args = closure_generator.fields.evaluation_state.initial_args.?;
                     try vm.pushCallFrame(bc, args);
                     agent_.gc_allocator.free(args);
-                    closure_generator.fields.evaluation_state.saved_frame_args = null;
-                }
+                    closure_generator.fields.evaluation_state.initial_args = null;
+                    break :blk vm.run(.{}) catch |err| {
+                        _ = agent_.execution_context_stack.pop().?;
+                        closure_generator.fields.async_generator_state = .draining_queue;
+                        closure_generator.fields.evaluation_state = undefined;
 
-                const result = vm.run() catch |err| {
-                    _ = agent_.execution_context_stack.pop().?;
-                    closure_generator.fields.async_generator_state = .draining_queue;
-                    closure_generator.fields.evaluation_state = undefined;
-
-                    switch (err) {
-                        error.OutOfMemory => return error.OutOfMemory,
-                        error.ExceptionThrown => {
-                            const exception = agent_.clearException();
-                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
-                            try asyncGeneratorDrainQueue(agent_, closure_generator);
-                            return;
-                        },
-                    }
+                        switch (err) {
+                            error.OutOfMemory => return error.OutOfMemory,
+                            error.ExceptionThrown => {
+                                const exception = agent_.clearException();
+                                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
+                                try asyncGeneratorDrainQueue(agent_, closure_generator);
+                                return;
+                            },
+                        }
+                    };
                 };
-
-                if (closure_generator.fields.evaluation_state.suspension_result) |_| {
-                    closure_generator.fields.evaluation_state.saved_frame = vm.saveGeneratorFrame();
-                    closure_generator.fields.evaluation_state.suspension_result = null;
-                    return;
+                switch (result) {
+                    .yield => |suspension| {
+                        closure_generator.fields.evaluation_state.suspension = suspension;
+                        closure_generator.fields.evaluation_state.suspension_result = null;
+                        return;
+                    },
+                    .@"return" => |value| {
+                        _ = agent_.execution_context_stack.pop().?;
+                        closure_generator.fields.async_generator_state = .draining_queue;
+                        closure_generator.fields.evaluation_state = undefined;
+                        const result_value: Value = value orelse .undefined;
+                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
+                        try asyncGeneratorDrainQueue(agent_, closure_generator);
+                        return;
+                    },
                 }
-
-                _ = agent_.execution_context_stack.pop().?;
-                closure_generator.fields.async_generator_state = .draining_queue;
-                closure_generator.fields.evaluation_state = undefined;
-                const result_value: Value = result orelse .undefined;
-                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
-                try asyncGeneratorDrainQueue(agent_, closure_generator);
-                return;
             }
 
             // c. If generatorBody is a Parse Node, then
