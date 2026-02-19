@@ -205,6 +205,7 @@ pub fn generatorStart(
                     const bc = try generator_function_.fields.compile(agent_);
                     const args = closure_generator.fields.evaluation_state.initial_args.?;
                     try vm.pushCallFrame(bc, args);
+                    errdefer vm.popCallFrame();
                     agent_.gc_allocator.free(args);
                     closure_generator.fields.evaluation_state.initial_args = null;
                     break :blk vm.run(.{}) catch |err| {

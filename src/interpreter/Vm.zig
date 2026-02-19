@@ -347,6 +347,7 @@ pub fn @"resume"(
         .arguments_len = arguments_len,
         .cached_this_value = suspension.cached_this_value,
     });
+    errdefer vm.popCallFrame();
     return vm.run(.{ .start_pc = suspension.saved_pc });
 }
 
