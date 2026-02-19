@@ -2356,6 +2356,26 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
         },
     };
 
+    const iterator_done = try b.addInst(.{
+        .tag = .iterator_is_done,
+        .data = .{ .ref = iterator_ref },
+    });
+    const close_cond = try b.addInstDeferred(.br_cond);
+
+    const close_label = try b.addLabel();
+    _ = try b.addInst(.{
+        .tag = .iterator_close,
+        .data = .{ .ref = iterator_ref },
+    });
+
+    const done_label = try b.addLabel();
+
+    close_cond.set(.{ .br_cond = .{
+        .condition = iterator_done,
+        .then_target = done_label,
+        .else_target = close_label,
+    } });
+
     return last_ref;
 }
 
