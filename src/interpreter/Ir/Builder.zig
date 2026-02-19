@@ -2351,6 +2351,13 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
 fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPattern, object: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
     var last_ref: Ir.Inst.Ref = .none;
 
+    if (pattern.properties.len == 0) {
+        return b.addInst(.{
+            .tag = .to_object,
+            .data = .{ .ref = object },
+        });
+    }
+
     for (pattern.properties) |property| switch (property) {
         .binding_property => |binding_property| switch (binding_property) {
             .single_name_binding => |binding| {
