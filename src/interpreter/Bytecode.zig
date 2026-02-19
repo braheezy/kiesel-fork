@@ -63,7 +63,6 @@ pub const Inst = struct {
         jump,
         jump_if_true,
         jump_if_false,
-        jump_if_nullish,
 
         load_undefined,
         load_null,
@@ -282,7 +281,6 @@ pub const Inst = struct {
             .jump = .i32,
             .jump_if_true = .reg_i32,
             .jump_if_false = .reg_i32,
-            .jump_if_nullish = .reg_i32,
             .load_undefined = .reg,
             .load_null = .reg,
             .load_true = .reg,

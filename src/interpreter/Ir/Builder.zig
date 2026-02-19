@@ -3584,19 +3584,51 @@ fn lowerEqualityExpression(b: *Builder, eq_expr: *const ast.EqualityExpression) 
 
 fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) Error!Ir.Inst.Ref {
     const lhs = try b.lowerExpression(log_expr.lhs_expression);
-    const rhs = try b.lowerExpression(log_expr.rhs_expression);
-    const tag: Ir.Inst.Tag = switch (log_expr.operator) {
-        .@"&&" => .logical_and,
-        .@"||" => .logical_or,
-        .@"??" => .nullish_coalesce,
+
+    const condition, const then_target_is_rhs = switch (log_expr.operator) {
+        .@"&&" => .{ lhs, true },
+        .@"||" => .{ lhs, false },
+        .@"??" => blk: {
+            const null_ref = try b.addInst(.{
+                .tag = .null,
+                .data = .{ .none = {} },
+            });
+            const is_nullish = try b.addInst(.{
+                .tag = .eq,
+                .data = .{ .binary = .{
+                    .lhs = lhs,
+                    .rhs = null_ref,
+                } },
+            });
+            break :blk .{ is_nullish, true };
+        },
     };
-    return b.addInst(.{
-        .tag = tag,
-        .data = .{ .binary = .{
-            .lhs = lhs,
-            .rhs = rhs,
-        } },
-    });
+    const br_cond = try b.addInstDeferred(.br_cond);
+
+    const lhs_label = try b.addLabel();
+    const lhs_br = try b.addInstDeferred(.br);
+
+    const rhs_label = try b.addLabel();
+    const rhs = try b.lowerExpression(log_expr.rhs_expression);
+    const rhs_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
+
+    br_cond.set(.{ .br_cond = .{
+        .condition = condition,
+        .then_target = if (then_target_is_rhs) rhs_label else lhs_label,
+        .else_target = if (then_target_is_rhs) lhs_label else rhs_label,
+    } });
+    lhs_br.set(.{ .br = .{
+        .target = end_label,
+        .value = lhs,
+    } });
+    rhs_br.set(.{ .br = .{
+        .target = end_label,
+        .value = rhs,
+    } });
+
+    return end_label;
 }
 
 fn lowerConditionalExpression(b: *Builder, cond_expr: *const ast.ConditionalExpression) Error!Ir.Inst.Ref {
@@ -4183,34 +4215,26 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
         else => unreachable,
     };
 
-    var condition: Ir.Inst.Ref = undefined;
-    var assign_on_true: bool = undefined;
-    switch (assign_expr.operator) {
-        .@"&&=" => {
-            condition = current_value;
-            assign_on_true = true;
-        },
-        .@"||=" => {
-            condition = current_value;
-            assign_on_true = false;
-        },
-        .@"??=" => {
+    const condition, const then_target_is_assign = switch (assign_expr.operator) {
+        .@"&&=" => .{ current_value, true },
+        .@"||=" => .{ current_value, false },
+        .@"??=" => blk: {
             const null_ref = try b.addInst(.{
                 .tag = .null,
                 .data = .{ .none = {} },
             });
-            condition = try b.addInst(.{
+            const is_nullish = try b.addInst(.{
                 .tag = .eq,
                 .data = .{ .binary = .{
                     .lhs = current_value,
                     .rhs = null_ref,
                 } },
             });
-            assign_on_true = true;
+            break :blk .{ is_nullish, true };
         },
         else => unreachable,
-    }
-    const br_cond_inst = try b.addInstDeferred(.br_cond);
+    };
+    const br_cond = try b.addInstDeferred(.br_cond);
 
     const assign_label = try b.addLabel();
 
@@ -4324,10 +4348,10 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
 
     const end_label = try b.addLabel();
 
-    br_cond_inst.set(.{ .br_cond = .{
+    br_cond.set(.{ .br_cond = .{
         .condition = condition,
-        .then_target = if (assign_on_true) assign_label else skip_label,
-        .else_target = if (assign_on_true) skip_label else assign_label,
+        .then_target = if (then_target_is_assign) assign_label else skip_label,
+        .else_target = if (then_target_is_assign) skip_label else assign_label,
     } });
     assign_br.set(.{ .br = .{
         .target = end_label,

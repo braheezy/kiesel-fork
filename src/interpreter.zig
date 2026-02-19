@@ -490,6 +490,102 @@ test {
     try testInterpreter(std.testing.allocator, "x = 10; --x;", .{ .value = Value.from(9) }, null, null);
     try testInterpreter(std.testing.allocator, "x = 10; x--;", .{ .value = Value.from(10) }, null, null);
 
+    // Logical expression
+    try testInterpreter(std.testing.allocator,
+        \\false && doesnotexist;
+        \\true || doesnotexist;
+        \\1 ?? doesnotexist;
+        \\
+        \\var x = 0;
+        \\true && (x += 1);
+        \\false || (x += 2);
+        \\null ?? (x += 3);
+        \\x;
+        \\
+    , .{ .value = Value.from(6) },
+        \\IR (test)
+        \\  %0: [  0..0  ] dead                  false
+        \\  %1: [  1..1  ] dead                  true
+        \\  %2: [  2..2  ] dead                  one
+        \\  %3: [  3..4  ]                       zero
+        \\  %4: [  4..4  ]                       set_binding @0 ("x"), %3
+        \\  %5: [  5..8  ]                       true
+        \\  %6: [  6..6  ]                       br_cond %5, %9, %7
+        \\  %7: [  7..7  ]                       label
+        \\  %8: [  8..8  ]                       br %15, %5
+        \\  %9: [  9..9  ]                       label
+        \\ %10: [ 10..12 ]                       get_binding @0 ("x")
+        \\ %11: [ 11..12 ]                       one
+        \\ %12: [ 12..13 ]                       add %10, %11
+        \\ %13: [ 13..14 ]                       set_binding @0 ("x"), %12
+        \\ %14: [ 14..14 ]                       br %15, %13
+        \\ %15: [ 15..15 ]                       label
+        \\ %16: [ 16..19 ]                       false
+        \\ %17: [ 17..17 ]                       br_cond %16, %18, %20
+        \\ %18: [ 18..18 ]                       label
+        \\ %19: [ 19..19 ]                       br %26, %16
+        \\ %20: [ 20..20 ]                       label
+        \\ %21: [ 21..23 ]                       get_binding @0 ("x")
+        \\ %22: [ 22..23 ]                       number 2
+        \\ %23: [ 23..24 ]                       add %21, %22
+        \\ %24: [ 24..25 ]                       set_binding @0 ("x"), %23
+        \\ %25: [ 25..25 ]                       br %26, %24
+        \\ %26: [ 26..26 ]                       label
+        \\ %27: [ 27..32 ]                       null
+        \\ %28: [ 28..29 ]                       null
+        \\ %29: [ 29..30 ]                       eq %27, %28
+        \\ %30: [ 30..30 ]                       br_cond %29, %33, %31
+        \\ %31: [ 31..31 ]                       label
+        \\ %32: [ 32..32 ]                       br %39, %27
+        \\ %33: [ 33..33 ]                       label
+        \\ %34: [ 34..36 ]                       get_binding @0 ("x")
+        \\ %35: [ 35..36 ]                       number 3
+        \\ %36: [ 36..37 ]                       add %34, %35
+        \\ %37: [ 37..38 ]                       set_binding @0 ("x"), %36
+        \\ %38: [ 38..38 ]                       br %39, %37
+        \\ %39: [ 39..39 ]                       label
+        \\ %40: [ 40..41 ]                       get_binding @0 ("x")
+        \\ %41: [ 41..41 ]                       return %40
+        \\
+    ,
+        \\Bytecode (test)
+        \\   0: 07 00 00 00 00 00 00             load_number_i32 r0, 0
+        \\   7: 45 00 00 00 00 00 00             set_binding @0 ("x"), r0
+        \\  14: 0b 01 00 00 00                   move r1, r0
+        \\  19: 05 00 00                         load_true r0
+        \\  22: 01 00 00 05 00 00 00             jump_if_true r0, 5
+        \\  29: 00 26 00 00 00                   jump 38
+        \\  34: 41 00 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\  41: 07 01 00 01 00 00 00             load_number_i32 r1, 1
+        \\  48: 24 02 00 00 00 01 00             add r2, r0, r1
+        \\  55: 45 00 00 00 00 02 00             set_binding @0 ("x"), r2
+        \\  62: 0b 00 00 02 00                   move r0, r2
+        \\  67: 00 00 00 00 00                   jump 0
+        \\  72: 06 00 00                         load_false r0
+        \\  75: 01 00 00 05 00 00 00             jump_if_true r0, 5
+        \\  82: 00 05 00 00 00                   jump 5
+        \\  87: 00 21 00 00 00                   jump 33
+        \\  92: 41 00 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\  99: 07 01 00 02 00 00 00             load_number_i32 r1, 2
+        \\ 106: 24 02 00 00 00 01 00             add r2, r0, r1
+        \\ 113: 45 00 00 00 00 02 00             set_binding @0 ("x"), r2
+        \\ 120: 0b 00 00 02 00                   move r0, r2
+        \\ 125: 04 00 00                         load_null r0
+        \\ 128: 04 01 00                         load_null r1
+        \\ 131: 36 02 00 00 00 01 00             eq r2, r0, r1
+        \\ 138: 01 02 00 05 00 00 00             jump_if_true r2, 5
+        \\ 145: 00 26 00 00 00                   jump 38
+        \\ 150: 41 00 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 157: 07 01 00 03 00 00 00             load_number_i32 r1, 3
+        \\ 164: 24 02 00 00 00 01 00             add r2, r0, r1
+        \\ 171: 45 00 00 00 00 02 00             set_binding @0 ("x"), r2
+        \\ 178: 0b 00 00 02 00                   move r0, r2
+        \\ 183: 00 00 00 00 00                   jump 0
+        \\ 188: 41 00 00 00 00 00 00             get_binding r0, @0 ("x")
+        \\ 195: 8f 00 00                         return r0
+        \\
+    );
+
     // Call expressions
     try testInterpreter(
         std.testing.allocator,

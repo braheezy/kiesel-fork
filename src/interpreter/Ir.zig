@@ -116,10 +116,6 @@ pub const Inst = struct {
         eq_strict,
         not_eq_strict,
 
-        logical_and,
-        logical_or,
-        nullish_coalesce,
-
         push_scope,
         push_var_scope,
         push_with_scope,
@@ -308,9 +304,6 @@ pub const Inst = struct {
         .not_eq = .binary,
         .eq_strict = .binary,
         .not_eq_strict = .binary,
-        .logical_and = .binary,
-        .logical_or = .binary,
-        .nullish_coalesce = .binary,
         .push_scope = .none,
         .push_var_scope = .none,
         .push_with_scope = .ref,

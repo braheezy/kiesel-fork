@@ -130,9 +130,6 @@ pub fn build(b: *Builder) Error!Bytecode {
             .not_eq => try b.lowerNotEq(data.binary, dest),
             .eq_strict => try b.lowerEqStrict(data.binary, dest),
             .not_eq_strict => try b.lowerNotEqStrict(data.binary, dest),
-            .logical_and => try b.lowerLogicalAnd(data.binary, dest),
-            .logical_or => try b.lowerLogicalOr(data.binary, dest),
-            .nullish_coalesce => try b.lowerNullishCoalesce(data.binary, dest),
             .push_scope => try b.lowerPushScope(),
             .push_var_scope => try b.lowerPushVarScope(),
             .push_with_scope => try b.lowerPushWithScope(data.ref),
@@ -339,7 +336,6 @@ const Block = struct {
     const Condition = enum {
         truthy,
         falsy,
-        nullish,
     };
 
     const Terminator = union(enum) {
@@ -371,7 +367,6 @@ const Block = struct {
                 const jump_cond_tag: Bytecode.Inst.Tag = switch (br.condition) {
                     .truthy => .jump_if_true,
                     .falsy => .jump_if_false,
-                    .nullish => .jump_if_nullish,
                 };
                 const jump_cond_size: u32 = Bytecode.Inst.encodedSize(jump_cond_tag);
                 const jump_size: u32 = if (br.else_block == next) 0 else Bytecode.Inst.encodedSize(.jump);
@@ -402,7 +397,6 @@ const Block = struct {
                 const jump_cond_tag: Bytecode.Inst.Tag = switch (br.condition) {
                     .truthy => .jump_if_true,
                     .falsy => .jump_if_false,
-                    .nullish => .jump_if_nullish,
                 };
                 const after_jump_cond = block.offset + block.size() + jump_cond_size;
                 const then_relative: i32 = @as(i32, @intCast(br.then_block.offset)) - @as(i32, @intCast(after_jump_cond));
@@ -997,54 +991,6 @@ fn lowerEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Err
 
 fn lowerNotEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
     try b.emitBinaryOp(.not_eq_strict, data.lhs, data.rhs, dest);
-}
-
-fn lowerLogicalAnd(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-
-    const rhs_block = try b.createBlock();
-    const merge_block = try b.createBlock();
-
-    try b.emitMoveIfNeeded(data.lhs, dest);
-    b.branch(.falsy, lhs_reg, merge_block, rhs_block);
-
-    b.switchToBlock(rhs_block);
-    try b.emitMoveIfNeeded(data.rhs, dest);
-    b.jump(merge_block);
-
-    b.switchToBlock(merge_block);
-}
-
-fn lowerLogicalOr(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-
-    const rhs_block = try b.createBlock();
-    const merge_block = try b.createBlock();
-
-    try b.emitMoveIfNeeded(data.lhs, dest);
-    b.branch(.truthy, lhs_reg, merge_block, rhs_block);
-
-    b.switchToBlock(rhs_block);
-    try b.emitMoveIfNeeded(data.rhs, dest);
-    b.jump(merge_block);
-
-    b.switchToBlock(merge_block);
-}
-
-fn lowerNullishCoalesce(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
-    const lhs_reg = b.resolve(data.lhs);
-
-    const rhs_block = try b.createBlock();
-    const merge_block = try b.createBlock();
-
-    try b.emitMoveIfNeeded(data.lhs, dest);
-    b.branch(.nullish, lhs_reg, rhs_block, merge_block);
-
-    b.switchToBlock(rhs_block);
-    try b.emitMoveIfNeeded(data.rhs, dest);
-    b.jump(merge_block);
-
-    b.switchToBlock(merge_block);
 }
 
 fn lowerPushScope(b: *Builder) Error!void {

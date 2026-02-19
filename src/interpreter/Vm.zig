@@ -143,7 +143,6 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .jump => vm.executeJump(data.i32, &pc),
                 .jump_if_true => vm.executeJumpIfTrue(data.reg_i32[0], data.reg_i32[1], &pc),
                 .jump_if_false => vm.executeJumpIfFalse(data.reg_i32[0], data.reg_i32[1], &pc),
-                .jump_if_nullish => vm.executeJumpIfNullish(data.reg_i32[0], data.reg_i32[1], &pc),
                 .load_undefined => vm.executeLoadUndefined(data.reg),
                 .load_null => vm.executeLoadNull(data.reg),
                 .load_true => vm.executeLoadTrue(data.reg),
@@ -466,13 +465,6 @@ fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *usize) v
 
 fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *usize) void {
     if (!vm.store(reg).toBoolean()) {
-        vm.jump(offset, pc);
-    }
-}
-
-fn executeJumpIfNullish(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *usize) void {
-    const value = vm.store(reg);
-    if (value.isUndefined() or value.isNull()) {
         vm.jump(offset, pc);
     }
 }
