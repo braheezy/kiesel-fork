@@ -171,7 +171,10 @@ pub fn generatorStart(
                 const vm = agent_.active_vm.?;
 
                 const result = if (closure_generator.fields.evaluation_state.suspension) |*suspension| blk: {
-                    defer agent_.gc_allocator.free(suspension.stack);
+                    // If resuming causes another yield the suspension will be overwritten, so we
+                    // have to capture the stack to free it regardless.
+                    const current_stack = suspension.stack;
+                    defer agent_.gc_allocator.free(current_stack);
                     switch (resume_completion.type) {
                         .normal => {
                             suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
