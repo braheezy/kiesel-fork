@@ -775,6 +775,7 @@ pub const Expression = union(enum) {
                 .generator_expression => |gen_expr| gen_expr.identifier == null,
                 .async_function_expression => |async_expr| async_expr.identifier == null,
                 .async_generator_expression => |async_gen_expr| async_gen_expr.identifier == null,
+                .class_expression => |class_expr| class_expr.identifier == null,
                 .arrow_function => true,
                 .async_arrow_function => true,
                 else => false,

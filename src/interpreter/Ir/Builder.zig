@@ -308,11 +308,22 @@ fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Inst.ClassI
 fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.Inst.StringIndex) void {
     const index = ref.toIndex().?;
     const inst = b.instructions.get(@intFromEnum(index));
-    std.debug.assert(inst.tag == .create_function);
-    const function_index = inst.data.create_function;
-    const function = &b.functions.items[@intFromEnum(function_index)];
-    if (function.name == .none) {
-        function.name = .{ .default = string_index };
+    switch (inst.tag) {
+        .create_function => {
+            const function_index = inst.data.create_function;
+            const function = &b.functions.items[@intFromEnum(function_index)];
+            if (function.name == .none) {
+                function.name = .{ .default = string_index };
+            }
+        },
+        .create_class => {
+            const class_index = inst.data.create_class;
+            const class = &b.classes.items[@intFromEnum(class_index)];
+            if (class.name == .none) {
+                class.name = .{ .default = string_index };
+            }
+        },
+        else => unreachable,
     }
 }
 
