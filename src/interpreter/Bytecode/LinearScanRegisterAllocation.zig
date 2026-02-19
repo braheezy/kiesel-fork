@@ -1,6 +1,6 @@
 //! Linear Scan Register Allocation
 //!
-//! https://web.cs.ucla.edu/~palsberg/course/cs132/linearscan.pdf
+//! Based on: https://web.cs.ucla.edu/~palsberg/course/cs132/linearscan.pdf
 
 const std = @import("std");
 
@@ -11,14 +11,9 @@ const Ir = interpreter.Ir;
 
 const LinearScanRegisterAllocation = @This();
 
-allocations: []Allocation,
-num_spill_slots: u16,
-
-pub const Allocation = union(enum) {
-    register: Bytecode.Inst.Reg,
-    spilled: u16,
-    none,
-};
+allocations: []Bytecode.Inst.Reg,
+num_allocations: u16,
+free_temp_regs: std.DynamicBitSetUnmanaged,
 
 const ActiveRange = struct {
     index: u32,
@@ -28,79 +23,75 @@ const ActiveRange = struct {
 pub fn init(
     gpa: std.mem.Allocator,
     live_ranges: []const Ir.LiveRange,
-    num_regs: u8,
 ) std.mem.Allocator.Error!LinearScanRegisterAllocation {
-    var allocations = try gpa.alloc(Allocation, live_ranges.len);
+    var allocations = try gpa.alloc(Bytecode.Inst.Reg, live_ranges.len);
     errdefer gpa.free(allocations);
     @memset(allocations, .none);
 
     var active: std.ArrayList(ActiveRange) = .empty;
     defer active.deinit(gpa);
 
-    var free_regs: std.bit_set.DynamicBitSetUnmanaged = try .initFull(gpa, num_regs);
+    var free_regs: std.DynamicBitSetUnmanaged = .{};
     defer free_regs.deinit(gpa);
-
-    var next_spill: u16 = 0;
 
     for (live_ranges, 0..) |live_range, i| {
         // Expire old ranges
         var j: usize = 0;
         while (j < active.items.len) {
             if (active.items[j].end < live_range.start) {
-                switch (allocations[active.items[j].index]) {
-                    .register => |reg| free_regs.set(@intFromEnum(reg)),
-                    else => {},
-                }
+                const reg = allocations[active.items[j].index];
+                std.debug.assert(reg != .none);
+                free_regs.set(@intFromEnum(reg));
                 _ = active.swapRemove(j);
             } else {
                 j += 1;
             }
         }
 
+        const reg = free_regs.findFirstSet() orelse blk: {
+            const new_reg = free_regs.bit_length;
+            try free_regs.resize(gpa, new_reg + 1, true);
+            break :blk new_reg;
+        };
+
         // Use register without marking active for dead values
         if (live_range.end == live_range.start) {
-            if (free_regs.findFirstSet()) |reg| {
-                allocations[i] = .{ .register = @enumFromInt(reg) };
-            } else {
-                allocations[i] = .{ .spilled = next_spill };
-                next_spill += 1;
-            }
+            allocations[i] = @enumFromInt(reg);
             continue;
         }
 
-        // Allocate register if available, spill otherwise
-        if (free_regs.findFirstSet()) |reg| {
-            allocations[i] = .{ .register = @enumFromInt(reg) };
-            free_regs.unset(reg);
-            try active.append(gpa, .{ .index = @intCast(i), .end = live_range.end });
-        } else {
-            var last_active_end = live_range.end;
-            var last_active_index: ?usize = null;
-            for (active.items, 0..) |active_range, k| {
-                if (active_range.end > last_active_end) {
-                    last_active_end = active_range.end;
-                    last_active_index = k;
-                }
-            }
-            if (last_active_index) |index| {
-                const inst_to_spill = active.items[index].index;
-                allocations[i] = .{ .register = allocations[inst_to_spill].register };
-                allocations[inst_to_spill] = .{ .spilled = next_spill };
-                next_spill += 1;
-                active.items[index] = .{ .index = @intCast(i), .end = live_range.end };
-            } else {
-                allocations[i] = .{ .spilled = next_spill };
-                next_spill += 1;
-            }
-        }
+        // Allocate register and mark used
+        allocations[i] = @enumFromInt(reg);
+        free_regs.unset(reg);
+        try active.append(gpa, .{ .index = @intCast(i), .end = live_range.end });
     }
 
     return .{
         .allocations = allocations,
-        .num_spill_slots = next_spill,
+        .num_allocations = @intCast(free_regs.bit_length),
+        .free_temp_regs = .{},
     };
 }
 
 pub fn deinit(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator) void {
     gpa.free(lsra.allocations);
+    lsra.free_temp_regs.deinit(gpa);
+}
+
+pub fn allocateTemp(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator) std.mem.Allocator.Error!Bytecode.Inst.Reg {
+    const reg = lsra.free_temp_regs.findFirstSet() orelse blk: {
+        const new_reg = lsra.free_temp_regs.bit_length;
+        try lsra.free_temp_regs.resize(gpa, new_reg + 1, true);
+        break :blk new_reg;
+    };
+    lsra.free_temp_regs.unset(reg);
+    return @enumFromInt(lsra.num_allocations + @as(u16, @intCast(reg)));
+}
+
+pub fn freeTemp(lsra: *LinearScanRegisterAllocation, reg: Bytecode.Inst.Reg) void {
+    lsra.free_temp_regs.set(@intFromEnum(reg) - lsra.num_allocations);
+}
+
+pub fn numRegs(lsra: *LinearScanRegisterAllocation) u16 {
+    return lsra.num_allocations + @as(u16, @intCast(lsra.free_temp_regs.bit_length));
 }

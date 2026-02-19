@@ -60,8 +60,6 @@ stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
 constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
 
-pub const num_regs = 32;
-
 pub const CallFrame = struct {
     bytecode: *const Bytecode,
     constants: Constants,
@@ -375,18 +373,20 @@ pub fn pushCallFrame(
         constants_gop.value_ptr.* = constants;
     }
     const constants = constants_gop.value_ptr.*;
+    const regs_len = callee_bytecode.num_regs;
+    const arguments_len: u16 = @intCast(args.len);
 
     const stack_base: u32 = @intCast(vm.stack.items.len);
-    try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, num_regs + args.len);
-    vm.stack.appendNTimesAssumeCapacity(undefined, num_regs);
+    try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, regs_len + arguments_len);
+    vm.stack.appendNTimesAssumeCapacity(undefined, regs_len);
     vm.stack.appendSliceAssumeCapacity(args);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
         .constants = constants,
         .stack_base = stack_base,
-        .regs_len = num_regs,
-        .arguments_len = @intCast(args.len),
+        .regs_len = regs_len,
+        .arguments_len = arguments_len,
         .cached_this_value = null,
     });
 }

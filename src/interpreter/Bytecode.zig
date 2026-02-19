@@ -1,14 +1,12 @@
 const std = @import("std");
 
 const ast = @import("../language/ast.zig");
-const interpreter = @import("../interpreter.zig");
-
-const Vm = interpreter.Vm;
 
 const Bytecode = @This();
 
 name: []const u8,
 code: []const u8,
+num_regs: u16,
 strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
@@ -454,11 +452,9 @@ pub const Inst = struct {
         });
     };
 
-    pub const Reg = enum(u8) {
-        /// Used for `end` instruction to indicate no register
-        none = std.math.maxInt(u8),
-        /// Scratch register for temporary values, e.g. the call arguments array
-        scratch = Vm.num_regs - 1,
+    pub const Reg = enum(u16) {
+        /// Used for `return` instruction to indicate no register
+        none = std.math.maxInt(u16),
         _,
     };
 
@@ -539,7 +535,7 @@ pub const Inst = struct {
 
     inline fn decodeField(comptime T: type, code: []const u8) T {
         return switch (T) {
-            Reg => @enumFromInt(code[0]),
+            Reg => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             StringIndex,
             BigIntIndex,
             FunctionIndex,
@@ -578,7 +574,7 @@ pub const Inst = struct {
 
     fn encodeField(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (T) {
-            Reg => try writer.writeInt(u8, @intFromEnum(value), .little),
+            Reg => try writer.writeInt(u16, @intFromEnum(value), .little),
             StringIndex,
             BigIntIndex,
             FunctionIndex,
@@ -678,7 +674,7 @@ pub fn print(
         for (bc.code[entry.offset..][0..size]) |byte| {
             try writer.print("{x:0>2} ", .{byte});
         }
-        _ = try writer.splatByteAll(' ', (10 - size) * 3);
+        _ = try writer.splatByteAll(' ', (11 - size) * 3);
         try tty_config.setColor(writer, .reset);
 
         try writer.print("{f}\n", .{entry.inst.fmt(bc, tty_config)});

@@ -645,7 +645,7 @@ pub fn print(
             live_range.end,
             if (is_live) "" else "dead",
         });
-        _ = try writer.splatByteAll(' ', 15);
+        _ = try writer.splatByteAll(' ', 18);
         try tty_config.setColor(writer, .reset);
 
         try writer.print("{f}\n", .{inst.fmt(ir, tty_config)});

@@ -4,7 +4,6 @@ const interpreter = @import("../../interpreter.zig");
 
 const Bytecode = interpreter.Bytecode;
 const Ir = interpreter.Ir;
-const Vm = interpreter.Vm;
 
 const LinearScanRegisterAllocation = @import("LinearScanRegisterAllocation.zig");
 
@@ -20,8 +19,7 @@ label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 pub const Error = error{OutOfMemory};
 
 pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Builder {
-    const usable_regs: u8 = Vm.num_regs - 1;
-    const lsra: LinearScanRegisterAllocation = try .init(gpa, ir.live_ranges, usable_regs);
+    const lsra: LinearScanRegisterAllocation = try .init(gpa, ir.live_ranges);
     return .{
         .gpa = gpa,
         .ir = ir,
@@ -319,6 +317,7 @@ pub fn build(b: *Builder) Error!Bytecode {
     return .{
         .name = name,
         .code = code,
+        .num_regs = b.lsra.numRegs(),
         .strings = strings,
         .big_ints = big_ints,
         .functions = functions,
@@ -552,11 +551,9 @@ fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest: Bytecode.Ins
 
 fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Inst.Reg {
     const index = ref.toIndex().?;
-    switch (b.lsra.allocations[@intFromEnum(index)]) {
-        .register => |reg| return reg,
-        .spilled => unreachable, // TODO: Handle spill slots
-        .none => unreachable, // Live instructions must have allocations
-    }
+    const reg = b.lsra.allocations[@intFromEnum(index)];
+    std.debug.assert(reg != .none); // Live instructions must have allocations
+    return reg;
 }
 
 fn lowerUndefined(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
@@ -1384,7 +1381,8 @@ fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode
         return;
     }
 
-    const excluded_reg: Bytecode.Inst.Reg = .scratch;
+    const excluded_reg = try b.lsra.allocateTemp(b.gpa);
+    defer b.lsra.freeTemp(excluded_reg);
     try b.emit(.{
         .tag = .array_create,
         .data = .{ .reg_u32 = .{
@@ -1448,7 +1446,8 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
         return;
     }
 
-    const args_reg: Bytecode.Inst.Reg = .scratch;
+    const args_reg = try b.lsra.allocateTemp(b.gpa);
+    defer b.lsra.freeTemp(args_reg);
     try b.emitArgumentsArray(args, args_reg);
 
     switch (extra.data.this_value) {
@@ -1477,7 +1476,8 @@ fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Ins
     const callee_reg = b.resolve(extra.data.callee);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
-    const args_reg: Bytecode.Inst.Reg = .scratch;
+    const args_reg = try b.lsra.allocateTemp(b.gpa);
+    defer b.lsra.freeTemp(args_reg);
     try b.emitArgumentsArray(args, args_reg);
 
     try b.emit(.{
@@ -1513,7 +1513,8 @@ fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
         return;
     }
 
-    const args_reg: Bytecode.Inst.Reg = .scratch;
+    const args_reg = try b.lsra.allocateTemp(b.gpa);
+    defer b.lsra.freeTemp(args_reg);
     try b.emitArgumentsArray(args, args_reg);
 
     try b.emit(.{
@@ -1756,7 +1757,8 @@ fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
     const extra = b.ir.extraData(Ir.Inst.SuperCall, data);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
-    const args_reg: Bytecode.Inst.Reg = .scratch;
+    const args_reg = try b.lsra.allocateTemp(b.gpa);
+    defer b.lsra.freeTemp(args_reg);
     try b.emitArgumentsArray(args, args_reg);
 
     try b.emit(.{
