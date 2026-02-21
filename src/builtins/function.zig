@@ -310,10 +310,18 @@ pub fn createDynamicFunction(
     var diagnostics = Diagnostics.init(agent.gc_allocator);
     defer diagnostics.deinit();
 
+    const state: Parser.State = switch (kind) {
+        .normal => .{},
+        .generator => .{ .in_generator_function = true },
+        .async => .{ .in_async_function = true },
+        .async_generator => .{ .in_async_function = true, .in_generator_function = true },
+    };
+
     // 17. Let parameters be ParseText(P, parameterSym).
     const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
+        .state = state,
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {
@@ -327,6 +335,7 @@ pub fn createDynamicFunction(
     const body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
+        .state = state,
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {

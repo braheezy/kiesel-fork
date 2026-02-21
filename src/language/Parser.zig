@@ -28,8 +28,7 @@ state: State = .{},
 identifier_stack: std.ArrayList(ast.Identifier),
 
 pub const State = struct {
-    in_async_arrow_function_expression: bool = false,
-    in_async_function_body: bool = false,
+    in_async_function: bool = false,
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
@@ -38,7 +37,7 @@ pub const State = struct {
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
     in_function_body_eval: bool = false,
-    in_generator_function_body: bool = false,
+    in_generator_function: bool = false,
     in_iteration_statement: bool = false,
     in_labelled_statement: bool = false,
     in_method_definition: bool = false,
@@ -677,21 +676,43 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
 
     switch (token.type) {
         .identifier => {
+            // It is a Syntax Error if IsStrict(this phrase) is true and the StringValue of
+            // IdentifierName is one of "implements", "interface", "let", "package", "private",
+            // "protected", "public", "static", or "yield".
+            if (self.state.in_strict_mode and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
             // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
             // of Identifier is "yield".
-            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+            if (self.state.in_generator_function and std.mem.eql(u8, string_value, "yield")) {
                 try self.emitErrorAt(
                     token.location,
                     "Identifier reference named 'yield' not allowed in generator functions",
                     .{},
                 );
             }
-            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
-            // of Identifier is "await".
-            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+
+            // It is a Syntax Error if the goal symbol of the syntactic grammar is Module and the
+            // StringValue of IdentifierName is "await".
+            if (self.state.in_module and std.mem.eql(u8, string_value, "await")) {
                 try self.emitErrorAt(
                     token.location,
-                    "Identifier reference named 'await' not allowed in async functions",
+                    "Identifier reference named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if ((self.state.in_async_function or self.state.in_class_static_block) and
+                std.mem.eql(u8, string_value, "await"))
+            {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -705,6 +726,14 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
                     .{},
                 );
             }
+            // It is a Syntax Error if this production has a [Yield] parameter.
+            if (self.state.in_generator_function) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
         },
         .await => {
             // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
@@ -712,6 +741,14 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
                 try self.emitErrorAt(
                     token.location,
                     "Identifier reference named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter.
+            if (self.state.in_async_function or self.state.in_class_static_block) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -736,21 +773,44 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
             if (self.state.in_strict_mode) {
                 try self.ensureAllowedIdentifier(.binding_identifier, string_value, token.location);
             }
+
+            // It is a Syntax Error if IsStrict(this phrase) is true and the StringValue of
+            // IdentifierName is one of "implements", "interface", "let", "package", "private",
+            // "protected", "public", "static", or "yield".
+            if (self.state.in_strict_mode and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
             // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
             // of Identifier is "yield".
-            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+            if (self.state.in_generator_function and std.mem.eql(u8, string_value, "yield")) {
                 try self.emitErrorAt(
                     token.location,
                     "Binding identifier named 'yield' not allowed in generator functions",
                     .{},
                 );
             }
-            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
-            // of Identifier is "await".
-            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+
+            // It is a Syntax Error if the goal symbol of the syntactic grammar is Module and the
+            // StringValue of IdentifierName is "await".
+            if (self.state.in_module and std.mem.eql(u8, string_value, "await")) {
                 try self.emitErrorAt(
                     token.location,
-                    "Binding identifier named 'await' not allowed in async functions",
+                    "Binding identifier named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if ((self.state.in_async_function or self.state.in_class_static_block) and
+                std.mem.eql(u8, string_value, "await"))
+            {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -765,7 +825,7 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
                 );
             }
             // It is a Syntax Error if this production has a [Yield] parameter.
-            if (self.state.in_generator_function_body) {
+            if (self.state.in_generator_function) {
                 try self.emitErrorAt(
                     token.location,
                     "Binding identifier named 'yield' not allowed in generator functions",
@@ -783,10 +843,10 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
                 );
             }
             // It is a Syntax Error if this production has an [Await] parameter.
-            if (self.state.in_async_function_body) {
+            if (self.state.in_async_function or self.state.in_class_static_block) {
                 try self.emitErrorAt(
                     token.location,
-                    "Binding identifier named 'await' not allowed in async functions",
+                    "Binding identifier named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -813,21 +873,34 @@ pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) Accept
 
     switch (token.type) {
         .identifier => {
+            // It is a Syntax Error if IsStrict(this phrase) is true and the StringValue of
+            // IdentifierName is one of "implements", "interface", "let", "package", "private",
+            // "protected", "public", "static", or "yield".
+            if (self.state.in_strict_mode and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
             // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
             // of Identifier is "yield".
-            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+            if (self.state.in_generator_function and std.mem.eql(u8, string_value, "yield")) {
                 try self.emitErrorAt(
                     token.location,
                     "Label named 'yield' not allowed in generator functions",
                     .{},
                 );
             }
+
             // It is a Syntax Error if this production has an [Await] parameter and the StringValue
             // of Identifier is "await".
-            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+            if ((self.state.in_async_function or self.state.in_class_static_block) and
+                std.mem.eql(u8, string_value, "await"))
+            {
                 try self.emitErrorAt(
                     token.location,
-                    "Label named 'await' not allowed in async functions",
+                    "Label named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -841,6 +914,15 @@ pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) Accept
                     .{},
                 );
             }
+            // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
+            // of Identifier is "yield".
+            if (self.state.in_generator_function) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
         },
         .await => {
             // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
@@ -848,6 +930,15 @@ pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) Accept
                 try self.emitErrorAt(
                     token.location,
                     "Label named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if (self.state.in_async_function or self.state.in_class_static_block) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'await' not allowed in async functions or class static blocks",
                     .{},
                 );
             }
@@ -3021,6 +3112,12 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
@@ -3032,6 +3129,13 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
         };
         return err;
     };
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, false);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, false);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3065,11 +3169,24 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, false);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, false);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3106,23 +3223,20 @@ pub fn acceptFunctionBody(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    switch (@"type") {
+        .async, .async_generator => std.debug.assert(self.state.in_async_function),
+        else => {},
+    }
+    switch (@"type") {
+        .generator, .async_generator => std.debug.assert(self.state.in_generator_function),
+        else => {},
+    }
+
     const tmp1 = temporaryChange(&self.state.in_function_body, true);
     defer tmp1.restore();
 
-    const tmp2 = temporaryChange(&self.state.in_async_function_body, switch (@"type") {
-        .async, .async_generator => true,
-        else => false,
-    });
+    const tmp2 = temporaryChange(&self.state.arguments_object_needed, false);
     defer tmp2.restore();
-
-    const tmp3 = temporaryChange(&self.state.in_generator_function_body, switch (@"type") {
-        .generator, .async_generator => true,
-        else => false,
-    });
-    defer tmp3.restore();
-
-    const tmp4 = temporaryChange(&self.state.arguments_object_needed, false);
-    defer tmp4.restore();
 
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
 
@@ -3160,6 +3274,12 @@ pub fn acceptFunctionBody(
 pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
 
     var start_offset: usize = undefined;
     var formal_parameters: ast.FormalParameters = undefined;
@@ -3247,11 +3367,17 @@ pub fn acceptMethodDefinition(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp1 = temporaryChange(&self.state.in_method_definition, true);
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
     defer tmp1.restore();
 
-    var tmp2: ?TemporaryChange(bool) = null;
-    defer if (tmp2) |tmp| tmp.restore();
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
+    const tmp3 = temporaryChange(&self.state.in_method_definition, true);
+    defer tmp3.restore();
+
+    var tmp4: ?TemporaryChange(bool) = null;
+    defer if (tmp4) |tmp| tmp.restore();
 
     const start_offset = if (parsed) |p| p.start_offset else blk: {
         defer self.core.restoreState(state);
@@ -3303,19 +3429,31 @@ pub fn acceptMethodDefinition(
             }
         };
         if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
-            tmp2 = temporaryChange(&self.state.in_class_constructor, true);
+            tmp4 = temporaryChange(&self.state.in_class_constructor, true);
         }
     }
-    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
-    const formal_parameters = try self.acceptFormalParameters();
-    _ = try self.core.accept(RuleSet.is(.@")"));
-    _ = try self.core.accept(RuleSet.is(.@"{"));
+
     const function_body_type: ast.FunctionBody.Type = switch (if (parsed) |p| p.method_type else .method) {
         .method, .get, .set => .normal,
         .generator => .generator,
         .async => .async,
         .async_generator => .async_generator,
     };
+    const tmp5 = temporaryChange(&self.state.in_async_function, switch (function_body_type) {
+        .async, .async_generator => true,
+        else => false,
+    });
+    defer tmp5.restore();
+    const tmp6 = temporaryChange(&self.state.in_generator_function, switch (function_body_type) {
+        .generator, .async_generator => true,
+        else => false,
+    });
+    defer tmp6.restore();
+
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(function_body_type);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     try self.ensureUniqueParameterNames(.method, formal_parameters, open_parenthesis_token.location);
@@ -3342,6 +3480,12 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
@@ -3352,6 +3496,13 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
         try self.emitError("Generator declaration must have a binding identifier", .{});
         return err;
     };
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, false);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, true);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3385,12 +3536,25 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, false);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, true);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3421,12 +3585,20 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
 }
 
 pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
-    if (!self.state.in_generator_function_body) return error.UnexpectedToken;
+    if (!self.state.in_generator_function) return error.UnexpectedToken;
 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.yield));
+    const token = try self.core.accept(RuleSet.is(.yield));
+
+    if (self.state.in_formal_parameters and self.state.in_generator_function) {
+        try self.emitErrorAt(
+            token.location,
+            "Yield expression not allowed in generator formal parameters",
+            .{},
+        );
+    }
     if (!self.followedByLineTerminator()) {
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.yield) + 1 };
         if (self.acceptExpression(ctx)) |expr| {
@@ -3444,6 +3616,12 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
@@ -3458,6 +3636,13 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
         try self.emitError("Async generator declaration must have a binding identifier", .{});
         return err;
     };
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, true);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, true);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3491,6 +3676,12 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
@@ -3501,6 +3692,13 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, true);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, true);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3691,8 +3889,17 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state.in_class_static_block, true);
-    defer tmp.restore();
+    const saved_state = self.state;
+    defer self.state = saved_state;
+
+    self.state.in_class_static_block = true;
+    self.state.in_async_function = false;
+    self.state.in_generator_function = false;
+    self.state.in_function_body = false;
+    self.state.in_breakable_statement = false;
+    self.state.in_iteration_statement = false;
+    self.state.in_labelled_statement = false;
+    self.state.in_class_constructor = false;
 
     const token = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList(.{});
@@ -3783,6 +3990,12 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
@@ -3798,6 +4011,13 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
         };
         return err;
     };
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, true);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, false);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3831,6 +4051,12 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
@@ -3840,6 +4066,13 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
     _ = try self.core.accept(RuleSet.is(.function));
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, true);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, false);
+    defer tmp4.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3870,8 +4103,7 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
 }
 
 pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
-    if (!(self.state.in_async_function_body or
-        self.state.in_async_arrow_function_expression or
+    if (!(self.state.in_async_function or
         (self.state.in_module and !self.state.in_function_body)))
     {
         return error.UnexpectedToken;
@@ -3880,7 +4112,14 @@ pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.await));
+    const token = try self.core.accept(RuleSet.is(.await));
+    if (self.state.in_formal_parameters and self.state.in_async_function) {
+        try self.emitErrorAt(
+            token.location,
+            "Await expression not allowed in async formal parameters",
+            .{},
+        );
+    }
     const expression = try self.allocator.create(ast.Expression);
     errdefer self.allocator.destroy(expression);
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.await) + 1 };
@@ -3892,12 +4131,27 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_class_static_block, false);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_formal_parameters, false);
+    defer tmp2.restore();
+
+    const error_count = self.diagnostics.errors.items.len;
+
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
+
+    const tmp3 = temporaryChange(&self.state.in_async_function, true);
+    defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.in_generator_function, false);
+    defer tmp4.restore();
+
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
     if (self.acceptBindingIdentifier()) |binding_identifier| {
@@ -3924,7 +4178,12 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
-    _ = try self.core.accept(RuleSet.is(.@"=>"));
+    _ = self.core.accept(RuleSet.is(.@"=>")) catch |err| {
+        // If parsing the async arrow function failed we may have emitted an 'invalid binding
+        // identifier' error, e.g. for `async (await)` - get rid of those
+        while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
+        return err;
+    };
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
@@ -3933,8 +4192,6 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
-        const tmp = temporaryChange(&self.state.in_async_arrow_function_expression, true);
-        defer tmp.restore();
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
