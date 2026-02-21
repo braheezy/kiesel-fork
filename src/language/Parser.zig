@@ -580,6 +580,95 @@ fn ensureUniqueCatchParameterNames(
     }
 }
 
+fn ensureUniquePrivateClassElementNames(
+    self: *Parser,
+    class_body: ast.ClassBody,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
+    const Kind = enum { getter, setter, other };
+    const Seen = std.EnumSet(Kind);
+    var seen_private_names: std.StringHashMapUnmanaged(Seen) = .empty;
+    defer seen_private_names.deinit(self.allocator);
+
+    for (class_body.class_element_list.items) |class_element| {
+        const private_identifier: ast.PrivateIdentifier = switch (class_element) {
+            .method_definition => |method_definition| switch (method_definition.class_element_name) {
+                .private_identifier => |name| name,
+                .property_name => continue,
+            },
+            .static_method_definition => |method_definition| switch (method_definition.class_element_name) {
+                .private_identifier => |name| name,
+                .property_name => continue,
+            },
+            .field_definition => |field_definition| switch (field_definition.class_element_name) {
+                .private_identifier => |name| name,
+                .property_name => continue,
+            },
+            .static_field_definition => |field_definition| switch (field_definition.class_element_name) {
+                .private_identifier => |name| name,
+                .property_name => continue,
+            },
+            .class_static_block, .empty_statement => continue,
+        };
+
+        const kind: Kind = switch (class_element) {
+            .method_definition => |method_definition| switch (method_definition.method) {
+                .get => .getter,
+                .set => .setter,
+                else => .other,
+            },
+            .static_method_definition => |method_definition| switch (method_definition.method) {
+                .get => .getter,
+                .set => .setter,
+                else => .other,
+            },
+            .field_definition, .static_field_definition => .other,
+            .class_static_block, .empty_statement => unreachable,
+        };
+
+        const result = try seen_private_names.getOrPut(self.allocator, private_identifier);
+        if (!result.found_existing) {
+            result.value_ptr.* = .initEmpty();
+        }
+        const seen = result.value_ptr;
+
+        const duplicate = switch (kind) {
+            .getter => seen.contains(.getter) or seen.contains(.other),
+            .setter => seen.contains(.setter) or seen.contains(.other),
+            .other => seen.contains(.other) or seen.contains(.getter) or seen.contains(.setter),
+        };
+        seen.insert(kind);
+        if (duplicate) {
+            try self.emitErrorAt(
+                location,
+                "Duplicate private class element '#{s}'",
+                .{private_identifier},
+            );
+        }
+    }
+}
+
+fn ensureUniqueConstructorMethod(
+    self: *Parser,
+    class_body: ast.ClassBody,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
+    var seen = false;
+    const duplicate = for (class_body.class_element_list.items) |class_element| {
+        if (class_element.classElementKind() == .constructor_method) {
+            if (seen) break true;
+            seen = true;
+        }
+    } else false;
+    if (duplicate) {
+        try self.emitErrorAt(
+            location,
+            "Class must not have more than one constructor",
+            .{},
+        );
+    }
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn followedByLineTerminator(self: *Parser) bool {
@@ -3800,9 +3889,19 @@ fn acceptClassTail(self: *Parser) AcceptError!ast.ClassTail {
         expression.* = try self.acceptExpression(.{});
         break :blk expression;
     } else |_| null;
-    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const token = try self.core.accept(RuleSet.is(.@"{"));
     const class_body = try self.acceptClassBody();
     _ = try self.core.accept(RuleSet.is(.@"}"));
+
+    // - It is a Syntax Error if the PrototypePropertyNameList of ClassElementList contains more
+    //   than one occurrence of "constructor".
+    try self.ensureUniqueConstructorMethod(class_body, token.location);
+
+    // - It is a Syntax Error if the PrivateBoundIdentifiers of ClassElementList contains any
+    //   duplicate entries, unless the name is used once for a getter and once for a setter and in
+    //   no other entries, and the getter and setter are either both static or both non-static.
+    try self.ensureUniquePrivateClassElementNames(class_body, token.location);
+
     return .{ .class_heritage = class_heritage, .class_body = class_body };
 }
 
@@ -3835,8 +3934,36 @@ fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
 
     if (self.acceptKeyword("static")) |_| {
         if (self.acceptMethodDefinition(null)) |*method_definition| {
+            // It is a Syntax Error if the PropName of MethodDefinition is "prototype".
+            if (method_definition.class_element_name == .property_name and
+                method_definition.class_element_name.property_name == .literal_property_name and
+                method_definition.class_element_name.property_name.literal_property_name == .identifier)
+            {
+                const identifier = method_definition.class_element_name.property_name.literal_property_name.identifier;
+                if (std.mem.eql(u8, identifier, "prototype")) {
+                    try self.emitErrorAt(
+                        state.location,
+                        "Class must not have static method named 'prototype'",
+                        .{},
+                    );
+                }
+            }
             return .{ .static_method_definition = method_definition.* };
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
+            // It is a Syntax Error if the PropName of FieldDefinition is either "prototype" or "constructor".
+            if (field_definition.class_element_name == .property_name and
+                field_definition.class_element_name.property_name == .literal_property_name and
+                field_definition.class_element_name.property_name.literal_property_name == .identifier)
+            {
+                const identifier = field_definition.class_element_name.property_name.literal_property_name.identifier;
+                if (std.mem.eql(u8, identifier, "prototype") or std.mem.eql(u8, identifier, "constructor")) {
+                    try self.emitErrorAt(
+                        state.location,
+                        "Class must not have static field named '{s}'",
+                        .{identifier},
+                    );
+                }
+            }
             _ = try self.acceptOrInsertSemicolon();
             return .{ .static_field_definition = field_definition };
         } else |_| if (self.acceptClassStaticBlock()) |class_static_block| {
@@ -3845,6 +3972,20 @@ fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
         return .{ .method_definition = method_definition.* };
     } else |_| if (self.acceptFieldDefinition()) |field_definition| {
+        // It is a Syntax Error if the PropName of FieldDefinition is "constructor".
+        if (field_definition.class_element_name == .property_name and
+            field_definition.class_element_name.property_name == .literal_property_name and
+            field_definition.class_element_name.property_name.literal_property_name == .identifier)
+        {
+            const identifier = field_definition.class_element_name.property_name.literal_property_name.identifier;
+            if (std.mem.eql(u8, identifier, "constructor")) {
+                try self.emitErrorAt(
+                    state.location,
+                    "Class must not have field named 'constructor'",
+                    .{},
+                );
+            }
+        }
         _ = try self.acceptOrInsertSemicolon();
         return .{ .field_definition = field_definition };
     } else |_| if (self.core.accept(RuleSet.is(.@";"))) |_| {
@@ -3876,10 +4017,9 @@ fn acceptClassElementName(self: *Parser) AcceptError!ast.ClassElementName {
         if (std.mem.eql(u8, private_identifier, "constructor")) {
             try self.emitErrorAt(
                 location,
-                "Private class element must not be named '#constructor'",
+                "Class must not have private element named '#constructor'",
                 .{},
             );
-            return error.UnexpectedToken;
         }
         return .{ .private_identifier = private_identifier };
     } else |_| return error.UnexpectedToken;
