@@ -60,6 +60,19 @@ stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
 constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
 
+pub const Pc = enum(u32) {
+    start = 0,
+    _,
+
+    pub fn offsetBy(pc: Pc, offset: i32) Pc {
+        if (offset >= 0) {
+            return @enumFromInt(@intFromEnum(pc) + @as(u32, @intCast(offset)));
+        } else {
+            return @enumFromInt(@intFromEnum(pc) - @as(u32, @intCast(-offset)));
+        }
+    }
+};
+
 pub const CallFrame = struct {
     bytecode: *const Bytecode,
     constants: Constants,
@@ -78,7 +91,7 @@ pub const GeneratorSuspension = struct {
     regs_len: u16,
     arguments_len: u16,
     cached_this_value: ?Value,
-    saved_pc: usize,
+    saved_pc: Pc,
     yield_reg: Bytecode.Inst.Reg,
 };
 
@@ -88,7 +101,7 @@ pub const RunResult = union(enum) {
 };
 
 pub const RunOptions = struct {
-    start_pc: usize = 0,
+    start_pc: Pc = .start,
 };
 
 const constants_align = @max(@alignOf(String), @alignOf(BigInt));
@@ -132,13 +145,13 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
 
     const frame = vm.currentCallFrame();
     var code = frame.bytecode.code;
-    var pc: usize = options.start_pc;
+    var pc = options.start_pc;
 
-    loop: switch (Bytecode.Inst.decodeTag(code[pc..])) {
+    loop: switch (Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..])) {
         inline else => |tag| {
             @setEvalBranchQuota(2_000);
-            const data = Bytecode.Inst.decodeData(code[pc + 1 ..], tag);
-            pc += comptime Bytecode.Inst.encodedSize(tag);
+            const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
+            pc = pc.offsetBy(comptime Bytecode.Inst.encodedSize(tag));
             const maybe_error = switch (tag) {
                 .jump => vm.executeJump(data.i32, &pc),
                 .jump_if_true => vm.executeJumpIfTrue(data.reg_i32[0], data.reg_i32[1], &pc),
@@ -319,7 +332,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 },
                 else => comptime unreachable,
             }
-            continue :loop Bytecode.Inst.decodeTag(code[pc..]);
+            continue :loop Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..]);
         },
     }
 }
@@ -425,14 +438,6 @@ fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
     vm.regs()[@intFromEnum(reg)] = value;
 }
 
-fn jump(_: *Vm, offset: i32, pc: *usize) void {
-    if (offset >= 0) {
-        pc.* += @intCast(offset);
-    } else {
-        pc.* -= @intCast(-offset);
-    }
-}
-
 fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) *const String {
     const frame = vm.currentCallFrame();
     return @ptrCast(frame.constants[@intFromEnum(index)]);
@@ -453,19 +458,19 @@ fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
     return frame.bytecode.classes[@intFromEnum(index)];
 }
 
-fn executeJump(vm: *Vm, offset: i32, pc: *usize) void {
-    vm.jump(offset, pc);
+fn executeJump(_: *Vm, offset: i32, pc: *Pc) void {
+    pc.* = pc.offsetBy(offset);
 }
 
-fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *usize) void {
+fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *Pc) void {
     if (vm.store(reg).toBoolean()) {
-        vm.jump(offset, pc);
+        pc.* = pc.offsetBy(offset);
     }
 }
 
-fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *usize) void {
+fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *Pc) void {
     if (!vm.store(reg).toBoolean()) {
-        vm.jump(offset, pc);
+        pc.* = pc.offsetBy(offset);
     }
 }
 
@@ -2002,7 +2007,7 @@ fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
     vm.load(reg, result);
 }
 
-fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: usize) Agent.Error!RunResult {
+fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
     const value = vm.store(reg);
     _ = try yield(vm.agent, value);
 
