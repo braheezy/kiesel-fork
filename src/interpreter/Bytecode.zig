@@ -11,6 +11,7 @@ strings: []const []const u8,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
+exception_handlers: []const ExceptionHandler,
 
 pub const Builder = @import("Bytecode/Builder.zig");
 
@@ -53,6 +54,13 @@ pub const Class = struct {
         identifier: Inst.StringIndex,
         default: Inst.StringIndex,
     };
+};
+
+pub const ExceptionHandler = struct {
+    start: u32,
+    end: u32,
+    target: u32,
+    exception_reg: Inst.Reg,
 };
 
 pub const Inst = struct {
@@ -618,6 +626,21 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.functions);
     for (bc.classes) |class| gpa.free(class.element_names);
     gpa.free(bc.classes);
+    gpa.free(bc.exception_handlers);
+}
+
+pub fn findExceptionHandler(bc: *const Bytecode, offset: u32) ?ExceptionHandler {
+    var best_handler: ?ExceptionHandler = null;
+    var best_span: u32 = 0;
+    for (bc.exception_handlers) |handler| {
+        if (offset < handler.start or offset >= handler.end) continue;
+        const span = handler.end - handler.start;
+        if (best_handler == null or span <= best_span) {
+            best_handler = handler;
+            best_span = span;
+        }
+    }
+    return best_handler;
 }
 
 pub const Iterator = struct {
@@ -676,6 +699,23 @@ pub fn print(
         try tty_config.setColor(writer, .reset);
 
         try writer.print("{f}\n", .{entry.inst.fmt(bc, tty_config)});
+    }
+
+    if (bc.exception_handlers.len > 0) {
+        try writer.writeByte('\n');
+        try tty_config.setColor(writer, .bold);
+        try writer.writeAll("Exception handlers\n");
+        try tty_config.setColor(writer, .reset);
+
+        for (bc.exception_handlers) |handler| {
+            try writer.print("  [{d: >4}..{d: <4}) → {d: >4}, ", .{
+                handler.start,
+                handler.end,
+                handler.target,
+            });
+            try printField(bc, handler.exception_reg, writer, tty_config);
+            try writer.writeByte('\n');
+        }
     }
 }
 

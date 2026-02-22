@@ -44,6 +44,25 @@ fn markReachable(
     reachable: *std.DynamicBitSetUnmanaged,
     start: Ir.Inst.Index,
 ) std.mem.Allocator.Error!void {
+    const ExceptionHandler = struct {
+        start: Ir.Inst.Index,
+        end: Ir.Inst.Index,
+        target: Ir.Inst.Index,
+    };
+
+    var exception_handlers: std.ArrayList(ExceptionHandler) = .empty;
+    defer exception_handlers.deinit(gpa);
+
+    for (ir.instructions.items(.tag), ir.instructions.items(.data)) |tag, data| {
+        if (tag != .exception_handler) continue;
+        const extra = ir.extraData(Ir.Inst.ExceptionHandler, data.exception_handler).data;
+        try exception_handlers.append(gpa, .{
+            .start = extra.start.toIndex().?,
+            .end = extra.end.toIndex().?,
+            .target = extra.target.toIndex().?,
+        });
+    }
+
     var worklist: std.ArrayList(Ir.Inst.Index) = .empty;
     defer worklist.deinit(gpa);
     try worklist.append(gpa, start);
@@ -54,6 +73,15 @@ fn markReachable(
         reachable.set(i);
 
         const inst = ir.instructions.get(i);
+
+        for (exception_handlers.items) |handler| {
+            if (i >= @intFromEnum(handler.start) and
+                i < @intFromEnum(handler.end) and
+                !reachable.isSet(@intFromEnum(handler.target)))
+            {
+                try worklist.append(gpa, handler.target);
+            }
+        }
 
         switch (inst.tag) {
             .br => {

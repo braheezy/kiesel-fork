@@ -233,19 +233,26 @@ const Deferred = struct {
     const Data = union {
         br: Ir.Inst.Br,
         br_cond: Ir.Inst.BrCond,
+        exception_handler: Ir.Inst.ExceptionHandler,
     };
 
     fn set(d: Deferred, data: Data) void {
         const slice = d.b.instructions.slice();
         const i = @intFromEnum(d.index);
         switch (slice.items(.tag)[i]) {
+            .br => slice.items(.data)[i] = .{ .br = data.br },
             .br_cond => {
                 const ei = @intFromEnum(slice.items(.data)[i].br_cond);
                 d.b.extra.items[ei] = @intFromEnum(data.br_cond.condition);
                 d.b.extra.items[ei + 1] = @intFromEnum(data.br_cond.then_target);
                 d.b.extra.items[ei + 2] = @intFromEnum(data.br_cond.else_target);
             },
-            .br => slice.items(.data)[i] = .{ .br = data.br },
+            .exception_handler => {
+                const ei = @intFromEnum(slice.items(.data)[i].exception_handler);
+                d.b.extra.items[ei] = @intFromEnum(data.exception_handler.start);
+                d.b.extra.items[ei + 1] = @intFromEnum(data.exception_handler.end);
+                d.b.extra.items[ei + 2] = @intFromEnum(data.exception_handler.target);
+            },
             else => unreachable,
         }
     }
@@ -253,12 +260,17 @@ const Deferred = struct {
 
 fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferred {
     const data: Ir.Inst.Data = switch (tag) {
+        .br => .{ .br = undefined },
         .br_cond => blk: {
             const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
             try b.extra.appendNTimes(b.gpa, undefined, 3);
             break :blk .{ .br_cond = extra_index };
         },
-        .br => .{ .br = undefined },
+        .exception_handler => blk: {
+            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+            try b.extra.appendNTimes(b.gpa, undefined, 3);
+            break :blk .{ .exception_handler = extra_index };
+        },
         else => unreachable,
     };
     const ref = try b.addInst(.{
@@ -1055,7 +1067,7 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
         .with_statement => |*with_stmt| try b.lowerWithStatement(with_stmt),
         .labelled_statement => |*lbl_stmt| try b.lowerLabelledStatement(lbl_stmt),
         .throw_statement => |*throw_stmt| try b.lowerThrowStatement(throw_stmt),
-        .try_statement => try b.todo("try statement"),
+        .try_statement => |*try_stmt| try b.lowerTryStatement(try_stmt),
         .debugger_statement => .none,
     };
 }
@@ -1069,7 +1081,11 @@ fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref
 }
 
 fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement, breakable_ctx: ?*BreakableContext) Error!Ir.Inst.Ref {
-    const stmt_list = &block_stmt.block.statement_list;
+    return b.lowerBlock(&block_stmt.block, breakable_ctx);
+}
+
+fn lowerBlock(b: *Builder, block: *const ast.Block, breakable_ctx: ?*BreakableContext) Error!Ir.Inst.Ref {
+    const stmt_list = &block.statement_list;
     const has_scope = stmt_list.hasLexicallyScopedDeclarations();
 
     if (has_scope) {
@@ -2106,6 +2122,133 @@ fn lowerThrowStatement(b: *Builder, throw_stmt: *const ast.ThrowStatement) Error
         .data = .{ .ref = value },
     });
     return .none;
+}
+
+fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.Inst.Ref {
+    const try_label = try b.addLabel();
+    const try_value = try b.lowerBlock(&try_stmt.try_block, null);
+    const try_result = if (try_value != .none) try_value else try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
+    const try_br = try b.addInstDeferred(.br);
+
+    var catch_label: Ir.Inst.Ref = undefined;
+    var catch_handler: Deferred = undefined;
+    var catch_result: Ir.Inst.Ref = undefined;
+    var catch_br: Deferred = undefined;
+
+    if (try_stmt.catch_block) |*catch_block| {
+        catch_label = try b.addLabel();
+        catch_handler = try b.addInstDeferred(.exception_handler);
+        const exception_value = catch_handler.index.toRef();
+
+        if (try_stmt.catch_parameter) |catch_parameter| {
+            _ = try b.addInst(.{
+                .tag = .push_scope,
+                .data = .{ .none = {} },
+            });
+            b.scope_depth += 1;
+
+            var bound_names: std.ArrayList(ast.Identifier) = .empty;
+            defer bound_names.deinit(b.gpa);
+            try catch_parameter.collectBoundNames(b.gpa, &bound_names);
+            for (bound_names.items) |bound_name| {
+                const string_index = try b.internString(bound_name);
+                _ = try b.addInst(.{
+                    .tag = .create_mutable_binding,
+                    .data = .{ .string = string_index },
+                });
+            }
+
+            switch (catch_parameter) {
+                .binding_identifier => |identifier| {
+                    const string_index = try b.internString(identifier);
+                    _ = try b.addInst(.{
+                        .tag = .initialize_binding,
+                        .data = .{ .set_binding = .{
+                            .name = string_index,
+                            .value = exception_value,
+                        } },
+                    });
+                },
+                .binding_pattern => |*binding_pattern| {
+                    _ = try b.lowerDestructuringAssignment(binding_pattern, exception_value, .initialize);
+                },
+            }
+        }
+
+        const catch_value = try b.lowerBlock(catch_block, null);
+        catch_result = if (catch_value != .none) catch_value else try b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        });
+
+        if (try_stmt.catch_parameter != null) {
+            _ = try b.addInst(.{
+                .tag = .pop_scope,
+                .data = .{ .none = {} },
+            });
+            b.scope_depth -= 1;
+        }
+
+        catch_br = try b.addInstDeferred(.br);
+    }
+
+    var finally_throw_label: Ir.Inst.Ref = undefined;
+    var finally_handler: Deferred = undefined;
+    var finally_label: Ir.Inst.Ref = undefined;
+    var finally_br: Deferred = undefined;
+
+    if (try_stmt.finally_block) |*finally_block| {
+        finally_throw_label = try b.addLabel();
+        finally_handler = try b.addInstDeferred(.exception_handler);
+        const exception_value = finally_handler.index.toRef();
+        _ = try b.lowerBlock(finally_block, null);
+        _ = try b.addInst(.{
+            .tag = .throw,
+            .data = .{ .ref = exception_value },
+        });
+
+        finally_label = try b.addLabel();
+        _ = try b.lowerBlock(finally_block, null);
+        finally_br = try b.addInstDeferred(.br);
+    }
+
+    const end_label = try b.addLabel();
+
+    const normal_target = if (try_stmt.finally_block != null) finally_label else end_label;
+
+    try_br.set(.{ .br = .{
+        .target = normal_target,
+        .value = try_result,
+    } });
+
+    if (try_stmt.catch_block != null) {
+        catch_handler.set(.{ .exception_handler = .{
+            .start = try_label,
+            .end = catch_label,
+            .target = catch_label,
+        } });
+        catch_br.set(.{ .br = .{
+            .target = normal_target,
+            .value = catch_result,
+        } });
+    }
+
+    if (try_stmt.finally_block != null) {
+        finally_handler.set(.{ .exception_handler = .{
+            .start = if (try_stmt.catch_block != null) catch_label else try_label,
+            .end = finally_throw_label,
+            .target = finally_throw_label,
+        } });
+        finally_br.set(.{ .br = .{
+            .target = end_label,
+            .value = finally_label,
+        } });
+    }
+
+    return end_label;
 }
 
 fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) Error!Ir.Inst.Ref {

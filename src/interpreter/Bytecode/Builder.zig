@@ -15,6 +15,14 @@ blocks: std.ArrayList(*Block),
 current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
+exception_handlers: std.ArrayList(ExceptionHandler),
+
+const ExceptionHandler = struct {
+    start: *Block,
+    end: *Block,
+    target: *Block,
+    exception_reg: Bytecode.Inst.Reg,
+};
 
 pub const Error = error{OutOfMemory};
 
@@ -27,6 +35,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .current = null,
         .lsra = lsra,
         .label_blocks = .empty,
+        .exception_handlers = .empty,
     };
 }
 
@@ -38,9 +47,21 @@ pub fn deinit(b: *Builder) void {
     b.blocks.deinit(b.gpa);
     b.lsra.deinit(b.gpa);
     b.label_blocks.deinit(b.gpa);
+    b.exception_handlers.deinit(b.gpa);
 }
 
 fn computeRPO(
+    gpa: std.mem.Allocator,
+    block: *Block,
+    visited: *std.AutoHashMapUnmanaged(*Block, void),
+    out: *std.ArrayList(*Block),
+) std.mem.Allocator.Error!void {
+    const start = out.items.len;
+    try computeRPOInner(gpa, block, visited, out);
+    std.mem.reverse(*Block, out.items[start..]);
+}
+
+fn computeRPOInner(
     gpa: std.mem.Allocator,
     block: *Block,
     visited: *std.AutoHashMapUnmanaged(*Block, void),
@@ -51,14 +72,14 @@ fn computeRPO(
 
     switch (block.terminator) {
         .none, .noreturn => {},
-        .jump => |target| try computeRPO(gpa, target, visited, out),
+        .jump => |target| try computeRPOInner(gpa, target, visited, out),
         .branch => |br| {
-            try computeRPO(gpa, br.else_block, visited, out);
-            try computeRPO(gpa, br.then_block, visited, out);
+            try computeRPOInner(gpa, br.else_block, visited, out);
+            try computeRPOInner(gpa, br.then_block, visited, out);
         },
     }
 
-    try out.insert(gpa, 0, block);
+    try out.append(gpa, block);
 }
 
 pub fn build(b: *Builder) Error!Bytecode {
@@ -96,6 +117,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .label => try b.lowerLabel(dest, index.toRef()),
             .br => try b.lowerBr(data.br, dest),
             .br_cond => try b.lowerBrCond(data.br_cond, dest),
+            .exception_handler => try b.lowerExceptionHandler(data.exception_handler, index.toRef()),
             .to_number => try b.lowerToNumber(data.ref, dest),
             .to_numeric => try b.lowerToNumeric(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
@@ -219,6 +241,11 @@ pub fn build(b: *Builder) Error!Bytecode {
     var visited: std.AutoHashMapUnmanaged(*Block, void) = .empty;
     defer visited.deinit(b.gpa);
     try computeRPO(b.gpa, b.blocks.items[0], &visited, &ordered);
+    for (b.blocks.items) |block| {
+        if (!visited.contains(block)) {
+            try computeRPO(b.gpa, block, &visited, &ordered);
+        }
+    }
 
     // Assign offsets
     var offset: u32 = 0;
@@ -254,6 +281,10 @@ pub fn build(b: *Builder) Error!Bytecode {
         strings_list.appendAssumeCapacity(cloned);
     }
     const strings = try strings_list.toOwnedSlice(b.gpa);
+    errdefer {
+        for (strings) |string| b.gpa.free(string);
+        b.gpa.free(strings);
+    }
 
     var big_ints_list: std.ArrayList(std.math.big.int.Const) = try .initCapacity(b.gpa, b.ir.big_ints.len);
     defer big_ints_list.deinit(b.gpa);
@@ -266,6 +297,10 @@ pub fn build(b: *Builder) Error!Bytecode {
         big_ints_list.appendAssumeCapacity(cloned);
     }
     const big_ints = try big_ints_list.toOwnedSlice(b.gpa);
+    errdefer {
+        for (big_ints) |big_int| b.gpa.free(big_int.limbs);
+        b.gpa.free(big_ints);
+    }
 
     var functions_list: std.ArrayList(Bytecode.Function) = try .initCapacity(b.gpa, b.ir.functions.len);
     defer functions_list.deinit(b.gpa);
@@ -283,6 +318,7 @@ pub fn build(b: *Builder) Error!Bytecode {
         });
     }
     const functions = try functions_list.toOwnedSlice(b.gpa);
+    errdefer b.gpa.free(functions);
 
     var classes_list: std.ArrayList(Bytecode.Class) = try .initCapacity(b.gpa, b.ir.classes.len);
     defer classes_list.deinit(b.gpa);
@@ -310,6 +346,23 @@ pub fn build(b: *Builder) Error!Bytecode {
         });
     }
     const classes = try classes_list.toOwnedSlice(b.gpa);
+    errdefer {
+        for (classes) |class| b.gpa.free(class.element_names);
+        b.gpa.free(classes);
+    }
+
+    var exception_handlers_list: std.ArrayList(Bytecode.ExceptionHandler) = try .initCapacity(b.gpa, b.exception_handlers.items.len);
+    defer exception_handlers_list.deinit(b.gpa);
+    for (b.exception_handlers.items) |handler| {
+        exception_handlers_list.appendAssumeCapacity(.{
+            .start = handler.start.offset,
+            .end = handler.end.offset,
+            .target = handler.target.offset,
+            .exception_reg = handler.exception_reg,
+        });
+    }
+    const exception_handlers = try exception_handlers_list.toOwnedSlice(b.gpa);
+    errdefer b.gpa.free(exception_handlers);
 
     return .{
         .name = name,
@@ -319,6 +372,7 @@ pub fn build(b: *Builder) Error!Bytecode {
         .big_ints = big_ints,
         .functions = functions,
         .classes = classes,
+        .exception_handlers = exception_handlers,
     };
 }
 
@@ -842,6 +896,19 @@ fn lowerBrCond(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) E
     const else_block = b.label_blocks.get(extra.data.else_target).?;
     const cond_reg = b.resolve(extra.data.condition);
     b.branch(.truthy, cond_reg, then_block, else_block);
+}
+
+fn lowerExceptionHandler(b: *Builder, exception_handler: Ir.Inst.ExtraIndex, exception_ref: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.ExceptionHandler, exception_handler).data;
+    const start_block = b.label_blocks.get(extra.start).?;
+    const end_block = b.label_blocks.get(extra.end).?;
+    const target_block = b.label_blocks.get(extra.target).?;
+    try b.exception_handlers.append(b.gpa, .{
+        .start = start_block,
+        .end = end_block,
+        .target = target_block,
+        .exception_reg = b.resolve(exception_ref),
+    });
 }
 
 fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {

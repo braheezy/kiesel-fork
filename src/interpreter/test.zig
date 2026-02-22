@@ -22,11 +22,13 @@ const ExpectedResult = union(enum) {
     ignore,
 
     const LiteralValue = union(enum) {
+        undefined,
         number: i32,
         string: []const u8,
 
         fn toValue(comptime self: LiteralValue) Value {
             return switch (self) {
+                .undefined => .undefined,
                 .number => |number| Value.from(number),
                 .string => |string| Value.from(string),
             };

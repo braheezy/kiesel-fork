@@ -77,6 +77,7 @@ pub const Inst = struct {
         label,
         br,
         br_cond,
+        exception_handler,
 
         to_number,
         to_numeric,
@@ -218,6 +219,7 @@ pub const Inst = struct {
         reg_exp: RegExp,
         br: Br,
         br_cond: ExtraIndex,
+        exception_handler: ExtraIndex,
         binary: Binary,
         get_property: GetProperty,
         get_property_computed: GetPropertyComputed,
@@ -270,6 +272,7 @@ pub const Inst = struct {
         .label = .none,
         .br = .br,
         .br_cond = .br_cond,
+        .exception_handler = .exception_handler,
         .to_number = .ref,
         .to_numeric = .ref,
         .to_string = .ref,
@@ -407,6 +410,7 @@ pub const Inst = struct {
 
     // Extra data types (>8 bytes)
     pub const BrCond = struct { condition: Ref, then_target: Ref, else_target: Ref };
+    pub const ExceptionHandler = struct { start: Ref, end: Ref, target: Ref };
     pub const SetProperty = struct { base: Ref, name: StringIndex, value: Ref };
     pub const SetPropertyComputed = struct { base: Ref, property: Ref, value: Ref };
     pub const SetPropertyIndexed = struct { base: Ref, index: u32, value: Ref };
@@ -541,6 +545,7 @@ pub const Inst = struct {
                 if (FieldType == ExtraIndex) {
                     const ExtraType = switch (dt) {
                         .br_cond => BrCond,
+                        .exception_handler => ExceptionHandler,
                         .set_property => SetProperty,
                         .set_property_computed => SetPropertyComputed,
                         .set_property_indexed => SetPropertyIndexed,
@@ -763,6 +768,7 @@ fn printData(
             if (FieldType == Inst.ExtraIndex) {
                 const ExtraType = switch (dt) {
                     .br_cond => Inst.BrCond,
+                    .exception_handler => Inst.ExceptionHandler,
                     .set_property => Inst.SetProperty,
                     .set_property_computed => Inst.SetPropertyComputed,
                     .set_property_indexed => Inst.SetPropertyIndexed,

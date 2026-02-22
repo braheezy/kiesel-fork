@@ -151,7 +151,8 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
         inline else => |tag| {
             @setEvalBranchQuota(2_000);
             const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
-            pc = pc.offsetBy(comptime Bytecode.Inst.encodedSize(tag));
+            const inst_size = comptime Bytecode.Inst.encodedSize(tag);
+            pc = pc.offsetBy(inst_size);
             const maybe_error = switch (tag) {
                 .jump => vm.executeJump(data.i32, &pc),
                 .jump_if_true => vm.executeJumpIfTrue(data.reg_i32[0], data.reg_i32[1], &pc),
@@ -327,12 +328,27 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .void => {},
                 .error_union => |u| {
                     comptime std.debug.assert(u.payload == void);
-                    // TODO: Exception handling
-                    try maybe_error;
+                    maybe_error catch |err| {
+                        const inst_pc = pc.offsetBy(-@as(i32, inst_size));
+                        try @call(.never_inline, handleError, .{ vm, err, inst_pc, &pc });
+                    };
                 },
                 else => comptime unreachable,
             }
             continue :loop Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..]);
+        },
+    }
+}
+
+fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void {
+    switch (err) {
+        error.OutOfMemory => return err,
+        error.ExceptionThrown => {
+            const frame = vm.currentCallFrame();
+            const handler = frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc)) orelse return err;
+            const exception = vm.agent.clearException();
+            vm.load(handler.exception_reg, exception.value);
+            pc.* = @enumFromInt(handler.target);
         },
     }
 }
