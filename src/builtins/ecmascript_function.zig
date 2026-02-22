@@ -620,7 +620,16 @@ fn evaluateFunctionBody(
 ) Agent.Error!Value {
     if (agent.options.new_interpreter) {
         const bc = try function.fields.compile(agent);
-        const vm = agent.active_vm.?;
+        var temp_vm: ?interpreter.Vm = null;
+        defer if (temp_vm) |*vm| vm.deinit();
+
+        const vm = agent.active_vm orelse blk: {
+            // Create a temporary VM if none is active. This happens when draining the job queue
+            // for example.
+            temp_vm = try interpreter.Vm.init(agent, bc);
+            break :blk &temp_vm.?;
+        };
+
         try vm.pushCallFrame(bc, arguments_list.values);
         errdefer vm.popCallFrame();
         const result = try vm.run(.{});
