@@ -4045,7 +4045,8 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
         },
         .binding_pattern_for_assignment_expression => |*pattern| {
             const value = try b.lowerExpression(assign_expr.rhs_expression);
-            return b.lowerDestructuringAssignment(pattern, value, .set);
+            _ = try b.lowerDestructuringAssignment(pattern, value, .set);
+            return value;
         },
         .call_expression => |*call_expr| {
             _ = try b.lowerCallExpression(call_expr);

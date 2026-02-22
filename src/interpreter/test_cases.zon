@@ -544,10 +544,12 @@
         \\const [x, y] = [10, 20];
         \\const {d: {e}} = {d: {e: 5}};
         \\const {f = 99} = {f: undefined};
-        \\rest.b + x + e + f;
+        \\const g = ({} = {g: 42}).g;
+        \\
+        \\rest.b + x + e + f + g;
         \\
         ,
-        .expected_result = .{ .value = .{ .number = 116 } },
+        .expected_result = .{ .value = .{ .number = 158 } },
         .expected_ir =
         \\IR (test)
         \\  %0: [  0..6  ]                       string @0 ("a")
@@ -598,15 +600,23 @@
         \\ %45: [ 45..45 ]                       br %46, %37
         \\ %46: [ 46..47 ]                       label
         \\ %47: [ 47..47 ]                       initialize_binding @8 ("f"), %46
-        \\ %48: [ 48..49 ]                       get_binding @3 ("rest")
-        \\ %49: [ 49..51 ]                       get_property %48, @1 ("b")
-        \\ %50: [ 50..51 ]                       get_binding @4 ("x")
-        \\ %51: [ 51..53 ]                       add %49, %50
-        \\ %52: [ 52..53 ]                       get_binding @7 ("e")
-        \\ %53: [ 53..55 ]                       add %51, %52
-        \\ %54: [ 54..55 ]                       get_binding @8 ("f")
-        \\ %55: [ 55..56 ]                       add %53, %54
-        \\ %56: [ 56..56 ]                       return %55
+        \\ %48: [ 48..50 ]                       string @10 ("g")
+        \\ %49: [ 49..50 ]                       number 42
+        \\ %50: [ 50..52 ]                       object {%48: %49}
+        \\ %51: [ 51..51 ]                       to_object %50
+        \\ %52: [ 52..53 ]                       get_property %50, @10 ("g")
+        \\ %53: [ 53..53 ]                       initialize_binding @10 ("g"), %52
+        \\ %54: [ 54..55 ]                       get_binding @3 ("rest")
+        \\ %55: [ 55..57 ]                       get_property %54, @1 ("b")
+        \\ %56: [ 56..57 ]                       get_binding @4 ("x")
+        \\ %57: [ 57..59 ]                       add %55, %56
+        \\ %58: [ 58..59 ]                       get_binding @7 ("e")
+        \\ %59: [ 59..61 ]                       add %57, %58
+        \\ %60: [ 60..61 ]                       get_binding @8 ("f")
+        \\ %61: [ 61..63 ]                       add %59, %60
+        \\ %62: [ 62..63 ]                       get_binding @10 ("g")
+        \\ %63: [ 63..64 ]                       add %61, %62
+        \\ %64: [ 64..64 ]                       return %63
         \\
         ,
         .expected_bc =
@@ -671,15 +681,25 @@
         \\ 373: 00 00 00 00 00                   jump 0
         \\ 378: 40 08 00 00 00 00 00             initialize_binding @8 ("f"), r0
         \\ 385: 0b 01 00 00 00                   move r1, r0
-        \\ 390: 41 00 00 03 00 00 00             get_binding r0, @3 ("rest")
-        \\ 397: 42 01 00 00 00 01 00 00 00       get_property r1, r0, @1 ("b")
-        \\ 406: 41 00 00 04 00 00 00             get_binding r0, @4 ("x")
-        \\ 413: 24 02 00 01 00 00 00             add r2, r1, r0
-        \\ 420: 41 00 00 07 00 00 00             get_binding r0, @7 ("e")
-        \\ 427: 24 01 00 02 00 00 00             add r1, r2, r0
-        \\ 434: 41 00 00 08 00 00 00             get_binding r0, @8 ("f")
-        \\ 441: 24 02 00 01 00 00 00             add r2, r1, r0
-        \\ 448: 8f 02 00                         return r2
+        \\ 390: 09 00 00 0a 00 00 00             load_string r0, @10 ("g")
+        \\ 397: 07 01 00 2a 00 00 00             load_number_i32 r1, 42
+        \\ 404: 11 02 00                         object_create r2
+        \\ 407: 12 02 00 0a 00 00 00 01 00       object_set r2, @10 ("g"), r1
+        \\ 416: 1e 00 00 02 00                   to_object r0, r2
+        \\ 421: 42 00 00 02 00 0a 00 00 00       get_property r0, r2, @10 ("g")
+        \\ 430: 40 0a 00 00 00 00 00             initialize_binding @10 ("g"), r0
+        \\ 437: 0b 01 00 00 00                   move r1, r0
+        \\ 442: 41 00 00 03 00 00 00             get_binding r0, @3 ("rest")
+        \\ 449: 42 01 00 00 00 01 00 00 00       get_property r1, r0, @1 ("b")
+        \\ 458: 41 00 00 04 00 00 00             get_binding r0, @4 ("x")
+        \\ 465: 24 02 00 01 00 00 00             add r2, r1, r0
+        \\ 472: 41 00 00 07 00 00 00             get_binding r0, @7 ("e")
+        \\ 479: 24 01 00 02 00 00 00             add r1, r2, r0
+        \\ 486: 41 00 00 08 00 00 00             get_binding r0, @8 ("f")
+        \\ 493: 24 02 00 01 00 00 00             add r2, r1, r0
+        \\ 500: 41 00 00 0a 00 00 00             get_binding r0, @10 ("g")
+        \\ 507: 24 01 00 02 00 00 00             add r1, r2, r0
+        \\ 514: 8f 01 00                         return r1
         \\
         ,
     },
