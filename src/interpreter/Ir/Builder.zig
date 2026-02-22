@@ -1181,29 +1181,38 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
 fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.Ref {
     if (try constantFold(b.gpa, &if_stmt.test_expression)) |constant| {
         defer constant.deinit(b.gpa);
-        return if (constant.isTruthy())
+        const result = if (constant.isTruthy())
             try b.lowerStatement(if_stmt.consequent_statement)
         else if (if_stmt.alternate_statement) |stmt|
             try b.lowerStatement(stmt)
         else
-            try b.addInst(.{
-                .tag = .undefined,
-                .data = .{ .none = {} },
-            });
+            Ir.Inst.Ref.none;
+        return if (result != .none) result else try b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        });
     }
 
     const test_result = try b.lowerExpression(&if_stmt.test_expression);
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const then_label = try b.addLabel();
-    const then_result = try b.lowerStatement(if_stmt.consequent_statement);
+    const then_value = try b.lowerStatement(if_stmt.consequent_statement);
+    const then_result = if (then_value != .none) then_value else try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
     const then_br = try b.addInstDeferred(.br);
 
     const else_label = try b.addLabel();
-    const else_result = if (if_stmt.alternate_statement) |stmt|
+    const else_value = if (if_stmt.alternate_statement) |stmt|
         try b.lowerStatement(stmt)
     else
-        .none;
+        Ir.Inst.Ref.none;
+    const else_result = if (else_value != .none) else_value else try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
     const else_br = try b.addInstDeferred(.br);
 
     const end_label = try b.addLabel();
@@ -2041,10 +2050,10 @@ fn lowerReturnStatement(b: *Builder, ret_stmt: *const ast.ReturnStatement) Error
 }
 
 fn lowerWithStatement(b: *Builder, with_stmt: *const ast.WithStatement) Error!Ir.Inst.Ref {
-    const value = try b.lowerExpression(&with_stmt.expression);
+    const expr_value = try b.lowerExpression(&with_stmt.expression);
     const object = try b.addInst(.{
         .tag = .to_object,
-        .data = .{ .ref = value },
+        .data = .{ .ref = expr_value },
     });
 
     _ = try b.addInst(.{
@@ -2053,7 +2062,11 @@ fn lowerWithStatement(b: *Builder, with_stmt: *const ast.WithStatement) Error!Ir
     });
     b.scope_depth += 1;
 
-    const result = try b.lowerStatement(with_stmt.statement);
+    const value = try b.lowerStatement(with_stmt.statement);
+    const result = if (value != .none) value else try b.addInst(.{
+        .tag = .undefined,
+        .data = .{ .none = {} },
+    });
 
     _ = try b.addInst(.{
         .tag = .pop_scope,
