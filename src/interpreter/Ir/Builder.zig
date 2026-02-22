@@ -1,4 +1,3 @@
-const builtin = @import("builtin");
 const std = @import("std");
 
 const ast = @import("../../language/ast.zig");
@@ -108,7 +107,7 @@ const BreakableContext = struct {
     }
 };
 
-pub const Error = error{ OutOfMemory, NotImplemented };
+pub const Error = error{OutOfMemory};
 
 pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
     const in_strict_mode = switch (root_node) {
@@ -210,14 +209,6 @@ pub fn build(b: *Builder) Error!Ir {
     errdefer b.gpa.free(ir.live_ranges);
 
     return ir;
-}
-
-fn todo(_: *Builder, msg: []const u8) Error!noreturn {
-    switch (builtin.target.os.tag) {
-        .uefi => {},
-        else => std.debug.print("TODO: {s}\n", .{msg}),
-    }
-    return error.NotImplemented;
 }
 
 fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {

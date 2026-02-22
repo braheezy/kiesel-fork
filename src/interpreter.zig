@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const ast = @import("language/ast.zig");
 const execution = @import("execution.zig");
 const types = @import("types.zig");
@@ -13,17 +15,14 @@ pub fn compile(
     agent: *Agent,
     name: []const u8,
     ast_node: Ir.Builder.Ast,
-) Agent.Error!Bytecode {
+) std.mem.Allocator.Error!Bytecode {
     // TODO: Don't use the GC allocator for IR generation
     const gpa = agent.gc_allocator;
 
     var ir = ir: {
         var builder: Ir.Builder = .init(gpa, name, ast_node);
         defer builder.deinit();
-        break :ir builder.build() catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.NotImplemented => return agent.throwException(.internal_error, "IR generation failed", .{}),
-        };
+        break :ir try builder.build();
     };
     defer ir.deinit(gpa);
 
