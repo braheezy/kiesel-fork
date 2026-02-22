@@ -2969,7 +2969,11 @@ fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
 }
 
 fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpressionLiteral) Error!Ir.Inst.Ref {
-    const pattern_index = try b.internString(regexp_lit.pattern);
+    // NOTE: The VM processes escape sequences when converting from UTF-8 to ASCII/UTF-16,
+    //       so for pattern strings we need to escape backslashes before interning.
+    const pattern_escaped = try std.mem.replaceOwned(u8, b.gpa, regexp_lit.pattern, "\\", "\\\\");
+    defer b.gpa.free(pattern_escaped);
+    const pattern_index = try b.internString(pattern_escaped);
     const flags_index = try b.internString(regexp_lit.flags);
     return b.addInst(.{
         .tag = .reg_exp,
