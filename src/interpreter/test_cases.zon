@@ -520,7 +520,7 @@
         \\ 208: 0c 07 00 00 00 00 00             array_create r7, 0
         \\ 215: 0d 07 00 02 00                   array_push r7, r2
         \\ 220: 0d 07 00 03 00                   array_push r7, r3
-        \\ 225: 10 07 00 06 00                   array_spread r7, r6
+        \\ 225: 10 07 00 04 00                   array_spread r7, r4
         \\ 230: 0d 07 00 05 00                   array_push r7, r5
         \\ 235: 79 06 00 01 00 00 00 07 00       call_property r6, r1, r0, r7
         \\ 244: 8f 06 00                         return r6

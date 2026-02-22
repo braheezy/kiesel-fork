@@ -572,23 +572,18 @@ fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest: Bytecode.Ins
         .data = .{ .reg_u32 = .{ dest, 0 } },
     });
     for (args) |arg| {
-        if (arg.toIndex()) |arg_index| {
-            if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
-                const spread_ref = b.ir.instructions.items(.data)[@intFromEnum(arg_index)].ref;
-                const spread_reg = b.resolve(spread_ref);
-                try b.emit(.{
-                    .tag = .array_spread,
-                    .data = .{ .reg_reg = .{
-                        dest,
-                        spread_reg,
-                    } },
-                });
-                continue;
+        const tag: Bytecode.Inst.Tag = blk: {
+            if (arg.toIndex()) |arg_index| {
+                if (b.ir.instructions.items(.tag)[@intFromEnum(arg_index)] == .spread) {
+                    break :blk .array_spread;
+                }
             }
-        }
+            break :blk .array_push;
+        };
+        // `lowerSpread()` will move the ref into dest, so we use the same register here.
         const arg_reg = b.resolve(arg);
         try b.emit(.{
-            .tag = .array_push,
+            .tag = tag,
             .data = .{ .reg_reg = .{
                 dest,
                 arg_reg,
