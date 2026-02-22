@@ -950,6 +950,9 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     defer lex_declarations.deinit(b.gpa);
     try function_body.collectLexicallyScopedDeclarations(b.gpa, &lex_declarations);
 
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
+    defer bound_names.deinit(b.gpa);
+
     // 35. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
@@ -957,8 +960,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    instantiated here but not initialized.
 
         // b. For each element dn of the BoundNames of d, do
-        var bound_names: std.ArrayList(ast.Identifier) = .empty;
-        defer bound_names.deinit(b.gpa);
+        bound_names.clearRetainingCapacity();
         try declaration.collectBoundNames(b.gpa, &bound_names);
 
         for (bound_names.items) |name| {
@@ -1842,6 +1844,40 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
 fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     const discriminant = try b.lowerExpression(&switch_stmt.expression);
 
+    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lex_declarations.deinit(b.gpa);
+    try switch_stmt.case_block.collectLexicallyScopedDeclarations(b.gpa, &lex_declarations);
+
+    const has_scope = lex_declarations.items.len > 0;
+
+    if (has_scope) {
+        _ = try b.addInst(.{
+            .tag = .push_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth += 1;
+
+        var bound_names: std.ArrayList(ast.Identifier) = .empty;
+        defer bound_names.deinit(b.gpa);
+
+        for (lex_declarations.items) |declaration| {
+            const tag: Ir.Inst.Tag = if (declaration.isConstantDeclaration())
+                .create_immutable_binding
+            else
+                .create_mutable_binding;
+
+            bound_names.clearRetainingCapacity();
+            try declaration.collectBoundNames(b.gpa, &bound_names);
+            for (bound_names.items) |name| {
+                const string_index = try b.internString(name);
+                _ = try b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .string = string_index },
+                });
+            }
+        }
+    }
+
     const undefined_ref = try b.addInst(.{
         .tag = .undefined,
         .data = .{ .none = {} },
@@ -1904,7 +1940,16 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
     }
 
     const exit_br = try b.addInstDeferred(.br);
+
     const end_label = try b.addLabel();
+
+    if (has_scope) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
 
     breakable_ctx.setDeferredBreaks(end_label);
 
@@ -2163,8 +2208,8 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
             var bound_names: std.ArrayList(ast.Identifier) = .empty;
             defer bound_names.deinit(b.gpa);
             try catch_parameter.collectBoundNames(b.gpa, &bound_names);
-            for (bound_names.items) |bound_name| {
-                const string_index = try b.internString(bound_name);
+            for (bound_names.items) |name| {
+                const string_index = try b.internString(name);
                 _ = try b.addInst(.{
                     .tag = .create_mutable_binding,
                     .data = .{ .string = string_index },
