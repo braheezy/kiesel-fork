@@ -1713,6 +1713,13 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     });
                 },
             },
+            .call_expression => |*call_expr| {
+                _ = try b.lowerCallExpression(call_expr);
+                _ = try b.addInst(.{
+                    .tag = .throw_reference_error,
+                    .data = .{ .none = {} },
+                });
+            },
             else => unreachable,
         },
         .for_binding => |for_binding| switch (for_binding) {
@@ -3504,13 +3511,6 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                 },
             }
         },
-        .call_expression => |*call_expr| {
-            _ = try b.lowerCallExpression(call_expr);
-            return b.addInst(.{
-                .tag = .throw_reference_error,
-                .data = .{ .none = {} },
-            });
-        },
         .super_property => |super_prop| switch (super_prop) {
             .identifier => |identifier| {
                 const string_index = try b.internString(identifier);
@@ -3592,6 +3592,13 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                 });
                 return if (update_expr.type == .prefix) new_value else to_numeric;
             },
+        },
+        .call_expression => |*call_expr| {
+            _ = try b.lowerCallExpression(call_expr);
+            return b.addInst(.{
+                .tag = .throw_reference_error,
+                .data = .{ .none = {} },
+            });
         },
         else => unreachable,
     }

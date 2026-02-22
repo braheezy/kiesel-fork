@@ -1685,4 +1685,25 @@
         .expected_ir = null,
         .expected_bc = null,
     },
+
+    // Call expression LHS
+    .{
+        .source =
+        \\var calls = 0;
+        \\var caught = 0;
+        \\function foo() { calls += 1; }
+        \\
+        \\try { foo() = 1; } catch { caught += 1; }
+        \\try { foo() += 1; } catch { caught += 1; }
+        \\try { foo()++; } catch { caught += 1; }
+        \\try { ++foo(); } catch { caught += 1; }
+        \\try { for (foo() in {a: 1}); } catch { caught += 1; }
+        \\
+        \\calls * 10 + caught;
+        \\
+        ,
+        .expected_result = .{ .value = .{ .number = 55 } },
+        .expected_ir = null,
+        .expected_bc = null,
+    },
 }
