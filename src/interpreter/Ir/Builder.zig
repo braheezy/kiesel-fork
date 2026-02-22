@@ -1494,6 +1494,9 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     const continue_br = try b.addInstDeferred(.br);
 
     const exit_label = try b.addLabel();
+    const exit_br = try b.addInstDeferred(.br);
+
+    const end_label = try b.addLabel();
 
     if (has_scope) {
         _ = try b.addInst(.{
@@ -1502,10 +1505,6 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
         });
         b.scope_depth -= 1;
     }
-
-    const exit_br = try b.addInstDeferred(.br);
-
-    const end_label = try b.addLabel();
 
     breakable_ctx.setDeferredContinues(continue_label);
     breakable_ctx.setDeferredBreaks(end_label);
