@@ -1143,19 +1143,15 @@ fn lowerBlock(b: *Builder, block: *const ast.Block, breakable_ctx: ?*BreakableCo
 }
 
 fn lowerVariableStatement(b: *Builder, var_stmt: *const ast.VariableStatement) Error!Ir.Inst.Ref {
-    var last: Ir.Inst.Ref = .none;
     for (var_stmt.variable_declaration_list.items) |*var_decl| {
-        const result = try b.lowerVariableDeclaration(var_decl);
-        if (result != .none) {
-            last = result;
-        }
+        _ = try b.lowerVariableDeclaration(var_decl);
     }
-    return last;
+    return .none;
 }
 
 fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaration) Error!Ir.Inst.Ref {
     // GlobalDeclarationInstantiation is responsible for creating the bindings and initializing them to undefined.
-    return switch (var_decl.*) {
+    switch (var_decl.*) {
         .binding_identifier => |binding| {
             if (binding.initializer) |*init_expr| {
                 const value = try b.lowerExpression(init_expr);
@@ -1163,7 +1159,7 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
                 if (init_expr.isAnonymousFunctionDefinition()) {
                     b.setAnonymousFunctionName(value, string_index);
                 }
-                return b.addInst(.{
+                _ = try b.addInst(.{
                     .tag = .set_binding,
                     .data = .{ .set_binding = .{
                         .name = string_index,
@@ -1171,13 +1167,13 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
                     } },
                 });
             }
-            return .none;
         },
         .binding_pattern => |pattern| {
             const value = try b.lowerExpression(&pattern.initializer);
-            return b.lowerDestructuringAssignment(&pattern.binding_pattern, value, .set);
+            _ = try b.lowerDestructuringAssignment(&pattern.binding_pattern, value, .set);
         },
-    };
+    }
+    return .none;
 }
 
 fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.Ref {

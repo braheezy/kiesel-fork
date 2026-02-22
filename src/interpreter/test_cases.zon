@@ -226,6 +226,15 @@
     // Variable statements
     .{
         .source =
+        \\var x = 1;
+        \\
+        ,
+        .expected_result = .{ .value = null },
+        .expected_ir = null,
+        .expected_bc = null,
+    },
+    .{
+        .source =
         \\var x = 10, y = 20;
         \\x + y;
         \\
