@@ -399,7 +399,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             }
         }
 
-        pub fn compile(self: *@This(), agent: *Agent) Agent.Error!*const interpreter.Bytecode {
+        pub fn compile(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*const interpreter.Bytecode {
             if (self.cached_bytecode) |bc| return bc;
 
             const function: *ECMAScriptFunction = @fieldParentPtr("fields", self);

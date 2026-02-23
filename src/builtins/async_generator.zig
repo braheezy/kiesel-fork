@@ -389,10 +389,7 @@ pub fn asyncGeneratorStart(
                         }
                     };
                 } else blk: {
-                    const bc = generator_function_.fields.compile(agent_) catch |err| switch (err) {
-                        error.OutOfMemory => return error.OutOfMemory,
-                        error.ExceptionThrown => unreachable,
-                    };
+                    const bc = try generator_function_.fields.compile(agent_);
                     const args = closure_generator.fields.evaluation_state.initial_args.?;
                     try vm.pushCallFrame(bc, args);
                     agent_.gc_allocator.free(args);
