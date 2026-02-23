@@ -1044,6 +1044,104 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 38. Return unused.
 }
 
+/// 14.2.3 BlockDeclarationInstantiation ( code, env )
+/// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
+fn lowerBlockDeclarationInstantiation(
+    b: *Builder,
+    ast_node: union(enum) {
+        block: *const ast.Block,
+        case_block: *const ast.CaseBlock,
+    },
+) Error!void {
+    // 1. Let declarations be the LexicallyScopedDeclarations of code.
+    var declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer declarations.deinit(b.gpa);
+    switch (ast_node) {
+        .block => |block| try block.statement_list.collectLexicallyScopedDeclarations(b.gpa, &declarations),
+        .case_block => |case_block| try case_block.collectLexicallyScopedDeclarations(b.gpa, &declarations),
+    }
+
+    // 2. Let privateEnv be the running execution context's PrivateEnvironment.
+
+    var bound_names: std.ArrayList(ast.Identifier) = .empty;
+    defer bound_names.deinit(b.gpa);
+
+    // 3. For each element d of declarations, do
+    for (declarations.items) |declaration| {
+        // a. For each element dn of the BoundNames of d, do
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(b.gpa, &bound_names);
+        for (bound_names.items) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            //     1. Perform ! env.CreateImmutableBinding(dn, true).
+            // ii. Else,
+            //     1. If the host is a web browser or otherwise supports Block-Level Function
+            //        Declarations Web Legacy Compatibility Semantics, then
+            //        [...]
+            //     2. Else,
+            //         a. Perform ! env.CreateMutableBinding(dn, false).
+            const tag: Ir.Inst.Tag = if (declaration.isConstantDeclaration())
+                .create_immutable_binding
+            else
+                .create_mutable_binding;
+            const string_index = try b.internString(name);
+            _ = try b.addInst(.{
+                .tag = tag,
+                .data = .{ .string = string_index },
+            });
+        }
+
+        // b. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
+        //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
+        if (declaration == .hoistable_declaration) {
+            const hoistable_declaration = declaration.hoistable_declaration;
+
+            // i. Let fn be the sole element of the BoundNames of d.
+            const function_name = switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier.?,
+            };
+
+            // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
+            // iii. If the host is a web browser or otherwise supports Block-Level Function
+            //      Declarations Web Legacy Compatibility Semantics, then
+            //      [...]
+            // iv. Else,
+            //     1. Perform ! env.InitializeBinding(fn, fo).
+            const source_text = switch (hoistable_declaration) {
+                inline else => |function_declaration| try b.internString(function_declaration.source_text),
+            };
+            const string_index = try b.internString(function_name);
+            const function_index = switch (hoistable_declaration) {
+                inline else => |function_declaration, tag_name| try b.addFunction(.{
+                    .source_text = source_text,
+                    .name = .{ .identifier = string_index },
+                    .parameters = function_declaration.formal_parameters,
+                    .body = function_declaration.function_body,
+                    .kind = switch (tag_name) {
+                        .function_declaration => .normal,
+                        .generator_declaration => .generator,
+                        .async_function_declaration => .async,
+                        .async_generator_declaration => .async_generator,
+                    },
+                }),
+            };
+            const function_ref = try b.addInst(.{
+                .tag = .create_function,
+                .data = .{ .create_function = function_index },
+            });
+            _ = try b.addInst(.{
+                .tag = .initialize_binding,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = function_ref,
+                } },
+            });
+        }
+    }
+
+    // 4. Return unused.
+}
+
 fn lowerStatementList(b: *Builder, stmt_list: *const ast.StatementList) Error!Ir.Inst.Ref {
     var last: Ir.Inst.Ref = .none;
     for (stmt_list.items) |item| {
@@ -1099,43 +1197,7 @@ fn lowerBlock(b: *Builder, block: *const ast.Block, breakable_ctx: ?*BreakableCo
             .data = .{ .none = {} },
         });
         b.scope_depth += 1;
-
-        for (stmt_list.items) |item| {
-            const lex_decl = switch (item) {
-                .declaration => |decl| switch (decl.*) {
-                    .lexical_declaration => |*lex_decl| lex_decl,
-                    else => continue,
-                },
-                .statement => continue,
-            };
-            const tag: Ir.Inst.Tag = if (lex_decl.isConstantDeclaration())
-                .create_immutable_binding
-            else
-                .create_mutable_binding;
-            for (lex_decl.binding_list.items) |lex_binding| {
-                switch (lex_binding) {
-                    .binding_identifier => |binding| {
-                        const string_index = try b.internString(binding.binding_identifier);
-                        _ = try b.addInst(.{
-                            .tag = tag,
-                            .data = .{ .string = string_index },
-                        });
-                    },
-                    .binding_pattern => |pattern| {
-                        var bound_names: std.ArrayList(ast.Identifier) = .empty;
-                        defer bound_names.deinit(b.gpa);
-                        try pattern.binding_pattern.collectBoundNames(b.gpa, &bound_names);
-                        for (bound_names.items) |name| {
-                            const string_index = try b.internString(name);
-                            _ = try b.addInst(.{
-                                .tag = tag,
-                                .data = .{ .string = string_index },
-                            });
-                        }
-                    },
-                }
-            }
-        }
+        try b.lowerBlockDeclarationInstantiation(.{ .block = block });
     }
 
     const result = if (breakable_ctx) |ctx| blk: {
@@ -1878,26 +1940,7 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
             .data = .{ .none = {} },
         });
         b.scope_depth += 1;
-
-        var bound_names: std.ArrayList(ast.Identifier) = .empty;
-        defer bound_names.deinit(b.gpa);
-
-        for (lex_declarations.items) |declaration| {
-            const tag: Ir.Inst.Tag = if (declaration.isConstantDeclaration())
-                .create_immutable_binding
-            else
-                .create_mutable_binding;
-
-            bound_names.clearRetainingCapacity();
-            try declaration.collectBoundNames(b.gpa, &bound_names);
-            for (bound_names.items) |name| {
-                const string_index = try b.internString(name);
-                _ = try b.addInst(.{
-                    .tag = tag,
-                    .data = .{ .string = string_index },
-                });
-            }
-        }
+        try b.lowerBlockDeclarationInstantiation(.{ .case_block = &switch_stmt.case_block });
     }
 
     const undefined_ref = try b.addInst(.{
