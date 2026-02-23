@@ -1555,6 +1555,8 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     var skip_br_cond: Deferred = undefined;
     var skip_condition: Ir.Inst.Ref = .none;
     var setup_label: Ir.Inst.Ref = undefined;
+    var skip_label: Ir.Inst.Ref = .none;
+    var skip_br: Deferred = undefined;
 
     if (for_in_of_stmt.type == .in) {
         const null_ref = try b.addInst(.{
@@ -1816,6 +1818,11 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     const exit_label = try b.addLabel();
     const exit_br = try b.addInstDeferred(.br);
 
+    if (for_in_of_stmt.type == .in) {
+        skip_label = try b.addLabel();
+        skip_br = try b.addInstDeferred(.br);
+    }
+
     const end_label = try b.addLabel();
 
     breakable_ctx.setDeferredContinues(test_label);
@@ -1824,8 +1831,12 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     if (for_in_of_stmt.type == .in) {
         skip_br_cond.set(.{ .br_cond = .{
             .condition = skip_condition,
-            .then_target = end_label,
+            .then_target = skip_label,
             .else_target = setup_label,
+        } });
+        skip_br.set(.{ .br = .{
+            .target = end_label,
+            .value = undefined_ref,
         } });
     }
     entry_br.set(.{ .br = .{
