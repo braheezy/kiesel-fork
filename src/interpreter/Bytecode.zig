@@ -95,6 +95,7 @@ pub const Inst = struct {
         object_set_getter_computed,
         object_set_setter,
         object_set_setter_computed,
+        object_set_prototype,
         object_spread,
 
         reg_exp_create,
@@ -311,6 +312,7 @@ pub const Inst = struct {
             .object_set_getter_computed = .reg_reg_reg,
             .object_set_setter = .reg_string_reg,
             .object_set_setter_computed = .reg_reg_reg,
+            .object_set_prototype = .reg_reg,
             .object_spread = .reg_reg,
             .reg_exp_create = .reg_string_string,
             .resolve_this_binding = .reg,

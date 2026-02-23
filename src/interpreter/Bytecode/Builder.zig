@@ -759,10 +759,13 @@ fn lowerObject(b: *Builder, data: Ir.Inst.Object, dest: Bytecode.Inst.Reg) Error
 
         const value_reg = b.resolve(value_ref);
 
-        if (value_inst.tag == .spread) {
-            std.debug.assert(key_ref == .none);
+        if (key_ref == .none) {
+            const tag: Bytecode.Inst.Tag = if (value_inst.tag == .spread)
+                .object_spread
+            else
+                .object_set_prototype;
             try b.emit(.{
-                .tag = .object_spread,
+                .tag = tag,
                 .data = .{ .reg_reg = .{
                     dest,
                     value_reg,

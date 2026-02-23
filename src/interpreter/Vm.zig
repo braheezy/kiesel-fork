@@ -183,6 +183,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .object_set_getter_computed => vm.executeObjectSetGetterComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .object_set_setter => vm.executeObjectSetSetter(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_setter_computed => vm.executeObjectSetSetterComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .object_set_prototype => vm.executeObjectSetPrototype(data.reg_reg[0], data.reg_reg[1]),
                 .object_spread => vm.executeObjectSpread(data.reg_reg[0], data.reg_reg[1]),
                 .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
@@ -628,6 +629,20 @@ fn executeObjectSetSetterComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_re
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
+}
+
+fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+    const object = vm.store(object_reg).asObject();
+    const prototype_value = vm.store(value_reg);
+
+    if (prototype_value.isObject() or prototype_value.isNull()) {
+        const prototype = if (prototype_value.isObject()) prototype_value.asObject() else null;
+        _ = object.internal_methods.setPrototypeOf(
+            vm.agent,
+            object,
+            prototype,
+        ) catch |err| try noexcept(err);
+    }
 }
 
 fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {

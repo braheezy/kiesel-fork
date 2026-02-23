@@ -2953,7 +2953,10 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                 };
                 try pairs.appendSlice(b.gpa, &.{ key_ref, method_ref });
             },
-            .property_name_and_expression => |*prop| {
+            .property_name_and_expression => |*prop| if (try prop.property_name.isProtoSetter(b.gpa)) {
+                const value_ref = try b.lowerExpression(&prop.expression);
+                try pairs.appendSlice(b.gpa, &.{ .none, value_ref });
+            } else {
                 const key_ref = try b.lowerPropertyName(&prop.property_name);
                 const value_ref = try b.lowerExpression(&prop.expression);
                 if (prop.property_name == .literal_property_name and
@@ -2963,8 +2966,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     const string_index = try b.internString(prop.property_name.literal_property_name.identifier);
                     b.setAnonymousFunctionName(value_ref, string_index);
                 }
-                try pairs.append(b.gpa, key_ref);
-                try pairs.append(b.gpa, value_ref);
+                try pairs.appendSlice(b.gpa, &.{ key_ref, value_ref });
             },
         }
     }
