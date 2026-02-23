@@ -358,7 +358,7 @@ pub fn @"resume"(
     callee_bytecode: *const Bytecode,
     suspension: GeneratorSuspension,
 ) Agent.Error!RunResult {
-    const constants = vm.constants_cache.get(callee_bytecode).?;
+    const constants = try vm.ensureConstants(callee_bytecode);
 
     const regs_len = suspension.regs_len;
     const arguments_len = suspension.arguments_len;
@@ -379,29 +379,33 @@ pub fn @"resume"(
     return vm.run(.{ .start_pc = suspension.saved_pc });
 }
 
-pub fn pushCallFrame(
-    vm: *Vm,
-    callee_bytecode: *const Bytecode,
-    args: []const Value,
-) std.mem.Allocator.Error!void {
-    const constants_gop = try vm.constants_cache.getOrPut(vm.agent.gc_allocator, callee_bytecode);
+fn ensureConstants(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.Error!Constants {
+    const constants_gop = try vm.constants_cache.getOrPut(vm.agent.gc_allocator, bytecode);
     if (!constants_gop.found_existing) {
-        const total_len = callee_bytecode.strings.len + callee_bytecode.big_ints.len;
+        const total_len = bytecode.strings.len + bytecode.big_ints.len;
         const Ptr = @typeInfo(Constants).pointer.child;
         const constants = try vm.agent.gc_allocator.alloc(Ptr, total_len);
         errdefer vm.agent.gc_allocator.free(constants);
 
-        for (callee_bytecode.strings, constants[0..callee_bytecode.strings.len]) |utf8, *slot| {
+        for (bytecode.strings, constants[0..bytecode.strings.len]) |utf8, *slot| {
             slot.* = @ptrCast(try stringValueImpl(vm.agent.gc_allocator, utf8));
         }
-        for (callee_bytecode.big_ints, constants[callee_bytecode.strings.len..]) |@"const", *slot| {
+        for (bytecode.big_ints, constants[bytecode.strings.len..]) |@"const", *slot| {
             const managed = try @"const".toManaged(vm.agent.gc_allocator);
             slot.* = @ptrCast(@alignCast(try BigInt.fromManaged(vm.agent, managed)));
         }
 
         constants_gop.value_ptr.* = constants;
     }
-    const constants = constants_gop.value_ptr.*;
+    return constants_gop.value_ptr.*;
+}
+
+pub fn pushCallFrame(
+    vm: *Vm,
+    callee_bytecode: *const Bytecode,
+    args: []const Value,
+) std.mem.Allocator.Error!void {
+    const constants = try vm.ensureConstants(callee_bytecode);
     const regs_len = callee_bytecode.num_regs;
     const arguments_len: u16 = @intCast(args.len);
 
