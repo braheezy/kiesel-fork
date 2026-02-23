@@ -7,6 +7,7 @@ const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -182,7 +183,16 @@ pub fn asyncBlockStart(
                 .ecmascript_function => |ef| blk: {
                     if (agent_.options.new_interpreter) {
                         const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
-                        const vm = agent_.active_vm.?;
+                        var temp_vm: ?interpreter.Vm = null;
+                        defer if (temp_vm) |*vm_| vm_.deinit();
+
+                        const vm = agent_.active_vm orelse vm: {
+                            // Create a temporary VM if none is active. This happens when draining
+                            // the job queue for example.
+                            temp_vm = interpreter.Vm.init(agent_, bc) catch |err| break :blk @as(Agent.Error!Completion, err);
+                            break :vm &temp_vm.?;
+                        };
+
                         vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
                         const result = vm.run(.{}) catch |err| {
                             vm.popCallFrame();
