@@ -1998,21 +1998,22 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
 }
 
 fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) Error!Ir.Inst.Ref {
-    const ctx = b.findBreakableContext(cont_stmt.label);
-    const value = ctx.result_ref;
+    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const target_ctx = b.findBreakableContext(cont_stmt.label);
+    const value = current_ctx.result_ref;
 
     var it = std.mem.reverseIterator(b.breakable_stack.items);
-    while (it.next()) |c| {
-        if (c == ctx) break;
-        if (c.iterator_ref != .none) {
+    while (it.next()) |ctx| {
+        if (ctx == target_ctx) break;
+        if (ctx.iterator_ref != .none) {
             _ = try b.addInst(.{
                 .tag = .iterator_close,
-                .data = .{ .ref = c.iterator_ref },
+                .data = .{ .ref = ctx.iterator_ref },
             });
         }
     }
 
-    const scope_pops = b.scope_depth - ctx.scope_depth;
+    const scope_pops = b.scope_depth - target_ctx.scope_depth;
     for (0..scope_pops) |_| {
         _ = try b.addInst(.{
             .tag = .pop_scope,
@@ -2020,7 +2021,7 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
         });
     }
 
-    switch (ctx.continue_target) {
+    switch (target_ctx.continue_target) {
         .known => |target| {
             _ = try b.addInst(.{
                 .tag = .br,
@@ -2042,21 +2043,22 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
 }
 
 fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
-    const ctx = b.findBreakableContext(brk_stmt.label);
-    const value = ctx.result_ref;
+    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const target_ctx = b.findBreakableContext(brk_stmt.label);
+    const value = current_ctx.result_ref;
 
     var it = std.mem.reverseIterator(b.breakable_stack.items);
-    while (it.next()) |c| {
-        if (c.iterator_ref != .none) {
+    while (it.next()) |ctx| {
+        if (ctx.iterator_ref != .none) {
             _ = try b.addInst(.{
                 .tag = .iterator_close,
-                .data = .{ .ref = c.iterator_ref },
+                .data = .{ .ref = ctx.iterator_ref },
             });
         }
-        if (c == ctx) break;
+        if (ctx == target_ctx) break;
     }
 
-    const scope_pops = b.scope_depth - ctx.scope_depth;
+    const scope_pops = b.scope_depth - target_ctx.scope_depth;
     for (0..scope_pops) |_| {
         _ = try b.addInst(.{
             .tag = .pop_scope,
@@ -2064,7 +2066,7 @@ fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!I
         });
     }
 
-    switch (ctx.break_target) {
+    switch (target_ctx.break_target) {
         .known => |target| {
             _ = try b.addInst(.{
                 .tag = .br,
