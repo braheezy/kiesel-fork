@@ -1,6 +1,9 @@
 const std = @import("std");
 
 const ast = @import("../../language/ast.zig");
+const types = @import("../../types.zig");
+
+const Number = types.Number;
 
 pub const Constant = union(enum) {
     undefined,
@@ -119,10 +122,7 @@ fn constantFoldUnaryExpression(
             .@"~" => switch (operand) {
                 .undefined, .null => return .{ .number = -1 },
                 .boolean => |b| return .{ .number = if (b) -2 else -1 },
-                .number => |n| {
-                    const i: i32 = @intFromFloat(@trunc(n));
-                    return .{ .number = @floatFromInt(~i) };
-                },
+                .number => |n| return .{ .number = Number.from(n).bitwiseNOT().asFloat() },
                 else => {},
             },
             .void => return .undefined,
