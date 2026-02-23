@@ -451,7 +451,20 @@ fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration
         .variable_statement => |*var_stmt| return b.lowerVariableStatement(var_stmt),
         .declaration => |decl| return b.lowerDeclaration(decl),
         .default_hoistable_declaration => return .none, // Handled by InitializeEnvironment
-        .default_class_declaration => |*class_decl| return b.lowerClassDeclaration(class_decl),
+        .default_class_declaration => |*class_decl| {
+            const value = try b.lowerClassDeclaration(class_decl);
+            if (class_decl.identifier == null) {
+                const string_index = try b.internString("*default*");
+                _ = try b.addInst(.{
+                    .tag = .initialize_binding,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = value,
+                    } },
+                });
+            }
+            return .none;
+        },
         .default_expression => |*expr| {
             const value = try b.lowerExpression(expr);
             const string_index = try b.internString("*default*");
