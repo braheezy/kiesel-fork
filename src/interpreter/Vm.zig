@@ -154,7 +154,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
 
     loop: switch (Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..])) {
         inline else => |tag| {
-            @setEvalBranchQuota(2_000);
+            @setEvalBranchQuota(3_000);
             const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
             const inst_size = comptime Bytecode.Inst.encodedSize(tag);
             pc = pc.offsetBy(inst_size);
@@ -321,6 +321,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .set_super_property_computed => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], false),
                 .set_super_property_computed_strict => vm.executeSetSuperPropertyComputed(data.reg_reg[0], data.reg_reg[1], true),
                 .create_private_element => vm.executeCreatePrivateElement(data.reg_string[0], data.reg_string[1]),
+                .resolve_private_element => vm.executeResolvePrivateElement(data.reg_string[0], data.reg_string[1]),
                 .push_private_scope => vm.executePushPrivateScope(),
                 .pop_private_scope => vm.executePopPrivateScope(),
                 .get_private_element => vm.executeGetPrivateElement(data.reg_reg_string[0], data.reg_reg_string[1], data.reg_reg_string[2]),
@@ -2300,6 +2301,16 @@ fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Byt
     const private_name = try PrivateName.init(vm.agent.gc_allocator, name);
 
     try private_env.names.putNoClobber(vm.agent.gc_allocator, name_utf8, private_name);
+    vm.load(dest, Value.from(private_name.symbol));
+}
+
+fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+    const name = vm.getString(name_index);
+    const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
+    defer vm.agent.gc_allocator.free(name_utf8);
+
+    const private_environment = vm.agent.runningExecutionContext().ecmascript_code.private_environment.?;
+    const private_name = private_environment.resolvePrivateIdentifier(name_utf8);
     vm.load(dest, Value.from(private_name.symbol));
 }
 

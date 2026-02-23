@@ -3813,7 +3813,7 @@ fn lowerRelationalExpression(b: *Builder, rel_expr: *const ast.RelationalExpress
         .private_identifier => |private_identifier| {
             const string_index = try b.internString(private_identifier);
             const name = try b.addInst(.{
-                .tag = .create_private_element,
+                .tag = .resolve_private_element,
                 .data = .{ .string = string_index },
             });
             const rhs = try b.lowerExpression(rel_expr.rhs_expression);

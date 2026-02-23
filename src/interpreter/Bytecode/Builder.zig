@@ -223,6 +223,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .set_super_property_computed => try b.lowerSetSuperPropertyComputed(data.set_property_computed, false, dest),
             .set_super_property_computed_strict => try b.lowerSetSuperPropertyComputed(data.set_property_computed, true, dest),
             .create_private_element => try b.lowerCreatePrivateElement(data.string, dest),
+            .resolve_private_element => try b.lowerResolvePrivateElement(data.string, dest),
             .push_private_scope => try b.lowerPushPrivateScope(),
             .pop_private_scope => try b.lowerPopPrivateScope(),
             .get_private_element => try b.lowerGetPrivateElement(data.get_property, dest),
@@ -1848,6 +1849,16 @@ fn lowerPopPrivateScope(b: *Builder) Error!void {
 fn lowerCreatePrivateElement(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{
         .tag = .create_private_element,
+        .data = .{ .reg_string = .{
+            dest,
+            @enumFromInt(@intFromEnum(string_index)),
+        } },
+    });
+}
+
+fn lowerResolvePrivateElement(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .resolve_private_element,
         .data = .{ .reg_string = .{
             dest,
             @enumFromInt(@intFromEnum(string_index)),
