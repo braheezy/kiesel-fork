@@ -395,10 +395,10 @@ pub fn asyncGeneratorStart(
                     };
                     const args = closure_generator.fields.evaluation_state.initial_args.?;
                     try vm.pushCallFrame(bc, args);
-                    errdefer vm.popCallFrame();
                     agent_.gc_allocator.free(args);
                     closure_generator.fields.evaluation_state.initial_args = null;
                     break :blk vm.run(.{}) catch |err| {
+                        vm.popCallFrame();
                         _ = agent_.execution_context_stack.pop().?;
                         closure_generator.fields.async_generator_state = .draining_queue;
                         closure_generator.fields.evaluation_state = undefined;

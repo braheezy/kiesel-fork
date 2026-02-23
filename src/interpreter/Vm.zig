@@ -143,6 +143,11 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
     vm.agent.active_vm = vm;
     defer vm.agent.active_vm = previous_vm;
 
+    // Caching the bytecode slice below depends on the call stack depth remaining the same within
+    // one `run()` call, so we maintain the invariant that nested calls need their own `run()` call
+    // and must not leave call frames behind. This is asserted after each instruction.
+    const initial_call_stack_depth = vm.call_stack.items.len;
+
     const frame = vm.currentCallFrame();
     var code = frame.bytecode.code;
     var pc = options.start_pc;
@@ -324,6 +329,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .import_call => vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_import_meta => vm.executeGetImportMeta(data.reg),
             };
+            std.debug.assert(vm.call_stack.items.len == initial_call_stack_depth);
             switch (@typeInfo(@TypeOf(maybe_error))) {
                 .void => {},
                 .error_union => |u| {
