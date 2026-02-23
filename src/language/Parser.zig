@@ -3399,6 +3399,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
         // We need to do this after consuming the '(' token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - (comptime "(".len);
         formal_parameters = try self.acceptFormalParameters();
+        formal_parameters.arguments_object_needed = false;
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
     if (self.followedByLineTerminator()) {
@@ -3406,7 +3407,8 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
-        const function_body = try self.acceptFunctionBody(.normal);
+        var function_body = try self.acceptFunctionBody(.normal);
+        function_body.arguments_object_needed = false;
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
@@ -4316,6 +4318,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     } else |_| {
         _ = try self.core.accept(RuleSet.is(.@"("));
         formal_parameters = try self.acceptFormalParameters();
+        formal_parameters.arguments_object_needed = false;
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
     _ = self.core.accept(RuleSet.is(.@"=>")) catch |err| {
@@ -4328,7 +4331,8 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
-        const function_body = try self.acceptFunctionBody(.async);
+        var function_body = try self.acceptFunctionBody(.async);
+        function_body.arguments_object_needed = false;
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {

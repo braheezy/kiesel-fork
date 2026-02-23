@@ -408,6 +408,13 @@ pub const ECMAScriptFunction = MakeObject(.{
             const name = try name_value.asString().toUtf8(agent.gc_allocator);
             defer agent.gc_allocator.free(name);
 
+            if (function.fields.this_mode == .lexical) {
+                // FDI IR lowering does not have [[ThisMode]] information and instead relies on the
+                // parser setting these.
+                std.debug.assert(!self.formal_parameters.arguments_object_needed);
+                std.debug.assert(!self.ecmascript_code.arguments_object_needed);
+            }
+
             const bc = try agent.gc_allocator.create(interpreter.Bytecode);
             errdefer agent.gc_allocator.destroy(bc);
             bc.* = try interpreter.compile(agent, name, .{
