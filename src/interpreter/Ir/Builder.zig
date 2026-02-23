@@ -2534,7 +2534,7 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
                     const value = try b.lowerDefaultExpression(next_value, default_expr, anonymous_function_name);
                     const tag: Ir.Inst.Tag = switch (binding_op) {
                         .initialize => .initialize_binding,
-                        .set => .set_binding,
+                        .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
                     };
                     last_ref = try b.addInst(.{
                         .tag = tag,
@@ -2561,7 +2561,7 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
                     const string_index = try b.internString(identifier);
                     const tag: Ir.Inst.Tag = switch (binding_op) {
                         .initialize => .initialize_binding,
-                        .set => .set_binding,
+                        .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
                     };
                     last_ref = try b.addInst(.{
                         .tag = tag,
@@ -2629,7 +2629,7 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
                 const value = try b.lowerDefaultExpression(prop_value, default_expr, anonymous_function_name);
                 const tag: Ir.Inst.Tag = switch (binding_op) {
                     .initialize => .initialize_binding,
-                    .set => .set_binding,
+                    .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
                 };
                 last_ref = try b.addInst(.{
                     .tag = tag,
@@ -2658,7 +2658,7 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
                         const value = try b.lowerDefaultExpression(prop_value, default_expr, anonymous_function_name);
                         const tag: Ir.Inst.Tag = switch (binding_op) {
                             .initialize => .initialize_binding,
-                            .set => .set_binding,
+                            .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
                         };
                         last_ref = try b.addInst(.{
                             .tag = tag,
@@ -2712,7 +2712,7 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
             const string_index = try b.internString(rest_property.binding_identifier);
             const tag: Ir.Inst.Tag = switch (binding_op) {
                 .initialize => .initialize_binding,
-                .set => .set_binding,
+                .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
             };
             last_ref = try b.addInst(.{
                 .tag = tag,
