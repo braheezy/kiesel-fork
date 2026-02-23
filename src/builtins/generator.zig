@@ -126,7 +126,6 @@ pub const Generator = MakeObject(.{
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
             suspension: ?interpreter.Vm.GeneratorSuspension = null,
-            initial_args: ?[]const Value = null,
         },
     },
     .tag = .generator,
@@ -139,6 +138,7 @@ pub fn generatorStart(
     agent: *Agent,
     generator: *Generator,
     generator_function: *builtins.ECMAScriptFunction,
+    initial_suspension: ?interpreter.Vm.GeneratorSuspension,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[GeneratorState]] is suspended-start.
     std.debug.assert(generator.fields.generator_state == .suspended_start);
@@ -169,59 +169,48 @@ pub fn generatorStart(
 
             if (agent_.options.new_interpreter) {
                 const vm = agent_.active_vm.?;
+                const suspension = &closure_generator.fields.evaluation_state.suspension.?;
 
-                const result = if (closure_generator.fields.evaluation_state.suspension) |*suspension| blk: {
-                    // If resuming causes another yield the suspension will be overwritten, so we
-                    // have to capture the stack to free it regardless.
-                    const current_stack = suspension.stack;
-                    defer agent_.gc_allocator.free(current_stack);
-                    switch (resume_completion.type) {
-                        .normal => {
+                // If resuming causes another yield the suspension will be overwritten, so we
+                // have to capture the stack to free it regardless.
+                const current_stack = suspension.stack;
+                defer agent_.gc_allocator.free(current_stack);
+                switch (resume_completion.type) {
+                    .normal => {
+                        if (suspension.yield_reg != .none) {
                             suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
-                        },
-                        .@"return" => {
-                            _ = agent_.execution_context_stack.pop().?;
-                            closure_generator.fields.generator_state = .completed;
-                            closure_generator.fields.evaluation_state = undefined;
-                            return createIteratorResultObject(agent_, resume_completion.value.?, true);
-                        },
-                        .throw => {
-                            _ = agent_.execution_context_stack.pop().?;
-                            closure_generator.fields.generator_state = .completed;
-                            closure_generator.fields.evaluation_state = undefined;
-                            agent_.exception = .{
-                                .value = resume_completion.value.?,
-                                .stack_trace = try agent_.captureStackTrace(),
-                            };
-                            return error.ExceptionThrown;
-                        },
-                        else => unreachable,
-                    }
-                    const bc = generator_function_.fields.cached_bytecode.?;
-                    break :blk vm.@"resume"(bc, suspension.*) catch |err| {
+                        }
+                    },
+                    .@"return" => {
                         _ = agent_.execution_context_stack.pop().?;
                         closure_generator.fields.generator_state = .completed;
                         closure_generator.fields.evaluation_state = undefined;
-                        return err;
-                    };
-                } else blk: {
-                    const bc = try generator_function_.fields.compile(agent_);
-                    const args = closure_generator.fields.evaluation_state.initial_args.?;
-                    try vm.pushCallFrame(bc, args);
-                    agent_.gc_allocator.free(args);
-                    closure_generator.fields.evaluation_state.initial_args = null;
-                    break :blk vm.run(.{}) catch |err| {
-                        vm.popCallFrame();
+                        return createIteratorResultObject(agent_, resume_completion.value.?, true);
+                    },
+                    .throw => {
                         _ = agent_.execution_context_stack.pop().?;
                         closure_generator.fields.generator_state = .completed;
                         closure_generator.fields.evaluation_state = undefined;
-                        return err;
-                    };
+                        agent_.exception = .{
+                            .value = resume_completion.value.?,
+                            .stack_trace = try agent_.captureStackTrace(),
+                        };
+                        return error.ExceptionThrown;
+                    },
+                    else => unreachable,
+                }
+
+                const bc = generator_function_.fields.cached_bytecode.?;
+                const result = vm.@"resume"(bc, suspension.*) catch |err| {
+                    _ = agent_.execution_context_stack.pop().?;
+                    closure_generator.fields.generator_state = .completed;
+                    closure_generator.fields.evaluation_state = undefined;
+                    return err;
                 };
                 switch (result) {
-                    .yield => |suspension| {
+                    .yield => |next_suspension| {
                         const suspension_result = closure_generator.fields.evaluation_state.suspension_result.?;
-                        closure_generator.fields.evaluation_state.suspension = suspension;
+                        closure_generator.fields.evaluation_state.suspension = next_suspension;
                         closure_generator.fields.evaluation_state.suspension_result = null;
                         return suspension_result.asObject();
                     },
@@ -313,6 +302,10 @@ pub fn generatorStart(
         .closure = closure,
         .generator_function = generator_function,
     };
+
+    if (agent.options.new_interpreter) {
+        generator.fields.evaluation_state.suspension = initial_suspension.?;
+    }
 
     // 6. Set generator.[[GeneratorContext]] to genContext.
     generator.fields.generator_context = generator_context;
@@ -406,11 +399,7 @@ pub fn generatorResumeAbrupt(
     if (state == .suspended_start) {
         // a. Set generator.[[GeneratorState]] to completed.
         generator.fields.generator_state = .completed;
-        if (generator.fields.evaluation_state.initial_args) |args| {
-            agent.gc_allocator.free(args);
-        } else {
-            generator.fields.evaluation_state.vm.deinit();
-        }
+        generator.fields.evaluation_state.vm.deinit();
 
         // b. NOTE: Once a generator enters the completed state it never leaves it and its associated
         //    execution context is never resumed. Any execution state associated with generator can be

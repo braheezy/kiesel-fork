@@ -166,11 +166,6 @@ pub const prototype = struct {
         if (state == .suspended_start or state == .completed) {
             // a. Set generator.[[AsyncGeneratorState]] to draining-queue.
             generator.fields.async_generator_state = .draining_queue;
-            if (state == .suspended_start) {
-                if (generator.fields.evaluation_state.initial_args) |args| {
-                    agent.gc_allocator.free(args);
-                }
-            }
 
             // b. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
@@ -219,9 +214,6 @@ pub const prototype = struct {
         if (state == .suspended_start) {
             // a. Set generator.[[AsyncGeneratorState]] to completed.
             generator.fields.async_generator_state = .completed;
-            if (generator.fields.evaluation_state.initial_args) |args| {
-                agent.gc_allocator.free(args);
-            }
 
             // b. Set state to completed.
             state = .completed;
@@ -289,7 +281,6 @@ pub const AsyncGenerator = MakeObject(.{
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
             suspension: ?interpreter.Vm.GeneratorSuspension = null,
-            initial_args: ?[]const Value = null,
         },
     },
     .tag = .async_generator,
@@ -312,6 +303,7 @@ pub fn asyncGeneratorStart(
     agent: *Agent,
     generator: *AsyncGenerator,
     generator_function: *builtins.ECMAScriptFunction,
+    initial_suspension: ?interpreter.Vm.GeneratorSuspension,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorState]] is suspended-start.
     std.debug.assert(generator.fields.async_generator_state == .suspended_start);
@@ -342,78 +334,58 @@ pub fn asyncGeneratorStart(
 
             if (agent_.options.new_interpreter) {
                 const vm = agent_.active_vm.?;
+                const suspension = &closure_generator.fields.evaluation_state.suspension.?;
 
-                const result = if (closure_generator.fields.evaluation_state.suspension) |*suspension| blk: {
-                    // If resuming causes another yield the suspension will be overwritten, so we
-                    // have to capture the stack to free it regardless.
-                    const current_stack = suspension.stack;
-                    defer agent_.gc_allocator.free(current_stack);
-                    switch (resume_completion.type) {
-                        .normal => {
+                // If resuming causes another yield the suspension will be overwritten, so we
+                // have to capture the stack to free it regardless.
+                const current_stack = suspension.stack;
+                defer agent_.gc_allocator.free(current_stack);
+                switch (resume_completion.type) {
+                    .normal => {
+                        if (suspension.yield_reg != .none) {
                             suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
-                        },
-                        .@"return" => {
-                            _ = agent_.execution_context_stack.pop().?;
-                            closure_generator.fields.async_generator_state = .draining_queue;
-                            closure_generator.fields.evaluation_state = undefined;
+                        }
+                    },
+                    .@"return" => {
+                        _ = agent_.execution_context_stack.pop().?;
+                        closure_generator.fields.async_generator_state = .draining_queue;
+                        closure_generator.fields.evaluation_state = undefined;
 
-                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
+                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
+                        try asyncGeneratorDrainQueue(agent_, closure_generator);
+                        return;
+                    },
+                    .throw => {
+                        _ = agent_.execution_context_stack.pop().?;
+                        closure_generator.fields.async_generator_state = .draining_queue;
+                        closure_generator.fields.evaluation_state = undefined;
+
+                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);
+                        try asyncGeneratorDrainQueue(agent_, closure_generator);
+                        return;
+                    },
+                    else => unreachable,
+                }
+
+                const bc = generator_function_.fields.cached_bytecode.?;
+                const result = vm.@"resume"(bc, suspension.*) catch |err| {
+                    _ = agent_.execution_context_stack.pop().?;
+                    closure_generator.fields.async_generator_state = .draining_queue;
+                    closure_generator.fields.evaluation_state = undefined;
+
+                    switch (err) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.ExceptionThrown => {
+                            const exception = agent_.clearException();
+                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
                             try asyncGeneratorDrainQueue(agent_, closure_generator);
                             return;
                         },
-                        .throw => {
-                            _ = agent_.execution_context_stack.pop().?;
-                            closure_generator.fields.async_generator_state = .draining_queue;
-                            closure_generator.fields.evaluation_state = undefined;
-
-                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);
-                            try asyncGeneratorDrainQueue(agent_, closure_generator);
-                            return;
-                        },
-                        else => unreachable,
                     }
-                    const bc = generator_function_.fields.cached_bytecode.?;
-                    break :blk vm.@"resume"(bc, suspension.*) catch |err| {
-                        _ = agent_.execution_context_stack.pop().?;
-                        closure_generator.fields.async_generator_state = .draining_queue;
-                        closure_generator.fields.evaluation_state = undefined;
-
-                        switch (err) {
-                            error.OutOfMemory => return error.OutOfMemory,
-                            error.ExceptionThrown => {
-                                const exception = agent_.clearException();
-                                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
-                                try asyncGeneratorDrainQueue(agent_, closure_generator);
-                                return;
-                            },
-                        }
-                    };
-                } else blk: {
-                    const bc = try generator_function_.fields.compile(agent_);
-                    const args = closure_generator.fields.evaluation_state.initial_args.?;
-                    try vm.pushCallFrame(bc, args);
-                    agent_.gc_allocator.free(args);
-                    closure_generator.fields.evaluation_state.initial_args = null;
-                    break :blk vm.run(.{}) catch |err| {
-                        vm.popCallFrame();
-                        _ = agent_.execution_context_stack.pop().?;
-                        closure_generator.fields.async_generator_state = .draining_queue;
-                        closure_generator.fields.evaluation_state = undefined;
-
-                        switch (err) {
-                            error.OutOfMemory => return error.OutOfMemory,
-                            error.ExceptionThrown => {
-                                const exception = agent_.clearException();
-                                try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
-                                try asyncGeneratorDrainQueue(agent_, closure_generator);
-                                return;
-                            },
-                        }
-                    };
                 };
                 switch (result) {
-                    .yield => |suspension| {
-                        closure_generator.fields.evaluation_state.suspension = suspension;
+                    .yield => |new_suspension| {
+                        closure_generator.fields.evaluation_state.suspension = new_suspension;
                         closure_generator.fields.evaluation_state.suspension_result = null;
                         return;
                     },
@@ -505,6 +477,10 @@ pub fn asyncGeneratorStart(
         .closure = closure,
         .generator_function = generator_function,
     };
+
+    if (agent.options.new_interpreter) {
+        generator.fields.evaluation_state.suspension = initial_suspension.?;
+    }
 
     // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
     generator.fields.async_generator_context = generator_context;

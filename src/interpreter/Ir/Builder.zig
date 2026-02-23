@@ -472,6 +472,18 @@ fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration
 
 fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, function_body: *const ast.FunctionBody) Error!Ir.Inst.Ref {
     try b.lowerFunctionDeclarationInstantiation(formal_parameters, function_body);
+
+    switch (function_body.type) {
+        .generator, .async_generator => {
+            // Emit a synthetic yield after FDI so the rest of the bytecode resumes later.
+            _ = try b.addInst(.{
+                .tag = .yield,
+                .data = .{ .ref = .none },
+            });
+        },
+        else => {},
+    }
+
     _ = try b.lowerStatementList(&function_body.statement_list);
     // Implicit return is added in `build()`
     return .none;
@@ -4622,7 +4634,10 @@ fn lowerYieldExpression(b: *Builder, yield_expr: *const ast.YieldExpression) Err
     const value = if (yield_expr.expression) |expr|
         try b.lowerExpression(expr)
     else
-        Ir.Inst.Ref.none;
+        try b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        });
     return b.addInst(.{
         .tag = .yield,
         .data = .{ .ref = value },

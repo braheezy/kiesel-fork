@@ -664,7 +664,29 @@ fn evaluateGeneratorBody(
 ) Agent.Error!Value {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    if (!agent.options.new_interpreter) {
+    var initial_suspension: ?interpreter.Vm.GeneratorSuspension = null;
+    errdefer if (initial_suspension) |suspension| agent.gc_allocator.free(suspension.stack);
+    if (agent.options.new_interpreter) {
+        const bc = try function.fields.compile(agent);
+        var temp_vm: ?interpreter.Vm = null;
+        defer if (temp_vm) |*vm| vm.deinit();
+
+        const vm = agent.active_vm orelse blk: {
+            // Create a temporary VM if none is active. This happens when draining the job queue
+            // for example.
+            temp_vm = try interpreter.Vm.init(agent, bc);
+            break :blk &temp_vm.?;
+        };
+
+        try vm.pushCallFrame(bc, arguments_list.values);
+        errdefer vm.popCallFrame();
+        const result = try vm.run(.{});
+        initial_suspension = switch (result) {
+            .yield => |suspension| suspension,
+            .@"return" => unreachable,
+        };
+        std.debug.assert(initial_suspension.?.yield_reg == .none);
+    } else {
         try functionDeclarationInstantiation(agent, function, arguments_list);
     }
 
@@ -685,11 +707,7 @@ fn evaluateGeneratorBody(
     );
 
     // 5. Perform GeneratorStart(G, FunctionBody).
-    try generatorStart(agent, generator, function);
-
-    if (agent.options.new_interpreter) {
-        generator.fields.evaluation_state.initial_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
-    }
+    try generatorStart(agent, generator, function, initial_suspension);
 
     // 6. Return ReturnCompletion(G).
     return Value.from(&generator.object);
@@ -704,7 +722,29 @@ fn evaluateAsyncGeneratorBody(
 ) Agent.Error!Value {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    if (!agent.options.new_interpreter) {
+    var initial_suspension: ?interpreter.Vm.GeneratorSuspension = null;
+    errdefer if (initial_suspension) |suspension| agent.gc_allocator.free(suspension.stack);
+    if (agent.options.new_interpreter) {
+        const bc = try function.fields.compile(agent);
+        var temp_vm: ?interpreter.Vm = null;
+        defer if (temp_vm) |*vm| vm.deinit();
+
+        const vm = agent.active_vm orelse blk: {
+            // Create a temporary VM if none is active. This happens when draining the job queue
+            // for example.
+            temp_vm = try interpreter.Vm.init(agent, bc);
+            break :blk &temp_vm.?;
+        };
+
+        try vm.pushCallFrame(bc, arguments_list.values);
+        errdefer vm.popCallFrame();
+        const result = try vm.run(.{});
+        initial_suspension = switch (result) {
+            .yield => |suspension| suspension,
+            .@"return" => unreachable,
+        };
+        std.debug.assert(initial_suspension.?.yield_reg == .none);
+    } else {
         try functionDeclarationInstantiation(agent, function, arguments_list);
     }
 
@@ -727,11 +767,7 @@ fn evaluateAsyncGeneratorBody(
     );
 
     // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
-    try asyncGeneratorStart(agent, generator, function);
-
-    if (agent.options.new_interpreter) {
-        generator.fields.evaluation_state.initial_args = try agent.gc_allocator.dupe(Value, arguments_list.values);
-    }
+    try asyncGeneratorStart(agent, generator, function, initial_suspension);
 
     // 6. Return ReturnCompletion(generator).
     return Value.from(&generator.object);

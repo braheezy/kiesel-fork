@@ -459,7 +459,7 @@ pub const Inst = struct {
     };
 
     pub const Reg = enum(u16) {
-        /// Used for `return` instruction to indicate no register
+        /// Used for `return`/`yield` instructions to indicate no register
         none = std.math.maxInt(u16),
         _,
     };
@@ -728,7 +728,10 @@ fn printData(
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
-    if (tag == .@"return" and data.reg == .none) return;
+    switch (tag) {
+        .@"return", .yield => if (data.reg == .none) return,
+        else => {},
+    }
 
     try writer.writeByte(' ');
     switch (data_tag) {

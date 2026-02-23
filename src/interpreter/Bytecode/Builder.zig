@@ -1686,14 +1686,17 @@ fn lowerAwait(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
 
 fn lowerYield(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
     if (ref == .none) {
-        try b.lowerUndefined(dest);
+        try b.emit(.{
+            .tag = .yield,
+            .data = .{ .reg = .none },
+        });
     } else {
         try b.emitMoveIfNeeded(ref, dest);
+        try b.emit(.{
+            .tag = .yield,
+            .data = .{ .reg = dest },
+        });
     }
-    try b.emit(.{
-        .tag = .yield,
-        .data = .{ .reg = dest },
-    });
 }
 
 fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest: Bytecode.Inst.Reg) Error!void {

@@ -2034,8 +2034,11 @@ fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
 }
 
 fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
-    const value = vm.store(reg);
-    _ = try yield(vm.agent, value);
+    // The initial `yield` instruction inserted after FDI doesn't have a register.
+    if (reg != .none) {
+        const value = vm.store(reg);
+        _ = try yield(vm.agent, value);
+    }
 
     std.debug.assert(vm.call_stack.items.len > 1);
     const frame = vm.currentCallFrame();
