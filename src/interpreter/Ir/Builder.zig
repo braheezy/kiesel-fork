@@ -1725,6 +1725,9 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     });
                 },
             },
+            .binding_pattern_for_assignment_expression => |*pattern| {
+                _ = try b.lowerDestructuringAssignment(pattern, next_value, .set);
+            },
             .call_expression => |*call_expr| {
                 _ = try b.lowerCallExpression(call_expr);
                 _ = try b.addInst(.{
