@@ -706,8 +706,19 @@ fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.
 
 fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(src);
-    const i = try value.toInt32(vm.agent);
-    vm.load(dst, Value.from(~i));
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (value.__isI32()) {
+        @branchHint(.likely);
+        vm.load(dst, Value.from(~value.__asI32()));
+        return;
+    }
+
+    const numeric = try value.toNumeric(vm.agent);
+    vm.load(dst, switch (numeric) {
+        .number => |n| Value.from(n.bitwiseNOT()),
+        .big_int => |b| Value.from(try b.bitwiseNOT(vm.agent)),
+    });
 }
 
 fn executeLogicalNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
