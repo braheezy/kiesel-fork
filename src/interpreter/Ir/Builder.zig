@@ -1189,11 +1189,12 @@ fn lowerStatement(b: *Builder, stmt: *const ast.Statement) Error!Ir.Inst.Ref {
 }
 
 fn lowerDeclaration(b: *Builder, decl: *const ast.Declaration) Error!Ir.Inst.Ref {
-    return switch (decl.*) {
-        .hoistable_declaration => .none, // Handled by GDI/FDI before execution
-        .class_declaration => |*class_decl| try b.lowerClassDeclaration(class_decl),
-        .lexical_declaration => |*lex_decl| try b.lowerLexicalDeclaration(lex_decl),
-    };
+    switch (decl.*) {
+        .hoistable_declaration => {}, // Handled by GDI/FDI before execution
+        .class_declaration => |*class_decl| _ = try b.lowerClassDeclaration(class_decl),
+        .lexical_declaration => |*lex_decl| _ = try b.lowerLexicalDeclaration(lex_decl),
+    }
+    return .none;
 }
 
 fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement, breakable_ctx: ?*BreakableContext) Error!Ir.Inst.Ref {
