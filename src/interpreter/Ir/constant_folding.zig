@@ -193,8 +193,13 @@ fn constantFoldBinaryExpression(
                         return .{ .big_int = result };
                     } else if (lhs == .boolean and rhs == .boolean) {
                         // Y tho
-                        const result: f64 = @floatFromInt(@intFromBool(lhs.boolean) + @intFromBool(rhs.boolean));
-                        return .{ .number = result };
+                        const number: f64 = if (lhs.boolean and rhs.boolean)
+                            2
+                        else if (lhs.boolean or rhs.boolean)
+                            1
+                        else
+                            0;
+                        return .{ .number = number };
                     }
                 },
                 else => {},
