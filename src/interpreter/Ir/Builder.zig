@@ -2560,12 +2560,12 @@ fn lowerDestructuringAssignment(b: *Builder, pattern: *const ast.BindingPattern,
     };
 }
 
-fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern, array: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern, array_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
     var last_ref: Ir.Inst.Ref = .none;
 
     const iterator_ref = try b.addInst(.{
         .tag = .get_iterator,
-        .data = .{ .ref = array },
+        .data = .{ .ref = array_value },
     });
 
     for (pattern.elements) |element| switch (element) {
@@ -2657,15 +2657,13 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
     return last_ref;
 }
 
-fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPattern, object: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
-    var last_ref: Ir.Inst.Ref = .none;
+fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPattern, object_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+    const object = try b.addInst(.{
+        .tag = .to_object,
+        .data = .{ .ref = object_value },
+    });
 
-    if (pattern.properties.len == 0) {
-        return b.addInst(.{
-            .tag = .to_object,
-            .data = .{ .ref = object },
-        });
-    }
+    var last_ref = object;
 
     for (pattern.properties) |property| switch (property) {
         .binding_property => |binding_property| switch (binding_property) {
