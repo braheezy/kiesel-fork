@@ -1671,6 +1671,13 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .tag = .iterator_is_done,
         .data = .{ .ref = iterator },
     });
+    // NOTE: We invert the condition to ensure the body block (then target, else target by default)
+    //       is placed within the surrounding try/catch handler ranges during block linearization.
+    //       (Yes, this is a hack.)
+    const should_continue = try b.addInst(.{
+        .tag = .logical_not,
+        .data = .{ .ref = is_done },
+    });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const body_label = try b.addLabel();
@@ -1923,9 +1930,9 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .value = undefined_ref,
     } });
     test_br_cond.set(.{ .br_cond = .{
-        .condition = is_done,
-        .then_target = exit_label,
-        .else_target = body_label,
+        .condition = should_continue,
+        .then_target = body_label,
+        .else_target = exit_label,
     } });
     body_br.set(.{ .br = .{
         .target = test_label,
@@ -2267,7 +2274,9 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
         .tag = .undefined,
         .data = .{ .none = {} },
     });
-    const try_br = try b.addInstDeferred(.br);
+
+    const try_end_label = try b.addLabel();
+    const try_end_br = try b.addInstDeferred(.br);
 
     var catch_label: Ir.Inst.Ref = undefined;
     var catch_handler: Deferred = undefined;
@@ -2355,7 +2364,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 
     const normal_target = if (try_stmt.finally_block != null) finally_label else end_label;
 
-    try_br.set(.{ .br = .{
+    try_end_br.set(.{ .br = .{
         .target = normal_target,
         .value = try_result,
     } });
@@ -2363,7 +2372,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
     if (try_stmt.catch_block != null) {
         catch_handler.set(.{ .exception_handler = .{
             .start = try_label,
-            .end = catch_label,
+            .end = try_end_label,
             .target = catch_label,
         } });
         catch_br.set(.{ .br = .{
