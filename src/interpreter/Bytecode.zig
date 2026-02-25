@@ -8,6 +8,7 @@ name: []const u8,
 code: []const u8,
 num_regs: u16,
 strings: []const []const u8,
+string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
@@ -18,6 +19,11 @@ pub const Builder = @import("Bytecode/Builder.zig");
 pub const PrintError =
     std.Io.Writer.Error ||
     std.Io.tty.Config.SetColorError;
+
+pub const StringKind = enum(u1) {
+    escaped,
+    literal,
+};
 
 pub const Function = struct {
     source_text: Inst.StringIndex,
@@ -625,6 +631,7 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.code);
     for (bc.strings) |string| gpa.free(string);
     gpa.free(bc.strings);
+    gpa.free(bc.string_kinds);
     for (bc.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(bc.big_ints);
     gpa.free(bc.functions);

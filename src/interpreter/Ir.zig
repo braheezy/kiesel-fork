@@ -9,6 +9,7 @@ name: []const u8,
 instructions: std.MultiArrayList(Inst).Slice,
 extra: []const u32,
 strings: []const []const u8,
+string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
@@ -17,6 +18,11 @@ live_ranges: []const LiveRange,
 
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
+
+pub const StringKind = enum(u1) {
+    escaped,
+    literal,
+};
 
 pub const Function = struct {
     source_text: Inst.StringIndex,
@@ -580,6 +586,7 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.extra);
     for (ir.strings) |string| gpa.free(string);
     gpa.free(ir.strings);
+    gpa.free(ir.string_kinds);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
     gpa.free(ir.functions);

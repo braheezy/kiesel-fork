@@ -395,12 +395,20 @@ fn ensureConstants(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.Error!C
         const constants = try vm.agent.gc_allocator.alloc(Ptr, total_len);
         errdefer vm.agent.gc_allocator.free(constants);
 
-        for (bytecode.strings, constants[0..bytecode.strings.len]) |utf8, *slot| {
-            slot.* = @ptrCast(try stringValueImpl(vm.agent.gc_allocator, utf8));
+        for (bytecode.strings, bytecode.string_kinds, constants[0..bytecode.strings.len]) |utf8, kind, *slot| {
+            const string = switch (kind) {
+                .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
+                .literal => try String.fromUtf8(
+                    vm.agent,
+                    try vm.agent.gc_allocator.dupe(u8, utf8),
+                ),
+            };
+            slot.* = @ptrCast(@alignCast(string));
         }
         for (bytecode.big_ints, constants[bytecode.strings.len..]) |@"const", *slot| {
             const managed = try @"const".toManaged(vm.agent.gc_allocator);
-            slot.* = @ptrCast(@alignCast(try BigInt.fromManaged(vm.agent, managed)));
+            const big_int = try BigInt.fromManaged(vm.agent, managed);
+            slot.* = @ptrCast(@alignCast(big_int));
         }
 
         constants_gop.value_ptr.* = constants;

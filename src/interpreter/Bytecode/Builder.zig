@@ -287,6 +287,12 @@ pub fn build(b: *Builder) Error!Bytecode {
         b.gpa.free(strings);
     }
 
+    const string_kinds = try b.gpa.alloc(Bytecode.StringKind, b.ir.string_kinds.len);
+    errdefer b.gpa.free(string_kinds);
+    for (b.ir.string_kinds, string_kinds) |ir_kind, *bc_kind| {
+        bc_kind.* = @enumFromInt(@intFromEnum(ir_kind));
+    }
+
     var big_ints_list: std.ArrayList(std.math.big.int.Const) = try .initCapacity(b.gpa, b.ir.big_ints.len);
     defer big_ints_list.deinit(b.gpa);
     errdefer for (big_ints_list.items) |big_int| b.gpa.free(big_int.limbs);
@@ -370,6 +376,7 @@ pub fn build(b: *Builder) Error!Bytecode {
         .code = code,
         .num_regs = b.lsra.numRegs(),
         .strings = strings,
+        .string_kinds = string_kinds,
         .big_ints = big_ints,
         .functions = functions,
         .classes = classes,
