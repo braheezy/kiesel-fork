@@ -58,7 +58,7 @@ const Vm = @This();
 agent: *Agent,
 stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
-constants_cache: std.AutoHashMapUnmanaged(*const Bytecode, Constants),
+bytecode_cache: std.AutoHashMapUnmanaged(*const Bytecode, CacheSlots),
 
 pub const Pc = enum(u32) {
     start = 0,
@@ -75,7 +75,7 @@ pub const Pc = enum(u32) {
 
 pub const CallFrame = struct {
     bytecode: *const Bytecode,
-    constants: Constants,
+    cache_slots: CacheSlots,
     stack_base: u32,
     regs_len: u16,
     arguments_len: u16,
@@ -104,8 +104,8 @@ pub const RunOptions = struct {
     start_pc: Pc = .start,
 };
 
-const constants_align = @max(@alignOf(String), @alignOf(BigInt));
-const Constants = []?*align(constants_align) const anyopaque;
+const cache_slots_align = @max(@alignOf(String), @alignOf(BigInt), @alignOf(Bytecode));
+const CacheSlots = []?*align(cache_slots_align) const anyopaque;
 
 pub fn init(
     agent: *Agent,
@@ -115,7 +115,7 @@ pub fn init(
         .agent = agent,
         .stack = .empty,
         .call_stack = .empty,
-        .constants_cache = .empty,
+        .bytecode_cache = .empty,
     };
     try vm.pushCallFrame(bytecode, &.{});
     return vm;
@@ -130,12 +130,12 @@ pub fn deinit(vm: *Vm) void {
     vm.stack.deinit(vm.agent.gc_allocator);
     vm.call_stack.deinit(vm.agent.gc_allocator);
 
-    var it = vm.constants_cache.iterator();
+    var it = vm.bytecode_cache.iterator();
     while (it.next()) |entry| {
         // Values might outlive the VM and need to be GC'd, but we can free the array
         vm.agent.gc_allocator.free(entry.value_ptr.*);
     }
-    vm.constants_cache.deinit(vm.agent.gc_allocator);
+    vm.bytecode_cache.deinit(vm.agent.gc_allocator);
 }
 
 pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
@@ -366,7 +366,7 @@ pub fn @"resume"(
     callee_bytecode: *const Bytecode,
     suspension: GeneratorSuspension,
 ) Agent.Error!RunResult {
-    const constants = try vm.ensureConstants(callee_bytecode);
+    const cache_slots = try vm.ensureCacheSlots(callee_bytecode);
 
     const regs_len = suspension.regs_len;
     const arguments_len = suspension.arguments_len;
@@ -377,7 +377,7 @@ pub fn @"resume"(
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
-        .constants = constants,
+        .cache_slots = cache_slots,
         .stack_base = stack_base,
         .regs_len = regs_len,
         .arguments_len = arguments_len,
@@ -387,16 +387,16 @@ pub fn @"resume"(
     return vm.run(.{ .start_pc = suspension.saved_pc });
 }
 
-fn ensureConstants(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.Error!Constants {
-    const constants_gop = try vm.constants_cache.getOrPut(vm.agent.gc_allocator, bytecode);
-    if (!constants_gop.found_existing) {
-        const total_len = bytecode.strings.len + bytecode.big_ints.len;
-        const Ptr = @typeInfo(Constants).pointer.child;
-        const constants = try vm.agent.gc_allocator.alloc(Ptr, total_len);
-        @memset(constants, null);
-        constants_gop.value_ptr.* = constants;
+fn ensureCacheSlots(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.Error!CacheSlots {
+    const gop = try vm.bytecode_cache.getOrPut(vm.agent.gc_allocator, bytecode);
+    if (!gop.found_existing) {
+        const total_len = bytecode.strings.len + bytecode.big_ints.len + bytecode.functions.len;
+        const Ptr = @typeInfo(CacheSlots).pointer.child;
+        const cache_slots = try vm.agent.gc_allocator.alloc(Ptr, total_len);
+        @memset(cache_slots, null);
+        gop.value_ptr.* = cache_slots;
     }
-    return constants_gop.value_ptr.*;
+    return gop.value_ptr.*;
 }
 
 pub fn pushCallFrame(
@@ -404,7 +404,7 @@ pub fn pushCallFrame(
     callee_bytecode: *const Bytecode,
     args: []const Value,
 ) std.mem.Allocator.Error!void {
-    const constants = try vm.ensureConstants(callee_bytecode);
+    const cache_slots = try vm.ensureCacheSlots(callee_bytecode);
     const regs_len = callee_bytecode.num_regs;
     const arguments_len: u16 = @intCast(args.len);
 
@@ -415,7 +415,7 @@ pub fn pushCallFrame(
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
-        .constants = constants,
+        .cache_slots = cache_slots,
         .stack_base = stack_base,
         .regs_len = regs_len,
         .arguments_len = arguments_len,
@@ -459,8 +459,8 @@ fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
 
 fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!*const String {
     const frame = vm.currentCallFrame();
-    const constants_index = @intFromEnum(index);
-    if (frame.constants[constants_index]) |ptr| {
+    const cache_index = @intFromEnum(index);
+    if (frame.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
@@ -473,21 +473,21 @@ fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!
             try vm.agent.gc_allocator.dupe(u8, utf8),
         ),
     };
-    frame.constants[constants_index] = @ptrCast(@alignCast(string));
+    frame.cache_slots[cache_index] = @ptrCast(@alignCast(string));
     return string;
 }
 
 fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
     const frame = vm.currentCallFrame();
-    const constants_index = frame.bytecode.strings.len + @intFromEnum(index);
-    if (frame.constants[constants_index]) |ptr| {
+    const cache_index = frame.bytecode.strings.len + @intFromEnum(index);
+    if (frame.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
     const @"const" = frame.bytecode.big_ints[@intFromEnum(index)];
     const managed = try @"const".toManaged(vm.agent.gc_allocator);
     const big_int = try BigInt.fromManaged(vm.agent, managed);
-    frame.constants[constants_index] = @ptrCast(@alignCast(big_int));
+    frame.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
     return big_int;
 }
 
@@ -2104,15 +2104,36 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
 }
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
+    const frame = vm.currentCallFrame();
     const function = vm.getFunction(function_index);
-    const source_text = try (try vm.getString(function.source_text)).toUtf8(vm.agent.gc_allocator);
+    const source_text = frame.bytecode.strings[@intFromEnum(function.source_text)];
     const identifier: ?[]const u8 = switch (function.name) {
-        .identifier => |name_index| try (try vm.getString(name_index)).toUtf8(vm.agent.gc_allocator),
+        .identifier => |name_index| frame.bytecode.strings[@intFromEnum(name_index)],
         .none, .default => null,
     };
     const default_name: ?[]const u8 = switch (function.name) {
-        .default => |name_index| try (try vm.getString(name_index)).toUtf8(vm.agent.gc_allocator),
+        .default => |name_index| frame.bytecode.strings[@intFromEnum(name_index)],
         .none, .identifier => null,
+    };
+    const cache_index =
+        frame.bytecode.strings.len +
+        frame.bytecode.big_ints.len +
+        @intFromEnum(function_index);
+    const cached_bytecode: *const Bytecode = if (frame.cache_slots[cache_index]) |ptr| blk: {
+        @branchHint(.likely);
+        break :blk @ptrCast(ptr);
+    } else blk: {
+        const name = identifier orelse default_name orelse "";
+        const bytecode = try vm.agent.gc_allocator.create(Bytecode);
+        errdefer vm.agent.gc_allocator.destroy(bytecode);
+        bytecode.* = try interpreter.compile(vm.agent, name, .{
+            .function = .{
+                .parameters = &function.parameters,
+                .body = &function.body,
+            },
+        });
+        frame.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
+        break :blk bytecode;
     };
     const function_obj = switch (function.kind) {
         .normal => try instantiateOrdinaryFunctionExpression(vm.agent, .{
@@ -2150,12 +2171,14 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
             .source_text = source_text,
         }, default_name),
     };
+    function_obj.fields.cached_bytecode = cached_bytecode;
     vm.load(dest, Value.from(&function_obj.object));
 }
 
 fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
+    const frame = vm.currentCallFrame();
     const class = vm.getClass(class_index);
-    const source_text = try (try vm.getString(class.source_text)).toUtf8(vm.agent.gc_allocator);
+    const source_text = frame.bytecode.strings[@intFromEnum(class.source_text)];
     const class_binding: ?*const String = switch (class.name) {
         .identifier => |name_index| try vm.getString(name_index),
         .none, .default => null,

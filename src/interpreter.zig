@@ -34,12 +34,15 @@ pub fn compile(
         stdout.flush() catch {};
     }
 
+    // Unlike IR, bytecode is GC-allocated and not explicitly freed.
+    // This allows us to use UTF-8 strings from the string table directly without incurring a copy
+    // via `Vm.getString()` and `String.toUtf8()`.
     var bc = bc: {
-        var builder: Bytecode.Builder = try .init(gpa, &ir);
+        var builder: Bytecode.Builder = try .init(agent.gc_allocator, &ir);
         defer builder.deinit();
         break :bc try builder.build();
     };
-    errdefer bc.deinit(gpa);
+    errdefer bc.deinit(agent.gc_allocator);
 
     if (agent.options.debug.print_bytecode) {
         const stdout = agent.platform.stdout;
