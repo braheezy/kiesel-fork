@@ -870,9 +870,9 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // c. For each element n of varNames, do
         for (var_names.items) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
-            if (!instantiated_var_names.contains(var_name)) {
+            const gop = try instantiated_var_names.getOrPut(b.gpa, var_name);
+            if (!gop.found_existing) {
                 // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.put(b.gpa, var_name, {});
 
                 // 2. Perform ! env.CreateMutableBinding(n, false).
                 const string_index = try b.internString(var_name, .literal);
@@ -919,9 +919,9 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // e. For each element n of varNames, do
         for (var_names.items) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
-            if (!instantiated_var_names.contains(var_name)) {
+            const gop = try instantiated_var_names.getOrPut(b.gpa, var_name);
+            if (!gop.found_existing) {
                 // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.put(b.gpa, var_name, {});
 
                 // 3. If parameterBindings does not contain n, or if functionNames contains n, then
                 const is_in_parameter_bindings = containsSlice(parameter_names.items, var_name) or
