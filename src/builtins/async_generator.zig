@@ -4,7 +4,6 @@
 const std = @import("std");
 
 const builtins = @import("../builtins.zig");
-const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
@@ -19,7 +18,6 @@ const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
 const Value = types.Value;
-const Vm = bytecode.Vm;
 const await = builtins.await;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIteratorResultObject = types.createIteratorResultObject;
@@ -276,7 +274,6 @@ pub const AsyncGenerator = MakeObject(.{
 
         // Non-standard
         evaluation_state: struct {
-            vm: Vm,
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
@@ -303,7 +300,7 @@ pub fn asyncGeneratorStart(
     agent: *Agent,
     generator: *AsyncGenerator,
     generator_function: *builtins.ECMAScriptFunction,
-    initial_suspension: ?interpreter.Vm.GeneratorSuspension,
+    initial_suspension: interpreter.Vm.GeneratorSuspension,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorState]] is suspended-start.
     std.debug.assert(generator.fields.async_generator_state == .suspended_start);
@@ -332,155 +329,106 @@ pub fn asyncGeneratorStart(
             // b. Let acGenerator be the Generator component of acGenContext.
             const closure_generator = closure_generator_context.generator.async_generator;
 
-            if (agent_.options.new_interpreter) {
-                const vm = agent_.active_vm.?;
-                const suspension = &closure_generator.fields.evaluation_state.suspension.?;
+            const vm = agent_.active_vm.?;
+            const suspension = &closure_generator.fields.evaluation_state.suspension.?;
 
-                // If resuming causes another yield the suspension will be overwritten, so we
-                // have to capture the stack to free it regardless.
-                const current_stack = suspension.stack;
-                defer agent_.gc_allocator.free(current_stack);
-                switch (resume_completion.type) {
-                    .normal => {
-                        if (suspension.yield_reg != .none) {
-                            suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
-                        }
-                    },
-                    .@"return" => {
-                        _ = agent_.execution_context_stack.pop().?;
-                        closure_generator.fields.async_generator_state = .draining_queue;
-                        closure_generator.fields.evaluation_state = undefined;
-
-                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(resume_completion.value.?), true, null);
-                        try asyncGeneratorDrainQueue(agent_, closure_generator);
-                        return;
-                    },
-                    .throw => {
-                        _ = agent_.execution_context_stack.pop().?;
-                        closure_generator.fields.async_generator_state = .draining_queue;
-                        closure_generator.fields.evaluation_state = undefined;
-
-                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(resume_completion.value.?), true, null);
-                        try asyncGeneratorDrainQueue(agent_, closure_generator);
-                        return;
-                    },
-                    else => unreachable,
-                }
-
-                const bc = generator_function_.fields.cached_bytecode.?;
-                const result = vm.@"resume"(bc, suspension.*) catch |err| {
+            // If resuming causes another yield the suspension will be overwritten, so we
+            // have to capture the stack to free it regardless.
+            const current_stack = suspension.stack;
+            defer agent_.gc_allocator.free(current_stack);
+            switch (resume_completion.type) {
+                .normal => {
+                    if (suspension.yield_reg != .none) {
+                        suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
+                    }
+                },
+                // TODO: Integrate throw/return completions with exception handlers in the Vm
+                .@"return", .throw => {
                     _ = agent_.execution_context_stack.pop().?;
                     closure_generator.fields.async_generator_state = .draining_queue;
                     closure_generator.fields.evaluation_state = undefined;
 
-                    switch (err) {
-                        error.OutOfMemory => return error.OutOfMemory,
-                        error.ExceptionThrown => {
-                            const exception = agent_.clearException();
-                            try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
-                            try asyncGeneratorDrainQueue(agent_, closure_generator);
-                            return;
-                        },
-                    }
-                };
-                switch (result) {
-                    .yield => |new_suspension| {
-                        closure_generator.fields.evaluation_state.suspension = new_suspension;
-                        closure_generator.fields.evaluation_state.suspension_result = null;
-                        return;
-                    },
-                    .@"return" => |value| {
-                        _ = agent_.execution_context_stack.pop().?;
-                        closure_generator.fields.async_generator_state = .draining_queue;
-                        closure_generator.fields.evaluation_state = undefined;
-                        const result_value: Value = value orelse .undefined;
-                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
+                    const completion: Completion = switch (resume_completion.type) {
+                        .@"return" => Completion.normal(resume_completion.value.?),
+                        .throw => Completion.throw(resume_completion.value.?),
+                        else => unreachable,
+                    };
+
+                    try asyncGeneratorCompleteStep(agent_, closure_generator, completion, true, null);
+                    try asyncGeneratorDrainQueue(agent_, closure_generator);
+                    return;
+                },
+                else => unreachable,
+            }
+
+            // c. If generatorBody is a Parse Node, then
+            //     i. Let result be Completion(Evaluation of generatorBody).
+            // d. Else,
+            //     i. Assert: generatorBody is an Abstract Closure with no parameters.
+            //     ii. Let result be Completion(generatorBody()).
+            const bc = generator_function_.fields.cached_bytecode.?;
+            const result = vm.@"resume"(bc, suspension.*) catch |err| {
+                // f-g.
+                _ = agent_.execution_context_stack.pop().?;
+                closure_generator.fields.async_generator_state = .draining_queue;
+                closure_generator.fields.evaluation_state = undefined;
+
+                switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.ExceptionThrown => {
+                        const exception = agent_.clearException();
+                        // j-k.
+                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
                         try asyncGeneratorDrainQueue(agent_, closure_generator);
                         return;
                     },
                 }
-            }
-
-            // c. If generatorBody is a Parse Node, then
-            const result = if (true) blk: {
-                // TODO: Integrate throw/return completions with exception handlers in the Vm
-                switch (resume_completion.type) {
-                    .normal => closure_generator.fields.evaluation_state.vm.result = resume_completion.value.?,
-                    .@"return" => break :blk resume_completion,
-                    .throw => {
-                        agent_.exception = .{
-                            .value = resume_completion.value.?,
-                            .stack_trace = try agent_.captureStackTrace(),
-                        };
-                        break :blk error.ExceptionThrown;
-                    },
-                    else => unreachable,
-                }
-
-                // i. Let result be Completion(Evaluation of generatorBody).
-                break :blk generator_function_.fields.evaluateBody(
-                    agent_,
-                    &closure_generator.fields.evaluation_state.vm,
-                );
-            } else {
-                // d. Else,
-                // i. Assert: generatorBody is an Abstract Closure with no parameters.
-                // ii. Let result be Completion(generatorBody()).
             };
-
-            // e. Assert: If we return here, the async generator either threw an exception or
-            //    performed either an implicit or explicit return.
-
-            if (closure_generator.fields.evaluation_state.suspension_result) |_| {
-                closure_generator.fields.evaluation_state.suspension_result = null;
-                return;
-            }
-
-            // f. Remove acGenContext from the execution context stack and restore the execution
-            //    context that is at the top of the execution context stack as the running
-            //    execution context.
-            _ = agent_.execution_context_stack.pop().?;
-
-            // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
-            closure_generator.fields.async_generator_state = .draining_queue;
-
-            const result_completion: Completion = if (result) |completion| switch (completion.type) {
-                // h. If result is a normal completion, set result to NormalCompletion(undefined).
-                .normal => Completion.normal(.undefined),
-
-                // i. If result is a return completion, set result to NormalCompletion(result.[[Value]]).
-                .@"return" => Completion.normal(completion.value.?),
-
-                else => unreachable,
-            } else |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.ExceptionThrown => blk: {
-                    const exception = agent_.clearException();
-                    break :blk Completion.throw(exception.value);
+            switch (result) {
+                .yield => |new_suspension| {
+                    closure_generator.fields.evaluation_state.suspension = new_suspension;
+                    closure_generator.fields.evaluation_state.suspension_result = null;
+                    return;
                 },
-            };
+                .@"return" => |value| {
+                    // e. Assert: If we return here, the async generator either threw an exception
+                    //    or performed either an implicit or explicit return.
 
-            // j. Perform AsyncGeneratorCompleteStep(acGenerator, result, true).
-            try asyncGeneratorCompleteStep(agent_, closure_generator, result_completion, true, null);
+                    // f. Remove acGenContext from the execution context stack and restore the
+                    //    execution context that is at the top of the execution context stack as
+                    //    the running execution context.
+                    _ = agent_.execution_context_stack.pop().?;
 
-            // k. Perform AsyncGeneratorDrainQueue(acGenerator).
-            try asyncGeneratorDrainQueue(agent_, closure_generator);
+                    // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
+                    closure_generator.fields.async_generator_state = .draining_queue;
 
-            // l. Return NormalCompletion(undefined).
+                    closure_generator.fields.evaluation_state = undefined;
+
+                    // h. If result is a normal completion, set result to NormalCompletion(undefined).
+                    // i. If result is a return completion, set result to NormalCompletion(result.[[Value]]).
+                    const result_value: Value = value orelse .undefined;
+
+                    // j. Perform AsyncGeneratorCompleteStep(acGenerator, result, true).
+                    try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
+
+                    // k. Perform AsyncGeneratorDrainQueue(acGenerator).
+                    try asyncGeneratorDrainQueue(agent_, closure_generator);
+
+                    // l. Return NormalCompletion(undefined).
+                    return;
+                },
+            }
         }
     }.func;
 
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
     generator.fields.evaluation_state = .{
-        .vm = try Vm.init(agent, undefined),
         .closure = closure,
         .generator_function = generator_function,
     };
 
-    if (agent.options.new_interpreter) {
-        generator.fields.evaluation_state.suspension = initial_suspension.?;
-    }
+    generator.fields.evaluation_state.suspension = initial_suspension;
 
     // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
     generator.fields.async_generator_context = generator_context;

@@ -5,10 +5,8 @@ const std = @import("std");
 
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
-const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
-const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -17,9 +15,7 @@ const Arguments = types.Arguments;
 const BuiltinFunction = builtins.BuiltinFunction;
 const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
-const Completion = types.Completion;
 const Environment = execution.Environment;
-const Executable = bytecode.Executable;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -33,20 +29,9 @@ const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Value = types.Value;
-const Vm = bytecode.Vm;
 const asyncFunctionStart = builtins.asyncFunctionStart;
 const asyncGeneratorStart = builtins.asyncGeneratorStart;
-const containsSlice = utils.containsSlice;
-const createArrayFromList = types.createArrayFromList;
-const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
-const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
-const generateBytecode = bytecode.generateBytecode;
 const generatorStart = builtins.generatorStart;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
-const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -112,292 +97,6 @@ pub const ECMAScriptFunction = MakeObject(.{
         is_class_constructor: bool,
 
         cached_bytecode: ?*const interpreter.Bytecode = null,
-
-        cached_arguments_executable: ?*Executable = null,
-        cached_body_executable: ?*Executable = null,
-        cached_use_arguments_fast_path: ?bool = null,
-        cached_ast_values: ?*const CachedAstValues = null,
-
-        const CachedAstValues = struct {
-            parameter_names: []const *const String,
-            var_declared_names: []const *const String,
-            var_scoped_declarations: []const ast.VarScopedDeclaration,
-            lexically_scoped_declarations: []const ast.LexicallyScopedDeclaration,
-            lexically_scoped_declarations_bound_names: []const []const *const String,
-            parameter_names_has_duplicates: bool,
-            parameter_names_contains_arguments: bool,
-            lexical_names_contains_arguments: bool,
-        };
-
-        pub fn ensureCachedAstValues(
-            self: *@This(),
-            agent: *Agent,
-        ) std.mem.Allocator.Error!*const CachedAstValues {
-            if (self.cached_ast_values) |cached_ast_values| return cached_ast_values;
-
-            var parameter_names_utf8: std.ArrayList(ast.Identifier) = .empty;
-            defer parameter_names_utf8.deinit(agent.gc_allocator);
-            try self.formal_parameters.collectBoundNames(agent.gc_allocator, &parameter_names_utf8);
-            var parameter_names: std.ArrayList(*const String) = .empty;
-            try parameter_names.ensureTotalCapacity(agent.gc_allocator, parameter_names_utf8.items.len);
-            for (parameter_names_utf8.items) |name_utf8| {
-                const name = try String.fromUtf8(agent, name_utf8);
-                parameter_names.appendAssumeCapacity(name);
-            }
-
-            var var_declared_names_utf8: std.ArrayList(ast.Identifier) = .empty;
-            defer var_declared_names_utf8.deinit(agent.gc_allocator);
-            try self.ecmascript_code.collectVarDeclaredNames(agent.gc_allocator, &var_declared_names_utf8);
-            var var_declared_names: std.ArrayList(*const String) = .empty;
-            try var_declared_names.ensureTotalCapacity(agent.gc_allocator, var_declared_names_utf8.items.len);
-            for (var_declared_names_utf8.items) |name_utf8| {
-                const name = try String.fromUtf8(agent, name_utf8);
-                var_declared_names.appendAssumeCapacity(name);
-            }
-
-            var lexically_declared_names: std.ArrayList(ast.Identifier) = .empty;
-            try self.ecmascript_code.collectLexicallyDeclaredNames(agent.gc_allocator, &lexically_declared_names);
-
-            var var_scoped_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
-            try self.ecmascript_code.collectVarScopedDeclarations(agent.gc_allocator, &var_scoped_declarations);
-
-            var lexically_scoped_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-            try self.ecmascript_code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexically_scoped_declarations);
-
-            var lexically_scoped_declarations_bound_names: std.ArrayList([]const *const String) = .empty;
-            for (lexically_scoped_declarations.items) |declaration| {
-                var bound_names_utf8: std.ArrayList(ast.Identifier) = .empty;
-                defer bound_names_utf8.deinit(agent.gc_allocator);
-                try declaration.collectBoundNames(agent.gc_allocator, &bound_names_utf8);
-                var bound_names: std.ArrayList(*const String) = .empty;
-                try bound_names.ensureTotalCapacity(agent.gc_allocator, bound_names_utf8.items.len);
-                for (bound_names_utf8.items) |name_utf8| {
-                    const name = try String.fromUtf8(agent, name_utf8);
-                    bound_names.appendAssumeCapacity(name);
-                }
-                try lexically_scoped_declarations_bound_names.append(agent.gc_allocator, try bound_names.toOwnedSlice(agent.gc_allocator));
-            }
-
-            var parameter_names_has_duplicates = false;
-            var parameter_names_contains_arguments = false;
-            var unique_names: String.HashMapUnmanaged(void) = .empty;
-            defer unique_names.deinit(agent.gc_allocator);
-            if (parameter_names.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
-            try unique_names.ensureTotalCapacity(agent.gc_allocator, @intCast(parameter_names.items.len));
-            for (parameter_names.items) |parameter_name| {
-                if (parameter_name.eql(String.fromLiteral("arguments"))) {
-                    parameter_names_contains_arguments = true;
-                }
-                const gop = unique_names.getOrPutAssumeCapacity(parameter_name);
-                gop.key_ptr.* = parameter_name;
-                if (gop.found_existing) {
-                    parameter_names_has_duplicates = true;
-                }
-                if (parameter_names_has_duplicates and parameter_names_contains_arguments) break;
-            }
-
-            const lexical_names_contains_arguments = containsSlice(lexically_declared_names.items, "arguments");
-
-            const cached_ast_values = try agent.gc_allocator.create(CachedAstValues);
-            cached_ast_values.* = .{
-                .parameter_names = try parameter_names.toOwnedSlice(agent.gc_allocator),
-                .var_declared_names = try var_declared_names.toOwnedSlice(agent.gc_allocator),
-                .var_scoped_declarations = try var_scoped_declarations.toOwnedSlice(agent.gc_allocator),
-                .lexically_scoped_declarations = try lexically_scoped_declarations.toOwnedSlice(agent.gc_allocator),
-                .lexically_scoped_declarations_bound_names = try lexically_scoped_declarations_bound_names.toOwnedSlice(agent.gc_allocator),
-                .parameter_names_has_duplicates = parameter_names_has_duplicates,
-                .parameter_names_contains_arguments = parameter_names_contains_arguments,
-                .lexical_names_contains_arguments = lexical_names_contains_arguments,
-            };
-            self.cached_ast_values = cached_ast_values;
-            return cached_ast_values;
-        }
-
-        /// Maybe a hack, but kind of a neat one :^)
-        pub fn evaluateArguments(
-            self: *@This(),
-            agent: *Agent,
-            arguments: Arguments,
-            maybe_environment: ?Environment,
-        ) Agent.Error!void {
-            std.debug.assert(!agent.options.new_interpreter);
-
-            // OPTIMIZATION: If there are no parameters we don't need to do anything.
-            if (self.formal_parameters.items.len == 0) return;
-
-            // OPTIMIZATION: If there are no default arguments or binding patterns we can do this
-            //               without codegen which is quite a bit faster.
-            const use_fast_path = self.cached_use_arguments_fast_path orelse blk: {
-                const use_fast_path = for (self.formal_parameters.items) |item| {
-                    switch (item) {
-                        .formal_parameter => |formal_parameter| {
-                            switch (formal_parameter.binding_element) {
-                                .single_name_binding => |single_name_binding| {
-                                    if (single_name_binding.initializer != null) break false;
-                                },
-                                .binding_pattern_and_expression => break false,
-                            }
-                        },
-                        .function_rest_parameter => |function_rest_parameter| {
-                            switch (function_rest_parameter.binding_rest_element) {
-                                .binding_identifier => {},
-                                .binding_pattern => break false,
-                            }
-                        },
-                    }
-                } else true;
-                self.cached_use_arguments_fast_path = use_fast_path;
-                break :blk use_fast_path;
-            };
-
-            if (use_fast_path) {
-                const environment = maybe_environment orelse agent.runningExecutionContext().ecmascript_code.lexical_environment;
-                for (self.formal_parameters.items, 0..) |item, i| {
-                    const name = self.cached_ast_values.?.parameter_names[i];
-                    const value = switch (item) {
-                        .formal_parameter => |formal_parameter| blk: {
-                            std.debug.assert(formal_parameter.binding_element == .single_name_binding);
-                            std.debug.assert(formal_parameter.binding_element.single_name_binding.initializer == null);
-                            break :blk arguments.get(i);
-                        },
-                        .function_rest_parameter => |function_rest_parameter| blk: {
-                            std.debug.assert(function_rest_parameter.binding_rest_element == .binding_identifier);
-                            const array = try createArrayFromList(
-                                agent,
-                                arguments.values[@min(i, arguments.count())..],
-                            );
-                            break :blk Value.from(&array.object);
-                        },
-                    };
-                    if (maybe_environment != null) {
-                        // Uses InitializeReferencedBinding
-                        try environment.initializeBinding(agent, name, value);
-                    } else {
-                        // Uses PutValue
-                        try environment.setMutableBinding(agent, name, value, self.strict);
-                    }
-                }
-                return;
-            }
-
-            const executable = self.cached_arguments_executable orelse blk: {
-                var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
-                    agent.gc_allocator,
-                    self.formal_parameters.items.len,
-                );
-                defer elements.deinit(agent.gc_allocator);
-                for (self.formal_parameters.items) |item| {
-                    const element: ast.ArrayBindingPattern.Element = switch (item) {
-                        .formal_parameter => |formal_parameter| .{
-                            .binding_element = formal_parameter.binding_element,
-                        },
-                        .function_rest_parameter => |function_rest_parameter| .{
-                            .binding_rest_element = function_rest_parameter.binding_rest_element,
-                        },
-                    };
-                    elements.appendAssumeCapacity(element);
-                }
-                const binding_pattern: ast.BindingPattern = .{
-                    .array_binding_pattern = .{ .elements = elements.items },
-                };
-                const initializer: ast.Expression = .{
-                    .primary_expression = .{ .literal = .null }, // Placeholder value
-                };
-                const executable = try agent.gc_allocator.create(Executable);
-                executable.* = (if (maybe_environment != null)
-                    // Uses InitializeReferencedBinding
-                    generateBytecode(agent.gc_allocator, ast.LexicalBinding{
-                        .binding_pattern = .{
-                            .binding_pattern = binding_pattern,
-                            .initializer = initializer,
-                        },
-                    }, .{})
-                else
-                    // Uses PutValue
-                    generateBytecode(agent.gc_allocator, ast.VariableDeclaration{
-                        .binding_pattern = .{
-                            .binding_pattern = binding_pattern,
-                            .initializer = initializer,
-                        },
-                    }, .{})) catch |err| switch (err) {
-                    error.IndexOutOfRange => return agent.throwException(
-                        .internal_error,
-                        "Bytecode generation failed",
-                        .{},
-                    ),
-                    error.OutOfMemory => return error.OutOfMemory,
-                };
-                // Patch executable to put the arguments array on the RHS
-                const dummy = Value.from(try ordinaryObjectCreate(agent, null));
-                const index = executable.addConstant(dummy) catch |err| switch (err) {
-                    error.IndexOutOfRange => return agent.throwException(
-                        .internal_error,
-                        "Bytecode generation failed",
-                        .{},
-                    ),
-                    error.OutOfMemory => return error.OutOfMemory,
-                };
-                // 0 = load, 1 = store_constant, 2..3 = index
-                std.mem.bytesAsValue(Executable.ConstantIndex, executable.instructions.items[2..]).* = index;
-
-                if (agent.options.debug.print_bytecode) {
-                    const stdout = agent.platform.stdout;
-                    executable.print(stdout, agent.platform.tty_config) catch {};
-                    stdout.flush() catch {};
-                }
-
-                self.cached_arguments_executable = executable;
-                break :blk executable;
-            };
-            const array = try createArrayFromList(agent, arguments.values);
-            executable.constants.keys()[executable.constants.count() - 1] = Value.from(&array.object);
-            try executable.constants.reIndex(executable.allocator);
-            var vm = try Vm.init(agent, executable);
-            defer vm.deinit();
-            _ = try vm.run();
-        }
-
-        pub fn evaluateBody(self: *@This(), agent: *Agent, maybe_vm: ?*Vm) Agent.Error!Completion {
-            std.debug.assert(!agent.options.new_interpreter);
-
-            // OPTIMIZATION: If the body is empty we can directly return a normal completion.
-            if (self.ecmascript_code.statement_list.items.len == 0) {
-                return Completion.normal(null);
-            }
-
-            const executable = self.cached_body_executable orelse blk: {
-                var executable = try agent.gc_allocator.create(Executable);
-                executable.* = generateBytecode(
-                    agent.gc_allocator,
-                    self.ecmascript_code,
-                    .{},
-                ) catch |err| switch (err) {
-                    error.IndexOutOfRange => return agent.throwException(
-                        .internal_error,
-                        "Bytecode generation failed",
-                        .{},
-                    ),
-                    error.OutOfMemory => return error.OutOfMemory,
-                };
-
-                if (agent.options.debug.print_bytecode) {
-                    const stdout = agent.platform.stdout;
-                    executable.print(stdout, agent.platform.tty_config) catch {};
-                    stdout.flush() catch {};
-                }
-
-                self.cached_body_executable = executable;
-                break :blk executable;
-            };
-            if (maybe_vm) |vm| {
-                vm.executable = executable;
-                return vm.run();
-            } else {
-                var vm = try Vm.init(agent, executable);
-                defer vm.deinit();
-                return vm.run();
-            }
-        }
 
         pub fn compile(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*const interpreter.Bytecode {
             if (self.cached_bytecode) |bc| return bc;
@@ -625,40 +324,33 @@ fn evaluateFunctionBody(
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
 ) Agent.Error!Value {
-    if (agent.options.new_interpreter) {
-        const bc = try function.fields.compile(agent);
-        var temp_vm: ?interpreter.Vm = null;
-        defer if (temp_vm) |*vm| vm.deinit();
-
-        const vm = agent.active_vm orelse blk: {
-            // Create a temporary VM if none is active. This happens when draining the job queue
-            // for example.
-            temp_vm = try interpreter.Vm.init(agent, bc);
-            break :blk &temp_vm.?;
-        };
-
-        try vm.pushCallFrame(bc, arguments_list.values);
-        errdefer vm.popCallFrame();
-        const result = try vm.run(.{});
-        return switch (result) {
-            .@"return" => |value| value orelse .undefined,
-            .yield => unreachable,
-        };
-    }
-
     // FunctionBody : FunctionStatementList
+
+    const bc = try function.fields.compile(agent);
+    var temp_vm: ?interpreter.Vm = null;
+    defer if (temp_vm) |*vm| vm.deinit();
+
+    const vm = agent.active_vm orelse blk: {
+        // Create a temporary VM if none is active. This happens when draining the job queue
+        // for example.
+        temp_vm = try interpreter.Vm.init(agent, bc);
+        break :blk &temp_vm.?;
+    };
+
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    try functionDeclarationInstantiation(agent, function, arguments_list);
+    // NOTE: FDI is handled via the generated bytecode.
 
     // 2. Perform ? Evaluation of FunctionStatementList.
     // 3. NOTE: If the previous step resulted in a normal completion, then evaluation finished by
     //    proceeding past the end of the FunctionStatementList.
+    try vm.pushCallFrame(bc, arguments_list.values);
+    errdefer vm.popCallFrame();
+    const result = try vm.run(.{});
+
     // 4. Return ReturnCompletion(undefined).
-    const completion = try function.fields.evaluateBody(agent, null);
-    return switch (completion.type) {
-        .@"return" => completion.value.?,
-        .normal => .undefined,
-        else => unreachable,
+    return switch (result) {
+        .@"return" => |value| value orelse .undefined,
+        .yield => unreachable,
     };
 }
 
@@ -671,31 +363,26 @@ fn evaluateGeneratorBody(
 ) Agent.Error!Value {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    var initial_suspension: ?interpreter.Vm.GeneratorSuspension = null;
-    errdefer if (initial_suspension) |suspension| agent.gc_allocator.free(suspension.stack);
-    if (agent.options.new_interpreter) {
-        const bc = try function.fields.compile(agent);
-        var temp_vm: ?interpreter.Vm = null;
-        defer if (temp_vm) |*vm| vm.deinit();
+    const bc = try function.fields.compile(agent);
+    var temp_vm: ?interpreter.Vm = null;
+    defer if (temp_vm) |*vm| vm.deinit();
 
-        const vm = agent.active_vm orelse blk: {
-            // Create a temporary VM if none is active. This happens when draining the job queue
-            // for example.
-            temp_vm = try interpreter.Vm.init(agent, bc);
-            break :blk &temp_vm.?;
-        };
+    const vm = agent.active_vm orelse blk: {
+        // Create a temporary VM if none is active. This happens when draining the job queue
+        // for example.
+        temp_vm = try interpreter.Vm.init(agent, bc);
+        break :blk &temp_vm.?;
+    };
 
-        try vm.pushCallFrame(bc, arguments_list.values);
-        errdefer vm.popCallFrame();
-        const result = try vm.run(.{});
-        initial_suspension = switch (result) {
-            .yield => |suspension| suspension,
-            .@"return" => unreachable,
-        };
-        std.debug.assert(initial_suspension.?.yield_reg == .none);
-    } else {
-        try functionDeclarationInstantiation(agent, function, arguments_list);
-    }
+    try vm.pushCallFrame(bc, arguments_list.values);
+    errdefer vm.popCallFrame();
+    const result = try vm.run(.{});
+    const initial_suspension = switch (result) {
+        .yield => |suspension| suspension,
+        .@"return" => unreachable,
+    };
+    errdefer agent.gc_allocator.free(initial_suspension.stack);
+    std.debug.assert(initial_suspension.yield_reg == .none);
 
     // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorPrototype%",
     //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
@@ -729,31 +416,26 @@ fn evaluateAsyncGeneratorBody(
 ) Agent.Error!Value {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    var initial_suspension: ?interpreter.Vm.GeneratorSuspension = null;
-    errdefer if (initial_suspension) |suspension| agent.gc_allocator.free(suspension.stack);
-    if (agent.options.new_interpreter) {
-        const bc = try function.fields.compile(agent);
-        var temp_vm: ?interpreter.Vm = null;
-        defer if (temp_vm) |*vm| vm.deinit();
+    const bc = try function.fields.compile(agent);
+    var temp_vm: ?interpreter.Vm = null;
+    defer if (temp_vm) |*vm| vm.deinit();
 
-        const vm = agent.active_vm orelse blk: {
-            // Create a temporary VM if none is active. This happens when draining the job queue
-            // for example.
-            temp_vm = try interpreter.Vm.init(agent, bc);
-            break :blk &temp_vm.?;
-        };
+    const vm = agent.active_vm orelse blk: {
+        // Create a temporary VM if none is active. This happens when draining the job queue
+        // for example.
+        temp_vm = try interpreter.Vm.init(agent, bc);
+        break :blk &temp_vm.?;
+    };
 
-        try vm.pushCallFrame(bc, arguments_list.values);
-        errdefer vm.popCallFrame();
-        const result = try vm.run(.{});
-        initial_suspension = switch (result) {
-            .yield => |suspension| suspension,
-            .@"return" => unreachable,
-        };
-        std.debug.assert(initial_suspension.?.yield_reg == .none);
-    } else {
-        try functionDeclarationInstantiation(agent, function, arguments_list);
-    }
+    try vm.pushCallFrame(bc, arguments_list.values);
+    errdefer vm.popCallFrame();
+    const result = try vm.run(.{});
+    const initial_suspension = switch (result) {
+        .yield => |suspension| suspension,
+        .@"return" => unreachable,
+    };
+    errdefer agent.gc_allocator.free(initial_suspension.stack);
+    std.debug.assert(initial_suspension.yield_reg == .none);
 
     // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject,
     //    "%AsyncGeneratorPrototype%", « [[AsyncGeneratorState]], [[AsyncGeneratorContext]],
@@ -797,26 +479,11 @@ fn evaluateAsyncFunctionBody(
     ) catch |err| try noexcept(err);
 
     // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
-    if (!agent.options.new_interpreter) {
-        functionDeclarationInstantiation(agent, function, arguments_list) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-
-            // 3. If completion is an abrupt completion, then
-            error.ExceptionThrown => {
-                const exception = agent.clearException();
-
-                // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
-                _ = Value.from(promise_capability.reject).callAssumeCallable(
-                    agent,
-                    .undefined,
-                    &.{exception.value},
-                ) catch |err_| try noexcept(err_);
-            },
-        };
-    }
-
+    // 3. If completion is an abrupt completion, then
+    //     a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
     // 4. Else,
     //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
+    // NOTE: FDI is handled via the generated bytecode.
     try asyncFunctionStart(agent, promise_capability, .{ .ecmascript_function = .{
         .function = function,
         .arguments = arguments_list.values,
@@ -1367,408 +1034,4 @@ pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.
     });
 
     // 3. Return unused.
-}
-
-/// 10.2.11 FunctionDeclarationInstantiation ( func, argumentsList )
-/// https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
-fn functionDeclarationInstantiation(
-    agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
-) Agent.Error!void {
-    std.debug.assert(!agent.options.new_interpreter);
-
-    // 1. Let calleeContext be the running execution context.
-    var callee_context = agent.runningExecutionContext();
-
-    // 2. Let code be func.[[ECMAScriptCode]].
-    const code = function.fields.ecmascript_code;
-
-    // 3. Let strict be func.[[Strict]].
-    const strict = function.fields.strict;
-
-    // 4. Let formals be func.[[FormalParameters]].
-    const formals = function.fields.formal_parameters;
-
-    // OPTIMIZATION: Instead of doing this every time the function is called, we collect all of
-    //               them once and then cache them.
-    const cached_ast_values = try function.fields.ensureCachedAstValues(agent);
-
-    // 5. Let parameterNames be the BoundNames of formals.
-    const parameter_names = cached_ast_values.parameter_names;
-
-    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; otherwise let
-    //    hasDuplicates be false.
-    const has_duplicates = cached_ast_values.parameter_names_has_duplicates;
-
-    // 7. Let simpleParameterList be IsSimpleParameterList of formals.
-    const simple_parameter_list = formals.isSimpleParameterList();
-
-    // 8. Let hasParameterExpressions be ContainsExpression of formals.
-    const has_parameter_expressions = formals.containsExpression();
-
-    // 9. Let varNames be the VarDeclaredNames of code.
-    const var_names = cached_ast_values.var_declared_names;
-
-    // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    const var_declarations = cached_ast_values.var_scoped_declarations;
-
-    // 11. Let lexicalNames be the LexicallyDeclaredNames of code.
-    // NOTE: This is covered by `lexical_names_contains_arguments`.
-
-    // 12. Let functionNames be a new empty List.
-    var function_names: String.HashMapUnmanaged(void) = .empty;
-    defer function_names.deinit(agent.gc_allocator);
-
-    // 13. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
-    defer functions_to_initialize.deinit(agent.gc_allocator);
-
-    // 14. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations);
-    while (it.next()) |var_declaration| {
-        // a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
-        if (var_declaration == .hoistable_declaration) {
-            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
-            //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
-            const hoistable_declaration = var_declaration.hoistable_declaration;
-
-            // ii. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
-            };
-
-            // iii. If functionNames does not contain fn, then
-            if (!function_names.contains(function_name)) {
-                // 1. Insert fn as the first element of functionNames.
-                try function_names.putNoClobber(agent.gc_allocator, function_name, {});
-
-                // 2. NOTE: If there are multiple function declarations for the same name, the last
-                //    declaration is used.
-                // 3. Insert d as the first element of functionsToInitialize.
-                // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
-            }
-        }
-    }
-
-    // 15. Let argumentsObjectNeeded be true.
-    // OPTIMIZATION: If nothing accesses the arguments object we don't need to create one. This is
-    //               determined during parsing, with a deopt when using eval.
-    var arguments_object_needed = formals.arguments_object_needed or code.arguments_object_needed;
-
-    // 16. If func.[[ThisMode]] is lexical, then
-    if (function.fields.this_mode == .lexical) {
-        // a. NOTE: Arrow functions never have an arguments object.
-        // b. Set argumentsObjectNeeded to false.
-        arguments_object_needed = false;
-    }
-    // 17. Else if parameterNames contains "arguments", then
-    else if (cached_ast_values.parameter_names_contains_arguments) {
-        // a. Set argumentsObjectNeeded to false.
-        arguments_object_needed = false;
-    }
-    // 18. Else if hasParameterExpressions is false, then
-    else if (!has_parameter_expressions) {
-        // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
-        if (function_names.contains(String.fromLiteral("arguments")) or
-            cached_ast_values.lexical_names_contains_arguments)
-        {
-            // i. Set argumentsObjectNeeded to false.
-            arguments_object_needed = false;
-        }
-    }
-
-    // 19. If strict is true or hasParameterExpressions is false, then
-    const env = if (strict or !has_parameter_expressions) blk: {
-        // a. NOTE: Only a single Environment Record is needed for the parameters, since calls
-        //    to eval in strict mode code cannot create new bindings which are visible outside
-        //    of the eval.
-
-        // b. Let env be the LexicalEnvironment of calleeContext.
-        break :blk callee_context.ecmascript_code.lexical_environment;
-    } else blk: {
-        // 20. Else,
-        // a. NOTE: A separate Environment Record is needed to ensure that bindings created by
-        //    direct eval calls in the formal parameter list are outside the environment where
-        //    parameters are declared.
-
-        // b. Let calleeEnv be the LexicalEnvironment of calleeContext.
-        const callee_env = callee_context.ecmascript_code.lexical_environment;
-
-        // c. Let env be NewDeclarativeEnvironment(calleeEnv).
-        const env: Environment = .{
-            .declarative_environment = try newDeclarativeEnvironment(
-                agent.gc_allocator,
-                callee_env,
-            ),
-        };
-
-        // d. Assert: The VariableEnvironment of calleeContext and calleeEnv are the same Environment Record.
-        std.debug.assert(
-            std.meta.eql(callee_context.ecmascript_code.variable_environment, callee_env),
-        );
-
-        // e. Set the LexicalEnvironment of calleeContext to env.
-        callee_context.ecmascript_code.lexical_environment = env;
-
-        break :blk env;
-    };
-
-    // 21. For each String paramName of parameterNames, do
-    for (parameter_names) |parameter_name| {
-        // a. Let alreadyDeclared be ! env.HasBinding(paramName).
-        const already_declared = env.hasBinding(agent, parameter_name) catch |err| try noexcept(err);
-
-        // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
-        //    functions that do not have parameter default values or rest parameters.
-
-        // c. If alreadyDeclared is false, then
-        if (!already_declared) {
-            // i. Perform ! env.CreateMutableBinding(paramName, false).
-            env.createMutableBinding(agent, parameter_name, false) catch |err| try noexcept(err);
-
-            // ii. If hasDuplicates is true, then
-            if (has_duplicates) {
-                // 1. Perform ! env.InitializeBinding(paramName, undefined).
-                env.initializeBinding(
-                    agent,
-                    parameter_name,
-                    .undefined,
-                ) catch |err| try noexcept(err);
-            }
-        }
-    }
-
-    // 22. If argumentsObjectNeeded is true, then
-    const parameter_bindings = if (arguments_object_needed) blk: {
-        // a. If strict is true or simpleParameterList is false, then
-        const arguments_object = if (strict or !simple_parameter_list) ao_blk: {
-            // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
-            break :ao_blk try createUnmappedArgumentsObject(agent, arguments_list.values);
-        } else ao_blk: {
-            // b. Else,
-            // i. NOTE: A mapped argument object is only provided for non-strict functions that
-            //    don't have a rest parameter, any parameter default value initializers, or any
-            //    destructured parameters.
-
-            // ii. Let ao be CreateMappedArgumentsObject(func, formals, argumentsList, env).
-            break :ao_blk try createMappedArgumentsObject(
-                agent,
-                &function.object,
-                formals,
-                arguments_list.values,
-                env,
-            );
-        };
-
-        // c. If strict is true, then
-        if (strict) {
-            // i. Perform ! env.CreateImmutableBinding("arguments", false).
-            env.createImmutableBinding(
-                agent,
-                String.fromLiteral("arguments"),
-                false,
-            ) catch |err| try noexcept(err);
-
-            // ii. NOTE: In strict mode code early errors prevent attempting to assign to this
-            //     binding, so its mutability is not observable.
-        } else {
-            // d. Else,
-            // i. Perform ! env.CreateMutableBinding("arguments", false).
-            env.createMutableBinding(
-                agent,
-                String.fromLiteral("arguments"),
-                false,
-            ) catch |err| try noexcept(err);
-        }
-
-        // e. Perform ! env.InitializeBinding("arguments", ao).
-        env.initializeBinding(
-            agent,
-            String.fromLiteral("arguments"),
-            Value.from(&arguments_object.object),
-        ) catch |err| try noexcept(err);
-
-        // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
-        var parameter_bindings: std.ArrayList(*const String) = .empty;
-        try parameter_bindings.ensureTotalCapacity(agent.gc_allocator, parameter_names.len + 1);
-        parameter_bindings.appendSliceAssumeCapacity(parameter_names);
-        parameter_bindings.appendAssumeCapacity(String.fromLiteral("arguments"));
-        break :blk try parameter_bindings.toOwnedSlice(agent.gc_allocator);
-    } else blk: {
-        // 23. Else,
-        // a. Let parameterBindings be parameterNames.
-        break :blk parameter_names;
-    };
-    defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
-
-    // 24-28.
-    try function.fields.evaluateArguments(agent, arguments_list, if (!has_duplicates) env else null);
-
-    // 29. If hasParameterExpressions is false, then
-    const var_env = if (!has_parameter_expressions) blk: {
-        // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
-
-        // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
-        defer instantiated_var_names.deinit(agent.gc_allocator);
-
-        if (parameter_bindings.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try instantiated_var_names.ensureTotalCapacity(
-            agent.gc_allocator,
-            @intCast(parameter_bindings.len),
-        );
-        for (parameter_bindings) |parameter_binding| {
-            instantiated_var_names.putAssumeCapacity(parameter_binding, {});
-        }
-
-        // c. For each element n of varNames, do
-        for (var_names) |var_name| {
-            // i. If instantiatedVarNames does not contain n, then
-            if (!instantiated_var_names.contains(var_name)) {
-                // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.putNoClobber(agent.gc_allocator, var_name, {});
-
-                // 2. Perform ! env.CreateMutableBinding(n, false).
-                env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
-
-                // 3. Perform ! env.InitializeBinding(n, undefined).
-                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
-            }
-        }
-
-        // d. Let varEnv be env.
-        break :blk env;
-    } else blk: {
-        // 30. Else,
-        // a. NOTE: A separate Environment Record is needed to ensure that closures created by
-        //    expressions in the formal parameter list do not have visibility of declarations in
-        //    the function body.
-
-        // b. Let varEnv be NewDeclarativeEnvironment(env).
-        const var_env: Environment = .{
-            .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, env),
-        };
-
-        // c. Set the VariableEnvironment of calleeContext to varEnv.
-        callee_context.ecmascript_code.variable_environment = var_env;
-
-        // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names: String.HashMapUnmanaged(void) = .empty;
-        defer instantiated_var_names.deinit(agent.gc_allocator);
-
-        // e. For each element n of varNames, do
-        for (var_names) |var_name| {
-            // i. If instantiatedVarNames does not contain n, then
-            if (!instantiated_var_names.contains(var_name)) {
-                // 1. Append n to instantiatedVarNames.
-                try instantiated_var_names.putNoClobber(agent.gc_allocator, var_name, {});
-
-                // 2. Perform ! varEnv.CreateMutableBinding(n, false).
-                var_env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
-
-                // 3. If parameterBindings does not contain n, or if functionNames contains n, then
-                //     a. Let initialValue be undefined.
-                // 4. Else,
-                //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const parameter_bindings_contains_var_name = for (parameter_bindings) |parameter_binding| {
-                    if (parameter_binding.eql(var_name)) break true;
-                } else false;
-                const initial_value: Value = if (!parameter_bindings_contains_var_name or function_names.contains(var_name))
-                    .undefined
-                else
-                    env.getBindingValue(agent, var_name, false) catch |err| try noexcept(err);
-
-                // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
-                var_env.initializeBinding(agent, var_name, initial_value) catch |err| try noexcept(err);
-
-                // 6. NOTE: A var with the same name as a formal parameter initially has the same
-                //    value as the corresponding initialized parameter.
-            }
-        }
-
-        break :blk var_env;
-    };
-
-    // 31. If strict is true, then
-    const lex_env = if (strict) blk: {
-        // a. Let lexEnv be varEnv.
-        break :blk var_env;
-    } else blk: {
-        // 32. Else,
-        // a. If the host is a web browser or otherwise supports Block-Level Function Declarations
-        //    Web Legacy Compatibility Semantics, then
-        //    [...]
-
-        // b. Let lexEnv be NewDeclarativeEnvironment(varEnv).
-        const lex_env: Environment = .{
-            .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, var_env),
-        };
-
-        // c. NOTE: Non-strict functions use a separate Environment Record for top-level lexical
-        //    declarations so that a direct eval can determine whether any var scoped declarations
-        //    introduced by the eval code conflict with pre-existing top-level lexically scoped
-        //    declarations. This is not needed for strict functions because a strict direct eval
-        //    always places all declarations into a new Environment Record.
-
-        break :blk lex_env;
-    };
-
-    // 33. Set the LexicalEnvironment of calleeContext to lexEnv.
-    callee_context.ecmascript_code.lexical_environment = lex_env;
-
-    // 34. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    const lex_declarations = cached_ast_values.lexically_scoped_declarations;
-
-    // 35. For each element d of lexDeclarations, do
-    for (lex_declarations, 0..) |declaration, i| {
-        // a. NOTE: A lexically declared name cannot be the same as a function/generator
-        //    declaration, formal parameter, or a var name. Lexically declared names are only
-        //    instantiated here but not initialized.
-
-        const bound_names = cached_ast_values.lexically_scoped_declarations_bound_names[i];
-
-        // b. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).
-                lex_env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
-            } else {
-                // ii. Else,
-                // 1. Perform ! lexEnv.CreateMutableBinding(dn, false).
-                lex_env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
-            }
-        }
-    }
-
-    // 36. Let privateEnv be the PrivateEnvironment of calleeContext.
-    const private_env = callee_context.ecmascript_code.private_environment;
-
-    // 37. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |hoistable_declaration| {
-        // a. Let fn be the sole element of the BoundNames of f.
-        const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
-        };
-
-        // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
-        const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, lex_env, private_env),
-            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, lex_env, private_env),
-            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, lex_env, private_env),
-            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, lex_env, private_env),
-        };
-
-        // c. Perform ! varEnv.SetMutableBinding(fn, fo, false).
-        var_env.setMutableBinding(
-            agent,
-            function_name,
-            Value.from(&function_object.object),
-            false,
-        ) catch |err| try noexcept(err);
-    }
-
-    // 38. Return unused.
 }

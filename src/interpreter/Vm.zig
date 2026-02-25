@@ -34,6 +34,7 @@ const evaluateNew = language.runtime.evaluateNew;
 const evaluateSuperCall = language.runtime.evaluateSuperCall;
 const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
+const getTemplateObject = language.runtime.getTemplateObject;
 const instantiateArrowFunctionExpression = language.runtime.instantiateArrowFunctionExpression;
 const instantiateAsyncArrowFunctionExpression = language.runtime.instantiateAsyncArrowFunctionExpression;
 const instantiateAsyncFunctionExpression = language.runtime.instantiateAsyncFunctionExpression;
@@ -1866,30 +1867,12 @@ fn executeConstructN(
 }
 
 fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Bytecode.Inst.Reg, raw_reg: Bytecode.Inst.Reg, template_id: u16) Agent.Error!void {
-    const realm = vm.agent.currentRealm();
     const frame = vm.currentCallFrame();
     const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&frame.bytecode));
-
-    const gop = try realm.template_map.getOrPut(vm.agent.gc_allocator, cache_key);
-    if (gop.found_existing) {
-        vm.load(dest, Value.from(&gop.value_ptr.*.object));
-        return;
-    }
-
-    const cooked = vm.store(cooked_reg).asObject();
-    const raw = vm.store(raw_reg).asObject();
-
-    _ = raw.setIntegrityLevel(vm.agent, .frozen) catch |err| try noexcept(err);
-
-    try cooked.definePropertyDirect(vm.agent, PropertyKey.from("raw"), .{
-        .value_or_accessor = .{ .value = Value.from(raw) },
-        .attributes = .none,
-    });
-    _ = cooked.setIntegrityLevel(vm.agent, .frozen) catch |err| try noexcept(err);
-
-    gop.value_ptr.* = cooked.as(builtins.Array);
-
-    vm.load(dest, Value.from(cooked));
+    const cooked = vm.store(cooked_reg).asObject().as(builtins.Array);
+    const raw = vm.store(raw_reg).asObject().as(builtins.Array);
+    const template = try getTemplateObject(vm.agent, cache_key, cooked, raw);
+    vm.load(dest, Value.from(&template.object));
 }
 
 fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {

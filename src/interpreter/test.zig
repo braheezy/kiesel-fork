@@ -74,10 +74,7 @@ fn testInterpreter(
 
     const platform: Agent.Platform = .default();
     defer platform.deinit();
-    var agent: Agent = try .init(&platform, .{
-        // Ensure generator code paths use new interpreter
-        .new_interpreter = true,
-    });
+    var agent: Agent = try .init(&platform, .{});
     defer agent.deinit();
 
     try Realm.initializeHostDefinedRealm(&agent, .{});

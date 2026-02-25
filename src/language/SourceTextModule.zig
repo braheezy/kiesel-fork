@@ -6,8 +6,8 @@ const std = @import("std");
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
 const builtins = @import("../builtins.zig");
-const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -32,7 +32,6 @@ const allImportAttributesSupported = language.allImportAttributesSupported;
 const asyncBlockStart = builtins.asyncBlockStart;
 const containsSlice = utils.containsSlice;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
@@ -1781,7 +1780,7 @@ fn executeModule(
         try agent.execution_context_stack.append(agent.gc_allocator, module_context);
 
         // c. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
-        const result = generateAndRunBytecode(agent, self.ecmascript_code, .{});
+        const result = interpreter.compileAndRun(agent, .{ .module = &self.ecmascript_code }, "<module>");
 
         // d. Suspend moduleContext and remove it from the execution context stack.
         _ = agent.execution_context_stack.pop().?;

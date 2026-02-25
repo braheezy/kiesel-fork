@@ -5,7 +5,6 @@ const std = @import("std");
 
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
-const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
 const types = @import("../types.zig");
@@ -22,7 +21,6 @@ const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
-const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
@@ -181,33 +179,33 @@ pub fn asyncBlockStart(
             //     ii. Let result be Completion(asyncBody()).
             const result = switch (async_body_) {
                 .ecmascript_function => |ef| blk: {
-                    if (agent_.options.new_interpreter) {
-                        const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
-                        var temp_vm: ?interpreter.Vm = null;
-                        defer if (temp_vm) |*vm_| vm_.deinit();
+                    const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
+                    var temp_vm: ?interpreter.Vm = null;
+                    defer if (temp_vm) |*vm_| vm_.deinit();
 
-                        const vm = agent_.active_vm orelse vm: {
-                            // Create a temporary VM if none is active. This happens when draining
-                            // the job queue for example.
-                            temp_vm = interpreter.Vm.init(agent_, bc) catch |err| break :blk @as(Agent.Error!Completion, err);
-                            break :vm &temp_vm.?;
-                        };
+                    const vm = agent_.active_vm orelse vm: {
+                        // Create a temporary VM if none is active. This happens when draining
+                        // the job queue for example.
+                        temp_vm = interpreter.Vm.init(agent_, bc) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        break :vm &temp_vm.?;
+                    };
 
-                        vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
-                        const result = vm.run(.{}) catch |err| {
-                            vm.popCallFrame();
-                            break :blk @as(Agent.Error!Completion, err);
-                        };
-                        const result_value: Value = switch (result) {
-                            .@"return" => |value| value orelse .undefined,
-                            .yield => unreachable,
-                        };
-                        break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value));
-                    }
-                    break :blk ef.function.fields.evaluateBody(agent_, null);
+                    vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
+                    const result = vm.run(.{}) catch |err| {
+                        vm.popCallFrame();
+                        break :blk @as(Agent.Error!Completion, err);
+                    };
+                    const result_value: Value = switch (result) {
+                        .@"return" => |value| value orelse .undefined,
+                        .yield => unreachable,
+                    };
+                    break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value));
                 },
                 .abstract_closure => |abstract_closure| abstract_closure.func(agent_, abstract_closure.captures),
-                .module => |module| generateAndRunBytecode(agent_, module, .{}),
+                .module => |module| blk: {
+                    const result_value = interpreter.compileAndRun(agent_, .{ .module = &module }, "<async module>") catch |err| break :blk @as(Agent.Error!Completion, err);
+                    break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value orelse .undefined));
+                },
             };
 
             // d. Assert: If we return here, the async function either threw an exception or

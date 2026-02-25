@@ -5,8 +5,8 @@ const std = @import("std");
 
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
-const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 
@@ -20,7 +20,6 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
-const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
 const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
 const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
@@ -117,9 +116,9 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of script).
         // b. If result is a normal completion and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, script, .{ .name = name })) |completion|
+        if (interpreter.compileAndRun(agent, .{ .script = &script }, name)) |value|
             // i. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse .undefined
+            break :blk value orelse .undefined
         else |err|
             break :blk err;
     } else |err| err;

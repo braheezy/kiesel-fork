@@ -12,7 +12,6 @@ pub const PrivateElement = @import("spec/private_element.zig").PrivateElement;
 pub const PrivateMethodDefinition = @import("spec/PrivateMethodDefinition.zig");
 pub const PrivateName = @import("spec/PrivateName.zig");
 pub const PropertyDescriptor = @import("spec/PropertyDescriptor.zig");
-pub const Reference = @import("spec/Reference.zig");
 pub const copyDataBlockBytes = data_block.copyDataBlockBytes;
 pub const createByteDataBlock = data_block.createByteDataBlock;
 pub const createIteratorResultObject = iterator.createIteratorResultObject;
@@ -29,5 +28,4 @@ test {
 
     _ = Completion;
     _ = PropertyDescriptor;
-    _ = Reference;
 }

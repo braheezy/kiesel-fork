@@ -1,8 +1,8 @@
 const std = @import("std");
 
 const ast = @import("../language/ast.zig");
-const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const interpreter = @import("../interpreter.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -16,7 +16,6 @@ const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
 const Value = types.Value;
 const fmtParseError = language.fmtParseError;
-const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
 const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
 const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
@@ -207,11 +206,13 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
         // 30. If result is a normal completion and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, body, .{
-            .contained_in_strict_mode_code = strict_eval,
-        })) |completion|
+        if (interpreter.compileAndRun(
+            agent,
+            .{ .eval = .{ .script = &body, .strict = strict_eval } },
+            "<eval>",
+        )) |value|
             // a. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse .undefined
+            break :blk value orelse .undefined
         else |err|
             break :blk err;
     } else |err| err;

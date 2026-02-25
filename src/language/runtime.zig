@@ -2,7 +2,6 @@ const std = @import("std");
 
 const ast = @import("ast.zig");
 const builtins = @import("../builtins.zig");
-const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
@@ -21,23 +20,18 @@ const Object = types.Object;
 const PrivateElement = types.PrivateElement;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PrivateMethodDefinition = types.PrivateMethodDefinition;
-const PrivateName = types.PrivateName;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
-const Reference = types.Reference;
 const String = types.String;
 const Value = types.Value;
 const allImportAttributesSupported = language.allImportAttributesSupported;
-const arrayCreate = builtins.arrayCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineMethodProperty = builtins.defineMethodProperty;
-const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const makeClassConstructor = builtins.makeClassConstructor;
 const makeConstructor = builtins.makeConstructor;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
-const newPrivateEnvironment = execution.newPrivateEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -47,128 +41,57 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performEval = builtins.performEval;
 const setFunctionName = builtins.setFunctionName;
 
-/// 8.6.2.1 InitializeBoundName ( name, value, environment )
-/// https://tc39.es/ecma262/#sec-initializeboundname
-pub fn initializeBoundName(
-    agent: *Agent,
-    name: *const String,
-    value: Value,
-    environment_or_strict: union(enum) {
-        environment: Environment,
-        strict: bool,
-    },
-) Agent.Error!void {
-    switch (environment_or_strict) {
-        // 1. If environment is not undefined, then
-        .environment => |environment| {
-            // a. Perform ! environment.InitializeBinding(name, value).
-            environment.initializeBinding(agent, name, value) catch |err| try noexcept(err);
-
-            // b. Return unused.
-        },
-
-        // 2. Else,
-        .strict => |strict| {
-            // a. Let lhs be ? ResolveBinding(name).
-            var dummy_cache: ?Environment.LookupCacheEntry = null;
-            const lhs = try agent.resolveBinding(name, null, strict, &dummy_cache);
-
-            // b. Return ? PutValue(lhs, value).
-            try lhs.putValue(agent, value);
-        },
-    }
-}
-
 /// 13.2.8.4 GetTemplateObject ( templateLiteral )
 /// https://tc39.es/ecma262/#sec-gettemplateobject
 pub fn getTemplateObject(
     agent: *Agent,
-    template_literal: *ast.TemplateLiteral,
+    cache_key: u64,
+    raw: *builtins.Array,
+    cooked: *builtins.Array,
 ) std.mem.Allocator.Error!*builtins.Array {
     // 1. Let realm be the current Realm Record.
     const realm = agent.currentRealm();
 
     // 2. Let templateRegistry be realm.[[TemplateMap]].
     // 3. For each element e of templateRegistry, do
-    if (realm.template_map.get(@intFromPtr(template_literal))) |template| {
+    if (realm.template_map.get(cache_key)) |template| {
         // a. If e.[[Site]] is the same Parse Node as templateLiteral, then
         //     i. Return e.[[Array]].
         return template;
     }
 
+    const template = cooked;
+
     // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument true.
     // 5. Assert: rawStrings is a List of Strings.
-    const raw_strings = try template_literal.templateStrings(agent.gc_allocator, true);
-    defer agent.gc_allocator.free(raw_strings);
-
     // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument false.
-    const cooked_strings = try template_literal.templateStrings(agent.gc_allocator, false);
-    defer agent.gc_allocator.free(cooked_strings);
-
     // 7. Let count be the number of elements in the List cookedStrings.
     // 8. Assert: count ≤ 2**32 - 1.
-    const count: u32 = @intCast(cooked_strings.len);
-
     // 9. Let template be ! ArrayCreate(count).
-    const template = arrayCreate(agent, count, null) catch |err| try noexcept(err);
-
     // 10. Let rawObj be ! ArrayCreate(count).
-    const raw_obj = arrayCreate(agent, count, null) catch |err| try noexcept(err);
-
     // 11. Let index be 0.
-    var index: u53 = 0;
-
     // 12. Repeat, while index < count,
-    while (index < count) : (index += 1) {
-        // a. Let prop be ! ToString(𝔽(index)).
-        const property_key = PropertyKey.from(index);
-
-        // b. Let cookedValue be cookedStrings[index].
-        const cooked_value = cooked_strings[@intCast(index)];
-
-        // c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
-        //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
-        //    }).
-        try template.object.definePropertyDirect(agent, property_key, .{
-            .value_or_accessor = .{
-                .value = Value.from(cooked_value),
-            },
-            .attributes = .{
-                .writable = false,
-                .enumerable = true,
-                .configurable = false,
-            },
-        });
-
-        // d. Let rawValue be the String value rawStrings[index].
-        const raw_value = raw_strings[@intCast(index)];
-
-        // e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
-        //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
-        //    }).
-        try raw_obj.object.definePropertyDirect(agent, property_key, .{
-            .value_or_accessor = .{
-                .value = Value.from(raw_value),
-            },
-            .attributes = .{
-                .writable = false,
-                .enumerable = true,
-                .configurable = false,
-            },
-        });
-
-        // f. Set index to index + 1.
-    }
+    //     a. Let prop be ! ToString(𝔽(index)).
+    //     b. Let cookedValue be cookedStrings[index].
+    //     c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
+    //          [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
+    //        }).
+    //     d. Let rawValue be the String value rawStrings[index].
+    //     e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
+    //          [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
+    //        }).
+    //     f. Set index to index + 1.
+    // NOTE: This is handled via the generated bytecode.
 
     // 13. Perform ! SetIntegrityLevel(rawObj, frozen).
-    _ = raw_obj.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
+    _ = raw.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 14. Perform ! DefinePropertyOrThrow(template, "raw", PropertyDescriptor {
     //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //     }).
     try template.object.definePropertyDirect(agent, PropertyKey.from("raw"), .{
         .value_or_accessor = .{
-            .value = Value.from(&raw_obj.object),
+            .value = Value.from(&raw.object),
         },
         .attributes = .none,
     });
@@ -177,7 +100,7 @@ pub fn getTemplateObject(
     _ = template.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
 
     // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
-    try realm.template_map.putNoClobber(agent.gc_allocator, @intFromPtr(template_literal), template);
+    try realm.template_map.putNoClobber(agent.gc_allocator, cache_key, template);
 
     // 17. Return template.
     return template;
@@ -201,28 +124,6 @@ pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) 
 
     // 6. Return ? Construct(constructor, argList).
     return Value.from(try constructor.asObject().construct(agent, arguments, null));
-}
-
-/// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
-/// https://tc39.es/ecma262/#sec-evaluatecall
-pub fn evaluateCallGetThisValue(reference: Reference) Value {
-    // 1. If ref is a Reference Record, then
-    // a. If IsPropertyReference(ref) is true, then
-    if (reference.isPropertyReference()) {
-        // i. Let thisValue be GetThisValue(ref).
-        return reference.getThisValue();
-    } else {
-        // b. Else,
-        // i. Let refEnv be ref.[[Base]].
-        // ii. Assert: refEnv is an Environment Record.
-        const reference_environment = reference.base.environment;
-
-        // iii. Let thisValue be refEnv.WithBaseObject().
-        return if (reference_environment.withBaseObject()) |object|
-            Value.from(object)
-        else
-            .undefined;
-    }
 }
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
@@ -666,101 +567,6 @@ pub fn applyStringOrNumericBinaryOperator(
     };
 
     // 8. Return operation(lNum, rNum).
-}
-
-pub const BlockDeclarationInstantiationType = enum {
-    statement_list,
-    case_block,
-};
-
-/// 14.2.3 BlockDeclarationInstantiation ( code, env )
-/// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
-pub fn blockDeclarationInstantiation(
-    agent: *Agent,
-    code: union(BlockDeclarationInstantiationType) {
-        statement_list: ast.StatementList,
-        case_block: ast.CaseBlock,
-    },
-    env: Environment,
-) std.mem.Allocator.Error!void {
-    // NOTE: Keeping this wrapped in a generic `Environment` makes a bunch of stuff below easier.
-    std.debug.assert(env == .declarative_environment);
-
-    // 1. let declarations be the LexicallyScopedDeclarations of code.
-    var declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer declarations.deinit(agent.gc_allocator);
-    switch (code) {
-        .statement_list => |node| try node.collectLexicallyScopedDeclarations(agent.gc_allocator, &declarations),
-        .case_block => |node| try node.collectLexicallyScopedDeclarations(agent.gc_allocator, &declarations),
-    }
-
-    // 2. Let privateEnv be the running execution context's PrivateEnvironment.
-    const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
-
-    var bound_names: std.ArrayList(ast.Identifier) = .empty;
-    defer bound_names.deinit(agent.gc_allocator);
-
-    // 3. For each element d of declarations, do
-    for (declarations.items) |declaration| {
-        bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
-
-        // a. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name_utf8| {
-            const name = try String.fromUtf8(agent, name_utf8);
-
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ! env.CreateImmutableBinding(dn, true).
-                env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
-            } else {
-                // ii. Else,
-                // 1. If the host is a web browser or otherwise supports Block-Level Function
-                //    Declarations Web Legacy Compatibility Semantics, then
-                //     a. If ! env.HasBinding(dn) is false, then
-                //         i. Perform ! env.CreateMutableBinding(dn, false).
-                // 2. Else,
-                //     a. Perform ! env.CreateMutableBinding(dn, false).
-                env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
-            }
-        }
-
-        // b. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
-        //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
-        if (declaration == .hoistable_declaration) {
-            const hoistable_declaration = declaration.hoistable_declaration;
-
-            // i. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
-            };
-
-            // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
-            const function_object = try switch (hoistable_declaration) {
-                .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, env, private_env),
-                .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, env, private_env),
-                .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, env, private_env),
-                .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env),
-            };
-
-            // iii. If the host is a web browser or otherwise supports Block-Level Function
-            //      Declarations Web Legacy Compatibility Semantics, then
-            //     1. If the binding for fn in env is an uninitialized binding, then
-            //         a. Perform ! env.InitializeBinding(fn, fo).
-            //     2. Else,
-            //         a. Assert: d is a FunctionDeclaration.
-            //         b. Perform ! env.SetMutableBinding(fn, fo, false).
-            // iv. Else,
-            //     1. Perform ! env.InitializeBinding(fn, fo).
-            env.initializeBinding(
-                agent,
-                function_name,
-                Value.from(&function_object.object),
-            ) catch |err| try noexcept(err);
-        }
-    }
-
-    // 4. Return unused.
 }
 
 /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
@@ -1836,21 +1642,16 @@ fn classFieldDefinitionEvaluation(
     agent: *Agent,
     field_definition: ast.FieldDefinition,
     home_object: *Object,
-    pre_evaluated_name: ?Value,
+    pre_evaluated_name: Value,
 ) Agent.Error!ClassFieldDefinition {
     const realm = agent.currentRealm();
 
     // 1. Let name be ? Evaluation of ClassElementName.
     const name: PropertyKeyOrPrivateName = blk: {
-        const value = pre_evaluated_name orelse (try generateAndRunBytecode(
-            agent,
-            field_definition.class_element_name,
-            .{},
-        )).value.?;
-        if (value.toPrivateName()) |private_name| {
+        if (pre_evaluated_name.toPrivateName()) |private_name| {
             break :blk .{ .private_name = private_name };
         }
-        const property_key = try value.toPropertyKey(agent);
+        const property_key = try pre_evaluated_name.toPropertyKey(agent);
         break :blk .{ .property_key = property_key };
     };
 
@@ -1980,7 +1781,7 @@ fn classElementEvaluation(
     agent: *Agent,
     class_element: ast.ClassElement,
     object: *Object,
-    pre_evaluated_name: ?Value,
+    pre_evaluated_name: Value,
 ) Agent.Error!?union(enum) {
     class_field_definition: ClassFieldDefinition,
     class_static_block_definition: ClassStaticBlockDefinition,
@@ -2011,14 +1812,9 @@ fn classElementEvaluation(
         .static_method_definition,
         => |method_definition| {
             // 1. Return ? MethodDefinitionEvaluation of MethodDefinition with arguments object and false.
-            const property_name = pre_evaluated_name orelse (try generateAndRunBytecode(
-                agent,
-                method_definition.class_element_name,
-                .{},
-            )).value.?;
             if (try methodDefinitionEvaluation(
                 agent,
-                .{ .property_name = property_name, .method = method_definition.method },
+                .{ .property_name = pre_evaluated_name, .method = method_definition.method },
                 object,
                 false,
             )) |private_method_definition|
@@ -2056,7 +1852,7 @@ pub fn classDefinitionEvaluation(
     class_name: *const String,
     source_text: []const u8,
     pre_evaluated_heritage: ?Value,
-    pre_evaluated_element_names: ?[]const Value,
+    pre_evaluated_element_names: []const Value,
 ) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
@@ -2077,43 +1873,17 @@ pub fn classDefinitionEvaluation(
     }
 
     // 4. Let outerPrivateEnvironment be the running execution context's PrivateEnvironment.
-
     // 5. Let classPrivateEnvironment be NewPrivateEnvironment(outerPrivateEnvironment).
-    var outer_private_environment: ?*PrivateEnvironment = undefined;
-    var class_private_environment: *PrivateEnvironment = undefined;
-
-    if (pre_evaluated_element_names != null and agent.runningExecutionContext().ecmascript_code.private_environment != null) {
-        class_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment.?;
-        outer_private_environment = class_private_environment.outer_private_environment;
-    } else {
-        outer_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment;
-        class_private_environment = try newPrivateEnvironment(
-            agent.gc_allocator,
-            outer_private_environment,
-        );
-    }
+    const class_private_environment = agent.runningExecutionContext().ecmascript_code.private_environment.?;
 
     // 6. If ClassBody is present, then
-    if (pre_evaluated_element_names == null and class_tail.class_body.class_element_list.items.len != 0) {
-        const private_bound_identifiers = try class_tail.class_body.privateBoundIdentifiers(agent.gc_allocator);
-        defer agent.gc_allocator.free(private_bound_identifiers);
-
-        // a. For each String dn of the PrivateBoundIdentifiers of ClassBody, do
-        for (private_bound_identifiers) |declared_name| {
-            // i. If classPrivateEnvironment.[[Names]] contains a Private Name pn such that pn.[[Description]] is dn, then
-            if (class_private_environment.names.contains(declared_name)) {
-                // 1. Assert: This is only possible for getter/setter pairs.
-            } else {
-                // ii. Else,
-                // 1. Let name be a new Private Name whose [[Description]] is dn.
-                const description = try String.fromUtf8(agent, declared_name);
-                const name = try PrivateName.init(agent.gc_allocator, description);
-
-                // 2. Append name to classPrivateEnvironment.[[Names]].
-                try class_private_environment.names.putNoClobber(agent.gc_allocator, declared_name, name);
-            }
-        }
-    }
+    //     a. For each String dn of the PrivateBoundIdentifiers of ClassBody, do
+    //         i. If classPrivateEnvironment.[[Names]] contains a Private Name pn such that pn.[[Description]] is dn, then
+    //             1. Assert: This is only possible for getter/setter pairs.
+    //         ii. Else,
+    //             1. Let name be a new Private Name whose [[Description]] is dn.
+    //             2. Append name to classPrivateEnvironment.[[Names]].
+    // NOTE: This is handled via the generated bytecode.
 
     var prototype_parent: ?*Object = undefined;
     var constructor_parent: *Object = undefined;
@@ -2133,27 +1903,12 @@ pub fn classDefinitionEvaluation(
         // b. NOTE: The running execution context's PrivateEnvironment is outerPrivateEnvironment
         //    when evaluating ClassHeritage.
         // c. Let superclassRef be Completion(Evaluation of ClassHeritage).
-        const superclass = if (pre_evaluated_heritage) |heritage| blk: {
-            // d. Set the running execution context's LexicalEnvironment to env.
-            agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
+        const superclass = pre_evaluated_heritage.?;
 
-            // e. Let superclass be ? GetValue(? superclassRef).
-            break :blk heritage;
-        } else blk: {
-            const superclass_ref = generateAndRunBytecode(
-                agent,
-                ast.ExpressionStatement{ .expression = class_tail.class_heritage.?.* },
-                .{},
-            );
+        // d. Set the running execution context's LexicalEnvironment to env.
+        agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
-            // d. Set the running execution context's LexicalEnvironment to env.
-            agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
-
-            // e. Let superclass be ? GetValue(? superclassRef).
-            // NOTE: Wrapping the Expression node in a ExpressionStatement above ensures a get_value
-            //       instruction is emitted for references.
-            break :blk (try superclass_ref).value.?;
-        };
+        // e. Let superclass be ? GetValue(? superclassRef).
 
         // f. If superclass is null, then
         if (superclass.isNull()) {
@@ -2371,12 +2126,7 @@ pub fn classDefinitionEvaluation(
     defer static_elements.deinit(agent.gc_allocator);
 
     // 26. For each ClassElement e of elements, do
-    for (elements, 0..) |class_element, element_index| {
-        const pre_evaluated_name: ?Value = if (pre_evaluated_element_names) |names|
-            names[element_index]
-        else
-            null;
-
+    for (elements, pre_evaluated_element_names) |class_element, pre_evaluated_name| {
         // a. If IsStatic of e is false, then
         const element_or_error = if (!class_element.isStatic()) blk: {
             // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
@@ -2394,9 +2144,7 @@ pub fn classDefinitionEvaluation(
             agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
             // ii. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            if (pre_evaluated_element_names == null) {
-                agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
-            }
+            // NOTE: This is handled via the generated bytecode.
 
             // iii. Return ? element.
             return err;
@@ -2538,9 +2286,7 @@ pub fn classDefinitionEvaluation(
         // c. If result is an abrupt completion, then
         _ = result catch |err| {
             // i. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-            if (pre_evaluated_element_names == null) {
-                agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
-            }
+            // NOTE: This is handled via the generated bytecode.
 
             // ii. Return ? result.
             return err;
@@ -2548,66 +2294,10 @@ pub fn classDefinitionEvaluation(
     }
 
     // 33. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
-    if (pre_evaluated_element_names == null) {
-        agent.runningExecutionContext().ecmascript_code.private_environment = outer_private_environment;
-    }
+    // NOTE: This is handled via the generated bytecode.
 
     // 34. Return F.
     return function;
-}
-
-/// 15.7.15 Runtime Semantics: BindingClassDeclarationEvaluation
-/// https://tc39.es/ecma262/#sec-runtime-semantics-bindingclassdeclarationevaluation
-pub fn bindingClassDeclarationEvaluation(
-    agent: *Agent,
-    class_declaration: ast.ClassDeclaration,
-) Agent.Error!*Object {
-    // ClassDeclaration : class BindingIdentifier ClassTail
-    if (class_declaration.identifier) |identifier| {
-        // 1. Let className be the StringValue of BindingIdentifier.
-        const class_name = try String.fromUtf8(agent, identifier);
-
-        // 2. Let sourceText be the source text matched by ClassDeclaration.
-        const source_text = class_declaration.source_text;
-
-        // 3. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className,
-        //    className, and sourceText.
-        const value = try classDefinitionEvaluation(
-            agent,
-            class_declaration.class_tail,
-            class_name,
-            class_name,
-            source_text,
-            null,
-            null,
-        );
-
-        // 4. Let env be the running execution context's LexicalEnvironment.
-        const env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
-
-        // 5. Perform ? InitializeBoundName(className, value, env).
-        try initializeBoundName(agent, class_name, Value.from(value), .{ .environment = env });
-
-        // 6. Return value.
-        return value;
-    }
-    // ClassDeclaration : class ClassTail
-    else {
-        // 1. Let sourceText be the source text matched by ClassDeclaration.
-        const source_text = class_declaration.source_text;
-
-        // 2. Return ? ClassDefinitionEvaluation of ClassTail with arguments undefined, "default",
-        //    and sourceText.
-        return classDefinitionEvaluation(
-            agent,
-            class_declaration.class_tail,
-            null,
-            String.fromLiteral("default"),
-            source_text,
-            null,
-            null,
-        );
-    }
 }
 
 /// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject

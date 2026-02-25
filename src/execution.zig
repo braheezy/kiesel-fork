@@ -12,7 +12,6 @@ pub const ObjectEnvironment = environments.ObjectEnvironment;
 pub const PrivateEnvironment = environments.PrivateEnvironment;
 pub const Realm = @import("execution/Realm.zig");
 pub const ScriptOrModule = @import("execution/ExecutionContext.zig").ScriptOrModule;
-pub const getIdentifierReference = environments.getIdentifierReference;
 pub const newDeclarativeEnvironment = environments.newDeclarativeEnvironment;
 pub const newFunctionEnvironment = environments.newFunctionEnvironment;
 pub const newGlobalEnvironment = environments.newGlobalEnvironment;

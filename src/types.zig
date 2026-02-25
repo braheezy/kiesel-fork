@@ -21,7 +21,6 @@ pub const PrivateName = spec.PrivateName;
 pub const PropertyDescriptor = spec.PropertyDescriptor;
 pub const PropertyKey = Object.PropertyKey;
 pub const PropertyKeyOrPrivateName = union(enum) { property_key: PropertyKey, private_name: PrivateName };
-pub const Reference = spec.Reference;
 pub const String = language.String;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;

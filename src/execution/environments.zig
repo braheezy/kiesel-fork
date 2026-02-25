@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const PrivateName = types.PrivateName;
-const Reference = types.Reference;
 const String = types.String;
 const Value = types.Value;
 
@@ -185,56 +184,6 @@ pub const Environment = union(enum) {
         };
     }
 };
-
-/// 9.1.2.1 GetIdentifierReference ( env, name, strict )
-/// https://tc39.es/ecma262/#sec-getidentifierreference
-pub fn getIdentifierReference(
-    agent: *Agent,
-    start_env: Environment,
-    name: *const String,
-    strict: bool,
-    lookup_cache_entry: *?Environment.LookupCacheEntry,
-) Agent.Error!Reference {
-    // 1. If env is null, then
-    //     a. Return the Reference Record {
-    //          [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-    //        }.
-    // 2. Let exists be ? env.HasBinding(name).
-    // 3. If exists is true, then
-    //     a. Return the Reference Record {
-    //          [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-    //        }.
-    // 4. Else,
-    //     a. Let outer be env.[[OuterEnv]].
-    //     b. Return ? GetIdentifierReference(outer, name, strict).
-    var env = start_env;
-    var distance: u16 = 0;
-    defer lookup_cache_entry.* = .{ .distance = distance };
-    if (lookup_cache_entry.*) |cache| {
-        while (distance < cache.distance) : (distance += 1) {
-            // We only ever increase the distance up to the global env.
-            // If we do reach it, the while loop below will check if the binding still exists.
-            env = env.outerEnv().?;
-        }
-    }
-    while (!try env.hasBinding(agent, name)) : (distance += 1) {
-        env = env.outerEnv() orelse {
-            @branchHint(.unlikely);
-            return .{
-                .base = .unresolvable,
-                .referenced_name = .{ .value = Value.from(name) },
-                .strict = strict,
-                .this_value = null,
-            };
-        };
-    }
-    return .{
-        .base = .{ .environment = env },
-        .referenced_name = .{ .value = Value.from(name) },
-        .strict = strict,
-        .this_value = null,
-    };
-}
 
 /// 9.1.2.2 NewDeclarativeEnvironment ( E )
 /// https://tc39.es/ecma262/#sec-newdeclarativeenvironment
