@@ -105,7 +105,7 @@ pub const RunOptions = struct {
 };
 
 const constants_align = @max(@alignOf(String), @alignOf(BigInt));
-const Constants = []const *align(constants_align) const anyopaque;
+const Constants = []?*align(constants_align) const anyopaque;
 
 pub fn init(
     agent: *Agent,
@@ -393,24 +393,7 @@ fn ensureConstants(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.Error!C
         const total_len = bytecode.strings.len + bytecode.big_ints.len;
         const Ptr = @typeInfo(Constants).pointer.child;
         const constants = try vm.agent.gc_allocator.alloc(Ptr, total_len);
-        errdefer vm.agent.gc_allocator.free(constants);
-
-        for (bytecode.strings, bytecode.string_kinds, constants[0..bytecode.strings.len]) |utf8, kind, *slot| {
-            const string = switch (kind) {
-                .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
-                .literal => try String.fromUtf8(
-                    vm.agent,
-                    try vm.agent.gc_allocator.dupe(u8, utf8),
-                ),
-            };
-            slot.* = @ptrCast(@alignCast(string));
-        }
-        for (bytecode.big_ints, constants[bytecode.strings.len..]) |@"const", *slot| {
-            const managed = try @"const".toManaged(vm.agent.gc_allocator);
-            const big_int = try BigInt.fromManaged(vm.agent, managed);
-            slot.* = @ptrCast(@alignCast(big_int));
-        }
-
+        @memset(constants, null);
         constants_gop.value_ptr.* = constants;
     }
     return constants_gop.value_ptr.*;
@@ -474,14 +457,38 @@ fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
     vm.regs()[@intFromEnum(reg)] = value;
 }
 
-fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) *const String {
+fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!*const String {
     const frame = vm.currentCallFrame();
-    return @ptrCast(frame.constants[@intFromEnum(index)]);
+    const constants_index = @intFromEnum(index);
+    if (frame.constants[constants_index]) |ptr| {
+        @branchHint(.likely);
+        return @ptrCast(ptr);
+    }
+    const utf8 = frame.bytecode.strings[@intFromEnum(index)];
+    const kind = frame.bytecode.string_kinds[@intFromEnum(index)];
+    const string = switch (kind) {
+        .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
+        .literal => try String.fromUtf8(
+            vm.agent,
+            try vm.agent.gc_allocator.dupe(u8, utf8),
+        ),
+    };
+    frame.constants[constants_index] = @ptrCast(@alignCast(string));
+    return string;
 }
 
-fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) *const BigInt {
+fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
     const frame = vm.currentCallFrame();
-    return @ptrCast(frame.constants[frame.bytecode.strings.len + @intFromEnum(index)]);
+    const constants_index = frame.bytecode.strings.len + @intFromEnum(index);
+    if (frame.constants[constants_index]) |ptr| {
+        @branchHint(.likely);
+        return @ptrCast(ptr);
+    }
+    const @"const" = frame.bytecode.big_ints[@intFromEnum(index)];
+    const managed = try @"const".toManaged(vm.agent.gc_allocator);
+    const big_int = try BigInt.fromManaged(vm.agent, managed);
+    frame.constants[constants_index] = @ptrCast(@alignCast(big_int));
+    return big_int;
 }
 
 fn getFunction(vm: *Vm, index: Bytecode.Inst.FunctionIndex) Bytecode.Function {
@@ -534,13 +541,13 @@ fn executeLoadNumberF64(vm: *Vm, reg: Bytecode.Inst.Reg, value: f64) void {
     vm.load(reg, Value.from(value));
 }
 
-fn executeLoadString(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.StringIndex) void {
-    const string = vm.getString(index);
+fn executeLoadString(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!void {
+    const string = try vm.getString(index);
     vm.load(reg, Value.from(string));
 }
 
-fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIntIndex) void {
-    const big_int = vm.getBigInt(index);
+fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!void {
+    const big_int = try vm.getBigInt(index);
     vm.load(reg, Value.from(big_int));
 }
 
@@ -599,7 +606,7 @@ fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) std.mem.Allocator.Error!
 
 fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
     const object = vm.store(object_reg).asObject();
-    const property_key = PropertyKey.from(vm.getString(key_index));
+    const property_key = PropertyKey.from(try vm.getString(key_index));
     const property_value = vm.store(value_reg);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
 }
@@ -613,7 +620,7 @@ fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Byt
 
 fn executeObjectSetGetter(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
-    const property_key = PropertyKey.from(vm.getString(key_index));
+    const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .get = function, .enumerable = true, .configurable = true });
 }
@@ -627,7 +634,7 @@ fn executeObjectSetGetterComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_re
 
 fn executeObjectSetSetter(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
-    const property_key = PropertyKey.from(vm.getString(key_index));
+    const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
 }
@@ -661,8 +668,8 @@ fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Byteco
 }
 
 fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.Inst.StringIndex, flags_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const pattern = vm.getString(pattern_index);
-    const flags = vm.getString(flags_index);
+    const pattern = try vm.getString(pattern_index);
+    const flags = try vm.getString(flags_index);
     const reg_exp = try builtins.regExpCreateFast(vm.agent, pattern, flags);
     vm.load(dst, Value.from(&reg_exp.object));
 }
@@ -756,7 +763,7 @@ fn executeTypeof(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
 }
 
 fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
 
     const execution_context = vm.agent.runningExecutionContext();
     var env = execution_context.ecmascript_code.lexical_environment;
@@ -1205,14 +1212,14 @@ fn executePopScope(vm: *Vm) void {
 }
 
 fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const execution_context = vm.agent.runningExecutionContext();
     const env = execution_context.ecmascript_code.lexical_environment;
     try env.createMutableBinding(vm.agent, name, false);
 }
 
 fn executeCreateImmutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const execution_context = vm.agent.runningExecutionContext();
     const env = execution_context.ecmascript_code.lexical_environment;
     try env.createImmutableBinding(vm.agent, name, true);
@@ -1223,7 +1230,7 @@ fn executeInitializeBinding(
     name_index: Bytecode.Inst.StringIndex,
     value_reg: Bytecode.Inst.Reg,
 ) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const value = vm.store(value_reg);
 
     const execution_context = vm.agent.runningExecutionContext();
@@ -1232,7 +1239,7 @@ fn executeInitializeBinding(
 }
 
 fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
 
     const execution_context = vm.agent.runningExecutionContext();
     var env = execution_context.ecmascript_code.lexical_environment;
@@ -1259,7 +1266,7 @@ fn executeGetProperty(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const result = try base_object.internal_methods.get(
         vm.agent,
         base_object,
@@ -1312,7 +1319,7 @@ fn executeSetBinding(
     value_reg: Bytecode.Inst.Reg,
     comptime strict: bool,
 ) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const value = vm.store(value_reg);
 
     const execution_context = vm.agent.runningExecutionContext();
@@ -1347,7 +1354,7 @@ fn executeSetProperty(
     const value = vm.store(value_reg);
 
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const success = try base_object.internal_methods.set(
         vm.agent,
         base_object,
@@ -1455,7 +1462,7 @@ fn executeUpdateBinding(
     comptime update_type: UpdateType,
     comptime strict: bool,
 ) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
@@ -1492,7 +1499,7 @@ fn executeUpdateProperty(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const old_value = try base_object.internal_methods.get(
         vm.agent,
         base_object,
@@ -1600,7 +1607,7 @@ fn executeUpdatePropertyIndexed(
 }
 
 fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
     while (!try env.hasBinding(vm.agent, name)) {
@@ -1624,7 +1631,7 @@ fn executeDeleteProperty(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const delete_status = try base_object.internal_methods.delete(
         vm.agent,
         base_object,
@@ -2098,13 +2105,13 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
     const function = vm.getFunction(function_index);
-    const source_text = try vm.getString(function.source_text).toUtf8(vm.agent.gc_allocator);
+    const source_text = try (try vm.getString(function.source_text)).toUtf8(vm.agent.gc_allocator);
     const identifier: ?[]const u8 = switch (function.name) {
-        .identifier => |name_index| try vm.getString(name_index).toUtf8(vm.agent.gc_allocator),
+        .identifier => |name_index| try (try vm.getString(name_index)).toUtf8(vm.agent.gc_allocator),
         .none, .default => null,
     };
     const default_name: ?[]const u8 = switch (function.name) {
-        .default => |name_index| try vm.getString(name_index).toUtf8(vm.agent.gc_allocator),
+        .default => |name_index| try (try vm.getString(name_index)).toUtf8(vm.agent.gc_allocator),
         .none, .identifier => null,
     };
     const function_obj = switch (function.kind) {
@@ -2148,14 +2155,14 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
 
 fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
     const class = vm.getClass(class_index);
-    const source_text = try vm.getString(class.source_text).toUtf8(vm.agent.gc_allocator);
+    const source_text = try (try vm.getString(class.source_text)).toUtf8(vm.agent.gc_allocator);
     const class_binding: ?*const String = switch (class.name) {
-        .identifier => |name_index| vm.getString(name_index),
+        .identifier => |name_index| try vm.getString(name_index),
         .none, .default => null,
     };
     const class_name: *const String = switch (class.name) {
-        .identifier => |name_index| vm.getString(name_index),
-        .default => |name_index| vm.getString(name_index),
+        .identifier => |name_index| try vm.getString(name_index),
+        .default => |name_index| try vm.getString(name_index),
         .none => .empty,
     };
     const heritage: ?Value = switch (class.heritage) {
@@ -2258,7 +2265,7 @@ fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecod
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
     };
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const result = try base_object.internal_methods.get(vm.agent, base_object, property_key, actual_this);
     vm.load(dest, result);
 }
@@ -2288,7 +2295,7 @@ fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Inst.Reg, name_index: By
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
     };
     const base_object = try base_value.toObject(vm.agent);
-    const property_key = PropertyKey.from(vm.getString(name_index));
+    const property_key = PropertyKey.from(try vm.getString(name_index));
     const succeeded = try base_object.internal_methods.set(vm.agent, base_object, property_key, value, actual_this);
     if (!succeeded and strict) {
         @branchHint(.unlikely);
@@ -2316,7 +2323,7 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Inst.Reg, val
 }
 
 fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
 
     const execution_context = vm.agent.runningExecutionContext();
@@ -2328,7 +2335,7 @@ fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Byt
 }
 
 fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
     defer vm.agent.gc_allocator.free(name_utf8);
 
@@ -2353,7 +2360,7 @@ fn executePopPrivateScope(vm: *Vm) void {
 
 fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
     defer vm.agent.gc_allocator.free(name_utf8);
 
@@ -2369,7 +2376,7 @@ fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode
 fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const name = vm.getString(name_index);
+    const name = try vm.getString(name_index);
     const identifier = try name.toUtf8(vm.agent.gc_allocator);
     defer vm.agent.gc_allocator.free(identifier);
 
