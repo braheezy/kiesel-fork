@@ -1269,7 +1269,10 @@ pub fn initializeInstanceElements(
 ) Agent.Error!void {
     // 1. Let methods be constructor.[[PrivateMethods]].
     const methods = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
-        break :blk ecmascript_function.fields.private_methods;
+        break :blk if (ecmascript_function.fields.class_data) |class_data|
+            class_data.private_methods
+        else
+            &.{};
     } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
         const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         break :blk class_constructor_fields.private_methods;
@@ -1283,7 +1286,10 @@ pub fn initializeInstanceElements(
 
     // 3. Let fields be constructor.[[Fields]].
     const fields = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
-        break :blk ecmascript_function.fields.fields;
+        break :blk if (ecmascript_function.fields.class_data) |class_data|
+            class_data.fields
+        else
+            &.{};
     } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
         const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         break :blk class_constructor_fields.fields;

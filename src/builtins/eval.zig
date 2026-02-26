@@ -69,10 +69,13 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
             in_method = this_env.hasSuperBinding();
 
             // iv. If F.[[ConstructorKind]] is derived, set inDerivedConstructor to true.
-            in_derived_constructor = function_object.fields.constructor_kind == .derived;
+            in_derived_constructor = function_object.fields.flags.constructor_kind == .derived;
 
             // v. Let classFieldInitializerName be F.[[ClassFieldInitializerName]].
-            const class_field_initializer_name = function_object.fields.class_field_initializer_name;
+            const class_field_initializer_name = if (function_object.fields.class_data) |class_data|
+                class_data.class_field_initializer_name
+            else
+                null;
 
             // vi. If classFieldInitializerName is not empty, set inClassFieldInitializer to true.
             if (class_field_initializer_name != null) in_class_field_initializer = true;

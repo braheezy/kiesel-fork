@@ -38,15 +38,40 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-pub const ConstructorKind = enum {
+pub const ConstructorKind = enum(u1) {
     base,
     derived,
 };
 
-pub const ThisMode = enum {
+pub const ThisMode = enum(u2) {
     lexical,
     strict,
     global,
+};
+
+pub const Flags = packed struct(u5) {
+    /// [[ConstructorKind]]
+    constructor_kind: ConstructorKind,
+
+    /// [[ThisMode]]
+    this_mode: ThisMode,
+
+    /// [[Strict]]
+    strict: bool,
+
+    /// [[IsClassConstructor]]
+    is_class_constructor: bool,
+};
+
+pub const ClassData = struct {
+    /// [[ClassFieldInitializerName]]
+    class_field_initializer_name: ?PropertyKeyOrPrivateName,
+
+    /// [[Fields]]
+    fields: []const ClassFieldDefinition,
+
+    /// [[PrivateMethods]]
+    private_methods: []const PrivateMethodDefinition,
 };
 
 pub const ECMAScriptFunction = MakeObject(.{
@@ -63,20 +88,11 @@ pub const ECMAScriptFunction = MakeObject(.{
         /// [[ECMAScriptCode]]
         ecmascript_code: ast.FunctionBody,
 
-        /// [[ConstructorKind]]
-        constructor_kind: ConstructorKind,
-
         /// [[Realm]]
         realm: *Realm,
 
         /// [[ScriptOrModule]]
         script_or_module: ScriptOrModule,
-
-        /// [[ThisMode]]
-        this_mode: ThisMode,
-
-        /// [[Strict]]
-        strict: bool,
 
         /// [[HomeObject]]
         home_object: ?*Object,
@@ -84,19 +100,22 @@ pub const ECMAScriptFunction = MakeObject(.{
         /// [[SourceText]]
         source_text: []const u8,
 
-        /// [[ClassFieldInitializerName]]
-        class_field_initializer_name: ?PropertyKeyOrPrivateName,
-
-        /// [[Fields]]
-        fields: []const ClassFieldDefinition,
-
-        /// [[PrivateMethods]]
-        private_methods: []const PrivateMethodDefinition,
-
-        /// [[IsClassConstructor]]
-        is_class_constructor: bool,
-
+        flags: Flags,
+        class_data: ?*ClassData,
         cached_bytecode: ?*const interpreter.Bytecode = null,
+
+        pub fn ensureClassData(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*ClassData {
+            if (self.class_data) |class_data| return class_data;
+
+            const class_data = try agent.gc_allocator.create(ClassData);
+            class_data.* = .{
+                .class_field_initializer_name = null,
+                .fields = &.{},
+                .private_methods = &.{},
+            };
+            self.class_data = class_data;
+            return class_data;
+        }
 
         pub fn compile(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*const interpreter.Bytecode {
             if (self.cached_bytecode) |bc| return bc;
@@ -107,7 +126,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             const name = try name_value.asString().toUtf8(agent.gc_allocator);
             defer agent.gc_allocator.free(name);
 
-            if (function.fields.this_mode == .lexical) {
+            if (function.fields.flags.this_mode == .lexical) {
                 // FDI IR lowering does not have [[ThisMode]] information and instead relies on the
                 // parser setting these.
                 std.debug.assert(!self.formal_parameters.arguments_object_needed);
@@ -154,7 +173,7 @@ fn call(
     std.debug.assert(&callee_context == agent.runningExecutionContext());
 
     // 4. If F.[[IsClassConstructor]] is true, then
-    if (function.fields.is_class_constructor) {
+    if (function.fields.flags.is_class_constructor) {
         // a. Let error be a newly created TypeError object.
         // b. NOTE: error is created in calleeContext with F's associated Realm Record.
         const err = agent.throwException(.type_error, "{f} is not callable", .{object});
@@ -238,7 +257,7 @@ pub fn ordinaryCallBindThis(
     this_argument: Value,
 ) std.mem.Allocator.Error!void {
     // 1. Let thisMode be F.[[ThisMode]].
-    const this_mode = function.fields.this_mode;
+    const this_mode = function.fields.flags.this_mode;
 
     // 2. If thisMode is lexical, return unused.
     if (this_mode == .lexical) return;
@@ -509,7 +528,7 @@ fn construct(
     // NOTE: This is only used to restore the context, which is a simple pop().
 
     // 2. Let kind be F.[[ConstructorKind]].
-    const kind = function.fields.constructor_kind;
+    const kind = function.fields.flags.constructor_kind;
 
     var this_argument: *Object = undefined;
 
@@ -628,19 +647,24 @@ pub fn ordinaryFunctionCreate(
             // 6. Set F.[[ECMAScriptCode]] to Body.
             .ecmascript_code = body,
 
-            // 8. Set F.[[Strict]] to Strict.
-            .strict = strict,
+            .flags = .{
+                // 8. Set F.[[Strict]] to Strict.
+                .strict = strict,
 
-            // 9. If thisMode is lexical-this, set F.[[ThisMode]] to lexical.
-            // 10. Else if Strict is true, set F.[[ThisMode]] to strict.
-            // 11. Else, set F.[[ThisMode]] to global.
-            .this_mode = switch (this_mode) {
-                .lexical_this => .lexical,
-                else => if (strict) .strict else .global,
+                // 9. If thisMode is lexical-this, set F.[[ThisMode]] to lexical.
+                // 10. Else if Strict is true, set F.[[ThisMode]] to strict.
+                // 11. Else, set F.[[ThisMode]] to global.
+                .this_mode = switch (this_mode) {
+                    .lexical_this => .lexical,
+                    else => if (strict) .strict else .global,
+                },
+
+                // 12. Set F.[[IsClassConstructor]] to false.
+                .is_class_constructor = false,
+
+                // NOTE: Not in the spec but we need to provide a value
+                .constructor_kind = .base,
             },
-
-            // 12. Set F.[[IsClassConstructor]] to false.
-            .is_class_constructor = false,
 
             // 13. Set F.[[Environment]] to env.
             .environment = env,
@@ -658,16 +682,9 @@ pub fn ordinaryFunctionCreate(
             .home_object = null,
 
             // 18. Set F.[[Fields]] to a new empty List.
-            .fields = &.{},
-
             // 19. Set F.[[PrivateMethods]] to a new empty List.
-            .private_methods = &.{},
-
             // 20. Set F.[[ClassFieldInitializerName]] to empty.
-            .class_field_initializer_name = null,
-
-            // NOTE: Not in the spec but we need to provide a value
-            .constructor_kind = .base,
+            .class_data = null,
         },
     });
 
@@ -707,18 +724,18 @@ pub fn ordinaryFunctionCreateFast(
             .source_text = source_text,
             .formal_parameters = parameter_list,
             .ecmascript_code = body,
-            .strict = strict,
-            .this_mode = if (strict) .strict else .global,
-            .is_class_constructor = false,
+            .flags = .{
+                .constructor_kind = .base,
+                .this_mode = if (strict) .strict else .global,
+                .strict = strict,
+                .is_class_constructor = false,
+            },
             .environment = env,
             .private_environment = private_env,
             .script_or_module = agent.getActiveScriptOrModule().?,
             .realm = realm,
             .home_object = null,
-            .fields = &.{},
-            .private_methods = &.{},
-            .class_field_initializer_name = null,
-            .constructor_kind = .base,
+            .class_data = null,
         },
     });
 
@@ -806,7 +823,7 @@ pub fn makeConstructor(
 
     // 3. Set F.[[ConstructorKind]] to base.
     if (function.cast(ECMAScriptFunction)) |ecmascript_function| {
-        ecmascript_function.fields.constructor_kind = .base;
+        ecmascript_function.fields.flags.constructor_kind = .base;
     } else if (function.cast(BuiltinFunction)) |builtin_function| {
         if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
             class_constructor_fields.constructor_kind = .base;
@@ -859,10 +876,10 @@ pub fn makeConstructor(
 /// https://tc39.es/ecma262/#sec-makeclassconstructor
 pub fn makeClassConstructor(function: *ECMAScriptFunction) void {
     // 1. Assert: F.[[IsClassConstructor]] is false.
-    std.debug.assert(!function.fields.is_class_constructor);
+    std.debug.assert(!function.fields.flags.is_class_constructor);
 
     // 2. Set F.[[IsClassConstructor]] to true.
-    function.fields.is_class_constructor = true;
+    function.fields.flags.is_class_constructor = true;
 
     // 3. Return unused.
 }

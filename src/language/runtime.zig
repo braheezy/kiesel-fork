@@ -1702,7 +1702,8 @@ fn classFieldDefinitionEvaluation(
         makeMethod(initializer_function, home_object);
 
         // g. Set initializer.[[ClassFieldInitializerName]] to name.
-        initializer_function.fields.class_field_initializer_name = name;
+        const class_data = try initializer_function.fields.ensureClassData(agent);
+        class_data.class_field_initializer_name = name;
 
         // NOTE: The spec does not set a function name but we rely on it for IR/bytecode metadata.
         try setFunctionName(agent, &initializer_function.object, name, null);
@@ -2085,7 +2086,7 @@ pub fn classDefinitionEvaluation(
     // 18. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {
         if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
-            ecmascript_function.fields.constructor_kind = .derived;
+            ecmascript_function.fields.flags.constructor_kind = .derived;
         } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
             const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
             class_constructor_fields.constructor_kind = .derived;
@@ -2237,18 +2238,19 @@ pub fn classDefinitionEvaluation(
     }
 
     // 29. Set F.[[PrivateMethods]] to instancePrivateMethods.
+    // 30. Set F.[[Fields]] to instanceFields.
     if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
-        ecmascript_function.fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
+        if (instance_private_methods.items.len != 0 or
+            instance_fields.items.len != 0 or
+            ecmascript_function.fields.class_data != null)
+        {
+            const class_data = try ecmascript_function.fields.ensureClassData(agent);
+            class_data.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
+            class_data.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
+        }
     } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
         const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
-    } else unreachable;
-
-    // 30. Set F.[[Fields]] to instanceFields.
-    if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
-        ecmascript_function.fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
-    } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
-        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
         class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 

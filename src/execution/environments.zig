@@ -246,7 +246,7 @@ pub fn newFunctionEnvironment(
 
         // 3. If F.[[ThisMode]] is lexical, set env.[[ThisBindingStatus]] to lexical.
         // 4. Else, set env.[[ThisBindingStatus]] to uninitialized.
-        .this_binding_status = if (function.fields.this_mode == .lexical)
+        .this_binding_status = if (function.fields.flags.this_mode == .lexical)
             .lexical
         else
             .uninitialized,
