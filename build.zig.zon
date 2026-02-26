@@ -53,8 +53,8 @@
             .lazy = true,
         },
         .zigline = .{
-            .url = "git+https://github.com/alimpfard/zigline#cd6ebe9efb5d79738090b03460a1ea6609f1380d",
-            .hash = "zigline-0.1.0-6llsB4CEAgA6Oy58ssb-9qe0Fyjoz0OfcK3zfnAmChTA",
+            .url = "git+https://github.com/alimpfard/zigline#cc661d9c128a8c916af67b9f59ffefbc2b01d655",
+            .hash = "zigline-0.1.0-6llsB9SEAgA0Co1k0QNMT66LJvBE82AAd3Rha6y5MaRB",
         },
     },
     .paths = .{
