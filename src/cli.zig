@@ -650,27 +650,41 @@ fn getHistoryPath(allocator: std.mem.Allocator) GetHistoryPathError![]const u8 {
 }
 
 fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    var buffer: [8][]const u8 = undefined;
-    var enabled_features: std.ArrayList([]const u8) = .initBuffer(&buffer);
-    if (kiesel.build_options.enable_annex_b) enabled_features.appendAssumeCapacity("annex_b");
-    if (kiesel.build_options.enable_intl) enabled_features.appendAssumeCapacity("intl");
-    if (kiesel.build_options.enable_legacy) enabled_features.appendAssumeCapacity("legacy");
-    if (kiesel.build_options.enable_libgc) enabled_features.appendAssumeCapacity("libgc");
-    if (kiesel.build_options.enable_libregexp) enabled_features.appendAssumeCapacity("libregexp");
-    if (kiesel.build_options.enable_nan_boxing) enabled_features.appendAssumeCapacity("nan_boxing");
-    if (kiesel.build_options.enable_runtime) enabled_features.appendAssumeCapacity("runtime");
-    if (kiesel.build_options.enable_temporal) enabled_features.appendAssumeCapacity("temporal");
-
+    const enabled_features, const disabled_features = comptime blk: {
+        var enabled_features: []const []const u8 = &.{};
+        var disabled_features: []const []const u8 = &.{};
+        for (@typeInfo(kiesel.build_options).@"struct".decls) |decl| {
+            if (std.mem.startsWith(u8, decl.name, "enable_")) {
+                const feature = decl.name["enable_".len..];
+                if (@field(kiesel.build_options, decl.name)) {
+                    enabled_features = enabled_features ++ .{feature};
+                } else {
+                    disabled_features = disabled_features ++ .{feature};
+                }
+            }
+        }
+        break :blk .{ enabled_features, disabled_features };
+    };
     try writer.print("Kiesel {f}\n\n", .{kiesel.version});
     try writer.print("Zig version        {s}\n", .{builtin.zig_version_string});
     try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
     try writer.print("Optimize mode      {t}\n", .{builtin.mode});
-    try writer.writeAll("Enabled features   ");
-    for (enabled_features.items, 0..) |feature, i| {
-        if (i != 0) try writer.writeByte(' ');
-        try writer.writeAll(feature);
+    if (enabled_features.len > 0) {
+        try writer.writeAll("Enabled features   ");
+        for (enabled_features, 0..) |feature, i| {
+            if (i != 0) try writer.writeByte(' ');
+            try writer.writeAll(feature);
+        }
+        try writer.writeByte('\n');
     }
-    try writer.writeByte('\n');
+    if (disabled_features.len > 0) {
+        try writer.writeAll("Disabled features  ");
+        for (disabled_features, 0..) |feature, i| {
+            if (i != 0) try writer.writeByte(' ');
+            try writer.writeAll(feature);
+        }
+        try writer.writeByte('\n');
+    }
 }
 
 fn printValueDebugInfo(
