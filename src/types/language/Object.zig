@@ -37,6 +37,13 @@ pub const Shape = @import("Object/Shape.zig");
 
 const Object = @This();
 
+tag: Tag,
+internal_methods: *const InternalMethods,
+property_storage: PropertyStorage,
+
+/// [[PrivateElements]]
+private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
+
 pub const Tag = enum(u32) {
     unset,
 
@@ -115,10 +122,6 @@ pub const EnumerationKind = enum {
     value,
     key_value,
 };
-
-tag: Object.Tag,
-internal_methods: *const InternalMethods,
-property_storage: PropertyStorage,
 
 pub fn format(self: *const Object, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     _ = self;
@@ -1070,7 +1073,7 @@ pub fn privateElementFind(self: *const Object, private_name: PrivateName) ?*Priv
     // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
     //     a. Return pe.
     // 2. Return empty.
-    return self.property_storage.private_elements.getPtr(private_name);
+    return self.private_elements.getPtr(private_name);
 }
 
 /// 7.3.27 PrivateFieldAdd ( O, P, value )
@@ -1093,7 +1096,7 @@ pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, 
     }
 
     // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
-    try self.property_storage.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
+    try self.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.
 }
@@ -1126,7 +1129,7 @@ pub fn privateMethodOrAccessorAdd(
     }
 
     // 5. Append method to O.[[PrivateElements]].
-    try self.property_storage.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
+    try self.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
 
     // 6. Return unused.
 }

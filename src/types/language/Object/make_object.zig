@@ -75,8 +75,8 @@ pub fn MakeObject(
                         .properties = .empty,
                         .indexed_properties = .empty,
                         .lazy_properties = .empty,
-                        .private_elements = .empty,
                     },
+                    .private_elements = .empty,
                 },
             };
             if (args.prototype != null) {
@@ -109,8 +109,8 @@ pub fn MakeObject(
                         .properties = .empty,
                         .indexed_properties = .empty,
                         .lazy_properties = .empty,
-                        .private_elements = .empty,
                     },
+                    .private_elements = .empty,
                 },
             };
             try self.object.property_storage.properties.resize(

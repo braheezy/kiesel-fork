@@ -5,8 +5,6 @@ const types = @import("../../../types.zig");
 
 const Agent = execution.Agent;
 const Object = types.Object;
-const PrivateElement = types.PrivateElement;
-const PrivateName = types.PrivateName;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -21,9 +19,6 @@ properties: std.ArrayList(union {
 }),
 indexed_properties: Object.IndexedProperties,
 lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
-
-/// [[PrivateElements]]
-private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
 
 pub const LazyProperty = struct {
     pub const Initializer = union(PropertyType) {
