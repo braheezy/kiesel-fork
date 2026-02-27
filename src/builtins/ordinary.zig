@@ -173,7 +173,7 @@ pub fn ordinaryGetOwnProperty(
             .configurable = false,
         };
     }
-    const property_descriptor = (try object.property_storage.getCreateLazyIfNeeded(property_key)) orelse return null;
+    const property_descriptor = (try object.property_storage.getCreateLazyIfNeeded(object, property_key)) orelse return null;
     return property_descriptor.toPropertyDescriptor();
 }
 
@@ -292,6 +292,7 @@ fn validateAndApplyPropertyDescriptor(
         };
 
         try object.property_storage.set(
+            object,
             allocator,
             property_key,
             property_descriptor,
@@ -443,6 +444,7 @@ fn validateAndApplyPropertyDescriptor(
         };
 
         try object.property_storage.set(
+            object,
             allocator,
             property_key,
             property_descriptor,
@@ -479,7 +481,7 @@ pub fn ordinaryHasProperty(
 
     // OPTIMIZATION: Fast path for ordinary objects
     if (has_ordinary_internal_methods) {
-        if (object.property_storage.contains(property_key)) return true;
+        if (object.property_storage.contains(object, property_key)) return true;
         const parent = object.prototype() orelse return false;
         return parent.internal_methods.hasProperty(agent, parent, property_key);
     }
@@ -549,7 +551,7 @@ pub fn ordinaryGet(
             };
         }
         // Otherwise go through the prototype chain and invoke the getter if necessary.
-        const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(property_key) orelse {
+        const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(object, property_key) orelse {
             const parent = object.prototype() orelse return .undefined;
             return parent.internal_methods.get(agent, parent, property_key, receiver);
         };
@@ -628,12 +630,12 @@ pub fn ordinarySet(
         has_ordinary_internal_methods and
         receiver_is_self)
     {
-        const property_metadata = object.property_storage.shape.properties.get(property_key) orelse {
+        const property_metadata = object.shape.properties.get(property_key) orelse {
             if (object.prototype()) |parent| {
                 return parent.internal_methods.set(agent, parent, property_key, value, receiver);
             }
             if (!object.extensible()) return false;
-            try object.property_storage.set(agent.gc_allocator, property_key, .{
+            try object.property_storage.set(object, agent.gc_allocator, property_key, .{
                 .value_or_accessor = .{
                     .value = value,
                 },
@@ -766,7 +768,7 @@ pub fn ordinarySetWithOwnDescriptor(
         } else {
             // e. Else,
             // i. Assert: Receiver does not currently have a property P.
-            std.debug.assert(!receiver.property_storage.contains(property_key));
+            std.debug.assert(!receiver.property_storage.contains(receiver, property_key));
 
             // ii. Return ? CreateDataProperty(Receiver, P, V).
             return receiver.createDataProperty(agent, property_key, value);
@@ -815,7 +817,7 @@ pub fn ordinaryDelete(agent: *Agent, object: *Object, property_key: PropertyKey)
     // 3. If desc.[[Configurable]] is true, then
     if (descriptor.configurable == true) {
         // a. Remove the own property with name P from O.
-        try object.property_storage.remove(agent.gc_allocator, property_key);
+        try object.property_storage.remove(object, agent.gc_allocator, property_key);
 
         // b. Return true.
         return true;
@@ -845,7 +847,7 @@ pub fn ordinaryOwnPropertyKeys(
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         allocator,
         object.property_storage.indexed_properties.count() +
-            object.property_storage.shape.properties.count() +
+            object.shape.properties.count() +
             @intFromBool(object.is(builtins.Array)),
     );
 
@@ -882,7 +884,7 @@ pub fn ordinaryOwnPropertyKeys(
 
     // 3. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string or property_key == .integer_index) {
             std.debug.assert(!property_key.isArrayIndex());
 
@@ -893,7 +895,7 @@ pub fn ordinaryOwnPropertyKeys(
 
     // 4. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

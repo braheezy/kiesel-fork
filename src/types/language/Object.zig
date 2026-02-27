@@ -39,6 +39,7 @@ const Object = @This();
 
 tag: Tag,
 internal_methods: *const InternalMethods,
+shape: *Shape,
 property_storage: PropertyStorage,
 
 /// [[PrivateElements]]
@@ -145,30 +146,30 @@ pub fn cast(self: *const Object, comptime T: type) ?*T {
 }
 
 pub fn prototype(self: *const Object) ?*Object {
-    return self.property_storage.shape.prototype;
+    return self.shape.prototype;
 }
 
 pub fn setPrototype(self: *Object, agent: *Agent, new_prototype: ?*Object) std.mem.Allocator.Error!void {
     if (self.prototype() == new_prototype) return;
-    self.property_storage.shape = try self.property_storage.shape.setPrototype(agent.gc_allocator, new_prototype);
+    self.shape = try self.shape.setPrototype(agent.gc_allocator, new_prototype);
 }
 
 pub fn extensible(self: *const Object) bool {
-    return self.property_storage.shape.extensible;
+    return self.shape.extensible;
 }
 
 pub fn setNonExtensible(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
     if (!self.extensible()) return;
-    self.property_storage.shape = try self.property_storage.shape.setNonExtensible(agent.gc_allocator);
+    self.shape = try self.shape.setNonExtensible(agent.gc_allocator);
 }
 
 pub fn isHTMLDDA(self: *const Object) bool {
-    return self.property_storage.shape.is_htmldda;
+    return self.shape.is_htmldda;
 }
 
 pub fn setIsHTMLDDA(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
     if (self.isHTMLDDA()) return;
-    self.property_storage.shape = try self.property_storage.shape.setIsHTMLDDA(agent.gc_allocator);
+    self.shape = try self.shape.setIsHTMLDDA(agent.gc_allocator);
 }
 
 pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.PropertyOffset, value: Value) void {
@@ -197,7 +198,7 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
             .sparse_property_descriptor => |sparse_property_descriptor| sparse_property_descriptor.get(index).?.value_or_accessor.value,
         };
     }
-    const property_metadata = self.property_storage.shape.properties.get(property_key).?;
+    const property_metadata = self.shape.properties.get(property_key).?;
     std.debug.assert(!self.property_storage.lazy_properties.contains(property_key));
     return switch (property_metadata.type) {
         .value => self.property_storage.properties.items[@intFromEnum(property_metadata.offset)].value,
@@ -228,7 +229,7 @@ pub fn createDataPropertyDirect(
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
         // Go directly to the property storage.
-        try self.property_storage.set(agent.gc_allocator, property_key, .{
+        try self.property_storage.set(self, agent.gc_allocator, property_key, .{
             .value_or_accessor = .{
                 .value = value,
             },
@@ -269,6 +270,7 @@ pub fn definePropertyDirect(
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
         try self.property_storage.set(
+            self,
             agent.gc_allocator,
             property_key,
             property_descriptor,
@@ -362,10 +364,10 @@ pub fn defineBuiltinAccessorWithAttributes(
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
-    if (!self.property_storage.shape.isUnique()) {
-        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    if (!self.shape.isUnique()) {
+        self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
-    try self.property_storage.shape.setPropertyWithoutTransition(
+    try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes_,
@@ -512,10 +514,10 @@ pub fn defineBuiltinPropertyWithAttributes(
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
-    if (!self.property_storage.shape.isUnique()) {
-        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    if (!self.shape.isUnique()) {
+        self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
-    try self.property_storage.shape.setPropertyWithoutTransition(
+    try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
@@ -533,10 +535,10 @@ pub fn defineBuiltinPropertyLazy(
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
-    if (!self.property_storage.shape.isUnique()) {
-        self.property_storage.shape = try self.property_storage.shape.makeUnique(agent.gc_allocator);
+    if (!self.shape.isUnique()) {
+        self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
-    try self.property_storage.shape.setPropertyWithoutTransition(
+    try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
@@ -668,7 +670,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
-        self.extensible() and for (self.property_storage.shape.properties.values()) |entry| {
+        self.extensible() and for (self.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
         } else true and switch (self.property_storage.indexed_properties.storage) {
             .sparse_property_descriptor => |sparse_property_descriptor| blk: {

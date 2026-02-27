@@ -705,7 +705,7 @@ fn printValueDebugInfo(
         .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
         .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
             @intFromPtr(value.asObject()),
-            @intFromPtr(value.asObject().property_storage.shape),
+            @intFromPtr(value.asObject().shape),
             value.asObject().property_storage.indexed_properties.storage,
             value.asObject().tag,
         }),
@@ -876,7 +876,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
             const prefix_utf8 = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
             const prefix = String.fromUtf8(self.realm.agent, prefix_utf8) catch return &.{};
 
-            for (object.property_storage.shape.properties.keys()) |key| {
+            for (object.shape.properties.keys()) |key| {
                 const property_name = switch (key) {
                     .string => |string| string,
                     else => continue,

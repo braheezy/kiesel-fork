@@ -70,8 +70,8 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .internal_methods = args.internal_methods,
+                    .shape = agent.empty_shape,
                     .property_storage = .{
-                        .shape = agent.empty_shape,
                         .properties = .empty,
                         .indexed_properties = .empty,
                         .lazy_properties = .empty,
@@ -104,8 +104,8 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .internal_methods = args.internal_methods,
+                    .shape = args.shape,
                     .property_storage = .{
-                        .shape = args.shape,
                         .properties = .empty,
                         .indexed_properties = .empty,
                         .lazy_properties = .empty,

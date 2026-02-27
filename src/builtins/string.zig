@@ -385,7 +385,7 @@ fn ownPropertyKeys(
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         object.property_storage.indexed_properties.count() +
-            object.property_storage.shape.properties.count() +
+            object.shape.properties.count() +
             len,
     );
 
@@ -423,7 +423,7 @@ fn ownPropertyKeys(
 
     // 7. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string or property_key == .integer_index) {
             std.debug.assert(!property_key.isArrayIndex());
 
@@ -434,7 +434,7 @@ fn ownPropertyKeys(
 
     // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

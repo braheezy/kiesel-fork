@@ -12,7 +12,6 @@ const Value = types.Value;
 
 const PropertyStorage = @This();
 
-shape: *Object.Shape,
 properties: std.ArrayList(union {
     value: Value,
     getter_or_setter: ?*Object,
@@ -133,22 +132,24 @@ pub const CompletePropertyDescriptor = struct {
 
 pub fn contains(
     self: PropertyStorage,
+    object: *Object,
     property_key: PropertyKey,
 ) bool {
     if (property_key.isArrayIndex()) {
         return self.indexed_properties.contains(@intCast(property_key.integer_index));
     }
-    return self.shape.properties.contains(property_key);
+    return object.shape.properties.contains(property_key);
 }
 
 pub fn getCreateLazyIfNeeded(
     self: *PropertyStorage,
+    object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?CompletePropertyDescriptor {
     if (property_key.isArrayIndex()) {
         return self.indexed_properties.get(@intCast(property_key.integer_index));
     }
-    const property_metadata = self.shape.properties.get(property_key) orelse return null;
+    const property_metadata = object.shape.properties.get(property_key) orelse return null;
     if (self.lazy_properties.fetchRemove(property_key)) |kv| {
         const lazy_property = kv.value;
         const realm = lazy_property.realm;
@@ -184,6 +185,7 @@ pub fn getCreateLazyIfNeeded(
 
 pub fn set(
     self: *PropertyStorage,
+    object: *Object,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
     property_descriptor: CompletePropertyDescriptor,
@@ -193,11 +195,11 @@ pub fn set(
     }
     const value_or_accessor = property_descriptor.value_or_accessor;
     const attributes = property_descriptor.attributes;
-    if (self.shape.properties.get(property_key)) |property_metadata| {
+    if (object.shape.properties.get(property_key)) |property_metadata| {
         const property_attributes_change = property_metadata.attributes != attributes;
         const property_type_change = property_metadata.type != std.meta.activeTag(value_or_accessor);
         if (property_attributes_change or property_type_change) {
-            self.shape = try self.shape.setProperty(
+            object.shape = try object.shape.setProperty(
                 allocator,
                 property_key,
                 attributes,
@@ -236,7 +238,7 @@ pub fn set(
             }
         }
     } else {
-        self.shape = try self.shape.setProperty(
+        object.shape = try object.shape.setProperty(
             allocator,
             property_key,
             attributes,
@@ -253,17 +255,17 @@ pub fn set(
         }
     }
 }
-
 pub fn remove(
     self: *PropertyStorage,
+    object: *Object,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!void {
     if (property_key.isArrayIndex()) {
         return self.indexed_properties.remove(allocator, @intCast(property_key.integer_index));
     }
-    const property_metadata = self.shape.properties.get(property_key).?;
-    self.shape = try self.shape.deleteProperty(allocator, property_key);
+    const property_metadata = object.shape.properties.get(property_key).?;
+    object.shape = try object.shape.deleteProperty(allocator, property_key);
     // By overwriting the value and keeping subsequent offsets intact we can make property
     // deletions part of the regular transition chain without making them unique and invalidating
     // ICs. Additionally we save the cost of moving all elements after this one around, at the

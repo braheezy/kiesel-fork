@@ -390,7 +390,7 @@ fn ownPropertyKeys(
     // 2. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.property_storage.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
+        object.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
             @as(usize, @intCast(@intFromEnum(typedArrayLength(ta))))
         else
             0,
@@ -411,7 +411,7 @@ fn ownPropertyKeys(
 
     // 4. For each own property key P of O such that P is a String and P is not an integer index,
     //    in ascending chronological order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -420,7 +420,7 @@ fn ownPropertyKeys(
 
     // 5. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.property_storage.shape.properties.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
