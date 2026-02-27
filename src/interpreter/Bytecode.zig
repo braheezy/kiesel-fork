@@ -478,9 +478,9 @@ pub const Inst = struct {
     };
 
     pub const StringIndex = enum(u32) { _ };
-    pub const BigIntIndex = enum(u32) { _ };
-    pub const FunctionIndex = enum(u32) { _ };
-    pub const ClassIndex = enum(u32) { _ };
+    pub const BigIntIndex = enum(u16) { _ };
+    pub const FunctionIndex = enum(u16) { _ };
+    pub const ClassIndex = enum(u16) { _ };
     pub const IcIndex = enum(u16) { _ };
 
     pub const Format = struct {
@@ -556,12 +556,12 @@ pub const Inst = struct {
     inline fn decodeField(comptime T: type, code: []const u8) T {
         return switch (T) {
             Reg => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
-            StringIndex,
+            StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
             BigIntIndex,
             FunctionIndex,
             ClassIndex,
-            => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
-            IcIndex => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
+            IcIndex,
+            => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
             u32 => std.mem.readInt(u32, code[0..4], .little),
@@ -596,12 +596,12 @@ pub const Inst = struct {
     fn encodeField(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (T) {
             Reg => try writer.writeInt(u16, @intFromEnum(value), .little),
-            StringIndex,
+            StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
             BigIntIndex,
             FunctionIndex,
             ClassIndex,
-            => try writer.writeInt(u32, @intFromEnum(value), .little),
-            IcIndex => try writer.writeInt(u16, @intFromEnum(value), .little),
+            IcIndex,
+            => try writer.writeInt(u16, @intFromEnum(value), .little),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
             u32 => try writer.writeInt(u32, value, .little),

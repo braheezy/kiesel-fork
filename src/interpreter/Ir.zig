@@ -396,9 +396,9 @@ pub const Inst = struct {
     });
 
     pub const StringIndex = enum(u32) { _ };
-    pub const BigIntIndex = enum(u32) { _ };
-    pub const FunctionIndex = enum(u32) { _ };
-    pub const ClassIndex = enum(u32) { _ };
+    pub const BigIntIndex = enum(u16) { _ };
+    pub const FunctionIndex = enum(u16) { _ };
+    pub const ClassIndex = enum(u16) { _ };
     pub const ExtraIndex = enum(u32) { _ };
 
     // Inline data types (8 bytes)
