@@ -319,7 +319,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             // ii. Let entries be Completion(EnumerableOwnProperties(attributesObj, key+value)).
             const entries = attributes_object.asObject().enumerableOwnProperties(
                 agent,
-                .@"key+value",
+                .key_value,
             ) catch |err| {
                 // iii. IfAbruptRejectPromise(entries, promiseCapability).
                 return Value.from(try promise_capability.rejectPromise(agent, err));

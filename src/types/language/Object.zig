@@ -110,10 +110,10 @@ pub const IntegrityLevel = enum {
     frozen,
 };
 
-pub const PropertyKind = enum {
+pub const EnumerationKind = enum {
     key,
     value,
-    @"key+value",
+    key_value,
 };
 
 tag: Object.Tag,
@@ -914,7 +914,7 @@ pub fn speciesConstructor(self: *Object, agent: *Agent, default_constructor: *Ob
 pub fn enumerableOwnProperties(
     self: *Object,
     agent: *Agent,
-    comptime kind: PropertyKind,
+    comptime kind: EnumerationKind,
 ) Agent.Error!std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
     const own_keys = try self.internal_methods.ownPropertyKeys(agent, self);
@@ -948,7 +948,7 @@ pub fn enumerableOwnProperties(
                     } else {
                         // c. Else,
                         // i. Assert: kind is key+value.
-                        std.debug.assert(kind == .@"key+value");
+                        std.debug.assert(kind == .key_value);
 
                         // ii. Let entry be CreateArrayFromList(« key, value »).
                         const entry = try createArrayFromList(

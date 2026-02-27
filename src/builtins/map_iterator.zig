@@ -23,7 +23,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn createMapIterator(
     agent: *Agent,
     map_value: Value,
-    comptime kind: Object.PropertyKind,
+    kind: Object.EnumerationKind,
 ) Agent.Error!*MapIterator {
     const realm = agent.currentRealm();
 
@@ -128,7 +128,7 @@ pub const prototype = struct {
             // 3. Else,
             //     a. Assert: kind is key+value.
             //     b. Let result be CreateArrayFromList(« e.[[Key]], e.[[Value]] »).
-            .@"key+value" => blk: {
+            .key_value => blk: {
                 const array = try createArrayFromList(agent, &.{ key, value });
                 break :blk Value.from(&array.object);
             },
@@ -147,7 +147,7 @@ pub const MapIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             map: *Map,
-            kind: Object.PropertyKind,
+            kind: Object.EnumerationKind,
             index: usize,
         },
         completed,

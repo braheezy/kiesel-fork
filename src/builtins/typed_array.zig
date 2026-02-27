@@ -1274,7 +1274,7 @@ pub const prototype = struct {
         const typed_array = ta.object;
 
         // 3. Return CreateArrayIterator(O, key+value).
-        const array_iterator = try createArrayIterator(agent, &typed_array.object, .@"key+value");
+        const array_iterator = try createArrayIterator(agent, &typed_array.object, .key_value);
         return Value.from(&array_iterator.object);
     }
 

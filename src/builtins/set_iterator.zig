@@ -23,7 +23,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn createSetIterator(
     agent: *Agent,
     set_value: Value,
-    comptime kind: Object.PropertyKind,
+    kind: Object.EnumerationKind,
 ) Agent.Error!*SetIterator {
     const realm = agent.currentRealm();
 
@@ -118,7 +118,7 @@ pub const prototype = struct {
 
         switch (kind) {
             // 1. If kind is key+value, then
-            .@"key+value" => {
+            .key_value => {
                 // a. Let result be CreateArrayFromList(« e, e »).
                 const result = try createArrayFromList(agent, &.{ value, value });
 
@@ -149,7 +149,7 @@ pub const SetIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             set: *Set,
-            kind: Object.PropertyKind,
+            kind: Object.EnumerationKind,
             index: usize,
         },
         completed,

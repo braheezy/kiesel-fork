@@ -287,7 +287,7 @@ pub const prototype = struct {
         const map = this_value;
 
         // 2. Return ? CreateMapIterator(M, key+value).
-        const map_iterator = try createMapIterator(agent, map, .@"key+value");
+        const map_iterator = try createMapIterator(agent, map, .key_value);
         return Value.from(&map_iterator.object);
     }
 

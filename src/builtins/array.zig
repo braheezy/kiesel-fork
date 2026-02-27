@@ -1306,7 +1306,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return CreateArrayIterator(O, key+value).
-        const array_iterator = try createArrayIterator(agent, object, .@"key+value");
+        const array_iterator = try createArrayIterator(agent, object, .key_value);
         return Value.from(&array_iterator.object);
     }
 

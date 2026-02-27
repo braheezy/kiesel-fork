@@ -464,7 +464,7 @@ pub const prototype = struct {
         const map = this_value;
 
         // 2. Return ? CreateSetIterator(S, key+value).
-        const set_iterator = try createSetIterator(agent, map, .@"key+value");
+        const set_iterator = try createSetIterator(agent, map, .key_value);
         return Value.from(&set_iterator.object);
     }
 

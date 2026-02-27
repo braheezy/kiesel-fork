@@ -26,7 +26,7 @@ const typedArrayLength = builtins.typedArrayLength;
 pub fn createArrayIterator(
     agent: *Agent,
     array: *Object,
-    comptime kind: Object.PropertyKind,
+    kind: Object.EnumerationKind,
 ) std.mem.Allocator.Error!*ArrayIterator {
     const realm = agent.currentRealm();
 
@@ -154,7 +154,7 @@ pub const prototype = struct {
             } else {
                 // d. Else,
                 // i. Assert: kind is key+value.
-                std.debug.assert(kind == .@"key+value");
+                std.debug.assert(kind == .key_value);
 
                 // ii. Let result be CreateArrayFromList(« indexNumber, elementValue »).
                 const result_array = try createArrayFromList(agent, &.{ index_number, element_value });
@@ -179,7 +179,7 @@ pub const ArrayIterator = MakeObject(.{
             array_like_next_index: u53,
 
             /// [[ArrayLikeIterationKind]]
-            array_like_iteration_kind: Object.PropertyKind,
+            array_like_iteration_kind: Object.EnumerationKind,
         },
         completed,
     },

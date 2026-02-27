@@ -288,7 +288,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let entryList be ? EnumerableOwnProperties(obj, key+value).
-        var entry_list = try obj.enumerableOwnProperties(agent, .@"key+value");
+        var entry_list = try obj.enumerableOwnProperties(agent, .key_value);
         defer entry_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(entryList).
