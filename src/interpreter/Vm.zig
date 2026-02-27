@@ -502,6 +502,23 @@ fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
     return frame.bytecode.classes[@intFromEnum(index)];
 }
 
+fn toObjectForPropertyAccess(agent: *Agent, value: Value) Agent.Error!*Object {
+    if (value.isObject()) {
+        @branchHint(.likely);
+        return value.asObject();
+    }
+    if (value.isString()) {
+        // TODO: Optimize property access on strings, for now eveything goes through the custom
+        //       [[GetOwnProperty]] implementation
+        return value.toObject(agent);
+    }
+    return try value.synthesizePrototype(agent) orelse {
+        // Null or undefined, guaranteed to throw
+        _ = try value.toObject(agent);
+        unreachable;
+    };
+}
+
 fn executeJump(_: *Vm, offset: i32, pc: *Pc) void {
     pc.* = pc.offsetBy(offset);
 }
@@ -1266,7 +1283,7 @@ fn executeGetProperty(
     name_index: Bytecode.Inst.StringIndex,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
     const result = try base_object.internal_methods.get(
         vm.agent,
@@ -1285,7 +1302,7 @@ fn executeGetPropertyComputed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const result = try base_object.internal_methods.get(
         vm.agent,
@@ -1303,7 +1320,7 @@ fn executeGetPropertyIndexed(
     index: u32,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const result = try base_object.internal_methods.get(
         vm.agent,
@@ -1354,7 +1371,7 @@ fn executeSetProperty(
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
 
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
     const success = try base_object.internal_methods.set(
         vm.agent,
@@ -1379,7 +1396,7 @@ fn executeSetPropertyComputed(
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
     const value = vm.store(value_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const success = try base_object.internal_methods.set(
         vm.agent,
@@ -1403,7 +1420,7 @@ fn executeSetPropertyIndexed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const success = try base_object.internal_methods.set(
         vm.agent,
@@ -1499,7 +1516,7 @@ fn executeUpdateProperty(
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
     const old_value = try base_object.internal_methods.get(
         vm.agent,
@@ -1539,7 +1556,7 @@ fn executeUpdatePropertyComputed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const old_value = try base_object.internal_methods.get(
         vm.agent,
@@ -1578,7 +1595,7 @@ fn executeUpdatePropertyIndexed(
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const old_value = try base_object.internal_methods.get(
         vm.agent,
@@ -1631,7 +1648,7 @@ fn executeDeleteProperty(
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
     const delete_status = try base_object.internal_methods.delete(
         vm.agent,
@@ -1654,7 +1671,7 @@ fn executeDeletePropertyComputed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const delete_status = try base_object.internal_methods.delete(
         vm.agent,
@@ -1676,7 +1693,7 @@ fn executeDeletePropertyIndexed(
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const base_object = try base_value.toObject(vm.agent);
+    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const delete_status = try base_object.internal_methods.delete(
         vm.agent,
