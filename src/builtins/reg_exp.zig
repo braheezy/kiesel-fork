@@ -181,7 +181,7 @@ pub fn regExpCreateFast(
     }
     const re_bytecode = try compileRegexp(agent, pattern, flags);
     const realm = agent.currentRealm();
-    const shape, const indices = try realm.shapes.regExpObject();
+    const shape, const offsets = try realm.shapes.regExpObject();
     const reg_exp = try RegExp.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -190,7 +190,7 @@ pub fn regExpCreateFast(
             .re_bytecode = re_bytecode,
         },
     });
-    reg_exp.object.setValueAtPropertyIndex(indices.lastIndex, Value.from(0));
+    reg_exp.object.setValueAtPropertyOffset(offsets.lastIndex, Value.from(0));
     return reg_exp;
 }
 
@@ -436,14 +436,14 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // 20. Let A be ! ArrayCreate(n + 1).
     // 21. Assert: The mathematical value of A's "length" property is n + 1.
     const realm = agent.currentRealm();
-    const array_shape, const array_indices = try realm.shapes.regExpExecObject();
+    const array_shape, const array_offsets = try realm.shapes.regExpExecObject();
     const array = try arrayCreateFastWithShape(agent, @intCast(n + 1), array_shape);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
-    array.object.setValueAtPropertyIndex(array_indices.index, Value.from(last_index));
+    array.object.setValueAtPropertyOffset(array_offsets.index, Value.from(last_index));
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
-    array.object.setValueAtPropertyIndex(array_indices.input, Value.from(string));
+    array.object.setValueAtPropertyOffset(array_offsets.input, Value.from(string));
 
     // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
     match = .{ .start_index = last_index, .end_index = end_index };
@@ -483,7 +483,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     };
 
     // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
-    array.object.setValueAtPropertyIndex(array_indices.groups, groups);
+    array.object.setValueAtPropertyOffset(array_offsets.groups, groups);
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;

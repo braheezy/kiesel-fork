@@ -214,7 +214,7 @@ pub fn createUnmappedArgumentsObject(
     const len = arguments_list.len;
 
     // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%, « [[ParameterMap]] »).
-    const shape, const indices = try realm.shapes.unmappedArgumentsObject();
+    const shape, const offsets = try realm.shapes.unmappedArgumentsObject();
     const arguments = try Arguments.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -226,7 +226,7 @@ pub fn createUnmappedArgumentsObject(
     // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    arguments.object.setValueAtPropertyIndex(indices.length, Value.from(@as(u53, @intCast(len))));
+    arguments.object.setValueAtPropertyOffset(offsets.length, Value.from(@as(u53, @intCast(len))));
 
     // 5. Let index be 0.
     // 6. Repeat, while index < len,
@@ -245,15 +245,15 @@ pub fn createUnmappedArgumentsObject(
     // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    arguments.object.setValueAtPropertyIndex(
-        indices.@"%Symbol.iterator%",
+    arguments.object.setValueAtPropertyOffset(
+        offsets.@"%Symbol.iterator%",
         Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
     );
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
-    arguments.object.setAccessorAtPropertyIndex(indices.callee, .{
+    arguments.object.setAccessorAtPropertyOffset(offsets.callee, .{
         .get = try realm.intrinsics.@"%ThrowTypeError%"(),
         .set = try realm.intrinsics.@"%ThrowTypeError%"(),
     });
@@ -283,7 +283,7 @@ pub fn createMappedArgumentsObject(
     const len = arguments_list.len;
 
     // 3. Let obj be MakeBasicObject(« [[Prototype]], [[Extensible]], [[ParameterMap]] »).
-    const shape, const indices = try realm.shapes.mappedArgumentsObject();
+    const shape, const offsets = try realm.shapes.mappedArgumentsObject();
     const arguments = try Arguments.createWithShape(agent, .{
         .shape = shape,
         .internal_methods = .initComptime(.{
@@ -342,7 +342,7 @@ pub fn createMappedArgumentsObject(
     // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    arguments.object.setValueAtPropertyIndex(indices.length, Value.from(@as(u53, @intCast(len))));
+    arguments.object.setValueAtPropertyOffset(offsets.length, Value.from(@as(u53, @intCast(len))));
 
     // 17. Let mappedNames be a new empty List.
     var mapped_names: String.HashMapUnmanaged(void) = .empty;
@@ -385,15 +385,15 @@ pub fn createMappedArgumentsObject(
     // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    arguments.object.setValueAtPropertyIndex(
-        indices.@"%Symbol.iterator%",
+    arguments.object.setValueAtPropertyOffset(
+        offsets.@"%Symbol.iterator%",
         Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
     );
 
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    arguments.object.setValueAtPropertyIndex(indices.callee, Value.from(function));
+    arguments.object.setValueAtPropertyOffset(offsets.callee, Value.from(function));
 
     // 22. Return obj.
     return arguments;

@@ -1926,7 +1926,7 @@ fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.
         vm.load(dest, Value.from(next));
     } else {
         vm.load(dest, .undefined);
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
     }
 }
 
@@ -1943,7 +1943,7 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byte
         vm.load(dest, next);
     } else {
         vm.load(dest, .undefined);
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
     }
 }
 
@@ -1958,19 +1958,19 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg:
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     const next_result = next_method.call(vm.agent, Value.from(iterator_inner), &.{}) catch |err| {
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;
     };
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
     const awaited_result = await(vm.agent, next_result) catch |err| {
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;
     };
 
     // c. If nextResult is not an Object, throw a TypeError exception.
     if (!awaited_result.isObject()) {
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return vm.agent.throwException(.type_error, "{f} is not an Object", .{awaited_result});
     }
 
@@ -1979,14 +1979,14 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg:
 
     // e. If done is true, return V.
     if (done) {
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         vm.load(dest, .undefined);
         return;
     }
 
     // f. Let nextValue be ? IteratorValue(nextResult).
     const value = Iterator.value(vm.agent, awaited_result.asObject()) catch |err| {
-        iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;
     };
 
@@ -2026,7 +2026,7 @@ fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byteco
     while (try iterator.stepValue(vm.agent)) |next| {
         try values.append(vm.agent.gc_allocator, next);
     }
-    iterator_obj.setValueAtPropertyIndex(@enumFromInt(2), .true);
+    iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
 
     const array = try createArrayFromList(vm.agent, values.items);
     vm.load(dest, Value.from(&array.object));

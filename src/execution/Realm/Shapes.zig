@@ -51,15 +51,15 @@ pub fn ordinaryObject(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
     return shape;
 }
 
-pub const OrdinaryFunctionIndices = struct {
-    length: Object.Shape.PropertyIndex,
-    name: Object.Shape.PropertyIndex,
-    prototype: Object.Shape.PropertyIndex,
+pub const OrdinaryFunctionOffsets = struct {
+    length: Object.Shape.PropertyOffset,
+    name: Object.Shape.PropertyOffset,
+    prototype: Object.Shape.PropertyOffset,
 };
 
 pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    OrdinaryFunctionIndices,
+    OrdinaryFunctionOffsets,
 } {
     const shape = self.lazy_shapes.ordinary_function orelse blk: {
         const realm = self.realm;
@@ -99,21 +99,21 @@ pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.ordinary_function = shape;
         break :blk shape;
     };
-    const indices: OrdinaryFunctionIndices = .{
+    const offsets: OrdinaryFunctionOffsets = .{
         .length = @enumFromInt(0),
         .name = @enumFromInt(1),
         .prototype = @enumFromInt(2),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }
 
-pub const OrdinaryFunctionPrototypeIndices = struct {
-    constructor: Object.Shape.PropertyIndex,
+pub const OrdinaryFunctionPrototypeOffsets = struct {
+    constructor: Object.Shape.PropertyOffset,
 };
 
 pub fn ordinaryFunctionPrototype(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    OrdinaryFunctionPrototypeIndices,
+    OrdinaryFunctionPrototypeOffsets,
 } {
     const shape = self.lazy_shapes.ordinary_function_prototype orelse blk: {
         const realm = self.realm;
@@ -129,21 +129,21 @@ pub fn ordinaryFunctionPrototype(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.ordinary_function_prototype = shape;
         break :blk shape;
     };
-    const indices: OrdinaryFunctionPrototypeIndices = .{
+    const offsets: OrdinaryFunctionPrototypeOffsets = .{
         .constructor = @enumFromInt(0),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }
 
-pub const UnmappedArgumentsObjectIndices = struct {
-    length: Object.Shape.PropertyIndex,
-    @"%Symbol.iterator%": Object.Shape.PropertyIndex,
-    callee: Object.Shape.PropertyIndex,
+pub const UnmappedArgumentsObjectOffsets = struct {
+    length: Object.Shape.PropertyOffset,
+    @"%Symbol.iterator%": Object.Shape.PropertyOffset,
+    callee: Object.Shape.PropertyOffset,
 };
 
 pub fn unmappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    UnmappedArgumentsObjectIndices,
+    UnmappedArgumentsObjectOffsets,
 } {
     const shape = self.lazy_shapes.unmapped_arguments_object orelse blk: {
         const realm = self.realm;
@@ -171,23 +171,23 @@ pub fn unmappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.unmapped_arguments_object = shape;
         break :blk shape;
     };
-    const indices: UnmappedArgumentsObjectIndices = .{
+    const offsets: UnmappedArgumentsObjectOffsets = .{
         .length = @enumFromInt(0),
         .@"%Symbol.iterator%" = @enumFromInt(1),
         .callee = @enumFromInt(2),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }
 
-pub const MappedArgumentsObjectIndices = struct {
-    length: Object.Shape.PropertyIndex,
-    @"%Symbol.iterator%": Object.Shape.PropertyIndex,
-    callee: Object.Shape.PropertyIndex,
+pub const MappedArgumentsObjectOffsets = struct {
+    length: Object.Shape.PropertyOffset,
+    @"%Symbol.iterator%": Object.Shape.PropertyOffset,
+    callee: Object.Shape.PropertyOffset,
 };
 
 pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    MappedArgumentsObjectIndices,
+    MappedArgumentsObjectOffsets,
 } {
     const shape = self.lazy_shapes.mapped_arguments_object orelse blk: {
         const realm = self.realm;
@@ -215,21 +215,21 @@ pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.mapped_arguments_object = shape;
         break :blk shape;
     };
-    const indices: MappedArgumentsObjectIndices = .{
+    const offsets: MappedArgumentsObjectOffsets = .{
         .length = @enumFromInt(0),
         .@"%Symbol.iterator%" = @enumFromInt(1),
         .callee = @enumFromInt(2),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }
 
-pub const RegExpObjectIndices = struct {
-    lastIndex: Object.Shape.PropertyIndex,
+pub const RegExpObjectOffsets = struct {
+    lastIndex: Object.Shape.PropertyOffset,
 };
 
 pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    RegExpObjectIndices,
+    RegExpObjectOffsets,
 } {
     const shape = self.lazy_shapes.reg_exp_object orelse blk: {
         const realm = self.realm;
@@ -249,21 +249,21 @@ pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.reg_exp_object = shape;
         break :blk shape;
     };
-    const indices: RegExpObjectIndices = .{
+    const offsets: RegExpObjectOffsets = .{
         .lastIndex = @enumFromInt(0),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }
 
-pub const RegExpExecObjectIndices = struct {
-    index: Object.Shape.PropertyIndex,
-    input: Object.Shape.PropertyIndex,
-    groups: Object.Shape.PropertyIndex,
+pub const RegExpExecObjectOffsets = struct {
+    index: Object.Shape.PropertyOffset,
+    input: Object.Shape.PropertyOffset,
+    groups: Object.Shape.PropertyOffset,
 };
 
 pub fn regExpExecObject(self: *Shapes) std.mem.Allocator.Error!struct {
     *Object.Shape,
-    RegExpExecObjectIndices,
+    RegExpExecObjectOffsets,
 } {
     const shape = self.lazy_shapes.reg_exp_exec_object orelse blk: {
         const realm = self.realm;
@@ -291,10 +291,10 @@ pub fn regExpExecObject(self: *Shapes) std.mem.Allocator.Error!struct {
         self.lazy_shapes.reg_exp_exec_object = shape;
         break :blk shape;
     };
-    const indices: RegExpExecObjectIndices = .{
+    const offsets: RegExpExecObjectOffsets = .{
         .index = @enumFromInt(0),
         .input = @enumFromInt(1),
         .groups = @enumFromInt(2),
     };
-    return .{ shape, indices };
+    return .{ shape, offsets };
 }

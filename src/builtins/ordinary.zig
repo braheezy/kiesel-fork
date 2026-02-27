@@ -644,10 +644,10 @@ pub fn ordinarySet(
         switch (property_metadata.type) {
             .value => {
                 if (!property_metadata.attributes.writable) return false;
-                object.property_storage.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
+                object.property_storage.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
             },
             .accessor => {
-                const maybe_setter = object.property_storage.properties.items[@intFromEnum(property_metadata.index) + 1].getter_or_setter;
+                const maybe_setter = object.property_storage.properties.items[@intFromEnum(property_metadata.offset) + 1].getter_or_setter;
                 const setter = maybe_setter orelse return false;
                 _ = try Value.from(setter).callAssumeCallable(agent, receiver, &.{value});
             },

@@ -168,17 +168,17 @@ pub fn setIsHTMLDDA(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
     self.property_storage.shape = try self.property_storage.shape.setIsHTMLDDA(agent.gc_allocator);
 }
 
-pub fn setValueAtPropertyIndex(self: *Object, index: Shape.PropertyIndex, value: Value) void {
-    self.property_storage.properties.items[@intFromEnum(index)] = .{ .value = value };
+pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.PropertyOffset, value: Value) void {
+    self.property_storage.properties.items[@intFromEnum(offset)] = .{ .value = value };
 }
 
-pub fn setAccessorAtPropertyIndex(
+pub fn setAccessorAtPropertyOffset(
     self: *Object,
-    index: Shape.PropertyIndex,
+    offset: Shape.PropertyOffset,
     accessor: PropertyStorage.Accessor,
 ) void {
-    self.property_storage.properties.items[@intFromEnum(index)] = .{ .getter_or_setter = accessor.get };
-    self.property_storage.properties.items[@intFromEnum(index) + 1] = .{ .getter_or_setter = accessor.set };
+    self.property_storage.properties.items[@intFromEnum(offset)] = .{ .getter_or_setter = accessor.get };
+    self.property_storage.properties.items[@intFromEnum(offset) + 1] = .{ .getter_or_setter = accessor.set };
 }
 
 /// Assumes the property exists, is a data property, and not lazy.
@@ -197,7 +197,7 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
     const property_metadata = self.property_storage.shape.properties.get(property_key).?;
     std.debug.assert(!self.property_storage.lazy_properties.contains(property_key));
     return switch (property_metadata.type) {
-        .value => self.property_storage.properties.items[@intFromEnum(property_metadata.index)].value,
+        .value => self.property_storage.properties.items[@intFromEnum(property_metadata.offset)].value,
         .accessor => unreachable,
     };
 }

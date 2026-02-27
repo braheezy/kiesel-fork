@@ -62,20 +62,14 @@ pub const Transition = union(enum) {
     }
 };
 
-pub const PropertyLookupCacheEntry = struct {
-    shape: *const Shape,
-    type: PropertyType,
-    index: PropertyIndex,
-};
-
-pub const PropertyIndex = enum(u32) {
+pub const PropertyOffset = enum(u32) {
     zero = 0,
     _,
 };
 
 pub const PropertyMetadata = struct {
     type: PropertyType,
-    index: PropertyIndex,
+    offset: PropertyOffset,
     attributes: Attributes,
 };
 
@@ -100,7 +94,7 @@ const TransitionCount = enum(u8) {
 };
 
 transition_count: TransitionCount,
-next_index: PropertyIndex,
+next_offset: PropertyOffset,
 transitions: Transition.HashMapUnmanaged(*Shape),
 properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
 
@@ -117,7 +111,7 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
         .transition_count = .zero,
-        .next_index = .zero,
+        .next_offset = .zero,
         .transitions = .empty,
         .properties = .empty,
         .prototype = null,
@@ -149,7 +143,7 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
     errdefer allocator.destroy(shape);
     shape.* = .{
         .transition_count = self.transition_count,
-        .next_index = self.next_index,
+        .next_offset = self.next_offset,
         .transitions = .empty,
         .properties = try self.properties.clone(allocator),
         .prototype = self.prototype,
@@ -252,12 +246,12 @@ pub fn setProperty(
     }
     property_gop.value_ptr.* = .{
         .type = property_type,
-        .index = shape.next_index,
+        .offset = shape.next_offset,
         .attributes = attributes,
     };
-    shape.next_index = switch (property_type) {
-        .value => @enumFromInt(@intFromEnum(shape.next_index) + 1),
-        .accessor => @enumFromInt(@intFromEnum(shape.next_index) + 2),
+    shape.next_offset = switch (property_type) {
+        .value => @enumFromInt(@intFromEnum(shape.next_offset) + 1),
+        .accessor => @enumFromInt(@intFromEnum(shape.next_offset) + 2),
     };
     return shape;
 }
@@ -278,12 +272,12 @@ pub fn setPropertyWithoutTransition(
     }
     property_gop.value_ptr.* = .{
         .type = property_type,
-        .index = self.next_index,
+        .offset = self.next_offset,
         .attributes = attributes,
     };
-    self.next_index = switch (property_type) {
-        .value => @enumFromInt(@intFromEnum(self.next_index) + 1),
-        .accessor => @enumFromInt(@intFromEnum(self.next_index) + 2),
+    self.next_offset = switch (property_type) {
+        .value => @enumFromInt(@intFromEnum(self.next_offset) + 1),
+        .accessor => @enumFromInt(@intFromEnum(self.next_offset) + 2),
     };
 }
 

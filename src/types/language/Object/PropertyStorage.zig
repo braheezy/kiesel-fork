@@ -161,23 +161,23 @@ pub fn getCreateLazyIfNeeded(
         switch (property_metadata.type) {
             .value => {
                 const value = try lazy_property.initializer.value(agent, realm);
-                self.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
+                self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
             },
             .accessor => {
                 const accessor = try lazy_property.initializer.accessor(agent, realm);
-                self.properties.items[@intFromEnum(property_metadata.index)] = .{ .getter_or_setter = accessor.get };
-                self.properties.items[@intFromEnum(property_metadata.index) + 1] = .{ .getter_or_setter = accessor.set };
+                self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .getter_or_setter = accessor.get };
+                self.properties.items[@intFromEnum(property_metadata.offset) + 1] = .{ .getter_or_setter = accessor.set };
             },
         }
     }
     const value_or_accessor: ValueOrAccessor = switch (property_metadata.type) {
         .value => .{
-            .value = self.properties.items[@intFromEnum(property_metadata.index)].value,
+            .value = self.properties.items[@intFromEnum(property_metadata.offset)].value,
         },
         .accessor => .{
             .accessor = .{
-                .get = self.properties.items[@intFromEnum(property_metadata.index)].getter_or_setter,
-                .set = self.properties.items[@intFromEnum(property_metadata.index) + 1].getter_or_setter,
+                .get = self.properties.items[@intFromEnum(property_metadata.offset)].getter_or_setter,
+                .set = self.properties.items[@intFromEnum(property_metadata.offset) + 1].getter_or_setter,
             },
         },
     };
@@ -213,11 +213,11 @@ pub fn set(
             // Clear value in the previous storage list
             switch (property_metadata.type) {
                 .value => {
-                    self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = undefined;
                 },
                 .accessor => {
-                    self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
-                    self.properties.items[@intFromEnum(property_metadata.index) + 1] = undefined;
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = undefined;
+                    self.properties.items[@intFromEnum(property_metadata.offset) + 1] = undefined;
                 },
             }
             switch (value_or_accessor) {
@@ -232,11 +232,11 @@ pub fn set(
         } else {
             switch (value_or_accessor) {
                 .value => |value| {
-                    self.properties.items[@intFromEnum(property_metadata.index)] = .{ .value = value };
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
                 },
                 .accessor => |accessor| {
-                    self.properties.items[@intFromEnum(property_metadata.index)] = .{ .getter_or_setter = accessor.get };
-                    self.properties.items[@intFromEnum(property_metadata.index) + 1] = .{ .getter_or_setter = accessor.set };
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .getter_or_setter = accessor.get };
+                    self.properties.items[@intFromEnum(property_metadata.offset) + 1] = .{ .getter_or_setter = accessor.set };
                 },
             }
         }
@@ -269,17 +269,17 @@ pub fn remove(
     }
     const property_metadata = self.shape.properties.get(property_key).?;
     self.shape = try self.shape.deleteProperty(allocator, property_key);
-    // By overwriting the value and keeping subsequent indices intact we can make property
+    // By overwriting the value and keeping subsequent offsets intact we can make property
     // deletions part of the regular transition chain without making them unique and invalidating
     // ICs. Additionally we save the cost of moving all elements after this one around, at the
     // memory cost of wasting one element.
     switch (property_metadata.type) {
         .value => {
-            self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
+            self.properties.items[@intFromEnum(property_metadata.offset)] = undefined;
         },
         .accessor => {
-            self.properties.items[@intFromEnum(property_metadata.index)] = undefined;
-            self.properties.items[@intFromEnum(property_metadata.index) + 1] = undefined;
+            self.properties.items[@intFromEnum(property_metadata.offset)] = undefined;
+            self.properties.items[@intFromEnum(property_metadata.offset) + 1] = undefined;
         },
     }
 }

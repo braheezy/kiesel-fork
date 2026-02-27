@@ -711,8 +711,8 @@ pub fn ordinaryFunctionCreateFast(
     const strict = body.strict;
 
     const realm = agent.currentRealm();
-    const function_shape, const function_indices = try realm.shapes.ordinaryFunction();
-    const prototype_shape, const prototype_indices = try realm.shapes.ordinaryFunctionPrototype();
+    const function_shape, const function_offsets = try realm.shapes.ordinaryFunction();
+    const prototype_shape, const prototype_offsets = try realm.shapes.ordinaryFunctionPrototype();
 
     const function = try ECMAScriptFunction.createWithShape(agent, .{
         .shape = function_shape,
@@ -740,11 +740,11 @@ pub fn ordinaryFunctionCreateFast(
     });
 
     const prototype = try builtins.Object.createWithShape(agent, .{ .shape = prototype_shape });
-    prototype.object.setValueAtPropertyIndex(prototype_indices.constructor, Value.from(&function.object));
+    prototype.object.setValueAtPropertyOffset(prototype_offsets.constructor, Value.from(&function.object));
 
-    function.object.setValueAtPropertyIndex(function_indices.length, Value.from(length));
-    function.object.setValueAtPropertyIndex(function_indices.name, Value.from(name));
-    function.object.setValueAtPropertyIndex(function_indices.prototype, Value.from(&prototype.object));
+    function.object.setValueAtPropertyOffset(function_offsets.length, Value.from(length));
+    function.object.setValueAtPropertyOffset(function_offsets.name, Value.from(name));
+    function.object.setValueAtPropertyOffset(function_offsets.prototype, Value.from(&prototype.object));
 
     return function;
 }

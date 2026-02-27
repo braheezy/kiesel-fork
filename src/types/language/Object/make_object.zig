@@ -115,7 +115,7 @@ pub fn MakeObject(
             };
             try self.object.property_storage.properties.resize(
                 agent.gc_allocator,
-                @intFromEnum(args.shape.next_index),
+                @intFromEnum(args.shape.next_offset),
             );
             if (build_options.enable_libgc) {
                 if (options.finalizer) |finalizer| {
