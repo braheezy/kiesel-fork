@@ -16,6 +16,7 @@ current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 exception_handlers: std.ArrayList(ExceptionHandler),
+num_inline_caches: u16,
 
 const ExceptionHandler = struct {
     start: *Block,
@@ -36,6 +37,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .lsra = lsra,
         .label_blocks = .empty,
         .exception_handlers = .empty,
+        .num_inline_caches = 0,
     };
 }
 
@@ -375,6 +377,7 @@ pub fn build(b: *Builder) Error!Bytecode {
         .name = name,
         .code = code,
         .num_regs = b.lsra.numRegs(),
+        .num_inline_caches = b.num_inline_caches,
         .strings = strings,
         .string_kinds = string_kinds,
         .big_ints = big_ints,
@@ -605,6 +608,12 @@ fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Inst.Reg {
     const reg = b.lsra.allocations[@intFromEnum(index)];
     std.debug.assert(reg != .none); // Live instructions must have allocations
     return reg;
+}
+
+fn nextIcIndex(b: *Builder) Bytecode.Inst.IcIndex {
+    const index: Bytecode.Inst.IcIndex = @enumFromInt(b.num_inline_caches);
+    b.num_inline_caches += 1;
+    return index;
 }
 
 fn lowerUndefined(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
@@ -1138,12 +1147,14 @@ fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecod
 fn lowerGetProperty(b: *Builder, data: Ir.Inst.GetProperty, dest: Bytecode.Inst.Reg) Error!void {
     const base_reg = b.resolve(data.base);
     const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
+    const ic_index = b.nextIcIndex();
     try b.emit(.{
         .tag = .get_property,
-        .data = .{ .reg_reg_string = .{
+        .data = .{ .reg_reg_string_ic = .{
             dest,
             base_reg,
             bytecode_string_index,
+            ic_index,
         } },
     });
 }
@@ -1163,12 +1174,14 @@ fn lowerGetPropertyComputed(b: *Builder, data: Ir.Inst.GetPropertyComputed, dest
 
 fn lowerGetPropertyIndexed(b: *Builder, data: Ir.Inst.GetPropertyIndexed, dest: Bytecode.Inst.Reg) Error!void {
     const base_reg = b.resolve(data.base);
+    const ic_index = b.nextIcIndex();
     try b.emit(.{
         .tag = .get_property_indexed,
-        .data = .{ .reg_reg_u32 = .{
+        .data = .{ .reg_reg_u32_ic = .{
             dest,
             base_reg,
             data.index,
+            ic_index,
         } },
     });
 }
@@ -1194,16 +1207,18 @@ fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: B
     const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
+    const ic_index = b.nextIcIndex();
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_strict
     else
         .set_property;
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_string = .{
+        .data = .{ .reg_reg_string_ic = .{
             base_reg,
             value_reg,
             @enumFromInt(@intFromEnum(extra.data.name)),
+            ic_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);
@@ -1233,16 +1248,18 @@ fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, 
     const extra = b.ir.extraData(Ir.Inst.SetPropertyIndexed, data);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
+    const ic_index = b.nextIcIndex();
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_indexed_strict
     else
         .set_property_indexed;
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_u32 = .{
+        .data = .{ .reg_reg_u32_ic = .{
             base_reg,
             value_reg,
             extra.data.index,
+            ic_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);

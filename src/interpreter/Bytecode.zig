@@ -7,6 +7,7 @@ const Bytecode = @This();
 name: []const u8,
 code: []const u8,
 num_regs: u16,
+num_inline_caches: u16,
 strings: []const []const u8,
 string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
@@ -285,6 +286,8 @@ pub const Inst = struct {
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
         reg_string_string: struct { Reg, StringIndex, StringIndex },
+        reg_reg_string_ic: struct { Reg, Reg, StringIndex, IcIndex },
+        reg_reg_u32_ic: struct { Reg, Reg, u32, IcIndex },
         reg_function: struct { Reg, FunctionIndex },
         reg_class: struct { Reg, ClassIndex },
         string: StringIndex,
@@ -361,17 +364,17 @@ pub const Inst = struct {
             .create_immutable_binding = .string,
             .initialize_binding = .string_reg,
             .get_binding = .reg_string,
-            .get_property = .reg_reg_string,
+            .get_property = .reg_reg_string_ic,
             .get_property_computed = .reg_reg_reg,
-            .get_property_indexed = .reg_reg_u32,
+            .get_property_indexed = .reg_reg_u32_ic,
             .set_binding = .string_reg,
             .set_binding_strict = .string_reg,
-            .set_property = .reg_reg_string,
-            .set_property_strict = .reg_reg_string,
+            .set_property = .reg_reg_string_ic,
+            .set_property_strict = .reg_reg_string_ic,
             .set_property_computed = .reg_reg_reg,
             .set_property_computed_strict = .reg_reg_reg,
-            .set_property_indexed = .reg_reg_u32,
-            .set_property_indexed_strict = .reg_reg_u32,
+            .set_property_indexed = .reg_reg_u32_ic,
+            .set_property_indexed_strict = .reg_reg_u32_ic,
             .increment_binding_prefix = .reg_string,
             .increment_binding_prefix_strict = .reg_string,
             .increment_binding_postfix = .reg_string,
@@ -478,6 +481,7 @@ pub const Inst = struct {
     pub const BigIntIndex = enum(u32) { _ };
     pub const FunctionIndex = enum(u32) { _ };
     pub const ClassIndex = enum(u32) { _ };
+    pub const IcIndex = enum(u16) { _ };
 
     pub const Format = struct {
         inst: Inst,
@@ -557,6 +561,7 @@ pub const Inst = struct {
             FunctionIndex,
             ClassIndex,
             => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
+            IcIndex => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
             u32 => std.mem.readInt(u32, code[0..4], .little),
@@ -596,6 +601,7 @@ pub const Inst = struct {
             FunctionIndex,
             ClassIndex,
             => try writer.writeInt(u32, @intFromEnum(value), .little),
+            IcIndex => try writer.writeInt(u16, @intFromEnum(value), .little),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
             u32 => try writer.writeInt(u32, value, .little),
@@ -813,6 +819,7 @@ fn printField(
         },
         Inst.FunctionIndex,
         Inst.ClassIndex,
+        Inst.IcIndex,
         => {
             try tty_config.setColor(writer, .yellow);
             try writer.print("@{d}", .{@intFromEnum(value)});
