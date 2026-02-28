@@ -57,7 +57,7 @@ const ScriptOrModuleHostDefined = struct {
 };
 
 fn resolveModulePath(
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     script_or_module: ScriptOrModule,
     specifier: []const u8,
 ) std.mem.Allocator.Error![]const u8 {
@@ -70,7 +70,7 @@ fn resolveModulePath(
     };
     const base_dir: []const u8 = host_defined.cast(*ScriptOrModuleHostDefined).base_dir;
     std.debug.assert(std.fs.path.isAbsolute(base_dir));
-    const resolved_path = try std.fs.path.resolve(allocator, &.{ base_dir, specifier });
+    const resolved_path = try std.fs.path.resolve(gpa, &.{ base_dir, specifier });
     std.debug.assert(std.fs.path.isAbsolute(resolved_path));
     return resolved_path;
 }
@@ -216,7 +216,10 @@ const Kiesel = struct {
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
     fn evalScript(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const source_text = try arguments.get(0).toString(agent);
+        const gpa = agent.gpa;
+
+        const source_text = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
+        defer gpa.free(source_text);
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
         //    an implementation dependent manner)
@@ -231,11 +234,11 @@ const Kiesel = struct {
         // 2. Let realm be the current Realm Record.
         const realm = agent.currentRealm();
 
-        var diagnostics = Diagnostics.init(agent.gc_allocator);
+        var diagnostics = Diagnostics.init(gpa);
         defer diagnostics.deinit();
 
         // 3. Let s be ParseScript(sourceText, realm, hostDefined).
-        const script = Script.parse(try source_text.toUtf8(agent.gc_allocator), realm, host_defined, .{
+        const script = Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = "evalScript",
         }) catch |err| switch (err) {
@@ -251,10 +254,8 @@ const Kiesel = struct {
         };
 
         // 5. Let status be ScriptEvaluation(s).
-        const status = script.evaluate("evalScript");
-
         // 6. Return Completion(status).
-        return status;
+        return script.evaluate("evalScript");
     }
 
     fn isMerlin(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -305,11 +306,10 @@ const Kiesel = struct {
     }
 
     fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const path = try arguments.get(0).toString(agent);
-        const bytes = readFile(
-            agent.gc_allocator,
-            try path.toUtf8(agent.gc_allocator),
-        ) catch |err| switch (err) {
+        const gpa = agent.gpa;
+        const path = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
+        defer gpa.free(path);
+        const bytes = readFile(agent.gc_allocator, path) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
                 .type_error,
@@ -381,17 +381,17 @@ const Kiesel = struct {
     }
 
     fn writeFile(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const path = try arguments.get(0).toString(agent);
-        const contents = try arguments.get(1).toString(agent);
+        const gpa = agent.gpa;
+        const path = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
+        defer gpa.free(path);
+        const contents = try (try arguments.get(1).toString(agent)).toUtf8(gpa);
+        defer gpa.free(contents);
 
-        const file = std.fs.cwd().createFile(
-            try path.toUtf8(agent.gc_allocator),
-            .{},
-        ) catch |err| {
+        const file = std.fs.cwd().createFile(path, .{}) catch |err| {
             return agent.throwException(.type_error, "Error while opening file: {t}", .{err});
         };
         defer file.close();
-        file.writeAll(try contents.toUtf8(agent.gc_allocator)) catch |err| {
+        file.writeAll(contents) catch |err| {
             return agent.throwException(.type_error, "Error while writing file: {t}", .{err});
         };
         return .undefined;
@@ -451,7 +451,7 @@ const Kiesel = struct {
     }
 };
 
-fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: struct {
+fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: []const u8,
     origin: union(enum) {
         repl,
@@ -471,7 +471,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
         break :blk ptr;
     });
 
-    var diagnostics = Diagnostics.init(allocator);
+    var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
 
     const file_name: []const u8 = switch (options.origin) {
@@ -614,15 +614,12 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
 
 const ReadFileError = std.fs.File.OpenError || std.Io.Reader.LimitedAllocError;
 
-fn readFile(
-    allocator: std.mem.Allocator,
-    path: []const u8,
-) ReadFileError![]const u8 {
+fn readFile(gpa: std.mem.Allocator, path: []const u8) ReadFileError![]const u8 {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
     var file_reader = file.reader(&.{});
     const reader = &file_reader.interface;
-    return reader.allocRemaining(allocator, .unlimited);
+    return reader.allocRemaining(gpa, .unlimited);
 }
 
 const GetHistoryPathError =
@@ -631,12 +628,12 @@ const GetHistoryPathError =
     std.fs.Dir.MakeError ||
     std.fs.File.OpenError;
 
-fn getHistoryPath(allocator: std.mem.Allocator) GetHistoryPathError![]const u8 {
-    const app_data_dir = try std.fs.getAppDataDir(allocator, "kiesel");
-    defer allocator.free(app_data_dir);
+fn getHistoryPath(gpa: std.mem.Allocator) GetHistoryPathError![]const u8 {
+    const app_data_dir = try std.fs.getAppDataDir(gpa, "kiesel");
+    defer gpa.free(app_data_dir);
 
-    const history_path = try std.fs.path.join(allocator, &.{ app_data_dir, "history" });
-    errdefer allocator.free(history_path);
+    const history_path = try std.fs.path.join(gpa, &.{ app_data_dir, "history" });
+    errdefer gpa.free(history_path);
 
     std.fs.cwd().makePath(app_data_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
@@ -714,7 +711,7 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .reset);
 }
 
-fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
+fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
     base_dir: []const u8,
     debug: bool = false,
     module: bool = false,
@@ -727,7 +724,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     try stdout.writeAll(repl_preamble);
     try stdout.flush();
 
-    var editor = Editor.init(allocator, .{});
+    var editor = Editor.init(gpa, .{});
     defer editor.deinit();
 
     var handler: struct {
@@ -819,7 +816,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         }
 
         pub fn tab_complete(self: *@This()) ![]const Editor.CompletionSuggestion {
-            const gpa = self.editor.allocator;
+            const gpa_ = self.editor.allocator;
 
             _ = self.string_arena.reset(.{ .retain_with_limit = 4096 });
             const string_arena = self.string_arena.allocator();
@@ -882,7 +879,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                     else => continue,
                 };
                 if (!property_name.startsWith(prefix)) continue;
-                const gop = seen.getOrPut(gpa, property_name) catch return &.{};
+                const gop = seen.getOrPut(gpa_, property_name) catch return &.{};
                 if (gop.found_existing) continue;
                 const property_name_utf8 = property_name.toUtf8(string_arena) catch return &.{};
                 suggestions.appendBounded(.{
@@ -897,7 +894,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
                 while (it.next()) |binding_name_ptr| {
                     const binding_name = binding_name_ptr.*;
                     if (!binding_name.startsWith(prefix)) continue;
-                    const gop = seen.getOrPut(gpa, binding_name) catch return &.{};
+                    const gop = seen.getOrPut(gpa_, binding_name) catch return &.{};
                     if (gop.found_existing) continue;
                     const binding_name_utf8 = binding_name.toUtf8(string_arena) catch return &.{};
                     suggestions.appendBounded(.{
@@ -922,20 +919,20 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     } = .{
         .editor = &editor,
         .realm = realm,
-        .string_arena = .init(allocator),
+        .string_arena = .init(gpa),
     };
 
     editor.setHandler(&handler);
     defer {
         if (handler.completion_buffer) |buffer| {
-            allocator.free(buffer);
+            gpa.free(buffer);
             handler.completion_buffer = null;
         }
         handler.string_arena.deinit();
     }
 
-    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(allocator) else "";
-    defer if (builtin.os.tag != .wasi) allocator.free(history_path);
+    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(gpa) else "";
+    defer if (builtin.os.tag != .wasi) gpa.free(history_path);
 
     if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch {
         try stdout.writeAll("Failed to load history\n");
@@ -952,7 +949,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
             error.Eof => break,
             else => return err,
         };
-        defer allocator.free(source_text);
+        defer gpa.free(source_text);
 
         // Directly show another prompt when spamming enter, whitespace is evaluated
         // however (and will print 'undefined').
@@ -961,7 +958,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
         try editor.addToHistory(source_text);
         lines += 1;
 
-        const result = run(allocator, realm, source_text, .{
+        const result = run(gpa, realm, source_text, .{
             .base_dir = options.base_dir,
             .origin = .repl,
             .module = options.module,
@@ -994,8 +991,16 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
 
 pub fn main() !u8 {
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = debug_allocator.deinit();
-    const allocator = debug_allocator.allocator();
+    const gpa, const is_debug = gpa: {
+        if (builtin.os.tag == .wasi) break :gpa .{ std.heap.wasm_allocator, false };
+        break :gpa switch (builtin.mode) {
+            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
+            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
+        };
+    };
+    defer if (is_debug) {
+        _ = debug_allocator.deinit();
+    };
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -1046,7 +1051,7 @@ pub fn main() !u8 {
             },
         };
     };
-    const parsed_args = args.parseForCurrentProcess(Options, allocator, .print) catch return 1;
+    const parsed_args = args.parseForCurrentProcess(Options, gpa, .print) catch return 1;
     defer parsed_args.deinit();
 
     const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
@@ -1082,7 +1087,7 @@ pub fn main() !u8 {
     }
     var platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{
+    var agent = try Agent.init(gpa, &platform, .{
         .debug = .{
             .print_ast = parsed_args.options.@"print-ast",
             .print_bytecode = parsed_args.options.@"print-bytecode",
@@ -1092,8 +1097,8 @@ pub fn main() !u8 {
     defer agent.deinit();
 
     if (kiesel.build_options.enable_intl) {
-        if (std.process.getEnvVarOwned(allocator, "LANG")) |lang| {
-            defer allocator.free(lang);
+        if (std.process.getEnvVarOwned(gpa, "LANG")) |lang| {
+            defer gpa.free(lang);
             const lang_trimmed = if (std.mem.indexOf(u8, lang, ".UTF-8")) |index|
                 lang[0..index]
             else
@@ -1105,8 +1110,8 @@ pub fn main() !u8 {
     }
 
     if (kiesel.build_options.enable_temporal) {
-        if (std.process.getEnvVarOwned(allocator, "TZ")) |tz| {
-            defer allocator.free(tz);
+        if (std.process.getEnvVarOwned(gpa, "TZ")) |tz| {
+            defer gpa.free(tz);
             const string_view = temporal_rs.toDiplomatStringView(tz);
             if (temporal_rs.success(
                 temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(string_view),
@@ -1180,23 +1185,21 @@ pub fn main() !u8 {
             module_request: ModuleRequest,
             module_path: []const u8,
         ) Agent.Error!Module {
+            const gpa_ = agent_.gpa;
             const realm = agent_.currentRealm();
-            const source_text = readFile(agent_.gc_allocator, module_path) catch |err| {
+            const source_text = readFile(gpa_, module_path) catch |err| {
                 return agent_.throwException(
                     .internal_error,
                     "Failed to import '{f}': {t}",
                     .{ module_request.specifier.fmtEscaped(), err },
                 );
             };
-            defer agent_.gc_allocator.free(source_text);
+            defer gpa_.free(source_text);
 
             for (module_request.attributes) |import_attribute| {
                 if (import_attribute.key.eql(String.fromLiteral("type"))) {
                     if (import_attribute.value.eql(String.fromLiteral("json"))) {
-                        const synthetic_module = try parseJSONModule(
-                            agent_,
-                            try String.fromUtf8(agent_, source_text),
-                        );
+                        const synthetic_module = try parseJSONModule(agent_, source_text);
                         return .{ .synthetic_module = synthetic_module };
                     }
                     return agent_.throwException(
@@ -1213,7 +1216,7 @@ pub fn main() !u8 {
                 break :blk ptr;
             });
 
-            var diagnostics = Diagnostics.init(agent_.gc_allocator);
+            var diagnostics = Diagnostics.init(gpa_);
             defer diagnostics.deinit();
 
             const source_text_module = SourceTextModule.parse(source_text, realm, host_defined, .{
@@ -1255,17 +1258,17 @@ pub fn main() !u8 {
     const realm = agent.currentRealm();
     try initializeGlobalObject(&agent, realm, realm.global_object);
 
-    const cwd = try std.process.getCwdAlloc(allocator);
-    defer allocator.free(cwd);
+    const cwd = try std.process.getCwdAlloc(gpa);
+    defer gpa.free(cwd);
     std.debug.assert(std.fs.path.isAbsolute(cwd));
 
     if (path_arg) |path| {
-        const source_text = try readFile(allocator, path);
-        defer allocator.free(source_text);
-        const resolved_path = try std.fs.path.resolve(allocator, &.{ cwd, path });
-        defer allocator.free(resolved_path);
+        const source_text = try readFile(gpa, path);
+        defer gpa.free(source_text);
+        const resolved_path = try std.fs.path.resolve(gpa, &.{ cwd, path });
+        defer gpa.free(resolved_path);
         std.debug.assert(std.fs.path.isAbsolute(resolved_path));
-        const result = run(allocator, realm, source_text, .{
+        const result = run(gpa, realm, source_text, .{
             .base_dir = std.fs.path.dirname(resolved_path).?,
             .origin = .{ .path = path },
             .module = parsed_args.options.module,
@@ -1279,7 +1282,7 @@ pub fn main() !u8 {
             try stdout.flush();
         }
     } else if (parsed_args.options.command) |source_text| {
-        const result = run(allocator, realm, source_text, .{
+        const result = run(gpa, realm, source_text, .{
             .base_dir = cwd,
             .origin = .command,
             .module = parsed_args.options.module,
@@ -1293,7 +1296,7 @@ pub fn main() !u8 {
             try stdout.flush();
         }
     } else {
-        try repl(allocator, realm, .{
+        try repl(gpa, realm, .{
             .base_dir = cwd,
             .debug = parsed_args.options.debug,
             .module = parsed_args.options.module,

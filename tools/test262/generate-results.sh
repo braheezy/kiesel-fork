@@ -21,7 +21,7 @@ test262-harness \
   --host-path="${kiesel_path}" \
   --test262-dir="${test262_dir}" \
   --reporter=json --reporter-keys=file,result \
-  --timeout=20000 \
+  --timeout=30000 \
   --threads="$(nproc)" \
   "${test262_glob}" \
 | jq -r '

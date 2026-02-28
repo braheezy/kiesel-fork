@@ -74,7 +74,7 @@ fn testInterpreter(
 
     const platform: Agent.Platform = .default();
     defer platform.deinit();
-    var agent: Agent = try .init(&platform, .{});
+    var agent: Agent = try .init(gpa, &platform, .{});
     defer agent.deinit();
 
     try Realm.initializeHostDefinedRealm(&agent, .{});

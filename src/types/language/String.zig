@@ -863,8 +863,10 @@ pub fn concat(
             return fromUtf16(agent, result);
         }
     }
-    var builder = try Builder.initCapacity(agent.gc_allocator, @intCast(strings.len));
-    defer builder.deinit(agent.gc_allocator);
+    const gpa = agent.gpa;
+    // SAFETY: This builder can use a GPA as it only stores strings rooted via the argument slice.
+    var builder = try Builder.initCapacity(gpa, @intCast(strings.len));
+    defer builder.deinit(gpa);
     for (strings) |string| builder.appendStringAssumeCapacity(string);
     return builder.build(agent);
 }
@@ -949,9 +951,10 @@ test fromLiteral {
 }
 
 test fromUtf8 {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromUtf8(&agent, "");
@@ -980,9 +983,10 @@ test fromUtf8 {
 }
 
 test fromAscii {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromAscii(&agent, "");
@@ -1004,9 +1008,10 @@ test fromAscii {
 }
 
 test fromUtf16 {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromUtf16(&agent, &.{});
@@ -1028,9 +1033,10 @@ test fromUtf16 {
 }
 
 test fromStringSliced {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     const parent = fromLiteral("foobarbaz");
     {
@@ -1063,9 +1069,10 @@ test fromStringSliced {
 }
 
 test trimStart {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1085,9 +1092,10 @@ test trimStart {
 }
 
 test trimEnd {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1107,9 +1115,10 @@ test trimEnd {
 }
 
 test trim {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1129,9 +1138,10 @@ test trim {
 }
 
 test repeat {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral("foo");
@@ -1151,9 +1161,10 @@ test repeat {
 }
 
 test concat {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     {
         const string = try String.concat(&agent, &.{});

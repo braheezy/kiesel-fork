@@ -1852,8 +1852,9 @@ pub fn stringToNumber(
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
-    const trimmed_string = try (try string.trim(agent)).toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(trimmed_string);
+    const gpa = agent.gpa;
+    const trimmed_string = try (try string.trim(agent)).toUtf8(gpa);
+    defer gpa.free(trimmed_string);
     if (trimmed_string.len == 0) return Number.from(0);
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
@@ -1897,8 +1898,9 @@ pub fn stringToBigInt(
     // 4. Assert: mv is an integer.
     // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
-    const trimmed_string = try (try string.trim(agent)).toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(trimmed_string);
+    const gpa = agent.gpa;
+    const trimmed_string = try (try string.trim(agent)).toUtf8(gpa);
+    defer gpa.free(trimmed_string);
     if (trimmed_string.len == 0) return .zero;
     // Unlike std.fmt.parseFloat() and std.fmt.parseInt() with base 0, std.math.big.int.Managed.setString()
     // doesn't like the prefix so we have to cut it off manually.
@@ -2414,9 +2416,10 @@ pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value)
 }
 
 test format {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     const symbol_without_description: Symbol = .{ .description = null };
     const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };

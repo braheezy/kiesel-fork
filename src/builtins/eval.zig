@@ -26,6 +26,8 @@ const noexcept = utils.noexcept;
 /// 19.2.1.1 PerformEval ( x, strictCaller, direct )
 /// https://tc39.es/ecma262/#sec-performeval
 pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) Agent.Error!Value {
+    const gpa = agent.gpa;
+
     // 1. Assert: If direct is false, then strictCaller is also false.
     if (!direct) std.debug.assert(!strict_caller);
 
@@ -85,11 +87,14 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
 
-    var diagnostics = Diagnostics.init(agent.gc_allocator);
+    const source_text = try x.asString().toUtf8(gpa);
+    defer gpa.free(source_text);
+
+    var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
 
     // a. Let script be ParseText(x, Script).
-    const script = Parser.parse(ast.Script, agent.gc_allocator, try x.asString().toUtf8(agent.gc_allocator), .{
+    const script = Parser.parse(ast.Script, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
         .file_name = "eval",
         .state = .{

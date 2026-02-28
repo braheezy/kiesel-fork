@@ -1383,6 +1383,8 @@ pub const IntlMathematicalValue = union(enum) {
 /// 16.5.16 ToIntlMathematicalValue ( value )
 /// https://tc39.es/ecma402/#sec-tointlmathematicalvalue
 pub fn toIntlMathematicalValue(agent: *Agent, value: Value) Agent.Error!IntlMathematicalValue {
+    const gpa = agent.gpa;
+
     // 1. Let primValue be ? ToPrimitive(value, number).
     const primitive_value = try value.toPrimitive(agent, .number);
 
@@ -1425,8 +1427,8 @@ pub fn toIntlMathematicalValue(agent: *Agent, value: Value) Agent.Error!IntlMath
     if (number.isNegativeInf()) return .negative_infinity;
     if (number.isPositiveInf()) return .positive_infinity;
     if (number.isNegativeZero()) return .negative_zero;
-    const str_utf8 = try str.toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(str_utf8);
+    const str_utf8 = try str.toUtf8(gpa);
+    defer gpa.free(str_utf8);
     return if (icu4zig.Decimal.fromString(str_utf8)) |decimal|
         .{ .mathematical_value = decimal }
     else |_|

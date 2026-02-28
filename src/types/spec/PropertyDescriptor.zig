@@ -195,10 +195,11 @@ pub fn hasFields(self: PropertyDescriptor) bool {
         self.configurable != null;
 }
 
-test "isAccessorDescriptor" {
+test isAccessorDescriptor {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     const getter = try ordinaryObjectCreate(&agent, null);
     const setter = try ordinaryObjectCreate(&agent, null);
@@ -209,17 +210,18 @@ test "isAccessorDescriptor" {
     try std.testing.expect(!(PropertyDescriptor{}).isAccessorDescriptor());
 }
 
-test "isDataDescriptor" {
+test isDataDescriptor {
     try std.testing.expect((PropertyDescriptor{ .value = .undefined }).isDataDescriptor());
     try std.testing.expect((PropertyDescriptor{ .writable = true }).isDataDescriptor());
     try std.testing.expect(!(PropertyDescriptor{ .writable = null }).isDataDescriptor());
     try std.testing.expect(!(PropertyDescriptor{}).isDataDescriptor());
 }
 
-test "isGenericDescriptor" {
+test isGenericDescriptor {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
     const setter = try ordinaryObjectCreate(&agent, null);
     try std.testing.expect((PropertyDescriptor{ .writable = null }).isGenericDescriptor());

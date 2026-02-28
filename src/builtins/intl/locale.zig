@@ -29,6 +29,7 @@ fn updateLanguageId(
     tag: icu4zig.Locale,
     options: *Object,
 ) Agent.Error!icu4zig.Locale {
+    const gpa = agent.gpa;
     var new_tag = tag.clone();
 
     // 1. Let baseName be GetLocaleBaseName(tag).
@@ -38,9 +39,10 @@ fn updateLanguageId(
     // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
     //    throw a RangeError exception.
     if (maybe_language) |language| {
-        const value = try language.toUtf8(agent.gc_allocator);
-        new_tag.setLanguage(value) catch {
-            return agent.throwException(.range_error, "Invalid language subtag '{s}'", .{value});
+        const language_utf8 = try language.toUtf8(gpa);
+        defer gpa.free(language_utf8);
+        new_tag.setLanguage(language_utf8) catch {
+            return agent.throwException(.range_error, "Invalid language subtag '{s}'", .{language_utf8});
         };
     }
 
@@ -51,9 +53,10 @@ fn updateLanguageId(
     if (maybe_script) |script| {
         // a. If script cannot be matched by the unicode_script_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        const value = try script.toUtf8(agent.gc_allocator);
-        new_tag.setScript(value) catch {
-            return agent.throwException(.range_error, "Invalid script subtag '{s}'", .{value});
+        const script_utf8 = try script.toUtf8(gpa);
+        defer gpa.free(script_utf8);
+        new_tag.setScript(script_utf8) catch {
+            return agent.throwException(.range_error, "Invalid script subtag '{s}'", .{script_utf8});
         };
     }
 
@@ -64,9 +67,10 @@ fn updateLanguageId(
     if (maybe_region) |region| {
         // a. If region cannot be matched by the unicode_region_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        const value = try region.toUtf8(agent.gc_allocator);
-        new_tag.setRegion(value) catch {
-            return agent.throwException(.range_error, "Invalid region subtag '{s}'", .{value});
+        const region_utf8 = try region.toUtf8(gpa);
+        defer gpa.free(region_utf8);
+        new_tag.setRegion(region_utf8) catch {
+            return agent.throwException(.range_error, "Invalid region subtag '{s}'", .{region_utf8});
         };
     }
 
@@ -75,11 +79,12 @@ fn updateLanguageId(
 
     // 9. If variants is not undefined, then
     if (maybe_variants) |variants| {
-        const value = try variants.toUtf8(agent.gc_allocator);
+        const variants_utf8 = try variants.toUtf8(gpa);
+        defer gpa.free(variants_utf8);
 
         // a. If variants is the empty String, throw a RangeError exception.
         if (variants.isEmpty()) {
-            return agent.throwException(.range_error, "Invalid variants subtag '{s}'", .{value});
+            return agent.throwException(.range_error, "Invalid variants subtag '{s}'", .{variants_utf8});
         }
 
         // b. Let lowerVariants be the ASCII-lowercase of variants.
@@ -126,6 +131,7 @@ pub const constructor = struct {
     /// 15.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
+        const gpa = agent.gpa;
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -178,7 +184,9 @@ pub const constructor = struct {
 
         // 11. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
         // 12. Set tag to CanonicalizeUnicodeLocaleId(tag).
-        var tag = icu4zig.Locale.fromString(try tag_string.toUtf8(agent.gc_allocator)) catch {
+        const tag_utf8 = try tag_string.toUtf8(gpa);
+        defer gpa.free(tag_utf8);
+        var tag = icu4zig.Locale.fromString(tag_utf8) catch {
             return agent.throwException(
                 .range_error,
                 "Invalid locale identifier {f}",
@@ -204,7 +212,9 @@ pub const constructor = struct {
         if (maybe_calendar) |calendar| {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            var value: []const u8 = try calendar.toUtf8(agent.gc_allocator);
+            const calendar_utf8 = try calendar.toUtf8(gpa);
+            defer gpa.free(calendar_utf8);
+            var value: []const u8 = calendar_utf8;
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {
@@ -232,7 +242,9 @@ pub const constructor = struct {
         if (maybe_collation) |collation| {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            var value: []const u8 = try collation.toUtf8(agent.gc_allocator);
+            const collation_utf8 = try collation.toUtf8(gpa);
+            defer gpa.free(collation_utf8);
+            var value: []const u8 = collation_utf8;
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {
@@ -309,7 +321,9 @@ pub const constructor = struct {
         if (maybe_numbering_system) |numbering_system| {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
-            var value: []const u8 = try numbering_system.toUtf8(agent.gc_allocator);
+            const numbering_system_utf8 = try numbering_system.toUtf8(gpa);
+            defer gpa.free(numbering_system_utf8);
+            var value: []const u8 = numbering_system_utf8;
             // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
             var it = std.mem.splitScalar(u8, value, '-');
             while (it.next()) |part| if (part.len < 3) {

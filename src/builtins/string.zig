@@ -591,13 +591,16 @@ pub const constructor = struct {
     /// 22.1.2.1 String.fromCharCode ( ...codeUnits )
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCharCode(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
+        // SAFETY: This builder can use a GPA as it only stores u16 code unit segments.
         var result = try types.String.Builder.initCapacity(
-            agent.gc_allocator,
+            gpa,
             @intCast(arguments.count()),
         );
-        defer result.deinit(agent.gc_allocator);
+        defer result.deinit(gpa);
 
         // 2. For each element next of codeUnits, do
         for (arguments.values) |next| {
@@ -615,13 +618,16 @@ pub const constructor = struct {
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
+        // SAFETY: This builder can use a GPA as it only stores u21 code point segments.
         var result = try types.String.Builder.initCapacity(
-            agent.gc_allocator,
+            gpa,
             @intCast(arguments.count()),
         );
-        defer result.deinit(agent.gc_allocator);
+        defer result.deinit(gpa);
 
         // 2. For each element next of codePoints, do
         for (arguments.values) |next| {
@@ -1196,6 +1202,7 @@ pub const prototype = struct {
             return localeCompareIntl(agent, this_value, arguments);
         }
 
+        const gpa = agent.gpa;
         const that = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -1215,12 +1222,12 @@ pub const prototype = struct {
         } else if (string.isUtf16() and that_value.isUtf16()) blk: {
             break :blk std.mem.order(u16, string.asUtf16(), that_value.asUtf16());
         } else if (string.isAscii() and that_value.isUtf16()) blk: {
-            const string_utf16 = try string.toUtf16(agent.gc_allocator);
-            defer agent.gc_allocator.free(string_utf16);
+            const string_utf16 = try string.toUtf16(gpa);
+            defer gpa.free(string_utf16);
             break :blk std.mem.order(u16, string_utf16, that_value.asUtf16());
         } else if (string.isUtf16() and that_value.isAscii()) blk: {
-            const that_value_utf16 = try that_value.toUtf16(agent.gc_allocator);
-            defer agent.gc_allocator.free(that_value_utf16);
+            const that_value_utf16 = try that_value.toUtf16(gpa);
+            defer gpa.free(that_value_utf16);
             break :blk std.mem.order(u16, string.asUtf16(), that_value_utf16);
         } else unreachable;
         return switch (order) {
@@ -1375,6 +1382,7 @@ pub const prototype = struct {
             return agent.throwException(.internal_error, "Intl support is disabled", .{});
         }
 
+        const gpa = agent.gpa;
         const form_value = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -1398,8 +1406,8 @@ pub const prototype = struct {
         //    form named by f as specified in the latest Unicode Standard, Normalization Forms.
         // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
         //       correctly here.
-        const utf8 = try string.toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(utf8);
+        const utf8 = try string.toUtf8(gpa);
+        defer gpa.free(utf8);
         const utf8_normalized = if (form.eql(types.String.fromLiteral("NFC"))) blk: {
             const normalizer = icu4zig.ComposingNormalizer.initNfc();
             defer normalizer.deinit();
@@ -1893,6 +1901,7 @@ pub const prototype = struct {
     /// 22.1.3.23 String.prototype.split ( separator, limit )
     /// https://tc39.es/ecma262/#sec-string.prototype.split
     fn split(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const separator_value = arguments.get(0);
         const limit_value = arguments.get(1);
 
@@ -1962,7 +1971,8 @@ pub const prototype = struct {
             const head = try string.substring(agent, 0, out_len);
 
             // d. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
-            const code_units = try head.toUtf16(agent.gc_allocator);
+            const code_units = try head.toUtf16(gpa);
+            defer gpa.free(code_units);
 
             // e. Return CreateArrayFromList(codeUnits).
             const array = try createArrayFromListMapToValue(agent, u16, code_units, struct {
@@ -2175,6 +2185,8 @@ pub const prototype = struct {
         locales: Value,
         target_case: enum { lower, upper },
     ) Agent.Error!*const types.String {
+        const gpa = agent.gpa;
+
         // 1. Let requestedLocales be ? CanonicalizeLocaleList(locales).
         const requested_locales = try builtins.intl.canonicalizeLocaleList(agent, locales);
 
@@ -2206,8 +2218,8 @@ pub const prototype = struct {
         // 10. Return CodePointsToString(newCodePoints).
         // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
         //       correctly here.
-        const utf8 = try string.toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(utf8);
+        const utf8 = try string.toUtf8(gpa);
+        defer gpa.free(utf8);
         const case_mapper = icu4zig.CaseMapper.init();
         defer case_mapper.deinit();
         const utf8_transformed = switch (target_case) {
@@ -2245,6 +2257,8 @@ pub const prototype = struct {
     /// 22.1.3.28 String.prototype.toLowerCase ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolowercase
     fn toLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let O be the this value.
         const object = this_value;
 
@@ -2261,8 +2275,8 @@ pub const prototype = struct {
         const lower = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
             //       correctly here.
-            const utf8 = try string.toUtf8(agent.gc_allocator);
-            defer agent.gc_allocator.free(utf8);
+            const utf8 = try string.toUtf8(gpa);
+            defer gpa.free(utf8);
             const case_mapper = icu4zig.CaseMapper.init();
             defer case_mapper.deinit();
             const locale = icu4zig.Locale.unknown();
@@ -2289,6 +2303,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-string.prototype.touppercase
     fn toUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // NOTE: The spec simply references toLowerCase() for this, so the steps below are inferred.
+        const gpa = agent.gpa;
 
         // 1. Let O be the this value.
         const object = this_value;
@@ -2306,8 +2321,8 @@ pub const prototype = struct {
         const upper = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
             //       correctly here.
-            const utf8 = try string.toUtf8(agent.gc_allocator);
-            defer agent.gc_allocator.free(utf8);
+            const utf8 = try string.toUtf8(gpa);
+            defer gpa.free(utf8);
             const case_mapper = icu4zig.CaseMapper.init();
             defer case_mapper.deinit();
             const locale = icu4zig.Locale.unknown();
@@ -2326,6 +2341,8 @@ pub const prototype = struct {
     /// 22.1.3.31 String.prototype.toWellFormed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.towellformed
     fn toWellFormed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let O be the this value.
         const object = this_value;
 
@@ -2346,8 +2363,9 @@ pub const prototype = struct {
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
-        var result = try types.String.Builder.initCapacity(agent.gc_allocator, str_len);
-        defer result.deinit(agent.gc_allocator);
+        // SAFETY: This builder can use a GPA as it only stores u21 code point segments.
+        var result = try types.String.Builder.initCapacity(gpa, str_len);
+        defer result.deinit(gpa);
 
         // 7. Repeat, while k < strLen,
         while (k < str_len) {

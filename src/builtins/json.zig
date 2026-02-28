@@ -64,7 +64,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
 
 /// 25.5.1.1 ParseJSON ( text )
 /// https://tc39.es/ecma262/#sec-ParseJSON
-pub fn parseJSON(agent: *Agent, text: *const String) Agent.Error!Value {
+pub fn parseJSON(agent: *Agent, text: []const u8) Agent.Error!Value {
     // 1. If StringToCodePoints(text) is not a valid JSON text as specified in ECMA-404, throw a
     //    SyntaxError exception.
     // 2. Let scriptString be the string-concatenation of "(", text, and ");".
@@ -81,7 +81,7 @@ pub fn parseJSON(agent: *Agent, text: *const String) Agent.Error!Value {
     const parsed = std.json.parseFromSlice(
         std.json.Value,
         agent.gc_allocator,
-        try text.toUtf8(agent.gc_allocator),
+        text,
         .{ .duplicate_field_behavior = .use_last },
     ) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -641,12 +641,14 @@ pub const namespace = struct {
     /// 25.5.1 JSON.parse ( text [ , reviver ] )
     /// https://tc39.es/ecma262/#sec-json.parse
     fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const realm = agent.currentRealm();
         const text = arguments.get(0);
         const reviver = arguments.get(1);
 
         // 1. Let jsonString be ? ToString(text).
-        const json_string = try text.toString(agent);
+        const json_string = try (try text.toString(agent)).toUtf8(gpa);
+        defer gpa.free(json_string);
 
         // 2. Let unfiltered be ? ParseJSON(jsonString).
         const unfiltered = try parseJSON(agent, json_string);

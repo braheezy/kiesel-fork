@@ -317,13 +317,14 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
             }
 
             // ii. Let entries be Completion(EnumerableOwnProperties(attributesObj, key+value)).
-            const entries = attributes_object.asObject().enumerableOwnProperties(
+            var entries = attributes_object.asObject().enumerableOwnProperties(
                 agent,
                 .key_value,
             ) catch |err| {
                 // iii. IfAbruptRejectPromise(entries, promiseCapability).
                 return Value.from(try promise_capability.rejectPromise(agent, err));
             };
+            defer entries.deinit(agent.gc_allocator);
 
             // iv. For each element entry of entries, do
             for (entries.items) |entry| {

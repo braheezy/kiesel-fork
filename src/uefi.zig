@@ -109,7 +109,7 @@ const Error =
     std.os.uefi.Error;
 
 fn mainWithErrorHandling() Error!void {
-    const allocator = std.os.uefi.pool_allocator;
+    const gpa = std.os.uefi.pool_allocator;
 
     const console_out = std.os.uefi.system_table.con_out.?;
     try console_out.reset(true);
@@ -125,8 +125,9 @@ fn mainWithErrorHandling() Error!void {
     const stderr = &stderr_writer.interface;
 
     const platform: Agent.Platform = .{
-        .gc_allocator = allocator,
-        .gc_allocator_atomic = allocator,
+        // No GC on UEFI, leak allocations instead.
+        .gc_allocator = gpa,
+        .gc_allocator_atomic = gpa,
         .stdout = stdout,
         .stderr = stderr,
         .tty_config = .no_color,
@@ -137,7 +138,7 @@ fn mainWithErrorHandling() Error!void {
         .currentTimeNs = std.time.nanoTimestamp,
     };
     defer platform.deinit();
-    var agent = try Agent.init(&platform, .{});
+    var agent = try Agent.init(gpa, &platform, .{});
     defer agent.deinit();
 
     Realm.initializeHostDefinedRealm(&agent, .{}) catch |err| switch (err) {
@@ -158,7 +159,7 @@ fn mainWithErrorHandling() Error!void {
     });
     try stdout.flush();
 
-    var editor = Editor.init(allocator, .{});
+    var editor = Editor.init(gpa, .{});
     defer editor.deinit();
 
     while (true) {
@@ -170,7 +171,7 @@ fn mainWithErrorHandling() Error!void {
                 continue;
             },
         };
-        defer allocator.free(source_text);
+        defer gpa.free(source_text);
 
         // Directly show another prompt when spamming enter, whitespace is evaluated
         // however (and will print 'undefined').
@@ -178,7 +179,7 @@ fn mainWithErrorHandling() Error!void {
 
         const file_name = "repl";
 
-        var diagnostics = Diagnostics.init(allocator);
+        var diagnostics = Diagnostics.init(gpa);
         defer diagnostics.deinit();
         const script = Script.parse(source_text, realm, null, .{
             .diagnostics = &diagnostics,

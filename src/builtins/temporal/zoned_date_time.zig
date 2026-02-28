@@ -85,6 +85,7 @@ pub const constructor = struct {
     /// 6.1.1 Temporal.ZonedDateTime ( epochNanoseconds, timeZone [ , calendar ] )
     /// https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime
     fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
+        const gpa = agent.gpa;
         const epoch_nanoseconds_value = arguments.get(0);
         const time_zone_value = arguments.get(1);
         var calendar_value = arguments.get(2);
@@ -125,8 +126,8 @@ pub const constructor = struct {
         //     c. Set timeZone to identifierRecord.[[Identifier]].
         // 7. Else,
         //     a. Set timeZone to FormatOffsetTimeZoneIdentifier(timeZoneParse.[[OffsetMinutes]]).
-        const time_zone_utf8 = try time_zone_value.asString().toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(time_zone_utf8);
+        const time_zone_utf8 = try time_zone_value.asString().toUtf8(gpa);
+        defer gpa.free(time_zone_utf8);
         const time_zone = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(

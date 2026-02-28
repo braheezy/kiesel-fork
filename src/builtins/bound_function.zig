@@ -15,6 +15,7 @@ const Value = types.Value;
 /// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
 fn call(agent: *Agent, object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
+    const gpa = agent.gpa;
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -27,12 +28,8 @@ fn call(agent: *Agent, object: *Object, _: Value, arguments_list: Arguments) Age
     const bound_args = function.fields.bound_arguments;
 
     // 4. Let args be the list-concatenation of boundArgs and argumentsList.
-    const args = try std.mem.concat(
-        agent.gc_allocator,
-        Value,
-        &.{ bound_args, arguments_list.values },
-    );
-    defer agent.gc_allocator.free(args);
+    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arguments_list.values });
+    defer gpa.free(args);
 
     // 5. Return ? Call(target, boundThis, args).
     return Value.from(target).callAssumeCallable(agent, bound_this, args);
@@ -46,6 +43,7 @@ fn construct(
     arguments_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
+    const gpa = agent.gpa;
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -58,12 +56,8 @@ fn construct(
     const bound_args = function.fields.bound_arguments;
 
     // 4. Let args be the list-concatenation of boundArgs and argumentsList.
-    const args = try std.mem.concat(
-        agent.gc_allocator,
-        Value,
-        &.{ bound_args, arguments_list.values },
-    );
-    defer agent.gc_allocator.free(args);
+    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arguments_list.values });
+    defer gpa.free(args);
 
     // 5. If SameValue(F, newTarget) is true, set newTarget to target.
     const new_target_ = if (object == new_target) target else new_target;

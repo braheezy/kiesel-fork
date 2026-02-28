@@ -158,6 +158,8 @@ pub fn toTemporalTimeZoneIdentifier(
     agent: *Agent,
     temporal_time_zone_like: Value,
 ) Agent.Error!temporal_rs.c.TimeZone {
+    const gpa = agent.gpa;
+
     // 1. If temporalTimeZoneLike is an Object, then
     if (temporal_time_zone_like.isObject()) {
         // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
@@ -183,12 +185,12 @@ pub fn toTemporalTimeZoneIdentifier(
     // 7. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(name).
     // 8. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     // 9. Return timeZoneIdentifierRecord.[[Identifier]].
-    const time_zone = try temporal_time_zone_like.asString().toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(time_zone);
+    const time_zone_utf8 = try temporal_time_zone_like.asString().toUtf8(gpa);
+    defer gpa.free(time_zone_utf8);
     return builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_TimeZone_try_from_str(
-            temporal_rs.toDiplomatStringView(time_zone),
+            temporal_rs.toDiplomatStringView(time_zone_utf8),
         ),
     );
 }
@@ -199,11 +201,13 @@ pub fn canonicalizeCalendar(
     agent: *Agent,
     id: *const String,
 ) Agent.Error!temporal_rs.c.AnyCalendarKind {
+    const gpa = agent.gpa;
+
     // 1. Let calendars be AvailableCalendars().
     // 2. If calendars does not contain the ASCII-lowercase of id, throw a RangeError exception.
     // 3. Return CanonicalizeUValue("ca", id).
-    const calendar_utf8 = try id.toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(calendar_utf8);
+    const calendar_utf8 = try id.toUtf8(gpa);
+    defer gpa.free(calendar_utf8);
     _ = std.ascii.lowerString(calendar_utf8, calendar_utf8);
     const calendar = temporal_rs.fromOption(
         temporal_rs.c.temporal_rs_AnyCalendarKind_get_for_str(
@@ -491,6 +495,8 @@ pub fn toTemporalCalendarIdentifier(
     agent: *Agent,
     temporal_calendar_like: Value,
 ) Agent.Error!temporal_rs.c.AnyCalendarKind {
+    const gpa = agent.gpa;
+
     // 1. If temporalCalendarLike is an Object, then
     if (temporal_calendar_like.isObject()) {
         // a. If temporalCalendarLike has an [[InitializedTemporalDate]],
@@ -532,8 +538,8 @@ pub fn toTemporalCalendarIdentifier(
 
     // 3. Let identifier be ? ParseTemporalCalendarString(temporalCalendarLike).
     // 4. Return ? CanonicalizeCalendar(identifier).
-    const calendar_utf8 = try temporal_calendar_like.asString().toUtf8(agent.gc_allocator);
-    defer agent.gc_allocator.free(calendar_utf8);
+    const calendar_utf8 = try temporal_calendar_like.asString().toUtf8(gpa);
+    defer gpa.free(calendar_utf8);
     const calendar = temporal_rs.fromOption(
         temporal_rs.c.temporal_rs_AnyCalendarKind_parse_temporal_calendar_string(
             temporal_rs.toDiplomatStringView(calendar_utf8),

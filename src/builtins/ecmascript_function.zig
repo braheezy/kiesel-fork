@@ -120,11 +120,12 @@ pub const ECMAScriptFunction = MakeObject(.{
         pub fn compile(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*const interpreter.Bytecode {
             if (self.cached_bytecode) |bc| return bc;
 
+            const gpa = agent.gpa;
             const function: *ECMAScriptFunction = @fieldParentPtr("fields", self);
             const object = &function.object;
             const name_value = object.getPropertyValueDirect(PropertyKey.from("name"));
-            const name = try name_value.asString().toUtf8(agent.gc_allocator);
-            defer agent.gc_allocator.free(name);
+            const name = try name_value.asString().toUtf8(gpa);
+            defer gpa.free(name);
 
             if (function.fields.flags.this_mode == .lexical) {
                 // FDI IR lowering does not have [[ThisMode]] information and instead relies on the

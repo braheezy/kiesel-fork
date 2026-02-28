@@ -50,8 +50,12 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
         const header_ptr = @as([*]align(@alignOf(usize)) u8, @ptrCast(@alignCast(ptr))) - @sizeOf(usize);
         const old_size = @as(*usize, @ptrCast(header_ptr)).*;
         const old_total_size = old_size + @sizeOf(usize);
-        const new_total_size = size + @sizeOf(usize);
         const old_mem: []align(@alignOf(usize)) u8 = header_ptr[0..old_total_size];
+        if (size == 0) {
+            lre_opaque.allocator.free(old_mem);
+            return null;
+        }
+        const new_total_size = size + @sizeOf(usize);
         const new_mem = lre_opaque.allocator.realloc(old_mem, new_total_size) catch return null;
         @as(*usize, @ptrCast(new_mem.ptr)).* = size;
         return new_mem.ptr + @sizeOf(usize);
@@ -107,6 +111,8 @@ fn compileRegexp(
     pattern: *const String,
     flags: *const String,
 ) Agent.Error![*]const u8 {
+    const gpa = agent.gpa;
+
     const parsed_flags = blk: {
         if (flags.isEmpty()) break :blk ParsedFlags.empty;
         switch (flags.asAsciiOrUtf16()) {
@@ -122,15 +128,15 @@ fn compileRegexp(
 
     // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
     const buf = switch (pattern.asAsciiOrUtf16()) {
-        .ascii => |ascii| try agent.gc_allocator.dupeZ(u8, ascii),
+        .ascii => |ascii| try gpa.dupeZ(u8, ascii),
         .utf16 => |utf16| try std.fmt.allocPrintSentinel(
-            agent.gc_allocator,
+            gpa,
             "{f}",
             .{std.unicode.fmtUtf16Le(utf16)},
             0,
         ),
     };
-    defer agent.gc_allocator.free(buf);
+    defer gpa.free(buf);
 
     var re_bytecode_len: c_int = undefined;
     var error_msg: [64]u8 = undefined;
@@ -340,6 +346,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         return agent.throwException(.internal_error, "RegExp support is disabled", .{});
     }
 
+    const gpa = agent.gpa;
+
     // 1. Let length be the length of S.
     const length = string.length;
 
@@ -354,7 +362,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     // libregexp's capture count includes the matched string
     std.debug.assert(capture_count >= 1);
 
-    const captures_list = try agent.gc_allocator.alloc(?*u8, alloc_count);
+    const captures_list = try gpa.alloc(?*u8, alloc_count);
+    defer gpa.free(captures_list);
 
     // 3. Let flags be R.[[OriginalFlags]].
     const re_flags = libregexp.c.lre_get_flags(re_bytecode);
@@ -374,7 +383,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         .ascii => |ascii| ascii.ptr,
         .utf16 => |utf16| @ptrCast(utf16.ptr),
     };
-    var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
+    var @"opaque": LreOpaque = .{ .allocator = gpa };
     const ret = if (last_index > length) 0 else libregexp.c.lre_exec(
         @ptrCast(captures_list),
         re_bytecode,
@@ -449,15 +458,15 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     match = .{ .start_index = last_index, .end_index = end_index };
 
     // 25. Let indices be a new empty List.
-    var indices: std.ArrayList(?Match) = .empty;
-    defer indices.deinit(agent.gc_allocator);
+    var indices: std.ArrayList(?Match) = try .initCapacity(gpa, n + 1);
+    defer indices.deinit(gpa);
 
     // 26. Let groupNames be a new empty List.
-    var group_names: std.ArrayList(?[]const u8) = .empty;
-    defer group_names.deinit(agent.gc_allocator);
+    var group_names: std.ArrayList(?[]const u8) = try .initCapacity(gpa, n + 1);
+    defer group_names.deinit(gpa);
 
     // 27. Append match to indices.
-    try indices.append(agent.gc_allocator, match);
+    indices.appendAssumeCapacity(match);
 
     // 28. Let matchedSubstr be GetMatchString(S, match).
     const matched_substr = try getMatchString(agent, string, match);
@@ -487,7 +496,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
-    defer matched_group_names.deinit(agent.gc_allocator);
+    defer matched_group_names.deinit(gpa);
 
     // 34. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
     var i: usize = 1;
@@ -503,7 +512,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             captured_value = .undefined;
 
             // ii. Append undefined to indices.
-            try indices.append(agent.gc_allocator, null);
+            indices.appendAssumeCapacity(null);
         } else {
             // c. Else,
             // i. Let captureStart be captureI.[[StartIndex]].
@@ -518,7 +527,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             captured_value = Value.from(try getMatchString(agent, string, capture));
 
             // vi. Append capture to indices.
-            try indices.append(agent.gc_allocator, capture);
+            indices.appendAssumeCapacity(capture);
         }
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
@@ -547,12 +556,12 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 std.debug.assert(captured_value.isUndefined());
 
                 // 2. Append undefined to groupNames.
-                try group_names.append(agent.gc_allocator, null);
+                group_names.appendAssumeCapacity(null);
             } else {
                 // iii. Else,
                 // 1. If capturedValue is not undefined, append s to matchedGroupNames.
                 if (!captured_value.isUndefined()) {
-                    try matched_group_names.put(agent.gc_allocator, group_name, {});
+                    try matched_group_names.put(gpa, group_name, {});
                 }
 
                 // 2. NOTE: If there are multiple groups named s, groups may already have an s
@@ -567,12 +576,12 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 try groups.asObject().createDataPropertyDirect(agent, property_key, captured_value);
 
                 // 4. Append s to groupNames.
-                try group_names.append(agent.gc_allocator, group_name);
+                group_names.appendAssumeCapacity(group_name);
             }
         } else {
             // f. Else,
             // i. Append undefined to groupNames.
-            try group_names.append(agent.gc_allocator, null);
+            group_names.appendAssumeCapacity(null);
         }
     }
 

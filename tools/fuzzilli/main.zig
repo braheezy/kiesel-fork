@@ -21,6 +21,7 @@ export threadlocal var __sancov_lowest_stack: usize = 0;
 
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#adding-custom-fuzzilli-javascript-builtin
 fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    const gpa = agent.gpa;
     // Don't throw as the fuzzed code itself might call this function
     if (arguments.count() != 2) return .undefined;
     const operation = try arguments.get(0).toString(agent);
@@ -34,8 +35,8 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         }
     } else if (operation.eql(String.fromLiteral("FUZZILLI_PRINT"))) {
         const str = try arguments.get(1).toString(agent);
-        const bytes = try str.toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(bytes);
+        const bytes = try str.toUtf8(gpa);
+        defer gpa.free(bytes);
         var index: usize = 0;
         while (index < bytes.len) {
             index += std.posix.write(REPRL_DWFD, bytes[index..]) catch break;
@@ -46,7 +47,7 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#reprl-psuedocode
 fn reprl() !u8 {
-    const gpa = std.heap.page_allocator;
+    const gpa = std.heap.smp_allocator;
 
     var platform = Agent.Platform.default();
     defer platform.deinit();
@@ -82,7 +83,7 @@ fn reprl() !u8 {
         @memcpy(data, @as([*]u8, @ptrCast(ptr))[0..data_size]);
 
         const result: u32 = blk: {
-            var agent = try Agent.init(&platform, .{});
+            var agent = try Agent.init(gpa, &platform, .{});
             defer agent.deinit();
 
             try Realm.initializeHostDefinedRealm(&agent, .{});

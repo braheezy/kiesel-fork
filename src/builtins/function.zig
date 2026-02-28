@@ -103,6 +103,7 @@ pub fn createDynamicFunction(
     parameter_args: []const Value,
     body_arg: Value,
 ) Agent.Error!*ECMAScriptFunction {
+    const gpa = agent.gpa;
     const realm = agent.currentRealm();
 
     // 1. If newTarget is undefined, set newTarget to constructor.
@@ -286,28 +287,28 @@ pub fn createDynamicFunction(
         }
     }
 
-    const parameters_string = try (try result.build(agent)).toUtf8(agent.gc_allocator);
+    const parameters_string = try (try result.build(agent)).toUtf8(gpa);
+    defer gpa.free(parameters_string);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
     const body_parse_string = try std.fmt.allocPrint(
-        agent.gc_allocator,
+        gpa,
         "\n{f}\n",
         .{body_string.fmtRaw()},
     );
+    defer gpa.free(body_parse_string);
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
     //     (LINE FEED), ") {", bodyParseString, and "}".
-    const source_string = try std.fmt.allocPrint(
+    // 16. Let sourceText be StringToCodePoints(sourceString).
+    const source_text = try std.fmt.allocPrint(
         agent.gc_allocator,
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
         .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
     );
 
-    // 16. Let sourceText be StringToCodePoints(sourceString).
-    const source_text = source_string;
-
-    var diagnostics = Diagnostics.init(agent.gc_allocator);
+    var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
 
     const state: Parser.State = switch (kind) {

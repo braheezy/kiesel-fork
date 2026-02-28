@@ -418,10 +418,12 @@ pub const PropertyName = union(enum) {
                 .identifier => |identifier| return std.mem.eql(u8, identifier, "__proto__"),
                 .string_literal => |string_literal| {
                     const string = try string_literal.stringValue(allocator);
-                    // TODO: This needs `String.deinit()`
-                    defer switch (string.asAsciiOrUtf16()) {
-                        .ascii => |ascii| allocator.free(ascii),
-                        .utf16 => |utf16| allocator.free(utf16),
+                    defer if (string != String.empty) {
+                        switch (string.asAsciiOrUtf16()) {
+                            .ascii => |ascii| allocator.free(ascii),
+                            .utf16 => |utf16| allocator.free(utf16),
+                        }
+                        allocator.destroy(@constCast(string));
                     };
                     return string.eql(String.fromLiteral("__proto__"));
                 },

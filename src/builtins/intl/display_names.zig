@@ -309,6 +309,7 @@ pub const prototype = struct {
     /// 12.3.3 Intl.DisplayNames.prototype.of ( code )
     /// https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.of
     fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const code_value = arguments.get(0);
 
         // 1. Let displayNames be this value.
@@ -323,8 +324,8 @@ pub const prototype = struct {
         // 6. If fields has a field [[<code>]], return fields.[[<code>]].
         // 7. If displayNames.[[Fallback]] is "code", return code.
         // 8. Return undefined.
-        const code_utf8 = try code.toUtf8(agent.gc_allocator);
-        defer agent.gc_allocator.free(code_utf8);
+        const code_utf8 = try code.toUtf8(gpa);
+        defer gpa.free(code_utf8);
         // ICU4X LocaleDisplayNamesFormatter and RegionDisplayNames return an error for at least
         // the 'und' locale, other engines seem to fall back to 'en' in that case.
         const fallback_locale = icu4zig.Locale.fromString("en") catch unreachable;

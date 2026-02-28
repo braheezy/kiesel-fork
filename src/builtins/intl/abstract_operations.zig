@@ -213,6 +213,8 @@ pub inline fn availableCalendars() []const *const String {
 /// 9.2.1 CanonicalizeLocaleList ( locales )
 /// https://tc39.es/ecma402/#sec-canonicalizelocalelist
 pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleList {
+    const gpa = agent.gpa;
+
     // 1. If locales is undefined, then
     if (locales.isUndefined()) {
         // a. Return a new empty List.
@@ -281,7 +283,9 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
             // v. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
             // vi. Let canonicalizedTag be CanonicalizeUnicodeLocaleId(tag).
-            const canonicalized_tag = icu4zig.Locale.fromString(try tag.toUtf8(agent.gc_allocator)) catch {
+            const tag_utf8 = try tag.toUtf8(gpa);
+            defer gpa.free(tag_utf8);
+            const canonicalized_tag = icu4zig.Locale.fromString(tag_utf8) catch {
                 return agent.throwException(
                     .range_error,
                     "Invalid locale identifier '{f}'",
@@ -291,7 +295,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
             // vii. If seen does not contain canonicalizedTag, append canonicalizedTag to seen.
             for (seen.items) |locale| {
-                if (locale.normalizingEq(try tag.toUtf8(agent.gc_allocator))) break;
+                if (locale.normalizingEq(tag_utf8)) break;
             } else {
                 try seen.append(agent.gc_allocator, canonicalized_tag);
             }
@@ -375,6 +379,8 @@ pub fn resolveOptions(
         coerce_options: bool = false,
     },
 ) Agent.Error!OptionsResolution(Resolution(ResolutionOptions(resolution_option_descriptors))) {
+    const gpa = agent.gpa;
+
     // 1. Let requestedLocales be ? CanonicalizeLocaleList(locales).
     const requested_locales = try canonicalizeLocaleList(agent, locales);
 
@@ -428,8 +434,8 @@ pub fn resolveOptions(
             // ii. If value cannot be matched by the type Unicode locale nonterminal, throw a
             //     RangeError exception.
             if (@"type" == .string) {
-                const value_utf8 = try value.toUtf8(agent.gc_allocator);
-                defer agent.gc_allocator.free(value_utf8);
+                const value_utf8 = try value.toUtf8(gpa);
+                defer gpa.free(value_utf8);
                 if (!matchUnicodeLocaleIdentifierType(value_utf8)) {
                     return agent.throwException(
                         .range_error,

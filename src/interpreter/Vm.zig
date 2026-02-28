@@ -1797,6 +1797,7 @@ fn executeDeletePropertyIndexed(
 }
 
 fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytecode.Inst.Reg, excluded_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const source_value = vm.store(source_reg);
 
     const target = try ordinaryObjectCreateFast(vm.agent);
@@ -1807,8 +1808,8 @@ fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytec
         const excluded_object = vm.store(excluded_reg).asObject();
         const excluded_len = excluded_object.as(builtins.Array).fields.length;
 
-        var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(vm.agent.gc_allocator, excluded_len);
-        defer excluded_items.deinit(vm.agent.gc_allocator);
+        var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(gpa, excluded_len);
+        defer excluded_items.deinit(gpa);
         for (0..excluded_len) |i| {
             const descriptor = excluded_object.property_storage.indexed_properties.get(@intCast(i)).?;
             const prop_key = PropertyKey.from(descriptor.value_or_accessor.value.asString());
@@ -1827,13 +1828,14 @@ fn executeCall(
     callee_reg: Bytecode.Inst.Reg,
     args_reg: Bytecode.Inst.Reg,
 ) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
     const args_value = vm.store(args_reg);
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
-    defer args_list.deinit(vm.agent.gc_allocator);
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    defer args_list.deinit(gpa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1867,14 +1869,15 @@ fn executeCallProperty(
     this_reg: Bytecode.Inst.Reg,
     args_reg: Bytecode.Inst.Reg,
 ) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
     const this_value = vm.store(this_reg);
     const args_value = vm.store(args_reg);
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
-    defer args_list.deinit(vm.agent.gc_allocator);
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    defer args_list.deinit(gpa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1910,13 +1913,14 @@ fn executeCallDirectEval(
     args_reg: Bytecode.Inst.Reg,
     strict: bool,
 ) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
     const args_value = vm.store(args_reg);
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
-    defer args_list.deinit(vm.agent.gc_allocator);
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    defer args_list.deinit(gpa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1939,13 +1943,14 @@ fn executeConstruct(
     constructor_reg: Bytecode.Inst.Reg,
     args_reg: Bytecode.Inst.Reg,
 ) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const constructor = vm.store(constructor_reg);
     const args_value = vm.store(args_reg);
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
-    defer args_list.deinit(vm.agent.gc_allocator);
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    defer args_list.deinit(gpa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -2352,12 +2357,13 @@ fn executeSuperCall(
     dest: Bytecode.Inst.Reg,
     args_reg: Bytecode.Inst.Reg,
 ) Agent.Error!void {
+    const gpa = vm.agent.gpa;
     const args_value = vm.store(args_reg);
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(vm.agent.gc_allocator, args_len);
-    defer args_list.deinit(vm.agent.gc_allocator);
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    defer args_list.deinit(gpa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -2447,12 +2453,13 @@ fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Byt
 }
 
 fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = try vm.getString(name_index);
-    const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
-    defer vm.agent.gc_allocator.free(name_utf8);
+    const frame = vm.currentCallFrame();
+    const name = frame.bytecode.strings[@intFromEnum(name_index)];
 
-    const private_environment = vm.agent.runningExecutionContext().ecmascript_code.private_environment.?;
-    const private_name = private_environment.resolvePrivateIdentifier(name_utf8);
+    const execution_context = vm.agent.runningExecutionContext();
+    const private_env = execution_context.ecmascript_code.private_environment.?;
+    const private_name = private_env.resolvePrivateIdentifier(name);
+
     vm.load(dest, Value.from(private_name.symbol));
 }
 
@@ -2472,13 +2479,12 @@ fn executePopPrivateScope(vm: *Vm) void {
 
 fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const name = try vm.getString(name_index);
-    const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
-    defer vm.agent.gc_allocator.free(name_utf8);
+    const frame = vm.currentCallFrame();
+    const name = frame.bytecode.strings[@intFromEnum(name_index)];
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
-    const private_name = private_env.resolvePrivateIdentifier(name_utf8);
+    const private_name = private_env.resolvePrivateIdentifier(name);
 
     const base_object = try base_value.toObject(vm.agent);
     const result = try base_object.privateGet(vm.agent, private_name);
@@ -2488,12 +2494,12 @@ fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode
 fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const name = try vm.getString(name_index);
-    const identifier = try name.toUtf8(vm.agent.gc_allocator);
-    defer vm.agent.gc_allocator.free(identifier);
+    const frame = vm.currentCallFrame();
+    const name = frame.bytecode.strings[@intFromEnum(name_index)];
 
-    const private_environment = vm.agent.runningExecutionContext().ecmascript_code.private_environment.?;
-    const private_name = private_environment.resolvePrivateIdentifier(identifier);
+    const execution_context = vm.agent.runningExecutionContext();
+    const private_env = execution_context.ecmascript_code.private_environment.?;
+    const private_name = private_env.resolvePrivateIdentifier(name);
 
     const base_object = try base_value.toObject(vm.agent);
     try base_object.privateSet(vm.agent, private_name, value);

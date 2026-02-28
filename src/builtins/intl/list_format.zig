@@ -229,6 +229,7 @@ pub const prototype = struct {
     /// 14.3.3 Intl.ListFormat.prototype.format ( list )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.format
     fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const list = arguments.get(0);
 
         // 1. Let lf be the this value.
@@ -238,8 +239,8 @@ pub const prototype = struct {
         // 3. Let stringList be ? StringListFromIterable(list).
         const string_list = try stringListFromIterable(agent, list);
         defer {
-            for (string_list) |string| agent.gc_allocator.free(string);
-            agent.gc_allocator.free(string_list);
+            for (string_list) |string| gpa.free(string);
+            gpa.free(string_list);
         }
 
         // 4. Return FormatList(lf, stringList).
@@ -327,6 +328,8 @@ fn formatList(
 /// 14.5.5 StringListFromIterable ( iterable )
 /// https://tc39.es/ecma402/#sec-createstringlistfromiterable
 fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []const u8 {
+    const gpa = agent.gpa;
+
     // 1. If iterable is undefined, then
     if (iterable.isUndefined()) {
         // a. Return a new empty List.
@@ -338,6 +341,10 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
 
     // 3. Let list be a new empty List.
     var list: std.ArrayList([]const u8) = .empty;
+    errdefer {
+        for (list.items) |item| gpa.free(item);
+        list.deinit(gpa);
+    }
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
@@ -358,7 +365,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
         }
 
         // d. Append next to list.
-        try list.append(agent.gc_allocator, try next.asString().toUtf8(agent.gc_allocator));
+        try list.append(gpa, try next.asString().toUtf8(gpa));
     }
-    return list.toOwnedSlice(agent.gc_allocator);
+    return list.toOwnedSlice(gpa);
 }

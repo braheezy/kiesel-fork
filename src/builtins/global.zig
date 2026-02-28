@@ -367,13 +367,15 @@ fn isNaN(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 /// 19.2.4 parseFloat ( string )
 /// https://tc39.es/ecma262/#sec-parsefloat-string
 fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    const gpa = agent.gpa;
     const string_value = arguments.get(0);
 
     // 1. Let inputString be ? ToString(string).
     const input_string = try string_value.toString(agent);
 
     // 2. Let trimmedString be ! TrimString(inputString, start).
-    var trimmed_string = try (try input_string.trimStart(agent)).toUtf8(agent.gc_allocator);
+    var trimmed_string = try (try input_string.trimStart(agent)).toUtf8(gpa);
+    defer gpa.free(trimmed_string);
 
     // 3. Let trimmed be StringToCodePoints(trimmedString).
     // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
@@ -401,6 +403,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 /// 19.2.5 parseInt ( string, radix )
 /// https://tc39.es/ecma262/#sec-parseint-string-radix
 fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    const gpa = agent.gpa;
     const string_value = arguments.get(0);
     const radix_value = arguments.get(1);
 
@@ -408,7 +411,9 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let S be ! TrimString(inputString, start).
-    var string = try (try input_string.trimStart(agent)).toUtf8(agent.gc_allocator);
+    const string_alloc = try (try input_string.trimStart(agent)).toUtf8(gpa);
+    defer gpa.free(string_alloc);
+    var string: []const u8 = string_alloc;
 
     // 3. Let sign be 1.
     var sign: f64 = 1;
@@ -640,14 +645,20 @@ fn decode(
     string: *const String,
     comptime preserve_escape_set: []const u8,
 ) Agent.Error!*const String {
-    const input = try string.toUtf16(agent.gc_allocator);
+    const gpa = agent.gpa;
+    var stack_fallback = std.heap.stackFallback(@sizeOf(u16) * 64, gpa);
+    const sfa = stack_fallback.get();
+
+    const input = try string.toUtf16(sfa);
+    defer sfa.free(input);
 
     // 1. Let len be the length of string.
     const len = input.len;
 
     // 2. Let R be the empty String.
+    // SAFETY: This builder can use a GPA as it only stores u8/u16/u21 char/code unit/code point segments.
     var result: String.Builder = .empty;
-    defer result.deinit(agent.gc_allocator);
+    defer result.deinit(gpa);
 
     // 3. Let k be 0.
     var k: usize = 0;
@@ -687,11 +698,11 @@ fn decode(
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape; otherwise set S to
                 //    asciiChar.
                 if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null) {
-                    try result.appendSegment(agent.gc_allocator, .{ .char = '%' });
-                    try result.appendSegment(agent.gc_allocator, .{ .char = @intCast(escape_[1]) });
-                    try result.appendSegment(agent.gc_allocator, .{ .char = @intCast(escape_[2]) });
+                    try result.appendSegment(gpa, .{ .char = '%' });
+                    try result.appendSegment(gpa, .{ .char = @intCast(escape_[1]) });
+                    try result.appendSegment(gpa, .{ .char = @intCast(escape_[2]) });
                 } else {
-                    try result.appendSegment(agent.gc_allocator, .{ .char = byte });
+                    try result.appendSegment(gpa, .{ .char = byte });
                 }
             } else {
                 // viii. Else,
@@ -743,10 +754,10 @@ fn decode(
                 // 7. Let V be the code point obtained by applying the UTF-8 transformation to
                 //    Octets, that is, from a List of octets into a 21-bit value.
                 // 8. Set S to UTF16EncodeCodePoint(V).
-                try result.appendSegment(agent.gc_allocator, .{ .code_point = code_point });
+                try result.appendSegment(gpa, .{ .code_point = code_point });
             }
         } else {
-            try result.appendSegment(agent.gc_allocator, .{ .code_unit = c });
+            try result.appendSegment(gpa, .{ .code_unit = c });
         }
 
         // d. Set R to the string-concatenation of R and S.
@@ -853,6 +864,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 /// B.2.1.2 unescape ( string )
 /// https://tc39.es/ecma262/#sec-unescape-string
 fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+    const gpa = agent.gpa;
     const string_value = arguments.get(0);
 
     // 1. Set string to ? ToString(string).
@@ -862,11 +874,12 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const len = string.length;
 
     // 3. Let R be the empty String.
+    // SAFETY: This builder can use a GPA as it only stores u16 code unit segments.
     var result: String.Builder = .empty;
-    defer result.deinit(agent.gc_allocator);
+    defer result.deinit(gpa);
 
-    const code_units = try string.toUtf16(agent.gc_allocator);
-    defer agent.gc_allocator.free(code_units);
+    const code_units = try string.toUtf16(gpa);
+    defer gpa.free(code_units);
 
     // 4. Let k be 0.
     var k: u32 = 0;
@@ -920,7 +933,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         }
 
         // c. Set R to the string-concatenation of R and C.
-        try result.appendCodeUnit(agent.gc_allocator, c);
+        try result.appendCodeUnit(gpa, c);
 
         // d. Set k to k + 1.
     }

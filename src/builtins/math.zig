@@ -474,9 +474,11 @@ pub const namespace = struct {
     /// 21.3.2.19 Math.hypot ( ...args )
     /// https://tc39.es/ecma262/#sec-math.hypot
     fn hypot(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
-        defer coerced.deinit(agent.gc_allocator);
+        var coerced = try std.ArrayList(Number).initCapacity(gpa, arguments.count());
+        defer coerced.deinit(gpa);
 
         // 2. For each element arg of args, do
         for (arguments.values) |arg| {
@@ -603,9 +605,11 @@ pub const namespace = struct {
     /// 21.3.2.25 Math.max ( ...args )
     /// https://tc39.es/ecma262/#sec-math.max
     fn max(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
-        defer coerced.deinit(agent.gc_allocator);
+        var coerced = try std.ArrayList(Number).initCapacity(gpa, arguments.count());
+        defer coerced.deinit(gpa);
 
         // 2. For each element arg of args, do
         for (arguments.values) |arg| {
@@ -641,9 +645,11 @@ pub const namespace = struct {
     /// 21.3.2.26 Math.min ( ...args )
     /// https://tc39.es/ecma262/#sec-math.min
     fn min(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+
         // 1. Let coerced be a new empty List.
-        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
-        defer coerced.deinit(agent.gc_allocator);
+        var coerced = try std.ArrayList(Number).initCapacity(gpa, arguments.count());
+        defer coerced.deinit(gpa);
 
         // 2. For each element arg of args, do
         for (arguments.values) |arg| {
@@ -790,6 +796,7 @@ pub const namespace = struct {
         // the JavaScript polyfill in the proposal's repository by Kevin Gibbons (bakkot on GitHub).
         // See the polyfill directory in https://github.com/tc39/proposal-math-sum for the licenses.
 
+        const gpa = agent.gpa;
         const items = arguments.get(0);
 
         // 1. Perform ? RequireObjectCoercible(items).
@@ -810,11 +817,11 @@ pub const namespace = struct {
         // 4. Let sum be 0.
         const initial_partials_count = 32;
 
-        var stack_fallback = std.heap.stackFallback(@sizeOf(f64) * initial_partials_count, agent.gc_allocator);
-        const allocator = stack_fallback.get();
+        var stack_fallback = std.heap.stackFallback(@sizeOf(f64) * initial_partials_count, gpa);
+        const sfa = stack_fallback.get();
 
-        var partials = try std.ArrayList(f64).initCapacity(allocator, initial_partials_count);
-        defer partials.deinit(allocator);
+        var partials = try std.ArrayList(f64).initCapacity(sfa, initial_partials_count);
+        defer partials.deinit(sfa);
         var overflow: f64 = 0.0;
 
         const max_f64 = std.math.floatMax(f64);
@@ -904,7 +911,7 @@ pub const namespace = struct {
                     partials.shrinkRetainingCapacity(written_partials_len);
 
                     if (x != 0.0) {
-                        try partials.append(allocator, x);
+                        try partials.append(sfa, x);
                     }
                 }
             }

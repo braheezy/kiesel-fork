@@ -16,8 +16,7 @@ pub fn compile(
     name: []const u8,
     ast_node: Ir.Builder.Ast,
 ) std.mem.Allocator.Error!Bytecode {
-    // TODO: Don't use the GC allocator for IR generation
-    const gpa = agent.gc_allocator;
+    const gpa = agent.gpa;
 
     var ir = ir: {
         var builder: Ir.Builder = .init(gpa, name, ast_node);

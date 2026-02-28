@@ -101,7 +101,7 @@ pub fn createDefaultExportSyntheticModule(
 
 /// 16.2.1.8.2 ParseJSONModule ( source )
 /// https://tc39.es/ecma262/#sec-parse-json-module
-pub fn parseJSONModule(agent: *Agent, source: *const String) Agent.Error!*SyntheticModule {
+pub fn parseJSONModule(agent: *Agent, source: []const u8) Agent.Error!*SyntheticModule {
     // 1. Let json be ? ParseJSON(source).
     const json = try parseJSON(agent, source);
 

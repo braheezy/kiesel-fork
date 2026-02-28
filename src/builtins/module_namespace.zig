@@ -64,13 +64,16 @@ fn preventExtensions(_: *Agent, _: *Object) error{}!bool {
 /// 10.4.6.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-getownproperty-p
 fn getOwnProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor {
+    const gpa = agent.gpa;
+
     // 1. If P is a Symbol, return OrdinaryGetOwnProperty(O, P).
     if (property_key == .symbol) return ordinaryGetOwnProperty(object, property_key);
 
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    defer gpa.free(property_key_string);
 
     // 3. If exports does not contain P, return undefined.
     if (!containsSlice(exports, property_key_string)) {
@@ -131,6 +134,8 @@ fn hasProperty(
     object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!bool {
+    const gpa = agent.gpa;
+
     // 1. If P is a Symbol, return ! OrdinaryHasProperty(O, P).
     if (property_key == .symbol) {
         return ordinaryHasProperty(agent, object, property_key) catch |err| try noexcept(err);
@@ -139,7 +144,8 @@ fn hasProperty(
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    defer gpa.free(property_key_string);
 
     // 3. If exports contains P, return true.
     if (containsSlice(exports, property_key_string)) {
@@ -158,6 +164,8 @@ fn get(
     property_key: PropertyKey,
     receiver: Value,
 ) Agent.Error!Value {
+    const gpa = agent.gpa;
+
     // 1. If P is a Symbol, then
     if (property_key == .symbol) {
         // a. Return ! OrdinaryGet(O, P, Receiver).
@@ -167,7 +175,8 @@ fn get(
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    defer gpa.free(property_key_string);
 
     // 3. If exports does not contain P, return undefined.
     if (!containsSlice(exports, property_key_string)) {
@@ -219,6 +228,8 @@ fn set(_: *Agent, _: *Object, _: PropertyKey, _: Value, _: Value) error{}!bool {
 /// 10.4.6.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-delete-p
 fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
+    const gpa = agent.gpa;
+
     // 1. If P is a Symbol, then
     if (property_key == .symbol) {
         // a. Return ! OrdinaryDelete(O, P).
@@ -228,7 +239,8 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.All
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    defer gpa.free(property_key_string);
 
     // 3. If exports contains P, return false.
     if (containsSlice(exports, property_key_string)) {

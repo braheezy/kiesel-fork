@@ -1405,9 +1405,10 @@ pub fn getOption(
 }
 
 test "format" {
+    const gpa = std.testing.allocator;
     const platform = Agent.Platform.default();
     defer platform.deinit();
-    var agent_ = try Agent.init(&platform, .{});
+    var agent_ = try Agent.init(gpa, &platform, .{});
     defer agent_.deinit();
 
     const test_cases = [_]struct { *Object, []const u8 }{
