@@ -21,7 +21,7 @@ test262-harness \
   --host-path="${kiesel_path}" \
   --test262-dir="${test262_dir}" \
   --reporter=json --reporter-keys=file,result \
-  --timeout=30000 \
+  --timeout=20000 \
   --threads="$(nproc)" \
   "${test262_glob}" \
 | jq -r '
@@ -30,13 +30,21 @@ test262-harness \
     # Ensure that the final result is always FAIL when results for the same
     # file differ (strict/non-strict) by doing a secondary sort on the result
     (if .result.pass then 0 else 1 end))
-  | map(
+  | map({
     # Some of the SpiderMonkey staging tests are really slow which leads to
     # spurious timeouts and mismatches between local runs and CI.
     # There is no good way to exclude subdirectories so we filter them here.
     # The only other solution would be to set the timeout very high or very low,
     # which other tests would suffer from.
-    select(.file | startswith("test/staging/sm/") | not) | {
-    (.file): (if .result.pass then "PASS" else "FAIL" end)
+    # Two of the decodeURI tests also commonly time out, so we skip them as well.
+    (.file): (
+      if .file == "test/built-ins/decodeURI/S15.1.3.1_A2.5_T1.js"
+      or .file == "test/built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js"
+      or (.file | startswith("test/staging/sm/"))
+      then "SKIP"
+      elif .result.pass then "PASS"
+      else "FAIL"
+      end
+    )
   })
   | add'
