@@ -30,12 +30,6 @@ pub const Environment = union(enum) {
     global_environment: *GlobalEnvironment,
     module_environment: *ModuleEnvironment,
 
-    pub const LookupCacheEntry = struct {
-        // Realistically an u8 should be enough for this but let's stay on the safe side.
-        // If you nest more than 256 environments you deserve to crash though.
-        distance: u16,
-    };
-
     pub fn outerEnv(self: Environment) ?Environment {
         return switch (self) {
             .declarative_environment => |env| env.outer_env,
@@ -46,8 +40,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    // This benefits from inlining due to being very hot code.
-    pub inline fn hasBinding(self: Environment, agent: *Agent, name: *const String) Agent.Error!bool {
+    pub fn hasBinding(self: Environment, agent: *Agent, name: *const String) Agent.Error!bool {
         return switch (self) {
             .declarative_environment => |env| env.hasBinding(name),
             .object_environment => |env| env.hasBinding(agent, name),
@@ -118,8 +111,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    // This benefits from inlining due to being very hot code.
-    pub inline fn getBindingValue(
+    pub fn getBindingValue(
         self: Environment,
         agent: *Agent,
         name: *const String,
@@ -181,6 +173,37 @@ pub const Environment = union(enum) {
             .function_environment => |env| env.getThisBinding(agent),
             .global_environment => |env| env.getThisBinding(),
             .module_environment => |env| env.getThisBinding(),
+        };
+    }
+
+    pub fn getBindingValueIfExists(
+        self: Environment,
+        agent: *Agent,
+        name: *const String,
+        strict: bool,
+    ) Agent.Error!?Value {
+        return switch (self) {
+            .declarative_environment => |env| env.getBindingValueIfExists(agent, name),
+            .function_environment => |env| env.declarative_environment.getBindingValueIfExists(agent, name),
+            .object_environment => |env| env.getBindingValueIfExists(agent, name, strict),
+            .global_environment => |env| env.getBindingValueIfExists(agent, name, strict),
+            .module_environment => |env| env.getBindingValueIfExists(agent, name),
+        };
+    }
+
+    pub fn setMutableBindingIfExists(
+        self: Environment,
+        agent: *Agent,
+        name: *const String,
+        value: Value,
+        strict: bool,
+    ) Agent.Error!bool {
+        return switch (self) {
+            .declarative_environment => |env| env.setMutableBindingIfExists(agent, name, value, strict),
+            .function_environment => |env| env.declarative_environment.setMutableBindingIfExists(agent, name, value, strict),
+            .object_environment => |env| env.setMutableBindingIfExists(agent, name, value, strict),
+            .global_environment => |env| env.setMutableBindingIfExists(agent, name, value, strict),
+            .module_environment => |env| env.setMutableBindingIfExists(agent, name, value, strict),
         };
     }
 };

@@ -415,3 +415,60 @@ pub fn createGlobalFunctionBinding(
 
     // 8. Return unused.
 }
+
+/// Combined `hasBinding()` and `getBindingValue()`
+pub fn getBindingValueIfExists(
+    self: GlobalEnvironment,
+    agent: *Agent,
+    name: *const String,
+    strict: bool,
+) Agent.Error!?Value {
+    if (self.declarative_record.bindings.get(name)) |binding| {
+        if (!binding.initialized) {
+            @branchHint(.unlikely);
+            return agent.throwException(
+                .reference_error,
+                "Binding for '{f}' is not initialized",
+                .{name.fmtRaw()},
+            );
+        }
+        return binding.value;
+    }
+    if (!try self.object_record.hasBinding(agent, name)) return null;
+    return try self.object_record.getBindingValue(agent, name, strict);
+}
+
+/// Combined `hasBinding()` and `setMutableBinding()`
+pub fn setMutableBindingIfExists(
+    self: GlobalEnvironment,
+    agent: *Agent,
+    name: *const String,
+    value: Value,
+    strict: bool,
+) Agent.Error!bool {
+    if (self.declarative_record.bindings.getPtr(name)) |binding| {
+        const final_strict = binding.strict or strict;
+        if (!binding.initialized) {
+            @branchHint(.unlikely);
+            return agent.throwException(
+                .reference_error,
+                "Binding for '{f}' is not initialized",
+                .{name.fmtRaw()},
+            );
+        }
+        if (binding.mutable) {
+            @branchHint(.likely);
+            binding.value = value;
+        } else if (final_strict) {
+            return agent.throwException(
+                .type_error,
+                "Binding for '{f}' is immutable",
+                .{name.fmtRaw()},
+            );
+        }
+        return true;
+    }
+    if (!try self.object_record.hasBinding(agent, name)) return false;
+    try self.object_record.setMutableBinding(agent, name, value, strict);
+    return true;
+}

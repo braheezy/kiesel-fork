@@ -151,3 +151,47 @@ pub fn createImportBinding(
 
     // 4. Return unused.
 }
+
+/// Combined `hasBinding()` and `getBindingValue()`
+pub fn getBindingValueIfExists(
+    self: ModuleEnvironment,
+    agent: *Agent,
+    name: *const String,
+) Agent.Error!?Value {
+    if (self.indirect_bindings.get(name)) |indirect_binding| {
+        const module = indirect_binding.module;
+        const binding_name = indirect_binding.binding_name;
+        const maybe_target_env = switch (module) {
+            inline else => |m| m.environment,
+        };
+        const target_env = maybe_target_env orelse {
+            @branchHint(.unlikely);
+            return agent.throwException(
+                .reference_error,
+                "Module environment is not initialized",
+                .{},
+            );
+        };
+        return try target_env.getBindingValue(agent, binding_name, true);
+    }
+    return self.declarative_environment.getBindingValueIfExists(agent, name);
+}
+
+/// Combined `hasBinding()` and `setMutableBinding()`
+pub fn setMutableBindingIfExists(
+    self: *ModuleEnvironment,
+    agent: *Agent,
+    name: *const String,
+    value: Value,
+    strict: bool,
+) Agent.Error!bool {
+    if (try self.declarative_environment.setMutableBindingIfExists(agent, name, value, strict)) return true;
+    if (self.indirect_bindings.contains(name)) {
+        return agent.throwException(
+            .type_error,
+            "Binding for '{f}' is immutable",
+            .{name.fmtRaw()},
+        );
+    }
+    return false;
+}

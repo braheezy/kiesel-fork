@@ -809,16 +809,17 @@ fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.In
 
     const execution_context = vm.agent.runningExecutionContext();
     var env = execution_context.ecmascript_code.lexical_environment;
-    while (!try env.hasBinding(vm.agent, name)) {
+    while (true) {
+        if (try env.getBindingValueIfExists(vm.agent, name, true)) |value| {
+            vm.load(dst, Value.from(value.typeof()));
+            return;
+        }
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
             vm.load(dst, Value.from("undefined"));
             return;
         };
     }
-
-    const value = try env.getBindingValue(vm.agent, name, true);
-    vm.load(dst, Value.from(value.typeof()));
 }
 
 fn executeAdd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
@@ -1285,7 +1286,11 @@ fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.
 
     const execution_context = vm.agent.runningExecutionContext();
     var env = execution_context.ecmascript_code.lexical_environment;
-    while (!try env.hasBinding(vm.agent, name)) {
+    while (true) {
+        if (try env.getBindingValueIfExists(vm.agent, name, true)) |result| {
+            vm.load(dst, result);
+            return;
+        }
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
             return vm.agent.throwException(
@@ -1295,9 +1300,6 @@ fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.
             );
         };
     }
-
-    const result = try env.getBindingValue(vm.agent, name, true);
-    vm.load(dst, result);
 }
 
 fn executeGetProperty(
@@ -1400,7 +1402,8 @@ fn executeSetBinding(
 
     const execution_context = vm.agent.runningExecutionContext();
     var env = execution_context.ecmascript_code.lexical_environment;
-    while (!try env.hasBinding(vm.agent, name)) {
+    while (true) {
+        if (try env.setMutableBindingIfExists(vm.agent, name, value, strict)) return;
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
             if (strict) {
@@ -1415,8 +1418,6 @@ fn executeSetBinding(
             return;
         };
     }
-
-    try env.setMutableBinding(vm.agent, name, value, strict);
 }
 
 fn executeSetProperty(
@@ -1572,7 +1573,17 @@ fn executeUpdateBinding(
     const name = try vm.getString(name_index);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
-    while (!try env.hasBinding(vm.agent, name)) {
+    while (true) {
+        if (try env.getBindingValueIfExists(vm.agent, name, strict)) |old_value| {
+            const update = try computeUpdateValues(vm.agent, old_value, update_op);
+            try env.setMutableBinding(vm.agent, name, update.new_value, strict);
+            const result = switch (update_type) {
+                .prefix => update.new_value,
+                .postfix => update.old_value_numeric,
+            };
+            vm.load(dest, result);
+            return;
+        }
         env = env.outerEnv() orelse {
             @branchHint(.unlikely);
             return vm.agent.throwException(
@@ -1582,17 +1593,6 @@ fn executeUpdateBinding(
             );
         };
     }
-
-    const old_value = try env.getBindingValue(vm.agent, name, strict);
-    const update = try computeUpdateValues(vm.agent, old_value, update_op);
-
-    try env.setMutableBinding(vm.agent, name, update.new_value, strict);
-
-    const result = switch (update_type) {
-        .prefix => update.new_value,
-        .postfix => update.old_value_numeric,
-    };
-    vm.load(dest, result);
 }
 
 fn executeUpdateProperty(

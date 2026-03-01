@@ -199,3 +199,31 @@ pub fn withBaseObject(self: ObjectEnvironment) ?*Object {
     // 2. Otherwise, return undefined.
     return null;
 }
+
+/// Combined `hasBinding()` and `getBindingValue()`
+pub fn getBindingValueIfExists(
+    self: ObjectEnvironment,
+    agent: *Agent,
+    name: *const String,
+    strict: bool,
+) Agent.Error!?Value {
+    // The repeated `hasProperty()` call is observable so for now we don't attempt to optimize it.
+    // This could be done for ordinary objects in the future.
+    if (!try self.hasBinding(agent, name)) return null;
+    return try self.getBindingValue(agent, name, strict);
+}
+
+/// Combined `hasBinding()` and `setMutableBinding()`
+pub fn setMutableBindingIfExists(
+    self: ObjectEnvironment,
+    agent: *Agent,
+    name: *const String,
+    value: Value,
+    strict: bool,
+) Agent.Error!bool {
+    // The repeated `hasProperty()` call is observable so for now we don't attempt to optimize it.
+    // This could be done for ordinary objects in the future.
+    if (!try self.hasBinding(agent, name)) return false;
+    try self.setMutableBinding(agent, name, value, strict);
+    return true;
+}

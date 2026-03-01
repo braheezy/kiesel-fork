@@ -244,3 +244,52 @@ pub fn withBaseObject(_: DeclarativeEnvironment) ?*Object {
     // 1. Return undefined.
     return null;
 }
+
+/// Combined `hasBinding()` and `getBindingValue()`
+pub fn getBindingValueIfExists(
+    self: DeclarativeEnvironment,
+    agent: *Agent,
+    name: *const String,
+) error{ExceptionThrown}!?Value {
+    const binding = self.bindings.get(name) orelse return null;
+    if (!binding.initialized) {
+        @branchHint(.unlikely);
+        return agent.throwException(
+            .reference_error,
+            "Binding for '{f}' is not initialized",
+            .{name.fmtRaw()},
+        );
+    }
+    return binding.value;
+}
+
+/// Combined `hasBinding()` and `setMutableBinding()`
+pub fn setMutableBindingIfExists(
+    self: *DeclarativeEnvironment,
+    agent: *Agent,
+    name: *const String,
+    value: Value,
+    strict: bool,
+) Agent.Error!bool {
+    const binding = self.bindings.getPtr(name) orelse return false;
+    const final_strict = binding.strict or strict;
+    if (!binding.initialized) {
+        @branchHint(.unlikely);
+        return agent.throwException(
+            .reference_error,
+            "Binding for '{f}' is not initialized",
+            .{name.fmtRaw()},
+        );
+    }
+    if (binding.mutable) {
+        @branchHint(.likely);
+        binding.value = value;
+    } else if (final_strict) {
+        return agent.throwException(
+            .type_error,
+            "Binding for '{f}' is immutable",
+            .{name.fmtRaw()},
+        );
+    }
+    return true;
+}
