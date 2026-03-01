@@ -114,7 +114,7 @@ pub const Environment = union(enum) {
             .object_environment => |env| env.setMutableBinding(agent, name, value, strict),
             .function_environment => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
             .global_environment => |env| env.setMutableBinding(agent, name, value, strict),
-            .module_environment => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
+            .module_environment => |env| env.setMutableBinding(agent, name, value, strict),
         };
     }
 

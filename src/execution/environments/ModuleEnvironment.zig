@@ -88,6 +88,27 @@ pub fn getBindingValue(
     return binding.value;
 }
 
+pub fn setMutableBinding(
+    self: *ModuleEnvironment,
+    agent: *Agent,
+    name: *const String,
+    value: Value,
+    strict: bool,
+) Agent.Error!void {
+    // In the spec indirect bindings are created as immutable bindings in the declarative
+    // environment, but since we keep them separate we have to check before delegating to the
+    // declarative environment. (9.1.1.1.5 SetMutableBinding step 5)
+    if (self.indirect_bindings.contains(name)) {
+        @branchHint(.unlikely);
+        return agent.throwException(
+            .type_error,
+            "Binding for '{f}' is immutable",
+            .{name.fmtRaw()},
+        );
+    }
+    return self.declarative_environment.setMutableBinding(agent, name, value, strict);
+}
+
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
 pub fn deleteBinding(_: ModuleEnvironment, _: *const String) bool {
