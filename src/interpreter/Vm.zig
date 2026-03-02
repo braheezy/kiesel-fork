@@ -50,7 +50,6 @@ const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newObjectEnvironment = execution.newObjectEnvironment;
 const newPrivateEnvironment = execution.newPrivateEnvironment;
 const noexcept = utils.noexcept;
-const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
 const stringValueImpl = ast.stringValueImpl;
 const yield = builtins.yield;
@@ -540,6 +539,24 @@ fn toObjectForPropertyAccess(agent: *Agent, value: Value) Agent.Error!*Object {
         // Null or undefined, guaranteed to throw
         _ = try value.toObject(agent);
         unreachable;
+    };
+}
+
+fn iteratorToObject(agent: *Agent, iterator: Iterator) std.mem.Allocator.Error!*Object {
+    const iterator_obj = &(try builtins.Object.createWithShape(agent, .{
+        .shape = try agent.ensureIteratorRecordShape(),
+    })).object;
+    iterator_obj.setValueAtPropertyOffset(@enumFromInt(0), Value.from(iterator.iterator));
+    iterator_obj.setValueAtPropertyOffset(@enumFromInt(1), iterator.next_method);
+    iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), Value.from(iterator.done));
+    return iterator_obj;
+}
+
+fn objectToIterator(iterator_obj: *const Object) Iterator {
+    return .{
+        .iterator = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject(),
+        .next_method = iterator_obj.getValueAtPropertyOffset(@enumFromInt(1)),
+        .done = iterator_obj.getValueAtPropertyOffset(@enumFromInt(2)).toBoolean(),
     };
 }
 
@@ -1989,24 +2006,14 @@ fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Byteco
 fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const iterator = try getIterator(vm.agent, value, .sync);
-
-    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
-
+    const iterator_obj = try iteratorToObject(vm.agent, iterator);
     vm.load(dest, Value.from(iterator_obj));
 }
 
 fn executeGetAsyncIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const iterator = try getIterator(vm.agent, value, .async);
-
-    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
-
+    const iterator_obj = try iteratorToObject(vm.agent, iterator);
     vm.load(dest, Value.from(iterator_obj));
 }
 
@@ -2015,23 +2022,13 @@ fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode
     const object = value.toObject(vm.agent) catch |err| try noexcept(err);
     const for_in_iterator = try createForInIterator(vm.agent, object);
     const iterator = try getIteratorDirect(vm.agent, &for_in_iterator.object);
-
-    const iterator_obj = try ordinaryObjectCreate(vm.agent, null);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("iterator"), Value.from(iterator.iterator));
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("nextMethod"), iterator.next_method);
-    try iterator_obj.createDataPropertyDirect(vm.agent, PropertyKey.from("done"), Value.from(iterator.done));
-
+    const iterator_obj = try iteratorToObject(vm.agent, iterator);
     vm.load(dest, Value.from(iterator_obj));
 }
 
 fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-
-    var iterator: Iterator = .{
-        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
-        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
-        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
-    };
+    var iterator = objectToIterator(iterator_obj);
 
     if (try iterator.step(vm.agent)) |next| {
         vm.load(dest, Value.from(next));
@@ -2043,12 +2040,7 @@ fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.
 
 fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-
-    var iterator: Iterator = .{
-        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
-        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
-        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
-    };
+    var iterator = objectToIterator(iterator_obj);
 
     if (try iterator.stepValue(vm.agent)) |next| {
         vm.load(dest, next);
@@ -2061,8 +2053,8 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byte
 fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
-    const iterator_inner = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject();
-    const next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod"));
+    const iterator_inner = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject();
+    const next_method = iterator_obj.getValueAtPropertyOffset(@enumFromInt(1));
 
     // Implements steps 6.a-f. of ForIn/OfBodyEvaluation for async iterators.
     // https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
@@ -2106,31 +2098,20 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg:
 
 fn executeIteratorClose(vm: *Vm, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-    const done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean();
-    if (done) return;
-
-    var iterator: Iterator = .{
-        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
-        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
-        .done = false,
-    };
+    var iterator = objectToIterator(iterator_obj);
+    if (iterator.done) return;
     try iterator.close(vm.agent, @as(Agent.Error!void, {}));
 }
 
 fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-    const done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done"));
+    const done = iterator_obj.getValueAtPropertyOffset(@enumFromInt(2));
     vm.load(dest, done);
 }
 
 fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-
-    var iterator: Iterator = .{
-        .iterator = iterator_obj.getPropertyValueDirect(PropertyKey.from("iterator")).asObject(),
-        .next_method = iterator_obj.getPropertyValueDirect(PropertyKey.from("nextMethod")),
-        .done = iterator_obj.getPropertyValueDirect(PropertyKey.from("done")).toBoolean(),
-    };
+    var iterator = objectToIterator(iterator_obj);
 
     var values: std.ArrayList(Value) = .empty;
     defer values.deinit(vm.agent.gc_allocator);

@@ -172,6 +172,10 @@ pub fn setIsHTMLDDA(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
     self.shape = try self.shape.setIsHTMLDDA(agent.gc_allocator);
 }
 
+pub fn getValueAtPropertyOffset(self: *const Object, offset: Shape.PropertyOffset) Value {
+    return self.property_storage.properties.items[@intFromEnum(offset)].value;
+}
+
 pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.PropertyOffset, value: Value) void {
     self.property_storage.properties.items[@intFromEnum(offset)] = .{ .value = value };
 }

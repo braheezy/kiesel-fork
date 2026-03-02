@@ -16,6 +16,7 @@ const ExecutionContext = @import("ExecutionContext.zig");
 const HostHooks = @import("HostHooks.zig");
 const Job = @import("Job.zig");
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = @import("Realm.zig");
 const String = types.String;
 const Symbol = types.Symbol;
@@ -36,6 +37,7 @@ host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(*ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
 empty_shape: *Object.Shape,
+iterator_record_shape: ?*Object.Shape,
 string_cache: String.Cache,
 platform: *const Platform,
 active_vm: ?*interpreter.Vm,
@@ -85,6 +87,7 @@ pub fn init(
         .execution_context_stack = .empty,
         .queued_jobs = .empty,
         .empty_shape = try .init(platform.gc_allocator),
+        .iterator_record_shape = null,
         .string_cache = .empty,
         .platform = platform,
         .active_vm = null,
@@ -97,6 +100,16 @@ pub fn deinit(self: *Agent) void {
     self.queued_jobs.deinit(self.gc_allocator);
     self.empty_shape.deinit(self.gc_allocator);
     self.string_cache.entries.deinit(self.gc_allocator);
+}
+
+pub fn ensureIteratorRecordShape(self: *Agent) std.mem.Allocator.Error!*Object.Shape {
+    if (self.iterator_record_shape) |shape| return shape;
+    const shape = try Object.Shape.init(self.gc_allocator);
+    try shape.setPropertyWithoutTransition(self.gc_allocator, PropertyKey.from("iterator"), .all, .value);
+    try shape.setPropertyWithoutTransition(self.gc_allocator, PropertyKey.from("nextMethod"), .all, .value);
+    try shape.setPropertyWithoutTransition(self.gc_allocator, PropertyKey.from("done"), .all, .value);
+    self.iterator_record_shape = shape;
+    return shape;
 }
 
 pub fn drainJobQueue(self: *Agent) void {
