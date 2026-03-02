@@ -83,6 +83,7 @@ pub const CallFrame = struct {
     stack_base: u32,
     regs_len: u16,
     arguments_len: u16,
+    scope_depth: u16,
     cached_this_value: ?Value,
 
     pub fn stackLen(frame: *const CallFrame) usize {
@@ -94,6 +95,7 @@ pub const GeneratorSuspension = struct {
     stack: []Value,
     regs_len: u16,
     arguments_len: u16,
+    scope_depth: u16,
     cached_this_value: ?Value,
     saved_pc: Pc,
     yield_reg: Bytecode.Inst.Reg,
@@ -364,6 +366,11 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
         error.ExceptionThrown => {
             const frame = vm.currentCallFrame();
             const handler = frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc)) orelse return err;
+            const execution_context = vm.agent.runningExecutionContext();
+            while (frame.scope_depth > handler.scope_depth) {
+                execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
+                frame.scope_depth -= 1;
+            }
             const exception = vm.agent.clearException();
             vm.load(handler.exception_reg, exception.value);
             pc.* = @enumFromInt(handler.target);
@@ -392,6 +399,7 @@ pub fn @"resume"(
         .stack_base = stack_base,
         .regs_len = regs_len,
         .arguments_len = arguments_len,
+        .scope_depth = suspension.scope_depth,
         .cached_this_value = suspension.cached_this_value,
     });
     errdefer vm.popCallFrame();
@@ -438,6 +446,7 @@ pub fn pushCallFrame(
         .stack_base = stack_base,
         .regs_len = regs_len,
         .arguments_len = arguments_len,
+        .scope_depth = 0,
         .cached_this_value = null,
     });
 }
@@ -1248,6 +1257,7 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    vm.currentCallFrame().scope_depth += 1;
 }
 
 fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
@@ -1256,6 +1266,7 @@ fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
     execution_context.ecmascript_code.variable_environment = .{ .declarative_environment = env };
+    vm.currentCallFrame().scope_depth += 1;
 }
 
 fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
@@ -1264,11 +1275,13 @@ fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocato
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newObjectEnvironment(vm.agent.gc_allocator, object, true, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .object_environment = env };
+    vm.currentCallFrame().scope_depth += 1;
 }
 
 fn executePopScope(vm: *Vm) void {
     const execution_context = vm.agent.runningExecutionContext();
     execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
+    vm.currentCallFrame().scope_depth -= 1;
 }
 
 fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
@@ -2172,6 +2185,7 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
         .stack = stack,
         .regs_len = frame.regs_len,
         .arguments_len = frame.arguments_len,
+        .scope_depth = frame.scope_depth,
         .cached_this_value = frame.cached_this_value,
         .saved_pc = pc,
         .yield_reg = reg,

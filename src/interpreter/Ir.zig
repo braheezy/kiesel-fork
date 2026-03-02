@@ -418,7 +418,7 @@ pub const Inst = struct {
 
     // Extra data types (>8 bytes)
     pub const BrCond = struct { condition: Ref, then_target: Ref, else_target: Ref };
-    pub const ExceptionHandler = struct { start: Ref, end: Ref, target: Ref };
+    pub const ExceptionHandler = struct { start: Ref, end: Ref, target: Ref, scope_depth: u16 };
     pub const SetProperty = struct { base: Ref, name: StringIndex, value: Ref };
     pub const SetPropertyComputed = struct { base: Ref, property: Ref, value: Ref };
     pub const SetPropertyIndexed = struct { base: Ref, index: u32, value: Ref };
@@ -606,6 +606,7 @@ pub fn extraData(ir: *const Ir, comptime T: type, extra_index: Inst.ExtraIndex) 
     var result: T = undefined;
     inline for (fields) |field| {
         @field(result, field.name) = switch (field.type) {
+            u16 => @intCast(ir.extra[i]),
             u32 => ir.extra[i],
             Inst.Ref,
             Inst.StringIndex,

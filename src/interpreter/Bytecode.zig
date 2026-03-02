@@ -68,6 +68,7 @@ pub const ExceptionHandler = struct {
     end: u32,
     target: u32,
     exception_reg: Inst.Reg,
+    scope_depth: u16,
 };
 
 pub const Inst = struct {
@@ -731,7 +732,7 @@ pub fn print(
                 handler.target,
             });
             try printField(bc, handler.exception_reg, writer, tty_config);
-            try writer.writeByte('\n');
+            try writer.print(", {d}\n", .{handler.scope_depth});
         }
     }
 }

@@ -275,6 +275,7 @@ const Deferred = struct {
                 d.b.extra.items[ei] = @intFromEnum(data.exception_handler.start);
                 d.b.extra.items[ei + 1] = @intFromEnum(data.exception_handler.end);
                 d.b.extra.items[ei + 2] = @intFromEnum(data.exception_handler.target);
+                d.b.extra.items[ei + 3] = data.exception_handler.scope_depth;
             },
             else => unreachable,
         }
@@ -291,7 +292,7 @@ fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferr
         },
         .exception_handler => blk: {
             const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-            try b.extra.appendNTimes(b.gpa, undefined, 3);
+            try b.extra.appendNTimes(b.gpa, undefined, 4);
             break :blk .{ .exception_handler = extra_index };
         },
         else => unreachable,
@@ -2307,6 +2308,8 @@ fn lowerThrowStatement(b: *Builder, throw_stmt: *const ast.ThrowStatement) Error
 }
 
 fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.Inst.Ref {
+    const scope_depth = b.scope_depth;
+
     const try_label = try b.addLabel();
     const try_value = try b.lowerBlock(&try_stmt.try_block, null);
     const try_result = if (try_value != .none) try_value else try b.addInst(.{
@@ -2413,6 +2416,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
             .start = try_label,
             .end = try_end_label,
             .target = catch_label,
+            .scope_depth = scope_depth,
         } });
         catch_br.set(.{ .br = .{
             .target = normal_target,
@@ -2425,6 +2429,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
             .start = if (try_stmt.catch_block != null) catch_label else try_label,
             .end = finally_throw_label,
             .target = finally_throw_label,
+            .scope_depth = scope_depth,
         } });
         finally_br.set(.{ .br = .{
             .target = end_label,

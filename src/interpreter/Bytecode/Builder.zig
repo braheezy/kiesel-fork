@@ -23,6 +23,7 @@ const ExceptionHandler = struct {
     end: *Block,
     target: *Block,
     exception_reg: Bytecode.Inst.Reg,
+    scope_depth: u16,
 };
 
 pub const Error = error{OutOfMemory};
@@ -368,6 +369,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .end = handler.end.offset,
             .target = handler.target.offset,
             .exception_reg = handler.exception_reg,
+            .scope_depth = handler.scope_depth,
         });
     }
     const exception_handlers = try exception_handlers_list.toOwnedSlice(b.gpa);
@@ -923,6 +925,7 @@ fn lowerExceptionHandler(b: *Builder, exception_handler: Ir.Inst.ExtraIndex, exc
         .end = end_block,
         .target = target_block,
         .exception_reg = b.resolve(exception_ref),
+        .scope_depth = extra.scope_depth,
     });
 }
 
