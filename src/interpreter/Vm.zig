@@ -62,6 +62,8 @@ agent: *Agent,
 stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
 per_bytecode_cache: std.AutoHashMapUnmanaged(*const Bytecode, PerBytecodeCache),
+frame: *CallFrame,
+regs: []Value,
 
 pub const Pc = enum(u32) {
     start = 0,
@@ -127,16 +129,17 @@ pub fn init(
         .stack = .empty,
         .call_stack = .empty,
         .per_bytecode_cache = .empty,
+        .frame = undefined,
+        .regs = undefined,
     };
     try vm.pushCallFrame(bytecode, &.{});
     return vm;
 }
 
 pub fn deinit(vm: *Vm) void {
-    const frame = vm.currentCallFrame();
-    std.debug.assert(frame.stack_base == 0);
-    std.debug.assert(frame.arguments_len == 0);
-    std.debug.assert(vm.stack.items.len == frame.stackLen());
+    std.debug.assert(vm.frame.stack_base == 0);
+    std.debug.assert(vm.frame.arguments_len == 0);
+    std.debug.assert(vm.stack.items.len == vm.frame.stackLen());
     std.debug.assert(vm.call_stack.items.len == 1);
     vm.stack.deinit(vm.agent.gc_allocator);
     vm.call_stack.deinit(vm.agent.gc_allocator);
@@ -160,8 +163,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
     // and must not leave call frames behind. This is asserted after each instruction.
     const initial_call_stack_depth = vm.call_stack.items.len;
 
-    const frame = vm.currentCallFrame();
-    var code = frame.bytecode.code;
+    var code = vm.frame.bytecode.code;
     var pc = options.start_pc;
 
     loop: switch (Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..])) {
@@ -364,12 +366,11 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
     switch (err) {
         error.OutOfMemory => return err,
         error.ExceptionThrown => {
-            const frame = vm.currentCallFrame();
-            const handler = frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc)) orelse return err;
+            const handler = vm.frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc)) orelse return err;
             const execution_context = vm.agent.runningExecutionContext();
-            while (frame.scope_depth > handler.scope_depth) {
+            while (vm.frame.scope_depth > handler.scope_depth) {
                 execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
-                frame.scope_depth -= 1;
+                vm.frame.scope_depth -= 1;
             }
             const exception = vm.agent.clearException();
             vm.load(handler.exception_reg, exception.value);
@@ -402,6 +403,8 @@ pub fn @"resume"(
         .scope_depth = suspension.scope_depth,
         .cached_this_value = suspension.cached_this_value,
     });
+    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    vm.regs = vm.stack.items[stack_base..][0..regs_len];
     errdefer vm.popCallFrame();
     return vm.run(.{ .start_pc = suspension.saved_pc });
 }
@@ -449,6 +452,8 @@ pub fn pushCallFrame(
         .scope_depth = 0,
         .cached_this_value = null,
     });
+    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    vm.regs = vm.stack.items[stack_base..][0..regs_len];
 }
 
 pub fn popCallFrame(vm: *Vm) void {
@@ -457,43 +462,33 @@ pub fn popCallFrame(vm: *Vm) void {
     const frame = vm.call_stack.pop().?;
     const stack_len = frame.stackLen();
     vm.stack.shrinkRetainingCapacity(vm.stack.items.len - stack_len);
-}
-
-fn currentCallFrame(vm: *Vm) *CallFrame {
-    return &vm.call_stack.items[vm.call_stack.items.len - 1];
-}
-
-fn regs(vm: *Vm) []Value {
-    const frame = vm.currentCallFrame();
-    const regs_start = frame.stack_base;
-    return vm.stack.items[regs_start..][0..frame.regs_len];
+    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    vm.regs = vm.stack.items[vm.frame.stack_base..][0..vm.frame.regs_len];
 }
 
 fn arguments(vm: *Vm) []const Value {
-    const frame = vm.currentCallFrame();
-    const args_start = frame.stack_base + frame.regs_len;
-    return vm.stack.items[args_start..][0..frame.arguments_len];
+    const args_start = vm.frame.stack_base + vm.frame.regs_len;
+    return vm.stack.items[args_start..][0..vm.frame.arguments_len];
 }
 
 fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
     std.debug.assert(reg != .none);
-    return vm.regs()[@intFromEnum(reg)];
+    return vm.regs[@intFromEnum(reg)];
 }
 
 fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
     std.debug.assert(reg != .none);
-    vm.regs()[@intFromEnum(reg)] = value;
+    vm.regs[@intFromEnum(reg)] = value;
 }
 
 fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!*const String {
-    const frame = vm.currentCallFrame();
     const cache_index = @intFromEnum(index);
-    if (frame.cache_slots[cache_index]) |ptr| {
+    if (vm.frame.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
-    const utf8 = frame.bytecode.strings[@intFromEnum(index)];
-    const kind = frame.bytecode.string_kinds[@intFromEnum(index)];
+    const utf8 = vm.frame.bytecode.strings[@intFromEnum(index)];
+    const kind = vm.frame.bytecode.string_kinds[@intFromEnum(index)];
     const string = switch (kind) {
         .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
         .literal => try String.fromUtf8(
@@ -501,37 +496,33 @@ fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!
             try vm.agent.gc_allocator.dupe(u8, utf8),
         ),
     };
-    frame.cache_slots[cache_index] = @ptrCast(@alignCast(string));
+    vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(string));
     return string;
 }
 
 fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
-    const frame = vm.currentCallFrame();
-    const cache_index = frame.bytecode.strings.len + @intFromEnum(index);
-    if (frame.cache_slots[cache_index]) |ptr| {
+    const cache_index = vm.frame.bytecode.strings.len + @intFromEnum(index);
+    if (vm.frame.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
-    const @"const" = frame.bytecode.big_ints[@intFromEnum(index)];
+    const @"const" = vm.frame.bytecode.big_ints[@intFromEnum(index)];
     const managed = try @"const".toManaged(vm.agent.gc_allocator);
     const big_int = try BigInt.fromManaged(vm.agent, managed);
-    frame.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
+    vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
     return big_int;
 }
 
 fn getFunction(vm: *Vm, index: Bytecode.Inst.FunctionIndex) Bytecode.Function {
-    const frame = vm.currentCallFrame();
-    return frame.bytecode.functions[@intFromEnum(index)];
+    return vm.frame.bytecode.functions[@intFromEnum(index)];
 }
 
 fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
-    const frame = vm.currentCallFrame();
-    return frame.bytecode.classes[@intFromEnum(index)];
+    return vm.frame.bytecode.classes[@intFromEnum(index)];
 }
 
 fn getInlineCache(vm: *Vm, index: Bytecode.Inst.IcIndex) *InlineCache {
-    const frame = vm.currentCallFrame();
-    return &frame.inline_caches[@intFromEnum(index)];
+    return &vm.frame.inline_caches[@intFromEnum(index)];
 }
 
 fn toObjectForPropertyAccess(agent: *Agent, value: Value) Agent.Error!*Object {
@@ -743,10 +734,9 @@ fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.
 }
 
 fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
-    const frame = vm.currentCallFrame();
-    const this_value = frame.cached_this_value orelse blk: {
+    const this_value = vm.frame.cached_this_value orelse blk: {
         const this_value = try vm.agent.resolveThisBinding();
-        frame.cached_this_value = this_value;
+        vm.frame.cached_this_value = this_value;
         break :blk this_value;
     };
     vm.load(reg, this_value);
@@ -1257,7 +1247,7 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
-    vm.currentCallFrame().scope_depth += 1;
+    vm.frame.scope_depth += 1;
 }
 
 fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
@@ -1266,7 +1256,7 @@ fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
     execution_context.ecmascript_code.variable_environment = .{ .declarative_environment = env };
-    vm.currentCallFrame().scope_depth += 1;
+    vm.frame.scope_depth += 1;
 }
 
 fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
@@ -1275,13 +1265,13 @@ fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocato
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newObjectEnvironment(vm.agent.gc_allocator, object, true, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .object_environment = env };
-    vm.currentCallFrame().scope_depth += 1;
+    vm.frame.scope_depth += 1;
 }
 
 fn executePopScope(vm: *Vm) void {
     const execution_context = vm.agent.runningExecutionContext();
     execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
-    vm.currentCallFrame().scope_depth -= 1;
+    vm.frame.scope_depth -= 1;
 }
 
 fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
@@ -2008,8 +1998,7 @@ fn executeConstructN(
 }
 
 fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Bytecode.Inst.Reg, raw_reg: Bytecode.Inst.Reg, template_id: u16) Agent.Error!void {
-    const frame = vm.currentCallFrame();
-    const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&frame.bytecode));
+    const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&vm.frame.bytecode));
     const cooked = vm.store(cooked_reg).asObject().as(builtins.Array);
     const raw = vm.store(raw_reg).asObject().as(builtins.Array);
     const template = try getTemplateObject(vm.agent, cache_key, cooked, raw);
@@ -2171,7 +2160,7 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
     }
 
     std.debug.assert(vm.call_stack.items.len > 1);
-    const frame = vm.currentCallFrame();
+    const frame = vm.frame;
     const stack_start = frame.stack_base;
     const stack_len = frame.stackLen();
     const stack = try vm.agent.gc_allocator.dupe(
@@ -2193,22 +2182,21 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
 }
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
-    const frame = vm.currentCallFrame();
     const function = vm.getFunction(function_index);
-    const source_text = frame.bytecode.strings[@intFromEnum(function.source_text)];
+    const source_text = vm.frame.bytecode.strings[@intFromEnum(function.source_text)];
     const identifier: ?[]const u8 = switch (function.name) {
-        .identifier => |name_index| frame.bytecode.strings[@intFromEnum(name_index)],
+        .identifier => |name_index| vm.frame.bytecode.strings[@intFromEnum(name_index)],
         .none, .default => null,
     };
     const default_name: ?[]const u8 = switch (function.name) {
-        .default => |name_index| frame.bytecode.strings[@intFromEnum(name_index)],
+        .default => |name_index| vm.frame.bytecode.strings[@intFromEnum(name_index)],
         .none, .identifier => null,
     };
     const cache_index =
-        frame.bytecode.strings.len +
-        frame.bytecode.big_ints.len +
+        vm.frame.bytecode.strings.len +
+        vm.frame.bytecode.big_ints.len +
         @intFromEnum(function_index);
-    const cached_bytecode: *const Bytecode = if (frame.cache_slots[cache_index]) |ptr| blk: {
+    const cached_bytecode: *const Bytecode = if (vm.frame.cache_slots[cache_index]) |ptr| blk: {
         @branchHint(.likely);
         break :blk @ptrCast(ptr);
     } else blk: {
@@ -2221,7 +2209,7 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
                 .body = &function.body,
             },
         });
-        frame.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
+        vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
         break :blk bytecode;
     };
     const function_obj = switch (function.kind) {
@@ -2265,9 +2253,8 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
 }
 
 fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
-    const frame = vm.currentCallFrame();
     const class = vm.getClass(class_index);
-    const source_text = frame.bytecode.strings[@intFromEnum(class.source_text)];
+    const source_text = vm.frame.bytecode.strings[@intFromEnum(class.source_text)];
     const class_binding: ?*const String = switch (class.name) {
         .identifier => |name_index| try vm.getString(name_index),
         .none, .default => null,
@@ -2448,8 +2435,7 @@ fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Byt
 }
 
 fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const frame = vm.currentCallFrame();
-    const name = frame.bytecode.strings[@intFromEnum(name_index)];
+    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
@@ -2474,8 +2460,7 @@ fn executePopPrivateScope(vm: *Vm) void {
 
 fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const frame = vm.currentCallFrame();
-    const name = frame.bytecode.strings[@intFromEnum(name_index)];
+    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
@@ -2489,8 +2474,7 @@ fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode
 fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const frame = vm.currentCallFrame();
-    const name = frame.bytecode.strings[@intFromEnum(name_index)];
+    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
