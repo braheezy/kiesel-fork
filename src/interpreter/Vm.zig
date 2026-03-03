@@ -64,6 +64,8 @@ call_stack: std.ArrayList(CallFrame),
 per_bytecode_cache: std.AutoHashMapUnmanaged(*const Bytecode, PerBytecodeCache),
 frame: *CallFrame,
 regs: []Value,
+cache_slots: CacheSlots,
+inline_caches: []InlineCache,
 
 pub const Pc = enum(u32) {
     start = 0,
@@ -80,27 +82,26 @@ pub const Pc = enum(u32) {
 
 pub const CallFrame = struct {
     bytecode: *const Bytecode,
-    cache_slots: CacheSlots,
-    inline_caches: []InlineCache,
     stack_base: u32,
-    regs_len: u16,
-    arguments_len: u16,
+    argument_count: u16,
     scope_depth: u16,
-    cached_this_value: ?Value,
 
     pub fn stackLen(frame: *const CallFrame) usize {
-        return frame.regs_len + frame.arguments_len;
+        return 1 + frame.argument_count + frame.bytecode.register_count;
     }
 };
 
 pub const GeneratorSuspension = struct {
     stack: []Value,
-    regs_len: u16,
-    arguments_len: u16,
+    argument_count: u16,
     scope_depth: u16,
-    cached_this_value: ?Value,
     saved_pc: Pc,
     yield_reg: Bytecode.Inst.Reg,
+
+    pub fn regs(suspension: *const GeneratorSuspension) []Value {
+        const regs_start = 1 + suspension.argument_count;
+        return suspension.stack[regs_start..];
+    }
 };
 
 pub const RunResult = union(enum) {
@@ -120,6 +121,14 @@ const PerBytecodeCache = struct {
     inline_caches: []InlineCache,
 };
 
+// Many engines have the concept of an "empty"/"hole" value, but I never really liked that, at
+// least if it leaks into the public API. Let's experiment with this in the VM only for now.
+const hole = Value.from(@as(*Object, @ptrFromInt(@alignOf(Object))));
+
+fn isHole(value: Value) bool {
+    return value.isObject() and value.asObject() == hole.asObject();
+}
+
 pub fn init(
     agent: *Agent,
     bytecode: *const Bytecode,
@@ -131,6 +140,8 @@ pub fn init(
         .per_bytecode_cache = .empty,
         .frame = undefined,
         .regs = undefined,
+        .cache_slots = undefined,
+        .inline_caches = undefined,
     };
     try vm.pushCallFrame(bytecode, &.{});
     return vm;
@@ -138,7 +149,7 @@ pub fn init(
 
 pub fn deinit(vm: *Vm) void {
     std.debug.assert(vm.frame.stack_base == 0);
-    std.debug.assert(vm.frame.arguments_len == 0);
+    std.debug.assert(vm.frame.argument_count == 0);
     std.debug.assert(vm.stack.items.len == vm.frame.stackLen());
     std.debug.assert(vm.call_stack.items.len == 1);
     vm.stack.deinit(vm.agent.gc_allocator);
@@ -386,25 +397,20 @@ pub fn @"resume"(
 ) Agent.Error!RunResult {
     const cache = try vm.ensurePerBytecodeCache(callee_bytecode);
 
-    const regs_len = suspension.regs_len;
-    const arguments_len = suspension.arguments_len;
-    std.debug.assert(suspension.stack.len == regs_len + arguments_len);
-
     const stack_base: u32 = @intCast(vm.stack.items.len);
+    const argument_count = suspension.argument_count;
+    const register_count = callee_bytecode.register_count;
+
+    std.debug.assert(suspension.stack.len == 1 + argument_count + register_count);
     try vm.stack.appendSlice(vm.agent.gc_allocator, suspension.stack);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
-        .cache_slots = cache.cache_slots,
-        .inline_caches = cache.inline_caches,
         .stack_base = stack_base,
-        .regs_len = regs_len,
-        .arguments_len = arguments_len,
+        .argument_count = argument_count,
         .scope_depth = suspension.scope_depth,
-        .cached_this_value = suspension.cached_this_value,
     });
-    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
-    vm.regs = vm.stack.items[stack_base..][0..regs_len];
+    vm.updateCachedFields(cache);
     errdefer vm.popCallFrame();
     return vm.run(.{ .start_pc = suspension.saved_pc });
 }
@@ -417,7 +423,7 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
         const cache_slots = try vm.agent.gc_allocator.alloc(Ptr, total_len);
         errdefer vm.agent.gc_allocator.free(cache_slots);
         @memset(cache_slots, null);
-        const inline_caches = try vm.agent.gc_allocator.alloc(InlineCache, bytecode.num_inline_caches);
+        const inline_caches = try vm.agent.gc_allocator.alloc(InlineCache, bytecode.inline_cache_count);
         errdefer vm.agent.gc_allocator.free(inline_caches);
         @memset(inline_caches, .{ .shape = null, .offset = undefined, .type = undefined });
         gop.value_ptr.* = .{
@@ -428,47 +434,56 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
     return gop.value_ptr.*;
 }
 
+fn updateCachedFields(vm: *Vm, cache: PerBytecodeCache) void {
+    const frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    const regs_start = frame.stack_base + 1 + frame.argument_count;
+    vm.frame = frame;
+    vm.regs = vm.stack.items[regs_start..][0..frame.bytecode.register_count];
+    vm.cache_slots = cache.cache_slots;
+    vm.inline_caches = cache.inline_caches;
+}
+
 pub fn pushCallFrame(
     vm: *Vm,
     callee_bytecode: *const Bytecode,
     args: []const Value,
 ) std.mem.Allocator.Error!void {
     const cache = try vm.ensurePerBytecodeCache(callee_bytecode);
-    const regs_len = callee_bytecode.num_regs;
-    const arguments_len: u16 = @intCast(args.len);
 
     const stack_base: u32 = @intCast(vm.stack.items.len);
-    try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, regs_len + arguments_len);
-    vm.stack.appendNTimesAssumeCapacity(undefined, regs_len);
+    const argument_count: u16 = @intCast(args.len);
+    const register_count = callee_bytecode.register_count;
+
+    const stack_len = 1 + argument_count + register_count;
+    try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, stack_len);
+    vm.stack.appendAssumeCapacity(hole);
     vm.stack.appendSliceAssumeCapacity(args);
+    vm.stack.appendNTimesAssumeCapacity(undefined, register_count);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
         .bytecode = callee_bytecode,
-        .cache_slots = cache.cache_slots,
-        .inline_caches = cache.inline_caches,
         .stack_base = stack_base,
-        .regs_len = regs_len,
-        .arguments_len = arguments_len,
+        .argument_count = argument_count,
         .scope_depth = 0,
-        .cached_this_value = null,
     });
-    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
-    vm.regs = vm.stack.items[stack_base..][0..regs_len];
+    vm.updateCachedFields(cache);
 }
 
 pub fn popCallFrame(vm: *Vm) void {
     std.debug.assert(vm.call_stack.items.len > 1);
 
-    const frame = vm.call_stack.pop().?;
-    const stack_len = frame.stackLen();
+    const stack_len = vm.frame.stackLen();
     vm.stack.shrinkRetainingCapacity(vm.stack.items.len - stack_len);
-    vm.frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
-    vm.regs = vm.stack.items[vm.frame.stack_base..][0..vm.frame.regs_len];
+    _ = vm.call_stack.pop().?;
+
+    const frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    const cache = vm.per_bytecode_cache.get(frame.bytecode).?;
+    vm.updateCachedFields(cache);
 }
 
 fn arguments(vm: *Vm) []const Value {
-    const args_start = vm.frame.stack_base + vm.frame.regs_len;
-    return vm.stack.items[args_start..][0..vm.frame.arguments_len];
+    const args_start = vm.frame.stack_base + 1;
+    return vm.stack.items[args_start..][0..vm.frame.argument_count];
 }
 
 fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
@@ -483,7 +498,7 @@ fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
 
 fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!*const String {
     const cache_index = @intFromEnum(index);
-    if (vm.frame.cache_slots[cache_index]) |ptr| {
+    if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
@@ -496,20 +511,20 @@ fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!
             try vm.agent.gc_allocator.dupe(u8, utf8),
         ),
     };
-    vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(string));
+    vm.cache_slots[cache_index] = @ptrCast(@alignCast(string));
     return string;
 }
 
 fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
     const cache_index = vm.frame.bytecode.strings.len + @intFromEnum(index);
-    if (vm.frame.cache_slots[cache_index]) |ptr| {
+    if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
     const @"const" = vm.frame.bytecode.big_ints[@intFromEnum(index)];
     const managed = try @"const".toManaged(vm.agent.gc_allocator);
     const big_int = try BigInt.fromManaged(vm.agent, managed);
-    vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
+    vm.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
     return big_int;
 }
 
@@ -522,7 +537,7 @@ fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
 }
 
 fn getInlineCache(vm: *Vm, index: Bytecode.Inst.IcIndex) *InlineCache {
-    return &vm.frame.inline_caches[@intFromEnum(index)];
+    return &vm.inline_caches[@intFromEnum(index)];
 }
 
 fn toObjectForPropertyAccess(agent: *Agent, value: Value) Agent.Error!*Object {
@@ -734,12 +749,12 @@ fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.
 }
 
 fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
-    const this_value = vm.frame.cached_this_value orelse blk: {
-        const this_value = try vm.agent.resolveThisBinding();
-        vm.frame.cached_this_value = this_value;
-        break :blk this_value;
-    };
-    vm.load(reg, this_value);
+    const cached_this_value = &vm.stack.items[vm.frame.stack_base];
+    if (isHole(cached_this_value.*)) {
+        @branchHint(.unlikely);
+        cached_this_value.* = try vm.agent.resolveThisBinding();
+    }
+    vm.load(reg, cached_this_value.*);
 }
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
@@ -2159,23 +2174,20 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
         _ = try yield(vm.agent, value);
     }
 
-    std.debug.assert(vm.call_stack.items.len > 1);
-    const frame = vm.frame;
-    const stack_start = frame.stack_base;
-    const stack_len = frame.stackLen();
+    const stack_len = vm.frame.stackLen();
     const stack = try vm.agent.gc_allocator.dupe(
         Value,
-        vm.stack.items[stack_start..][0..stack_len],
+        vm.stack.items[vm.frame.stack_base..][0..stack_len],
     );
 
+    const frame = vm.frame;
+    std.debug.assert(vm.call_stack.items.len > 1);
     vm.popCallFrame();
 
     return .{ .yield = .{
         .stack = stack,
-        .regs_len = frame.regs_len,
-        .arguments_len = frame.arguments_len,
+        .argument_count = frame.argument_count,
         .scope_depth = frame.scope_depth,
-        .cached_this_value = frame.cached_this_value,
         .saved_pc = pc,
         .yield_reg = reg,
     } };
@@ -2196,7 +2208,7 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
         vm.frame.bytecode.strings.len +
         vm.frame.bytecode.big_ints.len +
         @intFromEnum(function_index);
-    const cached_bytecode: *const Bytecode = if (vm.frame.cache_slots[cache_index]) |ptr| blk: {
+    const cached_bytecode: *const Bytecode = if (vm.cache_slots[cache_index]) |ptr| blk: {
         @branchHint(.likely);
         break :blk @ptrCast(ptr);
     } else blk: {
@@ -2209,7 +2221,7 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
                 .body = &function.body,
             },
         });
-        vm.frame.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
+        vm.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
         break :blk bytecode;
     };
     const function_obj = switch (function.kind) {

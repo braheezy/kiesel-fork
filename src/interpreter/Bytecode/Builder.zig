@@ -16,7 +16,7 @@ current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 exception_handlers: std.ArrayList(ExceptionHandler),
-num_inline_caches: u16,
+inline_cache_count: u16,
 
 const ExceptionHandler = struct {
     start: *Block,
@@ -38,7 +38,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .lsra = lsra,
         .label_blocks = .empty,
         .exception_handlers = .empty,
-        .num_inline_caches = 0,
+        .inline_cache_count = 0,
     };
 }
 
@@ -378,8 +378,8 @@ pub fn build(b: *Builder) Error!Bytecode {
     return .{
         .name = name,
         .code = code,
-        .num_regs = b.lsra.numRegs(),
-        .num_inline_caches = b.num_inline_caches,
+        .register_count = b.lsra.count(),
+        .inline_cache_count = b.inline_cache_count,
         .strings = strings,
         .string_kinds = string_kinds,
         .big_ints = big_ints,
@@ -613,8 +613,8 @@ fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Inst.Reg {
 }
 
 fn nextIcIndex(b: *Builder) Bytecode.Inst.IcIndex {
-    const index: Bytecode.Inst.IcIndex = @enumFromInt(b.num_inline_caches);
-    b.num_inline_caches += 1;
+    const index: Bytecode.Inst.IcIndex = @enumFromInt(b.inline_cache_count);
+    b.inline_cache_count += 1;
     return index;
 }
 

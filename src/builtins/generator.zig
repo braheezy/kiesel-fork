@@ -174,7 +174,7 @@ pub fn generatorStart(
             switch (resume_completion.type) {
                 .normal => {
                     if (suspension.yield_reg != .none) {
-                        suspension.stack[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
+                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
                     }
                 },
                 // TODO: Integrate throw/return completions with exception handlers in the Vm

@@ -6,8 +6,8 @@ const Bytecode = @This();
 
 name: []const u8,
 code: []const u8,
-num_regs: u16,
-num_inline_caches: u16,
+register_count: u16,
+inline_cache_count: u16,
 strings: []const []const u8,
 string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,

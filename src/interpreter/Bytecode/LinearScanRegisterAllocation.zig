@@ -92,6 +92,6 @@ pub fn freeTemp(lsra: *LinearScanRegisterAllocation, reg: Bytecode.Inst.Reg) voi
     lsra.free_temp_regs.set(@intFromEnum(reg) - lsra.num_allocations);
 }
 
-pub fn numRegs(lsra: *LinearScanRegisterAllocation) u16 {
+pub fn count(lsra: *LinearScanRegisterAllocation) u16 {
     return lsra.num_allocations + @as(u16, @intCast(lsra.free_temp_regs.bit_length));
 }
