@@ -12,7 +12,6 @@ const HostHooks = execution.HostHooks;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = execution.Job;
-const JobCallback = execution.JobCallback;
 const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const Realm = execution.Realm;
@@ -36,7 +35,7 @@ pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: *Object) Agent.Error!void {
 
 /// 9.5.2 HostMakeJobCallback ( callback )
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
-pub fn hostMakeJobCallback(callback: *Object) JobCallback {
+pub fn hostMakeJobCallback(callback: *Object) Job.Callback {
     // 1. Return the JobCallback Record { [[Callback]]: callback, [[HostDefined]]: empty }.
     return .{ .callback = callback, .host_defined = .null_pointer };
 }
@@ -45,7 +44,7 @@ pub fn hostMakeJobCallback(callback: *Object) JobCallback {
 /// https://tc39.es/ecma262/#sec-hostcalljobcallback
 pub fn hostCallJobCallback(
     agent: *Agent,
-    job_callback: JobCallback,
+    job_callback: Job.Callback,
     this_value: Value,
     arguments_list: []const Value,
 ) Agent.Error!Value {

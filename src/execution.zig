@@ -7,7 +7,6 @@ pub const ExecutionContext = @import("execution/ExecutionContext.zig");
 pub const GlobalEnvironment = environments.GlobalEnvironment;
 pub const HostHooks = @import("execution/HostHooks.zig");
 pub const Job = @import("execution/Job.zig");
-pub const JobCallback = @import("execution/JobCallback.zig");
 pub const ObjectEnvironment = environments.ObjectEnvironment;
 pub const PrivateEnvironment = environments.PrivateEnvironment;
 pub const Realm = @import("execution/Realm.zig");

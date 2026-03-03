@@ -12,7 +12,6 @@ const Arguments = types.Arguments;
 const Completion = types.Completion;
 const Iterator = types.Iterator;
 const Job = execution.Job;
-const JobCallback = execution.JobCallback;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -77,7 +76,7 @@ const PromiseReaction = struct {
     type: enum { fulfill, reject },
 
     /// [[Handler]]
-    handler: ?JobCallback,
+    handler: ?Job.Callback,
 };
 
 const ResolvingFunctions = struct {
@@ -585,13 +584,13 @@ pub fn newPromiseResolveThenableJob(
     agent: *Agent,
     promise_to_resolve: *Promise,
     thenable: *Object,
-    then: JobCallback,
+    then: Job.Callback,
 ) std.mem.Allocator.Error!struct { job: Job, realm: *Realm } {
     const Captures = struct {
         agent: *Agent,
         promise_to_resolve: *Promise,
         thenable: *Object,
-        then: JobCallback,
+        then: Job.Callback,
     };
     const captures = try agent.gc_allocator.create(Captures);
     captures.* = .{

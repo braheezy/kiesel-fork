@@ -15,7 +15,6 @@ const Cell = builtins.finalization_registry.Cell;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("Job.zig");
-const JobCallback = @import("JobCallback.zig");
 const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -48,7 +47,7 @@ hostGetSupportedImportAttributes: *const fn (
 ) std.mem.Allocator.Error!SupportedImportAttributes = default_host_hooks.hostGetSupportedImportAttributes,
 hostCallJobCallback: *const fn (
     agent: *Agent,
-    job_callback: JobCallback,
+    job_callback: Job.Callback,
     this_value: Value,
     arguments_list: []const Value,
 ) Agent.Error!Value = default_host_hooks.hostCallJobCallback,
@@ -100,7 +99,7 @@ hostLoadImportedModule: *const fn (
 ) std.mem.Allocator.Error!void = default_host_hooks.hostLoadImportedModule,
 hostMakeJobCallback: *const fn (
     callback: *Object,
-) JobCallback = default_host_hooks.hostMakeJobCallback,
+) Job.Callback = default_host_hooks.hostMakeJobCallback,
 hostPromiseRejectionTracker: *const fn (
     agent: *Agent,
     promise: *builtins.Promise,

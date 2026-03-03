@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const JobCallback = execution.JobCallback;
+const Job = execution.Job;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Realm = execution.Realm;
@@ -327,7 +327,7 @@ pub const FinalizationRegistry = MakeObject(.{
         realm: *Realm,
 
         /// [[CleanupCallback]]
-        cleanup_callback: JobCallback,
+        cleanup_callback: Job.Callback,
 
         /// [[Cells]]
         cells: std.ArrayList(*Cell),
