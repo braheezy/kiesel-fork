@@ -549,16 +549,32 @@ pub fn parse(
                 try local_export_entries.append(agent.gc_allocator, export_entry);
             } else {
                 // ii. Else,
-                // 1. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
+                // 1. NOTE: When exporting a binding or namespace object which was originally
+                //    imported from another module, the ExportEntry Record is rewritten to match
+                //    the form it would have if the binding or namespace object had been
+                //    re-exported directly from the original module rather than imported then
+                //    exported. This allows conflicts which arise from exporting the same binding
+                //    or namespace twice under the same name through export * from to be ignored
+                //    rather than being treated as ambiguous in step 9.e.iii of the ResolveExport
+                //    concrete method of Source Text Module Records.
+                // 2. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
                 const import_entry = import_entry_with_bound_name.?;
 
-                // 2. If ie.[[ImportName]] is namespace-object, then
+                // 3. If ie.[[ImportName]] is namespace-object, then
                 if (import_entry.import_name != null and import_entry.import_name.? == .namespace_object) {
                     // a. NOTE: This is a re-export of an imported module namespace object.
-                    // b. Append ee to localExportEntries.
-                    try local_export_entries.append(agent.gc_allocator, export_entry);
+                    // b. Append the ExportEntry Record {
+                    //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: all,
+                    //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
+                    //    } to indirectExportEntries.
+                    try indirect_export_entries.append(agent.gc_allocator, .{
+                        .module_request = import_entry.module_request,
+                        .import_name = .all,
+                        .local_name = null,
+                        .export_name = export_entry.export_name,
+                    });
                 } else {
-                    // 3. Else,
+                    // 4. Else,
                     // a. NOTE: This is a re-export of a single name.
                     // b. Append the ExportEntry Record {
                     //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
