@@ -3250,7 +3250,7 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
                     });
                 }
                 if (constant == .string) {
-                    const string_index = try b.internString(constant.string, .literal);
+                    const string_index = try b.internString(constant.string, .escaped);
                     return b.addInst(.{
                         .tag = .get_property,
                         .data = .{ .get_property = .{
@@ -3495,7 +3495,7 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
                         });
                     }
                     if (constant == .string) {
-                        const string_index = try b.internString(constant.string, .literal);
+                        const string_index = try b.internString(constant.string, .escaped);
                         break :blk try b.addInst(.{
                             .tag = .get_property,
                             .data = .{ .get_property = .{
@@ -4303,7 +4303,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                             });
                         }
                         if (constant == .string) {
-                            const string_index = try b.internString(constant.string, .literal);
+                            const string_index = try b.internString(constant.string, .escaped);
                             const current_value = try b.addInst(.{
                                 .tag = .get_property,
                                 .data = .{ .get_property = .{
@@ -4520,7 +4520,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                             });
                         }
                         if (constant == .string) {
-                            const string_index = try b.internString(constant.string, .literal);
+                            const string_index = try b.internString(constant.string, .escaped);
                             lhs = .{ .property = .{
                                 .base = base,
                                 .name = string_index,
