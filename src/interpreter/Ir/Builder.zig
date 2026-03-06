@@ -4753,17 +4753,40 @@ fn lowerAwaitExpression(b: *Builder, await_expr: *const ast.AwaitExpression) Err
 }
 
 fn lowerYieldExpression(b: *Builder, yield_expr: *const ast.YieldExpression) Error!Ir.Inst.Ref {
-    const value = if (yield_expr.expression) |expr|
-        try b.lowerExpression(expr)
-    else
-        try b.addInst(.{
-            .tag = .undefined,
-            .data = .{ .none = {} },
-        });
-    return b.addInst(.{
-        .tag = .yield,
-        .data = .{ .ref = value },
-    });
+    switch (yield_expr.*) {
+        .none => {
+            const value = try b.addInst(.{
+                .tag = .undefined,
+                .data = .{ .none = {} },
+            });
+            return b.addInst(.{
+                .tag = .yield,
+                .data = .{ .ref = value },
+            });
+        },
+        .expression => |expr| {
+            const value = try b.lowerExpression(expr);
+            return b.addInst(.{
+                .tag = .yield,
+                .data = .{ .ref = value },
+            });
+        },
+        .delegate => |expr| {
+            const value = try b.lowerExpression(expr);
+            const iterator = try b.addInst(.{
+                .tag = switch (b.root_node.function.body.type) {
+                    .generator => .get_iterator,
+                    .async_generator => .get_async_iterator,
+                    else => unreachable,
+                },
+                .data = .{ .ref = value },
+            });
+            return b.addInst(.{
+                .tag = .yield_star,
+                .data = .{ .ref = iterator },
+            });
+        },
+    }
 }
 
 fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) Error!Ir.Inst.Ref {

@@ -3019,8 +3019,10 @@ pub const GeneratorExpression = struct {
     source_text: []const u8,
 };
 
-pub const YieldExpression = struct {
-    expression: ?*Expression,
+pub const YieldExpression = union(enum) {
+    none,
+    expression: *Expression,
+    delegate: *Expression,
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorDeclaration

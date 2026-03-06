@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
+const Completion = types.Completion;
 const Iterator = types.Iterator;
 const Number = types.Number;
 const Object = types.Object;
@@ -33,6 +34,7 @@ const evaluateImportCall = language.runtime.evaluateImportCall;
 const evaluateImportMeta = language.runtime.evaluateImportMeta;
 const evaluateNew = language.runtime.evaluateNew;
 const evaluateSuperCall = language.runtime.evaluateSuperCall;
+const evaluateYieldStar = language.runtime.evaluateYieldStar;
 const getIterator = types.getIterator;
 const getIteratorDirect = types.getIteratorDirect;
 const getTemplateObject = language.runtime.getTemplateObject;
@@ -182,6 +184,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
             @setEvalBranchQuota(3_000);
             const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
             const inst_size = comptime Bytecode.Inst.encodedSize(tag);
+            const inst_pc = pc;
             pc = pc.offsetBy(inst_size);
             const maybe_error = switch (tag) {
                 .jump => vm.executeJump(data.i32, &pc),
@@ -331,6 +334,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .@"return" => return vm.executeReturn(data.reg),
                 .await => vm.executeAwait(data.reg),
                 .yield => return vm.executeYield(data.reg, pc),
+                .yield_star => if (vm.executeYieldStar(data.reg_reg[0], data.reg_reg[1], inst_pc)) |maybe_result| if (maybe_result) |result| return result else {} else |err| err,
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
                 .create_class => vm.executeCreateClass(data.reg_class[0], data.reg_class[1]),
                 .set_home_object => vm.executeSetHomeObject(data.reg_reg[0], data.reg_reg[1]),
@@ -362,7 +366,6 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .error_union => |u| {
                     comptime std.debug.assert(u.payload == void);
                     maybe_error catch |err| {
-                        const inst_pc = pc.offsetBy(-@as(i32, inst_size));
                         try @call(.never_inline, handleError, .{ vm, err, inst_pc, &pc });
                     };
                 },
@@ -2172,6 +2175,40 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
     if (reg != .none) {
         const value = vm.store(reg);
         _ = try yield(vm.agent, value);
+    }
+
+    const stack_len = vm.frame.stackLen();
+    const stack = try vm.agent.gc_allocator.dupe(
+        Value,
+        vm.stack.items[vm.frame.stack_base..][0..stack_len],
+    );
+
+    const frame = vm.frame;
+    std.debug.assert(vm.call_stack.items.len > 1);
+    vm.popCallFrame();
+
+    return .{ .yield = .{
+        .stack = stack,
+        .argument_count = frame.argument_count,
+        .scope_depth = frame.scope_depth,
+        .saved_pc = pc,
+        .yield_reg = reg,
+    } };
+}
+
+fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!?RunResult {
+    const iterator_obj = vm.store(iter_reg).asObject();
+    var iterator = objectToIterator(iterator_obj);
+    const received_value = vm.store(reg);
+
+    // TODO: Handle throw/return completions
+    switch (try evaluateYieldStar(vm.agent, &iterator, Completion.normal(received_value))) {
+        .done => |value| {
+            vm.load(reg, value);
+            return null;
+        },
+        .@"return" => |value| return .{ .@"return" = value },
+        .yield => {},
     }
 
     const stack_len = vm.frame.stackLen();

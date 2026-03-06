@@ -3692,15 +3692,18 @@ pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
     }
     if (!self.followedByLineTerminator()) {
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.yield) + 1 };
-        if (self.acceptExpression(ctx)) |expr| {
+        if (self.core.accept(RuleSet.is(.@"*"))) |_| {
+            const expr = try self.acceptExpression(ctx);
+            const expression = try self.allocator.create(ast.Expression);
+            expression.* = expr;
+            return .{ .delegate = expression };
+        } else |_| if (self.acceptExpression(ctx)) |expr| {
             const expression = try self.allocator.create(ast.Expression);
             expression.* = expr;
             return .{ .expression = expression };
-        } else |_| {
-            return .{ .expression = null };
-        }
+        } else |_| {}
     }
-    return .{ .expression = null };
+    return .none;
 }
 
 fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGeneratorDeclaration {

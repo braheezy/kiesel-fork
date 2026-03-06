@@ -287,8 +287,17 @@ pub fn printAwaitExpression(node: ast.AwaitExpression, writer: *std.Io.Writer, i
 }
 
 pub fn printYieldExpression(node: ast.YieldExpression, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
-    try print("YieldExpression", writer, indentation);
-    if (node.expression) |expression| try printExpression(expression.*, writer, indentation + 1);
+    switch (node) {
+        .none => try print("YieldExpression", writer, indentation),
+        .expression => |expression| {
+            try print("YieldExpression", writer, indentation);
+            try printExpression(expression.*, writer, indentation + 1);
+        },
+        .delegate => |expression| {
+            try print("YieldExpression*", writer, indentation);
+            try printExpression(expression.*, writer, indentation + 1);
+        },
+    }
 }
 
 pub fn printTaggedTemplate(node: ast.TaggedTemplate, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {

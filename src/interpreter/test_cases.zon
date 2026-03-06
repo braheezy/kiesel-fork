@@ -1685,22 +1685,30 @@
     // Generator
     .{
         .source =
+        \\function* h() {
+        \\  yield 4;
+        \\  yield 5;
+        \\}
         \\function* g() {
         \\  yield 1;
         \\  yield 2;
         \\  yield 3;
+        \\  yield* h();
         \\}
         \\function f() {
         \\  var gen = g();
-        \\  var a = gen.next();
-        \\  var b = gen.next();
-        \\  var c = gen.next();
-        \\  return a.value + b.value + c.value;
+        \\  var sum = 0;
+        \\  while (true) {
+        \\    var result = gen.next();
+        \\    if (result.done) break;
+        \\    sum += result.value;
+        \\  }
+        \\  return sum;
         \\}
         \\f();
         \\
         ,
-        .expected_result = .{ .value = .{ .number = 6 } },
+        .expected_result = .{ .value = .{ .number = 15 } },
         .expected_ir = null,
         .expected_bc = null,
     },

@@ -238,6 +238,7 @@ pub const Inst = struct {
         @"return",
         await,
         yield,
+        yield_star,
 
         create_function,
         create_class,
@@ -445,6 +446,7 @@ pub const Inst = struct {
             .@"return" = .reg,
             .await = .reg,
             .yield = .reg,
+            .yield_star = .reg_reg,
             .create_function = .reg_function,
             .create_class = .reg_class,
             .set_home_object = .reg_reg,

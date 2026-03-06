@@ -182,6 +182,7 @@ pub const Inst = struct {
         @"return",
         await,
         yield,
+        yield_star,
 
         create_function,
         create_class,
@@ -368,6 +369,7 @@ pub const Inst = struct {
         .@"return" = .ref,
         .await = .ref,
         .yield = .ref,
+        .yield_star = .ref,
         .create_function = .create_function,
         .create_class = .create_class,
         .create_unmapped_arguments_object = .none,

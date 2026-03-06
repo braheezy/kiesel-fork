@@ -209,6 +209,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .@"return" => try b.lowerReturn(data.ref, dest),
             .await => try b.lowerAwait(data.ref, dest),
             .yield => try b.lowerYield(data.ref, dest),
+            .yield_star => try b.lowerYieldStar(data.ref, dest),
             .create_function => try b.lowerCreateFunction(data.create_function, dest),
             .create_class => try b.lowerCreateClass(data.create_class, dest),
             .create_unmapped_arguments_object => try b.lowerCreateUnmappedArgumentsObject(dest),
@@ -1728,6 +1729,18 @@ fn lowerYield(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
             .data = .{ .reg = dest },
         });
     }
+}
+
+fn lowerYieldStar(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+    const iter_reg = b.resolve(ref);
+    try b.emit(.{
+        .tag = .load_undefined,
+        .data = .{ .reg = dest },
+    });
+    try b.emit(.{
+        .tag = .yield_star,
+        .data = .{ .reg_reg = .{ dest, iter_reg } },
+    });
 }
 
 fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest: Bytecode.Inst.Reg) Error!void {
