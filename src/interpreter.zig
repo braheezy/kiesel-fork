@@ -74,7 +74,7 @@ pub fn compileAndRun(
             .strict = e.strict,
         } },
     });
-    defer bc.deinit(agent.gc_allocator);
+    errdefer bc.deinit(agent.gc_allocator);
 
     var vm: Vm = try .init(agent, &bc);
     defer vm.deinit();
