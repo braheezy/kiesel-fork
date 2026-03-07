@@ -1178,14 +1178,12 @@ fn lowerGetPropertyComputed(b: *Builder, data: Ir.Inst.GetPropertyComputed, dest
 
 fn lowerGetPropertyIndexed(b: *Builder, data: Ir.Inst.GetPropertyIndexed, dest: Bytecode.Inst.Reg) Error!void {
     const base_reg = b.resolve(data.base);
-    const ic_index = b.nextIcIndex();
     try b.emit(.{
         .tag = .get_property_indexed,
-        .data = .{ .reg_reg_u32_ic = .{
+        .data = .{ .reg_reg_u32 = .{
             dest,
             base_reg,
             data.index,
-            ic_index,
         } },
     });
 }
@@ -1252,18 +1250,16 @@ fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, 
     const extra = b.ir.extraData(Ir.Inst.SetPropertyIndexed, data);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
-    const ic_index = b.nextIcIndex();
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_indexed_strict
     else
         .set_property_indexed;
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_u32_ic = .{
+        .data = .{ .reg_reg_u32 = .{
             base_reg,
             value_reg,
             extra.data.index,
-            ic_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);

@@ -256,15 +256,15 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .get_property => vm.executeGetProperty(data.reg_reg_string_ic[0], data.reg_reg_string_ic[1], data.reg_reg_string_ic[2], data.reg_reg_string_ic[3]),
                 .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
-                .get_property_indexed => vm.executeGetPropertyIndexed(data.reg_reg_u32_ic[0], data.reg_reg_u32_ic[1], data.reg_reg_u32_ic[2], data.reg_reg_u32_ic[3]),
+                .get_property_indexed => vm.executeGetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
                 .set_property => vm.executeSetProperty(data.reg_reg_string_ic[0], data.reg_reg_string_ic[1], data.reg_reg_string_ic[2], data.reg_reg_string_ic[3], false),
                 .set_property_strict => vm.executeSetProperty(data.reg_reg_string_ic[0], data.reg_reg_string_ic[1], data.reg_reg_string_ic[2], data.reg_reg_string_ic[3], true),
                 .set_property_computed => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], false),
                 .set_property_computed_strict => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
-                .set_property_indexed => vm.executeSetPropertyIndexed(data.reg_reg_u32_ic[0], data.reg_reg_u32_ic[1], data.reg_reg_u32_ic[2], data.reg_reg_u32_ic[3], false),
-                .set_property_indexed_strict => vm.executeSetPropertyIndexed(data.reg_reg_u32_ic[0], data.reg_reg_u32_ic[1], data.reg_reg_u32_ic[2], data.reg_reg_u32_ic[3], true),
+                .set_property_indexed => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
+                .set_property_indexed_strict => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
                 .increment_binding_prefix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, false),
                 .increment_binding_prefix_strict => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .prefix, true),
                 .increment_binding_postfix => vm.executeUpdateBinding(data.reg_string[0], data.reg_string[1], .increment, .postfix, false),
@@ -1399,20 +1399,8 @@ fn executeGetPropertyIndexed(
     dst: Bytecode.Inst.Reg,
     base_reg: Bytecode.Inst.Reg,
     index: u32,
-    ic_index: Bytecode.Inst.IcIndex,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const ic = vm.getInlineCache(ic_index);
-
-    if (base_value.isObject()) {
-        @branchHint(.likely);
-        const base_object = base_value.asObject();
-        if (try ic.get(vm.agent, base_object, base_value)) |value| {
-            vm.load(dst, value);
-            return;
-        }
-    }
-
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const result = try base_object.internal_methods.get(
@@ -1421,10 +1409,6 @@ fn executeGetPropertyIndexed(
         property_key,
         base_value,
     );
-
-    if (base_value.isObject()) {
-        ic.update(base_object, property_key, .get);
-    }
 
     vm.load(dst, result);
 }
@@ -1528,19 +1512,10 @@ fn executeSetPropertyIndexed(
     base_reg: Bytecode.Inst.Reg,
     value_reg: Bytecode.Inst.Reg,
     index: u32,
-    ic_index: Bytecode.Inst.IcIndex,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const ic = vm.getInlineCache(ic_index);
-
-    if (base_value.isObject()) {
-        @branchHint(.likely);
-        const base_object = base_value.asObject();
-        if (try ic.set(vm.agent, base_object, base_value, value)) return;
-    }
-
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const success = try base_object.internal_methods.set(
@@ -1556,10 +1531,6 @@ fn executeSetPropertyIndexed(
             return vm.agent.throwException(.type_error, "Could not set property", .{});
         }
         return;
-    }
-
-    if (base_value.isObject()) {
-        ic.update(base_object, property_key, .set);
     }
 }
 
