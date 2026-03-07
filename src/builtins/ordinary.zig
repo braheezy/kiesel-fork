@@ -538,17 +538,10 @@ pub fn ordinaryGet(
     // OPTIMIZATION: Fast path for ordinary objects
     if (has_ordinary_internal_methods) {
         // If we have an array index, dense storage, and no out of bounds access, return the value directly.
-        if (property_key.isArrayIndex() and
-            object.property_storage.indexed_properties.storage.isDense() and
-            object.property_storage.indexed_properties.count() > property_key.integer_index)
-        {
-            const index: u32 = @intCast(property_key.integer_index);
-            return switch (object.property_storage.indexed_properties.storage) {
-                .none, .sparse_value, .sparse_property_descriptor => unreachable,
-                .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
-                .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
-                .dense_value => |dense_value| dense_value.items[index],
-            };
+        if (property_key.isArrayIndex()) {
+            if (object.getIndexedFast(@intCast(property_key.integer_index))) |value| {
+                return value;
+            }
         }
         // Otherwise go through the prototype chain and invoke the getter if necessary.
         const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(object, property_key) orelse {
@@ -658,24 +651,10 @@ pub fn ordinarySet(
     }
 
     // OPTIMIZATION: Fast path for ordinary objects or arrays and indexed properties
-    if (property_key.isArrayIndex() and
-        (has_ordinary_internal_methods or object.is(builtins.Array)) and
-        receiver_is_self and
-        object.property_storage.indexed_properties.storage.isDense() and
-        object.property_storage.indexed_properties.count() > property_key.integer_index)
-    {
-        // If we have an array index, dense storage, and no out of bounds access, set the value directly.
-        try object.property_storage.indexed_properties.set(
-            agent.gc_allocator,
-            @intCast(property_key.integer_index),
-            .{
-                .value_or_accessor = .{
-                    .value = value,
-                },
-                .attributes = .all,
-            },
-        );
-        return true;
+    if (property_key.isArrayIndex() and receiver_is_self) {
+        if (try object.setIndexedFast(agent.gc_allocator, @intCast(property_key.integer_index), value)) {
+            return true;
+        }
     }
 
     // 1. Let ownDesc be ? O.[[GetOwnProperty]](P).

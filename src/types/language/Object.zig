@@ -189,6 +189,68 @@ pub fn setAccessorAtPropertyOffset(
     self.property_storage.properties.items[@intFromEnum(offset) + 1] = .{ .getter_or_setter = accessor.set };
 }
 
+pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_get,
+        // Dependencies of ordinary [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
+    if (!has_ordinary_internal_methods or
+        self.property_storage.indexed_properties.count() <= index)
+    {
+        @branchHint(.unlikely);
+        return null;
+    }
+
+    return switch (self.property_storage.indexed_properties.storage) {
+        .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
+        .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
+        .dense_value => |dense_value| dense_value.items[index],
+        .none, .sparse_value, .sparse_property_descriptor => null,
+    };
+}
+
+pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, value: Value) std.mem.Allocator.Error!bool {
+    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_set,
+        // Dependencies of ordinary [[Set]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
+    // Arrays have a custom [[DefineOwnProperty]] but it doesn't interfere with writeable
+    // in-bounds indexed properties.
+    if ((!has_ordinary_internal_methods and !self.is(builtins.Array)) or
+        self.property_storage.indexed_properties.count() <= index)
+    {
+        @branchHint(.unlikely);
+        return false;
+    }
+
+    switch (self.property_storage.indexed_properties.storage) {
+        .dense_i32 => |dense_i32| if (value.__isI32()) {
+            dense_i32.items[index] = value.__asI32();
+            return true;
+        },
+        .dense_f64 => |dense_f64| if (value.__isF64()) {
+            dense_f64.items[index] = value.__asF64();
+            return true;
+        },
+        .dense_value => |dense_value| {
+            dense_value.items[index] = value;
+            return true;
+        },
+        .none, .sparse_value, .sparse_property_descriptor => return false,
+    }
+    try self.property_storage.indexed_properties.set(allocator, index, .{
+        .value_or_accessor = .{ .value = value },
+        .attributes = .all,
+    });
+    return true;
+}
+
 /// Assumes the property exists, is a data property, and not lazy.
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
     if (property_key.isArrayIndex()) {

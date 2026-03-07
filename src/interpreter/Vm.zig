@@ -1401,6 +1401,16 @@ fn executeGetPropertyIndexed(
     index: u32,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
+
+    // OPTIMIZATION: Fast path for ordinary objects with dense storage and no out of bounds access
+    if (base_value.isObject()) {
+        @branchHint(.likely);
+        if (base_value.asObject().getIndexedFast(index)) |value| {
+            vm.load(dst, value);
+            return;
+        }
+    }
+
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const result = try base_object.internal_methods.get(
@@ -1516,6 +1526,15 @@ fn executeSetPropertyIndexed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
+
+    // OPTIMIZATION: Fast path for ordinary objects with dense storage and no out of bounds access
+    if (base_value.isObject()) {
+        @branchHint(.likely);
+        if (try base_value.asObject().setIndexedFast(vm.agent.gc_allocator, index, value)) {
+            return;
+        }
+    }
+
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
     const success = try base_object.internal_methods.set(
