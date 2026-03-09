@@ -565,8 +565,8 @@ pub const constructor = struct {
     fn isExtensible(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
-        // 1. If O is not an Object, return true.
-        if (!object.isObject()) return .true;
+        // 1. If O is not an Object, return false.
+        if (!object.isObject()) return .false;
 
         // 2. Return ? IsExtensible(O).
         return Value.from(try object.asObject().isExtensible(agent));
@@ -637,7 +637,7 @@ pub const constructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
-        if (!object.isObject()) return .true;
+        if (!object.isObject()) return object;
 
         // 2. Let status be ? SetIntegrityLevel(O, sealed).
         const status = try object.asObject().setIntegrityLevel(agent, .sealed);
@@ -650,7 +650,7 @@ pub const constructor = struct {
     }
 
     /// 20.1.2.23 Object.setPrototypeOf ( O, proto )
-    /// https://tc39.es/ecma262/#sec-object.seal
+    /// https://tc39.es/ecma262/#sec-object.setprototypeof
     fn setPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const prototype_ = arguments.get(1);
