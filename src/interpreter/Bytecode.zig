@@ -84,6 +84,7 @@ pub const Inst = struct {
         load_null,
         load_true,
         load_false,
+        load_number_i8,
         load_number_i32,
         load_number_f64,
         load_string,
@@ -279,6 +280,7 @@ pub const Inst = struct {
         reg_reg_reg_reg_reg: struct { Reg, Reg, Reg, Reg, Reg },
         reg_reg_u32: struct { Reg, Reg, u32 },
         reg_reg_reg_u16: struct { Reg, Reg, Reg, u16 },
+        reg_i8: struct { Reg, i8 },
         reg_u16: struct { Reg, u16 },
         reg_i32: struct { Reg, i32 },
         reg_u32: struct { Reg, u32 },
@@ -305,6 +307,7 @@ pub const Inst = struct {
             .load_null = .reg,
             .load_true = .reg,
             .load_false = .reg,
+            .load_number_i8 = .reg_i8,
             .load_number_i32 = .reg_i32,
             .load_number_f64 = .reg_f64,
             .load_string = .reg_string,
@@ -564,6 +567,7 @@ pub const Inst = struct {
             ClassIndex,
             IcIndex,
             => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
+            i8 => @bitCast(code[0]),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
             u32 => std.mem.readInt(u32, code[0..4], .little),
@@ -604,6 +608,7 @@ pub const Inst = struct {
             ClassIndex,
             IcIndex,
             => try writer.writeInt(u16, @intFromEnum(value), .little),
+            i8 => try writer.writeByte(@bitCast(value)),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
             u32 => try writer.writeInt(u32, value, .little),
@@ -782,6 +787,7 @@ fn printField(
 ) PrintError!void {
     const T = @TypeOf(value);
     switch (T) {
+        i8,
         u16,
         i32,
         u32,

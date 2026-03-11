@@ -649,30 +649,39 @@ fn lowerFalse(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
 
 fn lowerZero(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{
-        .tag = .load_number_i32,
-        .data = .{ .reg_i32 = .{ dest, 0 } },
+        .tag = .load_number_i8,
+        .data = .{ .reg_i8 = .{ dest, 0 } },
     });
 }
 
 fn lowerOne(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{
-        .tag = .load_number_i32,
-        .data = .{ .reg_i32 = .{ dest, 1 } },
+        .tag = .load_number_i8,
+        .data = .{ .reg_i8 = .{ dest, 1 } },
     });
 }
 
 fn lowerNumber(b: *Builder, n: f64, dest: Bytecode.Inst.Reg) Error!void {
-    if (n == @floor(n) and n >= std.math.minInt(i32) and n <= std.math.maxInt(i32) and !std.math.isNegativeZero(n)) {
-        try b.emit(.{
-            .tag = .load_number_i32,
-            .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } },
-        });
-    } else {
-        try b.emit(.{
-            .tag = .load_number_f64,
-            .data = .{ .reg_f64 = .{ dest, n } },
-        });
+    if (n == @floor(n) and !std.math.isNegativeZero(n)) {
+        if (n >= std.math.minInt(i8) and n <= std.math.maxInt(i8)) {
+            try b.emit(.{
+                .tag = .load_number_i8,
+                .data = .{ .reg_i8 = .{ dest, @intFromFloat(n) } },
+            });
+            return;
+        }
+        if (n >= std.math.minInt(i32) and n <= std.math.maxInt(i32)) {
+            try b.emit(.{
+                .tag = .load_number_i32,
+                .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } },
+            });
+            return;
+        }
     }
+    try b.emit(.{
+        .tag = .load_number_f64,
+        .data = .{ .reg_f64 = .{ dest, n } },
+    });
 }
 
 fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {

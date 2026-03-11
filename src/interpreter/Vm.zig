@@ -194,6 +194,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .load_null => vm.executeLoadNull(data.reg),
                 .load_true => vm.executeLoadTrue(data.reg),
                 .load_false => vm.executeLoadFalse(data.reg),
+                .load_number_i8 => vm.executeLoadNumberI8(data.reg_i8[0], data.reg_i8[1]),
                 .load_number_i32 => vm.executeLoadNumberI32(data.reg_i32[0], data.reg_i32[1]),
                 .load_number_f64 => vm.executeLoadNumberF64(data.reg_f64[0], data.reg_f64[1]),
                 .load_string => vm.executeLoadString(data.reg_string[0], data.reg_string[1]),
@@ -608,6 +609,10 @@ fn executeLoadTrue(vm: *Vm, reg: Bytecode.Inst.Reg) void {
 
 fn executeLoadFalse(vm: *Vm, reg: Bytecode.Inst.Reg) void {
     vm.load(reg, .false);
+}
+
+fn executeLoadNumberI8(vm: *Vm, reg: Bytecode.Inst.Reg, value: i8) void {
+    vm.load(reg, Value.from(value));
 }
 
 fn executeLoadNumberI32(vm: *Vm, reg: Bytecode.Inst.Reg, value: i32) void {
