@@ -23,6 +23,7 @@ pub const SyntheticModule = @import("language/SyntheticModule.zig");
 pub const allImportAttributesSupported = module.allImportAttributesSupported;
 pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
 pub const createDefaultExportSyntheticModule = SyntheticModule.createDefaultExportSyntheticModule;
+pub const createTextModule = SyntheticModule.createTextModule;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
 pub const fmtParseError = Parser.fmtParseError;
 pub const fmtParseErrorHint = Parser.fmtParseErrorHint;

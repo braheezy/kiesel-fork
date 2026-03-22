@@ -25,6 +25,7 @@ const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
 const String = kiesel.types.String;
 const Value = kiesel.types.Value;
+const createTextModule = kiesel.language.createTextModule;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
@@ -1180,6 +1181,19 @@ pub fn main() !u8 {
             try finishLoadingImportedModule(agent_, referrer, module_request, payload, result);
         }
 
+        const Type = enum {
+            json,
+            text,
+
+            pub fn fromString(string: *const String) ?Type {
+                if (!string.isAscii()) return null;
+                return std.StaticStringMap(Type).initComptime(&.{
+                    .{ "json", .json },
+                    .{ "text", .text },
+                }).get(string.asAscii());
+            }
+        };
+
         fn loadImportedModule(
             agent_: *Agent,
             module_request: ModuleRequest,
@@ -1196,17 +1210,38 @@ pub fn main() !u8 {
             };
             defer gpa_.free(source_text);
 
-            for (module_request.attributes) |import_attribute| {
-                if (import_attribute.key.eql(String.fromLiteral("type"))) {
-                    if (import_attribute.value.eql(String.fromLiteral("json"))) {
-                        const synthetic_module = try parseJSONModule(agent_, source_text);
-                        return .{ .synthetic_module = synthetic_module };
+            for (module_request.attributes) |entry| {
+                // If moduleRequest.[[Attributes]] has an entry entry such that entry.[[Key]] is
+                // "type", then
+                if (entry.key.eql(String.fromLiteral("type"))) {
+                    // 1. Let type be entry.[[Value]].
+                    const @"type" = Type.fromString(entry.value) orelse {
+                        return agent_.throwException(
+                            .internal_error,
+                            "Failed to import '{f}' with unknown module type '{f}'",
+                            .{ module_request.specifier.fmtEscaped(), entry.value.fmtEscaped() },
+                        );
+                    };
+
+                    switch (@"type") {
+                        // 2. If type is "json", the host environment must perform
+                        //    FinishLoadingImportedModule(referrer, moduleRequest, payload, result),
+                        //    where result is either the Completion Record returned by an invocation
+                        //    of ParseJSONModule or a throw completion.
+                        .json => {
+                            const synthetic_module = try parseJSONModule(agent_, source_text);
+                            return .{ .synthetic_module = synthetic_module };
+                        },
+
+                        // 3. If type is "text", the host environment must perform
+                        //    FinishLoadingImportedModule(referrer, moduleRequest, payload, result),
+                        //    where result is either the Completion Record returned by an invocation
+                        //    of CreateTextModule or a throw completion.
+                        .text => {
+                            const synthetic_module = try createTextModule(agent_, source_text);
+                            return .{ .synthetic_module = synthetic_module };
+                        },
                     }
-                    return agent_.throwException(
-                        .internal_error,
-                        "Failed to import '{f}' with unknown module type '{f}'",
-                        .{ module_request.specifier.fmtEscaped(), import_attribute.value.fmtEscaped() },
-                    );
                 }
             }
 

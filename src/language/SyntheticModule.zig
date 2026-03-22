@@ -278,3 +278,15 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
     // 16. Return pc.[[Promise]].
     return promise_capability.promise.as(builtins.Promise);
 }
+
+/// 16.2.1.8.5 CreateTextModule ( source )
+/// https://tc39.es/proposal-import-text/#sec-create-text-module
+pub fn createTextModule(agent: *Agent, source: []const u8) Agent.Error!*SyntheticModule {
+    const source_utf8 = try std.fmt.allocPrint(agent.gc_allocator, "{f}", .{
+        std.unicode.fmtUtf8(source),
+    });
+    const source_string = try String.fromUtf8(agent, source_utf8);
+
+    // 1. Return CreateDefaultExportSyntheticModule(source).
+    return createDefaultExportSyntheticModule(agent, Value.from(source_string));
+}
