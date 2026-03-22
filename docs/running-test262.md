@@ -1,8 +1,8 @@
 # Running test262
 
-There is no custom test262 runner for Kiesel yet, but
-[CanadaHonk](https://github.com/CanadaHonk/) kindly added support to their forks
-of various popular existing tools!
+There is no custom test262 runner for Kiesel yet, instead we use patched
+versions of [`eshost`](https://github.com/tc39/eshost) and
+[`test262-harness`](https://github.com/tc39/test262-harness).
 
 ## Installation
 
@@ -13,15 +13,12 @@ updated fork or submodule:
 git clone https://github.com/tc39/test262
 ```
 
-Install [`test262-harness`](https://github.com/CanadaHonk/test262-harness):
+Install the
+[`test262-harness` fork](https://codeberg.org/kiesel-js/test262-harness-fork):
 
 ```console
-npm install -g github:CanadaHonk/test262-harness
+npm install -g git+https://codeberg.org/kiesel-js/test262-harness-fork.git
 ```
-
-Optionally you can also use `CanadaHonk/esvu` to automatically install a recent
-build of Kiesel for your platform, but for the following we'll assume a local
-build is available.
 
 ## Usage
 

@@ -367,7 +367,7 @@ jobs:
       - name: Install dependencies
         run: |
           # NOTE: jq is already installed in the Docker image
-          npm install -g github:CanadaHonk/test262-harness
+          npm install -g git+https://codeberg.org/kiesel-js/test262-harness-fork.git
       - name: Build Kiesel
         run: |
           zig build -Doptimize=ReleaseSafe
