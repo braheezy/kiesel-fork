@@ -56,7 +56,11 @@ fn updateLanguageId(
         const script_utf8 = try script.toUtf8(gpa);
         defer gpa.free(script_utf8);
         new_tag.setScript(script_utf8) catch {
-            return agent.throwException(.range_error, "Invalid script subtag '{s}'", .{script_utf8});
+            return agent.throwException(
+                .range_error,
+                "Invalid script subtag '{s}'",
+                .{script_utf8},
+            );
         };
     }
 
@@ -70,7 +74,11 @@ fn updateLanguageId(
         const region_utf8 = try region.toUtf8(gpa);
         defer gpa.free(region_utf8);
         new_tag.setRegion(region_utf8) catch {
-            return agent.throwException(.range_error, "Invalid region subtag '{s}'", .{region_utf8});
+            return agent.throwException(
+                .range_error,
+                "Invalid region subtag '{s}'",
+                .{region_utf8},
+            );
         };
     }
 
@@ -84,7 +92,11 @@ fn updateLanguageId(
 
         // a. If variants is the empty String, throw a RangeError exception.
         if (variants.isEmpty()) {
-            return agent.throwException(.range_error, "Invalid variants subtag '{s}'", .{variants_utf8});
+            return agent.throwException(
+                .range_error,
+                "Invalid variants subtag '{s}'",
+                .{variants_utf8},
+            );
         }
 
         // b. Let lowerVariants be the ASCII-lowercase of variants.
@@ -146,7 +158,7 @@ pub const constructor = struct {
 
         // 2. Let localeExtensionKeys be %Intl.Locale%.[[LocaleExtensionKeys]].
         // 3. Let internalSlotsList be « [[InitializedLocale]], [[Locale]], [[Calendar]],
-        //    [[Collation]], [[HourCycle]], [[NumberingSystem]] ».
+        //    [[Collation]], [[FirstDayOfWeek]], [[HourCycle]], [[NumberingSystem]] ».
         // TODO: 4. If localeExtensionKeys contains "kf", then
         //     a. Append [[CaseFirst]] to internalSlotsList.
         // TODO: 5. If localeExtensionKeys contains "kn", then
@@ -222,7 +234,11 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("ca", value) catch {
-                return agent.throwException(.range_error, "Invalid u-ca subtag '{s}'", .{value});
+                return agent.throwException(
+                    .range_error,
+                    "Invalid u-ca subtag '{s}'",
+                    .{calendar_utf8},
+                );
             };
         }
 
@@ -252,14 +268,47 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("co", value) catch {
-                return agent.throwException(.range_error, "Invalid u-co subtag '{s}'", .{value});
+                return agent.throwException(
+                    .range_error,
+                    "Invalid u-co subtag '{s}'",
+                    .{collation_utf8},
+                );
             };
         }
 
         // 20. Set opt.[[co]] to collation.
         // NOTE: This is done as part of step 19.a.
 
-        // 21. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
+        // 21. Let fw be ? GetOption(options, "firstDayOfWeek", string, empty, undefined).
+        const maybe_fw = try options.getOption(agent, "firstDayOfWeek", .string, null, null);
+
+        // 22. If fw is not undefined, then
+        if (maybe_fw) |fw| {
+            // a. Set fw to WeekdayToUValue(fw).
+            // b. If fw cannot be matched by the type Unicode locale nonterminal, throw a
+            //    RangeError exception.
+            const fw_utf8 = try fw.toUtf8(gpa);
+            defer gpa.free(fw_utf8);
+            var value: []const u8 = weekdayToUValue(fw_utf8);
+            // NOTE: Valid strings are length 3-8 but ICU4X doesn't reject length 0 or 2
+            var it = std.mem.splitScalar(u8, value, '-');
+            while (it.next()) |part| if (part.len < 3) {
+                value = "x";
+                break;
+            };
+            tag.setUnicodeExtension("fw", value) catch {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid u-fw subtag '{s}'",
+                    .{fw_utf8},
+                );
+            };
+        }
+
+        // 23. Set opt.[[fw]] to fw.
+        // NOTE: This is done as part of step 22.a.
+
+        // 24. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
         //     undefined).
         const maybe_hc = try options.getOption(
             agent,
@@ -274,12 +323,12 @@ pub const constructor = struct {
             null,
         );
 
-        // 22. Set opt.[[hc]] to hc.
+        // 25. Set opt.[[hc]] to hc.
         if (maybe_hc) |hc| {
             tag.setUnicodeExtension("hc", hc.asAscii()) catch unreachable;
         }
 
-        // 23. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
+        // 26. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
         //     undefined).
         const maybe_kf = try options.getOption(
             agent,
@@ -293,21 +342,21 @@ pub const constructor = struct {
             null,
         );
 
-        // 24. Set opt.[[kf]] to kf.
+        // 27. Set opt.[[kf]] to kf.
         if (maybe_kf) |kf| {
             tag.setUnicodeExtension("kf", kf.asAscii()) catch unreachable;
         }
 
-        // 25. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
+        // 28. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
         const maybe_kn = try options.getOption(agent, "numeric", .boolean, null, null);
 
-        // 26. If kn is not undefined, set kn to ! ToString(kn).
-        // 27. Set opt.[[kn]] to kn.
+        // 29. If kn is not undefined, set kn to ! ToString(kn).
+        // 30. Set opt.[[kn]] to kn.
         if (maybe_kn) |kn| {
             tag.setUnicodeExtension("kn", if (kn) "true" else "false") catch unreachable;
         }
 
-        // 28. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
+        // 31. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
         //     undefined).
         const maybe_numbering_system = try options.getOption(
             agent,
@@ -317,7 +366,7 @@ pub const constructor = struct {
             null,
         );
 
-        // 29. If numberingSystem is not undefined, then
+        // 32. If numberingSystem is not undefined, then
         if (maybe_numbering_system) |numbering_system| {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
@@ -331,31 +380,36 @@ pub const constructor = struct {
                 break;
             };
             tag.setUnicodeExtension("nu", value) catch {
-                return agent.throwException(.range_error, "Invalid u-nu subtag '{s}'", .{value});
+                return agent.throwException(
+                    .range_error,
+                    "Invalid u-nu subtag '{s}'",
+                    .{numbering_system_utf8},
+                );
             };
         }
 
-        // 30. Set opt.[[nu]] to numberingSystem.
-        // NOTE: This is done as part of step 29.a.
+        // 33. Set opt.[[nu]] to numberingSystem.
+        // NOTE: This is done as part of step 32.a.
 
         locale.fields = .{
-            // 31. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
-            // 32. Set locale.[[Locale]] to r.[[locale]].
-            // 33. Set locale.[[Calendar]] to r.[[ca]].
-            // 34. Set locale.[[Collation]] to r.[[co]].
-            // 35. Set locale.[[HourCycle]] to r.[[hc]].
-            // 36. If localeExtensionKeys contains "kf", then
+            // 34. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
+            // 35. Set locale.[[Locale]] to r.[[locale]].
+            // 36. Set locale.[[Calendar]] to r.[[ca]].
+            // 37. Set locale.[[Collation]] to r.[[co]].
+            // 38. Set locale.[[FirstDayOfWeek]] to r.[[fw]].
+            // 39. Set locale.[[HourCycle]] to r.[[hc]].
+            // 40. If localeExtensionKeys contains "kf", then
             //     a. Set locale.[[CaseFirst]] to r.[[kf]].
-            // 37. If localeExtensionKeys contains "kn", then
+            // 41. If localeExtensionKeys contains "kn", then
             //     a. If SameValue(r.[[kn]], "true") is true or r.[[kn]] is the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
             //         i. Set locale.[[Numeric]] to false.
-            // 38. Set locale.[[NumberingSystem]] to r.[[nu]].
+            // 42. Set locale.[[NumberingSystem]] to r.[[nu]].
             .locale = tag,
         };
 
-        // 39. Return locale.
+        // 43. Return locale.
         return Value.from(&locale.object);
     }
 };
@@ -372,6 +426,7 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "calendar", calendar, null, realm);
         try object.defineBuiltinAccessor(agent, "caseFirst", caseFirst, null, realm);
         try object.defineBuiltinAccessor(agent, "collation", collation, null, realm);
+        try object.defineBuiltinAccessor(agent, "firstDayOfWeek", firstDayOfWeek, null, realm);
         try object.defineBuiltinAccessor(agent, "hourCycle", hourCycle, null, realm);
         try object.defineBuiltinAccessor(agent, "language", language, null, realm);
         try object.defineBuiltinFunction(agent, "maximize", maximize, 0, realm);
@@ -481,7 +536,28 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.6 get Intl.Locale.prototype.hourCycle
+    /// 15.3.6 get Intl.Locale.prototype.firstDayOfWeek
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.firstDayOfWeek
+    fn firstDayOfWeek(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[FirstDayOfWeek]].
+        return Value.from(
+            try String.fromAscii(
+                agent,
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "fw",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                } orelse return .undefined,
+            ),
+        );
+    }
+
+    /// 15.3.7 get Intl.Locale.prototype.hourCycle
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.hourCycle
     fn hourCycle(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -502,7 +578,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.7 get Intl.Locale.prototype.language
+    /// 15.3.8 get Intl.Locale.prototype.language
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
     fn language(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -518,7 +594,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.8 Intl.Locale.prototype.maximize ( )
+    /// 15.3.9 Intl.Locale.prototype.maximize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
     fn maximize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -545,7 +621,7 @@ pub const prototype = struct {
         return Value.from(&new_locale.object);
     }
 
-    /// 15.3.9 Intl.Locale.prototype.minimize ( )
+    /// 15.3.10 Intl.Locale.prototype.minimize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
     fn minimize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -572,7 +648,7 @@ pub const prototype = struct {
         return Value.from(&new_locale.object);
     }
 
-    /// 15.3.10 get Intl.Locale.prototype.numberingSystem
+    /// 15.3.11 get Intl.Locale.prototype.numberingSystem
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
     fn numberingSystem(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -593,7 +669,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.11 get Intl.Locale.prototype.numeric
+    /// 15.3.12 get Intl.Locale.prototype.numeric
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numeric
     fn numeric(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -610,7 +686,7 @@ pub const prototype = struct {
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }
 
-    /// 15.3.12 get Intl.Locale.prototype.region
+    /// 15.3.13 get Intl.Locale.prototype.region
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.region
     fn region(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -626,7 +702,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.13 get Intl.Locale.prototype.script
+    /// 15.3.14 get Intl.Locale.prototype.script
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.script
     fn script(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -642,7 +718,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.14 Intl.Locale.prototype.toString ( )
+    /// 15.3.15 Intl.Locale.prototype.toString ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -655,7 +731,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.15 get Intl.Locale.prototype.variants
+    /// 15.3.16 get Intl.Locale.prototype.variants
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.variants
     fn variants(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
@@ -679,3 +755,23 @@ pub const Locale = MakeObject(.{
     .tag = .intl_locale,
     .display_name = "Intl.Locale",
 });
+
+/// 15.5.15 WeekdayToUValue ( fw )
+/// https://tc39.es/ecma402/#sec-weekdaytouvalue
+fn weekdayToUValue(weekday: []const u8) []const u8 {
+    // 1. For each row of Table 26, except the header row, in table order, do
+    //     a. Let w be the Weekday value of the current row.
+    //     b. Let s be the String value of the current row.
+    //     c. If fw is equal to w, return s.
+    // 2. Return fw.
+    return std.StaticStringMap([]const u8).initComptime(&.{
+        .{ "0", "sun" },
+        .{ "1", "mon" },
+        .{ "2", "tue" },
+        .{ "3", "wed" },
+        .{ "4", "thu" },
+        .{ "5", "fri" },
+        .{ "6", "sat" },
+        .{ "7", "sun" },
+    }).get(weekday) orelse weekday;
+}
