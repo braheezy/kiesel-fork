@@ -87,6 +87,7 @@ fn testInterpreter(
         .ecmascript_code = script,
         .loaded_modules = .empty,
         .host_defined = .null_pointer,
+        .source = source,
     };
 
     const test_context = try agent.gc_allocator.create(execution.ExecutionContext);
@@ -103,7 +104,7 @@ fn testInterpreter(
     try agent.execution_context_stack.append(agent.gc_allocator, test_context);
     defer _ = agent.execution_context_stack.pop().?;
 
-    try Script.globalDeclarationInstantiation(&agent, script, realm.global_env);
+    try Script.globalDeclarationInstantiation(&agent, script, realm.global_env, source);
 
     var vm: Vm = try .init(&agent, &bc);
     defer vm.deinit();

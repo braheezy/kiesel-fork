@@ -376,10 +376,11 @@ pub fn createDynamicFunction(
     const private_env = null;
 
     // 28. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
+    const source = try String.fromUtf8(agent, source_text);
     const function = try ordinaryFunctionCreate(
         agent,
         proto,
-        source_text,
+        .{ .string = source },
         parameters,
         body,
         .non_lexical_this,
@@ -623,10 +624,12 @@ pub const prototype = struct {
         //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
         //     a. Return CodePointsToString(func.[[SourceText]]).
         if (func.castObject(ECMAScriptFunction)) |ecmascript_function| {
-            return Value.from(try String.fromUtf8(agent, ecmascript_function.fields.source_text));
+            const source_text = try ecmascript_function.fields.source_text.resolve(agent);
+            return Value.from(source_text);
         } else if (func.castObject(BuiltinFunction)) |builtin_function| {
             if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
-                return Value.from(try String.fromUtf8(agent, class_constructor_fields.source_text));
+                const source_text = try class_constructor_fields.source_text.resolve(agent);
+                return Value.from(source_text);
             }
         }
 

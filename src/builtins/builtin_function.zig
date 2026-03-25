@@ -20,6 +20,7 @@ const PrivateMethodDefinition = types.PrivateMethodDefinition;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
+const SourceText = builtins.ecmascript_function.SourceText;
 const String = types.String;
 const Value = types.Value;
 const asyncFunctionStart = builtins.asyncFunctionStart;
@@ -41,7 +42,7 @@ pub const ClassConstructorFields = struct {
     constructor_kind: ConstructorKind,
 
     /// [[SourceText]]
-    source_text: []const u8,
+    source_text: SourceText,
 
     /// [[PrivateMethods]]
     private_methods: []const PrivateMethodDefinition,

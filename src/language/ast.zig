@@ -21,6 +21,13 @@ const containsSlice = utils.containsSlice;
 const parseUnicodeEscapeSequence = language.tokenizer.parseUnicodeEscapeSequence;
 const parseLegacyOctalEscapeSequence = language.tokenizer.parseLegacyOctalEscapeSequence;
 
+pub const SourceRange = struct {
+    /// Byte offset into the UTF-8 source text, inclusive.
+    start: u32,
+    /// Byte offset into the UTF-8 source text, exclusive.
+    end: u32,
+};
+
 const AnalyzeQuery = enum {
     is_await_expression,
     is_identifier_reference,
@@ -2834,7 +2841,7 @@ pub const FunctionDeclaration = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -2866,7 +2873,7 @@ pub const FunctionExpression = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionBody
@@ -2952,7 +2959,7 @@ pub const FunctionBody = struct {
 pub const ArrowFunction = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-MethodDefinition
@@ -2984,7 +2991,7 @@ pub const GeneratorDeclaration = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3016,7 +3023,7 @@ pub const GeneratorExpression = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 pub const YieldExpression = union(enum) {
@@ -3030,7 +3037,7 @@ pub const AsyncGeneratorDeclaration = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3062,14 +3069,14 @@ pub const AsyncGeneratorExpression = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-ClassDeclaration
 pub const ClassDeclaration = struct {
     identifier: ?Identifier,
     class_tail: ClassTail,
-    source_text: []const u8,
+    source_range: SourceRange,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3100,7 +3107,7 @@ pub const ClassDeclaration = struct {
 pub const ClassExpression = struct {
     identifier: ?Identifier,
     class_tail: ClassTail,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-ClassTail
@@ -3365,7 +3372,7 @@ pub const AsyncFunctionDeclaration = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3397,7 +3404,7 @@ pub const AsyncFunctionExpression = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-AwaitExpression
@@ -3409,7 +3416,7 @@ pub const AwaitExpression = struct {
 pub const AsyncArrowFunction = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
-    source_text: []const u8,
+    source_range: SourceRange,
 };
 
 /// https://tc39.es/ecma262/#prod-Script

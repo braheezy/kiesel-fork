@@ -39,6 +39,8 @@ loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 /// [[HostDefined]]
 host_defined: SafePointer,
 
+source: []const u8,
+
 pub fn print(self: Script, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try ast_printing.printScript(self.ecmascript_code, writer, 0);
 }
@@ -60,12 +62,14 @@ pub fn parse(
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
     //    }.
+    const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(Script);
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
         .loaded_modules = .empty,
         .host_defined = host_defined orelse .null_pointer,
+        .source = source,
     };
     return self;
 }
@@ -110,7 +114,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     const script = self.ecmascript_code;
 
     // 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
-    const result_no_value = globalDeclarationInstantiation(agent, script, global_env);
+    const result_no_value = globalDeclarationInstantiation(agent, script, global_env, self.source);
 
     // 13. If result is a normal completion, then
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
@@ -138,7 +142,12 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
 
 /// 16.1.7 GlobalDeclarationInstantiation ( script, env )
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
-pub fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
+pub fn globalDeclarationInstantiation(
+    agent: *Agent,
+    script: ast.Script,
+    env: *GlobalEnvironment,
+    source: []const u8,
+) Agent.Error!void {
     // 1. Let lexNames be the LexicallyDeclaredNames of script.
     var lexical_names: std.ArrayList(ast.Identifier) = .empty;
     defer lexical_names.deinit(agent.gc_allocator);
@@ -337,10 +346,10 @@ pub fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *G
 
         // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.
         const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, .{ .global_environment = env }, private_env),
-            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, .{ .global_environment = env }, private_env),
-            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, .{ .global_environment = env }, private_env),
-            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, .{ .global_environment = env }, private_env),
+            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, .{ .global_environment = env }, private_env, source),
+            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, .{ .global_environment = env }, private_env, source),
+            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, .{ .global_environment = env }, private_env, source),
+            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, .{ .global_environment = env }, private_env, source),
         };
 
         // c. Perform ? CreateGlobalFunctionBinding(env, fn, fo, false).

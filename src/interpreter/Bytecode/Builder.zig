@@ -317,7 +317,7 @@ pub fn build(b: *Builder) Error!Bytecode {
     defer functions_list.deinit(b.gpa);
     for (b.ir.functions) |function| {
         functions_list.appendAssumeCapacity(.{
-            .source_text = @enumFromInt(@intFromEnum(function.source_text)),
+            .source_range = function.source_range,
             .name = switch (function.name) {
                 .none => .none,
                 .identifier => |s| .{ .identifier = @enumFromInt(@intFromEnum(s)) },
@@ -342,7 +342,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             };
         }
         classes_list.appendAssumeCapacity(.{
-            .source_text = @enumFromInt(@intFromEnum(class.source_text)),
+            .source_range = class.source_range,
             .name = switch (class.name) {
                 .none => .none,
                 .identifier => |s| .{ .identifier = @enumFromInt(@intFromEnum(s)) },

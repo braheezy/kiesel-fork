@@ -3242,15 +3242,12 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3293,15 +3290,12 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3437,14 +3431,11 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
         try self.ensureSimpleParameterList(formal_parameters, location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3552,16 +3543,13 @@ pub fn acceptMethodDefinition(
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     const method = switch (if (parsed) |p| p.method_type else .method) {
         inline else => |@"type"| @unionInit(ast.MethodDefinition.Method, @tagName(@"type"), .{
             .identifier = null,
             .formal_parameters = formal_parameters,
             .function_body = function_body,
-            .source_text = source_text,
+            .source_range = source_range,
         }),
     };
     return .{ .class_element_name = class_element_name, .method = method };
@@ -3611,15 +3599,12 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3663,15 +3648,12 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3754,15 +3736,12 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3810,15 +3789,12 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3844,14 +3820,11 @@ fn acceptClassDeclaration(self: *Parser) AcceptError!ast.ClassDeclaration {
     }
     const class_tail = try self.acceptClassTail();
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .class_tail = class_tail,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -3873,14 +3846,11 @@ fn acceptClassExpression(self: *Parser) AcceptError!ast.ClassExpression {
     }
     const class_tail = try self.acceptClassTail();
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .class_tail = class_tail,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -4180,15 +4150,12 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -4235,15 +4202,12 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 
@@ -4364,14 +4328,11 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         try self.ensureSimpleParameterList(formal_parameters, location);
     }
     const end_offset = self.core.tokenizer.offset;
-    const source_text = try self.allocator.dupe(
-        u8,
-        self.core.tokenizer.source[start_offset..end_offset],
-    );
+    const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
     return .{
         .formal_parameters = formal_parameters,
         .function_body = function_body,
-        .source_text = source_text,
+        .source_range = source_range,
     };
 }
 

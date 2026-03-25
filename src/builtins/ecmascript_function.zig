@@ -74,6 +74,26 @@ pub const ClassData = struct {
     private_methods: []const PrivateMethodDefinition,
 };
 
+pub const SourceText = union(enum) {
+    string: *const String,
+    // Most functions never have their source text accessed, so we create the heap-allocated slice
+    // string lazily when resolving.
+    slice: struct {
+        source: []const u8,
+        source_range: ast.SourceRange,
+    },
+
+    pub fn resolve(source_text: SourceText, agent: *Agent) std.mem.Allocator.Error!*const String {
+        return switch (source_text) {
+            .string => |string| string,
+            .slice => |slice| try String.fromUtf8(
+                agent,
+                slice.source[slice.source_range.start..slice.source_range.end],
+            ),
+        };
+    }
+};
+
 pub const ECMAScriptFunction = MakeObject(.{
     .Fields = struct {
         /// [[Environment]]
@@ -98,7 +118,7 @@ pub const ECMAScriptFunction = MakeObject(.{
         home_object: ?*Object,
 
         /// [[SourceText]]
-        source_text: []const u8,
+        source_text: SourceText,
 
         flags: Flags,
         class_data: ?*ClassData,
@@ -620,7 +640,7 @@ fn construct(
 pub fn ordinaryFunctionCreate(
     agent: *Agent,
     function_prototype: *Object,
-    source_text: []const u8,
+    source_text: SourceText,
     parameter_list: ast.FormalParameters,
     body: ast.FunctionBody,
     this_mode: enum { lexical_this, non_lexical_this },
@@ -701,7 +721,7 @@ pub fn ordinaryFunctionCreate(
 
 pub fn ordinaryFunctionCreateFast(
     agent: *Agent,
-    source_text: []const u8,
+    source_text: SourceText,
     parameter_list: ast.FormalParameters,
     body: ast.FunctionBody,
     env: Environment,

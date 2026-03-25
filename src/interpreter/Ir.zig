@@ -25,7 +25,7 @@ pub const StringKind = enum(u1) {
 };
 
 pub const Function = struct {
-    source_text: Inst.StringIndex,
+    source_range: ast.SourceRange,
     name: Name,
     parameters: ast.FormalParameters,
     body: ast.FunctionBody,
@@ -48,7 +48,7 @@ pub const Function = struct {
 };
 
 pub const Class = struct {
-    source_text: Inst.StringIndex,
+    source_range: ast.SourceRange,
     name: Name,
     class_tail: ast.ClassTail,
     heritage: Inst.Ref,

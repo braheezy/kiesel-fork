@@ -1056,33 +1056,29 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 37. For each Parse Node f of functionsToInitialize, do
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
-        const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| function_declaration.identifier.?,
-        };
-
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
-        const source_text = switch (hoistable_declaration) {
-            inline else => |function_declaration| try b.internString(function_declaration.source_text, .literal),
+        const string_index, const func_ref = switch (hoistable_declaration) {
+            inline else => |function_declaration, tag| blk: {
+                const string_index = try b.internString(function_declaration.identifier.?, .literal);
+                const function_index = try b.addFunction(.{
+                    .source_range = function_declaration.source_range,
+                    .name = .{ .identifier = string_index },
+                    .parameters = function_declaration.formal_parameters,
+                    .body = function_declaration.function_body,
+                    .kind = switch (tag) {
+                        .function_declaration => .normal,
+                        .generator_declaration => .generator,
+                        .async_function_declaration => .async,
+                        .async_generator_declaration => .async_generator,
+                    },
+                });
+                const func_ref = try b.addInst(.{
+                    .tag = .create_function,
+                    .data = .{ .create_function = function_index },
+                });
+                break :blk .{ string_index, func_ref };
+            },
         };
-        const string_index = try b.internString(function_name, .literal);
-        const function_index = switch (hoistable_declaration) {
-            inline else => |function_declaration, tag| try b.addFunction(.{
-                .source_text = source_text,
-                .name = .{ .identifier = string_index },
-                .parameters = function_declaration.formal_parameters,
-                .body = function_declaration.function_body,
-                .kind = switch (tag) {
-                    .function_declaration => .normal,
-                    .generator_declaration => .generator,
-                    .async_function_declaration => .async,
-                    .async_generator_declaration => .async_generator,
-                },
-            }),
-        };
-        const func_ref = try b.addInst(.{
-            .tag = .create_function,
-            .data = .{ .create_function = function_index },
-        });
 
         // c. Perform ! varEnv.SetMutableBinding(fn, fo, false).
         _ = try b.addInst(.{
@@ -1150,38 +1146,34 @@ fn lowerBlockDeclarationInstantiation(
             const hoistable_declaration = declaration.hoistable_declaration;
 
             // i. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier.?,
-            };
-
             // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
             // iii. If the host is a web browser or otherwise supports Block-Level Function
             //      Declarations Web Legacy Compatibility Semantics, then
             //      [...]
             // iv. Else,
             //     1. Perform ! env.InitializeBinding(fn, fo).
-            const source_text = switch (hoistable_declaration) {
-                inline else => |function_declaration| try b.internString(function_declaration.source_text, .literal),
+            const string_index, const function_ref = switch (hoistable_declaration) {
+                inline else => |function_declaration, tag| blk: {
+                    const string_index = try b.internString(function_declaration.identifier.?, .literal);
+                    const function_index = try b.addFunction(.{
+                        .source_range = function_declaration.source_range,
+                        .name = .{ .identifier = string_index },
+                        .parameters = function_declaration.formal_parameters,
+                        .body = function_declaration.function_body,
+                        .kind = switch (tag) {
+                            .function_declaration => .normal,
+                            .generator_declaration => .generator,
+                            .async_function_declaration => .async,
+                            .async_generator_declaration => .async_generator,
+                        },
+                    });
+                    const function_ref = try b.addInst(.{
+                        .tag = .create_function,
+                        .data = .{ .create_function = function_index },
+                    });
+                    break :blk .{ string_index, function_ref };
+                },
             };
-            const string_index = try b.internString(function_name, .literal);
-            const function_index = switch (hoistable_declaration) {
-                inline else => |function_declaration, tag_name| try b.addFunction(.{
-                    .source_text = source_text,
-                    .name = .{ .identifier = string_index },
-                    .parameters = function_declaration.formal_parameters,
-                    .body = function_declaration.function_body,
-                    .kind = switch (tag_name) {
-                        .function_declaration => .normal,
-                        .generator_declaration => .generator,
-                        .async_function_declaration => .async,
-                        .async_generator_declaration => .async_generator,
-                    },
-                }),
-            };
-            const function_ref = try b.addInst(.{
-                .tag = .create_function,
-                .data = .{ .create_function = function_index },
-            });
             _ = try b.addInst(.{
                 .tag = .initialize_binding,
                 .data = .{ .set_binding = .{
@@ -2441,7 +2433,6 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 }
 
 fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) Error!Ir.Inst.Ref {
-    const source_text = try b.internString(class_decl.source_text, .literal);
     const name: Ir.Class.Name = if (class_decl.identifier) |identifier|
         .{ .identifier = try b.internString(identifier, .literal) }
     else
@@ -2456,7 +2447,7 @@ fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) E
     const element_names = try b.lowerClassElementNames(&class_decl.class_tail.class_body);
 
     const class_index = try b.addClass(.{
-        .source_text = source_text,
+        .source_range = class_decl.source_range,
         .name = name,
         .class_tail = class_decl.class_tail,
         .heritage = heritage,
@@ -2963,8 +2954,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     .private_identifier => unreachable,
                 };
                 const method_ref = switch (method_def.method) {
-                    .get, .set => |f| blk: {
-                        const source_text = try b.internString(f.source_text, .literal);
+                    .get, .set => |func_expr| blk: {
                         const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
                             method_def.class_element_name.property_name.literal_property_name == .identifier)
                         name: {
@@ -2975,10 +2965,10 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                             break :name .{ .default = try b.internString(prefixed, .literal) };
                         } else .none;
                         const function_index = try b.addFunction(.{
-                            .source_text = source_text,
+                            .source_range = func_expr.source_range,
                             .name = name,
-                            .parameters = f.formal_parameters,
-                            .body = f.function_body,
+                            .parameters = func_expr.formal_parameters,
+                            .body = func_expr.function_body,
                             .kind = .normal,
                         });
                         const func_ref = try b.addInst(.{
@@ -2990,18 +2980,17 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                             .data = .{ .ref = func_ref },
                         });
                     },
-                    inline else => |f, tag| blk: {
-                        const source_text = try b.internString(f.source_text, .literal);
+                    inline else => |func_expr, tag| blk: {
                         const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
                             method_def.class_element_name.property_name.literal_property_name == .identifier)
                             .{ .default = try b.internString(method_def.class_element_name.property_name.literal_property_name.identifier, .literal) }
                         else
                             .none;
                         const function_index = try b.addFunction(.{
-                            .source_text = source_text,
+                            .source_range = func_expr.source_range,
                             .name = name,
-                            .parameters = f.formal_parameters,
-                            .body = f.function_body,
+                            .parameters = func_expr.formal_parameters,
+                            .body = func_expr.function_body,
                             .kind = switch (tag) {
                                 .method => .normal,
                                 .generator => .generator,
@@ -3050,7 +3039,6 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
 }
 
 fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Error!Ir.Inst.Ref {
-    const source_text = try b.internString(class_expr.source_text, .literal);
     const name: Ir.Class.Name = if (class_expr.identifier) |identifier|
         .{ .identifier = try b.internString(identifier, .literal) }
     else
@@ -3065,7 +3053,7 @@ fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Err
     const element_names = try b.lowerClassElementNames(&class_expr.class_tail.class_body);
 
     const class_index = try b.addClass(.{
-        .source_text = source_text,
+        .source_range = class_expr.source_range,
         .name = name,
         .class_tail = class_expr.class_tail,
         .heritage = heritage,
@@ -3128,14 +3116,13 @@ fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElemen
 }
 
 fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
-    const source_text = try b.internString(func_expr.source_text, .literal);
     const name: Ir.Function.Name = if (func_expr.identifier) |identifier|
         .{ .identifier = try b.internString(identifier, .literal) }
     else
         .none;
 
     const function_index = try b.addFunction(.{
-        .source_text = source_text,
+        .source_range = func_expr.source_range,
         .name = name,
         .parameters = func_expr.formal_parameters,
         .body = func_expr.function_body,
@@ -3213,10 +3200,8 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
 }
 
 fn lowerArrowFunction(b: *Builder, arrow_func: anytype) Error!Ir.Inst.Ref {
-    const source_text = try b.internString(arrow_func.source_text, .literal);
-
     const function_index = try b.addFunction(.{
-        .source_text = source_text,
+        .source_range = arrow_func.source_range,
         .name = .none,
         .parameters = arrow_func.formal_parameters,
         .body = arrow_func.function_body,

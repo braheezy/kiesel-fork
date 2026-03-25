@@ -2226,8 +2226,8 @@ fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg
 }
 
 fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
     const function = vm.getFunction(function_index);
-    const source_text = vm.frame.bytecode.strings[@intFromEnum(function.source_text)];
     const identifier: ?[]const u8 = switch (function.name) {
         .identifier => |name_index| vm.frame.bytecode.strings[@intFromEnum(name_index)],
         .none, .default => null,
@@ -2256,49 +2256,86 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
         vm.cache_slots[cache_index] = @ptrCast(@alignCast(bytecode));
         break :blk bytecode;
     };
+    const source: []const u8 = switch (execution_context.origin) {
+        .eval => |source| source,
+        else => switch (execution_context.script_or_module.?) {
+            .script => |script| script.source,
+            .module => |module| module.source_text_module.source,
+        },
+    };
     const function_obj = switch (function.kind) {
-        .normal => try instantiateOrdinaryFunctionExpression(vm.agent, .{
-            .identifier = identifier,
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
-        .arrow => try instantiateArrowFunctionExpression(vm.agent, .{
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
-        .generator => try instantiateGeneratorFunctionExpression(vm.agent, .{
-            .identifier = identifier,
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
-        .async => try instantiateAsyncFunctionExpression(vm.agent, .{
-            .identifier = identifier,
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
-        .async_arrow => try instantiateAsyncArrowFunctionExpression(vm.agent, .{
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
-        .async_generator => try instantiateAsyncGeneratorFunctionExpression(vm.agent, .{
-            .identifier = identifier,
-            .formal_parameters = function.parameters,
-            .function_body = function.body,
-            .source_text = source_text,
-        }, default_name),
+        .normal => try instantiateOrdinaryFunctionExpression(
+            vm.agent,
+            .{
+                .identifier = identifier,
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
+        .arrow => try instantiateArrowFunctionExpression(
+            vm.agent,
+            .{
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
+        .generator => try instantiateGeneratorFunctionExpression(
+            vm.agent,
+            .{
+                .identifier = identifier,
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
+        .async => try instantiateAsyncFunctionExpression(
+            vm.agent,
+            .{
+                .identifier = identifier,
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
+        .async_arrow => try instantiateAsyncArrowFunctionExpression(
+            vm.agent,
+            .{
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
+        .async_generator => try instantiateAsyncGeneratorFunctionExpression(
+            vm.agent,
+            .{
+                .identifier = identifier,
+                .formal_parameters = function.parameters,
+                .function_body = function.body,
+                .source_range = function.source_range,
+            },
+            default_name,
+            source,
+        ),
     };
     function_obj.fields.cached_bytecode = cached_bytecode;
     vm.load(dest, Value.from(&function_obj.object));
 }
 
 fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
     const class = vm.getClass(class_index);
-    const source_text = vm.frame.bytecode.strings[@intFromEnum(class.source_text)];
     const class_binding: ?*const String = switch (class.name) {
         .identifier => |name_index| try vm.getString(name_index),
         .none, .default => null,
@@ -2320,12 +2357,20 @@ fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.In
             else => vm.store(name_reg),
         };
     }
+    const source = switch (execution_context.origin) {
+        .eval => |source| source,
+        else => switch (execution_context.script_or_module.?) {
+            .script => |script| script.source,
+            .module => |module| module.source_text_module.source,
+        },
+    };
     const class_obj = try classDefinitionEvaluation(
         vm.agent,
         class.class_tail,
         class_binding,
         class_name,
-        source_text,
+        class.source_range,
+        source,
         heritage,
         element_names,
     );

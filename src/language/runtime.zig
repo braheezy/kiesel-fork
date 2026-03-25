@@ -25,6 +25,7 @@ const PrivateMethodDefinition = types.PrivateMethodDefinition;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
+const SourceText = builtins.ecmascript_function.SourceText;
 const String = types.String;
 const Value = types.Value;
 const allImportAttributesSupported = language.allImportAttributesSupported;
@@ -583,6 +584,7 @@ pub fn instantiateOrdinaryFunctionObject(
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
     // NOTE: An anonymous FunctionDeclaration can only occur as part of an export default
@@ -602,7 +604,10 @@ pub fn instantiateOrdinaryFunctionObject(
         String.fromLiteral("default");
 
     // 2. Let sourceText be the source text matched by FunctionDeclaration.
-    const source_text = function_declaration.source_text;
+    const source_text: SourceText = .{ .slice = .{
+        .source = source,
+        .source_range = function_declaration.source_range,
+    } };
 
     // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
     //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
@@ -628,6 +633,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     agent: *Agent,
     function_expression: ast.FunctionExpression,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     // FunctionExpression : function BindingIdentifier ( FormalParameters ) { FunctionBody }
     if (function_expression.identifier) |identifier| {
@@ -650,7 +656,10 @@ pub fn instantiateOrdinaryFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by FunctionExpression.
-        const source_text = function_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = function_expression.source_range,
+        } };
 
         // 8. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, funcEnv, privateEnv).
@@ -687,7 +696,10 @@ pub fn instantiateOrdinaryFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by FunctionExpression.
-        const source_text = function_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = function_expression.source_range,
+        } };
 
         // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
@@ -714,6 +726,7 @@ pub fn instantiateArrowFunctionExpression(
     agent: *Agent,
     arrow_function: ast.ArrowFunction,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -730,7 +743,10 @@ pub fn instantiateArrowFunctionExpression(
     const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. Let sourceText be the source text matched by ArrowFunction.
-    const source_text = arrow_function.source_text;
+    const source_text: SourceText = .{ .slice = .{
+        .source = source,
+        .source_range = arrow_function.source_range,
+    } };
 
     // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText, ArrowParameters,
     //    ConciseBody, lexical-this, env, privateEnv).
@@ -760,7 +776,8 @@ fn defineMethod(
     property_name: Value,
     object: *Object,
     function_prototype: ?*Object,
-) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: *builtins.ECMAScriptFunction } {
+    source: []const u8,
+) Agent.Error!(struct { key: PropertyKeyOrPrivateName, closure: *builtins.ECMAScriptFunction }) {
     const realm = agent.currentRealm();
 
     // 1. Let propKey be ? Evaluation of ClassElementName.
@@ -784,7 +801,10 @@ fn defineMethod(
     const prototype = function_prototype orelse try realm.intrinsics.@"%Function.prototype%"();
 
     // 6. Let sourceText be the source text matched by MethodDefinition.
-    const source_text = function_expression.source_text;
+    const source_text: SourceText = .{ .slice = .{
+        .source = source,
+        .source_range = function_expression.source_range,
+    } };
 
     // 7. Let closure be OrdinaryFunctionCreate(prototype, sourceText, UniqueFormalParameters,
     //    FunctionBody, non-lexical-this, env, privateEnv).
@@ -817,6 +837,7 @@ pub fn methodDefinitionEvaluation(
     },
     object: *Object,
     enumerable: bool,
+    source: []const u8,
 ) Agent.Error!?PrivateMethodDefinition {
     const realm = agent.currentRealm();
     switch (method_definition.method) {
@@ -829,6 +850,7 @@ pub fn methodDefinitionEvaluation(
                 method_definition.property_name,
                 object,
                 null,
+                source,
             );
 
             // 2. Perform SetFunctionName(methodDef.[[Closure]], methodDef.[[Key]]).
@@ -861,7 +883,10 @@ pub fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
-            const source_text = function_expression.source_text;
+            const source_text: SourceText = .{ .slice = .{
+                .source = source,
+                .source_range = function_expression.source_range,
+            } };
 
             // 5. Let formalParameterList be an instance of the production FormalParameters : [empty] .
             const formal_parameter_list: ast.FormalParameters = .{
@@ -934,7 +959,10 @@ pub fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
-            const source_text = function_expression.source_text;
+            const source_text: SourceText = .{ .slice = .{
+                .source = source,
+                .source_range = function_expression.source_range,
+            } };
 
             // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
             //    PropertySetParameterList, FunctionBody, non-lexical-this, env, privateEnv).
@@ -1001,7 +1029,10 @@ pub fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by GeneratorMethod.
-            const source_text = generator_expression.source_text;
+            const source_text: SourceText = .{ .slice = .{
+                .source = source,
+                .source_range = generator_expression.source_range,
+            } };
 
             // 5. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
             //    UniqueFormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
@@ -1069,7 +1100,10 @@ pub fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by AsyncGeneratorMethod.
-            const source_text = async_generator_expression.source_text;
+            const source_text: SourceText = .{ .slice = .{
+                .source = source,
+                .source_range = async_generator_expression.source_range,
+            } };
 
             // 5. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%,
             //    sourceText, UniqueFormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
@@ -1137,7 +1171,10 @@ pub fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
             // 4. Let sourceText be the source text matched by AsyncMethod.
-            const source_text = async_function_expression.source_text;
+            const source_text: SourceText = .{ .slice = .{
+                .source = source,
+                .source_range = async_function_expression.source_range,
+            } };
 
             // 5. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
             //    UniqueFormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
@@ -1177,6 +1214,7 @@ pub fn instantiateGeneratorFunctionObject(
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -1186,7 +1224,10 @@ pub fn instantiateGeneratorFunctionObject(
         const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by GeneratorDeclaration.
-        const source_text = generator_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = generator_declaration.source_range,
+        } };
 
         // 3. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
         //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
@@ -1232,7 +1273,10 @@ pub fn instantiateGeneratorFunctionObject(
     // declaration, and its function code is therefore always strict mode code.
     else {
         // 1. Let sourceText be the source text matched by GeneratorDeclaration.
-        const source_text = generator_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = generator_declaration.source_range,
+        } };
 
         // 2. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
         //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
@@ -1281,6 +1325,7 @@ pub fn instantiateGeneratorFunctionExpression(
     agent: *Agent,
     generator_expression: ast.GeneratorExpression,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -1305,7 +1350,10 @@ pub fn instantiateGeneratorFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by GeneratorExpression.
-        const source_text = generator_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = generator_expression.source_range,
+        } };
 
         // 8. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
         //    FormalParameters, GeneratorBody, non-lexical-this, funcEnv, privateEnv).
@@ -1364,7 +1412,10 @@ pub fn instantiateGeneratorFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by GeneratorExpression.
-        const source_text = generator_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = generator_expression.source_range,
+        } };
 
         // 5. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
         //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
@@ -1635,6 +1686,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -1644,7 +1696,10 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
-        const source_text = async_generator_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_generator_declaration.source_range,
+        } };
 
         // 3. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
@@ -1689,7 +1744,10 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     // NOTE: An anonymous AsyncGeneratorDeclaration can only occur as part of an `export default` declaration.
     else {
         // 1. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
-        const source_text = async_generator_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_generator_declaration.source_range,
+        } };
 
         // 2. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
@@ -1738,6 +1796,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     agent: *Agent,
     async_generator_expression: ast.AsyncGeneratorExpression,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -1762,7 +1821,10 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by AsyncGeneratorExpression.
-        const source_text = async_generator_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_generator_expression.source_range,
+        } };
 
         // 8. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, funcEnv, privateEnv).
@@ -1821,7 +1883,10 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by AsyncGeneratorExpression.
-        const source_text = async_generator_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_generator_expression.source_range,
+        } };
 
         // 5. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
@@ -1898,7 +1963,7 @@ fn classFieldDefinitionEvaluation(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // d. Let sourceText be the empty sequence of Unicode code points.
-        const source_text = "";
+        const source_text: SourceText = .{ .string = .empty };
 
         // e. Let initializer be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    formalParameterList, Initializer, non-lexical-this, env, privateEnv).
@@ -1963,7 +2028,7 @@ fn classStaticBlockDefinitionEvaluation(
     const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 3. Let sourceText be the empty sequence of Unicode code points.
-    const source_text = "";
+    const source_text: SourceText = .{ .string = .empty };
 
     // 4. Let formalParameters be an instance of the production FormalParameters : [empty] .
     const formal_parameter_list: ast.FormalParameters = .{
@@ -2011,6 +2076,7 @@ fn classElementEvaluation(
     class_element: ast.ClassElement,
     object: *Object,
     pre_evaluated_name: Value,
+    source: []const u8,
 ) Agent.Error!?union(enum) {
     class_field_definition: ClassFieldDefinition,
     class_static_block_definition: ClassStaticBlockDefinition,
@@ -2046,6 +2112,7 @@ fn classElementEvaluation(
                 .{ .property_name = pre_evaluated_name, .method = method_definition.method },
                 object,
                 false,
+                source,
             )) |private_method_definition|
                 return .{ .private_method_definition = private_method_definition }
             else
@@ -2079,7 +2146,8 @@ pub fn classDefinitionEvaluation(
     class_tail: ast.ClassTail,
     class_binding: ?*const String,
     class_name: *const String,
-    source_text: []const u8,
+    source_range: ast.SourceRange,
+    source: []const u8,
     pre_evaluated_heritage: ?Value,
     pre_evaluated_element_names: []const Value,
 ) Agent.Error!*Object {
@@ -2286,6 +2354,7 @@ pub fn classDefinitionEvaluation(
             Value.from("constructor"),
             prototype,
             constructor_parent,
+            source,
         ) catch |err| try noexcept(err);
 
         // b. Let F be constructorInfo.[[Closure]].
@@ -2301,6 +2370,10 @@ pub fn classDefinitionEvaluation(
     };
 
     // 16. Set F.[[SourceText]] to sourceText.
+    const source_text: SourceText = .{ .slice = .{
+        .source = source,
+        .source_range = source_range,
+    } };
     if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
         ecmascript_function.fields.source_text = source_text;
     } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
@@ -2359,11 +2432,11 @@ pub fn classDefinitionEvaluation(
         // a. If IsStatic of e is false, then
         const element_or_error = if (!class_element.isStatic()) blk: {
             // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
-            break :blk classElementEvaluation(agent, class_element, prototype, pre_evaluated_name);
+            break :blk classElementEvaluation(agent, class_element, prototype, pre_evaluated_name, source);
         } else blk: {
             // b. Else,
             // i. Let element be Completion(ClassElementEvaluation of e with argument F).
-            break :blk classElementEvaluation(agent, class_element, function, pre_evaluated_name);
+            break :blk classElementEvaluation(agent, class_element, function, pre_evaluated_name, source);
         };
 
         // c. If element is an abrupt completion, then
@@ -2537,6 +2610,7 @@ pub fn instantiateAsyncFunctionObject(
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -2546,7 +2620,10 @@ pub fn instantiateAsyncFunctionObject(
         const name = try String.fromUtf8(agent, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncFunctionDeclaration.
-        const source_text = async_function_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_function_declaration.source_range,
+        } };
 
         // 3. Let F be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
@@ -2570,7 +2647,10 @@ pub fn instantiateAsyncFunctionObject(
     // AsyncFunctionDeclaration : async function ( FormalParameters ) { AsyncFunctionBody }
     else {
         // 1. Let sourceText be the source text matched by AsyncFunctionDeclaration.
-        const source_text = async_function_declaration.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_function_declaration.source_range,
+        } };
 
         // 2. Let F be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
@@ -2599,6 +2679,7 @@ pub fn instantiateAsyncFunctionExpression(
     agent: *Agent,
     async_function_expression: ast.AsyncFunctionExpression,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -2623,7 +2704,10 @@ pub fn instantiateAsyncFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 7. Let sourceText be the source text matched by AsyncFunctionExpression.
-        const source_text = async_function_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_function_expression.source_range,
+        } };
 
         // 8. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, funcEnv, privateEnv).
@@ -2662,7 +2746,10 @@ pub fn instantiateAsyncFunctionExpression(
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
         // 4. Let sourceText be the source text matched by AsyncFunctionExpression.
-        const source_text = async_function_expression.source_text;
+        const source_text: SourceText = .{ .slice = .{
+            .source = source,
+            .source_range = async_function_expression.source_range,
+        } };
 
         // 5. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
@@ -2691,6 +2778,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     agent: *Agent,
     async_arrow_function: ast.AsyncArrowFunction,
     default_name: ?[]const u8,
+    source: []const u8,
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
@@ -2707,7 +2795,10 @@ pub fn instantiateAsyncArrowFunctionExpression(
     const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. Let sourceText be the source text matched by AsyncArrowFunction.
-    const source_text = async_arrow_function.source_text;
+    const source_text: SourceText = .{ .slice = .{
+        .source = source,
+        .source_range = async_arrow_function.source_range,
+    } };
 
     // 5. Let head be the AsyncArrowHead that is covered by CoverCallExpressionAndAsyncArrowHead.
     // 6. Let parameters be the ArrowFormalParameters of head.

@@ -115,6 +115,8 @@ async_parent_modules: std.ArrayList(*SourceTextModule),
 /// [[PendingAsyncDependencies]]
 pending_async_dependencies: ?usize,
 
+source: []const u8,
+
 const Status = enum {
     new,
     unlinked,
@@ -622,6 +624,7 @@ pub fn parse(
     //       [[IndirectExportEntries]]: indirectExportEntries, [[StarExportEntries]]: starExportEntries,
     //       [[DFSAncestorIndex]]: empty
     //     }.
+    const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(SourceTextModule);
     self.* = .{
         .realm = realm,
@@ -646,6 +649,7 @@ pub fn parse(
         .star_export_entries = star_export_entries,
         .loaded_modules = .empty,
         .dfs_ancestor_index = null,
+        .source = source,
     };
     return self;
 }
@@ -1730,10 +1734,10 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
 
                 // 1. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
                 const function_object = try switch (hoistable_declaration) {
-                    .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, env, private_env),
-                    .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, env, private_env),
-                    .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, env, private_env),
-                    .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env),
+                    .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, env, private_env, self.source),
+                    .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, env, private_env, self.source),
+                    .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, env, private_env, self.source),
+                    .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env, self.source),
                 };
 
                 // 2. Perform ! env.InitializeBinding(dn, fo).

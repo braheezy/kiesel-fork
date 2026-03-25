@@ -174,9 +174,10 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 19. If runningContext is not already suspended, suspend runningContext.
 
     // 20. Let evalContext be a new ECMAScript code execution context.
+    const source = try agent.gc_allocator.dupe(u8, source_text);
     var eval_context: ExecutionContext = .{
         // 21. Set evalContext's Function to null.
-        .origin = .eval,
+        .origin = .{ .eval = source },
 
         // 22. Set evalContext's Realm to evalRealm.
         .realm = eval_realm,
@@ -208,6 +209,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         lexical_environment,
         private_environment,
         strict_eval,
+        source,
     );
 
     // 29. If result is a normal completion, then
@@ -244,6 +246,7 @@ fn evalDeclarationInstantiation(
     lex_env: Environment,
     private_env: ?*PrivateEnvironment,
     strict: bool,
+    source: []const u8,
 ) Agent.Error!void {
     // 1. Let varNames be the VarDeclaredNames of body.
     var var_names: std.ArrayList(ast.Identifier) = .empty;
@@ -462,10 +465,10 @@ fn evalDeclarationInstantiation(
 
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
         const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, lex_env, private_env),
-            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, lex_env, private_env),
-            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, lex_env, private_env),
-            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, lex_env, private_env),
+            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, lex_env, private_env, source),
+            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, lex_env, private_env, source),
+            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, lex_env, private_env, source),
+            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, lex_env, private_env, source),
         };
 
         // c. If varEnv is a Global Environment Record, then

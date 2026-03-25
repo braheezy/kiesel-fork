@@ -20,7 +20,7 @@ pub const ScriptOrModule = union(enum) {
 
 pub const Origin = union(enum) {
     function: *Object,
-    eval,
+    eval: []const u8,
     script,
     module,
     realm,
