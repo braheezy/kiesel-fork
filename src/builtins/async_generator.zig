@@ -644,24 +644,23 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
 
         // d. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
         return asyncGeneratorUnwrapYieldResumption(agent, resumption_value);
-    } else {
-        // 12. Else,
-        // a. Set generator.[[AsyncGeneratorState]] to suspended-yield.
-        generator.fields.async_generator_state = .suspended_yield;
-
-        // b. Remove genContext from the execution context stack and restore the execution context
-        //    that is at the top of the execution context stack as the running execution context.
-        _ = agent.execution_context_stack.pop().?;
-
-        // c. Let callerContext be the running execution context.
-        // d. Resume callerContext passing undefined. If genContext is ever resumed again, let
-        //    resumptionValue be the Completion Record with which it is resumed.
-        generator.fields.evaluation_state.suspension_result = .undefined;
-
-        // TODO: e. Assert: If control reaches here, then genContext is the running execution context again.
-        // TODO: f. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
-        return Completion.normal(null);
     }
+
+    // 12. Set generator.[[AsyncGeneratorState]] to suspended-yield.
+    generator.fields.async_generator_state = .suspended_yield;
+
+    // 13. Remove genContext from the execution context stack and restore the execution context
+    //     that is at the top of the execution context stack as the running execution context.
+    _ = agent.execution_context_stack.pop().?;
+
+    // 14. Let callerContext be the running execution context.
+    // 15. Resume callerContext passing undefined. If genContext is ever resumed again, let
+    //     resumptionValue be the Completion Record with which it is resumed.
+    generator.fields.evaluation_state.suspension_result = .undefined;
+
+    // TODO: 16. Assert: If control reaches here, then genContext is the running execution context again.
+    // TODO: 17. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
+    return Completion.normal(null);
 }
 
 /// 27.6.3.10 AsyncGeneratorDrainQueue ( generator )
@@ -691,17 +690,16 @@ pub fn asyncGeneratorDrainQueue(
 
             // ii. Return unused.
             return;
-        } else {
-            // d. Else,
-            // i. If completion is a normal completion, then
-            if (completion.type == .normal) {
-                // 1. Set completion to NormalCompletion(undefined).
-                completion = Completion.normal(.undefined);
-            }
-
-            // ii. Perform AsyncGeneratorCompleteStep(generator, completion, true).
-            try asyncGeneratorCompleteStep(agent, generator, completion, true, null);
         }
+
+        // d. If completion is a normal completion, then
+        if (completion.type == .normal) {
+            // i. Set completion to NormalCompletion(undefined).
+            completion = Completion.normal(.undefined);
+        }
+
+        // e. Perform AsyncGeneratorCompleteStep(generator, completion, true).
+        try asyncGeneratorCompleteStep(agent, generator, completion, true, null);
     }
 
     // 4. Set generator.[[AsyncGeneratorState]] to completed.

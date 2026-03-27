@@ -221,14 +221,16 @@ pub fn unsignedRightShift(_: *const BigInt, agent: *Agent, _: *const BigInt) err
 /// 6.1.6.2.12 BigInt::lessThan ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-lessThan
 pub fn lessThan(x: *const BigInt, y: *const BigInt) bool {
-    // 1. If ℝ(x) < ℝ(y), return true; otherwise return false.
+    // 1. If ℝ(x) < ℝ(y), return true.
+    // 2. Return false.
     return x.managed.order(y.managed) == .lt;
 }
 
 /// 6.1.6.2.13 BigInt::equal ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: *const BigInt, y: *const BigInt) bool {
-    // 1. If ℝ(x) = ℝ(y), return true; otherwise return false.
+    // 1. If ℝ(x) = ℝ(y), return true.
+    // 2. Return false.
     return x.managed.eql(y.managed);
 }
 

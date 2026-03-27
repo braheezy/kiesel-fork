@@ -61,7 +61,7 @@ pub const constructor = struct {
         // 3. If prim is a Number, return ? NumberToBigInt(prim).
         if (primitive.isNumber()) return Value.from(try numberToBigInt(agent, primitive.asNumber()));
 
-        // 4. Otherwise, return ? ToBigInt(prim).
+        // 4. Return ? ToBigInt(prim).
         return Value.from(try primitive.toBigInt(agent));
     }
 
@@ -78,7 +78,8 @@ pub const constructor = struct {
         const big_int = try big_int_value.toBigInt(agent);
 
         // 3. Let mod be ℝ(bigint) modulo 2**bits.
-        // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise return ℤ(mod).
+        // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits).
+        // 5. Return ℤ(mod).
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int.managed, .signed, @intCast(bits));
         return Value.from(try types.BigInt.fromManaged(agent, result));

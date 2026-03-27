@@ -60,8 +60,7 @@ pub const PromiseCapability = struct {
             },
         }
 
-        // 3. Else,
-        //     a. Set value to ! value.
+        // 3. Set value to ! value.
         // NOTE: This has to be handled at the call site.
     }
 };
@@ -84,45 +83,41 @@ const ResolvingFunctions = struct {
     reject: *builtins.BuiltinFunction,
 };
 
-/// 27.2.1.3 CreateResolvingFunctions ( promise )
+/// 27.2.1.3 CreateResolvingFunctions ( toResolve )
 /// https://tc39.es/ecma262/#sec-createresolvingfunctions
 pub fn createResolvingFunctions(
     agent: *Agent,
-    promise: *Promise,
+    to_resolve: *Promise,
 ) std.mem.Allocator.Error!ResolvingFunctions {
-    const AlreadyResolved = struct { value: bool };
-
-    // 1. Let alreadyResolved be the Record { [[Value]]: false }.
-    const already_resolved: AlreadyResolved = .{ .value = false };
+    const PromiseOrEmpty = struct { value: ?*Promise };
 
     const AdditionalFields = struct {
-        promise: *Promise,
-        already_resolved: AlreadyResolved,
+        promise_or_empty: PromiseOrEmpty,
     };
     const additional_fields = try agent.gc_allocator.create(AdditionalFields);
     additional_fields.* = .{
-        .promise = promise,
-        .already_resolved = already_resolved,
+        // 1. Let promiseOrEmpty be the Record { [[Value]]: toResolve }.
+        .promise_or_empty = .{ .value = to_resolve },
     };
 
     // 2. Let resolveSteps be a new Abstract Closure with parameters (resolution) that captures
-    //    promise and alreadyResolved and performs the following steps when called:
+    //    promiseOrEmpty and performs the following steps when called:
     const resolve_steps = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const resolution = arguments.get(0);
 
             const function = agent_.activeFunctionObject();
             const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-            const promise_ = additional_fields_.promise;
-            const already_resolved_ = &additional_fields_.already_resolved;
+            const promise_or_empty_ = &additional_fields_.promise_or_empty;
 
-            // a. If alreadyResolved.[[Value]] is true, return undefined.
-            if (already_resolved_.value) return .undefined;
+            // a. If promiseOrEmpty.[[Value]] is empty, return undefined.
+            // b. Let promise be promiseOrEmpty.[[Value]].
+            const promise_ = promise_or_empty_.value orelse return .undefined;
 
-            // b. Set alreadyResolved.[[Value]] to true.
-            already_resolved_.value = true;
+            // c. Set promiseOrEmpty.[[Value]] to empty.
+            promise_or_empty_.value = null;
 
-            // c. If SameValue(resolution, promise) is true, then
+            // d. If SameValue(resolution, promise) is true, then
             if (sameValue(resolution, Value.from(&promise_.object))) {
                 // i. Let selfResolutionError be a newly created TypeError object.
                 const self_resolution_error = try agent_.createErrorObject(
@@ -138,7 +133,7 @@ pub fn createResolvingFunctions(
                 return .undefined;
             }
 
-            // d. If resolution is not an Object, then
+            // e. If resolution is not an Object, then
             if (!resolution.isObject()) {
                 // i. Perform FulfillPromise(promise, resolution).
                 try fulfillPromise(agent_, promise_, resolution);
@@ -147,15 +142,15 @@ pub fn createResolvingFunctions(
                 return .undefined;
             }
 
-            // e. Let then be Completion(Get(resolution, "then")).
-            // g. Let thenAction be then.[[Value]].
+            // f. Let then be Completion(Get(resolution, "then")).
+            // h. Let thenAction be then.[[Value]].
             const then_action = resolution.asObject().get(
                 agent_,
                 PropertyKey.from("then"),
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
 
-                // f. If then is an abrupt completion, then
+                // g. If then is an abrupt completion, then
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
@@ -167,7 +162,7 @@ pub fn createResolvingFunctions(
                 },
             };
 
-            // h. If IsCallable(thenAction) is false, then
+            // i. If IsCallable(thenAction) is false, then
             if (!then_action.isCallable()) {
                 // i. Perform FulfillPromise(promise, resolution).
                 try fulfillPromise(agent_, promise_, resolution);
@@ -176,10 +171,10 @@ pub fn createResolvingFunctions(
                 return .undefined;
             }
 
-            // i. Let thenJobCallback be HostMakeJobCallback(thenAction).
+            // j. Let thenJobCallback be HostMakeJobCallback(thenAction).
             const then_job_callback = agent_.host_hooks.hostMakeJobCallback(then_action.asObject());
 
-            // j. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
+            // k. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
             const job = try newPromiseResolveThenableJob(
                 agent_,
                 promise_,
@@ -187,10 +182,10 @@ pub fn createResolvingFunctions(
                 then_job_callback,
             );
 
-            // k. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+            // l. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
             try agent_.host_hooks.hostEnqueuePromiseJob(agent_, job.job, job.realm);
 
-            // l. Return undefined.
+            // m. Return undefined.
             return .undefined;
         }
     }.func;
@@ -204,27 +199,27 @@ pub fn createResolvingFunctions(
         .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
     );
 
-    // 4. Let rejectSteps be a new Abstract Closure with parameters (reason) that captures promise
-    //    and alreadyResolved and performs the following steps when called:
+    // 4. Let rejectSteps be a new Abstract Closure with parameters (reason) that captures
+    //    promiseOrEmpty and performs the following steps when called:
     const reject_steps = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const reason = arguments.get(0);
 
             const function = agent_.activeFunctionObject();
             const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
-            const promise_ = additional_fields_.promise;
-            const already_resolved_ = &additional_fields_.already_resolved;
+            const promise_or_empty_ = &additional_fields_.promise_or_empty;
 
-            // a. If alreadyResolved.[[Value]] is true, return undefined.
-            if (already_resolved_.value) return .undefined;
+            // a. If promiseOrEmpty.[[Value]] is empty, return undefined.
+            // b. Let promise be promiseOrEmpty.[[Value]].
+            const promise_ = promise_or_empty_.value orelse return .undefined;
 
-            // b. Set alreadyResolved.[[Value]] to true.
-            already_resolved_.value = true;
+            // c. Set promiseOrEmpty.[[Value]] to empty.
+            promise_or_empty_.value = null;
 
-            // c. Perform RejectPromise(promise, reason).
+            // d. Perform RejectPromise(promise, reason).
             try rejectPromise(agent_, promise_, reason);
 
-            // d. Return undefined.
+            // e. Return undefined.
             return .undefined;
         }
     }.func;
@@ -539,15 +534,14 @@ pub fn newPromiseReactionJob(
                     .undefined,
                     &.{handler_result.value.?},
                 );
-            } else {
-                // i. Else,
-                // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
-                return Value.from(promise_capability.?.resolve).callAssumeCallable(
-                    agent_,
-                    .undefined,
-                    &.{handler_result.value.?},
-                );
             }
+
+            // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
+            return Value.from(promise_capability.?.resolve).callAssumeCallable(
+                agent_,
+                .undefined,
+                &.{handler_result.value.?},
+            );
         }
     }.func;
     const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
@@ -1437,15 +1431,9 @@ pub fn performPromiseThen(
     // 12. Set promise.[[PromiseIsHandled]] to true.
     promise.fields.promise_is_handled = true;
 
-    // 13. If resultCapability is undefined, then
-    if (result_capability == null) {
-        // a. Return undefined.
-        return null;
-    } else {
-        // 14. Else,
-        // a. Return resultCapability.[[Promise]].
-        return result_capability.?.promise;
-    }
+    // 13. If resultCapability is undefined, return undefined.
+    // 14. Return resultCapability.[[Promise]].
+    return (result_capability orelse return null).promise;
 }
 
 /// 27.2.4 Properties of the Promise Constructor

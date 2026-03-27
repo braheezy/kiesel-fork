@@ -228,7 +228,7 @@ fn setViewValue(
     const get_index = try request_index.toIndex(agent);
 
     // 4. If IsBigIntElementType(type) is true, let numberValue be ? ToBigInt(value).
-    // 5. Otherwise, let numberValue be ? ToNumber(value).
+    // 5. Else, let numberValue be ? ToNumber(value).
     const number_value = if (@"type".isBigIntElementType())
         Value.from(try value.toBigInt(agent))
     else

@@ -171,9 +171,9 @@ pub fn builtinCallOrConstruct(
 
                 // i. Let result be the Completion Record that is the result of evaluating F in a
                 //    manner that conforms to the specification of F. If thisArgument is
-                //    uninitialized, the this value is uninitialized; otherwise thisArgument
-                //    provides the this value. argumentsList provides the named parameters.
-                //    newTarget provides the NewTarget value.
+                //    uninitialized, the this value is uninitialized; else thisArgument provides
+                //    the this value. argumentsList provides the named parameters. newTarget
+                //    provides the NewTarget value.
                 // ii. NOTE: If F is defined in this document, “the specification of F” is the
                 //     behaviour specified for it via algorithm steps or other means.
                 const result = switch (builtin_function_.fields.behaviour) {
@@ -200,26 +200,25 @@ pub fn builtinCallOrConstruct(
 
         // e. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
-    } else {
-        // 11. Else,
-        // a. Let result be the Completion Record that is the result of evaluating F in a manner
-        //    that conforms to the specification of F. If thisArgument is uninitialized, the this
-        //    value is uninitialized; otherwise thisArgument provides the this value. argumentsList
-        //    provides the named parameters. newTarget provides the NewTarget value.
-        // b. NOTE: If F is defined in this document, “the specification of F” is the behaviour
-        //    specified for it via algorithm steps or other means.
-        const result = switch (builtin_function.fields.behaviour) {
-            .function => |function| function(agent, this_argument.?, arguments_list),
-            .constructor => |constructor| constructor(agent, arguments_list, new_target),
-        };
-
-        // c. Remove calleeContext from the execution context stack and restore callerContext as
-        //    the running execution context.
-        _ = agent.execution_context_stack.pop().?;
-
-        // d. Return ? result.
-        return result;
     }
+
+    // 11. Let result be the Completion Record that is the result of evaluating F in a manner that
+    //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
+    //     uninitialized; else thisArgument provides the this value. argumentsList provides the
+    //     named parameters. newTarget provides the NewTarget value.
+    // 12. NOTE: If F is defined in this document, “the specification of F” is the behaviour
+    //     specified for it via algorithm steps or other means.
+    const result = switch (builtin_function.fields.behaviour) {
+        .function => |function| function(agent, this_argument.?, arguments_list),
+        .constructor => |constructor| constructor(agent, arguments_list, new_target),
+    };
+
+    // 13. Remove calleeContext from the execution context stack and restore callerContext as
+    //     the running execution context.
+    _ = agent.execution_context_stack.pop().?;
+
+    // 14. Return ? result.
+    return result;
 }
 
 /// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix [ , async ] ] ] ] )

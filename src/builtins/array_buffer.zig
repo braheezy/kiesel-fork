@@ -46,7 +46,7 @@ pub fn allocateArrayBuffer(
     // 1. Let slots be « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
-    //    be true; otherwise let allocatingResizableBuffer be false.
+    //    be true; else let allocatingResizableBuffer be false.
     const allocating_resizable_buffer = max_byte_length != .none;
 
     // 3. If allocatingResizableBuffer is true, then
@@ -332,7 +332,7 @@ pub fn rawBytesToNumeric(
     // 2. If isLittleEndian is false, reverse the order of the elements of rawBytes.
     if (!is_little_endian) std.mem.reverse(u8, &bytes);
 
-    // 3-8.
+    // 3-9.
     return std.mem.bytesToValue(@"type".type(), &bytes);
 }
 
@@ -462,8 +462,8 @@ pub fn numericToRawBytes(
         else => blk: {
             // a. Let n be the Element Size value specified in Table 71 for Element Type type.
 
-            // b. Let conversionOperation be the abstract operation named in the Conversion Operation
-            //    column in Table 71 for Element Type type.
+            // b. Let conversionOperation be the abstract operation named in the “Conversion
+            //    Operation” column of Table 70 for Element Type type.
             const conversionOperation = element_type.conversationOperation();
 
             // c. Let intValue be ℝ(! conversionOperation(value)).
@@ -505,8 +505,7 @@ pub fn setValueInBuffer(
     //    value of type.
     std.debug.assert(array_buffer.fields.data_block.?.bytes.len >= byte_index + @"type".elementSize());
 
-    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
-    //    Number.
+    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; else, value is a Number.
     std.debug.assert(if (@"type".isBigIntElementType()) value.isBigInt() else value.isNumber());
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
@@ -529,7 +528,7 @@ pub fn setValueInBuffer(
         // b. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
         //    [[AgentSignifier]] is AgentSignifier().
         // c. If isTypedArray is true and IsNoTearConfiguration(type, order) is true, let noTear be
-        //    true; otherwise let noTear be false.
+        //    true; else let noTear be false.
         // d. Append WriteSharedMemory { [[Order]]: order, [[NoTear]]: noTear, [[Block]]: block,
         //    [[ByteIndex]]: byteIndex, [[ElementSize]]: elementSize, [[Payload]]: rawBytes } to
         //    eventsRecord.[[EventList]].
@@ -563,8 +562,7 @@ pub fn getModifySetValueInBuffer(
     //    value of type.
     std.debug.assert(array_buffer.fields.data_block.?.bytes.len >= byte_index + @"type".elementSize());
 
-    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
-    //    Number.
+    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; else, value is a Number.
     std.debug.assert(if (@"type".isBigIntElementType()) value.isBigInt() else value.isNumber());
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
@@ -847,7 +845,8 @@ pub const prototype = struct {
             );
         }
 
-        // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
+        // 4. If IsFixedLengthArrayBuffer(O) is false, return true.
+        // 5. Return false.
         return Value.from(!isFixedLengthArrayBuffer(array_buffer));
     }
 

@@ -123,7 +123,8 @@ pub const prototype = struct {
         // 1. Let b be ? ThisBooleanValue(this value).
         const b = try thisBooleanValue(agent, this_value);
 
-        // 2. If b is true, return "true"; else return "false".
+        // 2. If b is true, return "true".
+        // 3. Return "false".
         return if (b) Value.from("true") else Value.from("false");
     }
 

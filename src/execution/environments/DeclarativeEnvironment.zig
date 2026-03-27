@@ -231,14 +231,21 @@ pub fn hasThisBinding(_: DeclarativeEnvironment) bool {
     return false;
 }
 
-/// 9.1.1.1.9 HasSuperBinding ( )
+/// 9.1.1.1.9 GetThisBinding ( )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-getthisbinding
+pub fn getThisBinding(_: DeclarativeEnvironment) Value {
+    // The GetThisBinding concrete method of a Declarative Environment Record is never used within
+    // this specification.
+    @compileError("Should not be used");
+}
+
+/// 9.1.1.1.10 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hassuperbinding
 pub fn hasSuperBinding(_: DeclarativeEnvironment) bool {
     // 1. Return false.
     return false;
 }
-
-/// 9.1.1.1.10 WithBaseObject ( )
+/// 9.1.1.1.11 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
 pub fn withBaseObject(_: DeclarativeEnvironment) ?*Object {
     // 1. Return undefined.

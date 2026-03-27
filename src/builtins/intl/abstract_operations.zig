@@ -281,7 +281,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                 break :blk try k_value.toString(agent);
             };
 
-            // v. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
+            // v. If IsWellFormedLanguageTag(tag) is false, throw a RangeError exception.
             // vi. Let canonicalizedTag be CanonicalizeUnicodeLocaleId(tag).
             const tag_utf8 = try tag.toUtf8(gpa);
             defer gpa.free(tag_utf8);

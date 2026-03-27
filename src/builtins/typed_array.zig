@@ -370,7 +370,8 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) std.mem.All
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
     if (try property_key.canonicalNumericIndex(agent)) |numeric_index| {
-        // i. If IsValidIntegerIndex(O, numericIndex) is false, return true; else return false.
+        // i. If IsValidIntegerIndex(O, numericIndex) is false, return true.
+        // ii. Return false.
         return !isValidIntegerIndex(object.as(TypedArray), numeric_index);
     }
 
@@ -683,7 +684,7 @@ fn typedArraySetElement(
     value: Value,
 ) Agent.Error!void {
     // 1. If O.[[ContentType]] is bigint, let numValue be ? ToBigInt(value).
-    // 2. Otherwise, let numValue be ? ToNumber(value).
+    // 2. Else, let numValue be ? ToNumber(value).
     const number_value = if (typed_array.fields.content_type == .bigint)
         Value.from(try value.toBigInt(agent))
     else
@@ -1342,7 +1343,7 @@ pub const prototype = struct {
         const len_f64: f64 = @floatFromInt(@intFromEnum(len));
 
         // 4. If O.[[ContentType]] is bigint, set value to ? ToBigInt(value).
-        // 5. Otherwise, set value to ? ToNumber(value).
+        // 5. Else, set value to ? ToNumber(value).
         value = if (typed_array.fields.content_type == .bigint)
             Value.from(try value.toBigInt(agent))
         else
@@ -1680,7 +1681,7 @@ pub const prototype = struct {
         // 7. If n = +∞, return false.
         if (std.math.isPositiveInf(n)) return .false;
 
-        // 8. Else if n = -∞, set n to 0.
+        // 8. If n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
 
         // 9. If n ≥ 0, then
@@ -1733,7 +1734,7 @@ pub const prototype = struct {
         // 7. If n = +∞, return -1𝔽.
         if (std.math.isPositiveInf(n)) return Value.from(-1);
 
-        // 8. Else if n = -∞, set n to 0.
+        // 8. If n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
 
         // 9. If n ≥ 0, then
@@ -2401,7 +2402,7 @@ pub const prototype = struct {
 
         // 18. If IsSharedArrayBuffer(srcBuffer) is true, IsSharedArrayBuffer(targetBuffer) is true,
         //     and srcBuffer.[[ArrayBufferData]] is targetBuffer.[[ArrayBufferData]], let
-        //     sameSharedArrayBuffer be true; otherwise let sameSharedArrayBuffer be false.
+        //     sameSharedArrayBuffer be true; else let sameSharedArrayBuffer be false.
         const same_shared_array_buffer =
             isSharedArrayBuffer(src_buffer) and
             isSharedArrayBuffer(target_buffer) and
@@ -3427,7 +3428,7 @@ pub fn allocateTypedArray(
 
             // 5. If constructorName is either "BigInt64Array" or "BigUint64Array", set
             //    obj.[[ContentType]] to bigint.
-            // 6. Otherwise, set obj.[[ContentType]] to number.
+            // 6. Else, set obj.[[ContentType]] to number.
             .content_type = switch (element_type) {
                 .bigint64, .biguint64 => .bigint,
                 else => .number,
@@ -4179,9 +4180,9 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             // 4. Let numberOfArgs be the number of elements in args.
             const number_of_args = arguments.count();
 
-            // 5. If numberOfArgs = 0, then
+            // 5. If numberOfArgs = 0, return ? AllocateTypedArray(constructorName, NewTarget,
+            //    proto, 0).
             if (number_of_args == 0) {
-                // a. Return ? AllocateTypedArray(constructorName, NewTarget, proto, 0).
                 const typed_array = try allocateTypedArray(
                     agent,
                     element_type,
@@ -4190,114 +4191,108 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     @enumFromInt(0),
                 );
                 return Value.from(&typed_array.object);
-            } else {
-                // 6. Else,
-                // a. Let firstArgument be args[0].
-                const first_argument = arguments.get(0);
+            }
 
-                // b. If firstArgument is an Object, then
-                if (first_argument.isObject()) {
-                    // i. Let O be ? AllocateTypedArray(constructorName, NewTarget, proto).
-                    const typed_array = try allocateTypedArray(
+            // 6. Let firstArgument be args[0].
+            const first_argument = arguments.get(0);
+
+            // 7. If firstArgument is an Object, then
+            if (first_argument.isObject()) {
+                // a. Let O be ? AllocateTypedArray(constructorName, NewTarget, proto).
+                const typed_array = try allocateTypedArray(
+                    agent,
+                    element_type,
+                    new_target.?,
+                    prototype_,
+                    .none,
+                );
+
+                // b. If firstArgument has a [[TypedArrayName]] internal slot, then
+                if (first_argument.asObject().cast(TypedArray)) |first_argument_typed_array| {
+                    // i. Perform ? InitializeTypedArrayFromTypedArray(O, firstArgument).
+                    try initializeTypedArrayFromTypedArray(
                         agent,
-                        element_type,
-                        new_target.?,
-                        prototype_,
-                        .none,
+                        typed_array,
+                        first_argument_typed_array,
+                    );
+                }
+                // c. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
+                else if (first_argument.asObject().cast(builtins.ArrayBuffer)) |array_buffer| {
+                    // i. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset be undefined.
+                    const byte_offset = arguments.get(1);
+
+                    // ii. If numberOfArgs > 2, let length be args[2]; else let length be undefined.
+                    const length = arguments.get(2);
+
+                    // iii. Perform ? InitializeTypedArrayFromArrayBuffer(O, firstArgument, byteOffset, length).
+                    try initializeTypedArrayFromArrayBuffer(
+                        agent,
+                        typed_array,
+                        array_buffer,
+                        byte_offset,
+                        length,
+                    );
+                } else {
+                    // d. Else,
+                    // i. Assert: firstArgument is an Object and firstArgument does not have either
+                    //    a [[TypedArrayName]] or an [[ArrayBufferData]] internal slot.
+                    std.debug.assert(
+                        first_argument.isObject() and
+                            !first_argument.asObject().is(TypedArray) and
+                            !first_argument.asObject().is(builtins.ArrayBuffer),
                     );
 
-                    // ii. If firstArgument has a [[TypedArrayName]] internal slot, then
-                    if (first_argument.asObject().cast(TypedArray)) |first_argument_typed_array| {
-                        // 1. Perform ? InitializeTypedArrayFromTypedArray(O, firstArgument).
-                        try initializeTypedArrayFromTypedArray(
-                            agent,
-                            typed_array,
-                            first_argument_typed_array,
-                        );
-                    }
-                    // iii. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
-                    else if (first_argument.asObject().cast(builtins.ArrayBuffer)) |array_buffer| {
-                        // 1. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset
-                        //    be undefined.
-                        const byte_offset = arguments.get(1);
+                    // ii. Let usingIterator be ? GetMethod(firstArgument, %Symbol.iterator%).
+                    const using_iterator = try first_argument.getMethod(
+                        agent,
+                        PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                    );
 
-                        // 2. If numberOfArgs > 2, let length be args[2]; else let length be
-                        //    undefined.
-                        const length = arguments.get(2);
-
-                        // 3. Perform ? InitializeTypedArrayFromArrayBuffer(O, firstArgument,
-                        //    byteOffset, length).
-                        try initializeTypedArrayFromArrayBuffer(
+                    // iii. If usingIterator is not undefined, then
+                    if (using_iterator != null) {
+                        // 1. Let values be ? IteratorToList(? GetIteratorFromMethod(firstArgument, usingIterator)).
+                        var iterator = try getIteratorFromMethod(
                             agent,
-                            typed_array,
-                            array_buffer,
-                            byte_offset,
-                            length,
+                            first_argument,
+                            using_iterator.?,
                         );
+                        const values = try iterator.toList(agent);
+                        defer agent.gc_allocator.free(values);
+
+                        // 2. Perform ? InitializeTypedArrayFromList(O, values).
+                        try initializeTypedArrayFromList(agent, typed_array, values);
                     } else {
                         // iv. Else,
-                        // 1. Assert: firstArgument is an Object and firstArgument does not have
-                        //    either a [[TypedArrayName]] or an [[ArrayBufferData]] internal slot.
-                        std.debug.assert(
-                            first_argument.isObject() and
-                                !first_argument.asObject().is(TypedArray) and
-                                !first_argument.asObject().is(builtins.ArrayBuffer),
-                        );
-
-                        // 2. Let usingIterator be ? GetMethod(firstArgument, %Symbol.iterator%).
-                        const using_iterator = try first_argument.getMethod(
+                        // 1. NOTE: firstArgument is not an iterable object, so assume it is
+                        //    already an array-like object.
+                        // 2. Perform ? InitializeTypedArrayFromArrayLike(O, firstArgument).
+                        try initializeTypedArrayFromArrayLike(
                             agent,
-                            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                            typed_array,
+                            first_argument.asObject(),
                         );
-
-                        // 3. If usingIterator is not undefined, then
-                        if (using_iterator != null) {
-                            // a. Let values be ? IteratorToList(? GetIteratorFromMethod(
-                            //    firstArgument, usingIterator)).
-                            var iterator = try getIteratorFromMethod(
-                                agent,
-                                first_argument,
-                                using_iterator.?,
-                            );
-                            const values = try iterator.toList(agent);
-                            defer agent.gc_allocator.free(values);
-
-                            // b. Perform ? InitializeTypedArrayFromList(O, values).
-                            try initializeTypedArrayFromList(agent, typed_array, values);
-                        } else {
-                            // 4. Else,
-                            // a. NOTE: firstArgument is not an iterable object, so assume it is
-                            //    already an array-like object.
-                            // b. Perform ? InitializeTypedArrayFromArrayLike(O, firstArgument).
-                            try initializeTypedArrayFromArrayLike(
-                                agent,
-                                typed_array,
-                                first_argument.asObject(),
-                            );
-                        }
                     }
-
-                    // v. Return O.
-                    return Value.from(&typed_array.object);
-                } else {
-                    // c. Else,
-                    // i. Assert: firstArgument is not an Object.
-                    std.debug.assert(!first_argument.isObject());
-
-                    // ii. Let elementLength be ? ToIndex(firstArgument).
-                    const element_length: ArrayLength = @enumFromInt(try first_argument.toIndex(agent));
-
-                    // iii. Return ? AllocateTypedArray(constructorName, NewTarget, proto, elementLength).
-                    const typed_array = try allocateTypedArray(
-                        agent,
-                        element_type,
-                        new_target.?,
-                        prototype_,
-                        element_length.toOptional(),
-                    );
-                    return Value.from(&typed_array.object);
                 }
+
+                // e. Return O.
+                return Value.from(&typed_array.object);
             }
+
+            // 8. Assert: firstArgument is not an Object.
+            std.debug.assert(!first_argument.isObject());
+
+            // 9. Let elementLength be ? ToIndex(firstArgument).
+            const element_length: ArrayLength = @enumFromInt(try first_argument.toIndex(agent));
+
+            // 10. Return ? AllocateTypedArray(constructorName, NewTarget, proto, elementLength).
+            const typed_array = try allocateTypedArray(
+                agent,
+                element_type,
+                new_target.?,
+                prototype_,
+                element_length.toOptional(),
+            );
+            return Value.from(&typed_array.object);
         }
 
         /// 23.3.1.1 Uint8Array.fromBase64 ( string [ , options ] )

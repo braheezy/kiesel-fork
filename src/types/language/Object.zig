@@ -1253,20 +1253,19 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
     };
 
     switch (entry.*) {
-        // 3. If entry.[[Kind]] is field, then
-        .field => |*value_ptr| {
-            // a. Set entry.[[Value]] to value.
-            value_ptr.* = value;
-        },
-
-        // 4. Else if entry.[[Kind]] is method, then
+        // 3. If entry.[[Kind]] is method, throw a TypeError exception.
         .method => {
-            // a. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,
                 "Private element '{f}' is a method and cannot be set",
                 .{private_name},
             );
+        },
+
+        // 4. If entry.[[Kind]] is field, then
+        .field => |*value_ptr| {
+            // a. Set entry.[[Value]] to value.
+            value_ptr.* = value;
         },
 
         // 5. Else,

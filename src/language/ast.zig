@@ -477,7 +477,8 @@ pub const RegularExpressionLiteral = struct {
         //        of the 16-bit elements of stringValue as a Unicode BMP code point. UTF-16
         //        decoding is not applied to the elements.
         // 7. Let parseResult be ParsePattern(patternText, u, v).
-        // 8. If parseResult is a Parse Node, return true; else return false.
+        // 8. If parseResult is a Parse Node, return true.
+        // 9. Return false.
         var re_bytecode_len: c_int = undefined;
         var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
@@ -2950,7 +2951,8 @@ pub const FunctionBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
     pub fn functionBodyContainsUseStrict(self: FunctionBody) bool {
         // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
-        //    true; otherwise return false.
+        //    true.
+        // 2. Return false.
         return self.statement_list.containsDirective("use strict");
     }
 };
@@ -3483,7 +3485,8 @@ pub const Script = struct {
     /// https://tc39.es/ecma262/#sec-scriptisstrict
     pub fn scriptIsStrict(self: Script) bool {
         // 1. If ScriptBody is present and the Directive Prologue of ScriptBody contains a Use
-        //    Strict Directive, return true; otherwise return false.
+        //    Strict Directive, return true.
+        // 2. Return false.
         return self.statement_list.containsDirective("use strict");
     }
 };

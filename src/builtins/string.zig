@@ -100,7 +100,7 @@ pub fn stringPad(
             truncated_string_filler,
             string,
         }),
-        // 7. Else, return the string-concatenation of S and truncatedStringFiller.
+        // 7. Return the string-concatenation of S and truncatedStringFiller.
         .end => return types.String.concat(agent, &.{
             string,
             truncated_string_filler,
@@ -191,7 +191,7 @@ pub fn getSubstitution(
         blk: {
             // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
-            //    digitCount be 2; otherwise let digitCount be 1.
+            //    digitCount be 2; else let digitCount be 1.
             var digit_count: u2 = if (template_reminder.length >= 3 and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))) and
                 std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(2)))) 2 else 1;
@@ -1168,7 +1168,7 @@ pub const prototype = struct {
         const num_pos = try position.toNumber(agent);
 
         // 6. Assert: If position is undefined, then numPos is NaN.
-        // 7. If numPos is NaN, let pos be +∞; otherwise let pos be ! ToIntegerOrInfinity(numPos).
+        // 7. If numPos is NaN, let pos be +∞; else let pos be ! ToIntegerOrInfinity(numPos).
         const pos = if (num_pos.isNan())
             std.math.inf(f64)
         else
@@ -2525,7 +2525,7 @@ pub const prototype = struct {
             int_start = @min(int_start, size);
         }
 
-        // 9. If length is undefined, let intLength be size; otherwise let intLength be ? ToIntegerOrInfinity(length).
+        // 9. If length is undefined, let intLength be size; else let intLength be ? ToIntegerOrInfinity(length).
         var int_length = if (length.isUndefined())
             size
         else

@@ -149,7 +149,7 @@ pub const constructor = struct {
                     break :blk types.Number.from(primitive.big_int.asFloat());
                 }
 
-                // c. Otherwise, let n be prim.
+                // c. Else, let n be prim.
                 break :blk primitive.number;
             } else {
                 // 2. Else,
@@ -188,7 +188,7 @@ pub const constructor = struct {
         // 2. If number is not finite, return false.
         if (!number.asNumber().isFinite()) return .false;
 
-        // 3. Otherwise, return true.
+        // 3. Return true.
         return .true;
     }
 
@@ -215,7 +215,7 @@ pub const constructor = struct {
         // 2. If number is NaN, return true.
         if (number.asNumber().isNan()) return .true;
 
-        // 3. Otherwise, return false.
+        // 3. Return false.
         return .false;
     }
 
@@ -408,8 +408,8 @@ pub const prototype = struct {
         // 11. Else,
         //     a. Let n be an integer for which n / 10**f - x is as close to zero as possible. If
         //        there are two such n, pick the larger n.
-        //     b. If n = 0, let m be "0"; otherwise let m be the String value consisting of the
-        //        digits of the decimal representation of n (in order, with no leading zeroes).
+        //     b. If n = 0, let m be "0"; else let m be the String value consisting of the digits
+        //        of the decimal representation of n (in order, with no leading zeroes).
         //     c. If f ≠ 0, then
         //         i. Let k be the length of m.
         //         ii. If k ≤ f, then

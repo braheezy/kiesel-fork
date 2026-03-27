@@ -70,7 +70,8 @@ pub fn bindThisValue(
 /// 9.1.1.3.2 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-hasthisbinding
 pub fn hasThisBinding(self: FunctionEnvironment) bool {
-    // 1. If envRec.[[ThisBindingStatus]] is lexical, return false; otherwise return true.
+    // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
+    // 2. Return true.
     return self.this_binding_status != .lexical;
 }
 
@@ -80,7 +81,8 @@ pub fn hasSuperBinding(self: FunctionEnvironment) bool {
     // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
     if (self.this_binding_status == .lexical) return false;
 
-    // 2. If envRec.[[FunctionObject]].[[HomeObject]] is undefined, return false; otherwise return true.
+    // 2. If envRec.[[FunctionObject]].[[HomeObject]] is undefined, return false.
+    // 3. Return true.
     return self.function_object.fields.home_object != null;
 }
 

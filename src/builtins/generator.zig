@@ -432,7 +432,7 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
         // 4. If generator has an [[AsyncGeneratorState]] internal slot, return async.
         .async_generator => .async,
 
-        // 5. Else, return sync.
+        // 5. Return sync.
         .generator => .sync,
     };
 }
@@ -477,7 +477,7 @@ pub fn yield(agent: *Agent, value: Value) Agent.Error!Completion {
         // 2. If generatorKind is async, return ? AsyncGeneratorYield(? Await(value)).
         .async => return asyncGeneratorYield(agent, try await(agent, value)),
 
-        // 3. Otherwise, return ? GeneratorYield(CreateIteratorResultObject(value, false)).
+        // 3. Return ? GeneratorYield(CreateIteratorResultObject(value, false)).
         .sync => return generatorYield(agent, try createIteratorResultObject(agent, value, false)),
 
         .non_generator => unreachable,

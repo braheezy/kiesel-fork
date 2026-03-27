@@ -202,7 +202,9 @@ fn doWait(
     // 8. Let q be ? ToNumber(timeout).
     const q = try timeout.toNumber(agent);
 
-    // 9. If q is either NaN or +∞𝔽, let t be +∞; else if q is -∞𝔽, let t be 0; else let t be max(ℝ(q), 0).
+    // 9. If q is either NaN or +∞𝔽, let t be +∞.
+    // 10. Else if q is -∞𝔽, let t be 0.
+    // 11. Else, let t be max(ℝ(q), 0).
     const t = if (q.isNan() or q.isPositiveInf())
         std.math.inf(f64)
     else if (q.isNegativeInf())
@@ -210,23 +212,23 @@ fn doWait(
     else
         @max(q.asFloat(), 0);
 
-    // 10. If mode is sync and AgentCanSuspend() is false, throw a TypeError exception.
+    // 12. If mode is sync and AgentCanSuspend() is false, throw a TypeError exception.
 
-    // 11. Let block be buffer.[[ArrayBufferData]].
+    // 13. Let block be buffer.[[ArrayBufferData]].
     const block = buffer.fields.data_block;
 
-    // TODO: 12. Let WL be GetWaiterList(block, byteIndexInBuffer).
+    // TODO: 14. Let WL be GetWaiterList(block, byteIndexInBuffer).
     _ = block;
 
     var promise_capability: PromiseCapability = undefined;
     var result_object: *Object = undefined;
 
-    // 13. If mode is sync, then
+    // 15. If mode is sync, then
     if (mode == .sync) {
         // a. Let promiseCapability be blocking.
         // b. Let resultObject be undefined.
     } else {
-        // 14. Else,
+        // 16. Else,
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         promise_capability = newPromiseCapability(
             agent,
@@ -240,13 +242,13 @@ fn doWait(
         );
     }
 
-    // TODO: 15. Perform EnterCriticalSection(WL).
+    // TODO: 17. Perform EnterCriticalSection(WL).
 
-    // 16. Let elementType be TypedArrayElementType(typedArray).
+    // 18. Let elementType be TypedArrayElementType(typedArray).
     const w = switch (typed_array.fields.element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| blk: {
-            // 17. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
             const w = getValueFromBuffer(
                 agent,
                 buffer,
@@ -263,7 +265,7 @@ fn doWait(
         },
     };
 
-    // 18. If v ≠ w, then
+    // 20. If v ≠ w, then
     if (!sameValue(v, w)) {
         // TODO: a. Perform LeaveCriticalSection(WL).
 
@@ -288,7 +290,7 @@ fn doWait(
         return Value.from(result_object);
     }
 
-    // 19. If t = 0 and mode is async, then
+    // 21. If t = 0 and mode is async, then
     if (t == 0 and mode == .async) {
         // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
         //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
@@ -314,27 +316,27 @@ fn doWait(
         return Value.from(result_object);
     }
 
-    // TODO: 20-29.
+    // TODO: 22-31.
     const waiter = .{ .result = "timed-out" };
 
-    // 30. If mode is sync, return waiterRecord.[[Result]].
+    // 32. If mode is sync, return waiterRecord.[[Result]].
     if (mode == .sync) return Value.from(waiter.result);
 
-    // 31. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
+    // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("async"),
         .true,
     );
 
-    // 32. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
+    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
     );
 
-    // 33. Return resultObject.
+    // 35. Return resultObject.
     return Value.from(result_object);
 }
 
@@ -356,7 +358,7 @@ fn atomicReadModifyWrite(
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
     // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
-    // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).
+    // 3. Else, let v be 𝔽(? ToIntegerOrInfinity(value)).
     const numeric_value = if (typed_array.fields.content_type == .bigint)
         Value.from(try value.toBigInt(agent))
     else
@@ -763,7 +765,7 @@ pub const namespace = struct {
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
         // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
-        // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).
+        // 3. Else, let v be 𝔽(? ToIntegerOrInfinity(value)).
         const numeric_value = if (typed_array.fields.content_type == .bigint)
             Value.from(try value.toBigInt(agent))
         else

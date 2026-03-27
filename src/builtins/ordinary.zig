@@ -412,8 +412,8 @@ fn validateAndApplyPropertyDescriptor(
             };
         } else blk: {
             // c. Else,
-            // i. For each field of Desc, set the corresponding attribute of the property named P
-            //    of object O to the value of the field.
+            // i. For each field name F of Desc, set the attribute named F of the property named P
+            //    of object O to the value of Desc's F field.
             if (current.isDataDescriptor()) {
                 break :blk .{
                     .value_or_accessor = .{
@@ -686,9 +686,8 @@ pub fn ordinarySetWithOwnDescriptor(
         // a. Let parent be ? O.[[GetPrototypeOf]]().
         const parent = try object.internal_methods.getPrototypeOf(agent, object);
 
-        // b. If parent is not null, then
+        // b. If parent is not null, return ? parent.[[Set]](P, V, Receiver).
         if (parent) |parent_object| {
-            // i. Return ? parent.[[Set]](P, V, Receiver).
             return parent_object.internal_methods.set(
                 agent,
                 parent_object,
@@ -696,18 +695,17 @@ pub fn ordinarySetWithOwnDescriptor(
                 value,
                 receiver_value,
             );
-        } else {
-            // c. Else,
-            // i. Set ownDesc to the PropertyDescriptor {
-            //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
-            //    }.
-            break :blk PropertyDescriptor{
-                .value = .undefined,
-                .writable = true,
-                .enumerable = true,
-                .configurable = true,
-            };
         }
+
+        // c. Set ownDesc to the PropertyDescriptor {
+        //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
+        //    }.
+        break :blk PropertyDescriptor{
+            .value = .undefined,
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        };
     };
 
     // 2. If IsDataDescriptor(ownDesc) is true, then
@@ -720,38 +718,35 @@ pub fn ordinarySetWithOwnDescriptor(
         const receiver = receiver_value.asObject();
 
         // c. Let existingDescriptor be ? Receiver.[[GetOwnProperty]](P).
-        const maybe_existing_descriptor = try receiver.internal_methods.getOwnProperty(
+        const existing_descriptor = try receiver.internal_methods.getOwnProperty(
             agent,
             receiver,
             property_key,
-        );
-
-        // d. If existingDescriptor is not undefined, then
-        if (maybe_existing_descriptor) |existing_descriptor| {
-            // i. If IsAccessorDescriptor(existingDescriptor) is true, return false.
-            if (existing_descriptor.isAccessorDescriptor()) return false;
-
-            // ii. If existingDescriptor.[[Writable]] is false, return false.
-            if (existing_descriptor.writable == false) return false;
-
-            // iii. Let valueDesc be the PropertyDescriptor { [[Value]]: V }.
-            const value_descriptor: PropertyDescriptor = .{ .value = value };
-
-            // iv. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
-            return receiver.internal_methods.defineOwnProperty(
-                agent,
-                receiver,
-                property_key,
-                value_descriptor,
-            );
-        } else {
-            // e. Else,
+        ) orelse {
+            // d. If existingDescriptor is undefined, then
             // i. Assert: Receiver does not currently have a property P.
             std.debug.assert(!receiver.property_storage.contains(receiver, property_key));
 
             // ii. Return ? CreateDataProperty(Receiver, P, V).
             return receiver.createDataProperty(agent, property_key, value);
-        }
+        };
+
+        // e. If IsAccessorDescriptor(existingDescriptor) is true, return false.
+        if (existing_descriptor.isAccessorDescriptor()) return false;
+
+        // f. If existingDescriptor.[[Writable]] is false, return false.
+        if (existing_descriptor.writable == false) return false;
+
+        // g. Let valueDesc be the PropertyDescriptor { [[Value]]: V }.
+        const value_descriptor: PropertyDescriptor = .{ .value = value };
+
+        // h. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
+        return receiver.internal_methods.defineOwnProperty(
+            agent,
+            receiver,
+            property_key,
+            value_descriptor,
+        );
     }
 
     // 3. Assert: IsAccessorDescriptor(ownDesc) is true.

@@ -653,27 +653,23 @@ pub const namespace = struct {
         // 2. Let unfiltered be ? ParseJSON(jsonString).
         const unfiltered = try parseJSON(agent, json_string);
 
-        // 3. If IsCallable(reviver) is true, then
-        if (reviver.isCallable()) {
-            // a. Let root be OrdinaryObjectCreate(%Object.prototype%).
-            const root = try ordinaryObjectCreate(
-                agent,
-                try realm.intrinsics.@"%Object.prototype%"(),
-            );
+        // 3. If IsCallable(reviver) is false, return unfiltered.
+        if (!reviver.isCallable()) return unfiltered;
 
-            // b. Let rootName be the empty String.
-            const root_name = PropertyKey.from("");
+        // 4. Let root be OrdinaryObjectCreate(%Object.prototype%).
+        const root = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
 
-            // c. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
-            try root.createDataPropertyDirect(agent, root_name, unfiltered);
+        // 5. Let rootName be the empty String.
+        const root_name = PropertyKey.from("");
 
-            // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
-            return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
-        } else {
-            // 4. Else,
-            // a. Return unfiltered.
-            return unfiltered;
-        }
+        // 6. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
+        root.createDataPropertyDirect(agent, root_name, unfiltered) catch |err| try noexcept(err);
+
+        // 7. Return ? InternalizeJSONProperty(root, rootName, reviver).
+        return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
     }
 
     /// 25.5.2 JSON.stringify ( value [ , replacer [ , space ] ] )
@@ -784,8 +780,8 @@ pub const namespace = struct {
             // b. Set spaceMV to min(10, spaceMV).
             const space_mv = @min(10, space.toIntegerOrInfinity(agent) catch unreachable);
 
-            // c. If spaceMV < 1, let gap be the empty String; otherwise let gap be the String
-            //    value containing spaceMV occurrences of the code unit 0x0020 (SPACE).
+            // c. If spaceMV < 1, let gap be the empty String; else let gap be the String value
+            //    containing spaceMV occurrences of the code unit 0x0020 (SPACE).
             if (space_mv < 1)
                 break :blk .empty
             else {
@@ -795,8 +791,8 @@ pub const namespace = struct {
             }
         } else if (space.isString()) blk: {
             // 8. Else if space is a String, then
-            // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
-            //    substring of space from 0 to 10.
+            // a. If the length of space ≤ 10, let gap be space; else let gap be the substring of
+            //    space from 0 to 10.
             break :blk if (space.asString().length <= 10)
                 space.asString()
             else

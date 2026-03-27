@@ -926,15 +926,15 @@ pub fn defineMethodProperty(
     // 1. Assert: homeObject is an ordinary, extensible object.
 
     switch (key) {
-        // 2. If key is a Private Name, then
         .private_name => |private_name| {
-            // a. Return PrivateElement { [[Key]]: key, [[Kind]]: method, [[Value]]: closure }.
+            // 2. If key is a Private Name, return PrivateElement {
+            //      [[Key]]: key, [[Kind]]: method, [[Value]]: closure
+            //    }.
             const private_element: PrivateElement = .{ .method = closure };
             return .{ .private_name = private_name, .private_element = private_element };
         },
-        // 3. Else,
         .property_key => |property_key| {
-            // a. Let desc be the PropertyDescriptor {
+            // 3. Let desc be the PropertyDescriptor {
             //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
             //    }.
             const property_descriptor: PropertyDescriptor = .{
@@ -944,17 +944,17 @@ pub fn defineMethodProperty(
                 .configurable = true,
             };
 
-            // b. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
+            // 4. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
             try home_object.definePropertyOrThrow(
                 agent,
                 property_key,
                 property_descriptor,
             );
 
-            // c. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
+            // 5. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
             //    define a class static method whose key is "prototype".
 
-            // d. Return unused.
+            // 6. Return unused.
             return null;
         },
     }

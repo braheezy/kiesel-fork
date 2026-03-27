@@ -562,7 +562,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     defer parameter_names.deinit(b.gpa);
     try formal_parameters.collectBoundNames(b.gpa, &parameter_names);
 
-    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; otherwise let
+    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; else let
     //    hasDuplicates be false.
     const has_duplicates = blk: {
         var seen: std.StringArrayHashMapUnmanaged(void) = .empty;

@@ -194,8 +194,11 @@ pub const constructor = struct {
         // 10. Set options to ? CoerceOptionsToObject(options).
         const options = try options_value.coerceOptionsToObject(agent);
 
-        // 11. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
-        // 12. Set tag to CanonicalizeUnicodeLocaleId(tag).
+        // 11. If IsWellFormedLanguageTag(tag) is false, throw a RangeError exception.
+        // 12. NOTE: Because LanguageId canonicalization can alter tag in arbitrary ways according
+        //     to Alias Rules from supplementalMetadata.xml, it is necessary to perform such
+        //     canonicalization before applying overrides from options.
+        // 13. Set tag to CanonicalizeUnicodeLocaleId(tag).
         const tag_utf8 = try tag_string.toUtf8(gpa);
         defer gpa.free(tag_utf8);
         var tag = icu4zig.Locale.fromString(tag_utf8) catch {
@@ -206,12 +209,12 @@ pub const constructor = struct {
             );
         };
 
-        // 13. Set tag to ? UpdateLanguageId(tag, options).
+        // 14. Set tag to ? UpdateLanguageId(tag, options).
         tag = try updateLanguageId(agent, tag, options);
 
-        // 14. Let opt be a new Record.
+        // 15. Let opt be a new Record.
 
-        // 15. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
+        // 16. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
         const maybe_calendar = try options.getOption(
             agent,
             "calendar",
@@ -220,7 +223,7 @@ pub const constructor = struct {
             null,
         );
 
-        // 16. If calendar is not undefined, then
+        // 17. If calendar is not undefined, then
         if (maybe_calendar) |calendar| {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
@@ -242,10 +245,10 @@ pub const constructor = struct {
             };
         }
 
-        // 17. Set opt.[[ca]] to calendar.
+        // 18. Set opt.[[ca]] to calendar.
         // NOTE: This is done as part of step 16.a.
 
-        // 18. Let collation be ? GetOption(options, "collation", string, empty, undefined).
+        // 19. Let collation be ? GetOption(options, "collation", string, empty, undefined).
         const maybe_collation = try options.getOption(
             agent,
             "collation",
@@ -254,7 +257,7 @@ pub const constructor = struct {
             null,
         );
 
-        // 19. If collation is not undefined, then
+        // 20. If collation is not undefined, then
         if (maybe_collation) |collation| {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
@@ -276,13 +279,13 @@ pub const constructor = struct {
             };
         }
 
-        // 20. Set opt.[[co]] to collation.
+        // 21. Set opt.[[co]] to collation.
         // NOTE: This is done as part of step 19.a.
 
-        // 21. Let fw be ? GetOption(options, "firstDayOfWeek", string, empty, undefined).
+        // 22. Let fw be ? GetOption(options, "firstDayOfWeek", string, empty, undefined).
         const maybe_fw = try options.getOption(agent, "firstDayOfWeek", .string, null, null);
 
-        // 22. If fw is not undefined, then
+        // 23. If fw is not undefined, then
         if (maybe_fw) |fw| {
             // a. Set fw to WeekdayToUValue(fw).
             // b. If fw cannot be matched by the type Unicode locale nonterminal, throw a
@@ -305,10 +308,10 @@ pub const constructor = struct {
             };
         }
 
-        // 23. Set opt.[[fw]] to fw.
+        // 24. Set opt.[[fw]] to fw.
         // NOTE: This is done as part of step 22.a.
 
-        // 24. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
+        // 25. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
         //     undefined).
         const maybe_hc = try options.getOption(
             agent,
@@ -323,12 +326,12 @@ pub const constructor = struct {
             null,
         );
 
-        // 25. Set opt.[[hc]] to hc.
+        // 26. Set opt.[[hc]] to hc.
         if (maybe_hc) |hc| {
             tag.setUnicodeExtension("hc", hc.asAscii()) catch unreachable;
         }
 
-        // 26. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
+        // 27. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
         //     undefined).
         const maybe_kf = try options.getOption(
             agent,
@@ -342,21 +345,21 @@ pub const constructor = struct {
             null,
         );
 
-        // 27. Set opt.[[kf]] to kf.
+        // 28. Set opt.[[kf]] to kf.
         if (maybe_kf) |kf| {
             tag.setUnicodeExtension("kf", kf.asAscii()) catch unreachable;
         }
 
-        // 28. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
+        // 29. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
         const maybe_kn = try options.getOption(agent, "numeric", .boolean, null, null);
 
-        // 29. If kn is not undefined, set kn to ! ToString(kn).
-        // 30. Set opt.[[kn]] to kn.
+        // 30. If kn is not undefined, set kn to ! ToString(kn).
+        // 31. Set opt.[[kn]] to kn.
         if (maybe_kn) |kn| {
             tag.setUnicodeExtension("kn", if (kn) "true" else "false") catch unreachable;
         }
 
-        // 31. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
+        // 32. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
         //     undefined).
         const maybe_numbering_system = try options.getOption(
             agent,
@@ -366,7 +369,7 @@ pub const constructor = struct {
             null,
         );
 
-        // 32. If numberingSystem is not undefined, then
+        // 33. If numberingSystem is not undefined, then
         if (maybe_numbering_system) |numbering_system| {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
@@ -388,28 +391,28 @@ pub const constructor = struct {
             };
         }
 
-        // 33. Set opt.[[nu]] to numberingSystem.
+        // 34. Set opt.[[nu]] to numberingSystem.
         // NOTE: This is done as part of step 32.a.
 
         locale.fields = .{
-            // 34. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
-            // 35. Set locale.[[Locale]] to r.[[locale]].
-            // 36. Set locale.[[Calendar]] to r.[[ca]].
-            // 37. Set locale.[[Collation]] to r.[[co]].
-            // 38. Set locale.[[FirstDayOfWeek]] to r.[[fw]].
-            // 39. Set locale.[[HourCycle]] to r.[[hc]].
-            // 40. If localeExtensionKeys contains "kf", then
+            // 35. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
+            // 36. Set locale.[[Locale]] to r.[[locale]].
+            // 37. Set locale.[[Calendar]] to r.[[ca]].
+            // 38. Set locale.[[Collation]] to r.[[co]].
+            // 39. Set locale.[[FirstDayOfWeek]] to r.[[fw]].
+            // 40. Set locale.[[HourCycle]] to r.[[hc]].
+            // 41. If localeExtensionKeys contains "kf", then
             //     a. Set locale.[[CaseFirst]] to r.[[kf]].
-            // 41. If localeExtensionKeys contains "kn", then
+            // 42. If localeExtensionKeys contains "kn", then
             //     a. If SameValue(r.[[kn]], "true") is true or r.[[kn]] is the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
             //         i. Set locale.[[Numeric]] to false.
-            // 42. Set locale.[[NumberingSystem]] to r.[[nu]].
+            // 43. Set locale.[[NumberingSystem]] to r.[[nu]].
             .locale = tag,
         };
 
-        // 43. Return locale.
+        // 44. Return locale.
         return Value.from(&locale.object);
     }
 };

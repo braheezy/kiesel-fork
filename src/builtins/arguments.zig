@@ -136,16 +136,14 @@ fn get(
     // 2. Let isMapped be ! HasOwnProperty(map, P).
     const is_mapped = map.has(property_key);
 
-    // 3. If isMapped is false, then
+    // 3. If isMapped is false, return ? OrdinaryGet(args, P, Receiver).
     if (!is_mapped) {
-        // a. Return ? OrdinaryGet(args, P, Receiver).
         return ordinaryGet(agent, object, property_key, receiver);
-    } else {
-        // 4. Else,
-        // a. Assert: map contains a formal parameter mapping for P.
-        // b. Return ! Get(map, P).
-        return map.get(agent, property_key);
     }
+
+    // 4. Assert: map contains a formal parameter mapping for P.
+    // 5. Return ! Get(map, P).
+    return map.get(agent, property_key);
 }
 
 /// 10.4.4.4 [[Set]] ( P, V, Receiver )

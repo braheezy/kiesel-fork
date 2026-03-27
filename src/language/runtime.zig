@@ -426,34 +426,33 @@ pub fn evaluateImportMeta(agent: *Agent) std.mem.Allocator.Error!Value {
 
     // 3. Let importMeta be module.[[ImportMeta]].
     // 4. If importMeta is empty, then
-    if (module.import_meta) |import_meta| {
-        // 5. Else,
-        //     a. Assert: importMeta is an Object.
-        //     b. Return importMeta.
-        return Value.from(import_meta);
-    }
+    const import_meta = module.import_meta orelse blk: {
+        // a. Set importMeta to OrdinaryObjectCreate(null).
+        const import_meta = try ordinaryObjectCreate(agent, null);
 
-    // a. Set importMeta to OrdinaryObjectCreate(null).
-    const import_meta = try ordinaryObjectCreate(agent, null);
+        // b. Let importMetaValues be HostGetImportMetaProperties(module).
+        var import_meta_values = try agent.host_hooks.hostGetImportMetaProperties(agent, module);
+        defer import_meta_values.deinit(agent.gc_allocator);
 
-    // b. Let importMetaValues be HostGetImportMetaProperties(module).
-    var import_meta_values = try agent.host_hooks.hostGetImportMetaProperties(agent, module);
-    defer import_meta_values.deinit(agent.gc_allocator);
+        // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
+        var it = import_meta_values.iterator();
+        while (it.next()) |entry| {
+            // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
+            try import_meta.createDataPropertyDirect(agent, entry.key_ptr.*, entry.value_ptr.*);
+        }
 
-    // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
-    var it = import_meta_values.iterator();
-    while (it.next()) |entry| {
-        // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
-        try import_meta.createDataPropertyDirect(agent, entry.key_ptr.*, entry.value_ptr.*);
-    }
+        // d. Perform HostFinalizeImportMeta(importMeta, module).
+        agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
 
-    // d. Perform HostFinalizeImportMeta(importMeta, module).
-    agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
+        // e. Set module.[[ImportMeta]] to importMeta.
+        module.import_meta = import_meta;
 
-    // e. Set module.[[ImportMeta]] to importMeta.
-    module.import_meta = import_meta;
+        // f. Return importMeta.
+        break :blk import_meta;
+    };
 
-    // f. Return importMeta.
+    // 5. Assert: importMeta is an Object.
+    // 6. Return importMeta.
     return Value.from(import_meta);
 }
 
@@ -469,7 +468,7 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
     // iii. Let evalArg be the first element of argList.
     const eval_arg = arguments[0];
 
-    // iv. If IsStrict(this CallExpression) is true, let strictCaller be true; otherwise let
+    // iv. If IsStrict(this CallExpression) is true, let strictCaller be true; else let
     //     strictCaller be false.
     const strict_caller = strict;
 
@@ -922,21 +921,20 @@ pub fn methodDefinitionEvaluation(
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
-                // 10. Else,
                 .property_key => |property_key| {
-                    // a. Let desc be the PropertyDescriptor {
-                    //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
-                    //    }.
+                    // 10. Let desc be the PropertyDescriptor {
+                    //       [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
+                    //     }.
                     const property_descriptor: PropertyDescriptor = .{
                         .get = &closure.object,
                         .enumerable = enumerable,
                         .configurable = true,
                     };
 
-                    // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                    // 11. Perform ? DefinePropertyOrThrow(object, propKey, desc).
                     try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
-                    // c. Return unused.
+                    // 12. Return unused.
                     return null;
                 },
             }
@@ -992,9 +990,8 @@ pub fn methodDefinitionEvaluation(
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
-                // 9. Else,
                 .property_key => |property_key| {
-                    // a. Let desc be the PropertyDescriptor {
+                    // 9. Let desc be the PropertyDescriptor {
                     //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
                     //    }.
                     const property_descriptor: PropertyDescriptor = .{
@@ -1003,10 +1000,10 @@ pub fn methodDefinitionEvaluation(
                         .configurable = true,
                     };
 
-                    // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                    // 10. Perform ? DefinePropertyOrThrow(object, propKey, desc).
                     try object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
-                    // c. Return unused.
+                    // 11. Return unused.
                     return null;
                 },
             }

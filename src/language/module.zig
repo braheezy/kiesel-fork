@@ -122,7 +122,7 @@ pub const Module = union(enum) {
     ) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
             .source_text_module => |module| module.loadRequestedModules(agent, host_defined),
-            .synthetic_module => |module| module.loadRequestedModules(agent),
+            .synthetic_module => |module| module.loadRequestedModules(agent, host_defined),
         };
     }
 
@@ -133,7 +133,7 @@ pub const Module = union(enum) {
     ) std.mem.Allocator.Error![]const []const u8 {
         return switch (self) {
             .source_text_module => |module| module.getExportedNames(agent, maybe_export_star_set),
-            .synthetic_module => |module| module.getExportedNames(agent),
+            .synthetic_module => |module| module.getExportedNames(agent, maybe_export_star_set),
         };
     }
 
@@ -145,7 +145,7 @@ pub const Module = union(enum) {
     ) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
         return switch (self) {
             .source_text_module => |module| module.resolveExport(agent, export_name, maybe_resolve_set),
-            .synthetic_module => |module| module.resolveExport(export_name),
+            .synthetic_module => |module| module.resolveExport(agent, export_name, maybe_resolve_set),
         };
     }
 

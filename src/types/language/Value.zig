@@ -728,7 +728,7 @@ fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
             );
         }
 
-        // c. If preferredType is not present, let preferredType be number.
+        // c. If preferredType is not present, set preferredType to number.
         // d. Return ? OrdinaryToPrimitive(input, preferredType).
         return self.asObject().ordinaryToPrimitive(agent, preferred_type orelse .number);
     }
@@ -881,7 +881,8 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
     // 3. Let int be truncate(ℝ(number)).
     // 4. Let int32bit be int modulo 2**32.
-    // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32); otherwise return 𝔽(int32bit).
+    // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32).
+    // 6. Return 𝔽(int32bit).
     return number.toInt32();
 }
 
@@ -923,7 +924,8 @@ pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
     // 4. Let int16bit be int modulo 2**16.
     const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
 
-    // 5. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16); otherwise return 𝔽(int16bit).
+    // 5. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16).
+    // 6. Return 𝔽(int16bit).
     return @bitCast(int16bit);
 }
 
@@ -961,7 +963,8 @@ pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
     // 4. Let int8bit be int modulo 2**8.
     const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
 
-    // 5. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8); otherwise return 𝔽(int8bit).
+    // 5. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8).
+    // 6. Return 𝔽(int8bit).
     return @bitCast(int8bit);
 }
 
@@ -1007,8 +1010,11 @@ pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
     // 7. If clamped > f + 0.5, return 𝔽(f + 1).
     if (clamped > f + 0.5) return f_int + 1;
 
-    // 8. If f is even, return 𝔽(f); otherwise return 𝔽(f + 1).
-    if (f_int % 2 == 0) return f_int else return f_int + 1;
+    // 8. If f is even, return 𝔽(f).
+    if (f_int % 2 == 0) return f_int;
+
+    // 9. Return 𝔽(f + 1).
+    return f_int + 1;
 }
 
 pub inline fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
@@ -1068,7 +1074,8 @@ pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
     const n = try self.toBigInt(agent);
 
     // 2. Let int64bit be ℝ(n) modulo 2**64.
-    // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
+    // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64).
+    // 4. Return ℤ(int64bit).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
     try int64bit.truncate(&n.managed, .signed, 64);
     return int64bit.toInt(i64) catch unreachable;
@@ -1989,15 +1996,18 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 
         // 4. If x is a String, then
         //     a. If x and y have the same length and the same code units in the same positions,
-        //        return true; otherwise return false.
+        //        return true.
+        //     b. Return false.
         .string => x.asString().eql(y.asString()),
 
         // 5. If x is a Boolean, then
-        //     a. If x and y are both true or both false, return true; otherwise return false.
+        //     a. If x and y are both true or both false, return true.
+        //     b. Return false.
         .boolean => x.asBoolean() == y.asBoolean(),
 
         // 6. NOTE: All other ECMAScript language values are compared by identity.
-        // 7. If x is y, return true; otherwise return false.
+        // 7. If x is y, return true.
+        // 8. Return false.
         .symbol => x.asSymbol() == y.asSymbol(),
         .object => x.asObject() == y.asObject(),
 
@@ -2058,69 +2068,66 @@ pub fn isLessThan(
             if (cx > cy) return false;
         }
 
-        // d. If lx < ly, return true; otherwise return false.
-        return lx < ly;
-    } else {
-        // 4. Else,
-        // a. If px is a BigInt and py is a String, then
-        if (px.isBigInt() and py.isString()) {
-            //     i. Let ny be StringToBigInt(py).
-            //     ii. If ny is undefined, return undefined.
-            //     iii. Return BigInt::lessThan(px, ny).
-        }
+        // d. If lx < ly, return true.
+        if (lx < ly) return true;
 
-        // b. If px is a String and py is a BigInt, then
-        if (px.isString() and py.isBigInt()) {
-            //     i. Let nx be StringToBigInt(px).
-            //     ii. If nx is undefined, return undefined.
-            //     iii. Return BigInt::lessThan(nx, py).
-        }
-
-        // c. NOTE: Because px and py are primitive values, evaluation order is not important.
-
-        // d. Let nx be ? ToNumeric(px).
-        const nx = try px.toNumeric(agent);
-
-        // e. Let ny be ? ToNumeric(py).
-        const ny = try py.toNumeric(agent);
-
-        // f. If SameType(nx, yx) is true, then
-        if (Numeric.sameType(nx, ny)) {
-            // i. If nx is a Number, then
-            if (nx == .number) {
-                // 1. Return Number::lessThan(nx, ny).
-                return nx.number.lessThan(ny.number);
-            } else {
-                // ii. Else,
-                // 1. Assert: nx is a BigInt.
-                std.debug.assert(nx == .big_int);
-
-                // 2. Return BigInt::lessThan(nx, ny).
-                return nx.big_int.lessThan(ny.big_int);
-            }
-        }
-
-        // g. Assert: nx is a BigInt and ny is a Number, or nx is a Number and ny is a BigInt.
-        std.debug.assert((nx == .big_int and ny == .number) or (nx == .number and ny == .big_int));
-
-        // h. If nx or ny is NaN, return undefined.
-        if ((nx == .number and nx.number.isNan()) or
-            (ny == .number and ny.number.isNan())) return null;
-
-        // i. If nx is -∞𝔽 or ny is +∞𝔽, return true.
-        if ((nx == .number and nx.number.isNegativeInf()) or
-            (ny == .number and ny.number.isPositiveInf())) return true;
-
-        // j. If nx is +∞𝔽 or ny is -∞𝔽, return false.
-        if ((nx == .number and nx.number.isPositiveInf()) or
-            (ny == .number and ny.number.isNegativeInf())) return false;
-
-        // k. If ℝ(nx) < ℝ(ny), return true; otherwise return false.
-        return switch (nx) {
-            .number => nx.number.asFloat() < ny.big_int.asFloat(),
-            .big_int => nx.big_int.asFloat() < ny.number.asFloat(),
-        };
+        // e. Return false.
+        return false;
     }
+
+    // 4. If px is a BigInt and py is a String, then
+    //     a. Let ny be StringToBigInt(py).
+    //     b. If ny is undefined, return undefined.
+    //     c. Return BigInt::lessThan(px, ny).
+    // 5. If px is a String and py is a BigInt, then
+    //     a. Let nx be StringToBigInt(px).
+    //     b. If nx is undefined, return undefined.
+    //     c. Return BigInt::lessThan(nx, py).
+    // 6. NOTE: Because px and py are primitive values, evaluation order is not important.
+
+    // 7. Let nx be ? ToNumeric(px).
+    const nx = try px.toNumeric(agent);
+
+    // 8. Let ny be ? ToNumeric(py).
+    const ny = try py.toNumeric(agent);
+
+    // 9. If SameType(nx, ny) is true, then
+    if (Numeric.sameType(nx, ny)) {
+        // a. If nx is a Number, return Number::lessThan(nx, ny).
+        if (nx == .number) {
+            return nx.number.lessThan(ny.number);
+        }
+
+        // b. Assert: nx is a BigInt.
+        std.debug.assert(nx == .big_int);
+
+        // c. Return BigInt::lessThan(nx, ny).
+        return nx.big_int.lessThan(ny.big_int);
+    }
+
+    // 10. Assert: nx is a BigInt and ny is a Number, or nx is a Number and ny is a BigInt.
+    std.debug.assert((nx == .big_int and ny == .number) or (nx == .number and ny == .big_int));
+
+    // 11. If nx or ny is NaN, return undefined.
+    if ((nx == .number and nx.number.isNan()) or
+        (ny == .number and ny.number.isNan())) return null;
+
+    // 12. If nx is -∞𝔽 or ny is +∞𝔽, return true.
+    if ((nx == .number and nx.number.isNegativeInf()) or
+        (ny == .number and ny.number.isPositiveInf())) return true;
+
+    // 13. If nx is +∞𝔽 or ny is -∞𝔽, return false.
+    if ((nx == .number and nx.number.isPositiveInf()) or
+        (ny == .number and ny.number.isNegativeInf())) return false;
+
+    // 14. If ℝ(nx) < ℝ(ny), return true.
+    if (switch (nx) {
+        .number => nx.number.asFloat() < ny.big_int.asFloat(),
+        .big_int => nx.big_int.asFloat() < ny.number.asFloat(),
+    }) return true;
+
+    // 15. Return false.
+    return false;
 }
 
 /// 7.2.13 IsLooselyEqual ( x, y )
@@ -2218,7 +2225,8 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
         if ((x.isNumber() and !x.asNumber().isFinite()) or
             (y.isNumber() and !y.asNumber().isFinite())) return false;
 
-        // b. If ℝ(x) = ℝ(y), return true; otherwise return false.
+        // b. If ℝ(x) = ℝ(y), return true.
+        // c. Return false.
         // TODO: Implement more efficient BigInt to f64 comparison
         if ((x.isNumber() and !x.asNumber().isIntegral()) or
             (y.isNumber() and !y.asNumber().isIntegral())) return false;

@@ -174,7 +174,7 @@ pub fn loadRequestedModules(
 ) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 
-    // 1. If hostDefined is not present, let hostDefined be empty.
+    // 1. If hostDefined is not present, set hostDefined to empty.
 
     // 2. Let pc be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
@@ -805,10 +805,8 @@ fn innerModuleEvaluation(
         else => false,
     }) {
         // a. If module.[[EvaluationError]] is empty, return index.
-        if (module.evaluation_error == null) return index;
-
-        // b. Otherwise, return ? module.[[EvaluationError]].
-        agent.exception = module.evaluation_error.?;
+        // b. Return ? module.[[EvaluationError]].
+        agent.exception = module.evaluation_error orelse return index;
         return error.ExceptionThrown;
     }
 
@@ -936,7 +934,7 @@ fn innerModuleEvaluation(
                 required_module.async_evaluation_order == .unset);
 
             // v. If requiredModule.[[AsyncEvaluationOrder]] is unset, set requiredModule.[[Status]] to evaluated.
-            // vi. Otherwise, set requiredModule.[[Status]] to evaluating-async.
+            // vi. Else, set requiredModule.[[Status]] to evaluating-async.
             required_module.status = if (required_module.async_evaluation_order == .unset) .evaluated else .evaluating_async;
 
             // viii. Set requiredModule.[[CycleRoot]] to module.
@@ -1167,7 +1165,7 @@ fn asyncModuleExecutionFulfilled(
             try executeAsyncModule(agent, m);
         } else {
             // c. Else,
-            // i. Let result be m.ExecuteModule().
+            // i. Let result be Completion(m.ExecuteModule()).
             const result = m.executeModule(agent, null);
 
             // ii. If result is an abrupt completion, then
@@ -1416,17 +1414,16 @@ pub fn resolveExport(
                         .binding_name = .namespace,
                     },
                 };
-            } else {
-                // iv. Else,
-                // 1. Assert: module imports a specific binding for this export.
-                // 2. Assert: e.[[ImportName]] is a String.
-                // 3. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
-                return imported_module.resolveExport(
-                    agent,
-                    export_entry.import_name.?.string,
-                    resolve_set,
-                );
             }
+
+            // iv. Assert: module imports a specific binding for this export.
+            // v. Assert: e.[[ImportName]] is a String.
+            // vi. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
+            return imported_module.resolveExport(
+                agent,
+                export_entry.import_name.?.string,
+                resolve_set,
+            );
         }
     }
 

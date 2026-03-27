@@ -36,7 +36,7 @@ pub fn allocateSharedArrayBuffer(
     // 1. Let slots be « [[ArrayBufferData]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingGrowableBuffer
-    //    be true; otherwise let allocatingGrowableBuffer be false.
+    //    be true; else let allocatingGrowableBuffer be false.
     const allocating_growable_buffer = max_byte_length != .none;
 
     // 3. If allocatingGrowableBuffer is true, then
@@ -71,7 +71,7 @@ pub fn allocateSharedArrayBuffer(
         },
     );
 
-    // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; otherwise let
+    // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; else let
     //    allocLength be byteLength.
     const alloc_length = max_byte_length.unwrap() orelse byte_length;
 
@@ -341,7 +341,8 @@ pub const prototype = struct {
             );
         }
 
-        // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
+        // 4. If IsFixedLengthArrayBuffer(O) is false, return true.
+        // 5. Return false.
         return Value.from(!isFixedLengthArrayBuffer(array_buffer));
     }
 

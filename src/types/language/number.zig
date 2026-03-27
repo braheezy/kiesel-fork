@@ -232,58 +232,62 @@ pub const Number = union(enum) {
 
         // 4. If base is +∞𝔽, then
         if (base.isPositiveInf()) {
-            // a. If exponent > +0𝔽, return +∞𝔽; otherwise return +0𝔽.
-            if (exponent.asFloat() > 0)
-                return .{ .f64 = std.math.inf(f64) }
+            // a. If exponent > +0𝔽, return +∞𝔽.
+            // b. Return +0𝔽.
+            return if (exponent.asFloat() > 0)
+                .{ .f64 = std.math.inf(f64) }
             else
-                return .{ .i32 = 0 };
+                .{ .i32 = 0 };
         }
 
         // 5. If base is -∞𝔽, then
         if (base.isNegativeInf()) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
-                // i. If exponent is an odd integral Number, return -∞𝔽; otherwise return +∞𝔽.
-                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
-                    return .{ .f64 = -std.math.inf(f64) }
+                // i. If exponent is an odd integral Number, return -∞𝔽.
+                // ii. Return +∞𝔽.
+                return if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
+                    .{ .f64 = -std.math.inf(f64) }
                 else
-                    return .{ .f64 = std.math.inf(f64) };
-            } else {
-                // b. Else,
-                // i. If exponent is an odd integral Number, return -0𝔽; otherwise return +0𝔽.
-                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
-                    return .{ .f64 = -0.0 }
-                else
-                    return .{ .i32 = 0 };
+                    .{ .f64 = std.math.inf(f64) };
             }
+
+            // b. If exponent is an odd integral Number, return -0𝔽.
+            // c. Return +0𝔽.
+            return if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
+                .{ .f64 = -0.0 }
+            else
+                .{ .i32 = 0 };
         }
 
         // 6. If base is +0𝔽, then
         if (base.isPositiveZero()) {
-            // a. If exponent > +0𝔽, return +0𝔽; otherwise return +∞𝔽.
-            if (exponent.asFloat() > 0)
-                return .{ .i32 = 0 }
+            // a. If exponent > +0𝔽, return +0𝔽.
+            // b. Return +∞𝔽.
+            return if (exponent.asFloat() > 0)
+                .{ .i32 = 0 }
             else
-                return .{ .f64 = std.math.inf(f64) };
+                .{ .f64 = std.math.inf(f64) };
         }
 
         // 7. If base is -0𝔽, then
         if (base.isNegativeZero()) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
-                // i. If exponent is an odd integral Number, return -0𝔽; otherwise return +0𝔽.
-                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
-                    return .{ .f64 = -0.0 }
+                // i. If exponent is an odd integral Number, return -0𝔽.
+                // ii. Return +0𝔽.
+                return if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
+                    .{ .f64 = -0.0 }
                 else
-                    return .{ .i32 = 0 };
-            } else {
-                // b. Else,
-                // i. If exponent is an odd integral Number, return -∞𝔽; otherwise return +∞𝔽.
-                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
-                    return .{ .f64 = -std.math.inf(f64) }
-                else
-                    return .{ .f64 = std.math.inf(f64) };
+                    .{ .i32 = 0 };
             }
+
+            // b. If exponent is an odd integral Number, return -∞𝔽.
+            // c. Return +∞𝔽.
+            return if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
+                .{ .f64 = -std.math.inf(f64) }
+            else
+                .{ .f64 = std.math.inf(f64) };
         }
 
         // 8. Assert: base is finite and is neither +0𝔽 nor -0𝔽.
@@ -292,25 +296,27 @@ pub const Number = union(enum) {
         // 9. If exponent is +∞𝔽, then
         if (exponent.isPositiveInf()) {
             // a. If abs(ℝ(base)) > 1, return +∞𝔽.
-            if (@abs(base.asFloat()) > 1) return .{ .f64 = std.math.inf(f64) };
-
             // b. If abs(ℝ(base)) = 1, return NaN.
-            if (@abs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
-
-            // c. If abs(ℝ(base)) < 1, return +0𝔽.
-            if (@abs(base.asFloat()) < 1) return .{ .i32 = 0 };
+            // c. Return +0𝔽.
+            return if (@abs(base.asFloat()) > 1)
+                .{ .f64 = std.math.inf(f64) }
+            else if (@abs(base.asFloat()) == 1)
+                .{ .f64 = std.math.nan(f64) }
+            else
+                .{ .i32 = 0 };
         }
 
         // 10. If exponent is -∞𝔽, then
         if (exponent.isNegativeInf()) {
             // a. If abs(ℝ(base)) > 1, return +0𝔽.
-            if (@abs(base.asFloat()) > 1) return .{ .i32 = 0 };
-
             // b. If abs(ℝ(base)) = 1, return NaN.
-            if (@abs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
-
-            // c. If abs(ℝ(base)) < 1, return +∞𝔽.
-            if (@abs(base.asFloat()) < 1) return .{ .f64 = std.math.inf(f64) };
+            // c. Return +∞𝔽.
+            return if (@abs(base.asFloat()) > 1)
+                .{ .i32 = 0 }
+            else if (@abs(base.asFloat()) == 1)
+                .{ .f64 = std.math.nan(f64) }
+            else
+                .{ .f64 = std.math.inf(f64) };
         }
 
         // 11. Assert: exponent is finite and is neither +0𝔽 nor -0𝔽.
@@ -328,6 +334,7 @@ pub const Number = union(enum) {
     /// 6.1.6.1.4 Number::multiply ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-multiply
     pub fn multiply(x: Number, y: Number) Number {
+        // 1-6.
         if (x == .i32 and y == .i32) {
             if (std.math.mul(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
         }
@@ -337,6 +344,7 @@ pub const Number = union(enum) {
     /// 6.1.6.1.5 Number::divide ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-divide
     pub fn divide(x: Number, y: Number) Number {
+        // 1-8.
         return from(x.asFloat() / y.asFloat());
     }
 
@@ -381,6 +389,7 @@ pub const Number = union(enum) {
     /// 6.1.6.1.7 Number::add ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-add
     pub fn add(x: Number, y: Number) Number {
+        // 1-8.
         if (x == .i32 and y == .i32) {
             if (std.math.add(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
         }
@@ -483,7 +492,8 @@ pub const Number = union(enum) {
         // 10. Assert: x and y are finite.
         std.debug.assert(std.math.isFinite(x.asFloat()) and std.math.isFinite(y.asFloat()));
 
-        // 11. If ℝ(x) < ℝ(y), return true; otherwise return false.
+        // 11. If ℝ(x) < ℝ(y), return true.
+        // 12. Return false.
         return x.asFloat() < y.asFloat();
     }
 

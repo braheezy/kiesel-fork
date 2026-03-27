@@ -854,17 +854,21 @@ pub const prototype = struct {
             const next = next_.canonicalizeKeyedCollectionKey();
 
             // ii. Let resultIndex be SetDataIndex(resultSetData, next).
+            // iii. If resultIndex is not-found, let alreadyInResult be false; else let
+            //      alreadyInResult be true.
             const maybe_result_index = setDataIndex(result_set_data, next);
 
-            // iii. If SetDataHas(O.[[SetData]], next) is true, then
+            // iii. If resultIndex is not-found, let alreadyInResult be false; else let
+            //      alreadyInResult be true.
+            // iv. If SetDataHas(O.[[SetData]], next) is true, then
             if (setDataHas(object.fields.set_data, next)) {
-                // 1. If resultIndex is not not-found, set resultSetData[resultIndex] to empty.
+                // 1. If alreadyInResult is true, set resultSetData[resultIndex] to empty.
                 if (maybe_result_index) |result_index| {
                     result_set_data.orderedRemoveAt(result_index);
                 }
             } else {
                 // v. Else,
-                // 1. If resultIndex is not-found, append next to resultSetData.
+                // 1. If alreadyInResult is false, append next to resultSetData.
                 if (maybe_result_index == null) {
                     try result_set_data.put(agent.gc_allocator, next, {});
                 }

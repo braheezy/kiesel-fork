@@ -932,7 +932,7 @@ pub const constructor = struct {
                 return;
             },
 
-            // 2. Else if cp is a code point listed in the “Code Point” column of Table 67, then
+            // 2. If cp is a code point listed in the “Code Point” column of Table 67, then
             '\t'...'\r' => {
                 // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the
                 //    string in the “ControlEscape” column of the row whose “Code Point” column
@@ -1156,7 +1156,7 @@ pub const prototype = struct {
                 return .undefined;
             }
 
-            // b. Otherwise, throw a TypeError exception.
+            // b. Throw a TypeError exception.
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         };
 
@@ -1214,76 +1214,73 @@ pub const prototype = struct {
         // 4. Let flags be ? ToString(? Get(rx, "flags")).
         const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
-        // 5. If flags does not contain "g", then
+        // 5. If flags does not contain "g", return ? RegExpExec(rx, S).
         if (flags_.indexOf(String.fromLiteral("g"), 0) == null) {
-            // a. Return ? RegExpExec(rx, S).
             return if (try regExpExec(agent, reg_exp, string)) |object|
                 Value.from(object)
             else
                 .null;
-        } else {
-            // 6. Else,
-            // a. If flags contains "u" or flags contains "v", let fullUnicode be true; otherwise
-            //    let fullUnicode be false.
-            const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
-                flags_.indexOf(String.fromLiteral("v"), 0) != null;
+        }
 
-            // b. Perform ? Set(rx, "lastIndex", +0𝔽, true).
-            try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+        // 6. If flags contains "u" or flags contains "v", let fullUnicode be true; else let
+        //    fullUnicode be false.
+        const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
+            flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
-            // c. Let A be ! ArrayCreate(0).
-            const array = try arrayCreateFast(agent, 0);
+        // 7. Perform ? Set(rx, "lastIndex", +0𝔽, true).
+        try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
-            // d. Let n be 0.
-            var n: u53 = 0;
+        // 8. Let A be ! ArrayCreate(0).
+        const array = try arrayCreateFast(agent, 0);
 
-            // e. Repeat,
-            while (true) : (n += 1) {
-                // i. Let result be ? RegExpExec(rx, S).
-                const result = try regExpExec(agent, reg_exp, string);
+        // 9. Let n be 0.
+        var n: u53 = 0;
 
-                // ii. If result is null, then
-                if (result == null) {
-                    // 1. If n = 0, return null.
-                    if (n == 0) return .null;
+        // 10. Repeat,
+        while (true) : (n += 1) {
+            // a. Let result be ? RegExpExec(rx, S).
+            const result = try regExpExec(agent, reg_exp, string);
 
-                    // 2. Return A.
-                    return Value.from(&array.object);
-                } else {
-                    // iii. Else,
-                    // 1. Let matchStr be ? ToString(? Get(result, "0")).
-                    const match_str = try (try result.?.get(agent, PropertyKey.from(0))).toString(agent);
+            // b. If result is null, then
+            if (result == null) {
+                // 1. If n = 0, return null.
+                if (n == 0) return .null;
 
-                    // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
-                    try array.object.createDataPropertyDirect(
-                        agent,
-                        PropertyKey.from(n),
-                        Value.from(match_str),
-                    );
-
-                    // 3. If matchStr is the empty String, then
-                    if (match_str.isEmpty()) {
-                        // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
-                        const this_index = try (try reg_exp.get(
-                            agent,
-                            PropertyKey.from("lastIndex"),
-                        )).toLength(agent);
-
-                        // b. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
-                        const next_index = advanceStringIndex(string, this_index, full_unicode);
-
-                        // c. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
-                        try reg_exp.set(
-                            agent,
-                            PropertyKey.from("lastIndex"),
-                            Value.from(@as(f64, @floatFromInt(next_index))),
-                            .throw,
-                        );
-                    }
-
-                    // 4. Set n to n + 1.
-                }
+                // 2. Return A.
+                return Value.from(&array.object);
             }
+
+            // c. Let matchStr be ? ToString(? Get(result, "0")).
+            const match_str = try (try result.?.get(agent, PropertyKey.from(0))).toString(agent);
+
+            // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
+            try array.object.createDataPropertyDirect(
+                agent,
+                PropertyKey.from(n),
+                Value.from(match_str),
+            );
+
+            // e. If matchStr is the empty String, then
+            if (match_str.isEmpty()) {
+                // i. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
+                const this_index = try (try reg_exp.get(
+                    agent,
+                    PropertyKey.from("lastIndex"),
+                )).toLength(agent);
+
+                // ii. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+                const next_index = advanceStringIndex(string, this_index, full_unicode);
+
+                // iii. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
+                try reg_exp.set(
+                    agent,
+                    PropertyKey.from("lastIndex"),
+                    Value.from(@as(f64, @floatFromInt(next_index))),
+                    .throw,
+                );
+            }
+
+            // f. Set n to n + 1.
         }
     }
 
@@ -1385,7 +1382,7 @@ pub const prototype = struct {
         // 7. Let flags be ? ToString(? Get(rx, "flags")).
         const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
-        // 8. If flags contains "g", let global be true; otherwise let global be false.
+        // 8. If flags contains "g", let global be true; else let global be false.
         const global_ = flags_.indexOf(String.fromLiteral("g"), 0) != null;
 
         // 9. If global is true, then
@@ -1427,8 +1424,8 @@ pub const prototype = struct {
                 // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
                 const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
-                // b. If flags contains "u" or flags contains "v", let fullUnicode be true;
-                //    otherwise let fullUnicode be false.
+                // b. If flags contains "u" or flags contains "v", let fullUnicode be true; else
+                //    let fullUnicode be false.
                 const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
                     flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
@@ -1655,7 +1652,7 @@ pub const prototype = struct {
                 return Value.from("(?:)");
             }
 
-            // b. Otherwise, throw a TypeError exception.
+            // b. Throw a TypeError exception.
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         };
 
@@ -1906,7 +1903,8 @@ pub const prototype = struct {
         // 4. Let match be ? RegExpExec(R, string).
         const match = try regExpExec(agent, reg_exp, string);
 
-        // 5. If match is not null, return true; else return false.
+        // 5. If match is null, return false.
+        // 6. Return true.
         return Value.from(match != null);
     }
 

@@ -150,8 +150,10 @@ pub fn getBindingValue(
     // 3. If value is false, then
     if (!value) {
         @branchHint(.unlikely);
-        // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
+        // a. If S is false, return undefined.
         if (!strict) return .undefined;
+
+        // b. Throw a ReferenceError exception.
         return agent.throwException(.reference_error, "'{f}' is not defined", .{name.fmtRaw()});
     }
 
@@ -180,14 +182,22 @@ pub fn hasThisBinding(_: ObjectEnvironment) bool {
     return false;
 }
 
-/// 9.1.1.2.9 HasSuperBinding ( )
+/// 9.1.1.2.9 GetThisBinding ( )
+/// https://tc39.es/ecma262/#sec-object-environment-records-getthisbinding
+pub fn getThisBinding(_: ObjectEnvironment) Value {
+    // The GetThisBinding concrete method of an Object Environment Record is never used within this
+    // specification.
+    @compileError("Should not be used");
+}
+
+/// 9.1.1.2.10 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hassuperbinding
 pub fn hasSuperBinding(_: ObjectEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
-/// 9.1.1.2.10 WithBaseObject ( )
+/// 9.1.1.2.11 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-object-environment-records-withbaseobject
 pub fn withBaseObject(self: ObjectEnvironment) ?*Object {
     // 1. If envRec.[[IsWithEnvironment]] is true, return envRec.[[BindingObject]].
@@ -196,7 +206,7 @@ pub fn withBaseObject(self: ObjectEnvironment) ?*Object {
         return self.binding_object;
     }
 
-    // 2. Otherwise, return undefined.
+    // 2. Return undefined.
     return null;
 }
 

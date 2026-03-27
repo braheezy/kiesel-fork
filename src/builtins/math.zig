@@ -534,7 +534,8 @@ pub const namespace = struct {
         // 3. Let product be (a × b) modulo 2**32.
         const product = a *% b;
 
-        // 4. If product ≥ 2**31, return 𝔽(product - 2**32); otherwise return 𝔽(product).
+        // 4. If product ≥ 2**31, return 𝔽(product - 2**32).
+        // 5. Return 𝔽(product).
         return Value.from(@as(i32, @bitCast(product)));
     }
 

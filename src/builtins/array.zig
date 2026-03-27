@@ -43,13 +43,13 @@ fn defineOwnProperty(
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    // 1. If P is "length", then
+    // 1. If P is "length", return ? ArraySetLength(A, Desc).
     if (property_key.isLength()) {
-        // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array.as(builtins.Array), property_descriptor);
     }
-    // 2. Else if P is an array index, then
-    else if (property_key.isArrayIndex()) {
+
+    // 2. If P is an array index, then
+    if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
         // b. Assert: lengthDesc is not undefined.
         // c. Assert: IsDataDescriptor(lengthDesc) is true.
@@ -387,14 +387,14 @@ pub const constructor = struct {
         // 3. Let numberOfArgs be the number of elements in values.
         const number_of_args = arguments.count();
 
-        // 4. If numberOfArgs = 0, then
+        // 4. If numberOfArgs = 0, return ! ArrayCreate(0, proto).
         if (number_of_args == 0) {
-            // a. Return ! ArrayCreate(0, proto).
             const array = arrayCreate(agent, 0, prototype_) catch |err| try noexcept(err);
             return Value.from(&array.object);
         }
-        // 5. Else if numberOfArgs = 1, then
-        else if (number_of_args == 1) {
+
+        // 5. If numberOfArgs = 1, then
+        if (number_of_args == 1) {
             // a. Let len be values[0].
             const len = arguments.get(0);
 
@@ -431,33 +431,32 @@ pub const constructor = struct {
 
             // f. Return array.
             return Value.from(&array.object);
-        } else {
-            // 6. Else,
-            // a. Assert: numberOfArgs ≥ 2.
-            std.debug.assert(number_of_args >= 2);
-
-            // b. Let array be ? ArrayCreate(numberOfArgs, proto).
-            const array = try arrayCreate(agent, @intCast(number_of_args), prototype_);
-
-            // c. Let k be 0.
-            // d. Repeat, while k < numberOfArgs,
-            for (arguments.values, 0..) |item_k, k| {
-                // i. Let Pk be ! ToString(𝔽(k)).
-                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
-
-                // ii. Let itemK be values[k].
-                // iii. Perform ! CreateDataPropertyOrThrow(array, Pk, itemK).
-                try array.object.createDataPropertyDirect(agent, property_key, item_k);
-
-                // iv. Set k to k + 1.
-            }
-
-            // e. Assert: The mathematical value of array's "length" property is numberOfArgs.
-            std.debug.assert(array.fields.length == @as(u32, @intCast(number_of_args)));
-
-            // f. Return array.
-            return Value.from(&array.object);
         }
+
+        // 6. Assert: numberOfArgs ≥ 2.
+        std.debug.assert(number_of_args >= 2);
+
+        // 7. Let array be ? ArrayCreate(numberOfArgs, proto).
+        const array = try arrayCreate(agent, @intCast(number_of_args), prototype_);
+
+        // 8. Let k be 0.
+        // 9. Repeat, while k < numberOfArgs,
+        for (arguments.values, 0..) |item_k, k| {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+
+            // b. Let itemK be values[k].
+            // c. Perform ! CreateDataPropertyOrThrow(array, Pk, itemK).
+            try array.object.createDataPropertyDirect(agent, property_key, item_k);
+
+            // d. Set k to k + 1.
+        }
+
+        // 10. Assert: The mathematical value of array's "length" property is numberOfArgs.
+        std.debug.assert(array.fields.length == @as(u32, @intCast(number_of_args)));
+
+        // 11. Return array.
+        return Value.from(&array.object);
     }
 
     /// 23.1.2.1 Array.from ( items [ , mapper [ , thisArg ] ] )
@@ -1878,7 +1877,7 @@ pub const prototype = struct {
         // 6. If n = +∞, return false.
         if (std.math.isPositiveInf(n)) return .false;
 
-        // 7. Else if n = -∞, set n to 0.
+        // 7. If n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
 
         // 8. If n ≥ 0, then
@@ -1934,7 +1933,7 @@ pub const prototype = struct {
         // 6. If n = +∞, return -1𝔽.
         if (std.math.isPositiveInf(n)) return Value.from(-1);
 
-        // 7. Else if n = -∞, set n to 0.
+        // 7. If n = -∞, set n to 0.
         if (std.math.isNegativeInf(n)) n = 0;
 
         // 8. If n ≥ 0, then
@@ -2175,29 +2174,28 @@ pub const prototype = struct {
 
             // b. Return undefined.
             return .undefined;
-        } else {
-            // 4. Else,
-            // a. Assert: len > 0.
-            std.debug.assert(len > 0);
-
-            // b. Let newLen be 𝔽(len - 1).
-            const new_len = len - 1;
-
-            // c. Let index be ! ToString(newLen).
-            const property_key = PropertyKey.from(new_len);
-
-            // d. Let element be ? Get(O, index).
-            const element = try object.get(agent, property_key);
-
-            // e. Perform ? DeletePropertyOrThrow(O, index).
-            try object.deletePropertyOrThrow(agent, property_key);
-
-            // f. Perform ? Set(O, "length", newLen, true).
-            try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
-
-            // g. Return element.
-            return element;
         }
+
+        // 4. Assert: len > 0.
+        std.debug.assert(len > 0);
+
+        // 5. Let newLen be 𝔽(len - 1).
+        const new_len = len - 1;
+
+        // 6. Let index be ! ToString(newLen).
+        const property_key = PropertyKey.from(new_len);
+
+        // 7. Let element be ? Get(O, index).
+        const element = try object.get(agent, property_key);
+
+        // 8. Perform ? DeletePropertyOrThrow(O, index).
+        try object.deletePropertyOrThrow(agent, property_key);
+
+        // 9. Perform ? Set(O, "length", newLen, true).
+        try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
+
+        // 10. Return element.
+        return element;
     }
 
     /// 23.1.3.23 Array.prototype.push ( ...items )

@@ -147,18 +147,19 @@ fn createIntrinsics(self: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
     // latter will be created twice.
     _ = try self.intrinsics.@"%Object.prototype%"();
 
-    // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
-    //    names are the names listed in column one of the table. The value of each field is a new
-    //    object value fully and recursively populated with property values as defined by the
-    //    specification of each object in clauses 19 through 28. All object property values are
+    // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field names
+    //    are the names listed in the “Intrinsic Name” column of the table. The value of each field
+    //    is a new object value fully and recursively populated with property values as defined by
+    //    the specification of each object in clauses 19 through 28. All object property values are
     //    newly created object values. All values that are built-in function objects are created by
-    //    performing CreateBuiltinFunction(steps, length, name, slots, realmRec, prototype) where
-    //    steps is the definition of that function provided by this specification, name is the
-    //    initial value of the function's "name" property, length is the initial value of the
+    //    performing CreateBuiltinFunction(steps, length, name, slots, realmRec, prototype, async)
+    //    where steps is the definition of that function provided by this specification, name is
+    //    the initial value of the function's "name" property, length is the initial value of the
     //    function's "length" property, slots is a list of the names, if any, of the function's
-    //    specified internal slots, and prototype is the specified value of the function's
-    //    [[Prototype]] internal slot. The creation of the intrinsics and their properties must be
-    //    ordered to avoid any dependencies upon objects that have not yet been created.
+    //    specified internal slots, prototype is the specified value of the function's
+    //    [[Prototype]] internal slot, and async is true if the function is described as “async”
+    //    and false otherwise. The creation of the intrinsics and their properties must be ordered
+    //    to avoid any dependencies upon objects that have not yet been created.
     // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
     // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).

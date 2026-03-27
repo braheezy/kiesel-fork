@@ -179,13 +179,13 @@ pub const prototype = struct {
         // 3. Let name be ? Get(O, "name").
         const name = try object.get(agent, PropertyKey.from("name"));
 
-        // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
+        // 4. If name is undefined, set name to "Error"; else set name to ? ToString(name).
         const name_string = if (name.isUndefined()) String.fromLiteral("Error") else try name.toString(agent);
 
         // 5. Let msg be ? Get(O, "message").
         const msg = try object.get(agent, PropertyKey.from("message"));
 
-        // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
+        // 6. If msg is undefined, set msg to the empty String; else set msg to ? ToString(msg).
         const msg_string: *const String = if (msg.isUndefined()) .empty else try msg.toString(agent);
 
         // 7. If name is the empty String, return msg.

@@ -12,6 +12,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const Module = language.Module;
 const Realm = execution.Realm;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
@@ -135,15 +136,18 @@ fn setSyntheticModuleExport(
     // 5. Return unused.
 }
 
-/// 16.2.1.8.4.1 LoadRequestedModules ( )
+/// 16.2.1.8.4.1 LoadRequestedModules ( [ hostDefined ] )
 /// https://tc39.es/ecma262/#sec-smr-LoadRequestedModules
 pub fn loadRequestedModules(
     _: *SyntheticModule,
     agent: *Agent,
+    _: ?SafePointer,
 ) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 
-    // 1. Return ! PromiseResolve(%Promise%, undefined).
+    // 1. NOTE: This implementation of LoadRequestedModules does not use hostDefined.
+
+    // 2. Return ! PromiseResolve(%Promise%, undefined).
     const promise = promiseResolve(
         agent,
         try realm.intrinsics.@"%Promise%"(),
@@ -152,27 +156,34 @@ pub fn loadRequestedModules(
     return promise.as(builtins.Promise);
 }
 
-/// 16.2.1.8.4.2 GetExportedNames ( )
+/// 16.2.1.8.4.2 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-smr-getexportednames
 pub fn getExportedNames(
     self: *SyntheticModule,
     agent: *Agent,
+    _: ?*Module.ExportStarSet,
 ) std.mem.Allocator.Error![]const []const u8 {
-    // 1. Return module.[[ExportNames]].
+    // 1. NOTE: This implementation of GetExportedNames does not use exportStarSet.
+
+    // 2. Return module.[[ExportNames]].
     // NOTE: The caller owns the returned memory so we have to dupe this.
     return agent.gc_allocator.dupe([]const u8, self.export_names);
 }
 
-/// 16.2.1.8.4.3 ResolveExport ( exportName )
+/// 16.2.1.8.4.3 ResolveExport ( exportName [ , resolveSet ] )
 /// https://tc39.es/ecma262/#sec-smr-resolveexport
 pub fn resolveExport(
     self: *SyntheticModule,
+    _: *Agent,
     export_name: []const u8,
+    _: ?*Module.ResolveSet,
 ) error{}!?ResolvedBindingOrAmbiguous {
-    // 1. If module.[[ExportNames]] does not contain exportName, return null.
+    // 1. NOTE: This implementation of ResolveExport does not use resolveSet.
+
+    // 2. If module.[[ExportNames]] does not contain exportName, return null.
     if (!containsSlice(self.export_names, export_name)) return null;
 
-    // 2. Return ResolvedBinding Record { [[Module]]: module, [[BindingName]]: exportName }.
+    // 3. Return ResolvedBinding Record { [[Module]]: module, [[BindingName]]: exportName }.
     return .{
         .resolved_binding = .{
             .module = .{ .synthetic_module = self },
