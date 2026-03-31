@@ -718,13 +718,10 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
                 // i. Assert: m.[[Status]] is evaluating.
                 std.debug.assert(m.status == .evaluating);
 
-                // ii. Assert: m.[[AsyncEvaluationOrder]] is unset.
-                std.debug.assert(m.async_evaluation_order == .unset);
-
-                // iii. Set m.[[Status]] to evaluated.
+                // ii. Set m.[[Status]] to evaluated.
                 m.status = .evaluated;
 
-                // iv. Set m.[[EvaluationError]] to result.
+                // iii. Set m.[[EvaluationError]] to result.
                 m.evaluation_error = exception;
             }
 
