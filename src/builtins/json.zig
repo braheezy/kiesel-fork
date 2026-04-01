@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -18,6 +19,12 @@ const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
+
+pub const RawJSON = MakeObject(.{
+    .tag = .raw_json,
+    .display_name = "RawJSON",
+});
 
 /// Recursively convert a `std.json.Value` to a JS `Value`.
 fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Error!Value {
@@ -62,7 +69,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
     };
 }
 
-/// 25.5.1.1 ParseJSON ( text )
+/// 25.5.2.1 ParseJSON ( text )
 /// https://tc39.es/ecma262/#sec-ParseJSON
 pub fn parseJSON(agent: *Agent, text: []const u8) Agent.Error!Value {
     // 1. If StringToCodePoints(text) is not a valid JSON text as specified in ECMA-404, throw a
@@ -73,11 +80,11 @@ pub fn parseJSON(agent: *Agent, text: []const u8) Agent.Error!Value {
     //    invocation of ParseText.
     // 5. Assert: script is a Parse Node.
     // 6. Let result be ! Evaluation of script.
-    // 7. NOTE: The PropertyDefinitionEvaluation semantics defined in 13.2.5.5 have special
+    // 7. NOTE: The PropertyDefinitionEvaluation semantics defined in 13.2.5.6 have special
     //    handling for the above evaluation.
     // 8. Assert: result is either a String, a Number, a Boolean, an Object that is defined by
     //    either an ArrayLiteral or an ObjectLiteral, or null.
-    // 9. Return result.
+    // 9. Return the Record { [[ParseNode]]: script, [[Value]]: result }.
     const parsed = std.json.parseFromSlice(
         std.json.Value,
         agent.gc_allocator,
@@ -94,44 +101,306 @@ pub fn parseJSON(agent: *Agent, text: []const u8) Agent.Error!Value {
     return convertJsonValue(agent, parsed.value);
 }
 
-/// 25.5.1.2 InternalizeJSONProperty ( holder, name, reviver )
+/// 25.5.2.2 JSON Parse Record
+/// https://tc39.es/ecma262/#sec-json-parse-record
+const JSONParseRecord = struct {
+    /// [[Value]]
+    value: Value,
+
+    // These are mutually exclusive so we use a tagged union.
+    contents: Contents,
+
+    const Contents = union(enum) {
+        /// [[ParseNode]]
+        primitive: []const u8,
+
+        /// [[Elements]]
+        array: []const JSONParseRecord,
+
+        /// [[Entries]]
+        object: String.HashMapUnmanaged(JSONParseRecord),
+    };
+};
+
+/// 25.5.2.3 CreateJSONParseRecord ( parseNode, key, val )
+/// https://tc39.es/ecma262/#sec-createjsonparserecord
+fn createJSONParseRecord(
+    agent: *Agent,
+    scanner: *std.json.Scanner,
+    value: Value,
+) std.mem.Allocator.Error!JSONParseRecord {
+    const gpa = agent.gpa;
+
+    // 1. Let typedValNode be ShallowestContainedJSONValue(parseNode).
+    // 2. Assert: typedValNode is not empty.
+    // 3. Let elements be a new empty List.
+    // 4. Let entries be a new empty List.
+    var contents: JSONParseRecord.Contents = .{ .primitive = "" };
+
+    // 5. If val is an Object, then
+    if (value.isObject()) {
+        // a. Let isArray be ! IsArray(val).
+        // b. If isArray is true, then
+        if (value.asObject().cast(builtins.Array)) |array| {
+            // i. Assert: typedValNode is an ArrayLiteral Parse Node.
+            {
+                const token = scanner.next() catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+                std.debug.assert(token == .array_begin);
+            }
+
+            // ii. Let contentNodes be the JSONArrayLiteralContentNodes of typedValNode.
+            // iii. Let len be the number of elements in contentNodes.
+            // iv. Let valLen be ! LengthOfArrayLike(val).
+            // v. Assert: valLen is len.
+            const len = array.fields.length;
+            const elements = try agent.gc_allocator.alloc(JSONParseRecord, len);
+
+            // vi. Let index be 0.
+            // vii. Repeat, while index < len,
+            for (elements, 0..) |*element, index| {
+                // 1. Let propName be ! ToString(𝔽(index)).
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
+
+                // 2. Let elementParseRecord be CreateJSONParseRecord(contentNodes[index],
+                //    propName, ! Get(val, propName)).
+                const element_parse_record = try createJSONParseRecord(
+                    agent,
+                    scanner,
+                    value.asObject().getPropertyValueDirect(property_key),
+                );
+
+                // 3. Append elementParseRecord to elements.
+                element.* = element_parse_record;
+
+                // 4. Set index to index + 1.
+            }
+            contents = .{ .array = elements };
+
+            {
+                const token = scanner.next() catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+                std.debug.assert(token == .array_end);
+            }
+        } else {
+            // c. Else,
+            // i. Assert: typedValNode is an ObjectLiteral Parse Node.
+            {
+                const token = scanner.next() catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+                std.debug.assert(token == .object_begin);
+            }
+
+            // ii. Let propertyNodes be the PropertyDefinitionNodes of typedValNode.
+            // Stores owned keys and slices into `scanner.input`.
+            var property_nodes: std.StringHashMapUnmanaged([]const u8) = .empty;
+            defer {
+                var it = property_nodes.iterator();
+                while (it.next()) |entry| gpa.free(entry.key_ptr.*);
+                property_nodes.deinit(gpa);
+            }
+            while (scanner.peekNextTokenType() catch unreachable != .object_end) {
+                const token = scanner.nextAlloc(gpa, .alloc_always) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+
+                _ = scanner.peekNextTokenType() catch unreachable;
+                const start = scanner.cursor;
+                scanner.skipValue() catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+                const end = scanner.cursor;
+                const gop = try property_nodes.getOrPut(gpa, token.allocated_string);
+                if (gop.found_existing) gpa.free(token.allocated_string);
+                gop.value_ptr.* = scanner.input[start..end];
+            }
+
+            {
+                const token = scanner.next() catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                };
+                std.debug.assert(token == .object_end);
+            }
+
+            var entries: String.HashMapUnmanaged(JSONParseRecord) = .empty;
+            try entries.ensureTotalCapacity(agent.gc_allocator, property_nodes.count());
+
+            // iii. NOTE: Because val was produced from JSON text and has not been modified, all of
+            //      its property keys are Strings and will be exhaustively enumerated.
+            // iv. Let keys be ! EnumerableOwnProperties(val, key).
+            // v. For each String P of keys, do
+            var it = property_nodes.iterator();
+            while (it.next()) |entry| {
+                // 1. NOTE: In the case of JSON text specifying multiple name/value pairs with the
+                //    same name for a single object (such as {"a":"lost","a":"kept"}), the value
+                //    for the corresponding property of the resulting ECMAScript object is
+                //    specified by the last pair with that name.
+                // 2. Let propertyDefinition be empty.
+                // 3. For each Parse Node propertyNode of propertyNodes, do
+                //     a. Let propName be the PropName of propertyNode.
+                //     b. If propName is P, set propertyDefinition to propertyNode.
+                // 4. Assert: propertyDefinition is PropertyDefinition : PropertyName :
+                //    AssignmentExpression .
+                // 5. Let propertyValueNode be the AssignmentExpression of propertyDefinition.
+
+                var sub_scanner = std.json.Scanner.initCompleteInput(gpa, entry.value_ptr.*);
+                defer sub_scanner.deinit();
+
+                const key = try String.fromUtf8(
+                    agent,
+                    try agent.gc_allocator.dupe(u8, entry.key_ptr.*),
+                );
+                const property_key = PropertyKey.from(key);
+
+                // 6. Let entryParseRecord be CreateJSONParseRecord(propertyValueNode, P, ! Get(val, P)).
+                const entry_parse_record = try createJSONParseRecord(
+                    agent,
+                    &sub_scanner,
+                    value.asObject().getPropertyValueDirect(property_key),
+                );
+
+                // 7. Append entryParseRecord to entries.
+                entries.putAssumeCapacityNoClobber(key, entry_parse_record);
+            }
+            contents = .{ .object = entries };
+        }
+    } else {
+        // 6. Else,
+        // a. Assert: typedValNode is neither an ArrayLiteral Parse Node nor an ObjectLiteral Parse Node.
+        _ = scanner.peekNextTokenType() catch unreachable;
+        const start = scanner.cursor;
+        scanner.skipValue() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => unreachable,
+        };
+        contents = .{ .primitive = scanner.input[start..scanner.cursor] };
+    }
+
+    // 7. Return the JSON Parse Record {
+    //      [[ParseNode]]: typedValNode, [[Key]]: key, [[Value]]: val, [[Elements]]: elements,
+    //      [[Entries]]: entries
+    //    }.
+    return .{
+        .value = value,
+        .contents = contents,
+    };
+}
+
+/// 25.5.2.4 InternalizeJSONProperty ( holder, name, reviver, parseRecord )
 /// https://tc39.es/ecma262/#sec-internalizejsonproperty
 fn internalizeJSONProperty(
     agent: *Agent,
     holder: *Object,
     name: PropertyKey,
     reviver: *Object,
+    maybe_parse_record: ?JSONParseRecord,
 ) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
     // 1. Let val be ? Get(holder, name).
     const value = try holder.get(agent, name);
 
-    // 2. If val is an Object, then
+    // 2. Let context be OrdinaryObjectCreate(%Object.prototype%).
+    const context = try ordinaryObjectCreate(
+        agent,
+        try realm.intrinsics.@"%Object.prototype%"(),
+    );
+
+    const records: union(enum) {
+        array: []const JSONParseRecord,
+        object: *const String.HashMapUnmanaged(JSONParseRecord),
+        none,
+    } = blk: {
+        // 3. If parseRecord is a JSON Parse Record and SameValue(parseRecord.[[Value]], val) is true, then
+        const parse_record = maybe_parse_record orelse break :blk .none;
+        if (!value.sameValue(parse_record.value)) break :blk .none;
+        switch (parse_record.contents) {
+            // a. If val is not an Object, then
+            .primitive => |source| {
+                // i. Let parseNode be parseRecord.[[ParseNode]].
+                // ii. Assert: parseNode is neither an ArrayLiteral Parse Node nor an ObjectLiteral
+                //     Parse Node.
+                // iii. Let sourceText be the source text matched by parseNode.
+                // iv. Perform ! CreateDataPropertyOrThrow(context, "source",
+                //     CodePointsToString(sourceText)).
+                const source_text = try String.fromUtf8(
+                    agent,
+                    try agent.gc_allocator.dupe(u8, source),
+                );
+                context.createDataPropertyDirect(
+                    agent,
+                    PropertyKey.from("source"),
+                    Value.from(source_text),
+                ) catch |err| try noexcept(err);
+                break :blk .none;
+            },
+
+            // b. Let elementRecords be parseRecord.[[Elements]].
+            .array => |elements| break :blk .{ .array = elements },
+
+            // c. Let entryRecords be parseRecord.[[Entries]].
+            .object => |*entries| break :blk .{ .object = entries },
+        }
+
+        // 4. Else,
+        //     a. Let elementRecords be a new empty List.
+        //     b. Let entryRecords be a new empty List.
+        // NOTE: This is handled upfront.
+        comptime unreachable;
+    };
+
+    // 5. If val is an Object, then
     if (value.isObject()) {
         // a. Let isArray be ? IsArray(val).
         const is_array = try value.isArray(agent);
 
         // b. If isArray is true, then
         if (is_array) {
-            // i. Let len be ? LengthOfArrayLike(val).
+            // i. Let elementRecordsLen be the number of elements in elementRecords.
+            // b. Let elementRecords be parseRecord.[[Elements]].
+            const element_records = switch (records) {
+                .array => |elements| elements,
+                .object, .none => &.{},
+            };
+            const element_records_len = element_records.len;
+
+            // ii. Let len be ? LengthOfArrayLike(val).
             const len = try value.asObject().lengthOfArrayLike(agent);
 
-            // ii. Let I be 0.
-            var i: u53 = 0;
+            // iii. Let index be 0.
+            var index: u53 = 0;
 
-            // iii. Repeat, while I < len,
-            while (i < len) : (i += 1) {
-                // 1. Let prop be ! ToString(𝔽(I)).
-                const property_key = PropertyKey.from(i);
+            // iv. Repeat, while index < len,
+            while (index < len) : (index += 1) {
+                // 1. Let prop be ! ToString(𝔽(index)).
+                const property_key = PropertyKey.from(index);
 
-                // 2. Let newElement be ? InternalizeJSONProperty(val, prop, reviver).
+                // 2. If index < elementRecordsLen, let elementRecord be elementRecords[index];
+                //    else let elementRecord be empty.
+                const element_record = if (index < element_records_len)
+                    element_records[@intCast(index)]
+                else
+                    null;
+
+                // 3. Let newElement be ? InternalizeJSONProperty(val, prop, reviver, elementRecord).
                 const new_element = try internalizeJSONProperty(
                     agent,
                     value.asObject(),
                     property_key,
                     reviver,
+                    element_record,
                 );
 
-                // 3. If newElement is undefined, then
+                // 4. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](prop).
                     _ = try value.asObject().internal_methods.delete(
@@ -140,12 +409,12 @@ fn internalizeJSONProperty(
                         property_key,
                     );
                 } else {
-                    // 4. Else,
+                    // 5. Else,
                     // a. Perform ? CreateDataProperty(val, prop, newElement).
                     _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
 
-                // 5. Set I to I + 1.
+                // 6. Set index to index + 1.
             }
         } else {
             // c. Else,
@@ -157,15 +426,23 @@ fn internalizeJSONProperty(
             for (keys.items) |key| {
                 const property_key = try key.toPropertyKey(agent);
 
-                // 1. Let newElement be ? InternalizeJSONProperty(val, P, reviver).
+                // 1. If there exists an element e of entryRecords such that e.[[Key]] is P, let
+                //    entryRecord be e; else let entryRecord be empty.
+                const entry_record = switch (records) {
+                    .object => |entries| entries.get(key.asString()),
+                    .array, .none => null,
+                };
+
+                // 2. Let newElement be ? InternalizeJSONProperty(val, P, reviver, entryRecord).
                 const new_element = try internalizeJSONProperty(
                     agent,
                     value.asObject(),
                     property_key,
                     reviver,
+                    entry_record,
                 );
 
-                // 2. If newElement is undefined, then
+                // 3. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](P).
                     _ = try value.asObject().internal_methods.delete(
@@ -174,7 +451,7 @@ fn internalizeJSONProperty(
                         property_key,
                     );
                 } else {
-                    // 3. Else,
+                    // 4. Else,
                     // a. Perform ? CreateDataProperty(val, P, newElement).
                     _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
@@ -182,15 +459,15 @@ fn internalizeJSONProperty(
         }
     }
 
-    // 3. Return ? Call(reviver, holder, « name, val »).
-    return Value.from(reviver).callAssumeCallable(
-        agent,
-        Value.from(holder),
-        &.{ name.toValue(agent) catch unreachable, value },
-    );
+    // 6. Return ? Call(reviver, holder, « name, val, context »).
+    return Value.from(reviver).callAssumeCallable(agent, Value.from(holder), &.{
+        name.toValue(agent) catch unreachable,
+        value,
+        Value.from(context),
+    });
 }
 
-/// 25.5.2.1 JSON Serialization Record
+/// 25.5.4.1 JSON Serialization Record
 /// https://tc39.es/ecma262/#sec-json-serialization-record
 const JSONSerialization = struct {
     pub const Stack = std.AutoHashMapUnmanaged(*Object, void);
@@ -211,7 +488,7 @@ const JSONSerialization = struct {
     indent: *const String,
 };
 
-/// 25.5.2.2 SerializeJSONProperty ( state, key, holder )
+/// 25.5.4.2 SerializeJSONProperty ( state, key, holder )
 /// https://tc39.es/ecma262/#sec-serializejsonproperty
 fn serializeJSONProperty(
     agent: *Agent,
@@ -246,22 +523,34 @@ fn serializeJSONProperty(
 
     // 4. If value is an Object, then
     if (value.isObject()) {
-        // a. If value has a [[NumberData]] internal slot, then
+        // a. If value has an [[IsRawJSON]] internal slot, then
+        if (value.asObject().is(RawJSON)) {
+            // i. Let rawJSON be ! Get(value, "rawJSON").
+            const raw_json = value.asObject().getValueAtPropertyOffset(@enumFromInt(0));
+
+            // ii. Assert: rawJSON is a String.
+            std.debug.assert(raw_json.isString());
+
+            // iii. Return rawJSON.
+            return raw_json.asString();
+        }
+
+        // b. If value has a [[NumberData]] internal slot, then
         if (value.asObject().is(builtins.Number)) {
             // i. Set value to ? ToNumber(value).
             value = Value.from(try value.toNumber(agent));
         }
-        // b. Else if value has a [[StringData]] internal slot, then
+        // c. Else if value has a [[StringData]] internal slot, then
         else if (value.asObject().is(builtins.String)) {
             // i. Set value to ? ToString(value).
             value = Value.from(try value.toString(agent));
         }
-        // c. Else if value has a [[BooleanData]] internal slot, then
+        // d. Else if value has a [[BooleanData]] internal slot, then
         else if (value.asObject().cast(builtins.Boolean)) |boolean| {
             // i. Set value to value.[[BooleanData]].
             value = Value.from(boolean.fields.boolean_data);
         }
-        // d. Else if value has a [[BigIntData]] internal slot, then
+        // e. Else if value has a [[BigIntData]] internal slot, then
         else if (value.asObject().cast(builtins.BigInt)) |big_int| {
             // i. Set value to value.[[BigIntData]].
             value = Value.from(big_int.fields.big_int_data);
@@ -310,7 +599,7 @@ fn serializeJSONProperty(
     return null;
 }
 
-/// 25.5.2.3 QuoteJSONString ( value )
+/// 25.5.4.3 QuoteJSONString ( value )
 /// https://tc39.es/ecma262/#sec-quotejsonstring
 fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!*const String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
@@ -364,7 +653,7 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     return String.fromUtf8(agent, try product.toOwnedSlice(agent.gc_allocator));
 }
 
-/// 25.5.2.4 UnicodeEscape ( C )
+/// 25.5.4.4 UnicodeEscape ( C )
 /// https://tc39.es/ecma262/#sec-unicodeescape
 fn unicodeEscape(agent: *Agent, c: u16) std.mem.Allocator.Error![]const u8 {
     // 1. Let n be the numeric value of C.
@@ -375,7 +664,7 @@ fn unicodeEscape(agent: *Agent, c: u16) std.mem.Allocator.Error![]const u8 {
     return std.fmt.allocPrint(agent.gc_allocator, "\\u{x:0>4}", .{c});
 }
 
-/// 25.5.2.5 SerializeJSONObject ( state, value )
+/// 25.5.4.5 SerializeJSONObject ( state, value )
 /// https://tc39.es/ecma262/#sec-serializejsonobject
 fn serializeJSONObject(
     agent: *Agent,
@@ -504,7 +793,7 @@ fn serializeJSONObject(
     return final;
 }
 
-/// 25.5.2.6 SerializeJSONArray ( state, value )
+/// 25.5.4.6 SerializeJSONArray ( state, value )
 /// https://tc39.es/ecma262/#sec-serializejsonarray
 fn serializeJSONArray(
     agent: *Agent,
@@ -621,7 +910,7 @@ pub const namespace = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 25.5.3 JSON [ %Symbol.toStringTag% ]
+        // 25.5.5 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -634,11 +923,23 @@ pub const namespace = struct {
             },
         );
 
+        try object.defineBuiltinFunction(agent, "isRawJSON", isRawJSON, 1, realm);
         try object.defineBuiltinFunction(agent, "parse", parse, 2, realm);
+        try object.defineBuiltinFunction(agent, "rawJSON", rawJSON, 1, realm);
         try object.defineBuiltinFunction(agent, "stringify", stringify, 3, realm);
     }
 
-    /// 25.5.1 JSON.parse ( text [ , reviver ] )
+    /// 25.5.1 JSON.isRawJSON ( O )
+    /// https://tc39.es/ecma262/#sec-json.israwjson
+    fn isRawJSON(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const object = arguments.get(0);
+
+        // 1. If O is an Object and O has an [[IsRawJSON]] internal slot, return true.
+        // 2. Return false.
+        return Value.from(object.isObject() and object.asObject().is(RawJSON));
+    }
+
+    /// 25.5.2 JSON.parse ( text [ , reviver ] )
     /// https://tc39.es/ecma262/#sec-json.parse
     fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
@@ -646,33 +947,90 @@ pub const namespace = struct {
         const text = arguments.get(0);
         const reviver = arguments.get(1);
 
-        // 1. Let jsonString be ? ToString(text).
+        // 1. Let jsonString be ? ToString(text).
         const json_string = try (try text.toString(agent)).toUtf8(gpa);
         defer gpa.free(json_string);
 
-        // 2. Let unfiltered be ? ParseJSON(jsonString).
+        // 2. Let parseResult be ? ParseJSON(jsonString).
+        // 3. Let unfiltered be parseResult.[[Value]].
         const unfiltered = try parseJSON(agent, json_string);
 
-        // 3. If IsCallable(reviver) is false, return unfiltered.
+        // 4. If IsCallable(reviver) is false, return unfiltered.
         if (!reviver.isCallable()) return unfiltered;
 
-        // 4. Let root be OrdinaryObjectCreate(%Object.prototype%).
+        // 5. Let root be OrdinaryObjectCreate(%Object.prototype%).
         const root = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%Object.prototype%"(),
         );
 
-        // 5. Let rootName be the empty String.
+        // 6. Let rootName be the empty String.
         const root_name = PropertyKey.from("");
 
-        // 6. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
+        // 7. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
         root.createDataPropertyDirect(agent, root_name, unfiltered) catch |err| try noexcept(err);
 
-        // 7. Return ? InternalizeJSONProperty(root, rootName, reviver).
-        return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
+        // 8. Let snapshot be CreateJSONParseRecord(parseResult.[[ParseNode]], rootName, unfiltered).
+        var scanner = std.json.Scanner.initCompleteInput(gpa, json_string);
+        defer scanner.deinit();
+        const snapshot = try createJSONParseRecord(agent, &scanner, unfiltered);
+
+        // 9. Return ? InternalizeJSONProperty(root, rootName, reviver, snapshot).
+        return internalizeJSONProperty(agent, root, root_name, reviver.asObject(), snapshot);
     }
 
-    /// 25.5.2 JSON.stringify ( value [ , replacer [ , space ] ] )
+    /// 25.5.3 JSON.rawJSON ( text )
+    /// https://tc39.es/ecma262/#sec-json.rawjson
+    fn rawJSON(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
+        const text = arguments.get(0);
+
+        // 1. Let jsonString be ? ToString(text).
+        const json_string = try text.toString(agent);
+
+        // 2. If jsonString is the empty String, throw a SyntaxError exception.
+        // 3. If the first code unit of jsonString is not either an ASCII lowercase letter code
+        //    unit (0x0061 through 0x007A, inclusive), an ASCII digit code unit (0x0030 through
+        //    0x0039, inclusive), 0x0022 (QUOTATION MARK), or 0x002D (HYPHEN-MINUS), throw a
+        //    SyntaxError exception.
+        // 4. If the last code unit of jsonString is not either an ASCII lowercase letter code unit
+        //    (0x0061 through 0x007A, inclusive), an ASCII digit code unit (0x0030 through 0x0039,
+        //    inclusive), or 0x0022 (QUOTATION MARK), throw a SyntaxError exception.
+        // 5. Let parseResult be ? ParseJSON(jsonString).
+        // 6. Assert: parseResult.[[Value]] is either a String, a Number, a Boolean, or null.
+        const json_string_utf8 = try json_string.toUtf8(gpa);
+        defer gpa.free(json_string_utf8);
+        const json_whitespace = [_]u8{ '\t', '\n', '\r', ' ' };
+        if (json_string_utf8.len == 0 or
+            std.mem.indexOfScalar(u8, &json_whitespace, json_string_utf8[0]) != null or
+            std.mem.indexOfScalar(u8, &json_whitespace, json_string_utf8[json_string_utf8.len - 1]) != null)
+        {
+            return agent.throwException(.syntax_error, "Raw JSON value must not have leading or trailing whitespace", .{});
+        }
+        const parse_result = try parseJSON(agent, json_string_utf8);
+        if (parse_result.isObject()) {
+            return agent.throwException(.syntax_error, "Raw JSON value must be a primitive", .{});
+        }
+
+        // 7. Let internalSlotsList be « [[IsRawJSON]] ».
+        // 8. Let obj be OrdinaryObjectCreate(null, internalSlotsList).
+        const raw_json = try ordinaryObjectCreateWithType(RawJSON, agent, null, {});
+
+        // 9. Perform ! CreateDataPropertyOrThrow(obj, "rawJSON", jsonString).
+        raw_json.object.createDataPropertyDirect(
+            agent,
+            PropertyKey.from("rawJSON"),
+            Value.from(json_string),
+        ) catch |err| try noexcept(err);
+
+        // 10. Perform ! SetIntegrityLevel(obj, frozen).
+        _ = raw_json.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);
+
+        // 11. Return obj.
+        return Value.from(&raw_json.object);
+    }
+
+    /// 25.5.4 JSON.stringify ( value [ , replacer [ , space ] ] )
     /// https://tc39.es/ecma262/#sec-json.stringify
     fn stringify(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();

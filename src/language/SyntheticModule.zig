@@ -103,11 +103,11 @@ pub fn createDefaultExportSyntheticModule(
 /// 16.2.1.8.2 ParseJSONModule ( source )
 /// https://tc39.es/ecma262/#sec-parse-json-module
 pub fn parseJSONModule(agent: *Agent, source: []const u8) Agent.Error!*SyntheticModule {
-    // 1. Let json be ? ParseJSON(source).
-    const json = try parseJSON(agent, source);
+    // 1. Let parseResult be ? ParseJSON(source).
+    const parse_result = try parseJSON(agent, source);
 
-    // 2. Return CreateDefaultExportSyntheticModule(json).
-    return createDefaultExportSyntheticModule(agent, json);
+    // 2. Return CreateDefaultExportSyntheticModule(parseResult.[[Value]]).
+    return createDefaultExportSyntheticModule(agent, parse_result);
 }
 
 /// 16.2.1.8.3 SetSyntheticModuleExport ( module, exportName, exportValue )

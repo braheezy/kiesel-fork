@@ -83,6 +83,7 @@ pub const Object = object.Object;
 pub const Promise = promise.Promise;
 pub const Proxy = proxy.Proxy;
 pub const RangeError = @"error".range_error.RangeError;
+pub const RawJSON = json.RawJSON;
 pub const ReferenceError = @"error".reference_error.ReferenceError;
 pub const RegExp = reg_exp.RegExp;
 pub const RegExpStringIterator = reg_exp_string_iterator.RegExpStringIterator;
