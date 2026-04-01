@@ -2,17 +2,19 @@
 
 const std = @import("std");
 
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const isStrictlyEqual = types.isStrictlyEqual;
 const sameValueZero = types.sameValueZero;
 
-const FindViaPredicateDirection = @import("array.zig").FindViaPredicateDirection;
-const FindViaPredicateResult = @import("array.zig").FindViaPredicateResult;
+const FindViaPredicateDirection = builtins.array.FindViaPredicateDirection;
+const FindViaPredicateResult = builtins.array.FindViaPredicateResult;
 
 fn lastIndexOfScalarPos(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
     var i: usize = start_index;
@@ -27,6 +29,8 @@ fn toI32(value: Value) ?i32 {
     switch (value.asNumber()) {
         .i32 => |x| return x,
         .f64 => |x| {
+            // This function coerces -0 to 0 which matches SameValueZero semantics.
+            // It's the caller's responsibility to check whether the value can actually be stored.
             if (!std.math.isFinite(x) or
                 x < std.math.minInt(i32) or
                 x > std.math.maxInt(i32) or
@@ -158,8 +162,9 @@ pub fn fill(
         .ordinary_is_extensible,
         .ordinary_define_own_property,
     }));
-    if (!has_ordinary_internal_methods or
-        start > std.math.maxInt(Object.IndexedProperties.Index) or
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
+    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
+    if (start > std.math.maxInt(Object.IndexedProperties.Index) or
         end > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (len > 0 and
         object.property_storage.indexed_properties.storage == .none and
@@ -539,8 +544,9 @@ pub fn reverse(object: *Object, len: u53) ?void {
         .ordinary_is_extensible,
         .ordinary_define_own_property,
     }));
-    if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() != len) return null;
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
+    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
+    if (object.property_storage.indexed_properties.count() != len) return null;
 
     switch (object.property_storage.indexed_properties.storage) {
         .none => {},
@@ -555,6 +561,125 @@ pub fn reverse(object: *Object, len: u53) ?void {
         },
         .sparse_value, .sparse_property_descriptor => return null,
     }
+}
+
+/// Fast path for `Array.prototype.pop()`.
+///
+/// Only applicable to objects that meet the following requirements:
+/// - Dense indexed property storage with exactly `len` items
+/// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
+pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_has_property,
+        .ordinary_get,
+        .ordinary_set,
+        .ordinary_delete,
+        // Dependencies of ordinary [[HasProperty]], [[Get]], [[Set]], and [[Delete]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
+    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
+    if (object.property_storage.indexed_properties.count() != len) return null;
+
+    if (len == 0) {
+        try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
+        return .undefined;
+    }
+
+    const element: Value = switch (object.property_storage.indexed_properties.storage) {
+        .none => unreachable,
+        .dense_i32 => |*dense_i32| Value.from(dense_i32.pop().?),
+        .dense_f64 => |*dense_f64| Value.from(dense_f64.pop().?),
+        .dense_value => |*dense_value| dense_value.pop().?,
+        .sparse_value, .sparse_property_descriptor => return null,
+    };
+    try object.set(agent, PropertyKey.from("length"), Value.from(len - 1), .throw);
+    return element;
+}
+
+/// Fast path for `Array.prototype.push()`.
+///
+/// Only applicable to objects that meet the following requirements:
+/// - Dense indexed property storage with exactly `len` items
+/// - Ordinary internal methods: `[[Set]]`
+/// - If the object has no property storage yet and `values.len` > 0 it must be extensible
+/// - No indexed properties on the prototype chain
+pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Agent.Error!?Value {
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_set,
+        // Dependencies of ordinary [[Set]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path as long as
+    // their length is writable.
+    if (!has_ordinary_internal_methods) {
+        const array = object.cast(builtins.Array) orelse return null;
+        if (!array.fields.length_writable) return null;
+    }
+    if (object.property_storage.indexed_properties.count() != len) return null;
+    var prototype = object.prototype();
+    while (prototype) |p| : (prototype = p.prototype()) {
+        if (p.property_storage.indexed_properties.count() > 0) return null;
+    }
+
+    const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
+    if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
+    if (values.len > 0 and
+        object.property_storage.indexed_properties.storage == .none and
+        !object.extensible()) return null;
+
+    for (values, 0..) |value, i| {
+        try object.property_storage.indexed_properties.set(
+            agent.gc_allocator,
+            @intCast(len + i),
+            .{ .value_or_accessor = .{ .value = value }, .attributes = .all },
+        );
+    }
+    try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
+    return Value.from(new_len);
+}
+
+/// Fast path for `Array.prototype.shift()`.
+///
+/// Only applicable to objects that meet the following requirements:
+/// - Dense indexed property storage with exactly `len` items
+/// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
+pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_has_property,
+        .ordinary_get,
+        .ordinary_set,
+        .ordinary_delete,
+        // Dependencies of ordinary [[HasProperty]], [[Get]], [[Set]], and [[Delete]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
+    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
+    if (object.property_storage.indexed_properties.count() != len) return null;
+
+    if (len == 0) {
+        try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
+        return .undefined;
+    }
+
+    const element: Value = switch (object.property_storage.indexed_properties.storage) {
+        .none => unreachable,
+        .dense_i32 => |*dense_i32| Value.from(dense_i32.orderedRemove(0)),
+        .dense_f64 => |*dense_f64| Value.from(dense_f64.orderedRemove(0)),
+        .dense_value => |*dense_value| dense_value.orderedRemove(0),
+        .sparse_value, .sparse_property_descriptor => return null,
+    };
+    try object.set(agent, PropertyKey.from("length"), Value.from(len - 1), .throw);
+    return element;
 }
 
 /// Fast path for `Array.prototype.some()`.
@@ -618,4 +743,83 @@ pub fn some(
         .sparse_value, .sparse_property_descriptor => return null,
     }
     return .{ .done = false };
+}
+
+/// Fast path for `Array.prototype.unshift()`.
+///
+/// Only applicable to objects that meet the following requirements:
+/// - Dense indexed property storage with exactly `len` items
+/// - Ordinary internal methods: `[[Set]]`
+/// - If the object has no property storage yet and `values.len` > 0 it must be extensible
+/// - No indexed properties on the prototype chain
+pub fn unshift(
+    agent: *Agent,
+    object: *Object,
+    len: u53,
+    values: []const Value,
+) Agent.Error!?Value {
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_set,
+        // Dependencies of ordinary [[Set]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+        .ordinary_is_extensible,
+        .ordinary_define_own_property,
+    }));
+    // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path as long as
+    // their length is writable.
+    if (!has_ordinary_internal_methods) {
+        const array = object.cast(builtins.Array) orelse return null;
+        if (!array.fields.length_writable) return null;
+    }
+    if (object.property_storage.indexed_properties.count() != len) return null;
+    var prototype = object.prototype();
+    while (prototype) |p| : (prototype = p.prototype()) {
+        if (p.property_storage.indexed_properties.count() > 0) return null;
+    }
+
+    const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
+    if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
+    if (values.len > 0 and
+        object.property_storage.indexed_properties.storage == .none and
+        !object.extensible()) return null;
+
+    switch (object.property_storage.indexed_properties.storage) {
+        .none => {
+            for (values, 0..) |value, i| {
+                try object.property_storage.indexed_properties.set(
+                    agent.gc_allocator,
+                    @intCast(i),
+                    .{ .value_or_accessor = .{ .value = value }, .attributes = .all },
+                );
+            }
+        },
+        .dense_i32 => |*dense_i32| {
+            for (values) |value| {
+                // Negative zero requires a storage migration to f64, bail out.
+                if (value.isNumber() and value.asNumber().isNegativeZero()) return null;
+                _ = toI32(value) orelse return null;
+            }
+            const slots = try dense_i32.addManyAt(agent.gc_allocator, 0, values.len);
+            for (values, slots) |value, *slot| {
+                slot.* = toI32(value).?;
+            }
+        },
+        .dense_f64 => |*dense_f64| {
+            for (values) |value| {
+                _ = toF64(value) orelse return null;
+            }
+            const slots = try dense_f64.addManyAt(agent.gc_allocator, 0, values.len);
+            for (values, slots) |value, *slot| {
+                slot.* = toF64(value).?;
+            }
+        },
+        .dense_value => |*dense_value| {
+            try dense_value.insertSlice(agent.gc_allocator, 0, values);
+        },
+        .sparse_value, .sparse_property_descriptor => return null,
+    }
+
+    try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
+    return Value.from(new_len);
 }

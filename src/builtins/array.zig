@@ -2167,6 +2167,11 @@ pub const prototype = struct {
         // 2. Let len be ? LengthOfArrayLike(O).
         const len = try object.lengthOfArrayLike(agent);
 
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.pop(agent, object, len)) |result| {
+            return result;
+        }
+
         // If len = 0, then
         if (len == 0) {
             // a. Perform ? Set(O, "length", +0𝔽, true).
@@ -2214,6 +2219,11 @@ pub const prototype = struct {
         _ = std.math.add(u53, len, arg_count) catch {
             return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         };
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.push(agent, object, len, arguments.values)) |result| {
+            return result;
+        }
 
         // 5. For each element E of items, do
         for (arguments.values) |element| {
@@ -2518,6 +2528,11 @@ pub const prototype = struct {
 
         // 2. Let len be ? LengthOfArrayLike(O).
         const len = try object.lengthOfArrayLike(agent);
+
+        // OPTIMIZATION: Use fast path if applicable
+        if (try array_fast_paths.shift(agent, object, len)) |result| {
+            return result;
+        }
 
         // 3. If len = 0, then
         if (len == 0) {
@@ -3326,6 +3341,11 @@ pub const prototype = struct {
             _ = std.math.add(u53, len, @intCast(arg_count)) catch {
                 return agent.throwException(.type_error, "Maximum array length exceeded", .{});
             };
+
+            // OPTIMIZATION: Use fast path if applicable
+            if (try array_fast_paths.unshift(agent, object, len, arguments.values)) |result| {
+                return result;
+            }
 
             // b. Let k be len.
             var k = len;
