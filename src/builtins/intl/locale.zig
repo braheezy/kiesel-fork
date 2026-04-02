@@ -90,22 +90,40 @@ fn updateLanguageId(
         const variants_utf8 = try variants.toUtf8(gpa);
         defer gpa.free(variants_utf8);
 
+        new_tag.clearVariants();
+
         // a. If variants is the empty String, throw a RangeError exception.
         if (variants.isEmpty()) {
-            return agent.throwException(
-                .range_error,
-                "Invalid variants subtag '{s}'",
-                .{variants_utf8},
-            );
+            return agent.throwException(.range_error, "Variants subtag must not be empty", .{});
         }
 
         // b. Let lowerVariants be the ASCII-lowercase of variants.
+        const lower_variants = std.ascii.lowerString(variants_utf8, variants_utf8);
+
         // c. Let variantSubtags be StringSplitToList(lowerVariants, "-").
+        var it = std.mem.splitScalar(u8, lower_variants, '-');
+
         // d. For each element variant of variantSubtags, do
-        //     i. If variant cannot be matched by the unicode_variant_subtag Unicode locale
-        //        nonterminal, throw a RangeError exception.
-        //     e. If variantSubtags contains any duplicate elements, throw a RangeError exception.
-        // TODO: This is blocked by https://github.com/unicode-org/icu4x/issues/6671
+        while (it.next()) |variant| {
+            const added = new_tag.addVariant(variant) catch {
+                // i. If variant cannot be matched by the unicode_variant_subtag Unicode locale
+                //    nonterminal, throw a RangeError exception.
+                return agent.throwException(
+                    .range_error,
+                    "Invalid variant subtag '{s}'",
+                    .{variant},
+                );
+            };
+
+            // e. If variantSubtags contains any duplicate elements, throw a RangeError exception.
+            if (!added) {
+                return agent.throwException(
+                    .range_error,
+                    "Duplicate variant subtag '{s}'",
+                    .{variant},
+                );
+            }
+        }
     }
 
     // 10-15.
@@ -742,9 +760,9 @@ pub const prototype = struct {
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
         // 3. Return GetLocaleVariants(loc.[[Locale]]).
-        // TODO: This is blocked by https://github.com/unicode-org/icu4x/issues/6671
-        _ = locale;
-        return .undefined;
+        const value = try locale.fields.locale.variants(agent.gc_allocator);
+        if (value.len == 0) return .undefined;
+        return Value.from(try String.fromAscii(agent, value));
     }
 };
 
