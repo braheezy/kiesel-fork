@@ -161,7 +161,7 @@ pub const constructor = struct {
         }
         if (maybe_sensitivity_string) |sensitivity_string| {
             const strength, const case_level = std.StaticStringMap(
-                struct { icu4zig.Collator.Options.Strength, ?icu4zig.Collator.Options.CaseLevel },
+                struct { icu4zig.Collator.Strength, ?icu4zig.Collator.CaseLevel },
             ).initComptime(&.{
                 // See https://docs.rs/icu/latest/icu/collator/enum.Strength.html#variants for the
                 // mapping of ECMA-402 sensitivity to ICU4X collator options.

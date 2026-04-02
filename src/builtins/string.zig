@@ -1409,19 +1409,19 @@ pub const prototype = struct {
         const utf8 = try string.toUtf8(gpa);
         defer gpa.free(utf8);
         const utf8_normalized = if (form.eql(types.String.fromLiteral("NFC"))) blk: {
-            const normalizer = icu4zig.ComposingNormalizer.initNfc();
+            const normalizer: icu4zig.ComposingNormalizer = .init(.nfc);
             defer normalizer.deinit();
             break :blk try normalizer.normalize(agent.gc_allocator, utf8);
         } else if (form.eql(types.String.fromLiteral("NFD"))) blk: {
-            const normalizer = icu4zig.DecomposingNormalizer.initNfd();
+            const normalizer: icu4zig.DecomposingNormalizer = .init(.nfd);
             defer normalizer.deinit();
             break :blk try normalizer.normalize(agent.gc_allocator, utf8);
         } else if (form.eql(types.String.fromLiteral("NFKC"))) blk: {
-            const normalizer = icu4zig.ComposingNormalizer.initNfkc();
+            const normalizer: icu4zig.ComposingNormalizer = .init(.nfkc);
             defer normalizer.deinit();
             break :blk try normalizer.normalize(agent.gc_allocator, utf8);
         } else if (form.eql(types.String.fromLiteral("NFKD"))) blk: {
-            const normalizer = icu4zig.DecomposingNormalizer.initNfkd();
+            const normalizer: icu4zig.DecomposingNormalizer = .init(.nfkd);
             defer normalizer.deinit();
             break :blk try normalizer.normalize(agent.gc_allocator, utf8);
         } else {
