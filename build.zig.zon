@@ -18,8 +18,8 @@
             .lazy = true,
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linus/icu4zig#0861794c02bc941060e164399a0256632374fca3",
-            .hash = "icu4zig-0.1.0-IT7GrNSRAgA2q5q14mwwNUMExd8VjUtlDjb8GBX5DPQc",
+            .url = "git+https://codeberg.org/linus/icu4zig#f0b12bc2f60068a6fdc5cdad4cf6d27ad20653ae",
+            .hash = "icu4zig-0.1.0-IT7GrHenAgD_UPQK2UUbyX8x2EfsK9JAFax3n-W-5rqr",
             .lazy = true,
         },
         .kiesel_runtime = .{

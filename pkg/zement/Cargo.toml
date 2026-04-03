@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies.icu_capi]
 version = "2.2.0"
 default-features = false
-features = ["compiled_data", "default_components", "experimental", "std"]
+features = ["compiled_data", "default_components", "unstable", "experimental", "std"]
 
 # This is pinned to the same version as the temporal_rs dependency in the top-level build.zig.zon,
 # which provides the C headers for Zig.

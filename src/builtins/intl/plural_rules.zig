@@ -204,6 +204,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "resolvedOptions", resolvedOptions, 0, realm);
         try object.defineBuiltinFunction(agent, "select", select, 1, realm);
+        try object.defineBuiltinFunction(agent, "selectRange", selectRange, 2, realm);
 
         // 17.3.1 Intl.PluralRules.prototype.constructor
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
@@ -334,9 +335,40 @@ pub const prototype = struct {
         defer n.deinit();
 
         // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
-        return Value.from(
-            try String.fromAscii(agent, @tagName(resolvePlural(plural_rules, n).plural_category)),
-        );
+        const plural_category = resolvePlural(plural_rules, n).plural_category;
+        return Value.from(try String.fromAscii(agent, @tagName(plural_category)));
+    }
+
+    /// 17.3.4 Intl.PluralRules.prototype.selectRange ( start, end )
+    /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.selectrange
+    fn selectRange(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let pr be the this value.
+        // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
+        const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
+
+        // 3. If start is undefined or end is undefined, throw a TypeError exception.
+        if (start.isUndefined() or end.isUndefined()) {
+            return agent.throwException(
+                .type_error,
+                "Plural range start and end must not be undefined",
+                .{},
+            );
+        }
+
+        // 4. Let x be ? ToIntlMathematicalValue(start).
+        const x = try toIntlMathematicalValue(agent, start);
+        defer x.deinit();
+
+        // 5. Let y be ? ToIntlMathematicalValue(end).
+        const y = try toIntlMathematicalValue(agent, end);
+        defer y.deinit();
+
+        // 6. Return ? ResolvePluralRange(pr, x, y).
+        const plural_category = try resolvePluralRange(agent, plural_rules, x, y);
+        return Value.from(try String.fromAscii(agent, @tagName(plural_category)));
     }
 };
 
@@ -542,4 +574,71 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematica
 
     // 11. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
+}
+
+/// 17.5.4 ResolvePluralRange ( pluralRules, x, y )
+/// https://tc39.es/ecma402/#sec-resolvepluralrange
+fn resolvePluralRange(
+    agent: *Agent,
+    plural_rules_object: *const PluralRules,
+    x: IntlMathematicalValue,
+    y: IntlMathematicalValue,
+) Agent.Error!icu4zig.PluralRules.PluralCategory {
+    // 1. If x is not-a-number or y is not-a-number, throw a RangeError exception.
+    const decimal_x = switch (x) {
+        .not_a_number => {
+            return agent.throwException(
+                .range_error,
+                "Plural range start and end must be a number",
+                .{},
+            );
+        },
+        .positive_infinity, .negative_infinity => return .other,
+        .negative_zero => icu4zig.Decimal.fromDoubleWithRoundTripPrecision(-0.0) catch unreachable,
+        .mathematical_value => |decimal| decimal,
+    };
+    defer if (x == .negative_zero) decimal_x.deinit();
+
+    const decimal_y = switch (y) {
+        .not_a_number => {
+            return agent.throwException(
+                .range_error,
+                "Plural range start and end must be a number",
+                .{},
+            );
+        },
+        .positive_infinity, .negative_infinity => return .other,
+        .negative_zero => icu4zig.Decimal.fromDoubleWithRoundTripPrecision(-0.0) catch unreachable,
+        .mathematical_value => |decimal| decimal,
+    };
+    defer if (y == .negative_zero) decimal_y.deinit();
+
+    // 2. Let xp be ResolvePlural(pluralRules, x).
+    // 3. Let yp be ResolvePlural(pluralRules, y).
+    // 4. If xp.[[FormattedString]] is yp.[[FormattedString]], then
+    //     a. Return xp.[[PluralCategory]].
+
+    // 5. Let locale be pluralRules.[[Locale]].
+    const locale = plural_rules_object.fields.locale;
+
+    // 6. Let type be pluralRules.[[Type]].
+    const @"type" = plural_rules_object.fields.type;
+
+    // 7. Let notation be pluralRules.[[Notation]].
+    const notation = plural_rules_object.fields.notation;
+
+    // 8. Let compactDisplay be pluralRules.[[CompactDisplay]].
+    const compact_display = plural_rules_object.fields.compact_display;
+
+    // 9. Return PluralRuleSelectRange(locale, type, notation, compactDisplay,
+    //    xp.[[PluralCategory]], yp.[[PluralCategory]]).
+    // TODO: Use these once ICU4X supports it.
+    _ = notation;
+    _ = compact_display;
+    const plural_rules_with_ranges = icu4zig.PluralRulesWithRanges.init(locale, switch (@"type") {
+        .cardinal => .cardinal,
+        .ordinal => .ordinal,
+    });
+    defer plural_rules_with_ranges.deinit();
+    return plural_rules_with_ranges.categoryForRange(decimal_x, decimal_y);
 }
