@@ -429,7 +429,7 @@ fn ensureSimpleParameterList(
 
 fn ensureUniqueParameterNames(
     self: *Parser,
-    kind: enum { strict, arrow, method },
+    kind: enum { strict, arrow, method, non_simple },
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) std.mem.Allocator.Error!void {
@@ -456,6 +456,11 @@ fn ensureUniqueParameterNames(
                 .method => try self.emitErrorAt(
                     location,
                     "Method must not have duplicate parameter names",
+                    .{},
+                ),
+                .non_simple => try self.emitErrorAt(
+                    location,
+                    "Function with non-simple parameter list must not have duplicate parameter names",
                     .{},
                 ),
             }
@@ -3237,6 +3242,8 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -3285,6 +3292,8 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -3594,6 +3603,8 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -3643,6 +3654,8 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -3731,6 +3744,8 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -3784,6 +3799,8 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -4145,6 +4162,8 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -4197,6 +4216,8 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
         }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
+    } else if (!formal_parameters.isSimpleParameterList()) {
+        try self.ensureUniqueParameterNames(.non_simple, formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
