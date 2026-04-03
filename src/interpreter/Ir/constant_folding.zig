@@ -49,6 +49,45 @@ pub const Constant = union(enum) {
             else => {},
         }
     }
+
+    pub fn isStrictlyEqual(lhs: Constant, rhs: Constant) ?bool {
+        if (@intFromEnum(lhs) != @intFromEnum(rhs)) return false;
+        return switch (lhs) {
+            .undefined, .null => true,
+            .number => |number| {
+                if (std.math.isNan(number) or std.math.isNan(rhs.number)) return false;
+                return number == rhs.number;
+            },
+            .big_int => |big_int| big_int.order(rhs.big_int) == .eq,
+            .string => |string| {
+                // TODO: Support equality constant folding for strings with escape sequences
+                if (std.mem.indexOfScalar(u8, string, '\\') != null or
+                    std.mem.indexOfScalar(u8, rhs.string, '\\') != null) return null;
+                return std.mem.eql(u8, string, rhs.string);
+            },
+            .boolean => |boolean| boolean == rhs.boolean,
+        };
+    }
+
+    pub fn isLooselyEqual(lhs: Constant, rhs: Constant) ?bool {
+        if (@intFromEnum(lhs) == @intFromEnum(rhs)) return lhs.isStrictlyEqual(rhs);
+        if (lhs == .null and rhs == .undefined) return true;
+        if (lhs == .undefined and rhs == .null) return true;
+        // The rest requires type coercion, bail out
+        return null;
+    }
+
+    pub fn isLessThan(lhs: Constant, rhs: Constant) ?bool {
+        if (lhs == .number and rhs == .number) {
+            if (std.math.isNan(lhs.number) or std.math.isNan(rhs.number)) return null;
+            return lhs.number < rhs.number;
+        }
+        if (lhs == .big_int and rhs == .big_int) {
+            return lhs.big_int.order(rhs.big_int) == .lt;
+        }
+        // The rest requires type coercion, bail out
+        return null;
+    }
 };
 
 pub fn constantFold(
@@ -62,6 +101,8 @@ pub fn constantFold(
         },
         .unary_expression => |*unary_expr| return constantFoldUnaryExpression(gpa, unary_expr),
         .binary_expression => |*bin_expr| return constantFoldBinaryExpression(gpa, bin_expr),
+        .relational_expression => |*rel_expr| return constantFoldRelationalExpression(gpa, rel_expr),
+        .equality_expression => |*eq_expr| return constantFoldEqualityExpression(gpa, eq_expr),
         .logical_expression => |*log_expr| return constantFoldLogicalExpression(gpa, log_expr),
         else => {},
     }
@@ -107,22 +148,22 @@ fn constantFoldUnaryExpression(
             .@"+" => switch (operand) {
                 .undefined => return .{ .number = std.math.nan(f64) },
                 .null => return .{ .number = 0 },
-                .boolean => |b| return .{ .number = if (b) 1 else 0 },
-                .number => |n| return .{ .number = n },
+                .boolean => |boolean| return .{ .number = if (boolean) 1 else 0 },
+                .number => |number| return .{ .number = number },
                 else => {},
             },
             .@"-" => switch (operand) {
                 .undefined => return .{ .number = std.math.nan(f64) },
                 .null => return .{ .number = -0.0 },
-                .boolean => |b| return .{ .number = if (b) -1 else -0.0 },
-                .number => |n| return .{ .number = -n },
+                .boolean => |boolean| return .{ .number = if (boolean) -1 else -0.0 },
+                .number => |number| return .{ .number = -number },
                 else => {},
             },
             .@"!" => return .{ .boolean = !operand.isTruthy() },
             .@"~" => switch (operand) {
                 .undefined, .null => return .{ .number = -1 },
-                .boolean => |b| return .{ .number = if (b) -2 else -1 },
-                .number => |n| return .{ .number = Number.from(n).bitwiseNOT().asFloat() },
+                .boolean => |boolean| return .{ .number = if (boolean) -2 else -1 },
+                .number => |number| return .{ .number = Number.from(number).bitwiseNOT().asFloat() },
                 else => {},
             },
             .void => return .undefined,
@@ -157,21 +198,21 @@ fn constantFoldBinaryExpression(
                         const lhs_str = switch (lhs) {
                             .undefined => "undefined",
                             .null => "null",
-                            .boolean => |b| if (b) "true" else "false",
+                            .boolean => |boolean| if (boolean) "true" else "false",
                             // TODO: Implement Number.toString() without needing an agent
                             .number => return null,
-                            .big_int => |b| try b.toStringAlloc(gpa, 10, .lower),
-                            .string => |s| s,
+                            .big_int => |big_int| try big_int.toStringAlloc(gpa, 10, .lower),
+                            .string => |string| string,
                         };
                         defer if (lhs == .big_int) gpa.free(lhs_str);
                         const rhs_str = switch (rhs) {
                             .undefined => "undefined",
                             .null => "null",
-                            .boolean => |b| if (b) "true" else "false",
+                            .boolean => |boolean| if (boolean) "true" else "false",
                             // TODO: Implement Number.toString() without needing an agent
                             .number => return null,
-                            .big_int => |b| try b.toStringAlloc(gpa, 10, .lower),
-                            .string => |s| s,
+                            .big_int => |big_int| try big_int.toStringAlloc(gpa, 10, .lower),
+                            .string => |string| string,
                         };
                         defer if (rhs == .big_int) gpa.free(rhs_str);
                         const result = try std.mem.concat(gpa, u8, &.{ lhs_str, rhs_str });
@@ -203,6 +244,49 @@ fn constantFoldBinaryExpression(
                     }
                 },
                 else => {},
+            }
+        }
+    }
+    return null;
+}
+
+fn constantFoldRelationalExpression(
+    gpa: std.mem.Allocator,
+    rel_expr: *const ast.RelationalExpression,
+) std.mem.Allocator.Error!?Constant {
+    const lhs_expr = switch (rel_expr.lhs) {
+        .expression => |expr| expr,
+        .private_identifier => return null,
+    };
+    if (try constantFold(gpa, lhs_expr)) |lhs| {
+        defer lhs.deinit(gpa);
+        if (try constantFold(gpa, rel_expr.rhs_expression)) |rhs| {
+            defer rhs.deinit(gpa);
+            switch (rel_expr.operator) {
+                .@"<" => if (lhs.isLessThan(rhs)) |result| return .{ .boolean = result },
+                .@">" => if (rhs.isLessThan(lhs)) |result| return .{ .boolean = result },
+                .@"<=" => if (rhs.isLessThan(lhs)) |result| return .{ .boolean = !result },
+                .@">=" => if (lhs.isLessThan(rhs)) |result| return .{ .boolean = !result },
+                .instanceof, .in => {},
+            }
+        }
+    }
+    return null;
+}
+
+fn constantFoldEqualityExpression(
+    gpa: std.mem.Allocator,
+    eq_expr: *const ast.EqualityExpression,
+) std.mem.Allocator.Error!?Constant {
+    if (try constantFold(gpa, eq_expr.lhs_expression)) |lhs| {
+        defer lhs.deinit(gpa);
+        if (try constantFold(gpa, eq_expr.rhs_expression)) |rhs| {
+            defer rhs.deinit(gpa);
+            switch (eq_expr.operator) {
+                .@"==" => if (lhs.isLooselyEqual(rhs)) |result| return .{ .boolean = result },
+                .@"!=" => if (lhs.isLooselyEqual(rhs)) |result| return .{ .boolean = !result },
+                .@"===" => if (lhs.isStrictlyEqual(rhs)) |result| return .{ .boolean = result },
+                .@"!==" => if (lhs.isStrictlyEqual(rhs)) |result| return .{ .boolean = !result },
             }
         }
     }
