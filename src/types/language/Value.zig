@@ -33,6 +33,11 @@ const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const Weak = @import("Value/weak.zig").Weak;
 
+const safety = switch (builtin.mode) {
+    .Debug, .ReleaseSafe => true,
+    .ReleaseFast, .ReleaseSmall => false,
+};
+
 const pow_2_8 = std.math.pow(f64, 2, 8);
 const pow_2_16 = std.math.pow(f64, 2, 16);
 const pow_2_32 = std.math.pow(f64, 2, 32);
@@ -358,6 +363,12 @@ comptime {
 const Impl = if (build_options.enable_nan_boxing) NanBoxingImpl else TaggedUnionImpl;
 impl: Impl,
 
+/// Sentinel value to avoid the memory overhead of `?Value`.
+///
+/// Uses an object value with a made-up pointer rather than its own tag to avoid leaking into the
+/// public API. Use with care.
+pub const uninitialized = from(@as(*Object, @ptrFromInt(@alignOf(Object))));
+
 pub const @"undefined": Value = .{ .impl = Impl.undefined };
 pub const @"null": Value = .{ .impl = Impl.null };
 pub const @"true": Value = from(true);
@@ -397,6 +408,10 @@ pub inline fn from(value: anytype) Value {
 
 pub fn @"type"(self: Value) Type {
     return self.impl.type();
+}
+
+pub fn isUninitialized(value: Value) bool {
+    return value.isObject() and value.impl.asObject() == uninitialized.impl.asObject();
 }
 
 pub fn isUndefined(self: Value) bool {
@@ -452,6 +467,11 @@ pub fn isObject(self: Value) bool {
 }
 
 pub fn asObject(self: Value) *Object {
+    if (safety) {
+        // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
+        // we don't return it by accident in safe builds.
+        std.debug.assert(self.impl.asObject() != uninitialized.impl.asObject());
+    }
     return self.impl.asObject();
 }
 
@@ -2450,6 +2470,11 @@ test format {
     }
 }
 
+test uninitialized {
+    const value: Value = .uninitialized;
+    try std.testing.expect(value.isUninitialized());
+}
+
 test @"undefined" {
     const value: Value = .undefined;
     try std.testing.expect(value.isUndefined());
@@ -2539,7 +2564,7 @@ test from {
         try std.testing.expectEqual(value.asBigInt(), big_int);
     }
     {
-        const object: *Object = @ptrFromInt(0x8);
+        const object: *Object = @ptrFromInt(0x8000);
         const value = Value.from(object);
         try std.testing.expect(value.isObject());
         try std.testing.expectEqual(value.asObject(), object);

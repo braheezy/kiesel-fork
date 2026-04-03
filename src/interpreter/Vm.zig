@@ -123,14 +123,6 @@ const PerBytecodeCache = struct {
     inline_caches: []InlineCache,
 };
 
-// Many engines have the concept of an "empty"/"hole" value, but I never really liked that, at
-// least if it leaks into the public API. Let's experiment with this in the VM only for now.
-const hole = Value.from(@as(*Object, @ptrFromInt(@alignOf(Object))));
-
-fn isHole(value: Value) bool {
-    return value.isObject() and value.asObject() == hole.asObject();
-}
-
 pub fn init(
     agent: *Agent,
     bytecode: *const Bytecode,
@@ -460,7 +452,7 @@ pub fn pushCallFrame(
 
     const stack_len = 1 + argument_count + register_count;
     try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, stack_len);
-    vm.stack.appendAssumeCapacity(hole);
+    vm.stack.appendAssumeCapacity(.uninitialized);
     vm.stack.appendSliceAssumeCapacity(args);
     vm.stack.appendNTimesAssumeCapacity(undefined, register_count);
 
@@ -758,7 +750,7 @@ fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.
 
 fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
     const cached_this_value = &vm.stack.items[vm.frame.stack_base];
-    if (isHole(cached_this_value.*)) {
+    if (cached_this_value.isUninitialized()) {
         @branchHint(.unlikely);
         cached_this_value.* = try vm.agent.resolveThisBinding();
     }
