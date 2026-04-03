@@ -434,8 +434,7 @@ pub fn getBindingValueIfExists(
         }
         return binding.value;
     }
-    if (!try self.object_record.hasBinding(agent, name)) return null;
-    return try self.object_record.getBindingValue(agent, name, strict);
+    return self.object_record.getBindingValueIfExists(agent, name, strict);
 }
 
 /// Combined `hasBinding()` and `setMutableBinding()`

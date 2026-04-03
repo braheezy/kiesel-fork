@@ -217,8 +217,34 @@ pub fn getBindingValueIfExists(
     name: *const String,
     strict: bool,
 ) Agent.Error!?Value {
-    // The repeated `hasProperty()` call is observable so for now we don't attempt to optimize it.
-    // This could be done for ordinary objects in the future.
+    const object = self.binding_object;
+    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+        .ordinary_has_property,
+        .ordinary_get,
+        // Dependencies of ordinary [[HasProperty]] and [[Get]]
+        .ordinary_get_own_property,
+        .ordinary_get_prototype_of,
+    }));
+
+    // OPTIMIZATION: Fast path for ordinary objects
+    if (has_ordinary_internal_methods and !self.is_with_environment) fast_path: {
+        @branchHint(.likely);
+        const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(
+            object,
+            .{ .string = name },
+        ) orelse {
+            // Don't bother with doing prototype chain traversal here, fall through to slow path
+            break :fast_path;
+        };
+        switch (property_descriptor.value_or_accessor) {
+            .value => |value| return value,
+            .accessor => |accessor| {
+                const getter = accessor.get orelse return .undefined;
+                return try Value.from(getter).callAssumeCallable(agent, Value.from(object), &.{});
+            },
+        }
+    }
+
     if (!try self.hasBinding(agent, name)) return null;
     return try self.getBindingValue(agent, name, strict);
 }
