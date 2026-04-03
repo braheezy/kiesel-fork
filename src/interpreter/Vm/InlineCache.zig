@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
@@ -27,13 +29,15 @@ pub fn get(
     }))) return null;
 
     switch (ic.type) {
-        .value => return base_object.property_storage.properties.items[@intFromEnum(ic.offset)].value,
+        .value => return base_object.property_storage.properties.items[@intFromEnum(ic.offset)],
         .accessor => {
-            const getter = base_object.property_storage.properties.items[@intFromEnum(ic.offset)].getter_or_setter orelse {
+            const getter_value = base_object.property_storage.properties.items[@intFromEnum(ic.offset)];
+            if (getter_value.isNull()) {
                 @branchHint(.unlikely);
                 return .undefined;
-            };
-            return try Value.from(getter).callAssumeCallable(agent, base_value, &.{});
+            }
+            std.debug.assert(getter_value.isObject());
+            return try getter_value.callAssumeCallable(agent, base_value, &.{});
         },
     }
 }
@@ -55,12 +59,17 @@ pub fn set(
 
     switch (ic.type) {
         .value => {
-            base_object.property_storage.properties.items[@intFromEnum(ic.offset)] = .{ .value = value };
+            base_object.property_storage.properties.items[@intFromEnum(ic.offset)] = value;
             return true;
         },
         .accessor => {
-            const setter = base_object.property_storage.properties.items[@intFromEnum(ic.offset) + 1].getter_or_setter orelse return false;
-            _ = try Value.from(setter).callAssumeCallable(agent, base_value, &.{value});
+            const setter_value = base_object.property_storage.properties.items[@intFromEnum(ic.offset) + 1];
+            if (setter_value.isNull()) {
+                @branchHint(.unlikely);
+                return false;
+            }
+            std.debug.assert(setter_value.isObject());
+            _ = try setter_value.callAssumeCallable(agent, base_value, &.{value});
             return true;
         },
     }

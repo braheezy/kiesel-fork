@@ -12,10 +12,8 @@ const Value = types.Value;
 
 const PropertyStorage = @This();
 
-properties: std.ArrayList(union {
-    value: Value,
-    getter_or_setter: ?*Object,
-}),
+/// Stores a single value for data properties and a pair of object/null for accessors.
+properties: std.ArrayList(Value),
 indexed_properties: Object.IndexedProperties,
 lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
 
@@ -150,37 +148,43 @@ pub fn getCreateLazyIfNeeded(
         return self.indexed_properties.get(@intCast(property_key.integer_index));
     }
     const property_metadata = object.shape.properties.get(property_key) orelse return null;
-    if (self.lazy_properties.fetchRemove(property_key)) |kv| {
-        const lazy_property = kv.value;
-        const realm = lazy_property.realm;
-        const agent = realm.agent;
-        switch (property_metadata.type) {
-            .value => {
-                const value = try lazy_property.initializer.value(agent, realm);
-                self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
-            },
-            .accessor => {
+    switch (property_metadata.type) {
+        .value => {
+            var value = &self.properties.items[@intFromEnum(property_metadata.offset)];
+            if (value.isUninitialized()) {
+                @branchHint(.unlikely);
+                const lazy_property = self.lazy_properties.fetchRemove(property_key).?.value;
+                const realm = lazy_property.realm;
+                const agent = realm.agent;
+                value.* = try lazy_property.initializer.value(agent, realm);
+            }
+            return .{
+                .value_or_accessor = .{ .value = value.* },
+                .attributes = property_metadata.attributes,
+            };
+        },
+        .accessor => {
+            var getter_value = &self.properties.items[@intFromEnum(property_metadata.offset)];
+            var setter_value = &self.properties.items[@intFromEnum(property_metadata.offset) + 1];
+            if (getter_value.isUninitialized()) {
+                @branchHint(.unlikely);
+                std.debug.assert(setter_value.isUninitialized());
+                const lazy_property = self.lazy_properties.fetchRemove(property_key).?.value;
+                const realm = lazy_property.realm;
+                const agent = realm.agent;
                 const accessor = try lazy_property.initializer.accessor(agent, realm);
-                self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .getter_or_setter = accessor.get };
-                self.properties.items[@intFromEnum(property_metadata.offset) + 1] = .{ .getter_or_setter = accessor.set };
-            },
-        }
+                getter_value.* = if (accessor.get) |getter| Value.from(getter) else .null;
+                setter_value.* = if (accessor.set) |setter| Value.from(setter) else .null;
+            }
+            return .{
+                .value_or_accessor = .{ .accessor = .{
+                    .get = if (getter_value.isObject()) getter_value.asObject() else null,
+                    .set = if (setter_value.isObject()) setter_value.asObject() else null,
+                } },
+                .attributes = property_metadata.attributes,
+            };
+        },
     }
-    const value_or_accessor: ValueOrAccessor = switch (property_metadata.type) {
-        .value => .{
-            .value = self.properties.items[@intFromEnum(property_metadata.offset)].value,
-        },
-        .accessor => .{
-            .accessor = .{
-                .get = self.properties.items[@intFromEnum(property_metadata.offset)].getter_or_setter,
-                .set = self.properties.items[@intFromEnum(property_metadata.offset) + 1].getter_or_setter,
-            },
-        },
-    };
-    return .{
-        .value_or_accessor = value_or_accessor,
-        .attributes = property_metadata.attributes,
-    };
 }
 
 pub fn set(
@@ -219,21 +223,24 @@ pub fn set(
             }
             switch (value_or_accessor) {
                 .value => |value| {
-                    try self.properties.append(allocator, .{ .value = value });
+                    try self.properties.append(allocator, value);
                 },
                 .accessor => |accessor| {
-                    try self.properties.append(allocator, .{ .getter_or_setter = accessor.get });
-                    try self.properties.append(allocator, .{ .getter_or_setter = accessor.set });
+                    const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
+                    const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
+                    try self.properties.appendSlice(allocator, &.{ getter_value, setter_value });
                 },
             }
         } else {
             switch (value_or_accessor) {
                 .value => |value| {
-                    self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = value;
                 },
                 .accessor => |accessor| {
-                    self.properties.items[@intFromEnum(property_metadata.offset)] = .{ .getter_or_setter = accessor.get };
-                    self.properties.items[@intFromEnum(property_metadata.offset) + 1] = .{ .getter_or_setter = accessor.set };
+                    const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
+                    const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
+                    self.properties.items[@intFromEnum(property_metadata.offset)] = getter_value;
+                    self.properties.items[@intFromEnum(property_metadata.offset) + 1] = setter_value;
                 },
             }
         }
@@ -246,11 +253,12 @@ pub fn set(
         );
         switch (value_or_accessor) {
             .value => |value| {
-                try self.properties.append(allocator, .{ .value = value });
+                try self.properties.append(allocator, value);
             },
             .accessor => |accessor| {
-                try self.properties.append(allocator, .{ .getter_or_setter = accessor.get });
-                try self.properties.append(allocator, .{ .getter_or_setter = accessor.set });
+                const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
+                const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
+                try self.properties.appendSlice(allocator, &.{ getter_value, setter_value });
             },
         }
     }

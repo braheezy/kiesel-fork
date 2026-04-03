@@ -639,12 +639,16 @@ pub fn ordinarySet(
         switch (property_metadata.type) {
             .value => {
                 if (!property_metadata.attributes.writable) return false;
-                object.property_storage.properties.items[@intFromEnum(property_metadata.offset)] = .{ .value = value };
+                object.property_storage.properties.items[@intFromEnum(property_metadata.offset)] = value;
             },
             .accessor => {
-                const maybe_setter = object.property_storage.properties.items[@intFromEnum(property_metadata.offset) + 1].getter_or_setter;
-                const setter = maybe_setter orelse return false;
-                _ = try Value.from(setter).callAssumeCallable(agent, receiver, &.{value});
+                const setter_value = object.property_storage.properties.items[@intFromEnum(property_metadata.offset) + 1];
+                if (setter_value.isNull()) {
+                    @branchHint(.unlikely);
+                    return false;
+                }
+                std.debug.assert(setter_value.isObject());
+                _ = try setter_value.callAssumeCallable(agent, receiver, &.{value});
             },
         }
         return true;

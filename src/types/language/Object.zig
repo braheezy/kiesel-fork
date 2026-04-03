@@ -174,11 +174,13 @@ pub fn setIsHTMLDDA(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
 }
 
 pub fn getValueAtPropertyOffset(self: *const Object, offset: Shape.PropertyOffset) Value {
-    return self.property_storage.properties.items[@intFromEnum(offset)].value;
+    const value = self.property_storage.properties.items[@intFromEnum(offset)];
+    std.debug.assert(!value.isUninitialized());
+    return value;
 }
 
 pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.PropertyOffset, value: Value) void {
-    self.property_storage.properties.items[@intFromEnum(offset)] = .{ .value = value };
+    self.property_storage.properties.items[@intFromEnum(offset)] = value;
 }
 
 pub fn setAccessorAtPropertyOffset(
@@ -186,8 +188,10 @@ pub fn setAccessorAtPropertyOffset(
     offset: Shape.PropertyOffset,
     accessor: PropertyStorage.Accessor,
 ) void {
-    self.property_storage.properties.items[@intFromEnum(offset)] = .{ .getter_or_setter = accessor.get };
-    self.property_storage.properties.items[@intFromEnum(offset) + 1] = .{ .getter_or_setter = accessor.set };
+    const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
+    const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
+    self.property_storage.properties.items[@intFromEnum(offset)] = getter_value;
+    self.property_storage.properties.items[@intFromEnum(offset) + 1] = setter_value;
 }
 
 pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
@@ -266,11 +270,8 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
         };
     }
     const property_metadata = self.shape.properties.get(property_key).?;
-    std.debug.assert(!self.property_storage.lazy_properties.contains(property_key));
-    return switch (property_metadata.type) {
-        .value => self.property_storage.properties.items[@intFromEnum(property_metadata.offset)].value,
-        .accessor => unreachable,
-    };
+    std.debug.assert(property_metadata.type == .value);
+    return self.getValueAtPropertyOffset(property_metadata.offset);
 }
 
 /// Fast version of `createDataPropertyOrThrow()` that assumes the property does not exist yet or
@@ -440,11 +441,11 @@ pub fn defineBuiltinAccessorWithAttributes(
         attributes_,
         .accessor,
     );
-    try self.property_storage.properties.append(agent.gc_allocator, .{
-        .getter_or_setter = if (@TypeOf(getter_function) != void) &getter_function.object else null,
-    });
-    try self.property_storage.properties.append(agent.gc_allocator, .{
-        .getter_or_setter = if (@TypeOf(setter_function) != void) &setter_function.object else null,
+    const getter_value: Value = if (@TypeOf(getter_function) != void) Value.from(&getter_function.object) else .null;
+    const setter_value: Value = if (@TypeOf(setter_function) != void) Value.from(&setter_function.object) else .null;
+    try self.property_storage.properties.appendSlice(agent.gc_allocator, &.{
+        getter_value,
+        setter_value,
     });
 }
 
@@ -590,7 +591,7 @@ pub fn defineBuiltinPropertyWithAttributes(
         attributes,
         .value,
     );
-    try self.property_storage.properties.append(agent.gc_allocator, .{ .value = value });
+    try self.property_storage.properties.append(agent.gc_allocator, value);
 }
 
 pub fn defineBuiltinPropertyLazy(
@@ -611,7 +612,7 @@ pub fn defineBuiltinPropertyLazy(
         attributes,
         .value,
     );
-    try self.property_storage.properties.append(agent.gc_allocator, .{ .value = undefined });
+    try self.property_storage.properties.append(agent.gc_allocator, .uninitialized);
     try self.property_storage.lazy_properties.putNoClobber(
         agent.gc_allocator,
         property_key,

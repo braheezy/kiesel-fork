@@ -201,8 +201,9 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
             },
             .lazy_property => |initializer| {
                 // NOTE: There aren't any accessors on the global object so this only ever creates data properties.
+                std.debug.assert(initializer == .value);
                 try global.definePropertyOrThrow(self.agent, property_key, .{
-                    .value = undefined,
+                    .value = .uninitialized,
                     .writable = true,
                     .enumerable = false,
                     .configurable = true,
