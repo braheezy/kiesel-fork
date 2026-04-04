@@ -25,8 +25,8 @@
         .kiesel_runtime = .{
             // Uncomment for local development:
             // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#82b5e1db8cb4bab71c08e8769334ff4caf136234",
-            .hash = "kiesel_runtime-0.1.0-goZjAU8ZAQBOxEFLRqtGrmRoIBKo6YuMMte6bBL4PV2s",
+            .url = "git+https://codeberg.org/kiesel-js/runtime#b12efe17dbe86cb9acd9cc4f173a87728123b395",
+            .hash = "kiesel_runtime-0.1.0-goZjAVUZAQDwGh8R43RiRORSbwX2thxiUH6bG3YzaVt4",
         },
         .libregexp = .{
             .path = "./pkg/libregexp",

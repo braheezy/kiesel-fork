@@ -268,11 +268,14 @@ fn prettyPrintError(
     const error_data = @"error".fields.error_data;
     const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .red);
-    try writer.print("{f}", .{error_data.name.fmtRaw()});
+    try tty_config.setColor(writer, .white);
+    try writer.print("{f}(", .{error_data.name.fmtRaw()});
+    try tty_config.setColor(writer, .reset);
     if (!error_data.message.isEmpty()) {
-        try writer.print(": {f}", .{error_data.message.fmtRaw()});
+        try writer.print("{f}", .{Value.from(error_data.message).fmtPretty()});
     }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
@@ -1501,9 +1504,22 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
     try tty_config.setColor(writer, .reset);
 }
 
-pub fn prettyPrintException(exception: Agent.Exception, writer: *std.Io.Writer) PrettyPrintError!void {
+pub fn prettyPrintException(
+    agent: *Agent,
+    exception: Agent.Exception,
+    writer: *std.Io.Writer,
+) PrettyPrintError!void {
     const tty_config = state.platform.tty_config;
-    try writer.print("Uncaught exception: {f}", .{exception.value.fmtPretty()});
+    const old_exception = agent.exception;
+    defer agent.exception = old_exception;
+    try writer.writeAll("Uncaught exception: ");
+    if (exception.value.toString(agent)) |string| {
+        try tty_config.setColor(writer, .red);
+        try writer.print("{f}", .{string.fmtRaw()});
+        try tty_config.setColor(writer, .reset);
+    } else |_| {
+        try writer.print("{f}", .{exception.value.fmtPretty()});
+    }
     var it = std.mem.reverseIterator(exception.stack_trace);
     while (it.next()) |stack_frame| {
         try writer.writeAll("\n  at ");

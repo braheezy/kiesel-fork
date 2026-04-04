@@ -199,7 +199,7 @@ fn mainWithErrorHandling() Error!void {
                 };
                 try stderr.print("{f}\n{f}\n", .{
                     fmtParseErrorHint(parse_error, source_text),
-                    exception.fmtPretty(),
+                    exception.fmtPretty(&agent),
                 });
                 try stderr.flush();
                 continue;
@@ -213,7 +213,7 @@ fn mainWithErrorHandling() Error!void {
             error.OutOfMemory => return error.OutOfMemory,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                try stderr.print("{f}\n", .{exception.fmtPretty()});
+                try stderr.print("{f}\n", .{exception.fmtPretty(&agent)});
                 try stderr.flush();
             },
         }

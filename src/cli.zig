@@ -509,7 +509,7 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
             };
             try stderr.print("{f}\n{f}\n", .{
                 fmtParseErrorHint(parse_error, source_text),
-                exception.fmtPretty(),
+                exception.fmtPretty(agent),
             });
             try stderr.flush();
             return error.AlreadyReported;
@@ -606,7 +606,7 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            try stderr.print("{f}\n", .{exception.fmtPretty()});
+            try stderr.print("{f}\n", .{exception.fmtPretty(agent)});
             try stderr.flush();
             return error.AlreadyReported;
         },
