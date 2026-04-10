@@ -459,8 +459,8 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
         command,
         path: []const u8,
     },
-    module: bool = false,
-    print_promise_rejection_warnings: bool = true,
+    module: bool,
+    print_promise_rejection_warnings: bool,
 }) !Value {
     const agent = realm.agent;
     const stdout = agent.platform.stdout;
@@ -714,9 +714,8 @@ fn printValueDebugInfo(
 
 fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
     base_dir: []const u8,
-    debug: bool = false,
-    module: bool = false,
-    print_promise_rejection_warnings: bool = true,
+    debug: bool,
+    print_promise_rejection_warnings: bool,
 }) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -962,7 +961,7 @@ fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
         const result = run(gpa, realm, source_text, .{
             .base_dir = options.base_dir,
             .origin = .repl,
-            .module = options.module,
+            .module = false,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         }) catch |err| switch (err) {
             // Handled exception & printed something, carry on
@@ -1015,7 +1014,7 @@ pub fn main() !u8 {
         command: ?[]const u8 = null,
         debug: bool = false,
         @"disable-gc": bool = false,
-        module: bool = false,
+        module: ?bool = null,
         @"print-ast": bool = false,
         @"print-bytecode": bool = false,
         @"print-ir": bool = false,
@@ -1055,7 +1054,7 @@ pub fn main() !u8 {
     const parsed_args = args.parseForCurrentProcess(Options, gpa, .print) catch return 1;
     defer parsed_args.deinit();
 
-    const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+    const maybe_path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
 
     if (parsed_args.options.version) {
         try printVersionInfo(stdout);
@@ -1067,8 +1066,8 @@ pub fn main() !u8 {
         try stdout.flush();
         return 0;
     }
-    if (parsed_args.options.module) {
-        if (path_arg == null) {
+    if (parsed_args.options.module != null) {
+        if (maybe_path == null) {
             try stderr.writeAll("-m/--module option must not be used in REPL mode\n");
             try stderr.flush();
             return 1;
@@ -1079,6 +1078,10 @@ pub fn main() !u8 {
             return 1;
         }
     }
+
+    const run_as_module =
+        parsed_args.options.module orelse
+        if (maybe_path) |path| std.mem.endsWith(u8, path, ".mjs") else false;
 
     if (kiesel.build_options.enable_libgc and parsed_args.options.@"disable-gc") {
         kiesel.gc.disable();
@@ -1297,7 +1300,7 @@ pub fn main() !u8 {
     defer gpa.free(cwd);
     std.debug.assert(std.fs.path.isAbsolute(cwd));
 
-    if (path_arg) |path| {
+    if (maybe_path) |path| {
         const source_text = try readFile(gpa, path);
         defer gpa.free(source_text);
         const resolved_path = try std.fs.path.resolve(gpa, &.{ cwd, path });
@@ -1306,7 +1309,7 @@ pub fn main() !u8 {
         const result = run(gpa, realm, source_text, .{
             .base_dir = std.fs.path.dirname(resolved_path).?,
             .origin = .{ .path = path },
-            .module = parsed_args.options.module,
+            .module = run_as_module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         }) catch |err| switch (err) {
             error.AlreadyReported => return 1,
@@ -1317,10 +1320,11 @@ pub fn main() !u8 {
             try stdout.flush();
         }
     } else if (parsed_args.options.command) |source_text| {
+        std.debug.assert(!run_as_module);
         const result = run(gpa, realm, source_text, .{
             .base_dir = cwd,
             .origin = .command,
-            .module = parsed_args.options.module,
+            .module = false,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         }) catch |err| switch (err) {
             error.AlreadyReported => return 1,
@@ -1331,10 +1335,10 @@ pub fn main() !u8 {
             try stdout.flush();
         }
     } else {
+        std.debug.assert(!run_as_module);
         try repl(gpa, realm, .{
             .base_dir = cwd,
             .debug = parsed_args.options.debug,
-            .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         });
     }
