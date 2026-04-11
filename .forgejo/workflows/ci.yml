@@ -332,6 +332,10 @@ jobs:
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
+      - name: Ensure test expectations are up to date
+        run: |
+          zig build -Denable-intl=false -Denable-temporal=false update-expectations
+          git diff --exit-code -- src/interpreter/test_cases.zon
       - name: Build fuzzilli shell
         run: |
           # This doesn't run anything, only make sure it keeps building

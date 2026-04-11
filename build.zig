@@ -307,4 +307,23 @@ pub fn build(b: *std.Build) void {
 
     const fuzzilli_step = b.step("fuzzilli", "Build and install fuzzilli shell");
     fuzzilli_step.dependOn(&b.addInstallArtifact(fuzzilli, .{}).step);
+
+    const update_expectations = b.addExecutable(.{
+        .name = "update-expectations",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/interpreter/update_expectations.zig"),
+            .imports = &.{
+                .{ .name = "kiesel", .module = kiesel },
+            },
+            .target = target,
+            .optimize = optimize,
+        }),
+        .use_llvm = use_llvm,
+    });
+
+    const run_update_expectations = b.addRunArtifact(update_expectations);
+    run_update_expectations.addArg("src/interpreter/test_cases.zon");
+
+    const update_expectations_step = b.step("update-expectations", "Update test expectations");
+    update_expectations_step.dependOn(&run_update_expectations.step);
 }
