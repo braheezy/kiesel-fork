@@ -16,6 +16,7 @@ current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 exception_handlers: std.ArrayList(ExceptionHandler),
+array_states: std.AutoHashMapUnmanaged(Ir.Inst.Ref, ArrayState),
 inline_cache_count: u16,
 
 const ExceptionHandler = struct {
@@ -24,6 +25,12 @@ const ExceptionHandler = struct {
     target: *Block,
     exception_reg: Bytecode.Inst.Reg,
     scope_depth: u16,
+};
+
+const ArrayState = struct {
+    index: u32,
+    len: u32,
+    has_spread: bool,
 };
 
 pub const Error = error{OutOfMemory};
@@ -38,6 +45,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .lsra = lsra,
         .label_blocks = .empty,
         .exception_handlers = .empty,
+        .array_states = .empty,
         .inline_cache_count = 0,
     };
 }
@@ -51,6 +59,7 @@ pub fn deinit(b: *Builder) void {
     b.lsra.deinit(b.gpa);
     b.label_blocks.deinit(b.gpa);
     b.exception_handlers.deinit(b.gpa);
+    b.array_states.deinit(b.gpa);
 }
 
 fn computeRPO(
@@ -113,8 +122,14 @@ pub fn build(b: *Builder) Error!Bytecode {
             .number => try b.lowerNumber(data.number, dest),
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
-            .array => try b.lowerArray(data.array, dest),
-            .object => try b.lowerObject(data.object, dest),
+            .array_create => try b.lowerArrayCreate(index.toRef(), data.array, dest),
+            .array_push => try b.lowerArrayPush(data.binary, dest),
+            .array_spread => try b.lowerArraySpread(data.binary, dest),
+            .object_create => try b.lowerObjectCreate(dest),
+            .object_set => try b.lowerObjectSet(data.set_property, dest),
+            .object_set_computed => try b.lowerObjectSetComputed(data.set_property_computed, dest),
+            .object_set_prototype => try b.lowerObjectSetPrototype(data.binary, dest),
+            .object_spread => try b.lowerObjectSpread(data.binary, dest),
             .reg_exp => try b.lowerRegExp(data.reg_exp, dest),
             .this => try b.lowerThis(dest),
             .label => try b.lowerLabel(dest, index.toRef()),
@@ -704,179 +719,187 @@ fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Re
     });
 }
 
-fn lowerArray(b: *Builder, data: Ir.Inst.Array, dest: Bytecode.Inst.Reg) Error!void {
-    const elements = b.ir.refSlice(data.extra_index, data.len);
+fn lowerArrayCreate(b: *Builder, array_ref: Ir.Inst.Ref, data: Ir.Inst.Array, dest: Bytecode.Inst.Reg) Error!void {
+    try b.emit(.{
+        .tag = .array_create,
+        .data = .{ .reg_u32 = .{
+            dest,
+            if (data.has_spread) 0 else data.len,
+        } },
+    });
 
-    const has_spread = for (elements) |elem| {
-        if (elem.toIndex()) |elem_index| {
-            if (b.ir.instructions.items(.tag)[@intFromEnum(elem_index)] == .spread) {
-                break true;
-            }
-        }
-    } else false;
-
-    if (has_spread) {
-        try b.emit(.{
-            .tag = .array_create,
-            .data = .{
-                .reg_u32 = .{ dest, 0 },
-            },
+    if (data.len > 0) {
+        try b.array_states.putNoClobber(b.gpa, array_ref, .{
+            .index = 0,
+            .len = data.len,
+            .has_spread = data.has_spread,
         });
+    }
+}
 
-        for (elements) |elem| {
-            if (elem == .none) {
-                try b.emit(.{
-                    .tag = .array_push_hole,
-                    .data = .{ .reg = dest },
-                });
-                continue;
-            }
-            const elem_index = elem.toIndex().?;
-            const elem_tag = b.ir.instructions.items(.tag)[@intFromEnum(elem_index)];
-            const tag: Bytecode.Inst.Tag = switch (elem_tag) {
-                .spread => .array_spread,
-                else => .array_push,
-            };
-            const elem_reg = b.resolve(elem);
+fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+    const array_reg = b.resolve(data.lhs);
+    const state = b.array_states.getPtr(data.lhs).?;
+    defer {
+        state.index += 1;
+        if (state.index == state.len) {
+            const removed = b.array_states.remove(data.lhs);
+            std.debug.assert(removed);
+        }
+    }
+
+    if (data.rhs == .none) {
+        if (state.has_spread) {
             try b.emit(.{
-                .tag = tag,
+                .tag = .array_push_hole,
+                .data = .{ .reg = array_reg },
+            });
+        } else {
+            // Holes are implicit for arrays without spread
+        }
+    } else {
+        const elem_reg = b.resolve(data.rhs);
+        if (state.has_spread) {
+            try b.emit(.{
+                .tag = .array_push,
                 .data = .{ .reg_reg = .{
-                    dest,
+                    array_reg,
                     elem_reg,
                 } },
             });
-        }
-    } else {
-        try b.emit(.{
-            .tag = .array_create,
-            .data = .{ .reg_u32 = .{
-                dest,
-                data.len,
-            } },
-        });
-
-        for (elements, 0..) |elem, i| {
-            if (elem == .none) continue; // Skip elisions
-            const elem_reg = b.resolve(elem);
+        } else {
             try b.emit(.{
                 .tag = .array_set,
                 .data = .{ .reg_reg_u32 = .{
-                    dest,
+                    array_reg,
                     elem_reg,
-                    @intCast(i),
+                    state.index,
                 } },
             });
         }
     }
 }
 
-fn lowerObject(b: *Builder, data: Ir.Inst.Object, dest: Bytecode.Inst.Reg) Error!void {
-    const pairs = b.ir.refSlice(data.extra_index, data.len * 2);
+fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+    const array_reg = b.resolve(data.lhs);
+    const value_reg = b.resolve(data.rhs);
+    const state = b.array_states.getPtr(data.lhs).?;
+    std.debug.assert(state.has_spread);
+    defer {
+        state.index += 1;
+        if (state.index == state.len) {
+            const removed = b.array_states.remove(data.lhs);
+            std.debug.assert(removed);
+        }
+    }
 
+    try b.emit(.{
+        .tag = .array_spread,
+        .data = .{ .reg_reg = .{ array_reg, value_reg } },
+    });
+}
+
+fn lowerObjectCreate(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{
         .tag = .object_create,
         .data = .{ .reg = dest },
     });
+}
 
-    var i: usize = 0;
-    while (i < pairs.len) : (i += 2) {
-        const key_ref = pairs[i];
-        const value_ref = pairs[i + 1];
-        const value_index = value_ref.toIndex().?;
-        const value_inst = b.ir.instructions.get(@intFromEnum(value_index));
+fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex, _: Bytecode.Inst.Reg) Error!void {
+    const data = b.ir.extraData(Ir.Inst.SetProperty, extra).data;
+    const object_reg = b.resolve(data.base);
+    const value_reg = b.resolve(data.value);
+    const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
 
-        const value_reg = b.resolve(value_ref);
+    const value_index = data.value.toIndex().?;
+    const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
 
-        if (key_ref == .none) {
-            const tag: Bytecode.Inst.Tag = if (value_inst.tag == .spread)
-                .object_spread
-            else
-                .object_set_prototype;
+    switch (value_tag) {
+        .getter, .setter, .create_function => {
             try b.emit(.{
-                .tag = tag,
+                .tag = .set_home_object,
                 .data = .{ .reg_reg = .{
-                    dest,
                     value_reg,
+                    object_reg,
                 } },
             });
-            continue;
-        }
-
-        const key_index = key_ref.toIndex().?;
-        const key_inst = b.ir.instructions.get(@intFromEnum(key_index));
-
-        switch (value_inst.tag) {
-            .getter, .setter => {
-                try b.emit(.{
-                    .tag = .set_home_object,
-                    .data = .{ .reg_reg = .{
-                        value_reg,
-                        dest,
-                    } },
-                });
-
-                const set_tag: Bytecode.Inst.Tag = if (key_inst.tag == .string)
-                    (if (value_inst.tag == .getter) .object_set_getter else .object_set_setter)
-                else
-                    (if (value_inst.tag == .getter) .object_set_getter_computed else .object_set_setter_computed);
-
-                if (key_inst.tag == .string) {
-                    const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_inst.data.string));
-                    try b.emit(.{
-                        .tag = set_tag,
-                        .data = .{ .reg_string_reg = .{
-                            dest,
-                            string_index,
-                            value_reg,
-                        } },
-                    });
-                } else {
-                    const key_reg = b.resolve(key_ref);
-                    try b.emit(.{
-                        .tag = set_tag,
-                        .data = .{ .reg_reg_reg = .{
-                            dest,
-                            key_reg,
-                            value_reg,
-                        } },
-                    });
-                }
-                continue;
-            },
-            .create_function => {
-                try b.emit(.{
-                    .tag = .set_home_object,
-                    .data = .{ .reg_reg = .{
-                        value_reg,
-                        dest,
-                    } },
-                });
-            },
-            else => {},
-        }
-
-        if (key_inst.tag == .string) {
-            const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(key_inst.data.string));
-            try b.emit(.{
-                .tag = .object_set,
-                .data = .{ .reg_string_reg = .{
-                    dest,
-                    string_index,
-                    value_reg,
-                } },
-            });
-        } else {
-            const key_reg = b.resolve(key_ref);
-            try b.emit(.{
-                .tag = .object_set_computed,
-                .data = .{ .reg_reg_reg = .{
-                    dest,
-                    key_reg,
-                    value_reg,
-                } },
-            });
-        }
+        },
+        else => {},
     }
+
+    try b.emit(.{
+        .tag = switch (value_tag) {
+            .getter => .object_set_getter,
+            .setter => .object_set_setter,
+            else => .object_set,
+        },
+        .data = .{ .reg_string_reg = .{
+            object_reg,
+            string_index,
+            value_reg,
+        } },
+    });
+}
+
+fn lowerObjectSetComputed(b: *Builder, data: Ir.Inst.ExtraIndex, _: Bytecode.Inst.Reg) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
+    const object_reg = b.resolve(extra.data.base);
+    const key_reg = b.resolve(extra.data.property);
+    const value_reg = b.resolve(extra.data.value);
+
+    const value_index = extra.data.value.toIndex().?;
+    const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
+
+    switch (value_tag) {
+        .getter, .setter, .create_function => {
+            try b.emit(.{
+                .tag = .set_home_object,
+                .data = .{ .reg_reg = .{
+                    value_reg,
+                    object_reg,
+                } },
+            });
+        },
+        else => {},
+    }
+
+    try b.emit(.{
+        .tag = switch (value_tag) {
+            .getter => .object_set_getter_computed,
+            .setter => .object_set_setter_computed,
+            else => .object_set_computed,
+        },
+        .data = .{ .reg_reg_reg = .{
+            object_reg,
+            key_reg,
+            value_reg,
+        } },
+    });
+}
+
+fn lowerObjectSetPrototype(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+    const object_reg = b.resolve(data.lhs);
+    const value_reg = b.resolve(data.rhs);
+    try b.emit(.{
+        .tag = .object_set_prototype,
+        .data = .{ .reg_reg = .{
+            object_reg,
+            value_reg,
+        } },
+    });
+}
+
+fn lowerObjectSpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+    const object_reg = b.resolve(data.lhs);
+    const value_reg = b.resolve(data.rhs);
+    try b.emit(.{
+        .tag = .object_spread,
+        .data = .{ .reg_reg = .{
+            object_reg,
+            value_reg,
+        } },
+    });
 }
 
 fn lowerRegExp(b: *Builder, data: Ir.Inst.RegExp, dest: Bytecode.Inst.Reg) Error!void {

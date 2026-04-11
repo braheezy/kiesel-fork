@@ -2891,76 +2891,119 @@ fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.R
 }
 
 fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.Inst.Ref {
-    var elements: std.ArrayList(Ir.Inst.Ref) = .empty;
-    defer elements.deinit(b.gpa);
+    const has_spread = for (array_lit.element_list) |elem| {
+        if (elem == .spread) break true;
+    } else false;
 
-    for (array_lit.element_list) |elem| {
-        const elem_ref: Ir.Inst.Ref = switch (elem) {
-            .elision => .none,
-            .expression => |*expr| try b.lowerExpression(expr),
-            .spread => |*expr| blk: {
-                const value = try b.lowerExpression(expr);
-                break :blk try b.addInst(.{
-                    .tag = .spread,
-                    .data = .{ .ref = value },
-                });
-            },
-        };
-        try elements.append(b.gpa, elem_ref);
-    }
-
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const len: u32 = @intCast(elements.items.len);
-    try b.extra.appendSlice(b.gpa, @ptrCast(elements.items));
-
-    return b.addInst(.{
-        .tag = .array,
+    const array_ref = try b.addInst(.{
+        .tag = .array_create,
         .data = .{ .array = .{
-            .extra_index = extra_index,
-            .len = len,
+            .len = @intCast(array_lit.element_list.len),
+            .has_spread = has_spread,
         } },
     });
+
+    for (array_lit.element_list) |elem| {
+        switch (elem) {
+            .elision => {
+                _ = try b.addInst(.{
+                    .tag = .array_push,
+                    .data = .{ .binary = .{
+                        .lhs = array_ref,
+                        .rhs = .none,
+                    } },
+                });
+            },
+            .expression => |*expr| {
+                const value = try b.lowerExpression(expr);
+                _ = try b.addInst(.{
+                    .tag = .array_push,
+                    .data = .{ .binary = .{
+                        .lhs = array_ref,
+                        .rhs = value,
+                    } },
+                });
+            },
+            .spread => |*expr| {
+                const value = try b.lowerExpression(expr);
+                _ = try b.addInst(.{
+                    .tag = .array_spread,
+                    .data = .{ .binary = .{
+                        .lhs = array_ref,
+                        .rhs = value,
+                    } },
+                });
+            },
+        }
+    }
+
+    return array_ref;
 }
 
 fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!Ir.Inst.Ref {
-    var pairs: std.ArrayList(Ir.Inst.Ref) = .empty;
-    defer pairs.deinit(b.gpa);
+    const Key = union(enum) {
+        string: Ir.Inst.StringIndex,
+        computed: Ir.Inst.Ref,
+    };
+
+    const object_ref = try b.addInst(.{
+        .tag = .object_create,
+        .data = .{ .none = {} },
+    });
 
     for (object_lit.property_definition_list.items) |prop_def| {
         switch (prop_def) {
             .identifier_reference => |identifier| {
                 const string_index = try b.internString(identifier, .literal);
-                const key_ref = try b.addInst(.{
-                    .tag = .string,
-                    .data = .{ .string = string_index },
-                });
                 const value_ref = try b.addInst(.{
                     .tag = .get_binding,
                     .data = .{ .string = string_index },
                 });
-                try pairs.appendSlice(b.gpa, &.{ key_ref, value_ref });
+                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                    .base = object_ref,
+                    .name = string_index,
+                    .value = value_ref,
+                });
+                _ = try b.addInst(.{
+                    .tag = .object_set,
+                    .data = .{ .set_property = extra_index },
+                });
             },
             .spread => |*expr| {
                 const value_ref = try b.lowerExpression(expr);
-                const spread_ref = try b.addInst(.{
-                    .tag = .spread,
-                    .data = .{ .ref = value_ref },
+                _ = try b.addInst(.{
+                    .tag = .object_spread,
+                    .data = .{ .binary = .{
+                        .lhs = object_ref,
+                        .rhs = value_ref,
+                    } },
                 });
-                try pairs.appendSlice(b.gpa, &.{ .none, spread_ref });
             },
             .method_definition => |method_def| {
-                const key_ref = switch (method_def.class_element_name) {
-                    .property_name => |*property_name| try b.lowerPropertyName(property_name),
-                    .private_identifier => unreachable,
+                const property_name = &method_def.class_element_name.property_name;
+                const key: Key = if (property_name.* == .literal_property_name and
+                    property_name.literal_property_name == .identifier)
+                    .{ .string = try b.internString(
+                        property_name.literal_property_name.identifier,
+                        .literal,
+                    ) }
+                else blk: {
+                    const key_ref = try b.lowerPropertyName(property_name);
+                    const key_index = key_ref.toIndex().?;
+                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    break :blk if (key_inst.tag == .string)
+                        .{ .string = key_inst.data.string }
+                    else
+                        .{ .computed = key_ref };
                 };
                 const method_ref = switch (method_def.method) {
                     .get, .set => |func_expr| blk: {
-                        const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
-                            method_def.class_element_name.property_name.literal_property_name == .identifier)
+                        const name: Ir.Function.Name = if (property_name.* == .literal_property_name and
+                            property_name.literal_property_name == .identifier)
                         name: {
                             const prefix: []const u8 = if (method_def.method == .get) "get " else "set ";
-                            const ident = method_def.class_element_name.property_name.literal_property_name.identifier;
-                            const prefixed = try std.fmt.allocPrint(b.gpa, "{s}{s}", .{ prefix, ident });
+                            const identifier = property_name.literal_property_name.identifier;
+                            const prefixed = try std.fmt.allocPrint(b.gpa, "{s}{s}", .{ prefix, identifier });
                             defer b.gpa.free(prefixed);
                             break :name .{ .default = try b.internString(prefixed, .literal) };
                         } else .none;
@@ -2981,9 +3024,12 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                         });
                     },
                     inline else => |func_expr, tag| blk: {
-                        const name: Ir.Function.Name = if (method_def.class_element_name.property_name == .literal_property_name and
-                            method_def.class_element_name.property_name.literal_property_name == .identifier)
-                            .{ .default = try b.internString(method_def.class_element_name.property_name.literal_property_name.identifier, .literal) }
+                        const name: Ir.Function.Name = if (property_name.* == .literal_property_name and
+                            property_name.literal_property_name == .identifier)
+                            .{ .default = try b.internString(
+                                property_name.literal_property_name.identifier,
+                                .literal,
+                            ) }
                         else
                             .none;
                         const function_index = try b.addFunction(.{
@@ -3005,37 +3051,89 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                         });
                     },
                 };
-                try pairs.appendSlice(b.gpa, &.{ key_ref, method_ref });
+                switch (key) {
+                    .string => |string_index| {
+                        const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                            .base = object_ref,
+                            .name = string_index,
+                            .value = method_ref,
+                        });
+                        _ = try b.addInst(.{
+                            .tag = .object_set,
+                            .data = .{ .set_property = extra_index },
+                        });
+                    },
+                    .computed => |key_ref| {
+                        const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                            .base = object_ref,
+                            .property = key_ref,
+                            .value = method_ref,
+                        });
+                        _ = try b.addInst(.{
+                            .tag = .object_set_computed,
+                            .data = .{ .set_property_computed = extra_index },
+                        });
+                    },
+                }
             },
             .property_name_and_expression => |*prop| if (try prop.property_name.isProtoSetter(b.gpa)) {
                 const value_ref = try b.lowerExpression(&prop.expression);
-                try pairs.appendSlice(b.gpa, &.{ .none, value_ref });
+                _ = try b.addInst(.{
+                    .tag = .object_set_prototype,
+                    .data = .{ .binary = .{
+                        .lhs = object_ref,
+                        .rhs = value_ref,
+                    } },
+                });
             } else {
-                const key_ref = try b.lowerPropertyName(&prop.property_name);
+                const key: Key = if (prop.property_name == .literal_property_name and
+                    prop.property_name.literal_property_name == .identifier)
+                    .{ .string = try b.internString(
+                        prop.property_name.literal_property_name.identifier,
+                        .literal,
+                    ) }
+                else blk: {
+                    const key_ref = try b.lowerPropertyName(&prop.property_name);
+                    const key_index = key_ref.toIndex().?;
+                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    break :blk if (key_inst.tag == .string)
+                        .{ .string = key_inst.data.string }
+                    else
+                        .{ .computed = key_ref };
+                };
                 const value_ref = try b.lowerExpression(&prop.expression);
-                if (prop.property_name == .literal_property_name and
-                    prop.property_name.literal_property_name == .identifier and
-                    prop.expression.isAnonymousFunctionDefinition())
-                {
-                    const string_index = try b.internString(prop.property_name.literal_property_name.identifier, .literal);
-                    b.setAnonymousFunctionName(value_ref, string_index);
+                switch (key) {
+                    .string => |string_index| {
+                        if (prop.expression.isAnonymousFunctionDefinition()) {
+                            b.setAnonymousFunctionName(value_ref, string_index);
+                        }
+                        const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                            .base = object_ref,
+                            .name = string_index,
+                            .value = value_ref,
+                        });
+                        _ = try b.addInst(.{
+                            .tag = .object_set,
+                            .data = .{ .set_property = extra_index },
+                        });
+                    },
+                    .computed => |key_ref| {
+                        const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                            .base = object_ref,
+                            .property = key_ref,
+                            .value = value_ref,
+                        });
+                        _ = try b.addInst(.{
+                            .tag = .object_set_computed,
+                            .data = .{ .set_property_computed = extra_index },
+                        });
+                    },
                 }
-                try pairs.appendSlice(b.gpa, &.{ key_ref, value_ref });
             },
         }
     }
 
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const len: u32 = @intCast(pairs.items.len / 2);
-    try b.extra.appendSlice(b.gpa, @ptrCast(pairs.items));
-
-    return b.addInst(.{
-        .tag = .object,
-        .data = .{ .object = .{
-            .extra_index = extra_index,
-            .len = len,
-        } },
-    });
+    return object_ref;
 }
 
 fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Error!Ir.Inst.Ref {
@@ -4804,37 +4902,49 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
     }
 
     const cooked_array = blk: {
-        const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+        const array_ref = try b.addInst(.{
+            .tag = .array_create,
+            .data = .{ .array = .{
+                .len = @intCast(cooked_indices.items.len),
+                .has_spread = false,
+            } },
+        });
         for (cooked_indices.items) |string_index| {
             const ref = try b.addInst(.{ .tag = .string, .data = .{
                 .string = string_index,
             } });
-            try b.extra.append(b.gpa, @intFromEnum(ref));
+            _ = try b.addInst(.{
+                .tag = .array_push,
+                .data = .{ .binary = .{
+                    .lhs = array_ref,
+                    .rhs = ref,
+                } },
+            });
         }
-        break :blk try b.addInst(.{
-            .tag = .array,
-            .data = .{ .array = .{
-                .extra_index = extra_index,
-                .len = @intCast(cooked_indices.items.len),
-            } },
-        });
+        break :blk array_ref;
     };
 
     const raw_array = blk: {
-        const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+        const array_ref = try b.addInst(.{
+            .tag = .array_create,
+            .data = .{ .array = .{
+                .len = @intCast(raw_indices.items.len),
+                .has_spread = false,
+            } },
+        });
         for (raw_indices.items) |string_index| {
             const ref = try b.addInst(.{ .tag = .string, .data = .{
                 .string = string_index,
             } });
-            try b.extra.append(b.gpa, @intFromEnum(ref));
+            _ = try b.addInst(.{
+                .tag = .array_push,
+                .data = .{ .binary = .{
+                    .lhs = array_ref,
+                    .rhs = ref,
+                } },
+            });
         }
-        break :blk try b.addInst(.{
-            .tag = .array,
-            .data = .{ .array = .{
-                .extra_index = extra_index,
-                .len = @intCast(raw_indices.items.len),
-            } },
-        });
+        break :blk array_ref;
     };
 
     const template_id = b.template_object_count;

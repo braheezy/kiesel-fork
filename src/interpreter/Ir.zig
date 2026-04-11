@@ -75,8 +75,14 @@ pub const Inst = struct {
         number,
         string,
         big_int,
-        array,
-        object,
+        array_create,
+        array_push,
+        array_spread,
+        object_create,
+        object_set,
+        object_set_computed,
+        object_set_prototype,
+        object_spread,
         reg_exp,
         this,
 
@@ -223,7 +229,6 @@ pub const Inst = struct {
         string: StringIndex,
         big_int: BigIntIndex,
         array: Array,
-        object: Object,
         reg_exp: RegExp,
         br: Br,
         br_cond: ExtraIndex,
@@ -273,8 +278,14 @@ pub const Inst = struct {
         .number = .number,
         .string = .string,
         .big_int = .big_int,
-        .array = .array,
-        .object = .object,
+        .array_create = .array,
+        .array_push = .binary,
+        .array_spread = .binary,
+        .object_create = .none,
+        .object_set = .set_property,
+        .object_set_computed = .set_property_computed,
+        .object_set_prototype = .binary,
+        .object_spread = .binary,
         .reg_exp = .reg_exp,
         .this = .none,
         .label = .none,
@@ -404,8 +415,7 @@ pub const Inst = struct {
     pub const ExtraIndex = enum(u32) { _ };
 
     // Inline data types (8 bytes)
-    pub const Array = struct { extra_index: ExtraIndex, len: u32 };
-    pub const Object = struct { extra_index: ExtraIndex, len: u32 };
+    pub const Array = packed struct(u32) { len: u31, has_spread: bool };
     pub const RegExp = struct { pattern: StringIndex, flags: StringIndex };
     pub const Br = struct { target: Ref, value: Ref };
     pub const Binary = struct { lhs: Ref, rhs: Ref };
@@ -494,22 +504,11 @@ pub const Inst = struct {
             .number,
             .string,
             .big_int,
+            .array,
             .argument,
             .create_function,
             => {},
             .ref => try uses.append(gpa, inst.data.ref),
-            .array => {
-                const elements = ir.refSlice(inst.data.array.extra_index, inst.data.array.len);
-                for (elements) |elem| {
-                    if (elem != .none) try uses.append(gpa, elem);
-                }
-            },
-            .object => {
-                const pairs = ir.refSlice(inst.data.object.extra_index, inst.data.object.len * 2);
-                for (pairs) |ref| {
-                    if (ref != .none) try uses.append(gpa, ref);
-                }
-            },
             .copy_data_properties => {
                 const extra = ir.extraData(CopyDataProperties, inst.data.copy_data_properties);
                 try uses.append(gpa, extra.data.source);
@@ -679,33 +678,13 @@ fn printData(
         .number,
         .string,
         .big_int,
+        .array,
         .ref,
         .argument,
         .create_function,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
             try printField(ir, field_data, writer, tty_config);
-        },
-        .array => {
-            try writer.writeByte('[');
-            const elements = ir.refSlice(data.array.extra_index, data.array.len);
-            for (elements, 0..) |element, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, element, writer, tty_config);
-            }
-            try writer.writeByte(']');
-        },
-        .object => {
-            try writer.writeByte('{');
-            const pairs = ir.refSlice(data.object.extra_index, data.object.len * 2);
-            var pair_index: usize = 0;
-            while (pair_index < pairs.len) : (pair_index += 2) {
-                if (pair_index > 0) try writer.writeAll(", ");
-                try printField(ir, pairs[pair_index], writer, tty_config);
-                try writer.writeAll(": ");
-                try printField(ir, pairs[pair_index + 1], writer, tty_config);
-            }
-            try writer.writeByte('}');
         },
         .copy_data_properties => {
             const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
@@ -836,6 +815,16 @@ fn printField(
             try tty_config.setColor(writer, .dim);
             try writer.print("none", .{});
             try tty_config.setColor(writer, .reset);
+        },
+        Inst.Array => {
+            try tty_config.setColor(writer, .magenta);
+            try writer.print("{}", .{value.len});
+            try tty_config.setColor(writer, .reset);
+            if (value.has_spread) {
+                try tty_config.setColor(writer, .dim);
+                try writer.writeAll(" (spread)");
+                try tty_config.setColor(writer, .reset);
+            }
         },
         // ExtraIndex should be handled in `printData()`
         Inst.StringIndex => {
