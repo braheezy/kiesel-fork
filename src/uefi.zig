@@ -2,7 +2,6 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const kiesel = @import("kiesel");
-const kiesel_runtime = @import("kiesel-runtime");
 
 const Agent = kiesel.execution.Agent;
 const Diagnostics = kiesel.language.Diagnostics;
@@ -146,8 +145,6 @@ fn mainWithErrorHandling() Error!void {
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
-
-    try kiesel_runtime.addBindings(&agent, realm, realm.global_object);
 
     try stdout.print("Kiesel {[kiesel]f} [Zig {[zig]f}] on uefi\n", .{
         .kiesel = kiesel.version,

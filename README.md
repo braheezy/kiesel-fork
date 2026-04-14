@@ -85,7 +85,6 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | `enable-libgc`      | `true`                                       | Enables building with `libgc`                                                                                                                 |
 | `enable-libregexp`  | `true`                                       | Enables building with `libregexp`                                                                                                             |
 | `enable-nan-boxing` | `true` on x86_64/aarch64, `false` otherwise  | Enables NaN-boxing which requires a maximum of 48 bits of addressable memory                                                                  |
-| `enable-runtime`    | `true`                                       | Enables the [web-compatible runtime](https://codeberg.org/kiesel-js/runtime)                                                                  |
 | `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal), depends on `cargo` |
 | `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                         |
 | `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                      |

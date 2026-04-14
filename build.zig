@@ -47,11 +47,6 @@ pub fn build(b: *std.Build) void {
         .x86_64, .aarch64 => true,
         else => false,
     };
-    const enable_runtime = b.option(
-        bool,
-        "enable-runtime",
-        "Enable the web-compatible runtime",
-    ) orelse true;
     const enable_temporal = b.option(
         bool,
         "enable-temporal",
@@ -86,13 +81,11 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_libgc", enable_libgc);
     options.addOption(bool, "enable_libregexp", enable_libregexp);
     options.addOption(bool, "enable_nan_boxing", enable_nan_boxing);
-    options.addOption(bool, "enable_runtime", enable_runtime);
     options.addOption(bool, "enable_temporal", enable_temporal);
     options.addOption(std.SemanticVersion, "version", version);
 
     const any_pointer = b.dependency("any_pointer", .{});
     const args = b.dependency("args", .{});
-    const kiesel_runtime = b.dependency("kiesel_runtime", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const stackinfo = b.dependency("stackinfo", .{ .target = target });
     const unicode_id = b.dependency("unicode_id", .{});
@@ -183,9 +176,6 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    // Ensure the runtime uses the kiesel module defined above.
-    kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
-
     const exe = switch (target.result.os.tag) {
         .uefi => b.addExecutable(.{
             .name = "bootx64",
@@ -193,7 +183,6 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("src/uefi.zig"),
                 .imports = &.{
                     .{ .name = "kiesel", .module = kiesel },
-                    .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
                     .{ .name = "zigline", .module = zigline.module("zigline") },
                 },
                 .target = target,
@@ -210,7 +199,6 @@ pub fn build(b: *std.Build) void {
                     .imports = &.{
                         .{ .name = "args", .module = args.module("args") },
                         .{ .name = "kiesel", .module = kiesel },
-                        .{ .name = "kiesel-runtime", .module = kiesel_runtime.module("kiesel-runtime") },
                         .{ .name = "zigline", .module = zigline.module("zigline") },
                     },
                     .target = target,

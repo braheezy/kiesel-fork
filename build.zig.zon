@@ -22,12 +22,6 @@
             .hash = "icu4zig-0.1.0-IT7GrHenAgD_UPQK2UUbyX8x2EfsK9JAFax3n-W-5rqr",
             .lazy = true,
         },
-        .kiesel_runtime = .{
-            // Uncomment for local development:
-            // .path = "../runtime",
-            .url = "git+https://codeberg.org/kiesel-js/runtime#b12efe17dbe86cb9acd9cc4f173a87728123b395",
-            .hash = "kiesel_runtime-0.1.0-goZjAVUZAQDwGh8R43RiRORSbwX2thxiUH6bG3YzaVt4",
-        },
         .libregexp = .{
             .path = "./pkg/libregexp",
             .lazy = true,

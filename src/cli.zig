@@ -4,7 +4,6 @@ const std = @import("std");
 const args = @import("args");
 const icu4zig = @import("icu4zig");
 const kiesel = @import("kiesel");
-const kiesel_runtime = @import("kiesel-runtime");
 const temporal_rs = @import("temporal_rs");
 
 const Editor = @import("zigline").Editor;
@@ -88,9 +87,6 @@ fn initializeGlobalObject(agent: *Agent, realm: *Realm, global_object: *Object) 
         realm,
         .builtin_default,
     );
-    if (kiesel.build_options.enable_runtime) {
-        try kiesel_runtime.addBindings(agent, realm, global_object);
-    }
 }
 
 const Kiesel = struct {
