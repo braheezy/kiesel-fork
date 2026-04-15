@@ -134,7 +134,7 @@ pub const constructor = struct {
         //    performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterables_ = captures_.iterables;
                 const index = &captures_.index;
                 const inner_iterator_ = &captures_.inner_iterator;
@@ -192,7 +192,7 @@ pub const constructor = struct {
         const abruptClosure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
                 // 3.a.v.3.b.
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 if (captures_.inner_iterator) |inner_iterator| {
                     _ = try inner_iterator.close(agent_, @as(Agent.Error!void, {}));
                 }
@@ -210,7 +210,7 @@ pub const constructor = struct {
 
                     .closure = closure,
                     .abruptClosure = abruptClosure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -650,7 +650,7 @@ pub const constructor = struct {
         //    steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iters_ = captures_.iters;
                 const open_iters_ = &captures_.open_iters;
                 const mode_ = captures_.mode;
@@ -835,7 +835,7 @@ pub const constructor = struct {
         const abruptClosure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
                 // 3.b.vi.
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const open_iters_ = captures_.open_iters;
                 _ = try types.Iterator.closeAll(
                     agent_,
@@ -856,7 +856,7 @@ pub const constructor = struct {
 
                     .closure = closure,
                     .abruptClosure = abruptClosure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -1035,7 +1035,7 @@ pub const prototype = struct {
         //    integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
@@ -1078,7 +1078,7 @@ pub const prototype = struct {
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -1209,7 +1209,7 @@ pub const prototype = struct {
         //    predicate and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
@@ -1256,7 +1256,7 @@ pub const prototype = struct {
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -1389,7 +1389,7 @@ pub const prototype = struct {
         //    mapper and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
                 const mapper_ = captures_.mapper;
                 const inner_iterator_ = &captures_.inner_iterator;
@@ -1464,7 +1464,7 @@ pub const prototype = struct {
         const abruptClosure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!void {
                 // 6.b.viii.4.b.
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 if (captures_.inner_iterator) |inner_iterator| {
                     inner_iterator.close(agent_, @as(Agent.Error!void, {})) catch |err| {
                         return captures_.iterated.close(agent_, @as(Agent.Error!void, err));
@@ -1485,7 +1485,7 @@ pub const prototype = struct {
 
                     .closure = closure,
                     .abruptClosure = abruptClosure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -1611,7 +1611,7 @@ pub const prototype = struct {
         //    mapper and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
                 const mapper_ = captures_.mapper;
 
@@ -1653,7 +1653,7 @@ pub const prototype = struct {
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });
@@ -1891,7 +1891,7 @@ pub const prototype = struct {
         //    integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
-                const captures_ = iterator_helper.fields.state.captures.cast(*Captures);
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
                 // a. Let remaining be integerLimit.
@@ -1933,7 +1933,7 @@ pub const prototype = struct {
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
-                    .captures = .make(*Captures, captures),
+                    .captures = captures,
                 },
             },
         });

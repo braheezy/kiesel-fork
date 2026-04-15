@@ -398,7 +398,7 @@ fn asyncFromSyncIteratorContinuation(
     const unwrap = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*UnwrapClosureCaptures);
+            const captures = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(UnwrapClosureCaptures);
             const done_ = captures.done;
             const value_ = arguments_.get(0);
 
@@ -413,7 +413,7 @@ fn asyncFromSyncIteratorContinuation(
         .{ .function = unwrap },
         1,
         "",
-        .{ .additional_fields = .make(*UnwrapClosureCaptures, unwrap_closure_captures) },
+        .{ .additional_fields = unwrap_closure_captures },
     );
 
     // 11. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
@@ -438,7 +438,7 @@ fn asyncFromSyncIteratorContinuation(
         const close_iterator = struct {
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const function = agent_.activeFunctionObject();
-                const captures = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*CloseIteratorClosureCaptures);
+                const captures = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(CloseIteratorClosureCaptures);
                 const sync_iterator_ = captures.sync_iterator;
                 const @"error" = arguments_.get(0);
 
@@ -460,7 +460,7 @@ fn asyncFromSyncIteratorContinuation(
             .{ .function = close_iterator },
             1,
             "",
-            .{ .additional_fields = .make(*CloseIteratorClosureCaptures, close_iterator_closure_captures) },
+            .{ .additional_fields = close_iterator_closure_captures },
         );
     };
 

@@ -409,7 +409,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
         agent,
         referrer,
         module_request,
-        .null_pointer,
+        null,
         .{ .promise_capability = promise_capability },
     );
 
@@ -2271,7 +2271,7 @@ pub fn classDefinitionEvaluation(
 
                 // iii. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
-                const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+                const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(ClassConstructorFields);
 
                 // iv. If F.[[ConstructorKind]] is derived, then
                 var result = if (class_constructor_fields.constructor_kind == .derived) blk: {
@@ -2336,7 +2336,8 @@ pub fn classDefinitionEvaluation(
             .{
                 .realm = agent.currentRealm(),
                 .prototype = constructor_parent,
-                .additional_fields = .make(*ClassConstructorFields, class_constructor_fields),
+                .flags = .{ .async = false, .is_class_constructor = true },
+                .additional_fields = class_constructor_fields,
             },
         );
         try setFunctionName(agent, &function.object, PropertyKey.from(class_name), null);
@@ -2374,7 +2375,7 @@ pub fn classDefinitionEvaluation(
     if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
         ecmascript_function.fields.source_text = source_text;
     } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
-        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
+        const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         class_constructor_fields.source_text = source_text;
     } else unreachable;
 
@@ -2386,7 +2387,7 @@ pub fn classDefinitionEvaluation(
         if (function.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
             ecmascript_function.fields.flags.constructor_kind = .derived;
         } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
-            const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
+            const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
             class_constructor_fields.constructor_kind = .derived;
         } else unreachable;
     }
@@ -2547,7 +2548,7 @@ pub fn classDefinitionEvaluation(
             class_data.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
         }
     } else if (function.cast(builtins.BuiltinFunction)) |builtin_function| {
-        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
+        const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice(agent.gc_allocator);
         class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;

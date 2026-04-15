@@ -776,7 +776,7 @@ pub fn asyncGeneratorAwaitReturn(
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const generator_ = captures_.generator;
             const value = arguments_.get(0);
 
@@ -803,7 +803,7 @@ pub fn asyncGeneratorAwaitReturn(
         .{ .function = fulfilled_closure },
         1,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
@@ -811,7 +811,7 @@ pub fn asyncGeneratorAwaitReturn(
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const generator_ = captures_.generator;
             const reason = arguments_.get(0);
 
@@ -838,7 +838,7 @@ pub fn asyncGeneratorAwaitReturn(
         .{ .function = rejected_closure },
         1,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 15. Perform PerformPromiseThen(promise, onFulfilled, onRejected).

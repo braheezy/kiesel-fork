@@ -10,7 +10,6 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
 const SyntheticModule = language.SyntheticModule;
@@ -118,7 +117,7 @@ pub const Module = union(enum) {
     pub fn loadRequestedModules(
         self: Module,
         agent: *Agent,
-        host_defined: ?SafePointer,
+        host_defined: ?*anyopaque,
     ) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
             .source_text_module => |module| module.loadRequestedModules(agent, host_defined),
@@ -217,7 +216,7 @@ pub const GraphLoadingState = struct {
     visited: Visited,
 
     /// [[HostDefined]]
-    host_defined: SafePointer,
+    host_defined: ?*anyopaque,
 };
 
 pub const ImportedModuleReferrer = union(enum) {
@@ -289,7 +288,7 @@ fn continueDynamicImport(
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*RejectedClosureCaptures);
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(RejectedClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
             const reason = arguments_.get(0);
 
@@ -311,7 +310,7 @@ fn continueDynamicImport(
         .{ .function = rejected_closure },
         1,
         "",
-        .{ .additional_fields = .make(*RejectedClosureCaptures, rejected_closure_captures) },
+        .{ .additional_fields = rejected_closure_captures },
     );
 
     const LinkAndEvaluateClosureCaptures = struct {
@@ -331,7 +330,7 @@ fn continueDynamicImport(
     const link_and_evaluate_closure = struct {
         fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*LinkAndEvaluateClosureCaptures);
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(LinkAndEvaluateClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
             const module_ = captures_.module;
             const on_rejected_ = captures_.on_rejected;
@@ -375,7 +374,7 @@ fn continueDynamicImport(
             const fulfilled_closure = struct {
                 fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     const function_ = agent__.activeFunctionObject();
-                    const captures__ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*FulfilledClosureCaptures);
+                    const captures__ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(FulfilledClosureCaptures);
                     const promise_capability__ = captures__.promise_capability;
                     const module__ = captures__.module;
 
@@ -400,7 +399,7 @@ fn continueDynamicImport(
                 .{ .function = fulfilled_closure },
                 0,
                 "",
-                .{ .additional_fields = .make(*FulfilledClosureCaptures, fulfilled_closure_captures) },
+                .{ .additional_fields = fulfilled_closure_captures },
             );
 
             // f. Perform PerformPromiseThen(evaluatePromise, onFulfilled, onRejected).
@@ -423,7 +422,7 @@ fn continueDynamicImport(
         .{ .function = link_and_evaluate_closure },
         0,
         "",
-        .{ .additional_fields = .make(*LinkAndEvaluateClosureCaptures, link_and_evaluate_closure_captures) },
+        .{ .additional_fields = link_and_evaluate_closure_captures },
     );
 
     // 8. Perform PerformPromiseThen(loadPromise, linkAndEvaluate, onRejected).

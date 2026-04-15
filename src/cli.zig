@@ -18,7 +18,6 @@ const Module = kiesel.language.Module;
 const ModuleRequest = kiesel.language.ModuleRequest;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
-const SafePointer = kiesel.types.SafePointer;
 const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
@@ -61,14 +60,15 @@ fn resolveModulePath(
     script_or_module: ScriptOrModule,
     specifier: []const u8,
 ) std.mem.Allocator.Error![]const u8 {
-    const host_defined = switch (script_or_module) {
+    const host_defined_ptr = switch (script_or_module) {
         .script => |script| script.host_defined,
         .module => |module| switch (module) {
             .source_text_module => |m| m.host_defined,
             .synthetic_module => unreachable,
         },
     };
-    const base_dir: []const u8 = host_defined.cast(*ScriptOrModuleHostDefined).base_dir;
+    const host_defined: *ScriptOrModuleHostDefined = @ptrCast(@alignCast(host_defined_ptr.?));
+    const base_dir: []const u8 = host_defined.base_dir;
     std.debug.assert(std.fs.path.isAbsolute(base_dir));
     const resolved_path = try std.fs.path.resolve(gpa, &.{ base_dir, specifier });
     std.debug.assert(std.fs.path.isAbsolute(resolved_path));
@@ -462,11 +462,8 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
 
-    const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
-        const ptr = try agent.gc_allocator.create(ScriptOrModuleHostDefined);
-        ptr.* = .{ .base_dir = options.base_dir };
-        break :blk ptr;
-    });
+    const host_defined = try agent.gc_allocator.create(ScriptOrModuleHostDefined);
+    host_defined.* = .{ .base_dir = options.base_dir };
 
     var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
@@ -1139,7 +1136,7 @@ pub fn main() !u8 {
             agent_: *Agent,
             referrer: ImportedModuleReferrer,
             module_request: ModuleRequest,
-            _: SafePointer,
+            _: ?*anyopaque,
             payload: ImportedModulePayload,
         ) std.mem.Allocator.Error!void {
             const result = blk: {
@@ -1244,11 +1241,8 @@ pub fn main() !u8 {
                 }
             }
 
-            const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
-                const ptr = try agent_.gc_allocator.create(ScriptOrModuleHostDefined);
-                ptr.* = .{ .base_dir = std.fs.path.dirname(module_path).? };
-                break :blk ptr;
-            });
+            const host_defined = try agent_.gc_allocator.create(ScriptOrModuleHostDefined);
+            host_defined.* = .{ .base_dir = std.fs.path.dirname(module_path).? };
 
             var diagnostics = Diagnostics.init(gpa_);
             defer diagnostics.deinit();

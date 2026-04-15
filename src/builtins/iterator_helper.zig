@@ -13,7 +13,6 @@ const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -132,9 +131,13 @@ pub const IteratorHelper = MakeObject(.{
 
             closure: *const fn (*Agent, *IteratorHelper) Agent.Error!?Value,
             abruptClosure: ?*const fn (*Agent, *IteratorHelper) Agent.Error!void = null,
-            captures: SafePointer = .null_pointer,
+            captures: *anyopaque,
             executing: bool = false,
             has_yielded: bool = false,
+
+            pub fn capturesAs(self: *const @This(), comptime T: type) *T {
+                return @ptrCast(@alignCast(self.captures));
+            }
         },
         completed,
     },

@@ -573,7 +573,7 @@ pub const prototype = struct {
                 /// https://tc39.es/ecma402/#sec-datetime-format-functions
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const date = arguments.get(0);
 
                     // 1. Let dtf be F.[[DateTimeFormat]].
@@ -601,7 +601,7 @@ pub const prototype = struct {
                 .{ .function = dateTimeFormatFunction },
                 1,
                 "",
-                .{ .additional_fields = .make(*Captures, captures) },
+                .{ .additional_fields = captures },
             );
 
             // c. Set dtf.[[BoundFormat]] to F.

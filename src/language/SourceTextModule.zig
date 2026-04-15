@@ -25,7 +25,6 @@ const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
 const ResolvedBinding = language.ResolvedBinding;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const allImportAttributesSupported = language.allImportAttributesSupported;
@@ -76,7 +75,7 @@ indirect_export_entries: std.ArrayList(ExportEntry),
 star_export_entries: std.ArrayList(ExportEntry),
 
 /// [[HostDefined]]
-host_defined: SafePointer,
+host_defined: ?*anyopaque,
 
 /// [[Status]]
 status: Status,
@@ -170,7 +169,7 @@ pub fn print(self: SourceTextModule, writer: *std.Io.Writer) std.Io.Writer.Error
 pub fn loadRequestedModules(
     self: *SourceTextModule,
     agent: *Agent,
-    host_defined: ?SafePointer,
+    host_defined: ?*anyopaque,
 ) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 
@@ -192,7 +191,7 @@ pub fn loadRequestedModules(
         .pending_modules_count = 1,
         .visited = .empty,
         .promise_capability = promise_capability,
-        .host_defined = host_defined orelse .null_pointer,
+        .host_defined = host_defined,
     };
 
     // 4. Perform InnerModuleLoading(state, module).
@@ -497,7 +496,7 @@ fn innerModuleLinking(
 pub fn parse(
     source_text: []const u8,
     realm: *Realm,
-    host_defined: ?SafePointer,
+    host_defined: ?*anyopaque,
     options: Parser.Options,
 ) Parser.Error!*SourceTextModule {
     const agent = realm.agent;
@@ -638,7 +637,7 @@ pub fn parse(
         .pending_async_dependencies = null,
         .status = .new,
         .evaluation_error = null,
-        .host_defined = host_defined orelse .null_pointer,
+        .host_defined = host_defined,
         .ecmascript_code = body,
         .context = null,
         .import_meta = null,
@@ -974,7 +973,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const module_ = captures_.module;
 
             // a. Perform AsyncModuleExecutionFulfilled(module).
@@ -991,7 +990,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
         .{ .function = fulfilled_closure },
         0,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 6. Let rejectedClosure be a new Abstract Closure with parameters (error) that captures
@@ -999,7 +998,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
-            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const module_ = captures_.module;
             const @"error" = arguments.get(0);
 
@@ -1020,7 +1019,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
         .{ .function = rejected_closure },
         0,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 8. Perform PerformPromiseThen(capability.[[Promise]], onFulfilled, onRejected).

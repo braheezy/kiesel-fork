@@ -17,7 +17,6 @@ const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
@@ -145,8 +144,8 @@ const AsyncBody = union(enum) {
         arguments: []const Value,
     },
     abstract_closure: struct {
-        func: *const fn (*Agent, SafePointer) Agent.Error!Completion,
-        captures: SafePointer,
+        func: *const fn (agent: *Agent, captures: *anyopaque) Agent.Error!Completion,
+        captures: *anyopaque,
     },
     module: ast.Module,
 };
@@ -295,7 +294,7 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const async_context_ = captures_.async_context;
             const v = arguments_.get(0);
 
@@ -318,7 +317,7 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
         .{ .function = fulfilled_closure },
         1,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 5. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
@@ -326,7 +325,7 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const async_context_ = captures_.async_context;
             const reason = arguments_.get(0);
 
@@ -349,7 +348,7 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
         .{ .function = rejected_closure },
         1,
         "",
-        .{ .additional_fields = .make(*Captures, captures) },
+        .{ .additional_fields = captures },
     );
 
     // 7. Perform PerformPromiseThen(promise, onFulfilled, onRejected).

@@ -15,7 +15,6 @@ const Job = execution.Job;
 const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
@@ -37,7 +36,7 @@ pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: *Object) Agent.Error!void {
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
 pub fn hostMakeJobCallback(callback: *Object) Job.Callback {
     // 1. Return the JobCallback Record { [[Callback]]: callback, [[HostDefined]]: empty }.
-    return .{ .callback = callback, .host_defined = .null_pointer };
+    return .{ .callback = callback, .host_defined = null };
 }
 
 /// 9.5.3 HostCallJobCallback ( jobCallback, V, argumentsList )
@@ -76,14 +75,18 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
     // Let cleanupJob be a new Job Abstract Closure with no parameters that captures
     // finalizationRegistry and performs the following steps when called:
     const cleanup_job: Job = .{
-        .captures = .make(*Cell, cell),
+        .captures = cell,
         .func = struct {
-            fn cleanupJob(cell_ptr: SafePointer) Agent.Error!Value {
+            fn cleanupJob(captures: *anyopaque) Agent.Error!Value {
                 // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(finalizationRegistry)).
-                // 2. If cleanupResult is an abrupt completion, perform any host-defined
-                //    steps for reporting the error.
-                const cleanup_result = try cleanupFinalizationRegistry(cell_ptr.cast(*Cell));
-                _ = cleanup_result;
+                const cell_: *Cell = @ptrCast(@alignCast(captures));
+                cleanupFinalizationRegistry(cell_) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.ExceptionThrown => {
+                        // 2. If cleanupResult is an abrupt completion, perform any host-defined
+                        //    steps for reporting the error.
+                    },
+                };
 
                 // 3. Return unused.
                 return .undefined;
@@ -118,7 +121,7 @@ pub fn hostLoadImportedModule(
     agent: *Agent,
     referrer: ImportedModuleReferrer,
     module_request: ModuleRequest,
-    _: SafePointer,
+    _: ?*anyopaque,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void {
     const result = agent.throwException(.internal_error, "Module loading is disabled", .{});

@@ -318,7 +318,7 @@ pub const prototype = struct {
                 /// https://tc39.es/ecma402/#sec-collator-compare-functions
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
 
                     // 1. Let collator be F.[[Collator]].
                     // 2. Assert: collator is an Object and collator has an [[InitializedCollator]]
@@ -342,7 +342,7 @@ pub const prototype = struct {
                 .{ .function = collator_compare_function },
                 2,
                 "",
-                .{ .additional_fields = .make(*Captures, captures) },
+                .{ .additional_fields = captures },
             );
 
             // c. Set collator.[[BoundCompare]] to F.

@@ -1153,7 +1153,7 @@ pub const constructor = struct {
                 const function = agent_.activeFunctionObject();
 
                 // b. Let p be F.[[RevocableProxy]].
-                const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const additional_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const revocable_proxy = additional_fields.revocable_proxy orelse {
                     // c. If p is null, return NormalCompletion(undefined).
                     return .undefined;
@@ -1181,7 +1181,7 @@ pub const constructor = struct {
             .{ .function = revoker_closure },
             0,
             "",
-            .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+            .{ .additional_fields = additional_fields },
         );
 
         // 4. Set revoker.[[RevocableProxy]] to proxy.

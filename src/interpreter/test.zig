@@ -86,7 +86,7 @@ fn testInterpreter(
         .realm = realm,
         .ecmascript_code = script,
         .loaded_modules = .empty,
-        .host_defined = .null_pointer,
+        .host_defined = null,
         .source = source,
     };
 

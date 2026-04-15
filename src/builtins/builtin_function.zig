@@ -19,7 +19,6 @@ const Object = types.Object;
 const PrivateMethodDefinition = types.PrivateMethodDefinition;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const SourceText = builtins.ecmascript_function.SourceText;
 const String = types.String;
 const Value = types.Value;
@@ -35,6 +34,13 @@ pub const Behaviour = union(enum) {
 
     function: *const Function,
     constructor: *const Constructor,
+};
+
+pub const Flags = packed struct(u2) {
+    /// [[Async]]
+    async: bool,
+
+    is_class_constructor: bool,
 };
 
 pub const ClassConstructorFields = struct {
@@ -61,10 +67,12 @@ pub const BuiltinFunction = MakeObject(.{
         /// [[InitialName]]
         initial_name: ?*const String,
 
-        /// [[Async]]
-        async: bool,
+        flags: Flags,
+        additional_fields: ?*anyopaque,
 
-        additional_fields: SafePointer,
+        pub fn additionalFieldsAs(self: *const @This(), comptime T: type) *T {
+            return @ptrCast(@alignCast(self.additional_fields.?));
+        }
     },
     .tag = .builtin_function,
     .display_name = "Builtin Function",
@@ -136,7 +144,7 @@ pub fn builtinCallOrConstruct(
     try agent.execution_context_stack.append(agent.gc_allocator, &callee_context);
 
     // 10. If F.[[Async]] is true, then
-    if (builtin_function.fields.async) {
+    if (builtin_function.fields.flags.async) {
         const realm = agent.currentRealm();
 
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
@@ -163,11 +171,12 @@ pub fn builtinCallOrConstruct(
         //    thisArgument, argumentsList, and newTarget and performs the following steps when
         //    called:
         const resultsClosure = struct {
-            fn func(agent_: *Agent, captures_: SafePointer) Agent.Error!Completion {
-                const builtin_function_ = captures_.cast(*Captures).builtin_function;
-                const this_argument_ = captures_.cast(*Captures).this_argument;
-                const arguments_list_ = captures_.cast(*Captures).arguments_list;
-                const new_target_ = captures_.cast(*Captures).new_target;
+            fn func(agent_: *Agent, captures_ptr: *anyopaque) Agent.Error!Completion {
+                const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
+                const builtin_function_ = captures_.builtin_function;
+                const this_argument_ = captures_.this_argument;
+                const arguments_list_ = captures_.arguments_list;
+                const new_target_ = captures_.new_target;
 
                 // i. Let result be the Completion Record that is the result of evaluating F in a
                 //    manner that conforms to the specification of F. If thisArgument is
@@ -190,7 +199,7 @@ pub fn builtinCallOrConstruct(
         try asyncFunctionStart(agent, promise_capability, .{
             .abstract_closure = .{
                 .func = resultsClosure,
-                .captures = .make(*Captures, captures),
+                .captures = captures,
             },
         });
 
@@ -234,8 +243,8 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?*Object = null,
         prefix: ?[]const u8 = null,
-        async: ?bool = null,
-        additional_fields: SafePointer = .null_pointer,
+        flags: Flags = .{ .async = false, .is_class_constructor = false },
+        additional_fields: ?*anyopaque = null,
     },
 ) std.mem.Allocator.Error!*BuiltinFunction {
     // 1. If realm is not present, set realm to the current Realm Record.
@@ -245,7 +254,6 @@ pub fn createBuiltinFunction(
     const prototype = args.prototype orelse try realm.intrinsics.@"%Function.prototype%"();
 
     // 3. If async is not present, set async to false.
-    const async = args.async orelse false;
 
     // 4. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
     //    requires for the built-in function object that is about to be created.
@@ -260,6 +268,9 @@ pub fn createBuiltinFunction(
             .call = call,
             .construct = if (behaviour == .constructor) construct else null,
         }),
+
+        // 7. Set func.[[Async]] to async.
+        // NOTE: This is done via `flags`.
 
         // 8. Set func.[[Prototype]] to prototype.
         .prototype = prototype,
@@ -276,9 +287,7 @@ pub fn createBuiltinFunction(
             // 11. Set func.[[InitialName]] to null.
             .initial_name = null,
 
-            // 7. Set func.[[Async]] to async.
-            .async = async,
-
+            .flags = args.flags,
             .additional_fields = args.additional_fields,
         },
     });

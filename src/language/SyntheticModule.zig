@@ -15,7 +15,6 @@ const ExecutionContext = execution.ExecutionContext;
 const Module = language.Module;
 const Realm = execution.Realm;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
@@ -37,7 +36,7 @@ environment: ?Environment,
 namespace: ?*builtins.ModuleNamespace,
 
 /// [[HostDefined]]
-host_defined: SafePointer,
+host_defined: ?*anyopaque,
 
 /// [[ExportNames]]
 export_names: []const []const u8,
@@ -46,8 +45,8 @@ export_names: []const []const u8,
 evaluation_steps: EvaluationSteps,
 
 pub const EvaluationSteps = struct {
-    func: *const fn (module: *SyntheticModule, captures: SafePointer) Agent.Error!void,
-    captures: SafePointer,
+    func: *const fn (module: *SyntheticModule, captures: *anyopaque) Agent.Error!void,
+    captures: *anyopaque,
 };
 
 /// 16.2.1.8.1 CreateDefaultExportSyntheticModule ( defaultExport )
@@ -71,10 +70,11 @@ pub fn createDefaultExportSyntheticModule(
     const setDefaultExport = struct {
         fn func(
             module: *SyntheticModule,
-            captures_: SafePointer,
+            captures_ptr: *anyopaque,
         ) Agent.Error!void {
-            const agent_ = captures_.cast(*Captures).agent;
-            const default_export_ = captures_.cast(*Captures).default_export;
+            const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
+            const agent_ = captures_.agent;
+            const default_export_ = captures_.default_export;
 
             // a. Perform SetSyntheticModuleExport(module, "default", defaultExport).
             try module.setSyntheticModuleExport(agent_, "default", default_export_);
@@ -93,9 +93,9 @@ pub fn createDefaultExportSyntheticModule(
         .realm = realm,
         .environment = null,
         .namespace = null,
-        .host_defined = .null_pointer,
+        .host_defined = null,
         .export_names = &.{"default"},
-        .evaluation_steps = .{ .func = setDefaultExport, .captures = .make(*Captures, captures) },
+        .evaluation_steps = .{ .func = setDefaultExport, .captures = captures },
     };
     return self;
 }
@@ -141,7 +141,7 @@ fn setSyntheticModuleExport(
 pub fn loadRequestedModules(
     _: *SyntheticModule,
     agent: *Agent,
-    _: ?SafePointer,
+    _: ?*anyopaque,
 ) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 

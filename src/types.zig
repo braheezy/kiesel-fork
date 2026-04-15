@@ -41,8 +41,6 @@ pub const sameType = language.sameType;
 pub const sameValue = language.sameValue;
 pub const sameValueZero = language.sameValueZero;
 
-pub const SafePointer = @import("any-pointer").SafePointer;
-
 pub const ByteLength = enum(u53) {
     zero = 0,
     _,

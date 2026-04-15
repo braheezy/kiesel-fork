@@ -846,7 +846,8 @@ pub fn makeConstructor(
     if (function.cast(ECMAScriptFunction)) |ecmascript_function| {
         ecmascript_function.fields.flags.constructor_kind = .base;
     } else if (function.cast(BuiltinFunction)) |builtin_function| {
-        if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+        if (builtin_function.fields.flags.is_class_constructor) {
+            const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
             class_constructor_fields.constructor_kind = .base;
         }
     }

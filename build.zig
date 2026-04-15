@@ -84,7 +84,6 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_temporal", enable_temporal);
     options.addOption(std.SemanticVersion, "version", version);
 
-    const any_pointer = b.dependency("any_pointer", .{});
     const args = b.dependency("args", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const stackinfo = b.dependency("stackinfo", .{ .target = target });
@@ -95,7 +94,6 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/kiesel.zig"),
         .imports = &.{
             .{ .name = "build-options", .module = options.createModule() },
-            .{ .name = "any-pointer", .module = any_pointer.module("any-pointer") },
             .{ .name = "ptk", .module = parser_toolkit.module("parser-toolkit") },
             .{ .name = "stackinfo", .module = stackinfo.module("stackinfo") },
             .{ .name = "unicode-id", .module = unicode_id.module("unicode-id") },

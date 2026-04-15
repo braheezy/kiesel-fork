@@ -1017,7 +1017,7 @@ pub const prototype = struct {
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const value = arguments.get(0);
                     const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
 
                     // 1. Let nf be F.[[NumberFormat]].
                     // 2. Assert: nf is an Object and nf has an [[InitializedNumberFormat]]
@@ -1040,7 +1040,7 @@ pub const prototype = struct {
                 .{ .function = number_format_function },
                 2,
                 "",
-                .{ .additional_fields = .make(*Captures, captures) },
+                .{ .additional_fields = captures },
             );
 
             // c. Set nf.[[BoundFormat]] to F.

@@ -341,7 +341,7 @@ pub const constructor = struct {
         const closure = struct {
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const function = agent_.activeFunctionObject();
-                const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                 const object_ = captures_.object;
                 const key = arguments_.get(0);
                 const value = arguments_.get(1);
@@ -363,7 +363,7 @@ pub const constructor = struct {
             .{ .function = closure },
             2,
             "",
-            .{ .additional_fields = .make(*Captures, captures) },
+            .{ .additional_fields = captures },
         );
 
         // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).

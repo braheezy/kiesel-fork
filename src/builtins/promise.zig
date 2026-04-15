@@ -16,7 +16,6 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -107,7 +106,7 @@ pub fn createResolvingFunctions(
             const resolution = arguments.get(0);
 
             const function = agent_.activeFunctionObject();
-            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
             const promise_or_empty_ = &additional_fields_.promise_or_empty;
 
             // a. If promiseOrEmpty.[[Value]] is empty, return undefined.
@@ -196,7 +195,7 @@ pub fn createResolvingFunctions(
         .{ .function = resolve_steps },
         1,
         "",
-        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+        .{ .additional_fields = additional_fields },
     );
 
     // 4. Let rejectSteps be a new Abstract Closure with parameters (reason) that captures
@@ -206,7 +205,7 @@ pub fn createResolvingFunctions(
             const reason = arguments.get(0);
 
             const function = agent_.activeFunctionObject();
-            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
             const promise_or_empty_ = &additional_fields_.promise_or_empty;
 
             // a. If promiseOrEmpty.[[Value]] is empty, return undefined.
@@ -230,7 +229,7 @@ pub fn createResolvingFunctions(
         .{ .function = reject_steps },
         1,
         "",
-        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+        .{ .additional_fields = additional_fields },
     );
 
     // 6. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
@@ -296,7 +295,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
             const resolve = arguments.get(0);
             const reject = arguments.get(1);
             const function = agent_.activeFunctionObject();
-            const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const additional_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
             const resolving_functions_ = &additional_fields.resolving_functions;
 
             // a. If resolvingFunctions.[[Resolve]] is not undefined, throw a TypeError exception.
@@ -334,7 +333,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
         .{ .function = executor_closure },
         2,
         "",
-        .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+        .{ .additional_fields = additional_fields },
     );
 
     // NOTE: This struct can outlive the function scope if anything holds on to the callback above.
@@ -468,10 +467,11 @@ pub fn newPromiseReactionJob(
     // 1. Let job be a new Job Abstract Closure with no parameters that captures reaction and
     //    argument and performs the following steps when called:
     const func = struct {
-        fn func(captures_: SafePointer) Agent.Error!Value {
-            const agent_ = captures_.cast(*Captures).agent;
-            const reaction_ = captures_.cast(*Captures).reaction;
-            const argument_ = captures_.cast(*Captures).argument;
+        fn func(captures_ptr: *anyopaque) Agent.Error!Value {
+            const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
+            const agent_ = captures_.agent;
+            const reaction_ = captures_.reaction;
+            const argument_ = captures_.argument;
 
             // a. Let promiseCapability be reaction.[[Capability]].
             const promise_capability = reaction_.capability;
@@ -544,7 +544,7 @@ pub fn newPromiseReactionJob(
             );
         }
     }.func;
-    const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = captures };
 
     // 2. Let handlerRealm be null.
     var handler_realm: ?*Realm = null;
@@ -597,11 +597,12 @@ pub fn newPromiseResolveThenableJob(
     // 1. Let job be a new Job Abstract Closure with no parameters that captures promiseToResolve,
     //    thenable, and then and performs the following steps when called:
     const func = struct {
-        fn func(captures_: SafePointer) Agent.Error!Value {
-            const agent_ = captures_.cast(*Captures).agent;
-            const promise_to_resolve_ = captures_.cast(*Captures).promise_to_resolve;
-            const thenable_ = captures_.cast(*Captures).thenable;
-            const then_ = captures_.cast(*Captures).then;
+        fn func(captures_ptr: *anyopaque) Agent.Error!Value {
+            const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
+            const agent_ = captures_.agent;
+            const promise_to_resolve_ = captures_.promise_to_resolve;
+            const thenable_ = captures_.thenable;
+            const then_ = captures_.then;
 
             // a. Let resolvingFunctions be CreateResolvingFunctions(promiseToResolve).
             const resolving_functions = try createResolvingFunctions(agent_, promise_to_resolve_);
@@ -637,7 +638,7 @@ pub fn newPromiseResolveThenableJob(
             return then_call_result;
         }
     }.func;
-    const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = captures };
 
     // 2. Let getThenRealmResult be Completion(GetFunctionRealm(then.[[Callback]])).
     const get_handler_realm_result = then.callback.getFunctionRealm(agent);
@@ -757,7 +758,7 @@ fn performPromiseAll(
                 // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
-                const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const additional_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields.values;
                 const result_capability_ = additional_fields.result_capability;
                 const remaining_elements_count_ = additional_fields.remaining_elements_count;
@@ -803,7 +804,7 @@ fn performPromiseAll(
             .{ .function = fulfilled_steps },
             1,
             "",
-            .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+            .{ .additional_fields = additional_fields },
         );
 
         additional_fields.* = .{
@@ -922,7 +923,7 @@ fn performPromiseAllSettled(
                 // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields_.values;
                 const result_capability_ = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
@@ -984,7 +985,7 @@ fn performPromiseAllSettled(
             .{ .function = fulfilled_steps },
             1,
             "",
-            .{ .additional_fields = .make(*AdditionalFields, on_fulfilled_additional_fields) },
+            .{ .additional_fields = on_fulfilled_additional_fields },
         );
 
         on_fulfilled_additional_fields.* = .{
@@ -1011,7 +1012,7 @@ fn performPromiseAllSettled(
                 // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields_.values;
                 const result_capability_ = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
@@ -1073,7 +1074,7 @@ fn performPromiseAllSettled(
             .{ .function = rejected_steps },
             1,
             "",
-            .{ .additional_fields = .make(*AdditionalFields, on_rejected_additional_fields) },
+            .{ .additional_fields = on_rejected_additional_fields },
         );
 
         on_rejected_additional_fields.* = .{
@@ -1201,7 +1202,7 @@ fn performPromiseAny(
                 // i. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const errors_ = additional_fields_.errors;
                 const promise_capability = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
@@ -1263,7 +1264,7 @@ fn performPromiseAny(
             .{ .function = rejected_steps },
             1,
             "",
-            .{ .additional_fields = .make(*AdditionalFields, additional_fields) },
+            .{ .additional_fields = additional_fields },
         );
 
         additional_fields.* = .{
@@ -1960,7 +1961,7 @@ pub const prototype = struct {
             const then_finally_closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const on_finally_ = captures_.on_finally;
                     const constructor__ = captures_.constructor;
                     const value = arguments_.get(0);
@@ -1979,7 +1980,7 @@ pub const prototype = struct {
                     const return_value = struct {
                         fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();
-                            const value_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
+                            const value_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Value).*;
 
                             // 1. Return NormalCompletion(value).
                             return value_;
@@ -1992,7 +1993,7 @@ pub const prototype = struct {
                         .{ .function = return_value },
                         0,
                         "",
-                        .{ .additional_fields = .make(*Value, value_capture) },
+                        .{ .additional_fields = value_capture },
                     );
 
                     // v. Return ? Invoke(p, "then", « valueThunk »).
@@ -2010,7 +2011,7 @@ pub const prototype = struct {
                 .{ .function = then_finally_closure },
                 1,
                 "",
-                .{ .additional_fields = .make(*Captures, captures) },
+                .{ .additional_fields = captures },
             );
             then_finally = Value.from(&then_finally_function.object);
 
@@ -2019,7 +2020,7 @@ pub const prototype = struct {
             const catch_finally_closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
-                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const on_finally_ = captures_.on_finally;
                     const constructor__ = captures_.constructor;
                     const reason = arguments_.get(0);
@@ -2038,11 +2039,11 @@ pub const prototype = struct {
                     const throw_reason = struct {
                         fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();
-                            const reason_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
+                            const reason_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Value);
 
                             // 1. Return ThrowCompletion(reason).
                             agent__.exception = .{
-                                .value = reason_,
+                                .value = reason_.*,
                                 .stack_trace = try agent__.captureStackTrace(),
                             };
                             return error.ExceptionThrown;
@@ -2055,7 +2056,7 @@ pub const prototype = struct {
                         .{ .function = throw_reason },
                         0,
                         "",
-                        .{ .additional_fields = .make(*Value, reason_capture) },
+                        .{ .additional_fields = reason_capture },
                     );
 
                     // v. Return ? Invoke(p, "then", « thrower »).
@@ -2073,7 +2074,7 @@ pub const prototype = struct {
                 .{ .function = catch_finally_closure },
                 1,
                 "",
-                .{ .additional_fields = .make(*Captures, captures) },
+                .{ .additional_fields = captures },
             );
             catch_finally = Value.from(&catch_finally_function.object);
         }

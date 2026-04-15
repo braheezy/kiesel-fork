@@ -19,7 +19,6 @@ const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
@@ -94,7 +93,7 @@ hostLoadImportedModule: *const fn (
     agent: *Agent,
     referrer: ImportedModuleReferrer,
     module_request: ModuleRequest,
-    host_defined: SafePointer,
+    host_defined: ?*anyopaque,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void = default_host_hooks.hostLoadImportedModule,
 hostMakeJobCallback: *const fn (

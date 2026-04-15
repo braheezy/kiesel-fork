@@ -17,7 +17,6 @@ const Module = language.Module;
 const ModuleRequest = language.ModuleRequest;
 const Parser = language.Parser;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
@@ -37,7 +36,7 @@ ecmascript_code: ast.Script,
 loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
-host_defined: SafePointer,
+host_defined: ?*anyopaque,
 
 source: []const u8,
 
@@ -50,7 +49,7 @@ pub fn print(self: Script, writer: *std.Io.Writer) std.Io.Writer.Error!void {
 pub fn parse(
     source_text: []const u8,
     realm: *Realm,
-    host_defined: ?SafePointer,
+    host_defined: ?*anyopaque,
     options: Parser.Options,
 ) Parser.Error!*Script {
     const agent = realm.agent;
@@ -68,7 +67,7 @@ pub fn parse(
         .realm = realm,
         .ecmascript_code = script,
         .loaded_modules = .empty,
-        .host_defined = host_defined orelse .null_pointer,
+        .host_defined = host_defined,
         .source = source,
     };
     return self;

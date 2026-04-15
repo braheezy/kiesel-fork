@@ -525,7 +525,10 @@ pub fn defineBuiltinAsyncFunctionWithAttributes(
         .{ .function = function },
         length,
         function_name,
-        .{ .realm = realm, .async = true },
+        .{
+            .realm = realm,
+            .flags = .{ .async = true, .is_class_constructor = false },
+        },
     );
     try self.defineBuiltinPropertyWithAttributes(
         agent,
@@ -1346,7 +1349,7 @@ pub fn initializeInstanceElements(
         else
             &.{};
     } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
-        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
+        const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         break :blk class_constructor_fields.private_methods;
     } else unreachable;
 
@@ -1363,7 +1366,7 @@ pub fn initializeInstanceElements(
         else
             &.{};
     } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
-        const class_constructor_fields = builtin_function.fields.additional_fields.cast(*ClassConstructorFields);
+        const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         break :blk class_constructor_fields.fields;
     } else unreachable;
 

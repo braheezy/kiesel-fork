@@ -15,7 +15,6 @@ const Module = language.Module;
 const ModuleRequest = language.ModuleRequest;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
@@ -46,7 +45,7 @@ template_map: std.AutoHashMapUnmanaged(u64, *builtins.Array),
 loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
 
 /// [[HostDefined]]
-host_defined: SafePointer,
+host_defined: ?*anyopaque,
 
 /// Non-standard, needed for `Math.random()`
 rng: std.Random.DefaultPrng,
@@ -85,7 +84,7 @@ pub fn initializeHostDefinedRealm(
         .template_map = .empty,
 
         .loaded_modules = .empty,
-        .host_defined = .null_pointer,
+        .host_defined = null,
     };
 
     // 5. Let newContext be a new execution context.

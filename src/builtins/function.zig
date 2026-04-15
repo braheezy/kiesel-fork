@@ -627,7 +627,8 @@ pub const prototype = struct {
             const source_text = try ecmascript_function.fields.source_text.resolve(agent);
             return Value.from(source_text);
         } else if (func.castObject(BuiltinFunction)) |builtin_function| {
-            if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+            if (builtin_function.fields.flags.is_class_constructor) {
+                const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
                 const source_text = try class_constructor_fields.source_text.resolve(agent);
                 return Value.from(source_text);
             }
