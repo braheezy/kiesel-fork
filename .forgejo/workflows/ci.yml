@@ -28,7 +28,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Build kiesel-linux-aarch64
         run: |
@@ -103,7 +103,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Build kiesel-macos-aarch64
         run: |
@@ -138,7 +138,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Install dependencies
         run: |
@@ -181,7 +181,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Build kiesel.wasm
         run: |
@@ -268,7 +268,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Install dependencies
         run: |
@@ -364,7 +364,7 @@ jobs:
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2026-01-22 # 1.93.0
+          toolchain: nightly-2026-04-16 # 1.95.0
           components: "rust-src"
       - name: Install Node.js
         uses: https://github.com/actions/setup-node@v6
