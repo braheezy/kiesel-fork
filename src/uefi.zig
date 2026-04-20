@@ -24,26 +24,6 @@ pub const std_options: std.Options = .{
             _: anytype,
         ) void {}
     }.logFn,
-
-    // No std.posix.getrandom() on UEFI
-    .cryptoRandomSeed = struct {
-        fn cryptoRandomSeed(buffer: []u8) void {
-            const rng = std.os.uefi.system_table.boot_services.?.locateProtocol(
-                std.os.uefi.protocol.Rng,
-                null,
-            ) catch {
-                // No random bytes for you
-                return;
-            } orelse {
-                // Might return null, e.g. in QEMU without virtio-rng
-                return;
-            };
-            rng.getRNG(null, buffer) catch {};
-        }
-    }.cryptoRandomSeed,
-
-    // tlsCsprngFill() needs this to work on UEFI due to lack of TLS
-    .crypto_always_getrandom = true,
 };
 
 pub const Writer = struct {
@@ -109,6 +89,8 @@ const Error =
 
 fn mainWithErrorHandling() Error!void {
     const gpa = std.os.uefi.pool_allocator;
+    // For now UEFI uses its own abstractions without accessing the Io instance
+    const io: std.Io = .failing;
 
     const console_out = std.os.uefi.system_table.con_out.?;
     try console_out.reset(true);
@@ -129,15 +111,13 @@ fn mainWithErrorHandling() Error!void {
         .gc_allocator_atomic = gpa,
         .stdout = stdout,
         .stderr = stderr,
-        .tty_config = .no_color,
+        .terminal_mode = .no_color,
         .stack_info = null,
         .default_locale = {},
         .default_time_zone = {},
-        .currentTimeMs = std.time.milliTimestamp,
-        .currentTimeNs = std.time.nanoTimestamp,
     };
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
 
     Realm.initializeHostDefinedRealm(&agent, .{}) catch |err| switch (err) {
@@ -156,7 +136,7 @@ fn mainWithErrorHandling() Error!void {
     });
     try stdout.flush();
 
-    var editor = Editor.init(gpa, .{});
+    var editor = Editor.init(gpa, io, .{});
     defer editor.deinit();
 
     while (true) {

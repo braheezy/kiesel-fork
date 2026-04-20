@@ -52,199 +52,190 @@ fn bigInt(value: anytype) *const BigInt {
     return big_int;
 }
 
-const PrettyPrintError = std.Io.Writer.Error || std.Io.tty.Config.SetColorError;
+const PrettyPrintError = std.Io.Terminal.SetColorError;
 
 fn prettyPrintArray(
     array: *const builtins.Array,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const length = array.fields.length;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("[");
-    try tty_config.setColor(writer, .reset);
-    if (length != 0) try writer.writeAll(" ");
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("[");
+    try terminal.setColor(.reset);
+    if (length != 0) try terminal.writer.writeAll(" ");
     for (0..length) |i| {
         if (array.object.property_storage.indexed_properties.get(@intCast(i))) |property_descriptor| {
             switch (property_descriptor.value_or_accessor) {
                 .value => |value| {
-                    try writer.print("{f}", .{value.fmtPretty()});
+                    try terminal.writer.print("{f}", .{value.fmtPretty()});
                 },
                 .accessor => {
-                    try tty_config.setColor(writer, .dim);
-                    try writer.writeAll("<accessor>");
-                    try tty_config.setColor(writer, .reset);
+                    try terminal.setColor(.dim);
+                    try terminal.writer.writeAll("<accessor>");
+                    try terminal.setColor(.reset);
                 },
             }
         } else {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<empty>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<empty>");
+            try terminal.setColor(.reset);
         }
-        if (i + 1 < length) try writer.writeAll(", ");
+        if (i + 1 < length) try terminal.writer.writeAll(", ");
     }
-    if (length != 0) try writer.writeAll(" ");
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("]");
-    try tty_config.setColor(writer, .reset);
+    if (length != 0) try terminal.writer.writeAll(" ");
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("]");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintArrayBuffer(
     array_buffer: *const builtins.ArrayBuffer,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     if (array_buffer.fields.data_block) |data_block| {
-        try tty_config.setColor(writer, .white);
+        try terminal.setColor(.white);
         if (data_block.shared) {
-            try writer.writeAll("SharedArrayBuffer(");
+            try terminal.writer.writeAll("SharedArrayBuffer(");
         } else {
-            try writer.writeAll("ArrayBuffer(");
+            try terminal.writer.writeAll("ArrayBuffer(");
         }
-        try tty_config.setColor(writer, .reset);
-        try writer.print("byteLength: {f}", .{
+        try terminal.setColor(.reset);
+        try terminal.writer.print("byteLength: {f}", .{
             Value.from(@intFromEnum(array_buffer.fields.byte_length)).fmtPretty(),
         });
         if (array_buffer.fields.max_byte_length.unwrap()) |max_byte_length| {
-            try writer.print(", maxByteLength: {f}", .{
+            try terminal.writer.print(", maxByteLength: {f}", .{
                 Value.from(@intFromEnum(max_byte_length)).fmtPretty(),
             });
         }
         if (data_block.bytes.len != 0) {
-            try writer.writeAll(", data: ");
-            try tty_config.setColor(writer, .dim);
+            try terminal.writer.writeAll(", data: ");
+            try terminal.setColor(.dim);
             // Like std.fmt.fmtSliceHexLower() but with a space between each bytes
             const charset = "0123456789abcdef";
             var buf: [2]u8 = undefined;
             for (data_block.bytes, 0..) |c, i| {
-                if (i != 0) try writer.writeAll(" ");
+                if (i != 0) try terminal.writer.writeAll(" ");
                 buf[0] = charset[c >> 4];
                 buf[1] = charset[c & 15];
-                try writer.writeAll(&buf);
+                try terminal.writer.writeAll(&buf);
             }
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.reset);
         }
-        try tty_config.setColor(writer, .white);
-        try writer.writeAll(")");
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.white);
+        try terminal.writer.writeAll(")");
+        try terminal.setColor(.reset);
     } else {
-        try tty_config.setColor(writer, .white);
-        try writer.writeAll("ArrayBuffer(");
-        try tty_config.setColor(writer, .dim);
-        try writer.writeAll("<detached>");
-        try tty_config.setColor(writer, .white);
-        try writer.writeAll(")");
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.white);
+        try terminal.writer.writeAll("ArrayBuffer(");
+        try terminal.setColor(.dim);
+        try terminal.writer.writeAll("<detached>");
+        try terminal.setColor(.white);
+        try terminal.writer.writeAll(")");
+        try terminal.setColor(.reset);
     }
 }
 
 fn prettyPrintArrayIterator(
     array_iterator: *const builtins.ArrayIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%ArrayIterator%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%ArrayIterator%(");
+    try terminal.setColor(.reset);
     switch (array_iterator.fields) {
         .state => |state_| {
-            try writer.print("{f}", .{Value.from(state_.iterated_array_like).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(state_.iterated_array_like).fmtPretty()});
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintAsyncGenerator(
     async_generator: *const builtins.AsyncGenerator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("AsyncGenerator(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("AsyncGenerator(");
+    try terminal.setColor(.reset);
     switch (async_generator.fields.async_generator_state) {
         .suspended_start => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .cyan);
-            try writer.writeAll("<suspended-start>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.cyan);
+            try terminal.writer.writeAll("<suspended-start>");
+            try terminal.setColor(.reset);
         },
         .suspended_yield => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .cyan);
-            try writer.writeAll("<suspended-yield>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.cyan);
+            try terminal.writer.writeAll("<suspended-yield>");
+            try terminal.setColor(.reset);
         },
         .executing => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .green);
-            try writer.writeAll("<executing>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.green);
+            try terminal.writer.writeAll("<executing>");
+            try terminal.setColor(.reset);
         },
         .draining_queue => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .cyan);
-            try writer.writeAll("<draining-queue>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.cyan);
+            try terminal.writer.writeAll("<draining-queue>");
+            try terminal.setColor(.reset);
         },
         .completed => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintDataView(
     date: *const builtins.DataView,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const viewed_array_buffer = date.fields.viewed_array_buffer;
     const byte_offset = date.fields.byte_offset;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("DataView(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty()});
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("DataView(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty()});
     if (date.fields.byte_length.unwrap()) |byte_length| {
-        try writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty()});
+        try terminal.writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty()});
     }
     if (byte_offset != .zero) {
-        try writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty()});
+        try terminal.writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty()});
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintDate(
     date: *const builtins.Date,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const date_value = date.fields.date_value;
-    const tty_config = state.platform.tty_config;
     const platform = state.platform;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Date(");
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Date(");
     if (!std.math.isNan(date_value)) {
-        try writer.print("{f}", .{
+        try terminal.writer.print("{f}", .{
             Value.from(asciiString(std.fmt.allocPrint(
                 arena.allocator(),
                 "{f}",
@@ -252,364 +243,344 @@ fn prettyPrintDate(
             ) catch return)).fmtPretty(),
         });
     } else {
-        try tty_config.setColor(writer, .dim);
-        try writer.writeAll("<invalid>");
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.dim);
+        try terminal.writer.writeAll("<invalid>");
+        try terminal.setColor(.reset);
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintError(
     @"error": *const builtins.Error,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const error_data = @"error".fields.error_data;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.print("{f}(", .{error_data.name.fmtRaw()});
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.print("{f}(", .{error_data.name.fmtRaw()});
+    try terminal.setColor(.reset);
     if (!error_data.message.isEmpty()) {
-        try writer.print("{f}", .{Value.from(error_data.message).fmtPretty()});
+        try terminal.writer.print("{f}", .{Value.from(error_data.message).fmtPretty()});
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintFinalizationRegistry(
     _: *const builtins.FinalizationRegistry,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("FinalizationRegistry()");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("FinalizationRegistry()");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintGenerator(
     generator: *const builtins.Generator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Generator(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Generator(");
+    try terminal.setColor(.reset);
     switch (generator.fields.generator_state) {
         .suspended_start => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .cyan);
-            try writer.writeAll("<suspended-start>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.cyan);
+            try terminal.writer.writeAll("<suspended-start>");
+            try terminal.setColor(.reset);
         },
         .suspended_yield => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .cyan);
-            try writer.writeAll("<suspended-yield>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.cyan);
+            try terminal.writer.writeAll("<suspended-yield>");
+            try terminal.setColor(.reset);
         },
         .executing => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .green);
-            try writer.writeAll("<executing>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.green);
+            try terminal.writer.writeAll("<executing>");
+            try terminal.setColor(.reset);
         },
         .completed => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIterator(
     _: *const builtins.Iterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Iterator()");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Iterator()");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIteratorHelper(
     iterator_helper: *const builtins.IteratorHelper,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%IteratorHelper%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%IteratorHelper%(");
+    try terminal.setColor(.reset);
     switch (iterator_helper.fields) {
         .state => |state_| {
             for (state_.underlying_iterators, 0..) |iterator, i| {
-                if (i != 0) try writer.writeAll(", ");
-                try writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty()});
+                if (i != 0) try terminal.writer.writeAll(", ");
+                try terminal.writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty()});
             }
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintMap(
     map: *const builtins.Map,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const map_data = map.fields.map_data;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Map(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Map(");
+    try terminal.setColor(.reset);
     var it = map_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{f} → {f}", .{ entry.key_ptr.fmtPretty(), entry.value_ptr.fmtPretty() });
+        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.fmtPretty(), entry.value_ptr.fmtPretty() });
         if (it.index < map_data.count()) {
-            try writer.writeAll(", ");
+            try terminal.writer.writeAll(", ");
         }
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintMapIterator(
     map_iterator: *const builtins.MapIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%MapIterator%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%MapIterator%(");
+    try terminal.setColor(.reset);
     switch (map_iterator.fields) {
         .state => |state_| {
-            try writer.print("{f}", .{Value.from(&state_.map.object).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(&state_.map.object).fmtPretty()});
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintPromise(
     promise: *const builtins.Promise,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const promise_state = promise.fields.promise_state;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Promise(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Promise(");
+    try terminal.setColor(.reset);
     switch (promise_state) {
         .pending => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<pending>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<pending>");
+            try terminal.setColor(.reset);
         },
         .fulfilled => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .green);
-            try writer.writeAll("<fulfilled>");
-            try tty_config.setColor(writer, .reset);
-            try writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.green);
+            try terminal.writer.writeAll("<fulfilled>");
+            try terminal.setColor(.reset);
+            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
         },
         .rejected => {
-            try writer.writeAll("state: ");
-            try tty_config.setColor(writer, .red);
-            try writer.writeAll("<rejected>");
-            try tty_config.setColor(writer, .reset);
-            try writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
+            try terminal.writer.writeAll("state: ");
+            try terminal.setColor(.red);
+            try terminal.writer.writeAll("<rejected>");
+            try terminal.setColor(.reset);
+            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintProxy(
     proxy: *const builtins.Proxy,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const proxy_target = proxy.fields.proxy_target;
     const proxy_handler = proxy.fields.proxy_handler;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Proxy(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Proxy(");
+    try terminal.setColor(.reset);
     if (proxy_target != null and proxy_handler != null) {
-        try writer.print("target: {f}, handler: {f}", .{
+        try terminal.writer.print("target: {f}, handler: {f}", .{
             Value.from(proxy_target.?).fmtPretty(),
             Value.from(proxy_handler.?).fmtPretty(),
         });
     } else {
-        try tty_config.setColor(writer, .dim);
-        try writer.writeAll("<revoked>");
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.dim);
+        try terminal.writer.writeAll("<revoked>");
+        try terminal.setColor(.reset);
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintRegExp(
     reg_exp: *const builtins.RegExp,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const original_source = reg_exp.fields.original_source;
     const original_flags = reg_exp.fields.original_flags;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("RegExp(");
-    try tty_config.setColor(writer, .green);
-    try writer.print("/{f}/{f}", .{ original_source.fmtRaw(), original_flags.fmtRaw() });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("RegExp(");
+    try terminal.setColor(.green);
+    try terminal.writer.print("/{f}/{f}", .{ original_source.fmtRaw(), original_flags.fmtRaw() });
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintRegExpStringIterator(
     reg_exp_string_iterator: *const builtins.RegExpStringIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%RegExpStringIterator%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%RegExpStringIterator%(");
+    try terminal.setColor(.reset);
     switch (reg_exp_string_iterator.fields) {
         .state => |state_| {
-            try writer.print("{f}, {f}", .{
+            try terminal.writer.print("{f}, {f}", .{
                 Value.from(state_.iterating_reg_exp).fmtPretty(),
                 Value.from(state_.iterated_string).fmtPretty(),
             });
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintSet(
     set: *const builtins.Set,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const set_data = set.fields.set_data;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Set(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Set(");
+    try terminal.setColor(.reset);
     var it = set_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{f}", .{entry.key_ptr.fmtPretty()});
+        try terminal.writer.print("{f}", .{entry.key_ptr.fmtPretty()});
         if (it.index < set_data.count()) {
-            try writer.writeAll(", ");
+            try terminal.writer.writeAll(", ");
         }
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintSetIterator(
     set_iterator: *const builtins.SetIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%SetIterator%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%SetIterator%(");
+    try terminal.setColor(.reset);
     switch (set_iterator.fields) {
         .state => |state_| {
-            try writer.print("{f}", .{Value.from(&state_.set.object).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(&state_.set.object).fmtPretty()});
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintStringIterator(
     string_iterator: *const builtins.StringIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%StringIterator%(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%StringIterator%(");
+    try terminal.setColor(.reset);
     switch (string_iterator.fields) {
         .state => |state_| {
-            try writer.print("{f}", .{Value.from(state_.string).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(state_.string).fmtPretty()});
         },
         .completed => {
-            try tty_config.setColor(writer, .dim);
-            try writer.writeAll("<completed>");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<completed>");
+            try terminal.setColor(.reset);
         },
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
-fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.Io.Writer) !void {
+fn prettyPrintTypedArray(
+    typed_array: *const builtins.TypedArray,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const element_type = typed_array.fields.element_type;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.print("{s}(", .{element_type.typedArrayName()});
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.print("{s}(", .{element_type.typedArrayName()});
+    try terminal.setColor(.reset);
     if (viewed_array_buffer.fields.data_block) |data_block| {
         const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
-        try writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty()});
+        try terminal.writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty()});
         if (data_block.bytes.len != 0) {
-            try writer.writeAll(", data: ");
-            try tty_config.setColor(writer, .white);
-            try writer.writeAll("[");
-            try tty_config.setColor(writer, .reset);
-            try writer.writeAll(" ");
+            try terminal.writer.writeAll(", data: ");
+            try terminal.setColor(.white);
+            try terminal.writer.writeAll("[");
+            try terminal.setColor(.reset);
+            try terminal.writer.writeAll(" ");
             switch (element_type) {
                 inline else => |@"type"| {
                     const element_size = @"type".elementSize();
@@ -623,106 +594,105 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: *std.I
                             Value.from(bigInt(value))
                         else
                             Value.from(value);
-                        if (i != 0) try writer.writeAll(", ");
-                        try writer.print("{f}", .{numeric.fmtPretty()});
+                        if (i != 0) try terminal.writer.writeAll(", ");
+                        try terminal.writer.print("{f}", .{numeric.fmtPretty()});
                     }
                 },
             }
-            try writer.writeAll(" ");
-            try tty_config.setColor(writer, .white);
-            try writer.writeAll("]");
-            try tty_config.setColor(writer, .reset);
+            try terminal.writer.writeAll(" ");
+            try terminal.setColor(.white);
+            try terminal.writer.writeAll("]");
+            try terminal.setColor(.reset);
         }
     } else {
         // Underlying ArrayBuffer has been detached, mirror behavior of .length getter
-        try writer.print("length: {f}", .{Value.from(0).fmtPretty()});
+        try terminal.writer.print("length: {f}", .{Value.from(0).fmtPretty()});
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintWeakMap(
     map: *const builtins.WeakMap,
-    writer: *std.Io.Writer,
-) !void {
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const weak_map_data = map.fields.weak_map_data;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("WeakMap(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("WeakMap(");
+    try terminal.setColor(.reset);
     var it = weak_map_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{f} → {f}", .{ entry.key_ptr.get().fmtPretty(), entry.value_ptr.fmtPretty() });
+        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.get().fmtPretty(), entry.value_ptr.fmtPretty() });
         if (it.index < weak_map_data.count()) {
-            try writer.writeAll(", ");
+            try terminal.writer.writeAll(", ");
         }
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
-fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: *std.Io.Writer) !void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("WeakRef(");
-    try tty_config.setColor(writer, .reset);
-    try prettyPrintValue(weakRefDeref(weak_ref), writer);
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+fn prettyPrintWeakRef(
+    weak_ref: *const builtins.WeakRef,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("WeakRef(");
+    try terminal.setColor(.reset);
+    try prettyPrintValue(weakRefDeref(weak_ref), terminal);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
-fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: *std.Io.Writer) !void {
+fn prettyPrintWeakSet(
+    weak_set: *const builtins.WeakSet,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const weak_set_data = weak_set.fields.weak_set_data;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("WeakSet(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("WeakSet(");
+    try terminal.setColor(.reset);
     var it = weak_set_data.iterator();
     while (it.next()) |entry| {
-        try writer.print("{f}", .{entry.key_ptr.get().fmtPretty()});
+        try terminal.writer.print("{f}", .{entry.key_ptr.get().fmtPretty()});
         if (it.index < weak_set_data.count()) {
-            try writer.writeAll(", ");
+            try terminal.writer.writeAll(", ");
         }
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintWrapForValidIterator(
     wrap_for_valid_iterator: *const builtins.WrapForValidIterator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("%WrapForValidIterator%(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator).fmtPretty()});
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("%WrapForValidIterator%(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator).fmtPretty()});
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlCollator(
     intl_collator: *const builtins.intl.Collator,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_collator.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_collator.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.Collator(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, usage: {f}, sensitivity: {f}, ignorePunctuation: " ++
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.Collator(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, usage: {f}, sensitivity: {f}, ignorePunctuation: " ++
         "{f}, collation: {f}, numeric: {f}, caseFirst: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.usage).fmtPretty(),
@@ -732,54 +702,52 @@ fn prettyPrintIntlCollator(
         Value.from(resolved_options.numeric).fmtPretty(),
         Value.from(resolved_options.case_first).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlDateTimeFormat(
     intl_date_time_format: *const builtins.intl.DateTimeFormat,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_date_time_format.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_date_time_format.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.DisplayNames(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, calendar: {f}, numberingSystem: {f}, timeZone: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.DisplayNames(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, calendar: {f}, numberingSystem: {f}, timeZone: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.calendar).fmtPretty(),
         Value.from(resolved_options.numbering_system).fmtPretty(),
         Value.from(resolved_options.time_zone).fmtPretty(),
     });
     if (resolved_options.date_style) |date_style| {
-        try writer.print(", dateStyle: {f}", .{Value.from(date_style).fmtPretty()});
+        try terminal.writer.print(", dateStyle: {f}", .{Value.from(date_style).fmtPretty()});
     }
     if (resolved_options.time_style) |time_style| {
-        try writer.print(", timeStyle: {f}", .{Value.from(time_style).fmtPretty()});
+        try terminal.writer.print(", timeStyle: {f}", .{Value.from(time_style).fmtPretty()});
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlDisplayNames(
     intl_display_names: *const builtins.intl.DisplayNames,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_display_names.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_display_names.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.DisplayNames(");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.DisplayNames(");
+    try terminal.setColor(.reset);
     if (intl_display_names.fields.type == .language) {
-        try writer.print("{f}, style: {f}, type: {f}, fallback: {f}, languageDisplay: {f}", .{
+        try terminal.writer.print("{f}, style: {f}, type: {f}, fallback: {f}, languageDisplay: {f}", .{
             Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
             Value.from(resolved_options.style).fmtPretty(),
             Value.from(resolved_options.type).fmtPretty(),
@@ -787,31 +755,30 @@ fn prettyPrintIntlDisplayNames(
             Value.from(resolved_options.language_display).fmtPretty(),
         });
     } else {
-        try writer.print("{f}, style: {f}, type: {f}, fallback: {f}", .{
+        try terminal.writer.print("{f}, style: {f}, type: {f}, fallback: {f}", .{
             Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
             Value.from(resolved_options.style).fmtPretty(),
             Value.from(resolved_options.type).fmtPretty(),
             Value.from(resolved_options.fallback).fmtPretty(),
         });
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlDurationFormat(
     intl_duration_format: *const builtins.intl.DurationFormat,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_duration_format.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_duration_format.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.DurationFormat(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, numberingSystem: {f}, style: {f}, years: {f}, " ++
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.DurationFormat(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, numberingSystem: {f}, style: {f}, years: {f}, " ++
         "yearsDisplay: {f}, months: {f}, monthsDisplay: {f}, weeks: {f}, " ++
         "weeksDisplay: {f}, days: {f}, daysDisplay: {f}, hours: {f}, " ++
         "hoursDisplay: {f}, minutes: {f}, minutesDisplay: {f}, seconds: {f}, " ++
@@ -843,101 +810,98 @@ fn prettyPrintIntlDurationFormat(
         Value.from(resolved_options.nanoseconds_display).fmtPretty(),
     });
     if (resolved_options.fractional_digits) |fractional_digits| {
-        try writer.print(", fractionalDigits: {f}", .{Value.from(fractional_digits).fmtPretty()});
+        try terminal.writer.print(", fractionalDigits: {f}", .{Value.from(fractional_digits).fmtPretty()});
     }
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlListFormat(
     intl_list_format: *const builtins.intl.ListFormat,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_list_format.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_list_format.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.ListFormat(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, type: {f}, style: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.ListFormat(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, type: {f}, style: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.type).fmtPretty(),
         Value.from(resolved_options.style).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlLocale(
     intl_locale: *const builtins.intl.Locale,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_locale.fields.locale;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.Locale(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.Locale(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlNumberFormat(
     intl_number_format: *const builtins.intl.NumberFormat,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_number_format.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_number_format.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.NumberFormat(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, numberingSystem: {f}, style: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.NumberFormat(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, numberingSystem: {f}, style: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.numbering_system).fmtPretty(),
         Value.from(resolved_options.style).fmtPretty(),
     });
     if (resolved_options.currency) |currency| {
-        try writer.print(", currency: {f}", .{Value.from(currency).fmtPretty()});
+        try terminal.writer.print(", currency: {f}", .{Value.from(currency).fmtPretty()});
     }
     if (resolved_options.currency_display) |currency_display| {
-        try writer.print(", currencyDisplay: {f}", .{Value.from(currency_display).fmtPretty()});
+        try terminal.writer.print(", currencyDisplay: {f}", .{Value.from(currency_display).fmtPretty()});
     }
     if (resolved_options.currency_sign) |currency_sign| {
-        try writer.print(", currencySign: {f}", .{Value.from(currency_sign).fmtPretty()});
+        try terminal.writer.print(", currencySign: {f}", .{Value.from(currency_sign).fmtPretty()});
     }
     if (resolved_options.unit) |unit| {
-        try writer.print(", unit: {f}", .{Value.from(unit).fmtPretty()});
+        try terminal.writer.print(", unit: {f}", .{Value.from(unit).fmtPretty()});
     }
     if (resolved_options.unit_display) |unit_display| {
-        try writer.print(", unitDisplay: {f}", .{Value.from(unit_display).fmtPretty()});
+        try terminal.writer.print(", unitDisplay: {f}", .{Value.from(unit_display).fmtPretty()});
     }
-    try writer.print(", minimumIntegerDigits: {f}", .{
+    try terminal.writer.print(", minimumIntegerDigits: {f}", .{
         Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
     });
     if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
-        try writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
     }
     if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
-        try writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
     }
     if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
-        try writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
     }
     if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
-        try writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
     }
-    try writer.print(", useGrouping: {f}, notation: {f}", .{
+    try terminal.writer.print(", useGrouping: {f}, notation: {f}", .{
         switch (resolved_options.use_grouping) {
             .false => Value.false,
             .string => |string| Value.from(string),
@@ -945,9 +909,9 @@ fn prettyPrintIntlNumberFormat(
         Value.from(resolved_options.notation).fmtPretty(),
     });
     if (resolved_options.compact_display) |compact_display| {
-        try writer.print(", compactDisplay: {f}", .{Value.from(compact_display).fmtPretty()});
+        try terminal.writer.print(", compactDisplay: {f}", .{Value.from(compact_display).fmtPretty()});
     }
-    try writer.print(", signDisplay: {f}, roundingIncrement: {f}, roundingMode: {f}, " ++
+    try terminal.writer.print(", signDisplay: {f}, roundingIncrement: {f}, roundingMode: {f}, " ++
         "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
         Value.from(resolved_options.sign_display).fmtPretty(),
         Value.from(resolved_options.rounding_increment).fmtPretty(),
@@ -955,110 +919,105 @@ fn prettyPrintIntlNumberFormat(
         Value.from(resolved_options.rounding_priority).fmtPretty(),
         Value.from(resolved_options.trailing_zero_display).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlPluralRules(
     intl_plural_rules: *const builtins.intl.PluralRules,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_plural_rules.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_plural_rules.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.PluralRules(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, type: {f}, notation: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.PluralRules(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, type: {f}, notation: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.type).fmtPretty(),
         Value.from(resolved_options.notation).fmtPretty(),
     });
     if (resolved_options.compact_display) |compact_display| {
-        try writer.print(", compactDisplay: {f}", .{
+        try terminal.writer.print(", compactDisplay: {f}", .{
             Value.from(compact_display).fmtPretty(),
         });
     }
-    try writer.print(", minimumIntegerDigits: {f}", .{
+    try terminal.writer.print(", minimumIntegerDigits: {f}", .{
         Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
     });
     if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
-        try writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
     }
     if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
-        try writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
     }
     if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
-        try writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
     }
     if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
-        try writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
     }
-    try writer.print(", roundingIncrement: {f}, roundingMode: {f}, " ++
+    try terminal.writer.print(", roundingIncrement: {f}, roundingMode: {f}, " ++
         "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
         Value.from(resolved_options.rounding_increment).fmtPretty(),
         Value.from(resolved_options.rounding_mode).fmtPretty(),
         Value.from(resolved_options.rounding_priority).fmtPretty(),
         Value.from(resolved_options.trailing_zero_display).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlRelativeTimeFormat(
     intl_relative_time_format: *const builtins.intl.RelativeTimeFormat,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_relative_time_format.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_relative_time_format.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.RelativeTimeFormat(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, style: {f}, numeric: {f}, numberingSystem: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.RelativeTimeFormat(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, style: {f}, numeric: {f}, numberingSystem: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.style).fmtPretty(),
         Value.from(resolved_options.numeric).fmtPretty(),
         Value.from(resolved_options.numbering_system).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.intl.Segmenter,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const locale = intl_segmenter.fields.locale;
-    const tty_config = state.platform.tty_config;
 
     const resolved_options = intl_segmenter.fields.resolvedOptions();
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Intl.Segmenter(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, granularity: {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Intl.Segmenter(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, granularity: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
         Value.from(resolved_options.granularity).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalDuration(
     temporal_duration: *const builtins.temporal.Duration,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const years = temporal_rs.c.temporal_rs_Duration_years(temporal_duration.fields.inner);
     const months = temporal_rs.c.temporal_rs_Duration_months(temporal_duration.fields.inner);
     const weeks = temporal_rs.c.temporal_rs_Duration_weeks(temporal_duration.fields.inner);
@@ -1070,10 +1029,10 @@ fn prettyPrintTemporalDuration(
     const microseconds = temporal_rs.c.temporal_rs_Duration_microseconds(temporal_duration.fields.inner);
     const nanoseconds = temporal_rs.c.temporal_rs_Duration_nanoseconds(temporal_duration.fields.inner);
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.Duration(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.Duration(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
         Value.from(@as(f64, @floatFromInt(years))).fmtPretty(),
         Value.from(@as(f64, @floatFromInt(months))).fmtPretty(),
         Value.from(@as(f64, @floatFromInt(weeks))).fmtPretty(),
@@ -1085,64 +1044,58 @@ fn prettyPrintTemporalDuration(
         Value.from(microseconds).fmtPretty(),
         Value.from(nanoseconds).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalInstant(
     temporal_instant: *const builtins.temporal.Instant,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
         temporal_rs.c.temporal_rs_Instant_epoch_nanoseconds(temporal_instant.fields.inner),
     );
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.Instant(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.Instant(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}", .{
         Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalPlainDate(
     temporal_plain_date: *const builtins.temporal.PlainDate,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const year = temporal_rs.c.temporal_rs_PlainDate_year(temporal_plain_date.fields.inner);
     const month = temporal_rs.c.temporal_rs_PlainDate_month(temporal_plain_date.fields.inner);
     const day = temporal_rs.c.temporal_rs_PlainDate_day(temporal_plain_date.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainDate_calendar(temporal_plain_date.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.PlainDate(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.PlainDate(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}, {f}", .{
         Value.from(year).fmtPretty(),
         Value.from(month).fmtPretty(),
         Value.from(day).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalPlainDateTime(
     temporal_plain_date_time: *const builtins.temporal.PlainDateTime,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const year = temporal_rs.c.temporal_rs_PlainDateTime_year(temporal_plain_date_time.fields.inner);
     const month = temporal_rs.c.temporal_rs_PlainDateTime_month(temporal_plain_date_time.fields.inner);
     const day = temporal_rs.c.temporal_rs_PlainDateTime_day(temporal_plain_date_time.fields.inner);
@@ -1155,10 +1108,10 @@ fn prettyPrintTemporalPlainDateTime(
     const calendar = temporal_rs.c.temporal_rs_PlainDateTime_calendar(temporal_plain_date_time.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.PlainDateTime(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.PlainDateTime(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
         Value.from(year).fmtPretty(),
         Value.from(month).fmtPretty(),
         Value.from(day).fmtPretty(),
@@ -1170,17 +1123,15 @@ fn prettyPrintTemporalPlainDateTime(
         Value.from(nanosecond).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalPlainMonthDay(
     temporal_plain_month_day: *const builtins.temporal.PlainMonthDay,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     var write = temporal_rs.DiplomatWrite.init(arena.allocator());
     temporal_rs.c.temporal_rs_PlainMonthDay_month_code(temporal_plain_month_day.fields.inner, &write.inner);
     const month_code = write.toOwnedSlice() catch return;
@@ -1188,25 +1139,23 @@ fn prettyPrintTemporalPlainMonthDay(
     const calendar = temporal_rs.c.temporal_rs_PlainMonthDay_calendar(temporal_plain_month_day.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.PlainMonthDay(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.PlainMonthDay(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}", .{
         Value.from(asciiString(month_code)).fmtPretty(),
         Value.from(day).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalPlainTime(
     temporal_plain_time: *const builtins.temporal.PlainTime,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const hour = temporal_rs.c.temporal_rs_PlainTime_hour(temporal_plain_time.fields.inner);
     const minute = temporal_rs.c.temporal_rs_PlainTime_minute(temporal_plain_time.fields.inner);
     const second = temporal_rs.c.temporal_rs_PlainTime_second(temporal_plain_time.fields.inner);
@@ -1214,10 +1163,10 @@ fn prettyPrintTemporalPlainTime(
     const microsecond = temporal_rs.c.temporal_rs_PlainTime_microsecond(temporal_plain_time.fields.inner);
     const nanosecond = temporal_rs.c.temporal_rs_PlainTime_nanosecond(temporal_plain_time.fields.inner);
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.PlainTime(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}, {f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.PlainTime(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}", .{
         Value.from(hour).fmtPretty(),
         Value.from(minute).fmtPretty(),
         Value.from(second).fmtPretty(),
@@ -1225,41 +1174,37 @@ fn prettyPrintTemporalPlainTime(
         Value.from(microsecond).fmtPretty(),
         Value.from(nanosecond).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalPlainYearMonth(
     temporal_plain_year_month: *const builtins.temporal.PlainYearMonth,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const year = temporal_rs.c.temporal_rs_PlainYearMonth_year(temporal_plain_year_month.fields.inner);
     const month = temporal_rs.c.temporal_rs_PlainYearMonth_month(temporal_plain_year_month.fields.inner);
     const calendar = temporal_rs.c.temporal_rs_PlainYearMonth_calendar(temporal_plain_year_month.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.PlainYearMonth(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.PlainYearMonth(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}", .{
         Value.from(year).fmtPretty(),
         Value.from(month).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintTemporalZonedDateTime(
     temporal_zoned_date_time: *const builtins.temporal.ZonedDateTime,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const epoch_nanoseconds = temporal_rs.fromI128Nanoseconds(
         temporal_rs.c.temporal_rs_ZonedDateTime_epoch_nanoseconds(temporal_zoned_date_time.fields.inner),
     );
@@ -1270,25 +1215,23 @@ fn prettyPrintTemporalZonedDateTime(
     const calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(temporal_zoned_date_time.fields.inner);
     const calendar_id = temporal_rs.fromDiplomatStringView(temporal_rs.c.temporal_rs_Calendar_identifier(calendar));
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("Temporal.ZonedDateTime(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}, {f}, {f}", .{
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("Temporal.ZonedDateTime(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}, {f}, {f}", .{
         Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
         Value.from(asciiString(time_zone_id)).fmtPretty(),
         Value.from(asciiString(calendar_id)).fmtPretty(),
     });
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
 fn prettyPrintPrimitiveWrapper(
     object: anytype,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
-
     const T = std.meta.Child(@TypeOf(object));
     const name, const value = switch (T) {
         builtins.BigInt => .{ "BigInt", Value.from(object.fields.big_int_data) },
@@ -1299,104 +1242,111 @@ fn prettyPrintPrimitiveWrapper(
         else => @panic("Unhandled object type in prettyPrintPrimitiveWrapper()"),
     };
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(name);
-    try writer.writeAll("(");
-    try tty_config.setColor(writer, .reset);
-    try writer.print("{f}", .{value.fmtPretty()});
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll(")");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(name);
+    try terminal.writer.writeAll("(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}", .{value.fmtPretty()});
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
 }
 
-fn prettyPrintFunction(object: *const Object, writer: *std.Io.Writer) PrettyPrintError!void {
+fn prettyPrintFunction(
+    object: *const Object,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const name = object.getPropertyValueDirect(PropertyKey.from("name")).asString();
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .bold);
-    try tty_config.setColor(writer, .blue);
+    try terminal.setColor(.bold);
+    try terminal.setColor(.blue);
     if (object.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
         const function_body = ecmascript_function.fields.ecmascript_code;
         switch (function_body.type) {
-            .normal => try writer.writeAll("fn "),
-            .generator => try writer.writeAll("fn* "),
-            .async => try writer.writeAll("async fn "),
-            .async_generator => try writer.writeAll("async fn* "),
+            .normal => try terminal.writer.writeAll("fn "),
+            .generator => try terminal.writer.writeAll("fn* "),
+            .async => try terminal.writer.writeAll("async fn "),
+            .async_generator => try terminal.writer.writeAll("async fn* "),
         }
     } else {
-        try writer.writeAll("fn ");
+        try terminal.writer.writeAll("fn ");
     }
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.reset);
     if (!name.isEmpty()) {
-        try writer.print("{f}", .{name.fmtRaw()});
+        try terminal.writer.print("{f}", .{name.fmtRaw()});
     } else {
-        try tty_config.setColor(writer, .dim);
-        try writer.writeAll("<anonymous>");
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.dim);
+        try terminal.writer.writeAll("<anonymous>");
+        try terminal.setColor(.reset);
     }
 }
 
-fn prettyPrintObject(object: *Object, writer: *std.Io.Writer) PrettyPrintError!void {
+fn prettyPrintObject(
+    object: *Object,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const property_keys = ordinaryOwnPropertyKeys(arena.allocator(), object) catch return;
-    const tty_config = state.platform.tty_config;
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("{");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("{");
+    try terminal.setColor(.reset);
 
     var printed_properties: usize = 0;
     for (property_keys) |property_key| {
         const property_descriptor = (object.property_storage.getCreateLazyIfNeeded(object, property_key) catch return).?;
         if (!property_descriptor.attributes.enumerable) continue;
 
-        if (printed_properties > 0) try writer.writeAll(",");
+        if (printed_properties > 0) try terminal.writer.writeAll(",");
         printed_properties += 1;
-        try writer.writeAll(" ");
+        try terminal.writer.writeAll(" ");
 
         switch (property_key) {
             .string => |string| {
-                try writer.writeAll("\"");
-                try tty_config.setColor(writer, .bold);
-                try writer.print("{f}", .{string.fmtEscaped()});
-                try tty_config.setColor(writer, .reset);
-                try writer.writeAll("\"");
+                try terminal.writer.writeAll("\"");
+                try terminal.setColor(.bold);
+                try terminal.writer.print("{f}", .{string.fmtEscaped()});
+                try terminal.setColor(.reset);
+                try terminal.writer.writeAll("\"");
             },
             .symbol => |symbol| {
-                try writer.writeAll("[");
-                try tty_config.setColor(writer, .bold);
-                try writer.print("{f}", .{symbol});
-                try tty_config.setColor(writer, .reset);
-                try writer.writeAll("]");
+                try terminal.writer.writeAll("[");
+                try terminal.setColor(.bold);
+                try terminal.writer.print("{f}", .{symbol});
+                try terminal.setColor(.reset);
+                try terminal.writer.writeAll("]");
             },
             .integer_index => |integer_index| {
-                try writer.writeAll("\"");
-                try tty_config.setColor(writer, .bold);
-                try writer.print("{d}", .{integer_index});
-                try tty_config.setColor(writer, .reset);
-                try writer.writeAll("\"");
+                try terminal.writer.writeAll("\"");
+                try terminal.setColor(.bold);
+                try terminal.writer.print("{d}", .{integer_index});
+                try terminal.setColor(.reset);
+                try terminal.writer.writeAll("\"");
             },
         }
-        try writer.writeAll(": ");
+        try terminal.writer.writeAll(": ");
 
         switch (property_descriptor.value_or_accessor) {
             .value => |value| {
-                try writer.print("{f}", .{value.fmtPretty()});
+                try terminal.writer.print("{f}", .{value.fmtPretty()});
             },
             .accessor => {
-                try tty_config.setColor(writer, .dim);
-                try writer.writeAll("<accessor>");
-                try tty_config.setColor(writer, .reset);
+                try terminal.setColor(.dim);
+                try terminal.writer.writeAll("<accessor>");
+                try terminal.setColor(.reset);
             },
         }
     }
-    if (printed_properties > 0) try writer.writeAll(" ");
+    if (printed_properties > 0) try terminal.writer.writeAll(" ");
 
-    try tty_config.setColor(writer, .white);
-    try writer.writeAll("}");
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("}");
+    try terminal.setColor(.reset);
 }
 
-pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!void {
+pub fn prettyPrintValue(
+    value: Value,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
     const print_in_progress = state.print_in_progress;
     state.print_in_progress = true;
     defer if (!print_in_progress) {
@@ -1405,14 +1355,12 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
         _ = arena.reset(.retain_capacity);
     };
 
-    const tty_config = state.platform.tty_config;
-
     if (value.isObject()) {
         const object = value.asObject();
         if (state.seen_objects.get(object)) |i| {
-            try tty_config.setColor(writer, .dim);
-            try writer.print("<ref #{d}>", .{i});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.print("<ref #{d}>", .{i});
+            try terminal.setColor(.reset);
             return;
         }
         state.seen_objects.putNoClobber(arena.allocator(), object, state.seen_objects.count()) catch return;
@@ -1470,26 +1418,26 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
             .{ builtins.temporal.ZonedDateTime, prettyPrintTemporalZonedDateTime },
         } else .{})) |entry| {
             const T, const prettyPrintFn = entry;
-            if (object.cast(T)) |ptr| return prettyPrintFn(ptr, writer);
+            if (object.cast(T)) |ptr| return prettyPrintFn(ptr, terminal);
         }
         // NOTE: This needs to go before pretty-printing functions as it has [[Call]] but no name.
         if (build_options.enable_annex_b and object.isHTMLDDA()) {
             // Keep colors in sync with undefined and null below :^)
-            try tty_config.setColor(writer, .bright_black);
-            try writer.writeAll("[[");
-            try tty_config.setColor(writer, .yellow);
-            try writer.writeAll("IsHTMLDDA");
-            try tty_config.setColor(writer, .bright_black);
-            try writer.writeAll("]]");
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.bright_black);
+            try terminal.writer.writeAll("[[");
+            try terminal.setColor(.yellow);
+            try terminal.writer.writeAll("IsHTMLDDA");
+            try terminal.setColor(.bright_black);
+            try terminal.writer.writeAll("]]");
+            try terminal.setColor(.reset);
             return;
         }
         if (object.internal_methods.call != null)
-            return prettyPrintFunction(object, writer);
-        return prettyPrintObject(object, writer);
+            return prettyPrintFunction(object, terminal);
+        return prettyPrintObject(object, terminal);
     }
 
-    const color: std.Io.tty.Color = switch (value.type()) {
+    const color: std.Io.Terminal.Color = switch (value.type()) {
         .undefined => .bright_black,
         .null => .yellow,
         .boolean => .blue,
@@ -1499,41 +1447,40 @@ pub fn prettyPrintValue(value: Value, writer: *std.Io.Writer) PrettyPrintError!v
         .big_int => .magenta,
         .object => unreachable,
     };
-    try tty_config.setColor(writer, color);
-    try writer.print("{f}", .{value});
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(color);
+    try terminal.writer.print("{f}", .{value});
+    try terminal.setColor(.reset);
 }
 
 pub fn prettyPrintException(
     agent: *Agent,
     exception: Agent.Exception,
-    writer: *std.Io.Writer,
+    terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const tty_config = state.platform.tty_config;
     const old_exception = agent.exception;
     defer agent.exception = old_exception;
-    try writer.writeAll("Uncaught exception: ");
+    try terminal.writer.writeAll("Uncaught exception: ");
     if (exception.value.toString(agent)) |string| {
-        try tty_config.setColor(writer, .red);
-        try writer.print("{f}", .{string.fmtRaw()});
-        try tty_config.setColor(writer, .reset);
+        try terminal.setColor(.red);
+        try terminal.writer.print("{f}", .{string.fmtRaw()});
+        try terminal.setColor(.reset);
     } else |_| {
-        try writer.print("{f}", .{exception.value.fmtPretty()});
+        try terminal.writer.print("{f}", .{exception.value.fmtPretty()});
     }
     var it = std.mem.reverseIterator(exception.stack_trace);
     while (it.next()) |stack_frame| {
-        try writer.writeAll("\n  at ");
+        try terminal.writer.writeAll("\n  at ");
         switch (stack_frame.origin) {
             .function => |function| {
-                try writer.print("{f}", .{Value.from(function).fmtPretty()});
+                try terminal.writer.print("{f}", .{Value.from(function).fmtPretty()});
             },
             .eval => {
                 // Keep this in sync with prettyPrintFunction()
-                try tty_config.setColor(writer, .bold);
-                try tty_config.setColor(writer, .blue);
-                try writer.writeAll("fn");
-                try tty_config.setColor(writer, .reset);
-                try writer.writeAll(" eval");
+                try terminal.setColor(.bold);
+                try terminal.setColor(.blue);
+                try terminal.writer.writeAll("fn");
+                try terminal.setColor(.reset);
+                try terminal.writer.writeAll(" eval");
             },
             // These should never be recorded
             .realm, .script, .module => unreachable,

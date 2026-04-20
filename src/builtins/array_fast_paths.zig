@@ -381,7 +381,7 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return false;
-            return std.mem.indexOfScalarPos(
+            return std.mem.findScalarPos(
                 i32,
                 dense_i32.items[0..end_index],
                 start_index,
@@ -397,7 +397,7 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
                 }
                 return false;
             }
-            return std.mem.indexOfScalarPos(
+            return std.mem.findScalarPos(
                 f64,
                 dense_f64.items[0..end_index],
                 start_index,
@@ -438,7 +438,7 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return Value.from(-1);
-            if (std.mem.indexOfScalarPos(
+            if (std.mem.findScalarPos(
                 i32,
                 dense_i32.items[0..end_index],
                 start_index,
@@ -449,7 +449,7 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
         },
         .dense_f64 => |dense_f64| {
             const search_element_f64 = toF64(search_element) orelse return Value.from(-1);
-            if (std.mem.indexOfScalarPos(
+            if (std.mem.findScalarPos(
                 f64,
                 dense_f64.items[0..end_index],
                 start_index,

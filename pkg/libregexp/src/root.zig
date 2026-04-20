@@ -1,3 +1,1 @@
-pub const c = @cImport({
-    @cInclude("libregexp.h");
-});
+pub const c = @import("c");

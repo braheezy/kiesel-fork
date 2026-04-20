@@ -4,6 +4,7 @@ const std = @import("std");
 const args = @import("args");
 const icu4zig = @import("icu4zig");
 const kiesel = @import("kiesel");
+const known_folders = @import("known-folders");
 const temporal_rs = @import("temporal_rs");
 
 const Editor = @import("zigline").Editor;
@@ -69,9 +70,9 @@ fn resolveModulePath(
     };
     const host_defined: *ScriptOrModuleHostDefined = @ptrCast(@alignCast(host_defined_ptr.?));
     const base_dir: []const u8 = host_defined.base_dir;
-    std.debug.assert(std.fs.path.isAbsolute(base_dir));
-    const resolved_path = try std.fs.path.resolve(gpa, &.{ base_dir, specifier });
-    std.debug.assert(std.fs.path.isAbsolute(resolved_path));
+    std.debug.assert(std.Io.Dir.path.isAbsolute(base_dir));
+    const resolved_path = try std.Io.Dir.path.resolve(gpa, &.{ base_dir, specifier });
+    std.debug.assert(std.Io.Dir.path.isAbsolute(resolved_path));
     return resolved_path;
 }
 
@@ -143,7 +144,7 @@ const Kiesel = struct {
         const data_exec = std.posix.mmap(
             null,
             data.len,
-            std.posix.PROT.READ | std.posix.PROT.WRITE | std.posix.PROT.EXEC,
+            .{ .READ = true, .WRITE = true, .EXEC = true },
             .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
             -1,
             0,
@@ -304,9 +305,10 @@ const Kiesel = struct {
 
     fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
+        const io = agent.io;
         const path = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
         defer gpa.free(path);
-        const bytes = readFile(agent.gc_allocator, path) catch |err| switch (err) {
+        const bytes = readFile(agent.gc_allocator, io, path) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
                 .type_error,
@@ -321,8 +323,9 @@ const Kiesel = struct {
     }
 
     fn readLine(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        const io = agent.io;
         var stdin_buf: [1024]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+        var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buf);
         const stdin = &stdin_reader.interface;
 
         var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
@@ -343,8 +346,9 @@ const Kiesel = struct {
     }
 
     fn readStdin(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        const io = agent.io;
         var stdin_buf: [1024]u8 = undefined;
-        var stdin_reader = std.fs.File.stdin().reader(&stdin_buf);
+        var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buf);
         const stdin = &stdin_reader.interface;
 
         const bytes = stdin.allocRemaining(
@@ -364,6 +368,7 @@ const Kiesel = struct {
     }
 
     fn sleep(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const io = agent.io;
         const milliseconds = try arguments.get(0).toNumber(agent);
         if (milliseconds.asFloat() < 0 or !milliseconds.isFinite()) {
             return agent.throwException(
@@ -372,23 +377,24 @@ const Kiesel = struct {
                 .{},
             );
         }
-        const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
-        std.Thread.sleep(nanoseconds);
+        const nanoseconds = std.math.lossyCast(i96, milliseconds.asFloat() * 1_000_000);
+        io.sleep(.fromNanoseconds(nanoseconds), .real) catch {};
         return .undefined;
     }
 
     fn writeFile(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
+        const io = agent.io;
         const path = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
         defer gpa.free(path);
         const contents = try (try arguments.get(1).toString(agent)).toUtf8(gpa);
         defer gpa.free(contents);
 
-        const file = std.fs.cwd().createFile(path, .{}) catch |err| {
+        const file = std.Io.Dir.cwd().createFile(io, path, .{}) catch |err| {
             return agent.throwException(.type_error, "Error while opening file: {t}", .{err});
         };
-        defer file.close();
-        file.writeAll(contents) catch |err| {
+        defer file.close(io);
+        file.writeStreamingAll(io, contents) catch |err| {
             return agent.throwException(.type_error, "Error while writing file: {t}", .{err});
         };
         return .undefined;
@@ -396,7 +402,7 @@ const Kiesel = struct {
 
     fn syscall(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number_value = try arguments.get(0).toLength(agent);
-        const number = std.meta.intToEnum(std.os.linux.SYS, number_value) catch {
+        const number = std.enums.fromInt(std.os.linux.SYS, number_value) orelse {
             return agent.throwException(.range_error, "Invalid syscall number {d}", .{number_value});
         };
         const result = switch (arguments.count() -| 1) {
@@ -606,36 +612,36 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
     };
 }
 
-const ReadFileError = std.fs.File.OpenError || std.Io.Reader.LimitedAllocError;
+const ReadFileError = std.Io.File.OpenError || std.Io.Reader.LimitedAllocError;
 
-fn readFile(gpa: std.mem.Allocator, path: []const u8) ReadFileError![]const u8 {
-    const file = try std.fs.cwd().openFile(path, .{});
-    defer file.close();
-    var file_reader = file.reader(&.{});
+fn readFile(gpa: std.mem.Allocator, io: std.Io, path: []const u8) ReadFileError![]const u8 {
+    const file = try std.Io.Dir.cwd().openFile(io, path, .{});
+    defer file.close(io);
+    var file_reader = file.reader(io, &.{});
     const reader = &file_reader.interface;
     return reader.allocRemaining(gpa, .unlimited);
 }
 
 const GetHistoryPathError =
+    known_folders.Error ||
     std.mem.Allocator.Error ||
-    std.fs.GetAppDataDirError ||
-    std.fs.Dir.MakeError ||
-    std.fs.File.OpenError;
+    std.Io.Dir.CreateDirPathError ||
+    std.Io.File.OpenError;
 
-fn getHistoryPath(gpa: std.mem.Allocator) GetHistoryPathError![]const u8 {
-    const app_data_dir = try std.fs.getAppDataDir(gpa, "kiesel");
+fn getHistoryPath(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) GetHistoryPathError![]const u8 {
+    const app_data_dir = try known_folders.getPath(io, gpa, environ_map.*, .data) orelse ".";
     defer gpa.free(app_data_dir);
 
-    const history_path = try std.fs.path.join(gpa, &.{ app_data_dir, "history" });
+    const history_path = try std.Io.Dir.path.join(gpa, &.{ app_data_dir, "kiesel", "history" });
     errdefer gpa.free(history_path);
 
-    std.fs.cwd().makePath(app_data_dir) catch |err| switch (err) {
+    std.Io.Dir.cwd().createDirPath(io, app_data_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
 
-    const file = try std.fs.createFileAbsolute(history_path, .{ .truncate = false });
-    file.close();
+    const file = try std.Io.Dir.cwd().createFile(io, history_path, .{ .truncate = false });
+    file.close(io);
 
     return history_path;
 }
@@ -678,23 +684,19 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
     }
 }
 
-fn printValueDebugInfo(
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
-    value: Value,
-) (std.Io.Writer.Error || std.Io.tty.Config.SetColorError)!void {
+fn printValueDebugInfo(value: Value, terminal: std.Io.Terminal) std.Io.Terminal.SetColorError!void {
     // Porffor REPL my beloved 💜
-    try tty_config.setColor(writer, .blue);
+    try terminal.setColor(.blue);
     switch (value.type()) {
-        .number => try writer.print(" (type: {t})", .{value.asNumber()}),
-        .string => try writer.print(" (ptr: 0x{x}, type: {t}, length: {d}, hash: 0x{x})", .{
+        .number => try terminal.writer.print(" (type: {t})", .{value.asNumber()}),
+        .string => try terminal.writer.print(" (ptr: 0x{x}, type: {t}, length: {d}, hash: 0x{x})", .{
             @intFromPtr(value.asString()),
             value.asString().data,
             value.asString().length,
             value.asString().hash,
         }),
-        .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
-        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
+        .symbol => try terminal.writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
+        .object => try terminal.writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
             @intFromPtr(value.asObject()),
             @intFromPtr(value.asObject().shape),
             value.asObject().property_storage.indexed_properties.storage,
@@ -702,22 +704,27 @@ fn printValueDebugInfo(
         }),
         else => {},
     }
-    try tty_config.setColor(writer, .reset);
+    try terminal.setColor(.reset);
 }
 
-fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
-    base_dir: []const u8,
-    debug: bool,
-    print_promise_rejection_warnings: bool,
-}) !void {
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    const stdout = &stdout_writer.interface;
+fn repl(
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    environ_map: *const std.process.Environ.Map,
+    realm: *Realm,
+    options: struct {
+        base_dir: []const u8,
+        debug: bool,
+        print_promise_rejection_warnings: bool,
+    },
+) !void {
+    const agent = realm.agent;
+    const stdout = agent.platform.stdout;
 
     try stdout.writeAll(repl_preamble);
     try stdout.flush();
 
-    var editor = Editor.init(gpa, .{});
+    var editor = Editor.init(gpa, io, .{});
     defer editor.deinit();
 
     var handler: struct {
@@ -924,7 +931,7 @@ fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
         handler.string_arena.deinit();
     }
 
-    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(gpa) else "";
+    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(gpa, io, environ_map);
     defer if (builtin.os.tag != .wasi) gpa.free(history_path);
 
     if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch {
@@ -963,8 +970,11 @@ fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
         };
         try stdout.print("{f}", .{result.fmtPretty()});
         if (options.debug) {
-            const tty_config = realm.agent.platform.tty_config;
-            try printValueDebugInfo(stdout, tty_config, result);
+            const terminal: std.Io.Terminal = .{
+                .writer = stdout,
+                .mode = agent.platform.terminal_mode,
+            };
+            try printValueDebugInfo(result, terminal);
         }
         try stdout.writeAll("\n");
         try stdout.flush();
@@ -982,25 +992,17 @@ fn repl(gpa: std.mem.Allocator, realm: *Realm, options: struct {
     }
 }
 
-pub fn main() !u8 {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    const gpa, const is_debug = gpa: {
-        if (builtin.os.tag == .wasi) break :gpa .{ std.heap.wasm_allocator, false };
-        break :gpa switch (builtin.mode) {
-            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
-            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
-        };
-    };
-    defer if (is_debug) {
-        _ = debug_allocator.deinit();
-    };
+pub fn main(init: std.process.Init) !u8 {
+    const gpa = init.gpa;
+    const io = init.io;
+    const environ_map = init.environ_map;
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     var stderr_buffer: [1024]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
     const Options = struct {
@@ -1044,7 +1046,7 @@ pub fn main() !u8 {
             },
         };
     };
-    const parsed_args = args.parseForCurrentProcess(Options, gpa, .print) catch return 1;
+    const parsed_args = args.parseForCurrentProcess(Options, init, .print) catch return 1;
     defer parsed_args.deinit();
 
     const maybe_path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
@@ -1082,9 +1084,9 @@ pub fn main() !u8 {
     if (kiesel.build_options.enable_libgc and !parsed_args.options.@"print-gc-warnings") {
         kiesel.gc.disableWarnings();
     }
-    var platform = Agent.Platform.default();
+    var platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{
+    var agent = try Agent.init(gpa, io, &platform, .{
         .debug = .{
             .print_ast = parsed_args.options.@"print-ast",
             .print_bytecode = parsed_args.options.@"print-bytecode",
@@ -1093,22 +1095,21 @@ pub fn main() !u8 {
     });
     defer agent.deinit();
 
+    const NO_COLOR = environ_map.contains("NO_COLOR");
+    const CLICOLOR_FORCE = environ_map.contains("CLICOLOR_FORCE");
+    platform.terminal_mode = try .detect(io, .stderr(), NO_COLOR, CLICOLOR_FORCE);
+
     if (kiesel.build_options.enable_intl) {
-        if (std.process.getEnvVarOwned(gpa, "LANG")) |lang| {
-            defer gpa.free(lang);
-            const lang_trimmed = if (std.mem.indexOf(u8, lang, ".UTF-8")) |index|
-                lang[0..index]
-            else
-                lang;
+        if (environ_map.get("LANG")) |lang| {
+            const lang_trimmed = std.mem.cutSuffix(u8, lang, ".UTF-8") orelse lang;
             if (icu4zig.Locale.fromString(lang_trimmed)) |locale|
                 platform.default_locale = locale
             else |_| {}
-        } else |_| {}
+        }
     }
 
     if (kiesel.build_options.enable_temporal) {
-        if (std.process.getEnvVarOwned(gpa, "TZ")) |tz| {
-            defer gpa.free(tz);
+        if (environ_map.get("TZ")) |tz| {
             const string_view = temporal_rs.toDiplomatStringView(tz);
             if (temporal_rs.success(
                 temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(string_view),
@@ -1117,7 +1118,7 @@ pub fn main() !u8 {
             )) |time_zone| {
                 platform.default_time_zone = time_zone;
             }
-        } else |_| {}
+        }
     }
 
     defer tracked_promise_rejections.deinit(agent.gc_allocator);
@@ -1196,8 +1197,9 @@ pub fn main() !u8 {
             module_path: []const u8,
         ) Agent.Error!Module {
             const gpa_ = agent_.gpa;
+            const io_ = agent_.io;
             const realm = agent_.currentRealm();
-            const source_text = readFile(gpa_, module_path) catch |err| {
+            const source_text = readFile(gpa_, io_, module_path) catch |err| {
                 return agent_.throwException(
                     .internal_error,
                     "Failed to import '{f}': {t}",
@@ -1242,14 +1244,14 @@ pub fn main() !u8 {
             }
 
             const host_defined = try agent_.gc_allocator.create(ScriptOrModuleHostDefined);
-            host_defined.* = .{ .base_dir = std.fs.path.dirname(module_path).? };
+            host_defined.* = .{ .base_dir = std.Io.Dir.path.dirname(module_path).? };
 
             var diagnostics = Diagnostics.init(gpa_);
             defer diagnostics.deinit();
 
             const source_text_module = SourceTextModule.parse(source_text, realm, host_defined, .{
                 .diagnostics = &diagnostics,
-                .file_name = std.fs.path.basename(module_path),
+                .file_name = std.Io.Dir.path.basename(module_path),
             }) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.ParseError => {
@@ -1286,18 +1288,18 @@ pub fn main() !u8 {
     const realm = agent.currentRealm();
     try initializeGlobalObject(&agent, realm, realm.global_object);
 
-    const cwd = try std.process.getCwdAlloc(gpa);
+    const cwd = try std.process.currentPathAlloc(io, gpa);
     defer gpa.free(cwd);
-    std.debug.assert(std.fs.path.isAbsolute(cwd));
+    std.debug.assert(std.Io.Dir.path.isAbsolute(cwd));
 
     if (maybe_path) |path| {
-        const source_text = try readFile(gpa, path);
+        const source_text = try readFile(gpa, io, path);
         defer gpa.free(source_text);
-        const resolved_path = try std.fs.path.resolve(gpa, &.{ cwd, path });
+        const resolved_path = try std.Io.Dir.path.resolve(gpa, &.{ cwd, path });
         defer gpa.free(resolved_path);
-        std.debug.assert(std.fs.path.isAbsolute(resolved_path));
+        std.debug.assert(std.Io.Dir.path.isAbsolute(resolved_path));
         const result = run(gpa, realm, source_text, .{
-            .base_dir = std.fs.path.dirname(resolved_path).?,
+            .base_dir = std.Io.Dir.path.dirname(resolved_path).?,
             .origin = .{ .path = path },
             .module = run_as_module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
@@ -1326,7 +1328,7 @@ pub fn main() !u8 {
         }
     } else {
         std.debug.assert(!run_as_module);
-        try repl(gpa, realm, .{
+        try repl(gpa, io, environ_map, realm, .{
             .base_dir = cwd,
             .debug = parsed_args.options.debug,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",

@@ -23,7 +23,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -98,7 +98,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -133,7 +133,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -176,7 +176,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -196,26 +196,23 @@ jobs:
         run: |
           zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
-      - name: Build kiesel-freebsd-x86
-        run: |
-          zig build -Dtarget=x86-freebsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86
       - name: Build kiesel-freebsd-x86_64
         run: |
           zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
-      - name: Build kiesel-netbsd-aarch64
-        run: |
-          zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
-      - name: Build kiesel-netbsd-x86
-        run: |
-          zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
-      - name: Build kiesel-netbsd-x86_64
-        run: |
-          zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
+      # TODO: Re-enable once https://codeberg.org/ziglang/translate-c/issues/323 is fixed
+      # - name: Build kiesel-netbsd-aarch64
+      #   run: |
+      #     zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
+      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
+      # - name: Build kiesel-netbsd-x86
+      #   run: |
+      #     zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
+      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
+      # - name: Build kiesel-netbsd-x86_64
+      #   run: |
+      #     zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
+      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
       - name: Build kiesel-uefi-x86_64.efi
         run: |
           zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false -Denable-libgc=false -Denable-libregexp=false
@@ -263,7 +260,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
@@ -307,7 +304,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
       - name: Check formatting
         run: |
           zig fmt --check .
@@ -315,7 +312,7 @@ jobs:
         run: |
           git clone https://github.com/tusharsadhwani/zigimports
           cd zigimports
-          git checkout 202470cd6f49a4c7829819efa6fef4a36f3f618f
+          git checkout 0c56cb27d932f69e572fb1247213075624011f7f
           zig build --release=safe
           "./zig-out/bin/zigimports-$(uname -m)-linux" ..
 
@@ -329,7 +326,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
@@ -361,7 +358,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@master
         with:

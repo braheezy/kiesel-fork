@@ -6,13 +6,21 @@ pub fn build(b: *std.Build) !void {
 
     const quickjs = b.dependency("quickjs", .{});
 
-    const module = b.addModule("libregexp", .{
-        .root_source_file = b.path("src/root.zig"),
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = b.path("src/c.h"),
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
     });
-    module.addIncludePath(quickjs.path("."));
+    translate_c.addIncludePath(quickjs.path("."));
+
+    const module = b.addModule("libregexp", .{
+        .root_source_file = b.path("src/root.zig"),
+        .imports = &.{
+            .{ .name = "c", .module = translate_c.createModule() },
+        },
+        .target = target,
+        .optimize = optimize,
+    });
     module.addCSourceFiles(.{
         .root = quickjs.path("."),
         .files = &.{

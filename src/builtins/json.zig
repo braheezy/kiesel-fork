@@ -1002,8 +1002,8 @@ pub const namespace = struct {
         defer gpa.free(json_string_utf8);
         const json_whitespace = [_]u8{ '\t', '\n', '\r', ' ' };
         if (json_string_utf8.len == 0 or
-            std.mem.indexOfScalar(u8, &json_whitespace, json_string_utf8[0]) != null or
-            std.mem.indexOfScalar(u8, &json_whitespace, json_string_utf8[json_string_utf8.len - 1]) != null)
+            std.mem.findScalar(u8, &json_whitespace, json_string_utf8[0]) != null or
+            std.mem.findScalar(u8, &json_whitespace, json_string_utf8[json_string_utf8.len - 1]) != null)
         {
             return agent.throwException(.syntax_error, "Raw JSON value must not have leading or trailing whitespace", .{});
         }

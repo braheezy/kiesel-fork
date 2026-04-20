@@ -395,7 +395,7 @@ fn findBreakableContext(b: *Builder, label: ?[]const u8) *BreakableContext {
 fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Allocator.Error!Ir.Inst.StringIndex {
     const canonical_kind: Ir.StringKind = switch (kind) {
         .literal => .literal,
-        .escaped => if (std.mem.indexOfScalar(u8, string, '\\') == null)
+        .escaped => if (std.mem.findScalar(u8, string, '\\') == null)
             .literal
         else
             .escaped,

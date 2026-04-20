@@ -471,24 +471,11 @@ pub const Inst = struct {
         }
     };
 
-    pub const Format = struct {
-        inst: Inst,
-        ir: *const Ir,
-        tty_config: std.Io.tty.Config,
-
-        pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            f.tty_config.setColor(writer, .cyan) catch {};
-            try writer.print("{t}", .{f.inst.tag});
-            f.tty_config.setColor(writer, .reset) catch {};
-            printData(f.ir, f.inst.tag, f.inst.data, writer, f.tty_config) catch |err| switch (err) {
-                error.Unexpected => {},
-                error.WriteFailed => return error.WriteFailed,
-            };
-        }
-    };
-
-    pub fn fmt(inst: Inst, ir: *const Ir, tty_config: std.Io.tty.Config) Format {
-        return .{ .inst = inst, .ir = ir, .tty_config = tty_config };
+    pub fn print(inst: Inst, ir: *const Ir, terminal: std.Io.Terminal) PrintError!void {
+        try terminal.setColor(.cyan);
+        try terminal.writer.print("{t}", .{inst.tag});
+        try terminal.setColor(.reset);
+        try printData(ir, inst.tag, inst.data, terminal);
     }
 
     pub fn collectRefs(
@@ -627,18 +614,12 @@ pub fn refSlice(ir: *const Ir, start: Inst.ExtraIndex, len: u32) []const Inst.Re
     return @ptrCast(ir.extra[@intFromEnum(start)..][0..len]);
 }
 
-pub const PrintError =
-    std.Io.Writer.Error ||
-    std.Io.tty.Config.SetColorError;
+pub const PrintError = std.Io.Terminal.SetColorError;
 
-pub fn print(
-    ir: *const Ir,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
-) PrintError!void {
-    try tty_config.setColor(writer, .bold);
-    try writer.print("IR ({s})\n", .{ir.name});
-    try tty_config.setColor(writer, .reset);
+pub fn print(ir: *const Ir, terminal: std.Io.Terminal) PrintError!void {
+    try terminal.setColor(.bold);
+    try terminal.writer.print("IR ({s})\n", .{ir.name});
+    try terminal.setColor(.reset);
     for (0..ir.instructions.len) |i| {
         const inst = ir.instructions.get(i);
         const live_range = ir.live_ranges[i];
@@ -646,18 +627,19 @@ pub fn print(
 
         var buf: [16]u8 = undefined;
         const label = std.fmt.bufPrint(&buf, "%{d}", .{i}) catch unreachable;
-        try writer.print("{s: >4}: ", .{label});
+        try terminal.writer.print("{s: >4}: ", .{label});
 
-        try tty_config.setColor(writer, .dim);
-        try writer.print("[{d: >3}..{d: <3}] {s: >4}", .{
+        try terminal.setColor(.dim);
+        try terminal.writer.print("[{d: >3}..{d: <3}] {s: >4}", .{
             live_range.start,
             live_range.end,
             if (is_live) "" else "dead",
         });
-        _ = try writer.splatByteAll(' ', 18);
-        try tty_config.setColor(writer, .reset);
+        _ = try terminal.writer.splatByteAll(' ', 18);
+        try terminal.setColor(.reset);
 
-        try writer.print("{f}\n", .{inst.fmt(ir, tty_config)});
+        try inst.print(ir, terminal);
+        try terminal.writer.writeByte('\n');
     }
 }
 
@@ -665,13 +647,12 @@ fn printData(
     ir: *const Ir,
     tag: Inst.Tag,
     data: Inst.Data,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
+    terminal: std.Io.Terminal,
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
 
-    try writer.writeByte(' ');
+    try terminal.writer.writeByte(' ');
     switch (data_tag) {
         .none => {},
         inline .boolean,
@@ -684,74 +665,74 @@ fn printData(
         .create_function,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
-            try printField(ir, field_data, writer, tty_config);
+            try printField(ir, field_data, terminal);
         },
         .copy_data_properties => {
             const extra = ir.extraData(Inst.CopyDataProperties, data.copy_data_properties);
-            try printField(ir, extra.data.source, writer, tty_config);
-            try writer.writeAll(", [");
+            try printField(ir, extra.data.source, terminal);
+            try terminal.writer.writeAll(", [");
             const excluded = ir.refSlice(extra.end, extra.data.excluded_len);
             for (excluded, 0..) |prop, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, prop, writer, tty_config);
+                if (j > 0) try terminal.writer.writeAll(", ");
+                try printField(ir, prop, terminal);
             }
-            try writer.writeByte(']');
+            try terminal.writer.writeByte(']');
         },
         .call => {
             const extra = ir.extraData(Inst.Call, data.call);
-            try printField(ir, extra.data.callee, writer, tty_config);
-            try writer.writeAll(", ");
-            try printField(ir, extra.data.this_value, writer, tty_config);
-            try writer.writeAll(", [");
+            try printField(ir, extra.data.callee, terminal);
+            try terminal.writer.writeAll(", ");
+            try printField(ir, extra.data.this_value, terminal);
+            try terminal.writer.writeAll(", [");
             const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, arg, writer, tty_config);
+                if (j > 0) try terminal.writer.writeAll(", ");
+                try printField(ir, arg, terminal);
             }
-            try writer.writeByte(']');
+            try terminal.writer.writeByte(']');
         },
         .construct => {
             const extra = ir.extraData(Inst.Construct, data.construct);
-            try printField(ir, extra.data.constructor, writer, tty_config);
-            try writer.writeAll(", [");
+            try printField(ir, extra.data.constructor, terminal);
+            try terminal.writer.writeAll(", [");
             const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, arg, writer, tty_config);
+                if (j > 0) try terminal.writer.writeAll(", ");
+                try printField(ir, arg, terminal);
             }
-            try writer.writeByte(']');
+            try terminal.writer.writeByte(']');
         },
         .get_template_object => {
             const extra = ir.extraData(Inst.GetTemplateObject, data.get_template_object);
-            try printField(ir, extra.data.cooked, writer, tty_config);
-            try writer.writeAll(", ");
-            try printField(ir, extra.data.raw, writer, tty_config);
-            try writer.writeAll(", ");
-            try printField(ir, extra.data.id, writer, tty_config);
+            try printField(ir, extra.data.cooked, terminal);
+            try terminal.writer.writeAll(", ");
+            try printField(ir, extra.data.raw, terminal);
+            try terminal.writer.writeAll(", ");
+            try printField(ir, extra.data.id, terminal);
         },
         .create_class => {
             const class = ir.classes[@intFromEnum(data.create_class)];
-            try printField(ir, data.create_class, writer, tty_config);
-            try writer.writeAll(", ");
-            try printField(ir, class.heritage, writer, tty_config);
+            try printField(ir, data.create_class, terminal);
+            try terminal.writer.writeAll(", ");
+            try printField(ir, class.heritage, terminal);
             if (class.element_names.len > 0) {
-                try writer.writeAll(", [");
+                try terminal.writer.writeAll(", [");
                 for (class.element_names, 0..) |name_ref, j| {
-                    if (j > 0) try writer.writeAll(", ");
-                    try printField(ir, name_ref, writer, tty_config);
+                    if (j > 0) try terminal.writer.writeAll(", ");
+                    try printField(ir, name_ref, terminal);
                 }
-                try writer.writeByte(']');
+                try terminal.writer.writeByte(']');
             }
         },
         .super_call => {
             const extra = ir.extraData(Inst.SuperCall, data.super_call);
-            try writer.writeByte('[');
+            try terminal.writer.writeByte('[');
             const args = ir.refSlice(extra.end, extra.data.args_len);
             for (args, 0..) |arg, j| {
-                if (j > 0) try writer.writeAll(", ");
-                try printField(ir, arg, writer, tty_config);
+                if (j > 0) try terminal.writer.writeAll(", ");
+                try printField(ir, arg, terminal);
             }
-            try writer.writeByte(']');
+            try terminal.writer.writeByte(']');
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
@@ -771,96 +752,91 @@ fn printData(
                 const extra = ir.extraData(ExtraType, field_data);
                 const extra_fields = @typeInfo(ExtraType).@"struct".fields;
                 inline for (extra_fields, 0..) |extra_field, j| {
-                    if (j > 0) try writer.writeAll(", ");
-                    try printField(ir, @field(extra.data, extra_field.name), writer, tty_config);
+                    if (j > 0) try terminal.writer.writeAll(", ");
+                    try printField(ir, @field(extra.data, extra_field.name), terminal);
                 }
             } else {
                 const struct_fields = @typeInfo(FieldType).@"struct".fields;
                 inline for (struct_fields, 0..) |struct_field, j| {
-                    if (j > 0) try writer.writeAll(", ");
-                    try printField(ir, @field(field_data, struct_field.name), writer, tty_config);
+                    if (j > 0) try terminal.writer.writeAll(", ");
+                    try printField(ir, @field(field_data, struct_field.name), terminal);
                 }
             }
         },
     }
 }
 
-fn printField(
-    ir: *const Ir,
-    value: anytype,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
-) PrintError!void {
+fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintError!void {
     const T = @TypeOf(value);
     switch (T) {
         bool => {
-            try tty_config.setColor(writer, .blue);
-            try writer.print("{}", .{value});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.blue);
+            try terminal.writer.print("{}", .{value});
+            try terminal.setColor(.reset);
         },
         u16,
         u32,
         i32,
         f64,
         => {
-            try tty_config.setColor(writer, .magenta);
-            try writer.print("{}", .{value});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.magenta);
+            try terminal.writer.print("{}", .{value});
+            try terminal.setColor(.reset);
         },
         Inst.Ref => if (value.toIndex()) |index| {
-            try tty_config.setColor(writer, .blue);
-            try writer.print("%{d}", .{@intFromEnum(index)});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.blue);
+            try terminal.writer.print("%{d}", .{@intFromEnum(index)});
+            try terminal.setColor(.reset);
         } else {
-            try tty_config.setColor(writer, .dim);
-            try writer.print("none", .{});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.dim);
+            try terminal.writer.print("none", .{});
+            try terminal.setColor(.reset);
         },
         Inst.Array => {
-            try tty_config.setColor(writer, .magenta);
-            try writer.print("{}", .{value.len});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.magenta);
+            try terminal.writer.print("{}", .{value.len});
+            try terminal.setColor(.reset);
             if (value.has_spread) {
-                try tty_config.setColor(writer, .dim);
-                try writer.writeAll(" (spread)");
-                try tty_config.setColor(writer, .reset);
+                try terminal.setColor(.dim);
+                try terminal.writer.writeAll(" (spread)");
+                try terminal.setColor(.reset);
             }
         },
         // ExtraIndex should be handled in `printData()`
         Inst.StringIndex => {
             const str = ir.strings[@intFromEnum(value)];
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeAll(" (");
-            try tty_config.setColor(writer, .green);
-            try writer.print("\"{s}\"", .{str});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeByte(')');
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeAll(" (");
+            try terminal.setColor(.green);
+            try terminal.writer.print("\"{s}\"", .{str});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeByte(')');
         },
         Inst.BigIntIndex => {
             const big_int = ir.big_ints[@intFromEnum(value)];
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeAll(" (");
-            try tty_config.setColor(writer, .magenta);
-            try big_int.formatNumber(writer, .{});
-            try writer.writeByte('n');
-            try tty_config.setColor(writer, .reset);
-            try writer.writeByte(')');
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeAll(" (");
+            try terminal.setColor(.magenta);
+            try big_int.formatNumber(terminal.writer, .{});
+            try terminal.writer.writeByte('n');
+            try terminal.setColor(.reset);
+            try terminal.writer.writeByte(')');
         },
         Inst.FunctionIndex,
         Inst.ClassIndex,
         => {
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
         },
         Inst.UpdateOp => {
-            try tty_config.setColor(writer, .blue);
-            try writer.print("{t}", .{value});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.blue);
+            try terminal.writer.print("{t}", .{value});
+            try terminal.setColor(.reset);
         },
         else => comptime unreachable,
     }

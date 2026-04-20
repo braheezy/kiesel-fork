@@ -345,8 +345,8 @@ pub const prototype = struct {
                 .{ sign, x, fraction_digits },
             );
         // Zig omits the '+' for positive exponents, so we need to add it ourselves
-        if (std.mem.indexOf(u8, formatted, "e-") == null) {
-            const index = std.mem.indexOf(u8, formatted, "e").?;
+        if (std.mem.find(u8, formatted, "e-") == null) {
+            const index = std.mem.find(u8, formatted, "e").?;
             formatted = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s}e+{s}",

@@ -30,9 +30,13 @@ const FormatPrettyData = struct {
 };
 
 pub fn formatPretty(data: FormatPrettyData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    return prettyPrintException(data.agent, data.exception, writer) catch |err| switch (err) {
-        // From `std.Io.tty.Config.setColor()`
-        error.Unexpected => {},
+    const terminal: std.Io.Terminal = .{
+        .writer = writer,
+        .mode = data.agent.platform.terminal_mode,
+    };
+    return prettyPrintException(data.agent, data.exception, terminal) catch |err| switch (err) {
+        // From `std.Io.Terminal.setColor()`
+        error.Canceled, error.Unexpected => {},
         error.WriteFailed => return error.WriteFailed,
     };
 }

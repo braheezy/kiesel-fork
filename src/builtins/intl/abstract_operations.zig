@@ -323,27 +323,16 @@ fn Resolution(comptime ResolutionOptionsType: type) type {
 }
 
 fn ResolutionOptions(comptime resolution_option_descriptors: anytype) type {
-    var fields: []const std.builtin.Type.StructField = &.{};
-    inline for (resolution_option_descriptors) |desc| {
+    const fields_len = resolution_option_descriptors.len;
+    var field_names: [fields_len][]const u8 = undefined;
+    var field_types: [fields_len]type = undefined;
+    const field_attrs: [fields_len]std.builtin.Type.StructField.Attributes = @splat(.{});
+    for (resolution_option_descriptors, &field_names, &field_types) |desc, *name, *Type| {
         const @"type": Object.OptionType = if (@hasField(@TypeOf(desc), "type")) desc.type else .string;
-        const T = ?@"type".T();
-        const field: std.builtin.Type.StructField = .{
-            .name = desc.key ++ "",
-            .type = T,
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = @alignOf(T),
-        };
-        fields = fields ++ .{field};
+        name.* = desc.key;
+        Type.* = ?@"type".T();
     }
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .is_tuple = false,
-            .fields = fields,
-            .decls = &.{},
-        },
-    });
+    return @Struct(.auto, null, &field_names, &field_types, &field_attrs);
 }
 
 const Matcher = enum { lookup, best_fit };

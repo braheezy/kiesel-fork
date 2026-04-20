@@ -197,9 +197,10 @@ pub fn hasFields(self: PropertyDescriptor) bool {
 
 test isAccessorDescriptor {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     const getter = try ordinaryObjectCreate(&agent, null);
     const setter = try ordinaryObjectCreate(&agent, null);
@@ -219,9 +220,10 @@ test isDataDescriptor {
 
 test isGenericDescriptor {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     const setter = try ordinaryObjectCreate(&agent, null);
     try std.testing.expect((PropertyDescriptor{ .writable = null }).isGenericDescriptor());

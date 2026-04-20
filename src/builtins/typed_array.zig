@@ -3981,7 +3981,7 @@ fn fromBase64Impl(
     //       supporting partial decoding.
     const source = switch (string.asAsciiOrUtf16()) {
         .ascii => |ascii| switch (last_chunk_handling) {
-            .loose => if (std.mem.indexOfScalar(u8, ascii, '=')) |end| blk: {
+            .loose => if (std.mem.findScalar(u8, ascii, '=')) |end| blk: {
                 for (ascii[end..]) |c| {
                     if (c != '=') {
                         const @"error" = try agent.createErrorObject(
@@ -4015,7 +4015,7 @@ fn fromBase64Impl(
         if (last_chunk_handling == .loose) null else '=',
         "\t\n\u{c}\r ",
     );
-    const dest = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(source.len) catch unreachable);
+    const dest = try agent.gc_allocator.alloc(u8, decoder.calcSizeUpperBound(source.len));
     const dest_len = decoder.decode(dest, source) catch {
         const @"error" = try agent.createErrorObject(
             .syntax_error,

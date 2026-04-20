@@ -447,7 +447,7 @@ fn innerModuleLinking(
             // ii. Assert: requiredModule.[[Status]] is linking if and only if stack contains
             //     requiredModule.
             std.debug.assert((required_module.status == .linking) ==
-                (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module) != null));
+                (std.mem.findScalar(*SourceTextModule, stack.items, required_module) != null));
 
             // iii. If requiredModule.[[Status]] is linking, then
             if (required_module.status == .linking) {
@@ -852,7 +852,7 @@ fn innerModuleEvaluation(
             // ii. Assert: requiredModule.[[Status]] is evaluating if and only if stack contains
             //     requiredModule.
             std.debug.assert((required_module.status == .evaluating) ==
-                (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module) != null));
+                (std.mem.findScalar(*SourceTextModule, stack.items, required_module) != null));
 
             // iii. If requiredModule.[[Status]] is evaluating, then
             if (required_module.status == .evaluating) {
@@ -1047,7 +1047,7 @@ fn gatherAvailableAncestors(
     // 1. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
     for (module.async_parent_modules.items) |m| {
         // a. If execList does not contain m and m.[[CycleRoot]].[[EvaluationError]] is empty, then
-        if (std.mem.indexOfScalar(*SourceTextModule, exec_list.items, m) == null and
+        if (std.mem.findScalar(*SourceTextModule, exec_list.items, m) == null and
             m.cycle_root.?.evaluation_error == null)
         {
             // i. Assert: m.[[Status]] is evaluating-async.

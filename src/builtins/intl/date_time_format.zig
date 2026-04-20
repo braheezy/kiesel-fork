@@ -572,6 +572,7 @@ pub const prototype = struct {
                 /// 11.5.4 DateTime Format Functions
                 /// https://tc39.es/ecma402/#sec-datetime-format-functions
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+                    const io = agent_.io;
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const date = arguments.get(0);
@@ -584,7 +585,8 @@ pub const prototype = struct {
                     // 3. If date is not provided or is undefined, then
                     const x = if (date.isUndefined()) blk: {
                         // a. Let x be ! Call(%Date.now%, undefined).
-                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTimeMs()));
+                        const timestamp: std.Io.Timestamp = .now(io, .real);
+                        break :blk @as(f64, @floatFromInt(timestamp.toMilliseconds()));
                     } else blk: {
                         // 4. Else,
                         // a. Let x be ? ToNumber(date).

@@ -390,7 +390,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return .nan;
     // Limit to characters valid for StrDecimalLiteral before brute forcing
     var len = for (trimmed_string, 0..) |c, i| {
-        if (!std.ascii.isDigit(c) and std.mem.indexOfScalar(u8, "+-.eE", c) == null) break i;
+        if (!std.ascii.isDigit(c) and std.mem.findScalar(u8, "+-.eE", c) == null) break i;
     } else trimmed_string.len;
     while (len != 0) : (len -= 1) {
         if (std.fmt.parseFloat(f64, trimmed_string[0..len])) |result|
@@ -567,7 +567,7 @@ fn encode(
         const writer = &allocating_writer.writer;
         std.Uri.Component.percentEncode(writer, string.asAscii(), struct {
             fn isValidChar(c: u8) bool {
-                return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
+                return std.mem.findScalar(u8, unescaped_set, c) != null;
             }
         }.isValidChar) catch |err| switch (err) {
             error.WriteFailed => return error.OutOfMemory,
@@ -592,7 +592,7 @@ fn encode(
 
         // b. If unescapedSet contains C, then
         if (c <= std.math.maxInt(u8) and
-            std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null)
+            std.mem.findScalar(u8, unescaped_set, @intCast(c)) != null)
         {
             // i. Set k to k + 1.
             k += 1;
@@ -697,7 +697,7 @@ fn decode(
                 // 1. Let asciiChar be the code unit whose numeric value is B.
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape; else set S to
                 //    asciiChar.
-                if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null) {
+                if (std.mem.findScalar(u8, preserve_escape_set, byte) != null) {
                     try result.appendSegment(gpa, .{ .char = '%' });
                     try result.appendSegment(gpa, .{ .char = @intCast(escape_[1]) });
                     try result.appendSegment(gpa, .{ .char = @intCast(escape_[2]) });
@@ -816,7 +816,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     var it = string.codeUnitIterator();
     while (it.next()) |c| {
         // b. If unescapedSet contains C, then
-        const s: String.Builder.Segment = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
+        const s: String.Builder.Segment = if (c < 256 and std.mem.findScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
             // i. Let S be C.
             break :blk .{ .char = @intCast(c) };
         } else blk: {

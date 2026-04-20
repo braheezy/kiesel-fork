@@ -6,9 +6,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Stop people from trying to build with an outdated Zig compiler
-    if (builtin.zig_version.order(.{ .major = 0, .minor = 15, .patch = 2 }) == .lt) {
+    if (builtin.zig_version.order(.{ .major = 0, .minor = 16, .patch = 0 }) == .lt) {
         std.debug.print("\n    {s}\n    {s}\n\n", .{
-            "Zig version 0.15.2 is required, found " ++ builtin.zig_version_string ++ ".",
+            "Zig version 0.16.0 is required, found " ++ builtin.zig_version_string ++ ".",
             "Please \u{1B}]8;;https://ziglang.org/download/\u{1B}\\download\u{1B}]8;;\u{1B}\\ or otherwise install a newer build and try again.",
         });
         std.process.exit(1);
@@ -54,7 +54,7 @@ pub fn build(b: *std.Build) void {
     ) orelse true;
 
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
-    // Defaults to true for now as the self-hosted backend in 0.15 fails with a linker error.
+    // Defaults to true for now as the self-hosted backend in 0.16 fails with a linker error.
     const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend") orelse true;
     const version_string = b.option(
         []const u8,
@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
         const output = b.runAllowFail(
             &.{ "git", "-C", b.build_root.path orelse ".", "rev-parse", "--short=9", "HEAD" },
             &code,
-            .Ignore,
+            .ignore,
         ) catch break :blk base_version;
         const git_revision = std.mem.trim(u8, output, "\n");
         break :blk b.fmt("{s}-dev+{s}", .{ base_version, git_revision });
@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(std.SemanticVersion, "version", version);
 
     const args = b.dependency("args", .{});
+    const known_folders = b.dependency("known_folders", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const stackinfo = b.dependency("stackinfo", .{ .target = target });
     const unicode_id = b.dependency("unicode_id", .{});
@@ -197,6 +198,7 @@ pub fn build(b: *std.Build) void {
                     .imports = &.{
                         .{ .name = "args", .module = args.module("args") },
                         .{ .name = "kiesel", .module = kiesel },
+                        .{ .name = "known-folders", .module = known_folders.module("known-folders") },
                         .{ .name = "zigline", .module = zigline.module("zigline") },
                     },
                     .target = target,

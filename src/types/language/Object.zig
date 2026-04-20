@@ -1474,11 +1474,12 @@ pub fn getOption(
     return coerced_value;
 }
 
-test "format" {
+test format {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent_ = try Agent.init(gpa, &platform, .{});
+    var agent_ = try Agent.init(gpa, io, &platform, .{});
     defer agent_.deinit();
 
     const test_cases = [_]struct { *Object, []const u8 }{

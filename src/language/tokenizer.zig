@@ -314,13 +314,13 @@ const first_byte_of_line_terminators = &.{ '\n', '\r', "\u{2028}"[0] };
 
 comptime {
     for (line_terminators) |line_terminator| {
-        std.debug.assert(std.mem.indexOfAny(u8, line_terminator, first_byte_of_line_terminators) == 0);
+        std.debug.assert(std.mem.findAny(u8, line_terminator, first_byte_of_line_terminators) == 0);
     }
 }
 
 fn indexOfFirstLineTerminator(str: []const u8) ?usize {
     var index: usize = 0;
-    while (std.mem.indexOfAnyPos(u8, str, index, first_byte_of_line_terminators)) |candidate_index| {
+    while (std.mem.findAnyPos(u8, str, index, first_byte_of_line_terminators)) |candidate_index| {
         if (startsWithLineTerminator(str[candidate_index..])) {
             return candidate_index;
         }
@@ -331,7 +331,7 @@ fn indexOfFirstLineTerminator(str: []const u8) ?usize {
 
 pub fn containsLineTerminator(str: []const u8) bool {
     for (line_terminators) |line_terminator| {
-        if (std.mem.indexOf(u8, str, line_terminator)) |_|
+        if (std.mem.find(u8, str, line_terminator)) |_|
             return true;
     }
     return false;
@@ -360,7 +360,7 @@ fn commentMatcher(str: []const u8) ?usize {
         return indexOfFirstLineTerminator(str) orelse str.len;
     }
     if (std.mem.startsWith(u8, str, "/*")) {
-        if (std.mem.indexOf(u8, str[2..], "*/")) |index|
+        if (std.mem.find(u8, str[2..], "*/")) |index|
             return index + 4;
     }
     return null;
@@ -528,7 +528,7 @@ pub fn parseUnicodeEscapeSequence(str: []const u8) ?struct { code_point: u21, le
         return null;
 
     if (str[2] == '{') {
-        const len = std.mem.indexOfScalar(u8, str[3..], '}') orelse return null;
+        const len = std.mem.findScalar(u8, str[3..], '}') orelse return null;
         if (len < 1 or len > 6) return null;
         for (str[3..][0..len]) |ch| {
             if (!std.ascii.isHex(ch)) return null;

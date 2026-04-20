@@ -332,7 +332,7 @@ fn utf8StringValue(
     text: []const u8,
 ) std.mem.Allocator.Error!?[]const u8 {
     // Only construct a full string if we need to unescape it.
-    if (std.mem.indexOfScalar(u8, text, '\\') == null) {
+    if (std.mem.findScalar(u8, text, '\\') == null) {
         return try allocator.dupe(u8, text);
     }
     const string = try ast.stringValueImpl(allocator, text);
@@ -2064,7 +2064,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
                         break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
                     },
                     // For loop initializer
-                    .in => if (std.mem.indexOfScalar(Tokenizer.TokenType, ctx.forbidden, .in) != null) {
+                    .in => if (std.mem.findScalar(Tokenizer.TokenType, ctx.forbidden, .in) != null) {
                         break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
                     },
                     else => {},
@@ -2123,7 +2123,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
         if (new_ctx.precedence == ctx.precedence and
             ctx.associativity != null and
             ctx.associativity.? == .left_to_right) break;
-        if (std.mem.indexOfScalar(
+        if (std.mem.findScalar(
             Tokenizer.TokenType,
             new_ctx.forbidden,
             next_token.type,

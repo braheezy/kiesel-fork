@@ -110,4 +110,4 @@ hostResizeArrayBuffer: *const fn (
 ) Agent.Error!ResizeArrayBufferHandled = default_host_hooks.hostResizeArrayBuffer,
 hostSystemUTCEpochNanoseconds: *const fn (
     agent: *Agent,
-) i128 = default_host_hooks.hostSystemUTCEpochNanoseconds,
+) i96 = default_host_hooks.hostSystemUTCEpochNanoseconds,

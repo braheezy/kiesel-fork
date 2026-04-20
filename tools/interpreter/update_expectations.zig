@@ -23,13 +23,12 @@ const TestCase = struct {
     expected_bc: std.zig.Zoir.Node.Index,
 };
 
-pub fn main() !u8 {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = debug_allocator.deinit();
-    const gpa = debug_allocator.allocator();
+pub fn main(init: std.process.Init) !u8 {
+    const gpa = init.gpa;
+    const io = init.io;
 
-    const args = try std.process.argsAlloc(gpa);
-    defer std.process.argsFree(gpa, args);
+    const args = try init.minimal.args.toSlice(gpa);
+    defer gpa.free(args);
 
     if (args.len != 2) {
         std.debug.print("Usage: {s} <path/to/test_cases.zon>\n", .{args[0]});
@@ -37,11 +36,11 @@ pub fn main() !u8 {
     }
     const zon_path = args[1];
 
-    const zon_source = try std.fs.cwd().readFileAllocOptions(
-        gpa,
+    const zon_source = try std.Io.Dir.cwd().readFileAllocOptions(
+        io,
         zon_path,
-        8 * 1024 * 1024,
-        null,
+        gpa,
+        .limited(8 * 1024 * 1024),
         .of(u8),
         0,
     );
@@ -50,7 +49,7 @@ pub fn main() !u8 {
     var diag: std.zon.parse.Diagnostics = .{};
     defer diag.deinit(gpa);
 
-    const test_cases = try std.zon.parse.fromSlice(
+    const test_cases = try std.zon.parse.fromSliceAlloc(
         []const TestCase,
         gpa,
         zon_source,
@@ -79,7 +78,7 @@ pub fn main() !u8 {
             continue;
         }
 
-        const script_source = try std.zon.parse.fromZoirNode(
+        const script_source = try std.zon.parse.fromZoirNodeAlloc(
             []const u8,
             gpa,
             diag.ast,
@@ -133,11 +132,13 @@ pub fn main() !u8 {
     }
 
     if (!std.mem.eql(u8, zon_source, rewritten.items)) {
+        var atomic_file = try std.Io.Dir.cwd().createFileAtomic(io, zon_path, .{ .replace = true });
+        defer atomic_file.deinit(io);
         var write_buffer: [4096]u8 = undefined;
-        var atomic_file = try std.fs.cwd().atomicFile(zon_path, .{ .write_buffer = &write_buffer });
-        defer atomic_file.deinit();
-        try atomic_file.file_writer.interface.writeAll(rewritten.items);
-        try atomic_file.finish();
+        var file_writer = atomic_file.file.writer(io, &write_buffer);
+        try file_writer.interface.writeAll(rewritten.items);
+        try file_writer.flush();
+        try atomic_file.replace(io);
     }
 
     return 0;
@@ -167,10 +168,15 @@ fn generateExpectations(gpa: std.mem.Allocator, source: []const u8) !GeneratedEx
     var aw: std.Io.Writer.Allocating = .init(gpa);
     defer aw.deinit();
 
-    try ir.print(&aw.writer, .no_color);
+    const terminal: std.Io.Terminal = .{
+        .writer = &aw.writer,
+        .mode = .no_color,
+    };
+
+    try ir.print(terminal);
     const ir_out = try aw.toOwnedSlice();
 
-    try bc.print(&aw.writer, .no_color);
+    try bc.print(terminal);
     const bc_out = try aw.toOwnedSlice();
 
     return .{ .ir = ir_out, .bc = bc_out };

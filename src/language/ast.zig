@@ -527,7 +527,7 @@ pub const TemplateLiteral = struct {
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!*const String {
             const text = self.templateCharacters();
-            if (std.mem.indexOf(u8, text, "\r") == null) {
+            if (std.mem.find(u8, text, "\r") == null) {
                 return stringValueImpl(allocator, text);
             }
             const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
@@ -543,7 +543,7 @@ pub const TemplateLiteral = struct {
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!*const String {
             const text = self.templateCharacters();
-            if (std.mem.indexOf(u8, text, "\r") == null) {
+            if (std.mem.find(u8, text, "\r") == null) {
                 return String.fromUtf8Alloc(allocator, text);
             }
             const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");

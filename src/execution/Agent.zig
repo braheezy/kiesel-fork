@@ -27,6 +27,7 @@ const noexcept = utils.noexcept;
 const Agent = @This();
 
 gpa: std.mem.Allocator,
+io: std.Io,
 gc_allocator: std.mem.Allocator,
 gc_allocator_atomic: std.mem.Allocator,
 options: Options,
@@ -68,12 +69,14 @@ pub const QueuedJob = struct {
 
 pub fn init(
     gpa: std.mem.Allocator,
+    io: std.Io,
     platform: *const Agent.Platform,
     options: Options,
 ) std.mem.Allocator.Error!Agent {
     pretty_printing.state.platform = platform;
     return .{
         .gpa = gpa,
+        .io = io,
         // TODO: Do we want to remove these aliases? In that case you'd have to type out
         //       `agent.platform.gc_allocator.alloc()` every time, or we remove both levels of
         //       indirection and make it `agent.alloc()`.
@@ -362,20 +365,22 @@ pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
 
 test init {
     const gpa = std.testing.allocator;
-    var platform = Platform.default();
+    const io = std.testing.io;
+    var platform = Platform.default(io);
     defer platform.deinit();
     // Ensure Agent teardown is leak-free
     platform.gc_allocator = std.testing.allocator;
     platform.gc_allocator_atomic = std.testing.allocator;
-    var agent = try init(gpa, &platform, .{});
+    var agent = try init(gpa, io, &platform, .{});
     defer agent.deinit();
 }
 
 test "well_known_symbols" {
     const gpa = std.testing.allocator;
-    var platform = Platform.default();
+    const io = std.testing.io;
+    var platform = Platform.default(io);
     defer platform.deinit();
-    var agent = try init(gpa, &platform, .{});
+    var agent = try init(gpa, io, &platform, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
     try std.testing.expectEqualStrings(unscopables.description.?.asAscii(), "Symbol.unscopables");

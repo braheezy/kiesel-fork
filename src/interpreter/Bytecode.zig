@@ -17,10 +17,6 @@ exception_handlers: []const ExceptionHandler,
 
 pub const Builder = @import("Bytecode/Builder.zig");
 
-pub const PrintError =
-    std.Io.Writer.Error ||
-    std.Io.tty.Config.SetColorError;
-
 pub const StringKind = enum(u1) {
     escaped,
     literal,
@@ -488,24 +484,9 @@ pub const Inst = struct {
     pub const ClassIndex = enum(u16) { _ };
     pub const IcIndex = enum(u16) { _ };
 
-    pub const Format = struct {
-        inst: Inst,
-        bc: *const Bytecode,
-        tty_config: std.Io.tty.Config,
-
-        pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            f.tty_config.setColor(writer, .cyan) catch {};
-            try writer.print("{t}", .{f.inst.tag});
-            f.tty_config.setColor(writer, .reset) catch {};
-            printData(f.bc, f.inst.tag, f.inst.data, writer, f.tty_config) catch |err| switch (err) {
-                error.Unexpected => {},
-                error.WriteFailed => return error.WriteFailed,
-            };
-        }
-    };
-
-    pub fn fmt(inst: Inst, bc: *const Bytecode, tty_config: std.Io.tty.Config) Format {
-        return .{ .inst = inst, .bc = bc, .tty_config = tty_config };
+    pub fn print(inst: Inst, bc: *const Bytecode, terminal: std.Io.Terminal) PrintError!void {
+        try terminal.writer.print("{t}", .{inst.tag});
+        try printData(bc, inst.tag, inst.data, terminal);
     }
 
     /// Decode an instruction from the given bytecode slice.
@@ -694,51 +675,50 @@ pub fn iterator(bc: *const Bytecode) Iterator {
     };
 }
 
-pub fn print(
-    bc: *const Bytecode,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
-) PrintError!void {
-    try tty_config.setColor(writer, .bold);
-    try writer.print("Bytecode ({s})\n", .{bc.name});
-    try tty_config.setColor(writer, .reset);
+pub const PrintError = std.Io.Terminal.SetColorError;
+
+pub fn print(bc: *const Bytecode, terminal: std.Io.Terminal) PrintError!void {
+    try terminal.setColor(.bold);
+    try terminal.writer.print("Bytecode ({s})\n", .{bc.name});
+    try terminal.setColor(.reset);
     var it = bc.iterator();
     while (it.next() catch |err| switch (err) {
         error.InvalidInstruction => {
-            try tty_config.setColor(writer, .red);
-            try writer.print("Invalid instruction at offset {d}\n", .{it.offset});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.red);
+            try terminal.writer.print("Invalid instruction at offset {d}\n", .{it.offset});
+            try terminal.setColor(.reset);
             return;
         },
     }) |entry| {
         const size = it.offset - entry.offset;
 
-        try writer.print("{d: >4}: ", .{entry.offset});
+        try terminal.writer.print("{d: >4}: ", .{entry.offset});
 
-        try tty_config.setColor(writer, .dim);
+        try terminal.setColor(.dim);
         for (bc.code[entry.offset..][0..size]) |byte| {
-            try writer.print("{x:0>2} ", .{byte});
+            try terminal.writer.print("{x:0>2} ", .{byte});
         }
-        _ = try writer.splatByteAll(' ', (11 - size) * 3);
-        try tty_config.setColor(writer, .reset);
+        _ = try terminal.writer.splatByteAll(' ', (11 - size) * 3);
+        try terminal.setColor(.reset);
 
-        try writer.print("{f}\n", .{entry.inst.fmt(bc, tty_config)});
+        try entry.inst.print(bc, terminal);
+        try terminal.writer.writeByte('\n');
     }
 
     if (bc.exception_handlers.len > 0) {
-        try writer.writeByte('\n');
-        try tty_config.setColor(writer, .bold);
-        try writer.writeAll("Exception handlers\n");
-        try tty_config.setColor(writer, .reset);
+        try terminal.writer.writeByte('\n');
+        try terminal.setColor(.bold);
+        try terminal.writer.writeAll("Exception handlers\n");
+        try terminal.setColor(.reset);
 
         for (bc.exception_handlers) |handler| {
-            try writer.print("  [{d: >4}..{d: <4}) → {d: >4}, ", .{
+            try terminal.writer.print("  [{d: >4}..{d: <4}) → {d: >4}, ", .{
                 handler.start,
                 handler.end,
                 handler.target,
             });
-            try printField(bc, handler.exception_reg, writer, tty_config);
-            try writer.print(", {d}\n", .{handler.scope_depth});
+            try printField(bc, handler.exception_reg, terminal);
+            try terminal.writer.print(", {d}\n", .{handler.scope_depth});
         }
     }
 }
@@ -747,8 +727,7 @@ fn printData(
     bc: *const Bytecode,
     tag: Inst.Tag,
     data: Inst.Data,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
+    terminal: std.Io.Terminal,
 ) PrintError!void {
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
@@ -757,7 +736,7 @@ fn printData(
         else => {},
     }
 
-    try writer.writeByte(' ');
+    try terminal.writer.writeByte(' ');
     switch (data_tag) {
         .none => {},
         inline .i32,
@@ -765,15 +744,15 @@ fn printData(
         .string,
         => |dt| {
             const field_data = @field(data, @tagName(dt));
-            try printField(bc, field_data, writer, tty_config);
+            try printField(bc, field_data, terminal);
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
             const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
             inline for (field_type.fields, 0..) |struct_field, idx| {
-                if (idx > 0) try writer.writeAll(", ");
+                if (idx > 0) try terminal.writer.writeAll(", ");
                 const value = @field(field_data, struct_field.name);
-                try printField(bc, value, writer, tty_config);
+                try printField(bc, value, terminal);
             }
         },
     }
@@ -782,8 +761,7 @@ fn printData(
 fn printField(
     bc: *const Bytecode,
     value: anytype,
-    writer: *std.Io.Writer,
-    tty_config: std.Io.tty.Config,
+    terminal: std.Io.Terminal,
 ) PrintError!void {
     const T = @TypeOf(value);
     switch (T) {
@@ -793,45 +771,45 @@ fn printField(
         u32,
         f64,
         => {
-            try tty_config.setColor(writer, .magenta);
-            try writer.print("{}", .{value});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.magenta);
+            try terminal.writer.print("{}", .{value});
+            try terminal.setColor(.reset);
         },
         Inst.Reg => {
-            try tty_config.setColor(writer, .blue);
-            try writer.print("r{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.blue);
+            try terminal.writer.print("r{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
         },
         Inst.StringIndex => {
             const str = bc.strings[@intFromEnum(value)];
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeAll(" (");
-            try tty_config.setColor(writer, .green);
-            try writer.print("\"{s}\"", .{str});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeByte(')');
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeAll(" (");
+            try terminal.setColor(.green);
+            try terminal.writer.print("\"{s}\"", .{str});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeByte(')');
         },
         Inst.BigIntIndex => {
             const big_int = bc.big_ints[@intFromEnum(value)];
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
-            try writer.writeAll(" (");
-            try tty_config.setColor(writer, .magenta);
-            try big_int.formatNumber(writer, .{});
-            try writer.writeByte('n');
-            try tty_config.setColor(writer, .reset);
-            try writer.writeByte(')');
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
+            try terminal.writer.writeAll(" (");
+            try terminal.setColor(.magenta);
+            try big_int.formatNumber(terminal.writer, .{});
+            try terminal.writer.writeByte('n');
+            try terminal.setColor(.reset);
+            try terminal.writer.writeByte(')');
         },
         Inst.FunctionIndex,
         Inst.ClassIndex,
         Inst.IcIndex,
         => {
-            try tty_config.setColor(writer, .yellow);
-            try writer.print("@{d}", .{@intFromEnum(value)});
-            try tty_config.setColor(writer, .reset);
+            try terminal.setColor(.yellow);
+            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.setColor(.reset);
         },
         else => comptime unreachable,
     }

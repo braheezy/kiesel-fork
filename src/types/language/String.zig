@@ -516,7 +516,7 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: u32
     // 5. Return not-found.
     if (from_index >= len or search_len > len) return null;
     if (self.isAscii() and search_value.isAscii()) {
-        return if (std.mem.indexOf(
+        return if (std.mem.find(
             u8,
             self.asAscii()[from_index..],
             search_value.asAscii(),
@@ -526,7 +526,7 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: u32
             null;
     }
     if (self.isUtf16() and search_value.isUtf16()) {
-        return if (std.mem.indexOf(
+        return if (std.mem.find(
             u16,
             self.asUtf16()[from_index..],
             search_value.asUtf16(),
@@ -728,10 +728,10 @@ pub fn trimStart(self: *const String, agent: *Agent) std.mem.Allocator.Error!*co
     var start: u32 = 0;
     switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
-            while (start < self.length and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
+            while (start < self.length and std.mem.findScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
         },
         .utf16 => |utf16| {
-            while (start < self.length and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
+            while (start < self.length and std.mem.findScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
         },
     }
     return self.substring(agent, start, null);
@@ -742,10 +742,10 @@ pub fn trimEnd(self: *const String, agent: *Agent) std.mem.Allocator.Error!*cons
     var end: u32 = self.length;
     switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
-            while (end > 0 and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
+            while (end > 0 and std.mem.findScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
         },
         .utf16 => |utf16| {
-            while (end > 0 and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
+            while (end > 0 and std.mem.findScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
         },
     }
     return self.substring(agent, 0, end);
@@ -757,12 +757,12 @@ pub fn trim(self: *const String, agent: *Agent) std.mem.Allocator.Error!*const S
     var end: u32 = self.length;
     switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| {
-            while (start < end and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
-            while (end > start and std.mem.indexOfScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
+            while (start < end and std.mem.findScalar(u8, &whitespace_ascii, ascii[start]) != null) : (start += 1) {}
+            while (end > start and std.mem.findScalar(u8, &whitespace_ascii, ascii[end - 1]) != null) : (end -= 1) {}
         },
         .utf16 => |utf16| {
-            while (start < end and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
-            while (end > start and std.mem.indexOfScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
+            while (start < end and std.mem.findScalar(u16, &whitespace_utf16, utf16[start]) != null) : (start += 1) {}
+            while (end > start and std.mem.findScalar(u16, &whitespace_utf16, utf16[end - 1]) != null) : (end -= 1) {}
         },
     }
     return self.substring(agent, start, end);
@@ -952,9 +952,10 @@ test fromLiteral {
 
 test fromUtf8 {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromUtf8(&agent, "");
@@ -984,9 +985,10 @@ test fromUtf8 {
 
 test fromAscii {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromAscii(&agent, "");
@@ -1009,9 +1011,10 @@ test fromAscii {
 
 test fromUtf16 {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const string = try fromUtf16(&agent, &.{});
@@ -1034,9 +1037,10 @@ test fromUtf16 {
 
 test fromStringSliced {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     const parent = fromLiteral("foobarbaz");
     {
@@ -1070,9 +1074,10 @@ test fromStringSliced {
 
 test trimStart {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1093,9 +1098,10 @@ test trimStart {
 
 test trimEnd {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1116,9 +1122,10 @@ test trimEnd {
 
 test trim {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral(" \n\r\t \n\r\t");
@@ -1139,9 +1146,10 @@ test trim {
 
 test repeat {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const parent = fromLiteral("foo");
@@ -1162,9 +1170,10 @@ test repeat {
 
 test concat {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     {
         const string = try String.concat(&agent, &.{});

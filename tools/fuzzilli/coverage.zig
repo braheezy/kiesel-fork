@@ -38,12 +38,15 @@ pub fn __sanitizer_cov_reset_edgeguards() void {
 
 export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void {
     @disableInstrumentation();
+
+    const io = std.Options.debug_io;
+
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     var stderr_buffer: [1024]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
     // Avoid duplicate initialization
@@ -68,7 +71,7 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
         const fd = std.c.shm_open(
             shm_key.?,
             @bitCast(std.c.O{ .ACCMODE = .RDWR }),
-            std.c.S.IRUSR | std.c.S.IWUSR,
+            @as(c_int, std.c.S.IRUSR | std.c.S.IWUSR),
         );
         defer _ = std.c.close(fd);
         if (fd <= -1) {
@@ -81,8 +84,8 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
         const ptr = std.c.mmap(
             null,
             SHM_SIZE,
-            std.c.PROT.READ | std.c.PROT.WRITE,
-            std.c.MAP{ .TYPE = .SHARED },
+            .{ .READ = true, .WRITE = true },
+            .{ .TYPE = .SHARED },
             fd,
             0,
         );

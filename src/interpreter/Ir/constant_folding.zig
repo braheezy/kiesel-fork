@@ -61,8 +61,8 @@ pub const Constant = union(enum) {
             .big_int => |big_int| big_int.order(rhs.big_int) == .eq,
             .string => |string| {
                 // TODO: Support equality constant folding for strings with escape sequences
-                if (std.mem.indexOfScalar(u8, string, '\\') != null or
-                    std.mem.indexOfScalar(u8, rhs.string, '\\') != null) return null;
+                if (std.mem.findScalar(u8, string, '\\') != null or
+                    std.mem.findScalar(u8, rhs.string, '\\') != null) return null;
                 return std.mem.eql(u8, string, rhs.string);
             },
             .boolean => |boolean| boolean == rhs.boolean,
@@ -223,7 +223,7 @@ fn constantFoldBinaryExpression(
                     } else if (lhs == .big_int and rhs == .big_int) {
                         var result_managed: std.math.big.int.Managed = try .init(gpa);
                         defer result_managed.deinit();
-                        try result_managed.ensureAddCapacity(lhs.big_int, rhs.big_int);
+                        try result_managed.ensureCapacity(@max(lhs.big_int.limbs.len, rhs.big_int.limbs.len) + 1);
                         var result_mutable = result_managed.toMutable();
                         result_mutable.add(lhs.big_int, rhs.big_int);
                         result_managed.setMetadata(result_mutable.positive, result_mutable.len);

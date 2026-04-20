@@ -47,6 +47,7 @@ const test_cases: []const TestCase = @import("test_cases.zon");
 
 fn testInterpreter(
     gpa: std.mem.Allocator,
+    io: std.Io,
     source: []const u8,
     comptime expected_result: ExpectedResult,
     expected_ir: ?[]const u8,
@@ -72,9 +73,9 @@ fn testInterpreter(
     };
     defer bc.deinit(gpa);
 
-    const platform: Agent.Platform = .default();
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent: Agent = try .init(gpa, &platform, .{});
+    var agent: Agent = try .init(gpa, io, &platform, .{});
     defer agent.deinit();
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
@@ -136,23 +137,31 @@ fn testInterpreter(
     var aw: std.Io.Writer.Allocating = .init(gpa);
     defer aw.deinit();
 
+    const terminal: std.Io.Terminal = .{
+        .writer = &aw.writer,
+        .mode = .no_color,
+    };
+
     if (expected_ir) |expected| {
-        try ir.print(&aw.writer, .no_color);
+        try ir.print(terminal);
         try std.testing.expectEqualStrings(expected, aw.written());
         aw.clearRetainingCapacity();
     }
 
     if (expected_bc) |expected| {
-        try bc.print(&aw.writer, .no_color);
+        try bc.print(terminal);
         try std.testing.expectEqualStrings(expected, aw.written());
         aw.clearRetainingCapacity();
     }
 }
 
 test {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
     inline for (test_cases) |test_case| {
         try testInterpreter(
-            std.testing.allocator,
+            gpa,
+            io,
             test_case.source,
             test_case.expected_result,
             test_case.expected_ir,

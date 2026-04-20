@@ -188,9 +188,12 @@ pub fn hostPromiseRejectionTracker(
 
 /// 2.3.1 HostSystemUTCEpochNanoseconds ( global )
 /// https://tc39.es/proposal-temporal/#sec-hostsystemutcepochnanoseconds
-pub fn hostSystemUTCEpochNanoseconds(agent: *Agent) i128 {
+pub fn hostSystemUTCEpochNanoseconds(agent: *Agent) i96 {
+    const io = agent.io;
+
     // 1. Let ns be the approximate current UTC date and time, in nanoseconds since the epoch.
-    const ns = agent.platform.currentTimeNs();
+    const timestamp: std.Io.Timestamp = .now(io, .real);
+    const ns = timestamp.toNanoseconds();
 
     // 2. Return the result of clamping ns between nsMinInstant and nsMaxInstant.
     return std.math.clamp(ns, ns_min_instant, ns_max_instant);

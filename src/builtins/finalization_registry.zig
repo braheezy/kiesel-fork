@@ -83,7 +83,7 @@ pub const constructor = struct {
                 .cleanup_callback = agent.host_hooks.hostMakeJobCallback(cleanup_callback.asObject()),
 
                 // 7. Set finalizationRegistry.[[Cells]] to a new empty List.
-                .cells = .{},
+                .cells = .empty,
             },
         );
 
@@ -284,7 +284,7 @@ pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
     //       a single cell instead.
 
     //    b. Remove cell from finalizationRegistry.[[Cells]].
-    const cell_index = std.mem.indexOfScalar(*Cell, cell.finalization_registry.fields.cells.items, cell) orelse return;
+    const cell_index = std.mem.findScalar(*Cell, cell.finalization_registry.fields.cells.items, cell) orelse return;
     _ = finalization_registry.fields.cells.swapRemove(cell_index);
 
     if (!cell.is_unregistered) {

@@ -1001,7 +1001,7 @@ pub fn validateTemporalUnitValue(
     const value = maybe_value orelse return;
 
     // 2. If extraValues is present and extraValues contains value, return unused.
-    if (std.mem.indexOfScalar(temporal_rs.c.Unit, extra_values, value) != null) return;
+    if (std.mem.findScalar(temporal_rs.c.Unit, extra_values, value) != null) return;
 
     // 3. Let category be the value in the “Category” column of the row of Table 21 whose “Value”
     //    column contains value. If there is no such row, throw a RangeError exception.

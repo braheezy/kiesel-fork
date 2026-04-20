@@ -390,10 +390,14 @@ pub fn format(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     }
 }
 
-pub fn formatPretty(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    return prettyPrintValue(self, writer) catch |err| switch (err) {
-        // From `std.Io.tty.Config.setColor()`
-        error.Unexpected => {},
+fn formatPretty(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    const terminal: std.Io.Terminal = .{
+        .writer = writer,
+        .mode = pretty_printing.state.platform.terminal_mode,
+    };
+    return prettyPrintValue(self, terminal) catch |err| switch (err) {
+        // From `std.Io.Terminal.setColor()`
+        error.Canceled, error.Unexpected => {},
         error.WriteFailed => return error.WriteFailed,
     };
 }
@@ -1895,13 +1899,13 @@ pub fn stringToNumber(
         ((std.ascii.startsWithIgnoreCase(trimmed_string, "0b") or
             std.ascii.startsWithIgnoreCase(trimmed_string, "0o") or
             std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) and
-            (std.mem.indexOfScalar(u8, trimmed_string, '.') != null or
-                std.mem.indexOfAny(u8, trimmed_string, "pP") != null)) or
-        (std.mem.indexOfAny(u8, trimmed_string, "+-") == 0 and
+            (std.mem.findScalar(u8, trimmed_string, '.') != null or
+                std.mem.findAny(u8, trimmed_string, "pP") != null)) or
+        (std.mem.findAny(u8, trimmed_string, "+-") == 0 and
             (std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0b") or
                 std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0o") or
                 std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x"))) or
-        std.mem.indexOfScalar(u8, trimmed_string, '_') != null)
+        std.mem.findScalar(u8, trimmed_string, '_') != null)
     {
         return Number.from(std.math.nan(f64));
     }
@@ -2445,9 +2449,10 @@ pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value)
 
 test format {
     const gpa = std.testing.allocator;
-    const platform = Agent.Platform.default();
+    const io = std.testing.io;
+    const platform: Agent.Platform = .default(io);
     defer platform.deinit();
-    var agent = try Agent.init(gpa, &platform, .{});
+    var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
     const symbol_without_description: Symbol = .{ .description = null };
     const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };

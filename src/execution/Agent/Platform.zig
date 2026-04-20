@@ -14,12 +14,10 @@ gc_allocator: std.mem.Allocator,
 gc_allocator_atomic: std.mem.Allocator,
 stdout: *std.Io.Writer,
 stderr: *std.Io.Writer,
-tty_config: std.Io.tty.Config,
+terminal_mode: std.Io.Terminal.Mode,
 stack_info: ?stackinfo.StackInfo,
 default_locale: Locale,
 default_time_zone: TimeZone,
-currentTimeMs: *const fn () i64,
-currentTimeNs: *const fn () i128,
 
 pub const Locale = if (build_options.enable_intl) icu4zig.Locale else void;
 pub const TimeZone = if (build_options.enable_temporal) temporal_rs.c.TimeZone else void;
@@ -42,35 +40,33 @@ const has_std_time_nanotimestamp = switch (builtin.os.tag) {
 
 const State = struct {
     stdout_buffer: if (has_fd_t) [1024]u8 else void,
-    stdout_writer: if (has_fd_t) std.fs.File.Writer else void,
+    stdout_writer: if (has_fd_t) std.Io.File.Writer else void,
     stderr_buffer: if (has_fd_t) [1024]u8 else void,
-    stderr_writer: if (has_fd_t) std.fs.File.Writer else void,
+    stderr_writer: if (has_fd_t) std.Io.File.Writer else void,
 };
 
 var state: State = undefined;
 
-pub fn default() Platform {
+pub fn default(io: std.Io) Platform {
     if (comptime !(has_fd_t and has_std_time_nanotimestamp)) {
         @compileError("Platform.default() is not supported on this platform");
     }
     if (build_options.enable_libgc) gc.init();
     state = .{
         .stdout_buffer = undefined,
-        .stdout_writer = std.fs.File.stdout().writer(&state.stdout_buffer),
+        .stdout_writer = std.Io.File.stdout().writer(io, &state.stdout_buffer),
         .stderr_buffer = undefined,
-        .stderr_writer = std.fs.File.stderr().writer(&state.stderr_buffer),
+        .stderr_writer = std.Io.File.stderr().writer(io, &state.stderr_buffer),
     };
     return .{
         .gc_allocator = if (build_options.enable_libgc) gc.allocator else std.heap.page_allocator,
         .gc_allocator_atomic = if (build_options.enable_libgc) gc.allocator_atomic else std.heap.page_allocator,
         .stdout = &state.stdout_writer.interface,
         .stderr = &state.stderr_writer.interface,
-        .tty_config = .detect(.stdout()),
+        .terminal_mode = .no_color,
         .stack_info = stackinfo.StackInfo.init() catch null,
         .default_locale = if (Locale != void) icu4zig.Locale.unknown(),
         .default_time_zone = if (TimeZone != void) temporal_rs.c.temporal_rs_TimeZone_utc(),
-        .currentTimeMs = std.time.milliTimestamp,
-        .currentTimeNs = std.time.nanoTimestamp,
     };
 }
 

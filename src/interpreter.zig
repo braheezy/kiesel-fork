@@ -18,6 +18,12 @@ pub fn compile(
 ) std.mem.Allocator.Error!Bytecode {
     const gpa = agent.gpa;
 
+    const stdout = agent.platform.stdout;
+    const terminal: std.Io.Terminal = .{
+        .writer = stdout,
+        .mode = agent.platform.terminal_mode,
+    };
+
     var ir = ir: {
         var builder: Ir.Builder = .init(gpa, name, ast_node);
         defer builder.deinit();
@@ -26,9 +32,8 @@ pub fn compile(
     defer ir.deinit(gpa);
 
     if (agent.options.debug.print_ir) {
-        const stdout = agent.platform.stdout;
-        const tty_config = agent.platform.tty_config;
-        ir.print(stdout, tty_config) catch {};
+        ir.print(terminal) catch {};
+        // Print an extra newline for separation
         stdout.writeByte('\n') catch {};
         stdout.flush() catch {};
     }
@@ -44,9 +49,8 @@ pub fn compile(
     errdefer bc.deinit(agent.gc_allocator);
 
     if (agent.options.debug.print_bytecode) {
-        const stdout = agent.platform.stdout;
-        const tty_config = agent.platform.tty_config;
-        bc.print(stdout, tty_config) catch {};
+        bc.print(terminal) catch {};
+        // Print an extra newline for separation
         stdout.writeByte('\n') catch {};
         stdout.flush() catch {};
     }

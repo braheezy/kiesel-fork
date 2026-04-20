@@ -879,10 +879,13 @@ pub const constructor = struct {
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
+        const io = agent.io;
+
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
-            const now_: f64 = @floatFromInt(agent.platform.currentTimeMs());
+            const timestamp: std.Io.Timestamp = .now(io, .real);
+            const now_: f64 = @floatFromInt(timestamp.toMilliseconds());
 
             // b. Return ToDateString(now).
             return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -898,7 +901,8 @@ pub const constructor = struct {
         // 3. If numberOfArgs = 0, then
         const date_value = if (number_of_args == 0) blk: {
             // a. Let dv be the time value (UTC) identifying the current time.
-            break :blk @as(f64, @floatFromInt(agent.platform.currentTimeMs()));
+            const timestamp: std.Io.Timestamp = .now(io, .real);
+            break :blk @as(f64, @floatFromInt(timestamp.toMilliseconds()));
         } else if (number_of_args == 1) blk: {
             // 4. Else if numberOfArgs = 1, then
             // a. Let value be values[0].
@@ -989,8 +993,9 @@ pub const constructor = struct {
     fn now(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // This function returns the time value designating the UTC date and time of the occurrence
         // of the call to it.
-        const timestamp = agent.platform.currentTimeMs();
-        return Value.from(@as(f64, @floatFromInt(timestamp)));
+        const io = agent.io;
+        const timestamp: std.Io.Timestamp = .now(io, .real);
+        return Value.from(@as(f64, @floatFromInt(timestamp.toMilliseconds())));
     }
 
     /// 21.4.3.2 Date.parse ( string )
