@@ -2170,7 +2170,7 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
         vm.stack.items[vm.frame.stack_base..][0..stack_len],
     );
 
-    const frame = vm.frame;
+    const frame = vm.frame.*;
     std.debug.assert(vm.call_stack.items.len > 1);
     vm.popCallFrame();
 
@@ -2204,7 +2204,7 @@ fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg
         vm.stack.items[vm.frame.stack_base..][0..stack_len],
     );
 
-    const frame = vm.frame;
+    const frame = vm.frame.*;
     std.debug.assert(vm.call_stack.items.len > 1);
     vm.popCallFrame();
 
