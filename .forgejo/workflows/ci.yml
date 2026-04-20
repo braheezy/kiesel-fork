@@ -315,6 +315,7 @@ jobs:
         run: |
           git clone https://github.com/tusharsadhwani/zigimports
           cd zigimports
+          git checkout 202470cd6f49a4c7829819efa6fef4a36f3f618f
           zig build --release=safe
           "./zig-out/bin/zigimports-$(uname -m)-linux" ..
 
