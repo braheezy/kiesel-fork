@@ -1756,34 +1756,16 @@ fn executeModule(
     agent: *Agent,
     capability: ?PromiseCapability,
 ) Agent.Error!void {
-    // 1. Let moduleContext be a new ECMAScript code execution context.
-    const module_context = try agent.gc_allocator.create(ExecutionContext);
-    module_context.* = .{
-        // 2. Set the Function of moduleContext to null.
-        .origin = .module,
+    // 1. Assert: module has been linked and declarations in its module environment have been
+    //    instantiated.
+    std.debug.assert(self.environment != null and self.context != null);
 
-        // 3. Set the Realm of moduleContext to module.[[Realm]].
-        .realm = self.realm,
+    // 2. Let moduleContext be module.[[Context]].
+    const module_context = self.context.?;
 
-        // 4. Set the ScriptOrModule of moduleContext to module.
-        .script_or_module = .{ .module = .{ .source_text_module = self } },
+    // 3. Suspend the running execution context.
 
-        // 5. Assert: module has been linked and declarations in its module environment have been
-        //    instantiated.
-        .ecmascript_code = .{
-            // 6. Set the VariableEnvironment of moduleContext to module.[[Environment]].
-            .variable_environment = self.environment.?,
-
-            // 7. Set the LexicalEnvironment of moduleContext to module.[[Environment]].
-            .lexical_environment = self.environment.?,
-
-            .private_environment = null,
-        },
-    };
-
-    // 8. Suspend the running execution context.
-
-    // 9. If module.[[HasTLA]] is false, then
+    // 4. If module.[[HasTLA]] is false, then
     if (!self.has_tla) {
         // a. Assert: capability is not present.
         std.debug.assert(capability == null);
@@ -1805,7 +1787,7 @@ fn executeModule(
         //     i. Return ? result.
         _ = try result;
     } else {
-        // 10. Else,
+        // 5. Else,
         // 1. Assert: capability is a PromiseCapability Record.
         std.debug.assert(capability != null);
 
@@ -1818,5 +1800,5 @@ fn executeModule(
         );
     }
 
-    // 11. Return unused.
+    // 6. Return unused.
 }
