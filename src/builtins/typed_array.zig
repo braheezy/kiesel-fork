@@ -4350,7 +4350,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 10. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Return ThrowCompletion(result.[[Error]]).
+                // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4403,7 +4403,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 3. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Return ThrowCompletion(result.[[Error]]).
+                // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4569,7 +4569,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 20. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Return ThrowCompletion(result.[[Error]]).
+                // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},
@@ -4648,7 +4648,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
 
             // 13. If result.[[Error]] is not none, then
             if (result.@"error") |@"error"| {
-                // a. Return ThrowCompletion(result.[[Error]]).
+                // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
                     .stack_trace = agent.captureStackTrace() catch &.{},

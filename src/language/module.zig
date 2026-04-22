@@ -186,7 +186,7 @@ pub const Module = union(enum) {
             // b. Set promise.[[PromiseIsHandled]] to true.
             promise.fields.promise_is_handled = true;
 
-            // c. Return ThrowCompletion(promise.[[PromiseResult]]).
+            // c. Throw promise.[[PromiseResult]].
             agent.exception = .{
                 .value = promise.fields.promise_result,
                 // TODO: Capture stack when rejecting a promise

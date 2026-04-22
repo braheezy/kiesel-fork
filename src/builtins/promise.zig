@@ -2041,7 +2041,7 @@ pub const prototype = struct {
                             const function_ = agent__.activeFunctionObject();
                             const reason_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Value);
 
-                            // 1. Return ThrowCompletion(reason).
+                            // 1. Throw reason.
                             agent__.exception = .{
                                 .value = reason_.*,
                                 .stack_trace = try agent__.captureStackTrace(),

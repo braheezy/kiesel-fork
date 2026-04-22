@@ -203,7 +203,7 @@ fn call(
         //    the running execution context.
         _ = agent.execution_context_stack.pop().?;
 
-        // d. Return ThrowCompletion(error).
+        // d. Throw error.
         return err;
     }
 
