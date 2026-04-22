@@ -28,10 +28,12 @@ const createTextModule = kiesel.language.createTextModule;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const fmtParseError = kiesel.language.fmtParseError;
 const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
+const noexcept = kiesel.utils.noexcept;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 const parseJSONModule = kiesel.language.parseJSONModule;
 const regExpCreateFast = kiesel.builtins.regExpCreateFast;
 const regExpExec = kiesel.builtins.regExpExec;
+const temporaryChange = kiesel.utils.temporaryChange;
 
 var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
     *kiesel.builtins.Promise,
@@ -76,8 +78,29 @@ fn resolveModulePath(
     return resolved_path;
 }
 
-fn initializeGlobalObject(agent: *Agent, realm: *Realm, global_object: *Object) Agent.Error!void {
-    try global_object.defineBuiltinPropertyLazy(
+fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
+    // Ensure caller has not popped the realm yet
+    std.debug.assert(agent.currentRealm() == realm);
+
+    // Disable debug printing for internal script evaluation (node pls fix)
+    const tmp = temporaryChange(&agent.options.debug, .{});
+    defer tmp.restore();
+
+    // Polyfill a basic console.log, too many things expect it to exist.
+    // We can't invoke eval() directly as functions need an active script or module.
+    const script = Script.parse(
+        \\globalThis.console = {
+        \\    log(...args) {
+        \\        Kiesel.print(args.join(" "));
+        \\    },
+        \\};
+    , realm, null, .{}) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.ParseError => unreachable,
+    };
+    _ = script.evaluate("polyfill") catch |err| try noexcept(err);
+
+    try realm.global_object.defineBuiltinPropertyLazy(
         agent,
         "Kiesel",
         struct {
@@ -193,8 +216,8 @@ const Kiesel = struct {
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
+        try initializeRealm(agent, realm);
         _ = agent.execution_context_stack.pop().?;
-        try initializeGlobalObject(agent, realm, realm.global_object);
         return Value.from(realm.global_object);
     }
 
@@ -1286,7 +1309,7 @@ pub fn main(init: std.process.Init) !u8 {
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
-    try initializeGlobalObject(&agent, realm, realm.global_object);
+    try initializeRealm(&agent, realm);
 
     const cwd = try std.process.currentPathAlloc(io, gpa);
     defer gpa.free(cwd);
