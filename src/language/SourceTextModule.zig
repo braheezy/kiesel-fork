@@ -134,7 +134,7 @@ pub const ImportEntry = struct {
     /// [[ImportName]]
     import_name: ?union(enum) {
         string: []const u8,
-        namespace_object,
+        namespace,
     },
 
     /// [[LocalName]]
@@ -152,7 +152,7 @@ pub const ExportEntry = struct {
     /// [[ImportName]]
     import_name: ?union(enum) {
         string: []const u8,
-        all,
+        namespace,
         all_but_default,
     },
 
@@ -561,39 +561,22 @@ pub fn parse(
                 // 2. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
                 const import_entry = import_entry_with_bound_name.?;
 
-                // 3. If ie.[[ImportName]] is namespace-object, then
-                if (import_entry.import_name != null and import_entry.import_name.? == .namespace_object) {
-                    // a. NOTE: This is a re-export of an imported module namespace object.
-                    // b. Append the ExportEntry Record {
-                    //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: all,
-                    //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
-                    //    } to indirectExportEntries.
-                    try indirect_export_entries.append(agent.gc_allocator, .{
-                        .module_request = import_entry.module_request,
-                        .import_name = .all,
-                        .local_name = null,
-                        .export_name = export_entry.export_name,
-                    });
-                } else {
-                    // 4. Else,
-                    // a. NOTE: This is a re-export of a single name.
-                    // b. Append the ExportEntry Record {
-                    //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
-                    //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
-                    //    } to indirectExportEntries.
-                    try indirect_export_entries.append(agent.gc_allocator, .{
-                        .module_request = import_entry.module_request,
-                        .import_name = if (import_entry.import_name) |import_name|
-                            switch (import_name) {
-                                .string => |string| .{ .string = string },
-                                .namespace_object => unreachable,
-                            }
-                        else
-                            null,
-                        .local_name = null,
-                        .export_name = export_entry.export_name,
-                    });
-                }
+                // 3. Append the ExportEntry Record {
+                //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
+                //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
+                //    } to indirectExportEntries.
+                try indirect_export_entries.append(agent.gc_allocator, .{
+                    .module_request = import_entry.module_request,
+                    .import_name = if (import_entry.import_name) |import_name|
+                        switch (import_name) {
+                            .string => |string| .{ .string = string },
+                            .namespace => .namespace,
+                        }
+                    else
+                        null,
+                    .local_name = null,
+                    .export_name = export_entry.export_name,
+                });
             }
         }
         // b. Else if ee.[[ImportName]] is all-but-default, then
@@ -1400,8 +1383,8 @@ pub fn resolveExport(
             // ii. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
             const imported_module = getImportedModule(self, export_entry.module_request.?);
 
-            // iii. If e.[[ImportName]] is all, then
-            if (export_entry.import_name != null and export_entry.import_name.? == .all) {
+            // iii. If e.[[ImportName]] is namespace, then
+            if (export_entry.import_name != null and export_entry.import_name.? == .namespace) {
                 // 1. Assert: module does not provide the direct binding for this export.
                 // 2. Return ResolvedBinding Record { [[Module]]: importedModule, [[BindingName]]: namespace }.
                 return .{
@@ -1540,81 +1523,87 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         // a. Let importedModule be GetImportedModule(module, in.[[ModuleRequest]]).
         const imported_module = getImportedModule(self, import_entry.module_request);
 
-        const import_name = import_entry.import_name.?;
         const local_name = try String.fromUtf8(agent, import_entry.local_name);
 
-        // b. If in.[[ImportName]] is namespace-object, then
-        if (import_name == .namespace_object) {
-            // i. Let namespace be GetModuleNamespace(importedModule).
-            const namespace = try getModuleNamespace(agent, imported_module);
+        switch (import_entry.import_name.?) {
+            // b. If in.[[ImportName]] is namespace, then
+            .namespace => {
+                // i. Let namespace be GetModuleNamespace(importedModule).
+                const namespace = try getModuleNamespace(agent, imported_module);
 
-            // ii. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
-            env.createImmutableBinding(
-                agent,
-                local_name,
-                true,
-            ) catch |err| try noexcept(err);
-
-            // iii. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
-            env.initializeBinding(
-                agent,
-                local_name,
-                Value.from(&namespace.object),
-            ) catch |err| try noexcept(err);
-        } else {
-            // c. Else,
-            // i. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
-            const maybe_resolution = try imported_module.resolveExport(
-                agent,
-                import_name.string,
-                null,
-            );
-
-            // ii. If resolution is either null or ambiguous, throw a SyntaxError exception.
-            const resolution = if (maybe_resolution) |resolution| switch (resolution) {
-                .ambiguous => return agent.throwException(
-                    .syntax_error,
-                    "Ambiguous star export '{s}' in module '{f}'",
-                    .{ import_name.string, import_entry.module_request.specifier.fmtEscaped() },
-                ),
-                .resolved_binding => |resolved_binding| resolved_binding,
-            } else {
-                return agent.throwException(
-                    .syntax_error,
-                    "No export named '{s}' in module '{f}'",
-                    .{ import_name.string, import_entry.module_request.specifier.fmtEscaped() },
-                );
-            };
-
-            // iii. If resolution.[[BindingName]] is namespace, then
-            if (resolution.binding_name == .namespace) {
-                // 1. Let namespace be GetModuleNamespace(resolution.[[Module]]).
-                const namespace = try getModuleNamespace(agent, resolution.module);
-
-                // 2. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+                // ii. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
                 env.createImmutableBinding(
                     agent,
                     local_name,
                     true,
                 ) catch |err| try noexcept(err);
 
-                // 3. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+                // iii. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
                 env.initializeBinding(
                     agent,
                     local_name,
                     Value.from(&namespace.object),
                 ) catch |err| try noexcept(err);
-            } else {
-                // iv. Else,
-                // 1. Perform CreateImportBinding(env, in.[[LocalName]], resolution.[[Module]],
-                //    resolution.[[BindingName]]).
-                try env.module_environment.createImportBinding(
+            },
+            // c. Else,
+            // i. Assert: in.[[ImportName]] is a String.
+            .string => |import_name| {
+                // ii. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
+                const maybe_resolution = try imported_module.resolveExport(
                     agent,
-                    local_name,
-                    resolution.module,
-                    try String.fromUtf8(agent, resolution.binding_name.string),
+                    import_name,
+                    null,
                 );
-            }
+
+                // iii. If resolution is either null or ambiguous, throw a SyntaxError exception.
+                const resolution = if (maybe_resolution) |resolution| switch (resolution) {
+                    .ambiguous => return agent.throwException(
+                        .syntax_error,
+                        "Ambiguous star export '{s}' in module '{f}'",
+                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                    ),
+                    .resolved_binding => |resolved_binding| resolved_binding,
+                } else {
+                    return agent.throwException(
+                        .syntax_error,
+                        "No export named '{s}' in module '{f}'",
+                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                    );
+                };
+
+                // iv. If resolution.[[BindingName]] is namespace, then
+                switch (resolution.binding_name) {
+                    .namespace => {
+                        // 1. Let namespace be GetModuleNamespace(resolution.[[Module]]).
+                        const namespace = try getModuleNamespace(agent, resolution.module);
+
+                        // 2. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+                        env.createImmutableBinding(
+                            agent,
+                            local_name,
+                            true,
+                        ) catch |err| try noexcept(err);
+
+                        // 3. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+                        env.initializeBinding(
+                            agent,
+                            local_name,
+                            Value.from(&namespace.object),
+                        ) catch |err| try noexcept(err);
+                    },
+                    .string => |binding_name| {
+                        // v. Else,
+                        // 1. Perform CreateImportBinding(env, in.[[LocalName]], resolution.[[Module]],
+                        //    resolution.[[BindingName]]).
+                        try env.module_environment.createImportBinding(
+                            agent,
+                            local_name,
+                            resolution.module,
+                            try String.fromUtf8(agent, binding_name),
+                        );
+                    },
+                }
+            },
         }
     }
 

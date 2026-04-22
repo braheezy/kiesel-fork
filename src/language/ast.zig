@@ -4143,11 +4143,11 @@ pub const ImportClause = union(enum) {
                 const local_name = imported_binding;
 
                 // 2. Let entry be the ImportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: namespace-object, [[LocalName]]: localName
+                //      [[ModuleRequest]]: module, [[ImportName]]: namespace, [[LocalName]]: localName
                 //    }.
                 const entry: ImportEntry = .{
                     .module_request = module,
-                    .import_name = .namespace_object,
+                    .import_name = .namespace,
                     .local_name = local_name,
                 };
 
@@ -4531,12 +4531,12 @@ pub const ExportFromClause = union(enum) {
                 };
 
                 // 2. Let entry be the ExportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: all, [[LocalName]]: null,
+                //      [[ModuleRequest]]: module, [[ImportName]]: namespace, [[LocalName]]: null,
                 //      [[ExportName]]: exportName
                 //    }.
                 const entry: ExportEntry = .{
                     .module_request = module,
-                    .import_name = .all,
+                    .import_name = .namespace,
                     .local_name = null,
                     .export_name = export_name,
                 };
