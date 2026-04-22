@@ -899,14 +899,12 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: We may already have an i32 :^)
     if (self.__isI32()) return self.__asI32();
 
-    // 1. Let number be ? ToNumber(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 2. If int is not finite, return +0𝔽.
+    // 3. Let int32bit be int modulo 2**32.
+    // 4. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32).
+    // 5. Return 𝔽(int32bit).
     const number = try self.toNumber(agent);
-
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    // 3. Let int be truncate(ℝ(number)).
-    // 4. Let int32bit be int modulo 2**32.
-    // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32).
-    // 6. Return 𝔽(int32bit).
     return number.toInt32();
 }
 
@@ -914,100 +912,84 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: We may already have an i32 that we can bitcast :^)
-    if (self.__isI32())
-        return @bitCast(self.__asI32());
+    if (self.__isI32()) return @bitCast(self.__asI32());
 
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
+    // 2. If int is not finite, return +0𝔽.
+    if (!std.math.isFinite(int)) return 0;
 
-    // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
-    // 4. Let int32bit be int modulo 2**32.
+    // 3. Let int32bit be int modulo 2**32.
     const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
 
-    // 5. Return 𝔽(int32bit).
+    // 4. Return 𝔽(int32bit).
     return int32bit;
 }
 
 /// 7.1.8 ToInt16 ( argument )
 /// https://tc39.es/ecma262/#sec-toint16
 pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
+    // 2. If int is not finite, return +0𝔽.
+    if (!std.math.isFinite(int)) return 0;
 
-    // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
-    // 4. Let int16bit be int modulo 2**16.
+    // 3. Let int16bit be int modulo 2**16.
     const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
 
-    // 5. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16).
-    // 6. Return 𝔽(int16bit).
+    // 4. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16).
+    // 5. Return 𝔽(int16bit).
     return @bitCast(int16bit);
 }
 
 /// 7.1.9 ToUint16 ( argument )
 /// https://tc39.es/ecma262/#sec-touint16
 pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
+    // 2. If int is not finite, return +0𝔽.
+    if (!std.math.isFinite(int)) return 0;
 
-    // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
-    // 4. Let int16bit be int modulo 2**16.
+    // 3. Let int16bit be int modulo 2**16.
     const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
 
-    // 5. Return 𝔽(int16bit).
+    // 4. Return 𝔽(int16bit).
     return int16bit;
 }
 
 /// 7.1.10 ToInt8 ( argument )
 /// https://tc39.es/ecma262/#sec-toint8
 pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
+    // 2. If int is not finite, return +0𝔽.
+    if (!std.math.isFinite(int)) return 0;
 
-    // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
-    // 4. Let int8bit be int modulo 2**8.
+    // 3. Let int8bit be int modulo 2**8.
     const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
 
-    // 5. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8).
-    // 6. Return 𝔽(int8bit).
+    // 4. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8).
+    // 5. Return 𝔽(int8bit).
     return @bitCast(int8bit);
 }
 
 /// 7.1.11 ToUint8 ( argument )
 /// https://tc39.es/ecma262/#sec-touint8
 pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
+    // 2. If int is not finite, return +0𝔽.
+    if (!std.math.isFinite(int)) return 0;
 
-    // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
-    // 4. Let int8bit be int modulo 2**8.
+    // 3. Let int8bit be int modulo 2**8.
     const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
 
-    // 5. Return 𝔽(int8bit).
+    // 4. Return 𝔽(int8bit).
     return int8bit;
 }
 
