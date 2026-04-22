@@ -286,7 +286,7 @@ pub fn parseNode(
     const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
     defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         else => null,
     };
     if (parser.diagnostics.hasErrors()) {
@@ -342,7 +342,7 @@ fn utf8StringValue(
             allocator,
             utf16,
         ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             error.DanglingSurrogateHalf,
             error.ExpectedSecondSurrogateHalf,
             error.UnexpectedSecondSurrogateHalf,

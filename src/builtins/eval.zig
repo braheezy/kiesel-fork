@@ -108,7 +108,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
             // .in_class_field_initializer = in_class_field_initializer,
         },
     }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];

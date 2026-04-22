@@ -95,7 +95,7 @@ fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
         \\    },
         \\};
     , realm, null, .{}) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ParseError => unreachable,
     };
     _ = script.evaluate("polyfill") catch |err| try noexcept(err);
@@ -263,7 +263,7 @@ const Kiesel = struct {
             .diagnostics = &diagnostics,
             .file_name = "evalScript",
         }) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             // 4. If s is a List of errors, then
             error.ParseError => {
                 // a. Let error be the first element of s.
@@ -332,7 +332,7 @@ const Kiesel = struct {
         const path = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
         defer gpa.free(path);
         const bytes = readFile(agent.gc_allocator, io, path) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             else => return agent.throwException(
                 .type_error,
                 "Error while reading file: {t}",
@@ -536,7 +536,7 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
             try stderr.flush();
             return error.AlreadyReported;
         },
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
     };
 
     if (agent.options.debug.print_ast) {
@@ -1272,7 +1272,7 @@ pub fn main(init: std.process.Init) !u8 {
                 .diagnostics = &diagnostics,
                 .file_name = std.Io.Dir.path.basename(module_path),
             }) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
                 error.ParseError => {
                     const parse_error = diagnostics.errors.items[0];
                     return agent_.throwException(

@@ -212,7 +212,7 @@ pub fn fromUtf8(agent: *Agent, utf8: []const u8) std.mem.Allocator.Error!*const 
         } else {
             const utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, utf8) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
             };
             result.string.* = .{
                 .data = .{ .owned_utf16 = utf16.ptr },
@@ -234,7 +234,7 @@ pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.All
     } else {
         const utf16 = std.unicode.utf8ToUtf16LeAlloc(allocator, utf8) catch |err| switch (err) {
             error.InvalidUtf8 => @panic("Invalid UTF-8"),
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
         };
         errdefer allocator.free(utf16);
         return fromUtf16Alloc(allocator, utf16);
@@ -789,11 +789,11 @@ pub fn replace(
         .utf16 => |utf16| {
             const needle_utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, needle) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
             };
             const replacement_utf16 = std.unicode.utf8ToUtf16LeAlloc(agent.gc_allocator, replacement) catch |err| switch (err) {
                 error.InvalidUtf8 => @panic("Invalid UTF-8"),
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
             };
             const output = try std.mem.replaceOwned(
                 u16,

@@ -509,7 +509,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "ca",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -530,7 +530,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "kf",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -551,7 +551,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "co",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -572,7 +572,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "fw",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -593,7 +593,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "hc",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -684,7 +684,7 @@ pub const prototype = struct {
                     agent.gc_allocator,
                     "nu",
                 ) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 } orelse return .undefined,
             ),
         );
@@ -702,7 +702,7 @@ pub const prototype = struct {
             agent.gc_allocator,
             "kn",
         ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
         } orelse return .false;
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }

@@ -68,6 +68,6 @@ pub fn registerFinalizer(
 pub fn registerDisappearingLink(link: *?*anyopaque, object: *const anyopaque) std.mem.Allocator.Error!void {
     bdwgc.registerDisappearingLink(link, object) catch |err| switch (err) {
         error.DuplicateLink => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
     };
 }

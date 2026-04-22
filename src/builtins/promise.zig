@@ -41,7 +41,7 @@ pub const PromiseCapability = struct {
     pub fn rejectPromise(self: @This(), agent: *Agent, err: Agent.Error) Agent.Error!*Object {
         // 1. Assert: value is a Completion Record.
         switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
 
             // 2. If value is an abrupt completion, then
             error.ExceptionThrown => {
@@ -147,7 +147,7 @@ pub fn createResolvingFunctions(
                 agent_,
                 PropertyKey.from("then"),
             ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
 
                 // g. If then is an abrupt completion, then
                 error.ExceptionThrown => {
@@ -508,7 +508,7 @@ pub fn newPromiseReactionJob(
                 )) |value|
                     break :blk Completion.normal(value)
                 else |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         const exception = agent_.clearException();
                         break :blk Completion.throw(exception.value);
@@ -618,7 +618,7 @@ pub fn newPromiseResolveThenableJob(
                     Value.from(&resolving_functions.reject.object),
                 },
             ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
 
                 // c. If thenCallResult is an abrupt completion, then
                 error.ExceptionThrown => {
@@ -1530,7 +1530,7 @@ pub const constructor = struct {
                 Value.from(&resolving_functions.reject.object),
             },
         ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
 
             // 11. If completion is an abrupt completion, then
             error.ExceptionThrown => {
@@ -1803,7 +1803,7 @@ pub const constructor = struct {
                 &.{value},
             );
         } else |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 _ = try Value.from(promise_capability.reject).callAssumeCallable(

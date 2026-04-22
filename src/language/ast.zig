@@ -276,7 +276,7 @@ pub const NumericLiteral = struct {
                 errdefer managed.deinit();
                 managed.setString(base, str) catch |err| switch (err) {
                     error.InvalidBase, error.InvalidCharacter => unreachable,
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                 };
                 const big_int = try allocator.create(BigInt);
                 big_int.* = .{ .managed = managed };

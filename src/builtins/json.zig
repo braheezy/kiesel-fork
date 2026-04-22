@@ -91,7 +91,7 @@ pub fn parseJSON(agent: *Agent, text: []const u8) Agent.Error!Value {
         text,
         .{ .duplicate_field_behavior = .use_last },
     ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.SyntaxError, error.UnexpectedEndOfInput => {
             return agent.throwException(.syntax_error, "Invalid JSON document", .{});
         },
@@ -145,7 +145,7 @@ fn createJSONParseRecord(
             // i. Assert: typedValNode is an ArrayLiteral Parse Node.
             {
                 const token = scanner.next() catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
                 std.debug.assert(token == .array_begin);
@@ -181,7 +181,7 @@ fn createJSONParseRecord(
 
             {
                 const token = scanner.next() catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
                 std.debug.assert(token == .array_end);
@@ -191,7 +191,7 @@ fn createJSONParseRecord(
             // i. Assert: typedValNode is an ObjectLiteral Parse Node.
             {
                 const token = scanner.next() catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
                 std.debug.assert(token == .object_begin);
@@ -207,14 +207,14 @@ fn createJSONParseRecord(
             }
             while (scanner.peekNextTokenType() catch unreachable != .object_end) {
                 const token = scanner.nextAlloc(gpa, .alloc_always) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
 
                 _ = scanner.peekNextTokenType() catch unreachable;
                 const start = scanner.cursor;
                 scanner.skipValue() catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
                 const end = scanner.cursor;
@@ -225,7 +225,7 @@ fn createJSONParseRecord(
 
             {
                 const token = scanner.next() catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     else => unreachable,
                 };
                 std.debug.assert(token == .object_end);
@@ -279,7 +279,7 @@ fn createJSONParseRecord(
         _ = scanner.peekNextTokenType() catch unreachable;
         const start = scanner.cursor;
         scanner.skipValue() catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             else => unreachable,
         };
         contents = .{ .primitive = scanner.input[start..scanner.cursor] };
@@ -636,7 +636,7 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
             try product.appendSlice(
                 agent.gc_allocator,
                 std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{c}) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.DanglingSurrogateHalf,
                     error.ExpectedSecondSurrogateHalf,
                     error.UnexpectedSecondSurrogateHalf,

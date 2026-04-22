@@ -274,7 +274,7 @@ pub fn toString(
     // 2. Return the String value consisting of the representation of x using radix radix.
     return String.fromAscii(agent, self.managed.toString(agent.gc_allocator, radix, .lower) catch |err| switch (err) {
         error.InvalidBase => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
     });
 }
 

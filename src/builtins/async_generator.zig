@@ -374,7 +374,7 @@ pub fn asyncGeneratorStart(
                 closure_generator.fields.evaluation_state = undefined;
 
                 switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         const exception = agent_.clearException();
                         // j-k.
@@ -592,7 +592,7 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
 
     // 3. If awaited is a throw completion, return ? awaited.
     const awaited_value = awaited catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ExceptionThrown => {
             const exception = agent.clearException();
             return Completion.throw(exception.value);
@@ -742,7 +742,7 @@ pub fn asyncGeneratorAwaitReturn(
         try realm.intrinsics.@"%Promise%"(),
         completion.value.?,
     ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
 
         // 8. If promiseCompletion is an abrupt completion, then
         error.ExceptionThrown => {

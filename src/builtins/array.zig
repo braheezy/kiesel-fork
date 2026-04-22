@@ -749,7 +749,7 @@ pub const constructor = struct {
                         this_arg,
                         &.{ next_value, Value.from(k) },
                     ) catch |err| switch (err) {
-                        error.OutOfMemory => return error.OutOfMemory,
+                        error.OutOfMemory => |e| return e,
                         error.ExceptionThrown => {
                             // 2. IfAbruptCloseAsyncIterator(mappedValue, iteratorRecord).
                             return iterator.closeAsync(agent, @as(Agent.Error!Value, err));
@@ -758,7 +758,7 @@ pub const constructor = struct {
 
                     // 3. Set mappedValue to Completion(Await(mappedValue)).
                     mapped_value = await(agent, mapped_value) catch |err| switch (err) {
-                        error.OutOfMemory => return error.OutOfMemory,
+                        error.OutOfMemory => |e| return e,
                         error.ExceptionThrown => {
                             // 4. IfAbruptCloseAsyncIterator(mappedValue, iteratorRecord).
                             return iterator.closeAsync(agent, @as(Agent.Error!Value, err));
@@ -774,7 +774,7 @@ pub const constructor = struct {
 
                 // xi. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
                 array.createDataPropertyOrThrow(agent, property_key, mapped_value) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         // xii. IfAbruptCloseAsyncIterator(defineStatus, iteratorRecord).
                         return iterator.closeAsync(agent, @as(Agent.Error!Value, err));

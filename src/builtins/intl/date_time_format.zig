@@ -728,7 +728,7 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
         date_time_format,
         x,
     ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
     };
     return Value.from(try String.fromUtf8(agent, result));
@@ -823,7 +823,7 @@ pub fn formatDateTimeRange(agent: *Agent, date_time_format: *const DateTimeForma
         date_time_format,
         x,
     ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
     };
     const result_y = formatDateTimeImpl(
@@ -831,7 +831,7 @@ pub fn formatDateTimeRange(agent: *Agent, date_time_format: *const DateTimeForma
         date_time_format,
         y,
     ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
     };
     if (std.mem.eql(u8, result_x, result_y)) {

@@ -37,7 +37,7 @@ pub fn formatPretty(data: FormatPrettyData, writer: *std.Io.Writer) std.Io.Write
     return prettyPrintException(data.agent, data.exception, terminal) catch |err| switch (err) {
         // From `std.Io.Terminal.setColor()`
         error.Canceled, error.Unexpected => {},
-        error.WriteFailed => return error.WriteFailed,
+        error.WriteFailed => |e| return e,
     };
 }
 

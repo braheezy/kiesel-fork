@@ -398,7 +398,7 @@ fn formatPretty(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     return prettyPrintValue(self, terminal) catch |err| switch (err) {
         // From `std.Io.Terminal.setColor()`
         error.Canceled, error.Unexpected => {},
-        error.WriteFailed => return error.WriteFailed,
+        error.WriteFailed => |e| return e,
     };
 }
 
@@ -1951,7 +1951,7 @@ pub fn stringToBigInt(
         break :blk .{ 10, trimmed_string };
     };
     return BigInt.fromString(agent, base, value) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };

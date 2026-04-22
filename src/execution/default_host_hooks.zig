@@ -81,7 +81,7 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
                 // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(finalizationRegistry)).
                 const cell_: *Cell = @ptrCast(@alignCast(captures));
                 cleanupFinalizationRegistry(cell_) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         // 2. If cleanupResult is an abrupt completion, perform any host-defined
                         //    steps for reporting the error.

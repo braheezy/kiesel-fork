@@ -359,7 +359,7 @@ pub const prototype = struct {
                 ) catch unreachable;
                 defer region_display_names.deinit();
                 break :blk region_display_names.of(agent.gc_allocator, code_utf8) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
+                    error.OutOfMemory => |e| return e,
                     error.Subtag => return agent.throwException(
                         .range_error,
                         "Invalid region '{f}'",

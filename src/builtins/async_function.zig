@@ -231,7 +231,7 @@ pub fn asyncBlockStart(
             }
             // h. Else,
             else |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
 
                 // i. Assert: result is a throw completion.
                 error.ExceptionThrown => {

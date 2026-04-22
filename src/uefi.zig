@@ -121,7 +121,7 @@ fn mainWithErrorHandling() Error!void {
     defer agent.deinit();
 
     Realm.initializeHostDefinedRealm(&agent, .{}) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ExceptionThrown => unreachable,
     };
     const realm = agent.currentRealm();
@@ -162,7 +162,7 @@ fn mainWithErrorHandling() Error!void {
             .diagnostics = &diagnostics,
             .file_name = file_name,
         }) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             error.ParseError => {
                 const parse_error = diagnostics.errors.items[0];
                 const syntax_error = try agent.createErrorObject(
@@ -187,7 +187,7 @@ fn mainWithErrorHandling() Error!void {
             try stdout.print("{f}\n", .{result});
             try stdout.flush();
         } else |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
+            error.OutOfMemory => |e| return e,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 try stderr.print("{f}\n", .{exception.fmtPretty(&agent)});

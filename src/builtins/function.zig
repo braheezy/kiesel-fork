@@ -324,7 +324,7 @@ pub fn createDynamicFunction(
         .file_name = "Function",
         .state = state,
     }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ParseError => {
             // 18. If parameters is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
@@ -338,7 +338,7 @@ pub fn createDynamicFunction(
         .file_name = "Function",
         .state = state,
     }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ParseError => {
             // 20. If body is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
@@ -358,7 +358,7 @@ pub fn createDynamicFunction(
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
         error.ParseError => {
             // 24. If expr is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];

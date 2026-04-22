@@ -313,7 +313,7 @@ pub fn continueModuleLoading(
     }
     // 3. Else,
     else |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
 
         error.ExceptionThrown => {
             const exception = agent.clearException();
@@ -707,7 +707,7 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
 
     // 9. If result is an abrupt completion, then
     if (std.meta.isError(result)) _ = result catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
 
         error.ExceptionThrown => {
             const exception = agent.clearException();
@@ -1166,7 +1166,7 @@ fn asyncModuleExecutionFulfilled(
 
             // ii. If result is an abrupt completion, then
             _ = result catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
 
                 error.ExceptionThrown => {
                     const exception = agent.clearException();

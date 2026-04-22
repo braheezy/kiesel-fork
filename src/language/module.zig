@@ -257,7 +257,7 @@ fn continueDynamicImport(
     // 1. If moduleCompletion is an abrupt completion, then
     // 2. Let module be moduleCompletion.[[Value]].
     const module = module_completion catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
 
         error.ExceptionThrown => {
             const exception = agent.clearException();
@@ -340,7 +340,7 @@ fn continueDynamicImport(
 
             // b. If link is an abrupt completion, then
             link catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
+                error.OutOfMemory => |e| return e,
 
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();

@@ -12,7 +12,7 @@ pub const float16 = @import("utils/float16.zig");
 pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) std.mem.Allocator.Error!noreturn {
     switch (err) {
         error.ExceptionThrown => @panic("Throw completion was returned from '!' function call"),
-        error.OutOfMemory => return error.OutOfMemory,
+        error.OutOfMemory => |e| return e,
     }
 }
 
