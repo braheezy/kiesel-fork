@@ -73,8 +73,8 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 }
 
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#reprl-psuedocode
-fn reprl(gpa: std.mem.Allocator, io: std.Io) !u8 {
-    var platform: Agent.Platform = .default(io);
+fn reprl(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) !u8 {
+    var platform: Agent.Platform = .default(io, environ_map);
     defer platform.deinit();
 
     var helo: [4]u8 = "HELO".*;
@@ -122,5 +122,6 @@ fn reprl(gpa: std.mem.Allocator, io: std.Io) !u8 {
 pub fn main(init: std.process.Init) u8 {
     const gpa = init.gpa;
     const io = init.io;
-    return reprl(gpa, io) catch 1;
+    const environ_map = init.environ_map;
+    return reprl(gpa, io, environ_map) catch 1;
 }

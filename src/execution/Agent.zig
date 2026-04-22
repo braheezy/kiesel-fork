@@ -366,7 +366,9 @@ pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
 test init {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    var platform = Platform.default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    var platform: Platform = .default(io, &environ_map);
     defer platform.deinit();
     // Ensure Agent teardown is leak-free
     platform.gc_allocator = std.testing.allocator;
@@ -378,7 +380,9 @@ test init {
 test "well_known_symbols" {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    var platform = Platform.default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try init(gpa, io, &platform, .{});
     defer agent.deinit();

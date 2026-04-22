@@ -47,7 +47,7 @@ const State = struct {
 
 var state: State = undefined;
 
-pub fn default(io: std.Io) Platform {
+pub fn default(io: std.Io, environ_map: *const std.process.Environ.Map) Platform {
     if (comptime !(has_fd_t and has_std_time_nanotimestamp)) {
         @compileError("Platform.default() is not supported on this platform");
     }
@@ -58,12 +58,18 @@ pub fn default(io: std.Io) Platform {
         .stderr_buffer = undefined,
         .stderr_writer = std.Io.File.stderr().writer(io, &state.stderr_buffer),
     };
+    const terminal_mode = std.Io.Terminal.Mode.detect(
+        io,
+        .stderr(),
+        environ_map.contains("NO_COLOR"),
+        environ_map.contains("CLICOLOR_FORCE"),
+    ) catch .no_color;
     return .{
         .gc_allocator = if (build_options.enable_libgc) gc.allocator else std.heap.page_allocator,
         .gc_allocator_atomic = if (build_options.enable_libgc) gc.allocator_atomic else std.heap.page_allocator,
         .stdout = &state.stdout_writer.interface,
         .stderr = &state.stderr_writer.interface,
-        .terminal_mode = .no_color,
+        .terminal_mode = terminal_mode,
         .stack_info = stackinfo.StackInfo.init() catch null,
         .default_locale = if (Locale != void) icu4zig.Locale.unknown(),
         .default_time_zone = if (TimeZone != void) temporal_rs.c.temporal_rs_TimeZone_utc(),

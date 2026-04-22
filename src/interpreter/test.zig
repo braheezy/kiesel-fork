@@ -48,6 +48,7 @@ const test_cases: []const TestCase = @import("test_cases.zon");
 fn testInterpreter(
     gpa: std.mem.Allocator,
     io: std.Io,
+    environ_map: *const std.process.Environ.Map,
     source: []const u8,
     comptime expected_result: ExpectedResult,
     expected_ir: ?[]const u8,
@@ -73,7 +74,7 @@ fn testInterpreter(
     };
     defer bc.deinit(gpa);
 
-    const platform: Agent.Platform = .default(io);
+    const platform: Agent.Platform = .default(io, environ_map);
     defer platform.deinit();
     var agent: Agent = try .init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -158,10 +159,13 @@ fn testInterpreter(
 test {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
     inline for (test_cases) |test_case| {
         try testInterpreter(
             gpa,
             io,
+            &environ_map,
             test_case.source,
             test_case.expected_result,
             test_case.expected_ir,

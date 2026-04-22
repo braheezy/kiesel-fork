@@ -1477,7 +1477,9 @@ pub fn getOption(
 test format {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent_ = try Agent.init(gpa, io, &platform, .{});
     defer agent_.deinit();

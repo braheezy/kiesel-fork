@@ -953,7 +953,9 @@ test fromLiteral {
 test fromUtf8 {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -986,7 +988,9 @@ test fromUtf8 {
 test fromAscii {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1012,7 +1016,9 @@ test fromAscii {
 test fromUtf16 {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1038,7 +1044,9 @@ test fromUtf16 {
 test fromStringSliced {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1075,7 +1083,9 @@ test fromStringSliced {
 test trimStart {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1099,7 +1109,9 @@ test trimStart {
 test trimEnd {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1123,7 +1135,9 @@ test trimEnd {
 test trim {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1147,7 +1161,9 @@ test trim {
 test repeat {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();
@@ -1171,7 +1187,9 @@ test repeat {
 test concat {
     const gpa = std.testing.allocator;
     const io = std.testing.io;
-    const platform: Agent.Platform = .default(io);
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+    const platform: Agent.Platform = .default(io, &environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});
     defer agent.deinit();

@@ -1107,7 +1107,7 @@ pub fn main(init: std.process.Init) !u8 {
     if (kiesel.build_options.enable_libgc and !parsed_args.options.@"print-gc-warnings") {
         kiesel.gc.disableWarnings();
     }
-    var platform: Agent.Platform = .default(io);
+    var platform: Agent.Platform = .default(io, environ_map);
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{
         .debug = .{
@@ -1117,10 +1117,6 @@ pub fn main(init: std.process.Init) !u8 {
         },
     });
     defer agent.deinit();
-
-    const NO_COLOR = environ_map.contains("NO_COLOR");
-    const CLICOLOR_FORCE = environ_map.contains("CLICOLOR_FORCE");
-    platform.terminal_mode = try .detect(io, .stderr(), NO_COLOR, CLICOLOR_FORCE);
 
     if (kiesel.build_options.enable_intl) {
         if (environ_map.get("LANG")) |lang| {
