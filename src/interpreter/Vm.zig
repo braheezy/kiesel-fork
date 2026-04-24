@@ -1380,6 +1380,18 @@ fn executeGetPropertyComputed(
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
+    const property_is_index = property_value.__isI32() and property_value.__asI32() >= 0;
+
+    // OPTIMIZATION: Fast path for ordinary objects with dense storage and no out of bounds access
+    if (base_value.isObject() and property_is_index) {
+        @branchHint(.likely);
+        const index: u32 = @intCast(property_value.__asI32());
+        if (base_value.asObject().getIndexedFast(index)) |value| {
+            vm.load(dst, value);
+            return;
+        }
+    }
+
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const result = try base_object.internal_methods.get(
@@ -1499,6 +1511,17 @@ fn executeSetPropertyComputed(
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
     const value = vm.store(value_reg);
+    const property_is_index = property_value.__isI32() and property_value.__asI32() >= 0;
+
+    // OPTIMIZATION: Fast path for ordinary objects with dense storage and no out of bounds access
+    if (base_value.isObject() and property_is_index) {
+        @branchHint(.likely);
+        const index: u32 = @intCast(property_value.__asI32());
+        if (try base_value.asObject().setIndexedFast(vm.agent.gc_allocator, index, value)) {
+            return;
+        }
+    }
+
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const success = try base_object.internal_methods.set(
