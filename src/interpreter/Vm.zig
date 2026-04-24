@@ -542,8 +542,8 @@ fn toObjectForPropertyAccess(agent: *Agent, value: Value) Agent.Error!*Object {
         return value.asObject();
     }
     if (value.isString()) {
-        // TODO: Optimize property access on strings, for now eveything goes through the custom
-        //       [[GetOwnProperty]] implementation
+        // TODO: Optimize 'length' property access on strings, for now everything goes through the
+        //       custom [[GetOwnProperty]] implementation
         return value.toObject(agent);
     }
     return try value.synthesizePrototype(agent) orelse {
@@ -1392,6 +1392,19 @@ fn executeGetPropertyComputed(
         }
     }
 
+    // OPTIMIZATION: Fast path for string indexing
+    if (base_value.isString() and property_is_index) {
+        @branchHint(.likely);
+        const index: u32 = @intCast(property_value.__asI32());
+        const string = base_value.asString();
+        if (index < string.length) {
+            const result = try string.substring(vm.agent, index, index + 1);
+            vm.load(dst, Value.from(result));
+            return;
+        }
+        // Fall through to prototype chain lookup for out of bounds access
+    }
+
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
     const result = try base_object.internal_methods.get(
@@ -1418,6 +1431,18 @@ fn executeGetPropertyIndexed(
             vm.load(dst, value);
             return;
         }
+    }
+
+    // OPTIMIZATION: Fast path for string indexing
+    if (base_value.isString()) {
+        @branchHint(.likely);
+        const string = base_value.asString();
+        if (index < string.length) {
+            const result = try string.substring(vm.agent, index, index + 1);
+            vm.load(dst, Value.from(result));
+            return;
+        }
+        // Fall through to prototype chain lookup for out of bounds access
     }
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
