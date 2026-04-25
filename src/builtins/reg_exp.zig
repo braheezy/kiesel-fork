@@ -255,42 +255,43 @@ fn regExpInitialize(
     // 4. Else, let F be ? ToString(flags).
     const f: *const String = if (flags.isUndefined()) .empty else try flags.toString(agent);
 
-    // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", or if F
-    //    contains any code unit more than once, throw a SyntaxError exception.
-    // 6. If F contains "i", let i be true; else let i be false.
-    // 7. If F contains "m", let m be true; else let m be false.
-    // 8. If F contains "s", let s be true; else let s be false.
-    // 9. If F contains "u", let u be true; else let u be false.
-    // 10. If F contains "v", let v be true; else let v be false.
-    // TODO: 11. If u is true or v is true, then
+    // 5. If flags contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y",
+    //    throw a SyntaxError exception.
+    // 6. If flags contains any code unit more than once, throw a SyntaxError exception.
+    // 7. If F contains "i", let i be true; else let i be false.
+    // 8. If F contains "m", let m be true; else let m be false.
+    // 9. If F contains "s", let s be true; else let s be false.
+    // 10. If F contains "u", let u be true; else let u be false.
+    // 11. If F contains "v", let v be true; else let v be false.
+    // TODO: 12. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).
-    // 12. Else,
+    // 13. Else,
     //     a. Let patternText be the result of interpreting each of P's 16-bit elements as a
     //        Unicode BMP code point. UTF-16 decoding is not applied to the elements.
-    // 13. Let parseResult be ParsePattern(patternText, u, v).
-    // 14. If parseResult is a non-empty List of SyntaxError objects, throw a SyntaxError exception.
-    // 15. Assert: parseResult is a Pattern Parse Node.
+    // 14. Let parseResult be ParsePattern(patternText, u, v).
+    // 15. If parseResult is a non-empty List of SyntaxError objects, throw a SyntaxError exception.
+    // 16. Assert: parseResult is a Pattern Parse Node.
     const re_bytecode = try compileRegexp(agent, p, f);
 
-    // 16. Set obj.[[OriginalSource]] to P.
+    // 17. Set obj.[[OriginalSource]] to P.
     reg_exp.fields.original_source = p;
 
-    // 17. Set obj.[[OriginalFlags]] to F.
+    // 18. Set obj.[[OriginalFlags]] to F.
     reg_exp.fields.original_flags = f;
 
-    // 18. Let capturingGroupsCount be CountLeftCapturingParensWithin(parseResult).
-    // 19. Let rer be the RegExp Record {
+    // 19. Let capturingGroupsCount be CountLeftCapturingParensWithin(parseResult).
+    // 20. Let rer be the RegExp Record {
     //       [[IgnoreCase]]: i, [[Multiline]]: m, [[DotAll]]: s, [[Unicode]]: u, [[UnicodeSets]]: v,
     //       [[CapturingGroupsCount]]: capturingGroupsCount
     //     }.
-    // 20. Set obj.[[RegExpRecord]] to rer.
-    // 21. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
+    // 21. Set obj.[[RegExpRecord]] to rer.
+    // 22. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
     reg_exp.fields.re_bytecode = re_bytecode;
 
-    // 22. Perform ? Set(obj, "lastIndex", +0𝔽, true).
+    // 23. Perform ? Set(obj, "lastIndex", +0𝔽, true).
     try reg_exp.object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
-    // 23. Return obj.
+    // 24. Return obj.
     return reg_exp;
 }
 

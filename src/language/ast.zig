@@ -464,21 +464,21 @@ pub const RegularExpressionLiteral = struct {
         }
 
         // 1. Let flags be the FlagText of literal.
-        // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
-        //    contains any code point more than once, return false.
+        // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, return false.
+        // 3. If flags contains any code point more than once, return false.
         const parsed_flags = ParsedFlags.from(self.flags) orelse return .invalid_flags;
 
-        // 3. If flags contains u, let u be true; else let u be false.
-        // 4. If flags contains v, let v be true; else let v be false.
-        // 5. Let patternText be the BodyText of literal.
-        // 6. If u is false and v is false, then
+        // 4. If flags contains u, let u be true; else let u be false.
+        // 5. If flags contains v, let v be true; else let v be false.
+        // 6. Let patternText be the BodyText of literal.
+        // 7. If u is false and v is false, then
         //     a. Let stringValue be CodePointsToString(patternText).
         //     b. Set patternText to the sequence of code points resulting from interpreting each
         //        of the 16-bit elements of stringValue as a Unicode BMP code point. UTF-16
         //        decoding is not applied to the elements.
-        // 7. Let parseResult be ParsePattern(patternText, u, v).
-        // 8. If parseResult is a Parse Node, return true.
-        // 9. Return false.
+        // 8. Let parseResult be ParsePattern(patternText, u, v).
+        // 9. If parseResult is a Parse Node, return true.
+        // 10. Return false.
         var re_bytecode_len: c_int = undefined;
         var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.

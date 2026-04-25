@@ -3340,7 +3340,7 @@ pub fn compareTypedArrayElements(
     }
 
     if (x.isNumber() and y.isNumber()) {
-        // 3. If x and y are both NaN, return +0𝔽.
+        // 3. If x is NaN and y is NaN, return +0𝔽.
         if (x.asNumber().isNan() and y.asNumber().isNan()) return .eq;
 
         // 4. If x is NaN, return 1𝔽.

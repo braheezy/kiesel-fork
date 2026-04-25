@@ -257,7 +257,7 @@ pub fn createBuiltinFunction(
 
     // 4. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
     //    requires for the built-in function object that is about to be created.
-    // 5. Append to internalSlotsList the elements of additionalInternalSlotsList.
+    // 5. Append the elements of additionalInternalSlotsList to internalSlotsList .
 
     // 6. Let func be a new built-in function object that, when called, performs the action
     //    described by behaviour using the provided arguments as the values of the corresponding

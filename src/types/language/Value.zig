@@ -2007,8 +2007,9 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
         .string => x.asString().eql(y.asString()),
 
         // 5. If x is a Boolean, then
-        //     a. If x and y are both true or both false, return true.
-        //     b. Return false.
+        //     a. If x is true and y is true, return true.
+        //     b. If x is false and y is false, return true.
+        //     c. Return false.
         .boolean => x.asBoolean() == y.asBoolean(),
 
         // 6. NOTE: All other ECMAScript language values are compared by identity.
@@ -2114,7 +2115,7 @@ pub fn isLessThan(
     // 10. Assert: nx is a BigInt and ny is a Number, or nx is a Number and ny is a BigInt.
     std.debug.assert((nx == .big_int and ny == .number) or (nx == .number and ny == .big_int));
 
-    // 11. If nx or ny is NaN, return undefined.
+    // 11. If nx is NaN or ny is NaN, return undefined.
     if ((nx == .number and nx.number.isNan()) or
         (ny == .number and ny.number.isNan())) return null;
 

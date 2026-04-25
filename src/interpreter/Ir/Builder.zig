@@ -924,7 +924,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             if (!gop.found_existing) {
                 // 1. Append n to instantiatedVarNames.
 
-                // 3. If parameterBindings does not contain n, or if functionNames contains n, then
+                // 3. If parameterBindings does not contain n or functionNames contains n, then
                 const is_in_parameter_bindings = containsSlice(parameter_names.items, var_name) or
                     (parameter_bindings_has_arguments and std.mem.eql(u8, var_name, "arguments"));
                 if (!is_in_parameter_bindings or function_names.contains(var_name)) {

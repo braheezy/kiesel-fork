@@ -3633,7 +3633,7 @@ pub fn compareArrayElements(
     y: Value,
     maybe_comparator: ?*Object,
 ) Agent.Error!std.math.Order {
-    // 1. If x and y are both undefined, return +0𝔽.
+    // 1. If x is undefined and y is undefined, return +0𝔽.
     if (x.isUndefined() and y.isUndefined()) return .eq;
 
     // 2. If x is undefined, return 1𝔽.

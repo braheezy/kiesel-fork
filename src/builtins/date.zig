@@ -474,8 +474,8 @@ pub fn makeDate(day_: f64, time: f64) f64 {
 /// 21.4.1.30 MakeFullYear ( year )
 /// https://tc39.es/ecma262/#sec-makefullyear
 pub fn makeFullYear(year: f64) f64 {
-    // 1. If year is NaN, return NaN.
-    if (std.math.isNan(year)) return std.math.nan(f64);
+    // 1. If year is one of NaN, +∞𝔽, or -∞𝔽, return NaN.
+    if (!std.math.isFinite(year)) return std.math.nan(f64);
 
     // 2. Let truncated be ! ToIntegerOrInfinity(year).
     const truncated = toIntegerOrInfinity(year);

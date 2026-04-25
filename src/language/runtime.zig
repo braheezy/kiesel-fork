@@ -682,7 +682,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     }
     // FunctionExpression : function ( FormalParameters ) { FunctionBody }
     else {
-        // 1. If name is not present, set name to "".
+        // 1. If name is not present, set name to the empty String.
         const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent, name)
         else
@@ -729,7 +729,7 @@ pub fn instantiateArrowFunctionExpression(
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
-    // 1. If name is not present, set name to "".
+    // 1. If name is not present, set name to the empty String.
     const name: *const String = if (default_name) |name|
         try String.fromUtf8(agent, name)
     else
@@ -1396,7 +1396,7 @@ pub fn instantiateGeneratorFunctionExpression(
     }
     // GeneratorExpression : function * ( FormalParameters ) { GeneratorBody }
     else {
-        // 1. If name is not present, set name to "".
+        // 1. If name is not present, set name to the empty String.
         const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent, name)
         else
@@ -1867,7 +1867,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     }
     // AsyncGeneratorExpression : async function * ( FormalParameters ) { AsyncGeneratorBody }
     else {
-        // 1. If name is not present, set name to "".
+        // 1. If name is not present, set name to the empty String.
         const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent, name)
         else
@@ -2731,7 +2731,7 @@ pub fn instantiateAsyncFunctionExpression(
     }
     // AsyncFunctionExpression : async function ( FormalParameters ) { AsyncFunctionBody }
     else {
-        // 1. If name is not present, set name to "".
+        // 1. If name is not present, set name to the empty String.
         const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent, name)
         else
@@ -2780,7 +2780,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
 ) std.mem.Allocator.Error!*builtins.ECMAScriptFunction {
     const realm = agent.currentRealm();
 
-    // 1. If name is not present, set name to "".
+    // 1. If name is not present, set name to the empty String.
     const name: *const String = if (default_name) |name|
         try String.fromUtf8(agent, name)
     else
