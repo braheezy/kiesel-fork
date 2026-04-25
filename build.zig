@@ -162,11 +162,11 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .@"enable-intl" = enable_intl,
         })) |zement| {
-            kiesel.addLibraryPath(zement.namedLazyPath("lib"));
-            kiesel.linkSystemLibrary("zement", .{
-                .preferred_link_mode = .static,
-                .use_pkg_config = .no,
-            });
+            // NOTE: Rust outputs 'libzement.a' instead of 'zement.lib' when targeting
+            // *-pc-windows-gnu, so we can hardcode the name here instead of using
+            // `std.zig.binNameAlloc()` to select a target-dependent prefix and extension.
+            // See: https://github.com/rust-lang/rust/pull/70937
+            kiesel.addObjectFile(zement.namedLazyPath("lib").path(b, "libzement.a"));
             kiesel.linkLibrary(zement.artifact("unwind_stubs"));
 
             // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
