@@ -168,9 +168,13 @@ pub fn build(b: *std.Build) void {
                 .use_pkg_config = .no,
             });
             kiesel.linkLibrary(zement.artifact("unwind_stubs"));
-            if (target.result.os.tag == .windows) {
+
+            // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
+            if (target.result.os.tag == .windows and optimize == .Debug) {
                 // For GetUserProfileDirectoryW
                 kiesel.linkSystemLibrary("userenv", .{});
+                // For a bunch of networking APIs
+                kiesel.linkSystemLibrary("ws2_32", .{});
             }
         }
     }
