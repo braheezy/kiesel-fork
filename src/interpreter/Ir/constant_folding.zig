@@ -199,22 +199,40 @@ fn constantFoldBinaryExpression(
                             .undefined => "undefined",
                             .null => "null",
                             .boolean => |boolean| if (boolean) "true" else "false",
-                            // TODO: Implement Number.toString() without needing an agent
-                            .number => return null,
+                            .number => |number| blk: {
+                                var aw: std.Io.Writer.Allocating = .init(gpa);
+                                defer aw.deinit();
+                                aw.writer.print("{f}", .{Number.from(number).fmt(10)}) catch |err| switch (err) {
+                                    error.WriteFailed => return error.OutOfMemory,
+                                };
+                                break :blk try aw.toOwnedSlice();
+                            },
                             .big_int => |big_int| try big_int.toStringAlloc(gpa, 10, .lower),
                             .string => |string| string,
                         };
-                        defer if (lhs == .big_int) gpa.free(lhs_str);
+                        defer switch (lhs) {
+                            .number, .big_int => gpa.free(lhs_str),
+                            else => {},
+                        };
                         const rhs_str = switch (rhs) {
                             .undefined => "undefined",
                             .null => "null",
                             .boolean => |boolean| if (boolean) "true" else "false",
-                            // TODO: Implement Number.toString() without needing an agent
-                            .number => return null,
+                            .number => |number| blk: {
+                                var aw: std.Io.Writer.Allocating = .init(gpa);
+                                defer aw.deinit();
+                                aw.writer.print("{f}", .{Number.from(number).fmt(10)}) catch |err| switch (err) {
+                                    error.WriteFailed => return error.OutOfMemory,
+                                };
+                                break :blk try aw.toOwnedSlice();
+                            },
                             .big_int => |big_int| try big_int.toStringAlloc(gpa, 10, .lower),
                             .string => |string| string,
                         };
-                        defer if (rhs == .big_int) gpa.free(rhs_str);
+                        defer switch (rhs) {
+                            .number, .big_int => gpa.free(rhs_str),
+                            else => {},
+                        };
                         const result = try std.mem.concat(gpa, u8, &.{ lhs_str, rhs_str });
                         return .{ .string = result };
                     } else if (lhs == .number and rhs == .number) {
