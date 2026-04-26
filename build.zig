@@ -209,6 +209,19 @@ pub fn build(b: *std.Build) void {
                     .optimize = optimize,
                     .strip = strip,
                 });
+                // Use musl's optimized memset until Zig's compiler_rt implementations have
+                // comparable performance. See: https://codeberg.org/ziglang/zig/issues/32091
+                if (target.result.os.tag == .linux) {
+                    if (b.lazyDependency("musl", .{})) |musl| {
+                        switch (target.result.cpu.arch) {
+                            .aarch64 => module.addAssemblyFile(musl.path("src/string/aarch64/memset.S")),
+                            .arm => module.addAssemblyFile(musl.path("src/string/arm/__aeabi_memset.s")),
+                            .x86 => module.addAssemblyFile(musl.path("src/string/i386/memset.s")),
+                            .x86_64 => module.addAssemblyFile(musl.path("src/string/x86_64/memset.s")),
+                            else => {},
+                        }
+                    }
+                }
                 if (enable_intl) {
                     if (b.lazyDependency("icu4zig", .{
                         .target = target,

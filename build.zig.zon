@@ -26,6 +26,11 @@
             .path = "./pkg/libregexp",
             .lazy = true,
         },
+        .musl = .{
+            .url = "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+            .hash = "N-V-__8AAMFkNQCMS3QG2Q2vrQ1urnQq0PqKINS-iRDs1Xqc",
+            .lazy = true,
+        },
         .parser_toolkit = .{
             .url = "git+https://github.com/ikskuh/parser-toolkit#cc3977376a7bf0eb6f203ae5c00e8cea6f9d6600",
             .hash = "parser_toolkit-0.1.0-baYGPdpDEwBQQ2__YEalqGB09TAjP7vpoe2DFkwg6mRa",
