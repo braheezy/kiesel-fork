@@ -36,6 +36,19 @@ pub const Number = union(enum) {
         }
     }
 
+    pub fn fmt(self: Number, radix: u8) Format {
+        return .{ .number = self, .radix = radix };
+    }
+
+    const Format = struct {
+        number: Number,
+        radix: u8,
+
+        pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+            try f.number.toStringImpl(writer, f.radix);
+        }
+    };
+
     pub inline fn from(number: anytype) Number {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
@@ -598,53 +611,76 @@ pub const Number = union(enum) {
         return .{ .i32 = numberBitwiseOp(.@"|", x, y) };
     }
 
-    /// 6.1.6.1.20 Number::toString ( x, radix )
-    /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
     pub fn toString(
         self: Number,
         agent: *Agent,
         radix: u8,
     ) std.mem.Allocator.Error!*const String {
-        // 1. If x is NaN, return "NaN".
+        // Handle special cases so they can return static strings
         if (self.isNan()) return String.fromLiteral("NaN");
+        if (self.isPositiveInf()) return String.fromLiteral("Infinity");
+        if (self.isNegativeInf()) return String.fromLiteral("-Infinity");
+
+        var aw: std.Io.Writer.Allocating = .init(agent.gc_allocator);
+        defer aw.deinit();
+        aw.writer.print("{f}", .{self.fmt(radix)}) catch |err| switch (err) {
+            error.WriteFailed => return error.OutOfMemory,
+        };
+        return String.fromAscii(agent, try aw.toOwnedSlice());
+    }
+
+    /// 6.1.6.1.20 Number::toString ( x, radix )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
+    fn toStringImpl(self: Number, writer: *std.Io.Writer, radix: u8) std.Io.Writer.Error!void {
+        std.debug.assert(radix >= 2);
+        std.debug.assert(radix <= 36);
+
+        // 1. If x is NaN, return "NaN".
+        if (self.isNan()) {
+            try writer.writeAll("NaN");
+            return;
+        }
 
         // 2. If x is either +0𝔽 or -0𝔽, return "0".
-        if (self.isPositiveZero() or self.isNegativeZero()) return String.fromLiteral("0");
+        if (self.isPositiveZero() or self.isNegativeZero()) {
+            try writer.writeByte('0');
+            return;
+        }
 
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
         if (self.asFloat() < 0) {
-            const negated_string = try self.unaryMinus().toString(agent, radix);
-            return String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "-{f}",
-                .{negated_string.fmtRaw()},
-            ));
+            try writer.writeByte('-');
+            try self.unaryMinus().toStringImpl(writer, radix);
+            return;
         }
 
         // 4. If x is +∞𝔽, return "Infinity".
-        if (self.isPositiveInf()) return String.fromLiteral("Infinity");
+        if (self.isPositiveInf()) {
+            try writer.writeAll("Infinity");
+            return;
+        }
 
         // TODO: Implement steps 5-12 according to spec!
-        return String.fromAscii(agent, switch (self) {
+        switch (self) {
             .f64 => |x| if (@abs(x) >= 1e-6 and @abs(x) < 1e21)
-                try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{x})
+                try writer.print("{d}", .{x})
             else if (@abs(x) < 1)
-                try std.fmt.allocPrint(agent.gc_allocator, "{e}", .{x})
-            else blk: {
-                const tmp = try std.fmt.allocPrint(agent.gc_allocator, "{e}", .{x});
-                defer agent.gc_allocator.free(tmp);
-                break :blk try std.mem.replaceOwned(u8, agent.gc_allocator, tmp, "e", "e+");
-            },
-            .i32 => |x| blk: {
-                var allocating_writer: std.Io.Writer.Allocating = .init(agent.gc_allocator);
-                defer allocating_writer.deinit();
-                const writer = &allocating_writer.writer;
-                writer.printInt(x, radix, .lower, .{}) catch |err| switch (err) {
-                    error.WriteFailed => return error.OutOfMemory,
+                try writer.print("{e}", .{x})
+            else {
+                var buffer: [32]u8 = undefined;
+                const scientific = std.fmt.bufPrint(&buffer, "{e}", .{x}) catch |err| switch (err) {
+                    error.NoSpaceLeft => unreachable,
                 };
-                break :blk try allocating_writer.toOwnedSlice();
+                const exponent_index = std.mem.indexOfScalar(u8, scientific, 'e').?;
+                try writer.writeAll(scientific[0 .. exponent_index + 1]);
+                const exponent = scientific[exponent_index + 1 ..];
+                if (exponent[0] != '-') {
+                    try writer.writeByte('+');
+                }
+                try writer.writeAll(exponent);
             },
-        });
+            .i32 => |x| try writer.printInt(x, radix, .lower, .{}),
+        }
     }
 };
 

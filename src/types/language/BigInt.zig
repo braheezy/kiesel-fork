@@ -20,6 +20,22 @@ pub fn format(self: *const BigInt, writer: *std.Io.Writer) std.Io.Writer.Error!v
     try writer.print("{f}n", .{self.managed});
 }
 
+pub fn fmt(self: *const BigInt, gpa: std.mem.Allocator, radix: u8) Format {
+    std.debug.assert(radix >= 2);
+    std.debug.assert(radix <= 36);
+    return .{ .big_int = self, .allocator = gpa, .radix = radix };
+}
+
+const Format = struct {
+    big_int: *const BigInt,
+    allocator: std.mem.Allocator,
+    radix: u8,
+
+    pub fn format(f: Format, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        f.big_int.toStringImpl(f.allocator, writer, f.radix) catch return error.WriteFailed;
+    }
+};
+
 pub fn fromLiteral(comptime value: anytype) *const BigInt {
     const managed: std.math.big.int.Managed = comptime blk: {
         var limbs: [std.math.big.int.calcLimbLen(value)]std.math.big.Limb = undefined;
@@ -261,21 +277,37 @@ pub fn bitwiseOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allo
     return fromManaged(agent, result);
 }
 
-/// 6.1.6.2.21 BigInt::toString ( x, radix )
-/// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
 pub fn toString(
     self: *const BigInt,
     agent: *Agent,
     radix: u8,
 ) std.mem.Allocator.Error!*const String {
+    var aw: std.Io.Writer.Allocating = .init(agent.gc_allocator);
+    defer aw.deinit();
+    aw.writer.print("{f}", .{self.fmt(agent.gc_allocator, radix)}) catch |err| switch (err) {
+        error.WriteFailed => return error.OutOfMemory,
+    };
+    return String.fromAscii(agent, try aw.toOwnedSlice());
+}
+
+/// 6.1.6.2.21 BigInt::toString ( x, radix )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
+fn toStringImpl(
+    self: *const BigInt,
+    gpa: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    radix: u8,
+) (std.mem.Allocator.Error || std.Io.Writer.Error)!void {
     std.debug.assert(radix >= 2);
     std.debug.assert(radix <= 36);
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
-    return String.fromAscii(agent, self.managed.toString(agent.gc_allocator, radix, .lower) catch |err| switch (err) {
+    const string = self.managed.toString(gpa, radix, .lower) catch |err| switch (err) {
         error.InvalidBase => unreachable,
         error.OutOfMemory => |e| return e,
-    });
+    };
+    defer gpa.free(string);
+    try writer.writeAll(string);
 }
 
 test format {

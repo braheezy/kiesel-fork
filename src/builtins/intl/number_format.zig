@@ -1390,8 +1390,12 @@ pub fn toIntlMathematicalValue(agent: *Agent, value: Value) Agent.Error!IntlMath
 
     // 2. If primValue is a BigInt, return ℝ(primValue).
     if (primitive_value.isBigInt()) {
-        const string = try primitive_value.asBigInt().toString(agent, 10);
-        const decimal = icu4zig.Decimal.fromString(string.asAscii()) catch unreachable;
+        var aw: std.Io.Writer.Allocating = .init(agent.gpa);
+        defer aw.deinit();
+        aw.writer.print("{f}", .{primitive_value.asBigInt().fmt(agent.gpa, 10)}) catch |err| switch (err) {
+            error.WriteFailed => return error.OutOfMemory,
+        };
+        const decimal = icu4zig.Decimal.fromString(aw.written()) catch unreachable;
         return .{ .mathematical_value = decimal };
     }
 
