@@ -652,16 +652,19 @@ const GetHistoryPathError =
     std.Io.File.OpenError;
 
 fn getHistoryPath(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) GetHistoryPathError![]const u8 {
-    const app_data_dir = try known_folders.getPath(io, gpa, environ_map.*, .data) orelse ".";
-    defer gpa.free(app_data_dir);
+    const data_path = try known_folders.getPath(io, gpa, environ_map.*, .data) orelse ".";
+    defer gpa.free(data_path);
 
-    const history_path = try std.Io.Dir.path.join(gpa, &.{ app_data_dir, "kiesel", "history" });
-    errdefer gpa.free(history_path);
+    const kiesel_data_path = try std.Io.Dir.path.join(gpa, &.{ data_path, "kiesel" });
+    defer gpa.free(kiesel_data_path);
 
-    std.Io.Dir.cwd().createDirPath(io, app_data_dir) catch |err| switch (err) {
+    std.Io.Dir.cwd().createDirPath(io, kiesel_data_path) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
+
+    const history_path = try std.Io.Dir.path.join(gpa, &.{ kiesel_data_path, "history" });
+    errdefer gpa.free(history_path);
 
     const file = try std.Io.Dir.cwd().createFile(io, history_path, .{ .truncate = false });
     file.close(io);
