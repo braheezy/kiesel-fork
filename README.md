@@ -57,6 +57,7 @@ Further reading:
 - [Kiesel Devlog #10: Let's Make It Fast!](https://linus.dev/posts/kiesel-devlog-10/)
 - [Kiesel Devlog #11: Community Edition](https://linus.dev/posts/kiesel-devlog-11/)
 - [Kiesel Devlog #12: Write Once, Run Anywhere](https://linus.dev/posts/kiesel-devlog-12/)
+- [Kiesel Devlog #13: Human After All](https://linus.dev/posts/kiesel-devlog-13/)
 
 ## Build
 
