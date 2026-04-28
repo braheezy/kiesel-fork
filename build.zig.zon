@@ -14,8 +14,8 @@
             .lazy = true,
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linus/icu4zig#3e1365ad36c0c55365dad20fe3789ecd03f7e92e",
-            .hash = "icu4zig-0.1.0-IT7GrNmmAgDxsqxEyCnK87MK8f3FMg9vFDOEdDXp37Ih",
+            .url = "git+https://codeberg.org/linus/icu4zig#bc79765907d6900122cddb3623ec1be9c78f1427",
+            .hash = "icu4zig-0.1.0-IT7GrJalAgDqj5Od_0nlLHoYcwSDRmXqzGbd4B6aA1E_",
             .lazy = true,
         },
         .known_folders = .{
