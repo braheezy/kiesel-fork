@@ -34,7 +34,7 @@ pub const Storage = union(Type) {
     sparse_value: std.AutoHashMapUnmanaged(Index, Value),
     sparse_property_descriptor: std.AutoHashMapUnmanaged(Index, CompletePropertyDescriptor),
 
-    pub fn isDense(self: Storage) bool {
+    pub fn isDense(self: *const Storage) bool {
         return switch (self) {
             .dense_i32, .dense_f64, .dense_value => true,
             else => false,
@@ -271,7 +271,7 @@ pub fn migrateStorage(
     };
 }
 
-pub fn count(self: IndexedProperties) usize {
+pub fn count(self: *const IndexedProperties) usize {
     switch (self.storage) {
         .none => return 0,
         .dense_i32 => |dense_i32| return dense_i32.items.len,
@@ -282,7 +282,7 @@ pub fn count(self: IndexedProperties) usize {
     }
 }
 
-pub fn contains(self: IndexedProperties, index: Index) bool {
+pub fn contains(self: *const IndexedProperties, index: Index) bool {
     switch (self.storage) {
         .none => return false,
         .dense_i32 => |dense_i32| return index < dense_i32.items.len,
@@ -293,7 +293,7 @@ pub fn contains(self: IndexedProperties, index: Index) bool {
     }
 }
 
-pub fn get(self: IndexedProperties, index: Index) ?CompletePropertyDescriptor {
+pub fn get(self: *const IndexedProperties, index: Index) ?CompletePropertyDescriptor {
     switch (self.storage) {
         .none => return null,
         .dense_i32 => |dense_i32| {

@@ -35,7 +35,7 @@ configurable: ?bool = null,
 
 /// 6.2.6.1 IsAccessorDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isaccessordescriptor
-pub fn isAccessorDescriptor(self: PropertyDescriptor) bool {
+pub fn isAccessorDescriptor(self: *const PropertyDescriptor) bool {
     // 1. If Desc has a [[Get]] field, return true.
     // 2. If Desc has a [[Set]] field, return true.
     // 3. Return false.
@@ -44,7 +44,7 @@ pub fn isAccessorDescriptor(self: PropertyDescriptor) bool {
 
 /// 6.2.6.2 IsDataDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isdatadescriptor
-pub fn isDataDescriptor(self: PropertyDescriptor) bool {
+pub fn isDataDescriptor(self: *const PropertyDescriptor) bool {
     // 1. If Desc has a [[Value]] field, return true.
     // 2. If Desc has a [[Writable]] field, return true.
     // 3. Return false.
@@ -53,7 +53,7 @@ pub fn isDataDescriptor(self: PropertyDescriptor) bool {
 
 /// 6.2.6.3 IsGenericDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isgenericdescriptor
-pub fn isGenericDescriptor(self: PropertyDescriptor) bool {
+pub fn isGenericDescriptor(self: *const PropertyDescriptor) bool {
     // 1. If IsAccessorDescriptor(Desc) is true, return false.
     // 2. If IsDataDescriptor(Desc) is true, return false.
     // 3. Return true.
@@ -63,7 +63,7 @@ pub fn isGenericDescriptor(self: PropertyDescriptor) bool {
 /// 6.2.6.4 FromPropertyDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-frompropertydescriptor
 pub fn fromPropertyDescriptor(
-    self: PropertyDescriptor,
+    self: *const PropertyDescriptor,
     agent: *Agent,
 ) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
@@ -179,14 +179,14 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
     // 6. Return unused.
 }
 
-pub fn isFullyPopulated(self: PropertyDescriptor) bool {
+pub fn isFullyPopulated(self: *const PropertyDescriptor) bool {
     return ((self.value != null and self.writable != null) or
         (self.get != null or self.set != null)) and
         self.enumerable != null and
         self.configurable != null;
 }
 
-pub fn hasFields(self: PropertyDescriptor) bool {
+pub fn hasFields(self: *const PropertyDescriptor) bool {
     return self.value != null or
         self.writable != null or
         self.get != null or

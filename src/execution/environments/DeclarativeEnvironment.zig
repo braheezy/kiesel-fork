@@ -40,7 +40,7 @@ comptime {
 
 /// 9.1.1.1.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
-pub fn hasBinding(self: DeclarativeEnvironment, name: *const String) bool {
+pub fn hasBinding(self: *const DeclarativeEnvironment, name: *const String) bool {
     // 1. If envRec has a binding for N, return true.
     // 2. Return false.
     return self.bindings.contains(name);
@@ -94,7 +94,7 @@ pub fn createImmutableBinding(
 /// 9.1.1.1.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
 pub fn initializeBinding(
-    self: DeclarativeEnvironment,
+    self: *const DeclarativeEnvironment,
     name: *const String,
     value: Value,
 ) void {
@@ -183,7 +183,7 @@ pub fn setMutableBinding(
 /// 9.1.1.1.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: DeclarativeEnvironment,
+    self: *const DeclarativeEnvironment,
     agent: *Agent,
     name: *const String,
     _: bool,
@@ -226,14 +226,14 @@ pub fn deleteBinding(self: *DeclarativeEnvironment, name: *const String) bool {
 
 /// 9.1.1.1.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasthisbinding
-pub fn hasThisBinding(_: DeclarativeEnvironment) bool {
+pub fn hasThisBinding(_: *const DeclarativeEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
 /// 9.1.1.1.9 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-getthisbinding
-pub fn getThisBinding(_: DeclarativeEnvironment) Value {
+pub fn getThisBinding(_: *const DeclarativeEnvironment) Value {
     // The GetThisBinding concrete method of a Declarative Environment Record is never used within
     // this specification.
     @compileError("Should not be used");
@@ -241,20 +241,20 @@ pub fn getThisBinding(_: DeclarativeEnvironment) Value {
 
 /// 9.1.1.1.10 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hassuperbinding
-pub fn hasSuperBinding(_: DeclarativeEnvironment) bool {
+pub fn hasSuperBinding(_: *const DeclarativeEnvironment) bool {
     // 1. Return false.
     return false;
 }
 /// 9.1.1.1.11 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
-pub fn withBaseObject(_: DeclarativeEnvironment) ?*Object {
+pub fn withBaseObject(_: *const DeclarativeEnvironment) ?*Object {
     // 1. Return undefined.
     return null;
 }
 
 /// Combined `hasBinding()` and `getBindingValue()`
 pub fn getBindingValueIfExists(
-    self: DeclarativeEnvironment,
+    self: *const DeclarativeEnvironment,
     agent: *Agent,
     name: *const String,
 ) error{ExceptionThrown}!?Value {

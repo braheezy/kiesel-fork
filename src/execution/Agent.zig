@@ -232,7 +232,7 @@ pub fn throwException(
 
 /// Capture stack frames for an exception, skipping the Realm's root execution context and the
 /// script or module execution context if present.
-pub fn captureStackTrace(self: *Agent) std.mem.Allocator.Error!Exception.StackTrace {
+pub fn captureStackTrace(self: *const Agent) std.mem.Allocator.Error!Exception.StackTrace {
     var stack_trace: std.ArrayList(Exception.StackFrame) = .empty;
     errdefer stack_trace.deinit(self.gc_allocator);
     for (self.execution_context_stack.items) |execution_context| {
@@ -249,7 +249,7 @@ pub fn captureStackTrace(self: *Agent) std.mem.Allocator.Error!Exception.StackTr
 }
 
 /// https://tc39.es/ecma262/#running-execution-context
-pub fn runningExecutionContext(self: Agent) *ExecutionContext {
+pub fn runningExecutionContext(self: *const Agent) *ExecutionContext {
     // At any point in time, there is at most one execution context per agent that is actually
     // executing code. This is known as the agent's running execution context.
     // The running execution context is always the top element of this stack.
@@ -258,14 +258,14 @@ pub fn runningExecutionContext(self: Agent) *ExecutionContext {
 }
 
 /// https://tc39.es/ecma262/#current-realm
-pub fn currentRealm(self: Agent) *Realm {
+pub fn currentRealm(self: *const Agent) *Realm {
     // The value of the Realm component of the running execution context is also called the current
     // Realm Record.
     return self.runningExecutionContext().realm;
 }
 
 /// https://tc39.es/ecma262/#active-function-object
-pub fn activeFunctionObject(self: Agent) *Object {
+pub fn activeFunctionObject(self: *const Agent) *Object {
     // The value of the Function component of the running execution context is also called the
     // active function object.
     return self.runningExecutionContext().origin.function;
@@ -273,7 +273,7 @@ pub fn activeFunctionObject(self: Agent) *Object {
 
 /// 9.4.1 GetActiveScriptOrModule ( )
 /// https://tc39.es/ecma262/#sec-getactivescriptormodule
-pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
+pub fn getActiveScriptOrModule(self: *const Agent) ?ExecutionContext.ScriptOrModule {
     // 1. If the execution context stack is empty, return null.
     if (self.execution_context_stack.items.len == 0) return null;
 
@@ -291,7 +291,7 @@ pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
 
 /// 9.4.3 GetThisEnvironment ( )
 /// https://tc39.es/ecma262/#sec-getthisenvironment
-pub fn getThisEnvironment(self: *Agent) Environment {
+pub fn getThisEnvironment(self: *const Agent) Environment {
     // 1. Let env be the running execution context's LexicalEnvironment.
     var env = self.runningExecutionContext().ecmascript_code.lexical_environment;
 
@@ -330,7 +330,7 @@ pub fn resolveThisBinding(self: *Agent) Error!Value {
 
 /// 9.4.5 GetNewTarget ( )
 /// https://tc39.es/ecma262/#sec-getnewtarget
-pub fn getNewTarget(self: *Agent) ?*Object {
+pub fn getNewTarget(self: *const Agent) ?*Object {
     // 1. Let envRec be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
@@ -343,7 +343,7 @@ pub fn getNewTarget(self: *Agent) ?*Object {
 
 /// 9.4.6 GetGlobalObject ( )
 /// https://tc39.es/ecma262/#sec-getglobalobject
-pub fn getGlobalObject(self: Agent) *Object {
+pub fn getGlobalObject(self: *const Agent) *Object {
     // 1. Let currentRealm be the current Realm Record.
     const current_realm = self.currentRealm();
 

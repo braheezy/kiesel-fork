@@ -65,7 +65,7 @@ pub const Attributes = packed struct(u3) {
         .configurable = true,
     };
 
-    pub fn fromPropertyDescriptor(property_descriptor: PropertyDescriptor) Attributes {
+    pub fn fromPropertyDescriptor(property_descriptor: *const PropertyDescriptor) Attributes {
         return .{
             .writable = property_descriptor.writable orelse false,
             .enumerable = property_descriptor.enumerable orelse false,
@@ -80,7 +80,7 @@ pub const CompletePropertyDescriptor = struct {
     value_or_accessor: ValueOrAccessor,
     attributes: Attributes,
 
-    pub fn fromPropertyDescriptor(descriptor: PropertyDescriptor) CompletePropertyDescriptor {
+    pub fn fromPropertyDescriptor(descriptor: *const PropertyDescriptor) CompletePropertyDescriptor {
         if (descriptor.isAccessorDescriptor()) {
             return .{
                 .value_or_accessor = .{
@@ -110,7 +110,7 @@ pub const CompletePropertyDescriptor = struct {
         }
     }
 
-    pub fn toPropertyDescriptor(self: CompletePropertyDescriptor) PropertyDescriptor {
+    pub fn toPropertyDescriptor(self: *const CompletePropertyDescriptor) PropertyDescriptor {
         return switch (self.value_or_accessor) {
             .value => |value| .{
                 .value = value,
@@ -129,7 +129,7 @@ pub const CompletePropertyDescriptor = struct {
 };
 
 pub fn contains(
-    self: PropertyStorage,
+    self: *const PropertyStorage,
     object: *Object,
     property_key: PropertyKey,
 ) bool {

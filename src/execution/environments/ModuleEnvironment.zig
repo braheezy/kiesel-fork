@@ -26,7 +26,7 @@ pub const IndirectBinding = struct {
     binding_name: *const String,
 };
 
-pub fn hasBinding(self: ModuleEnvironment, name: *const String) bool {
+pub fn hasBinding(self: *const ModuleEnvironment, name: *const String) bool {
     // Handled via DeclarativeEnvironment in the spec but with a vague "has a binding", so we need
     // to override the implementation and check the indirect bindings as well.
     return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
@@ -35,7 +35,7 @@ pub fn hasBinding(self: ModuleEnvironment, name: *const String) bool {
 /// 9.1.1.5.1 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: ModuleEnvironment,
+    self: *const ModuleEnvironment,
     agent: *Agent,
     name: *const String,
     strict: bool,
@@ -111,7 +111,7 @@ pub fn setMutableBinding(
 
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
-pub fn deleteBinding(_: ModuleEnvironment, _: *const String) bool {
+pub fn deleteBinding(_: *ModuleEnvironment, _: *const String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
     @compileError("Should not be used");
@@ -119,14 +119,14 @@ pub fn deleteBinding(_: ModuleEnvironment, _: *const String) bool {
 
 /// 9.1.1.5.3 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-hasthisbinding
-pub fn hasThisBinding(_: ModuleEnvironment) bool {
+pub fn hasThisBinding(_: *const ModuleEnvironment) bool {
     // 1. Return true.
     return true;
 }
 
 /// 9.1.1.5.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getthisbinding
-pub fn getThisBinding(_: ModuleEnvironment) Value {
+pub fn getThisBinding(_: *const ModuleEnvironment) Value {
     // 1. Return undefined.
     return .undefined;
 }
@@ -154,7 +154,7 @@ pub fn createImportBinding(
 
 /// Combined `hasBinding()` and `getBindingValue()`
 pub fn getBindingValueIfExists(
-    self: ModuleEnvironment,
+    self: *const ModuleEnvironment,
     agent: *Agent,
     name: *const String,
 ) Agent.Error!?Value {

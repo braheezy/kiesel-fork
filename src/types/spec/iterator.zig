@@ -132,7 +132,7 @@ pub const Iterator = struct {
 
     /// 7.4.11 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
-    pub fn close(self: Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
+    pub fn close(self: *const Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
         const completion_exception = agent.exception;
 
         // 1. Assert: iteratorRecord.[[Iterator]] is an Object.
@@ -179,7 +179,7 @@ pub const Iterator = struct {
 
     /// 7.4.12 IteratorCloseAll ( iters, completion )
     /// https://tc39.es/ecma262/#sec-iteratorcloseall
-    pub fn closeAll(agent: *Agent, iterators: []Iterator, completion: anytype) @TypeOf(completion) {
+    pub fn closeAll(agent: *Agent, iterators: []const Iterator, completion: anytype) @TypeOf(completion) {
         var new_completion = completion;
 
         // 1. For each element iter of iters, in reverse List order, do
@@ -195,7 +195,7 @@ pub const Iterator = struct {
 
     /// 7.4.13 AsyncIteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-asynciteratorclose
-    pub fn closeAsync(self: Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
+    pub fn closeAsync(self: *const Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
         const completion_exception = agent.exception;
 
         // 1. Assert: iteratorRecord.[[Iterator]] is an Object.

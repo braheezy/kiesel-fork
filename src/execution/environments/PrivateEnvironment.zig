@@ -17,7 +17,10 @@ names: std.StringHashMapUnmanaged(PrivateName),
 
 /// 9.2.1.2 ResolvePrivateIdentifier ( privateEnv, identifier )
 /// https://tc39.es/ecma262/#sec-resolve-private-identifier
-pub fn resolvePrivateIdentifier(self: PrivateEnvironment, identifier: []const u8) PrivateName {
+pub fn resolvePrivateIdentifier(
+    self: *const PrivateEnvironment,
+    identifier: []const u8,
+) PrivateName {
     // 1. Let names be privateEnv.[[Names]].
     // 2. For each Private Name pn of names, do
     //     a. If pn.[[Description]] is identifier, then

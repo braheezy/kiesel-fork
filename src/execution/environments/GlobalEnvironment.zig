@@ -33,7 +33,7 @@ outer_env: ?Environment,
 
 /// 9.1.1.4.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
-pub fn hasBinding(self: GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
+pub fn hasBinding(self: *const GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, return true.
     if (self.declarative_record.hasBinding(name)) return true;
@@ -92,7 +92,7 @@ pub fn createImmutableBinding(
 /// 9.1.1.4.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-global-environment-records-initializebinding-n-v
 pub fn initializeBinding(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     value: Value,
@@ -116,7 +116,7 @@ pub fn initializeBinding(
 /// 9.1.1.4.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     value: Value,
@@ -156,7 +156,7 @@ pub fn setMutableBinding(
 /// 9.1.1.4.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     strict: bool,
@@ -183,7 +183,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
-pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
+pub fn deleteBinding(self: *const GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     const property_key: PropertyKey = .{ .string = name };
 
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
@@ -218,35 +218,35 @@ pub fn deleteBinding(self: *GlobalEnvironment, agent: *Agent, name: *const Strin
 
 /// 9.1.1.4.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasthisbinding
-pub fn hasThisBinding(_: GlobalEnvironment) bool {
+pub fn hasThisBinding(_: *const GlobalEnvironment) bool {
     // 1. Return true.
     return true;
 }
 
 /// 9.1.1.4.9 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hassuperbinding
-pub fn hasSuperBinding(_: GlobalEnvironment) bool {
+pub fn hasSuperBinding(_: *const GlobalEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
 /// 9.1.1.4.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-withbaseobject
-pub fn withBaseObject(_: GlobalEnvironment) ?*Object {
+pub fn withBaseObject(_: *const GlobalEnvironment) ?*Object {
     // 1. Return undefined.
     return null;
 }
 
 /// 9.1.1.4.11 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
-pub fn getThisBinding(self: GlobalEnvironment) Value {
+pub fn getThisBinding(self: *const GlobalEnvironment) Value {
     // 1. Return envRec.[[GlobalThisValue]].
     return Value.from(self.global_this_value);
 }
 
 /// 9.1.1.4.12 HasLexicalDeclaration ( envRec, N )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
-pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool {
+pub fn hasLexicalDeclaration(self: *const GlobalEnvironment, name: *const String) bool {
     // 1.Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. Return ! DclRec.HasBinding(N).
     return self.declarative_record.hasBinding(name);
@@ -255,7 +255,7 @@ pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: *const String) bool 
 /// 9.1.1.4.13 HasRestrictedGlobalProperty ( envRec, N )
 /// https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty
 pub fn hasRestrictedGlobalProperty(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
@@ -285,7 +285,7 @@ pub fn hasRestrictedGlobalProperty(
 /// 9.1.1.4.14 CanDeclareGlobalVar ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(
-    self: *GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
@@ -308,7 +308,7 @@ pub fn canDeclareGlobalVar(
 /// 9.1.1.4.15 CanDeclareGlobalFunction ( envRec, N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
 pub fn canDeclareGlobalFunction(
-    self: *GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
 ) Agent.Error!bool {
@@ -344,7 +344,7 @@ pub fn canDeclareGlobalFunction(
 /// 9.1.1.4.16 CreateGlobalVarBinding ( envRec, N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
-    self: *GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     deletable: bool,
@@ -376,7 +376,7 @@ pub fn createGlobalVarBinding(
 /// 9.1.1.4.17 CreateGlobalFunctionBinding ( envRec, N, V, D )
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
-    self: *GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     value: Value,
@@ -418,7 +418,7 @@ pub fn createGlobalFunctionBinding(
 
 /// Combined `hasBinding()` and `getBindingValue()`
 pub fn getBindingValueIfExists(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     strict: bool,
@@ -439,7 +439,7 @@ pub fn getBindingValueIfExists(
 
 /// Combined `hasBinding()` and `setMutableBinding()`
 pub fn setMutableBindingIfExists(
-    self: GlobalEnvironment,
+    self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
     value: Value,

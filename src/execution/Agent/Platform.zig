@@ -76,6 +76,6 @@ pub fn default(io: std.Io, environ_map: *const std.process.Environ.Map) Platform
     };
 }
 
-pub fn deinit(self: Platform) void {
+pub fn deinit(self: *const Platform) void {
     if (Locale != void) self.default_locale.deinit();
 }

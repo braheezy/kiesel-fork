@@ -69,7 +69,7 @@ pub fn bindThisValue(
 
 /// 9.1.1.3.2 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-hasthisbinding
-pub fn hasThisBinding(self: FunctionEnvironment) bool {
+pub fn hasThisBinding(self: *const FunctionEnvironment) bool {
     // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
     // 2. Return true.
     return self.this_binding_status != .lexical;
@@ -77,7 +77,7 @@ pub fn hasThisBinding(self: FunctionEnvironment) bool {
 
 /// 9.1.1.3.3 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-hassuperbinding
-pub fn hasSuperBinding(self: FunctionEnvironment) bool {
+pub fn hasSuperBinding(self: *const FunctionEnvironment) bool {
     // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
     if (self.this_binding_status == .lexical) return false;
 
@@ -88,7 +88,7 @@ pub fn hasSuperBinding(self: FunctionEnvironment) bool {
 
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
-pub fn getThisBinding(self: FunctionEnvironment, agent: *Agent) error{ExceptionThrown}!Value {
+pub fn getThisBinding(self: *const FunctionEnvironment, agent: *Agent) error{ExceptionThrown}!Value {
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
     std.debug.assert(self.this_binding_status != .lexical);
 
@@ -113,7 +113,7 @@ pub const SuperBase = union(enum) {
 
 /// 9.1.1.3.5 GetSuperBase ( envRec )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: FunctionEnvironment, agent: *Agent) std.mem.Allocator.Error!SuperBase {
+pub fn getSuperBase(self: *const FunctionEnvironment, agent: *Agent) std.mem.Allocator.Error!SuperBase {
     // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object orelse {
         // 2. If home is undefined, return undefined.
