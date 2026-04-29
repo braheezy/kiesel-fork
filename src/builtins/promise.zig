@@ -9,7 +9,6 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const Completion = types.Completion;
 const Iterator = types.Iterator;
 const Job = execution.Job;
 const MakeObject = types.MakeObject;
@@ -474,7 +473,7 @@ pub fn newPromiseReactionJob(
             const argument_ = captures_.argument;
 
             // a. Let promiseCapability be reaction.[[Capability]].
-            const promise_capability = reaction_.capability;
+            const maybe_promise_capability = reaction_.capability;
 
             // b. Let type be reaction.[[Type]].
             const @"type" = reaction_.type;
@@ -482,19 +481,24 @@ pub fn newPromiseReactionJob(
             // c. Let handler be reaction.[[Handler]].
             const handler = reaction_.handler;
 
+            const Result = union(enum) {
+                resolve: Value,
+                reject: Value,
+            };
+
             // d. If handler is empty, then
-            const handler_result = if (handler == null) blk: {
+            const handler_result: Result = if (handler == null) blk: {
                 switch (@"type") {
                     // i. If type is fulfill, then
                     .fulfill => {
                         // 1. Let handlerResult be NormalCompletion(argument).
-                        break :blk Completion.normal(argument_);
+                        break :blk .{ .resolve = argument_ };
                     },
                     // ii. Else,
                     //    1. Assert: type is reject.
                     .reject => {
                         // 2. Let handlerResult be ThrowCompletion(argument).
-                        break :blk Completion.throw(argument_);
+                        break :blk .{ .reject = argument_ };
                     },
                 }
             } else blk: {
@@ -506,42 +510,46 @@ pub fn newPromiseReactionJob(
                     .undefined,
                     &.{argument_},
                 )) |value|
-                    break :blk Completion.normal(value)
+                    break :blk .{ .resolve = value }
                 else |err| switch (err) {
                     error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         const exception = agent_.clearException();
-                        break :blk Completion.throw(exception.value);
+                        break :blk .{ .reject = exception.value };
                     },
                 }
             };
 
             // f. If promiseCapability is undefined, then
-            if (promise_capability == null) {
+            const promise_capability = maybe_promise_capability orelse {
                 // i. Assert: handlerResult is not an abrupt completion.
-                std.debug.assert(handler_result.type == .normal);
+                std.debug.assert(handler_result == .resolve);
 
                 // ii. Return empty.
                 return .undefined;
-            }
+            };
 
             // g. Assert: promiseCapability is a PromiseCapability Record.
-            // h. If handlerResult is an abrupt completion, then
-            if (handler_result.type != .normal) {
-                // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
-                return Value.from(promise_capability.?.reject).callAssumeCallable(
-                    agent_,
-                    .undefined,
-                    &.{handler_result.value.?},
-                );
-            }
 
-            // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
-            return Value.from(promise_capability.?.resolve).callAssumeCallable(
-                agent_,
-                .undefined,
-                &.{handler_result.value.?},
-            );
+            switch (handler_result) {
+                // h. If handlerResult is an abrupt completion, then
+                .reject => |value| {
+                    // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
+                    return Value.from(promise_capability.reject).callAssumeCallable(
+                        agent_,
+                        .undefined,
+                        &.{value},
+                    );
+                },
+                .resolve => |value| {
+                    // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
+                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                        agent_,
+                        .undefined,
+                        &.{value},
+                    );
+                },
+            }
         }
     }.func;
     const job: Job = .{ .func = func, .captures = captures };

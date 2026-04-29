@@ -11,7 +11,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const Completion = types.Completion;
+const Completion = builtins.generator.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -109,7 +109,7 @@ pub const prototype = struct {
         }
 
         // 7. Let completion be NormalCompletion(value).
-        const completion = Completion.normal(value);
+        const completion: Completion = .{ .normal = value };
 
         // 8. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
         try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
@@ -152,7 +152,7 @@ pub const prototype = struct {
         const generator = generator_value.asObject().as(AsyncGenerator);
 
         // 5. Let completion be ReturnCompletion(value).
-        const completion = Completion.@"return"(value);
+        const completion: Completion = .{ .@"return" = value };
 
         // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
         try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
@@ -231,7 +231,7 @@ pub const prototype = struct {
         }
 
         // 8. Let completion be ThrowCompletion(exception).
-        const completion = Completion.throw(exception);
+        const completion: Completion = .{ .throw = exception };
 
         // 9. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
         try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
@@ -336,10 +336,10 @@ pub fn asyncGeneratorStart(
             // have to capture the stack to free it regardless.
             const current_stack = suspension.stack;
             defer agent_.gc_allocator.free(current_stack);
-            switch (resume_completion.type) {
-                .normal => {
+            switch (resume_completion) {
+                .normal => |value| {
                     if (suspension.yield_reg != .none) {
-                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
+                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = value;
                     }
                 },
                 // TODO: Integrate throw/return completions with exception handlers in the Vm
@@ -348,17 +348,16 @@ pub fn asyncGeneratorStart(
                     closure_generator.fields.async_generator_state = .draining_queue;
                     closure_generator.fields.evaluation_state = undefined;
 
-                    const completion: Completion = switch (resume_completion.type) {
-                        .@"return" => Completion.normal(resume_completion.value.?),
-                        .throw => Completion.throw(resume_completion.value.?),
-                        else => unreachable,
+                    const completion: Completion = switch (resume_completion) {
+                        .normal => unreachable,
+                        .@"return" => |value| .{ .normal = value },
+                        .throw => |value| .{ .throw = value },
                     };
 
                     try asyncGeneratorCompleteStep(agent_, closure_generator, completion, true, null);
                     try asyncGeneratorDrainQueue(agent_, closure_generator);
                     return;
                 },
-                else => unreachable,
             }
 
             // c. If generatorBody is a Parse Node, then
@@ -378,7 +377,7 @@ pub fn asyncGeneratorStart(
                     error.ExceptionThrown => {
                         const exception = agent_.clearException();
                         // j-k.
-                        try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.throw(exception.value), true, null);
+                        try asyncGeneratorCompleteStep(agent_, closure_generator, .{ .throw = exception.value }, true, null);
                         try asyncGeneratorDrainQueue(agent_, closure_generator);
                         return;
                     },
@@ -409,7 +408,7 @@ pub fn asyncGeneratorStart(
                     const result_value: Value = value orelse .undefined;
 
                     // j. Perform AsyncGeneratorCompleteStep(acGenerator, result, true).
-                    try asyncGeneratorCompleteStep(agent_, closure_generator, Completion.normal(result_value), true, null);
+                    try asyncGeneratorCompleteStep(agent_, closure_generator, .{ .normal = result_value }, true, null);
 
                     // k. Perform AsyncGeneratorDrainQueue(acGenerator).
                     try asyncGeneratorDrainQueue(agent_, closure_generator);
@@ -465,7 +464,10 @@ pub fn asyncGeneratorEnqueue(
     // 1. Let request be AsyncGeneratorRequest {
     //      [[Completion]]: completion, [[Capability]]: promiseCapability
     //    }.
-    const request: AsyncGeneratorRequest = .{ .completion = completion, .capability = promise_capability };
+    const request: AsyncGeneratorRequest = .{
+        .completion = completion,
+        .capability = promise_capability,
+    };
 
     // 2. Append request to generator.[[AsyncGeneratorQueue]].
     try generator.fields.async_generator_queue.append(agent.gc_allocator, request);
@@ -493,46 +495,46 @@ pub fn asyncGeneratorCompleteStep(
     const promise_capability = next.capability;
 
     // 5. Let value be completion.[[Value]].
-    const value = completion.value.?;
-
-    // 6. If completion is a throw completion, then
-    if (completion.type == .throw) {
-        // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
-        _ = Value.from(promise_capability.reject).callAssumeCallable(
-            agent,
-            .undefined,
-            &.{value},
-        ) catch |err| try noexcept(err);
-    } else {
+    switch (completion) {
+        // 6. If completion is a throw completion, then
+        .throw => |value| {
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
+            _ = Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
+                .undefined,
+                &.{value},
+            ) catch |err| try noexcept(err);
+        },
         // 7. Else,
         // a. Assert: completion is a normal completion.
-        std.debug.assert(completion.type == .normal);
+        .normal => |value| {
+            // b. If realm is present, then
+            const iterator_result = if (realm) |new_realm| blk: {
+                // i. Let oldRealm be the running execution context's Realm.
+                const old_realm = agent.runningExecutionContext().realm;
 
-        // b. If realm is present, then
-        const iterator_result = if (realm) |new_realm| blk: {
-            // i. Let oldRealm be the running execution context's Realm.
-            const old_realm = agent.runningExecutionContext().realm;
+                // ii. Set the running execution context's Realm to realm.
+                agent.runningExecutionContext().realm = new_realm;
+                defer agent.runningExecutionContext().realm = old_realm;
 
-            // ii. Set the running execution context's Realm to realm.
-            agent.runningExecutionContext().realm = new_realm;
-            defer agent.runningExecutionContext().realm = old_realm;
+                // iii. Let iteratorResult be CreateIteratorResultObject(value, done).
+                break :blk try createIteratorResultObject(agent, value, done);
 
-            // iii. Let iteratorResult be CreateIteratorResultObject(value, done).
-            break :blk try createIteratorResultObject(agent, value, done);
+                // iv. Set the running execution context's Realm to oldRealm.
+            } else blk: {
+                // c. Else,
+                // i. Let iteratorResult be CreateIteratorResultObject(value, done).
+                break :blk try createIteratorResultObject(agent, value, done);
+            };
 
-            // iv. Set the running execution context's Realm to oldRealm.
-        } else blk: {
-            // c. Else,
-            // i. Let iteratorResult be CreateIteratorResultObject(value, done).
-            break :blk try createIteratorResultObject(agent, value, done);
-        };
-
-        // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
-        _ = Value.from(promise_capability.resolve).callAssumeCallable(
-            agent,
-            .undefined,
-            &.{Value.from(iterator_result)},
-        ) catch |err| try noexcept(err);
+            // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
+            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+                agent,
+                .undefined,
+                &.{Value.from(iterator_result)},
+            ) catch |err| try noexcept(err);
+        },
+        .@"return" => unreachable,
     }
 
     // 8. Return unused.
@@ -585,23 +587,25 @@ pub fn asyncGeneratorResume(
 /// https://tc39.es/ecma262/#sec-asyncgeneratorunwrapyieldresumption
 pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Completion) Agent.Error!Completion {
     // 1. If resumptionValue is not a return completion, return ? resumptionValue.
-    if (resumption_value.type != .@"return") return resumption_value;
+    const value = switch (resumption_value) {
+        .@"return" => |value| value,
+        else => return resumption_value,
+    };
 
     // 2. Let awaited be Completion(Await(resumptionValue.[[Value]])).
-    const awaited = await(agent, resumption_value.value.?);
-
-    // 3. If awaited is a throw completion, return ? awaited.
-    const awaited_value = awaited catch |err| switch (err) {
+    const awaited = await(agent, value) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
+
+        // 3. If awaited is a throw completion, return ? awaited.
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            return Completion.throw(exception.value);
+            return .{ .throw = exception.value };
         },
     };
 
     // 4. Assert: awaited is a normal completion.
     // 5. Return ReturnCompletion(awaited.[[Value]]).
-    return Completion.@"return"(awaited_value);
+    return .{ .@"return" = awaited };
 }
 
 /// 27.6.3.8 AsyncGeneratorYield ( value )
@@ -616,7 +620,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     const generator = generator_context.generator.async_generator;
 
     // 5. Let completion be NormalCompletion(value).
-    const completion = Completion.normal(value);
+    const completion: Completion = .{ .normal = value };
 
     // 6. Assert: The execution context stack has at least two elements.
     std.debug.assert(agent.execution_context_stack.items.len >= 2);
@@ -660,7 +664,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
 
     // TODO: 16. Assert: If control reaches here, then genContext is the running execution context again.
     // TODO: 17. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
-    return Completion.normal(null);
+    return .{ .normal = .undefined };
 }
 
 /// 27.6.3.10 AsyncGeneratorDrainQueue ( generator )
@@ -684,7 +688,7 @@ pub fn asyncGeneratorDrainQueue(
         var completion = next.completion;
 
         // c. If completion is a return completion, then
-        if (completion.type == .@"return") {
+        if (completion == .@"return") {
             // i. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
 
@@ -693,9 +697,9 @@ pub fn asyncGeneratorDrainQueue(
         }
 
         // d. If completion is a normal completion, then
-        if (completion.type == .normal) {
+        if (completion == .normal) {
             // i. Set completion to NormalCompletion(undefined).
-            completion = Completion.normal(.undefined);
+            completion = .{ .normal = .undefined };
         }
 
         // e. Perform AsyncGeneratorCompleteStep(generator, completion, true).
@@ -732,7 +736,7 @@ pub fn asyncGeneratorAwaitReturn(
     const completion = next.completion;
 
     // 6. Assert: completion is a return completion.
-    std.debug.assert(completion.type == .@"return");
+    std.debug.assert(completion == .@"return");
 
     // 7. Let promiseCompletion be Completion(PromiseResolve(%Promise%, completion.[[Value]])).
     // 9. Assert: promiseCompletion is a normal completion.
@@ -740,14 +744,14 @@ pub fn asyncGeneratorAwaitReturn(
     const promise = promiseResolve(
         agent,
         try realm.intrinsics.@"%Promise%"(),
-        completion.value.?,
+        completion.@"return",
     ) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
 
         // 8. If promiseCompletion is an abrupt completion, then
         error.ExceptionThrown => {
             const exception = agent.clearException();
-            const promise_completion = Completion.throw(exception.value);
+            const promise_completion: Completion = .{ .throw = exception.value };
 
             // a. Set generator.[[AsyncGeneratorState]] to completed.
             generator.fields.async_generator_state = .completed;
@@ -784,7 +788,7 @@ pub fn asyncGeneratorAwaitReturn(
             std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be NormalCompletion(value).
-            const result = Completion.normal(value);
+            const result: Completion = .{ .normal = value };
 
             // c. Perform AsyncGeneratorCompleteStep(generator, result, true).
             try asyncGeneratorCompleteStep(agent_, generator_, result, true, null);
@@ -819,7 +823,7 @@ pub fn asyncGeneratorAwaitReturn(
             std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be ThrowCompletion(reason).
-            const result = Completion.throw(reason);
+            const result: Completion = .{ .throw = reason };
 
             // c. Perform AsyncGeneratorCompleteStep(generator, result, true).
             try asyncGeneratorCompleteStep(agent_, generator_, result, true, null);

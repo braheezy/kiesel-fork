@@ -10,7 +10,6 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -78,7 +77,7 @@ pub const prototype = struct {
         const generator = this_value;
 
         // 2. Let C be ReturnCompletion(value).
-        const completion = Completion.@"return"(value);
+        const completion: Completion = .{ .@"return" = value };
 
         // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
         return Value.from(try generatorResumeAbrupt(agent, generator, completion));
@@ -93,7 +92,7 @@ pub const prototype = struct {
         const generator = this_value;
 
         // 2. Let C be ThrowCompletion(exception).
-        const completion = Completion.throw(exception);
+        const completion: Completion = .{ .throw = exception };
 
         // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
         return Value.from(try generatorResumeAbrupt(agent, generator, completion));
@@ -128,6 +127,12 @@ pub const Generator = MakeObject(.{
     .tag = .generator,
     .display_name = "Generator",
 });
+
+pub const Completion = union(enum) {
+    normal: Value,
+    @"return": Value,
+    throw: Value,
+};
 
 /// 27.5.3.1 GeneratorStart ( generator, generatorBody )
 /// https://tc39.es/ecma262/#sec-generatorstart
@@ -171,29 +176,28 @@ pub fn generatorStart(
             // have to capture the stack to free it regardless.
             const current_stack = suspension.stack;
             defer agent_.gc_allocator.free(current_stack);
-            switch (resume_completion.type) {
-                .normal => {
+            switch (resume_completion) {
+                .normal => |value| {
                     if (suspension.yield_reg != .none) {
-                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = resume_completion.value orelse .undefined;
+                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = value;
                     }
                 },
                 // TODO: Integrate throw/return completions with exception handlers in the Vm
-                .@"return", .throw => {
+                .@"return", .throw => |value| {
                     _ = agent_.execution_context_stack.pop().?;
                     closure_generator.fields.generator_state = .completed;
                     closure_generator.fields.evaluation_state = undefined;
 
-                    if (resume_completion.type == .@"return") {
-                        return createIteratorResultObject(agent_, resume_completion.value.?, true);
+                    if (resume_completion == .@"return") {
+                        return createIteratorResultObject(agent_, value, true);
                     }
 
                     agent_.exception = .{
-                        .value = resume_completion.value.?,
-                        .stack_trace = try agent_.captureStackTrace(),
+                        .value = value,
+                        .stack_trace = agent_.captureStackTrace() catch &.{},
                     };
                     return error.ExceptionThrown;
                 },
-                else => unreachable,
             }
 
             // c. If generatorBody is a Parse Node, then
@@ -323,7 +327,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     const result = try generator.fields.evaluation_state.closure(
         agent,
         generator.fields.evaluation_state.generator_function,
-        Completion.normal(value),
+        .{ .normal = value },
     );
 
     // 10. Assert: When we return here, genContext has already been removed from the execution
@@ -362,19 +366,24 @@ pub fn generatorResumeAbrupt(
 
     // 3. If state is completed, then
     if (state == .completed) {
-        // a. If abruptCompletion is a return completion, then
-        if (abrupt_completion.type == .@"return") {
-            // i. Return CreateIteratorResultObject(abruptCompletion.[[Value]], true).
-            return createIteratorResultObject(agent, abrupt_completion.value.?, true);
-        }
+        switch (abrupt_completion) {
+            .normal => unreachable,
 
-        // b. Return ? abruptCompletion.
-        std.debug.assert(abrupt_completion.type == .throw);
-        agent.exception = .{
-            .value = abrupt_completion.value.?,
-            .stack_trace = try agent.captureStackTrace(),
-        };
-        return error.ExceptionThrown;
+            // a. If abruptCompletion is a return completion, then
+            .@"return" => |value| {
+                // i. Return CreateIteratorResultObject(abruptCompletion.[[Value]], true).
+                return createIteratorResultObject(agent, value, true);
+            },
+
+            // b. Return ? abruptCompletion.
+            .throw => |value| {
+                agent.exception = .{
+                    .value = value,
+                    .stack_trace = agent.captureStackTrace() catch &.{},
+                };
+                return error.ExceptionThrown;
+            },
+        }
     }
 
     // 4. Assert: state is suspended-yield.
@@ -464,7 +473,7 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
 
     // TODO: 9. Assert: If control reaches here, then genContext is the running execution context again.
     // TODO: 10. Return resumptionValue.
-    return Completion.normal(null);
+    return .{ .normal = .undefined };
 }
 
 /// 27.5.3.7 Yield ( value )

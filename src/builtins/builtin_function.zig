@@ -11,7 +11,6 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const ClassFieldDefinition = types.ClassFieldDefinition;
-const Completion = types.Completion;
 const ConstructorKind = builtins.ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
@@ -171,7 +170,7 @@ pub fn builtinCallOrConstruct(
         //    thisArgument, argumentsList, and newTarget and performs the following steps when
         //    called:
         const resultsClosure = struct {
-            fn func(agent_: *Agent, captures_ptr: *anyopaque) Agent.Error!Completion {
+            fn func(agent_: *Agent, captures_ptr: *anyopaque) Agent.Error!Value {
                 const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
                 const builtin_function_ = captures_.builtin_function;
                 const this_argument_ = captures_.this_argument;
@@ -191,7 +190,7 @@ pub fn builtinCallOrConstruct(
                 };
 
                 // iii. Return Completion(result).
-                return .@"return"(try result);
+                return result;
             }
         }.func;
 

@@ -11,7 +11,6 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
-const Completion = types.Completion;
 const Iterator = types.Iterator;
 const Number = types.Number;
 const Object = types.Object;
@@ -2237,7 +2236,7 @@ fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg
     const received_value = vm.store(reg);
 
     // TODO: Handle throw/return completions
-    switch (try evaluateYieldStar(vm.agent, &iterator, Completion.normal(received_value))) {
+    switch (try evaluateYieldStar(vm.agent, &iterator, .{ .normal = received_value })) {
         .done => |value| {
             vm.load(reg, value);
             return null;

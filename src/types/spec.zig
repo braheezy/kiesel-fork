@@ -4,7 +4,6 @@ const iterator = @import("spec/iterator.zig");
 pub const Arguments = @import("spec/Arguments.zig");
 pub const ClassFieldDefinition = @import("spec/ClassFieldDefinition.zig");
 pub const ClassStaticBlockDefinition = @import("spec/ClassStaticBlockDefinition.zig");
-pub const Completion = @import("spec/Completion.zig");
 pub const DataBlock = data_block.DataBlock;
 pub const Iterator = iterator.Iterator;
 pub const IteratorKind = iterator.IteratorKind;
@@ -26,6 +25,5 @@ test {
     _ = data_block;
     _ = iterator;
 
-    _ = Completion;
     _ = PropertyDescriptor;
 }

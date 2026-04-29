@@ -12,7 +12,6 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
 const PromiseCapability = builtins.promise.PromiseCapability;
@@ -144,7 +143,7 @@ const AsyncBody = union(enum) {
         arguments: []const Value,
     },
     abstract_closure: struct {
-        func: *const fn (agent: *Agent, captures: *anyopaque) Agent.Error!Completion,
+        func: *const fn (agent: *Agent, captures: *anyopaque) Agent.Error!Value,
         captures: *anyopaque,
     },
     module: ast.Module,
@@ -176,34 +175,34 @@ pub fn asyncBlockStart(
             // c. Else,
             //     i. Assert: asyncBody is an Abstract Closure with no parameters.
             //     ii. Let result be Completion(asyncBody()).
-            const result = switch (async_body_) {
+            const result: Agent.Error!Value = switch (async_body_) {
                 .ecmascript_function => |ef| blk: {
-                    const bc = ef.function.fields.compile(agent_) catch |err| break :blk @as(Agent.Error!Completion, err);
+                    const bc = ef.function.fields.compile(agent_) catch |err| break :blk err;
                     var temp_vm: ?interpreter.Vm = null;
                     defer if (temp_vm) |*vm_| vm_.deinit();
 
                     const vm = agent_.active_vm orelse vm: {
                         // Create a temporary VM if none is active. This happens when draining
                         // the job queue for example.
-                        temp_vm = interpreter.Vm.init(agent_, bc) catch |err| break :blk @as(Agent.Error!Completion, err);
+                        temp_vm = interpreter.Vm.init(agent_, bc) catch |err| break :blk err;
                         break :vm &temp_vm.?;
                     };
 
-                    vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk @as(Agent.Error!Completion, err);
+                    vm.pushCallFrame(bc, ef.arguments) catch |err| break :blk err;
                     const result = vm.run(.{}) catch |err| {
                         vm.popCallFrame();
-                        break :blk @as(Agent.Error!Completion, err);
+                        break :blk err;
                     };
-                    const result_value: Value = switch (result) {
-                        .@"return" => |value| value orelse .undefined,
+                    const result_value = switch (result) {
+                        .@"return" => |value| value,
                         .yield => unreachable,
                     };
-                    break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value));
+                    break :blk result_value orelse .undefined;
                 },
                 .abstract_closure => |abstract_closure| abstract_closure.func(agent_, abstract_closure.captures),
                 .module => |module| blk: {
-                    const result_value = interpreter.compileAndRun(agent_, .{ .module = &module }, "<async module>") catch |err| break :blk @as(Agent.Error!Completion, err);
-                    break :blk @as(Agent.Error!Completion, Completion.@"return"(result_value orelse .undefined));
+                    const result_value = interpreter.compileAndRun(agent_, .{ .module = &module }, "<async module>") catch |err| break :blk err;
+                    break :blk result_value orelse .undefined;
                 },
             };
 
@@ -215,10 +214,7 @@ pub fn asyncBlockStart(
             //    context.
             _ = agent_.execution_context_stack.pop().?;
 
-            if (result) |completion| {
-                std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                const value: Value = completion.value orelse .undefined;
-
+            if (result) |value| {
                 // f. If result is a normal completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
                 // g. Else if result is a return completion, then
