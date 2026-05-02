@@ -3294,6 +3294,14 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
             });
         }
     }
+    // There is always at least one span, but it may have been skipped if empty.
+    if (result == .none) {
+        const string_index = try b.internString("", .literal);
+        return b.addInst(.{
+            .tag = .string,
+            .data = .{ .string = string_index },
+        });
+    }
     return result;
 }
 
@@ -4933,9 +4941,10 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
             } },
         });
         for (raw_indices.items) |string_index| {
-            const ref = try b.addInst(.{ .tag = .string, .data = .{
-                .string = string_index,
-            } });
+            const ref = try b.addInst(.{
+                .tag = .string,
+                .data = .{ .string = string_index },
+            });
             _ = try b.addInst(.{
                 .tag = .array_push,
                 .data = .{ .binary = .{

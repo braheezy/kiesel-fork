@@ -1589,6 +1589,49 @@
         ,
     },
 
+    // Template literal
+    .{
+        .source =
+        \\var empty = ``;
+        \\`${empty}a${"b"}c`;
+        \\
+        ,
+        .expected_result = .{ .value = .{ .string = "abc" } },
+        .expected_ir =
+        \\IR (test)
+        \\  %0: [  0..1  ]                       string @0 ("")
+        \\  %1: [  1..1  ]                       set_binding @1 ("empty"), %0
+        \\  %2: [  2..3  ]                       get_binding @1 ("empty")
+        \\  %3: [  3..5  ]                       to_string %2
+        \\  %4: [  4..5  ]                       string @2 ("a")
+        \\  %5: [  5..8  ]                       add %3, %4
+        \\  %6: [  6..7  ]                       string @3 ("b")
+        \\  %7: [  7..8  ]                       to_string %6
+        \\  %8: [  8..10 ]                       add %5, %7
+        \\  %9: [  9..10 ]                       string @4 ("c")
+        \\ %10: [ 10..11 ]                       add %8, %9
+        \\ %11: [ 11..11 ]                       return %10
+        \\
+        ,
+        .expected_bc =
+        \\Bytecode (test)
+        \\   0: 0a 00 00 00 00 00 00             load_string r0, @0 ("")
+        \\   7: 47 01 00 00 00 00 00             set_binding @1 ("empty"), r0
+        \\  14: 0c 01 00 00 00                   move r1, r0
+        \\  19: 43 00 00 01 00 00 00             get_binding r0, @1 ("empty")
+        \\  26: 1f 01 00 00 00                   to_string r1, r0
+        \\  31: 0a 00 00 02 00 00 00             load_string r0, @2 ("a")
+        \\  38: 26 02 00 01 00 00 00             add r2, r1, r0
+        \\  45: 0a 00 00 03 00 00 00             load_string r0, @3 ("b")
+        \\  52: 1f 01 00 00 00                   to_string r1, r0
+        \\  57: 26 00 00 02 00 01 00             add r0, r2, r1
+        \\  64: 0a 01 00 04 00 00 00             load_string r1, @4 ("c")
+        \\  71: 26 02 00 00 00 01 00             add r2, r0, r1
+        \\  78: 91 02 00                         return r2
+        \\
+        ,
+    },
+
     // Tagged template
     .{
         .source =
