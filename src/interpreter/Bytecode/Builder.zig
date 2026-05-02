@@ -595,20 +595,28 @@ fn emitBinaryOp(
 }
 
 fn emitMoveIfNeeded(b: *Builder, src: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    var index = dest.toIndex().?;
+    if (b.ir.instructions.items(.tag)[@intFromEnum(index)] == .br) {
+        const br = b.ir.instructions.items(.data)[@intFromEnum(index)].br;
+        index = br.target.toIndex().?;
+    }
+    const live_range = b.ir.live_ranges[@intFromEnum(index)];
+    if (live_range.end <= @intFromEnum(index)) return;
+
     const src_reg = switch (src) {
         .none => return,
         _ => b.resolve(src),
     };
     const dest_reg = b.resolve(dest);
-    if (src_reg != dest_reg) {
-        try b.emit(.{
-            .tag = .move,
-            .data = .{ .reg_reg = .{
-                dest_reg,
-                src_reg,
-            } },
-        });
-    }
+    if (src_reg == dest_reg) return;
+
+    try b.emit(.{
+        .tag = .move,
+        .data = .{ .reg_reg = .{
+            dest_reg,
+            src_reg,
+        } },
+    });
 }
 
 fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest_reg: Bytecode.Inst.Reg) Error!void {
