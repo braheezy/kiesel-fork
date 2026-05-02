@@ -442,8 +442,8 @@ pub const Inst = struct {
             .throw = .reg,
             .throw_reference_error = .none,
             .@"return" = .reg,
-            .await = .reg,
-            .yield = .reg,
+            .await = .reg_reg,
+            .yield = .reg_reg,
             .yield_star = .reg_reg,
             .create_function = .reg_function,
             .create_class = .reg_class,
@@ -732,7 +732,8 @@ fn printData(
     const data_tag = Inst.data_tags[@intFromEnum(tag)];
     if (data_tag == .none) return;
     switch (tag) {
-        .@"return", .yield => if (data.reg == .none) return,
+        .@"return" => if (data.reg == .none) return,
+        .yield => if (data.reg_reg[1] == .none) return,
         else => {},
     }
 

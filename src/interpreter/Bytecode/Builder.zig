@@ -1801,10 +1801,13 @@ fn lowerReturn(b: *Builder, value: Ir.Inst.Ref) Error!void {
 
 fn lowerAwait(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
-    try b.emitMoveIfNeeded(value, dest);
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .await,
-        .data = .{ .reg = dest_reg },
+        .data = .{ .reg_reg = .{
+            dest_reg,
+            value_reg,
+        } },
     });
 }
 
@@ -1813,15 +1816,18 @@ fn lowerYield(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
         .none => {
             try b.emit(.{
                 .tag = .yield,
-                .data = .{ .reg = .none },
+                .data = .{ .reg_reg = .{ .none, .none } },
             });
         },
         _ => {
+            const dest_reg = b.resolve(dest);
             const value_reg = b.resolve(value);
-            try b.emitMoveIfNeeded(value, dest);
             try b.emit(.{
                 .tag = .yield,
-                .data = .{ .reg = value_reg },
+                .data = .{ .reg_reg = .{
+                    dest_reg,
+                    value_reg,
+                } },
             });
         },
     }

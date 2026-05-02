@@ -324,8 +324,8 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .throw => vm.executeThrow(data.reg),
                 .throw_reference_error => vm.executeThrowReferenceError(),
                 .@"return" => return vm.executeReturn(data.reg),
-                .await => vm.executeAwait(data.reg),
-                .yield => return vm.executeYield(data.reg, pc),
+                .await => vm.executeAwait(data.reg_reg[0], data.reg_reg[1]),
+                .yield => return vm.executeYield(data.reg_reg[0], data.reg_reg[1], pc),
                 .yield_star => if (vm.executeYieldStar(data.reg_reg[0], data.reg_reg[1], inst_pc)) |maybe_result| if (maybe_result) |result| return result else {} else |err| err,
                 .create_function => vm.executeCreateFunction(data.reg_function[0], data.reg_function[1]),
                 .create_class => vm.executeCreateClass(data.reg_class[0], data.reg_class[1]),
@@ -2198,17 +2198,19 @@ fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) RunResult {
     return .{ .@"return" = return_value };
 }
 
-fn executeAwait(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
-    const value = vm.store(reg);
+fn executeAwait(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+    const value = vm.store(value_reg);
     const result = try await(vm.agent, value);
-    vm.load(reg, result);
+    vm.load(dest, result);
 }
 
-fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
+fn executeYield(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
     // The initial `yield` instruction inserted after FDI doesn't have a register.
-    if (reg != .none) {
-        const value = vm.store(reg);
+    if (dest != .none) {
+        const value = vm.store(value_reg);
         _ = try yield(vm.agent, value);
+    } else {
+        std.debug.assert(value_reg == .none);
     }
 
     const stack_len = vm.frame.stackLen();
@@ -2226,7 +2228,7 @@ fn executeYield(vm: *Vm, reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
         .argument_count = frame.argument_count,
         .scope_depth = frame.scope_depth,
         .saved_pc = pc,
-        .yield_reg = reg,
+        .yield_reg = dest,
     } };
 }
 
