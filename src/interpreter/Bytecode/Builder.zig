@@ -111,7 +111,7 @@ pub fn build(b: *Builder) Error!Bytecode {
     for (b.ir.instructions.items(.tag), b.ir.instructions.items(.data), 0..) |tag, data, i| {
         if (!b.ir.liveness.isSet(i)) continue;
         const index: Ir.Inst.Index = @enumFromInt(i);
-        const dest = b.resolve(index.toRef());
+        const dest = index.toRef();
         switch (tag) {
             .undefined => try b.lowerUndefined(dest),
             .null => try b.lowerNull(dest),
@@ -122,20 +122,20 @@ pub fn build(b: *Builder) Error!Bytecode {
             .number => try b.lowerNumber(data.number, dest),
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
-            .array_create => try b.lowerArrayCreate(index.toRef(), data.array, dest),
-            .array_push => try b.lowerArrayPush(data.binary, dest),
-            .array_spread => try b.lowerArraySpread(data.binary, dest),
+            .array_create => try b.lowerArrayCreate(data.array, dest),
+            .array_push => try b.lowerArrayPush(data.binary),
+            .array_spread => try b.lowerArraySpread(data.binary),
             .object_create => try b.lowerObjectCreate(dest),
-            .object_set => try b.lowerObjectSet(data.set_property, dest),
-            .object_set_computed => try b.lowerObjectSetComputed(data.set_property_computed, dest),
-            .object_set_prototype => try b.lowerObjectSetPrototype(data.binary, dest),
-            .object_spread => try b.lowerObjectSpread(data.binary, dest),
+            .object_set => try b.lowerObjectSet(data.set_property),
+            .object_set_computed => try b.lowerObjectSetComputed(data.set_property_computed),
+            .object_set_prototype => try b.lowerObjectSetPrototype(data.binary),
+            .object_spread => try b.lowerObjectSpread(data.binary),
             .reg_exp => try b.lowerRegExp(data.reg_exp, dest),
             .this => try b.lowerThis(dest),
-            .label => try b.lowerLabel(dest, index.toRef()),
-            .br => try b.lowerBr(data.br, dest),
-            .br_cond => try b.lowerBrCond(data.br_cond, dest),
-            .exception_handler => try b.lowerExceptionHandler(data.exception_handler, index.toRef()),
+            .label => try b.lowerLabel(dest),
+            .br => try b.lowerBr(data.br),
+            .br_cond => try b.lowerBrCond(data.br_cond),
+            .exception_handler => try b.lowerExceptionHandler(data.exception_handler, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
             .to_numeric => try b.lowerToNumeric(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
@@ -219,9 +219,9 @@ pub fn build(b: *Builder) Error!Bytecode {
             .iterator_close => try b.lowerIteratorClose(data.ref),
             .iterator_is_done => try b.lowerIteratorIsDone(data.ref, dest),
             .iterator_collect => try b.lowerIteratorCollect(data.ref, dest),
-            .throw => try b.lowerThrow(data.ref, dest),
-            .throw_reference_error => try b.lowerThrowReferenceError(dest),
-            .@"return" => try b.lowerReturn(data.ref, dest),
+            .throw => try b.lowerThrow(data.ref),
+            .throw_reference_error => try b.lowerThrowReferenceError(),
+            .@"return" => try b.lowerReturn(data.ref),
             .await => try b.lowerAwait(data.ref, dest),
             .yield => try b.lowerYield(data.ref, dest),
             .yield_star => try b.lowerYieldStar(data.ref, dest),
@@ -353,7 +353,7 @@ pub fn build(b: *Builder) Error!Bytecode {
         for (class.element_names, element_name_regs) |name_ref, *reg| {
             reg.* = switch (name_ref) {
                 .none => .none,
-                else => b.resolve(name_ref),
+                _ => b.resolve(name_ref),
             };
         }
         classes_list.appendAssumeCapacity(.{
@@ -366,7 +366,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .class_tail = class.class_tail,
             .heritage = switch (class.heritage) {
                 .none => .none,
-                else => b.resolve(class.heritage),
+                _ => b.resolve(class.heritage),
             },
             .element_names = element_name_regs,
         });
@@ -473,7 +473,10 @@ const Block = struct {
                 if (target != next) {
                     const current_offset = block.offset + block.size();
                     const target_relative: i32 = @as(i32, @intCast(target.offset)) - @as(i32, @intCast(current_offset + jump_size));
-                    try (Bytecode.Inst{ .tag = .jump, .data = .{ .i32 = target_relative } }).encode(writer);
+                    try (Bytecode.Inst{
+                        .tag = .jump,
+                        .data = .{ .i32 = target_relative },
+                    }).encode(writer);
                 }
             },
             .branch => |br| {
@@ -558,12 +561,16 @@ fn emitUnaryOp(
     b: *Builder,
     tag: Bytecode.Inst.Tag,
     operand: Ir.Inst.Ref,
-    dest: Bytecode.Inst.Reg,
+    dest: Ir.Inst.Ref,
 ) Error!void {
+    const dest_reg = b.resolve(dest);
     const operand_reg = b.resolve(operand);
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg = .{ dest, operand_reg } },
+        .data = .{ .reg_reg = .{
+            dest_reg,
+            operand_reg,
+        } },
     });
 }
 
@@ -572,33 +579,42 @@ fn emitBinaryOp(
     tag: Bytecode.Inst.Tag,
     lhs: Ir.Inst.Ref,
     rhs: Ir.Inst.Ref,
-    dest: Bytecode.Inst.Reg,
+    dest: Ir.Inst.Ref,
 ) Error!void {
+    const dest_reg = b.resolve(dest);
     const lhs_reg = b.resolve(lhs);
     const rhs_reg = b.resolve(rhs);
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_reg = .{ dest, lhs_reg, rhs_reg } },
+        .data = .{ .reg_reg_reg = .{
+            dest_reg,
+            lhs_reg,
+            rhs_reg,
+        } },
     });
 }
 
-fn emitMoveIfNeeded(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const src = switch (ref) {
+fn emitMoveIfNeeded(b: *Builder, src: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const src_reg = switch (src) {
         .none => return,
-        else => b.resolve(ref),
+        _ => b.resolve(src),
     };
-    if (src != dest) {
+    const dest_reg = b.resolve(dest);
+    if (src_reg != dest_reg) {
         try b.emit(.{
             .tag = .move,
-            .data = .{ .reg_reg = .{ dest, src } },
+            .data = .{ .reg_reg = .{
+                dest_reg,
+                src_reg,
+            } },
         });
     }
 }
 
-fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest_reg: Bytecode.Inst.Reg) Error!void {
     try b.emit(.{
         .tag = .array_create,
-        .data = .{ .reg_u32 = .{ dest, 0 } },
+        .data = .{ .reg_u32 = .{ dest_reg, 0 } },
     });
     for (args) |arg| {
         const tag: Bytecode.Inst.Tag = blk: {
@@ -609,12 +625,13 @@ fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest: Bytecode.Ins
             }
             break :blk .array_push;
         };
-        // `lowerSpread()` will move the ref into dest, so we use the same register here.
+        // For spread args, `lowerSpread()` will have moved the value into `arg_reg` so we use that
+        // unconditionally instead of resolving the spread value ref.
         const arg_reg = b.resolve(arg);
         try b.emit(.{
             .tag = tag,
             .data = .{ .reg_reg = .{
-                dest,
+                dest_reg,
                 arg_reg,
             } },
         });
@@ -634,102 +651,114 @@ fn nextIcIndex(b: *Builder) Bytecode.Inst.IcIndex {
     return index;
 }
 
-fn lowerUndefined(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerUndefined(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_undefined,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerNull(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerNull(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_null,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerTrue(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerTrue(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_true,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerFalse(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerFalse(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_false,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerZero(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerZero(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_number_i8,
-        .data = .{ .reg_i8 = .{ dest, 0 } },
+        .data = .{ .reg_i8 = .{ dest_reg, 0 } },
     });
 }
 
-fn lowerOne(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerOne(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_number_i8,
-        .data = .{ .reg_i8 = .{ dest, 1 } },
+        .data = .{ .reg_i8 = .{ dest_reg, 1 } },
     });
 }
 
-fn lowerNumber(b: *Builder, n: f64, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerNumber(b: *Builder, n: f64, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     if (n == @floor(n) and !std.math.isNegativeZero(n)) {
         if (n >= std.math.minInt(i8) and n <= std.math.maxInt(i8)) {
             try b.emit(.{
                 .tag = .load_number_i8,
-                .data = .{ .reg_i8 = .{ dest, @intFromFloat(n) } },
+                .data = .{ .reg_i8 = .{ dest_reg, @intFromFloat(n) } },
             });
             return;
         }
         if (n >= std.math.minInt(i32) and n <= std.math.maxInt(i32)) {
             try b.emit(.{
                 .tag = .load_number_i32,
-                .data = .{ .reg_i32 = .{ dest, @intFromFloat(n) } },
+                .data = .{ .reg_i32 = .{ dest_reg, @intFromFloat(n) } },
             });
             return;
         }
     }
     try b.emit(.{
         .tag = .load_number_f64,
-        .data = .{ .reg_f64 = .{ dest, n } },
+        .data = .{ .reg_f64 = .{ dest_reg, n } },
     });
 }
 
-fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerString(b: *Builder, string: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string));
     try b.emit(.{
         .tag = .load_string,
-        .data = .{
-            .reg_string = .{ dest, string_index },
-        },
+        .data = .{ .reg_string = .{
+            dest_reg,
+            string_index,
+        } },
     });
 }
 
-fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerBigInt(b: *Builder, big_int: Ir.Inst.BigIntIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const big_int_index: Bytecode.Inst.BigIntIndex = @enumFromInt(@intFromEnum(big_int));
     try b.emit(.{
         .tag = .load_big_int,
-        .data = .{
-            .reg_big_int = .{ dest, big_int_index },
-        },
+        .data = .{ .reg_big_int = .{
+            dest_reg,
+            big_int_index,
+        } },
     });
 }
 
-fn lowerArrayCreate(b: *Builder, array_ref: Ir.Inst.Ref, data: Ir.Inst.Array, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerArrayCreate(b: *Builder, data: Ir.Inst.Array, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .array_create,
         .data = .{ .reg_u32 = .{
-            dest,
+            dest_reg,
             if (data.has_spread) 0 else data.len,
         } },
     });
 
     if (data.len > 0) {
-        try b.array_states.putNoClobber(b.gpa, array_ref, .{
+        try b.array_states.putNoClobber(b.gpa, dest, .{
             .index = 0,
             .len = data.len,
             .has_spread = data.has_spread,
@@ -737,7 +766,7 @@ fn lowerArrayCreate(b: *Builder, array_ref: Ir.Inst.Ref, data: Ir.Inst.Array, de
     }
 }
 
-fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const array_reg = b.resolve(data.lhs);
     const state = b.array_states.getPtr(data.lhs).?;
     defer {
@@ -780,7 +809,7 @@ fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error
     }
 }
 
-fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const array_reg = b.resolve(data.lhs);
     const value_reg = b.resolve(data.rhs);
     const state = b.array_states.getPtr(data.lhs).?;
@@ -795,22 +824,26 @@ fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Err
 
     try b.emit(.{
         .tag = .array_spread,
-        .data = .{ .reg_reg = .{ array_reg, value_reg } },
+        .data = .{ .reg_reg = .{
+            array_reg,
+            value_reg,
+        } },
     });
 }
 
-fn lowerObjectCreate(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerObjectCreate(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .object_create,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex, _: Bytecode.Inst.Reg) Error!void {
+fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex) Error!void {
     const data = b.ir.extraData(Ir.Inst.SetProperty, extra).data;
     const object_reg = b.resolve(data.base);
     const value_reg = b.resolve(data.value);
-    const string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
 
     const value_index = data.value.toIndex().?;
     const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
@@ -836,13 +869,13 @@ fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex, _: Bytecode.Inst.Reg) 
         },
         .data = .{ .reg_string_reg = .{
             object_reg,
-            string_index,
+            name_index,
             value_reg,
         } },
     });
 }
 
-fn lowerObjectSetComputed(b: *Builder, data: Ir.Inst.ExtraIndex, _: Bytecode.Inst.Reg) Error!void {
+fn lowerObjectSetComputed(b: *Builder, data: Ir.Inst.ExtraIndex) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
     const object_reg = b.resolve(extra.data.base);
     const key_reg = b.resolve(extra.data.property);
@@ -878,7 +911,7 @@ fn lowerObjectSetComputed(b: *Builder, data: Ir.Inst.ExtraIndex, _: Bytecode.Ins
     });
 }
 
-fn lowerObjectSetPrototype(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+fn lowerObjectSetPrototype(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const object_reg = b.resolve(data.lhs);
     const value_reg = b.resolve(data.rhs);
     try b.emit(.{
@@ -890,7 +923,7 @@ fn lowerObjectSetPrototype(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.R
     });
 }
 
-fn lowerObjectSpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Error!void {
+fn lowerObjectSpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const object_reg = b.resolve(data.lhs);
     const value_reg = b.resolve(data.rhs);
     try b.emit(.{
@@ -902,45 +935,43 @@ fn lowerObjectSpread(b: *Builder, data: Ir.Inst.Binary, _: Bytecode.Inst.Reg) Er
     });
 }
 
-fn lowerRegExp(b: *Builder, data: Ir.Inst.RegExp, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerRegExp(b: *Builder, data: Ir.Inst.RegExp, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const pattern_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.pattern));
     const flags_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.flags));
     try b.emit(.{
         .tag = .reg_exp_create,
         .data = .{ .reg_string_string = .{
-            dest,
+            dest_reg,
             pattern_index,
             flags_index,
         } },
     });
 }
 
-fn lowerThis(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerThis(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .resolve_this_binding,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerLabel(b: *Builder, dest: Bytecode.Inst.Reg, label_ref: Ir.Inst.Ref) Error!void {
-    _ = dest;
-    const label_block = b.label_blocks.get(label_ref).?;
+fn lowerLabel(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const label_block = b.label_blocks.get(dest).?;
     if (!b.terminated()) {
         b.jump(label_block);
     }
     b.switchToBlock(label_block);
 }
 
-fn lowerBr(b: *Builder, data: Ir.Inst.Br, dest: Bytecode.Inst.Reg) Error!void {
-    _ = dest;
-    const target_reg = b.resolve(data.target);
-    try b.emitMoveIfNeeded(data.value, target_reg);
+fn lowerBr(b: *Builder, data: Ir.Inst.Br) Error!void {
+    try b.emitMoveIfNeeded(data.value, data.target);
     const target_block = b.label_blocks.get(data.target).?;
     b.jump(target_block);
 }
 
-fn lowerBrCond(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
-    _ = dest;
+fn lowerBrCond(b: *Builder, data: Ir.Inst.ExtraIndex) Error!void {
     const extra = b.ir.extraData(Ir.Inst.BrCond, data);
     const then_block = b.label_blocks.get(extra.data.then_target).?;
     const else_block = b.label_blocks.get(extra.data.else_target).?;
@@ -953,161 +984,165 @@ fn lowerExceptionHandler(b: *Builder, exception_handler: Ir.Inst.ExtraIndex, exc
     const start_block = b.label_blocks.get(extra.start).?;
     const end_block = b.label_blocks.get(extra.end).?;
     const target_block = b.label_blocks.get(extra.target).?;
+    const exception_reg = b.resolve(exception_ref);
     try b.exception_handlers.append(b.gpa, .{
         .start = start_block,
         .end = end_block,
         .target = target_block,
-        .exception_reg = b.resolve(exception_ref),
+        .exception_reg = exception_reg,
         .scope_depth = extra.scope_depth,
     });
 }
 
-fn lowerToNumber(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.to_number, ref, dest);
+fn lowerToNumber(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.to_number, value, dest);
 }
 
-fn lowerToNumeric(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.to_numeric, ref, dest);
+fn lowerToNumeric(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.to_numeric, value, dest);
 }
 
-fn lowerToString(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.to_string, ref, dest);
+fn lowerToString(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.to_string, value, dest);
 }
 
-fn lowerToObject(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.to_object, ref, dest);
+fn lowerToObject(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.to_object, value, dest);
 }
 
-fn lowerNegate(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.negate, ref, dest);
+fn lowerNegate(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.negate, value, dest);
 }
 
-fn lowerBitwiseNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.bitwise_not, ref, dest);
+fn lowerBitwiseNot(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.bitwise_not, value, dest);
 }
 
-fn lowerLogicalNot(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.logical_not, ref, dest);
+fn lowerLogicalNot(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.logical_not, value, dest);
 }
 
-fn lowerTypeof(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitUnaryOp(.typeof, ref, dest);
+fn lowerTypeof(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.typeof, value, dest);
 }
 
-fn lowerTypeofBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerTypeofBinding(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .typeof_binding,
         .data = .{ .reg_string = .{
-            dest,
-            bytecode_string_index,
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_undefined,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .load_true,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerSpread(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitMoveIfNeeded(ref, dest);
+fn lowerSpread(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitMoveIfNeeded(value, dest);
 }
 
-fn lowerAdd(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerAdd(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.add, data.lhs, data.rhs, dest);
 }
 
-fn lowerSub(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSub(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.sub, data.lhs, data.rhs, dest);
 }
 
-fn lowerMul(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerMul(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.mul, data.lhs, data.rhs, dest);
 }
 
-fn lowerDiv(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerDiv(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.div, data.lhs, data.rhs, dest);
 }
 
-fn lowerRem(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerRem(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.rem, data.lhs, data.rhs, dest);
 }
 
-fn lowerExp(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerExp(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.exp, data.lhs, data.rhs, dest);
 }
 
-fn lowerShiftLeft(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerShiftLeft(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.shift_left, data.lhs, data.rhs, dest);
 }
 
-fn lowerShiftRight(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerShiftRight(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.shift_right, data.lhs, data.rhs, dest);
 }
 
-fn lowerShiftRightUnsigned(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerShiftRightUnsigned(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.shift_right_unsigned, data.lhs, data.rhs, dest);
 }
 
-fn lowerBitwiseAnd(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerBitwiseAnd(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.bitwise_and, data.lhs, data.rhs, dest);
 }
 
-fn lowerBitwiseOr(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerBitwiseOr(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.bitwise_or, data.lhs, data.rhs, dest);
 }
 
-fn lowerBitwiseXor(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerBitwiseXor(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.bitwise_xor, data.lhs, data.rhs, dest);
 }
 
-fn lowerLt(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerLt(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.lt, data.lhs, data.rhs, dest);
 }
 
-fn lowerGt(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGt(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.gt, data.lhs, data.rhs, dest);
 }
 
-fn lowerLtEq(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerLtEq(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.lt_eq, data.lhs, data.rhs, dest);
 }
 
-fn lowerGtEq(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGtEq(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.gt_eq, data.lhs, data.rhs, dest);
 }
 
-fn lowerInstanceof(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerInstanceof(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.instanceof, data.lhs, data.rhs, dest);
 }
 
-fn lowerIn(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerIn(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.in, data.lhs, data.rhs, dest);
 }
 
-fn lowerEq(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerEq(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.eq, data.lhs, data.rhs, dest);
 }
 
-fn lowerNotEq(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerNotEq(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.not_eq, data.lhs, data.rhs, dest);
 }
 
-fn lowerEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.eq_strict, data.lhs, data.rhs, dest);
 }
 
-fn lowerNotEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerNotEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.not_eq_strict, data.lhs, data.rhs, dest);
 }
 
@@ -1140,88 +1175,92 @@ fn lowerPopScope(b: *Builder) Error!void {
     });
 }
 
-fn lowerCreateMutableBinding(b: *Builder, string_index: Ir.Inst.StringIndex) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerCreateMutableBinding(b: *Builder, name: Ir.Inst.StringIndex) Error!void {
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .create_mutable_binding,
-        .data = .{ .string = bytecode_string_index },
+        .data = .{ .string = name_index },
     });
 }
 
-fn lowerCreateImmutableBinding(b: *Builder, string_index: Ir.Inst.StringIndex) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerCreateImmutableBinding(b: *Builder, name: Ir.Inst.StringIndex) Error!void {
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .create_immutable_binding,
-        .data = .{ .string = bytecode_string_index },
+        .data = .{ .string = name_index },
     });
 }
 
-fn lowerInitializeBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerInitializeBinding(b: *Builder, name: Ir.Inst.StringIndex, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .initialize_binding,
         .data = .{ .string_reg = .{
-            bytecode_string_index,
+            name_index,
             value_reg,
         } },
     });
     try b.emitMoveIfNeeded(value, dest);
 }
 
-fn lowerGetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerGetBinding(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .get_binding,
         .data = .{ .reg_string = .{
-            dest,
-            bytecode_string_index,
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerGetProperty(b: *Builder, data: Ir.Inst.GetProperty, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetProperty(b: *Builder, data: Ir.Inst.GetProperty, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
     const ic_index = b.nextIcIndex();
     try b.emit(.{
         .tag = .get_property,
         .data = .{ .reg_reg_string_ic = .{
-            dest,
+            dest_reg,
             base_reg,
-            bytecode_string_index,
+            name_index,
             ic_index,
         } },
     });
 }
 
-fn lowerGetPropertyComputed(b: *Builder, data: Ir.Inst.GetPropertyComputed, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetPropertyComputed(b: *Builder, data: Ir.Inst.GetPropertyComputed, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     const property_reg = b.resolve(data.property);
     try b.emit(.{
         .tag = .get_property_computed,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             base_reg,
             property_reg,
         } },
     });
 }
 
-fn lowerGetPropertyIndexed(b: *Builder, data: Ir.Inst.GetPropertyIndexed, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetPropertyIndexed(b: *Builder, data: Ir.Inst.GetPropertyIndexed, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     try b.emit(.{
         .tag = .get_property_indexed,
         .data = .{ .reg_reg_u32 = .{
-            dest,
+            dest_reg,
             base_reg,
             data.index,
         } },
     });
 }
 
-fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Inst.Ref, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerSetBinding(b: *Builder, name: Ir.Inst.StringIndex, value: Ir.Inst.Ref, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     const value_reg = b.resolve(value);
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_binding_strict
@@ -1230,17 +1269,18 @@ fn lowerSetBinding(b: *Builder, string_index: Ir.Inst.StringIndex, value: Ir.Ins
     try b.emit(.{
         .tag = tag,
         .data = .{ .string_reg = .{
-            bytecode_string_index,
+            name_index,
             value_reg,
         } },
     });
     try b.emitMoveIfNeeded(value, dest);
 }
 
-fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const ic_index = b.nextIcIndex();
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_strict
@@ -1251,14 +1291,14 @@ fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: B
         .data = .{ .reg_reg_string_ic = .{
             base_reg,
             value_reg,
-            @enumFromInt(@intFromEnum(extra.data.name)),
+            name_index,
             ic_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
     const base_reg = b.resolve(extra.data.base);
     const property_reg = b.resolve(extra.data.property);
@@ -1278,7 +1318,7 @@ fn lowerSetPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool,
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetPropertyIndexed, data);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
@@ -1297,8 +1337,9 @@ fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, 
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg, update_op: Ir.Inst.UpdateOp, strict: bool) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerUpdateBinding(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref, update_op: Ir.Inst.UpdateOp, strict: bool) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     const tag: Bytecode.Inst.Tag = switch (update_op) {
         .increment_prefix => if (strict) .increment_binding_prefix_strict else .increment_binding_prefix,
         .increment_postfix => if (strict) .increment_binding_postfix_strict else .increment_binding_postfix,
@@ -1308,15 +1349,17 @@ fn lowerUpdateBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Byte
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_string = .{
-            dest,
-            bytecode_string_index,
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerUpdateProperty(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg, strict: bool) Error!void {
+fn lowerUpdateProperty(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
     const extra = b.ir.extraData(Ir.Inst.UpdateProperty, data);
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const tag: Bytecode.Inst.Tag = switch (extra.data.update_op) {
         .increment_prefix => if (strict) .increment_property_prefix_strict else .increment_property_prefix,
         .increment_postfix => if (strict) .increment_property_postfix_strict else .increment_property_postfix,
@@ -1326,15 +1369,16 @@ fn lowerUpdateProperty(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Ins
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_string = .{
-            dest,
+            dest_reg,
             base_reg,
-            @enumFromInt(@intFromEnum(extra.data.name)),
+            name_index,
         } },
     });
 }
 
-fn lowerUpdatePropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg, strict: bool) Error!void {
+fn lowerUpdatePropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
     const extra = b.ir.extraData(Ir.Inst.UpdatePropertyComputed, data);
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
     const property_reg = b.resolve(extra.data.property);
     const tag: Bytecode.Inst.Tag = switch (extra.data.update_op) {
@@ -1346,15 +1390,16 @@ fn lowerUpdatePropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Byte
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             base_reg,
             property_reg,
         } },
     });
 }
 
-fn lowerUpdatePropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg, strict: bool) Error!void {
+fn lowerUpdatePropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
     const extra = b.ir.extraData(Ir.Inst.UpdatePropertyIndexed, data);
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
     const tag: Bytecode.Inst.Tag = switch (extra.data.update_op) {
         .increment_prefix => if (strict) .increment_property_indexed_prefix_strict else .increment_property_indexed_prefix,
@@ -1365,26 +1410,29 @@ fn lowerUpdatePropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytec
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_u32 = .{
-            dest,
+            dest_reg,
             base_reg,
             extra.data.index,
         } },
     });
 }
 
-fn lowerDeleteBinding(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_string_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(string_index));
+fn lowerDeleteBinding(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .delete_binding,
         .data = .{ .reg_string = .{
-            dest,
-            bytecode_string_index,
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerDeleteProperty(b: *Builder, data: Ir.Inst.DeleteProperty, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerDeleteProperty(b: *Builder, data: Ir.Inst.DeleteProperty, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
     const tag: Bytecode.Inst.Tag = if (strict)
         .delete_property_strict
     else
@@ -1392,14 +1440,15 @@ fn lowerDeleteProperty(b: *Builder, data: Ir.Inst.DeleteProperty, strict: bool, 
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_string = .{
-            dest,
+            dest_reg,
             base_reg,
-            @enumFromInt(@intFromEnum(data.name)),
+            name_index,
         } },
     });
 }
 
-fn lowerDeletePropertyComputed(b: *Builder, data: Ir.Inst.DeletePropertyComputed, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerDeletePropertyComputed(b: *Builder, data: Ir.Inst.DeletePropertyComputed, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     const property_reg = b.resolve(data.property);
     const tag: Bytecode.Inst.Tag = if (strict)
@@ -1409,14 +1458,15 @@ fn lowerDeletePropertyComputed(b: *Builder, data: Ir.Inst.DeletePropertyComputed
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             base_reg,
             property_reg,
         } },
     });
 }
 
-fn lowerDeletePropertyIndexed(b: *Builder, data: Ir.Inst.DeletePropertyIndexed, strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerDeletePropertyIndexed(b: *Builder, data: Ir.Inst.DeletePropertyIndexed, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     const tag: Bytecode.Inst.Tag = if (strict)
         .delete_property_indexed_strict
@@ -1425,15 +1475,16 @@ fn lowerDeletePropertyIndexed(b: *Builder, data: Ir.Inst.DeletePropertyIndexed, 
     try b.emit(.{
         .tag = tag,
         .data = .{ .reg_reg_u32 = .{
-            dest,
+            dest_reg,
             base_reg,
             data.index,
         } },
     });
 }
 
-fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.CopyDataProperties, data);
+    const dest_reg = b.resolve(dest);
     const source_reg = b.resolve(extra.data.source);
     const excluded = b.ir.refSlice(extra.end, extra.data.excluded_len);
 
@@ -1441,7 +1492,7 @@ fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode
         try b.emit(.{
             .tag = .copy_data_properties,
             .data = .{ .reg_reg_reg = .{
-                dest,
+                dest_reg,
                 source_reg,
                 .none,
             } },
@@ -1472,19 +1523,20 @@ fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode
     try b.emit(.{
         .tag = .copy_data_properties,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             source_reg,
             excluded_reg,
         } },
     });
 }
 
-fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.Call, data);
+    const dest_reg = b.resolve(dest);
     const callee_reg = b.resolve(extra.data.callee);
     const this_reg = switch (extra.data.this_value) {
-        .none => Bytecode.Inst.Reg.none,
-        else => |ref| b.resolve(ref),
+        .none => .none,
+        _ => |ref| b.resolve(ref),
     };
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
@@ -1499,15 +1551,15 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
     if (args.len <= 2 and !has_spread) {
         try b.emit(switch (this_reg) {
             .none => switch (args.len) {
-                0 => .{ .tag = .call0, .data = .{ .reg_reg = .{ dest, callee_reg } } },
-                1 => .{ .tag = .call1, .data = .{ .reg_reg_reg = .{ dest, callee_reg, b.resolve(args[0]) } } },
-                2 => .{ .tag = .call2, .data = .{ .reg_reg_reg_reg = .{ dest, callee_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+                0 => .{ .tag = .call0, .data = .{ .reg_reg = .{ dest_reg, callee_reg } } },
+                1 => .{ .tag = .call1, .data = .{ .reg_reg_reg = .{ dest_reg, callee_reg, b.resolve(args[0]) } } },
+                2 => .{ .tag = .call2, .data = .{ .reg_reg_reg_reg = .{ dest_reg, callee_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
                 else => unreachable,
             },
             else => switch (args.len) {
-                0 => .{ .tag = .call_property0, .data = .{ .reg_reg_reg = .{ dest, callee_reg, this_reg } } },
-                1 => .{ .tag = .call_property1, .data = .{ .reg_reg_reg_reg = .{ dest, callee_reg, this_reg, b.resolve(args[0]) } } },
-                2 => .{ .tag = .call_property2, .data = .{ .reg_reg_reg_reg_reg = .{ dest, callee_reg, this_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+                0 => .{ .tag = .call_property0, .data = .{ .reg_reg_reg = .{ dest_reg, callee_reg, this_reg } } },
+                1 => .{ .tag = .call_property1, .data = .{ .reg_reg_reg_reg = .{ dest_reg, callee_reg, this_reg, b.resolve(args[0]) } } },
+                2 => .{ .tag = .call_property2, .data = .{ .reg_reg_reg_reg_reg = .{ dest_reg, callee_reg, this_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
                 else => unreachable,
             },
         });
@@ -1522,7 +1574,7 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
         .none => try b.emit(.{
             .tag = .call,
             .data = .{ .reg_reg_reg = .{
-                dest,
+                dest_reg,
                 callee_reg,
                 args_reg,
             } },
@@ -1530,7 +1582,7 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
         else => try b.emit(.{
             .tag = .call_property,
             .data = .{ .reg_reg_reg_reg = .{
-                dest,
+                dest_reg,
                 callee_reg,
                 this_reg,
                 args_reg,
@@ -1539,8 +1591,9 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Err
     }
 }
 
-fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg, strict: bool) Error!void {
+fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
     const extra = b.ir.extraData(Ir.Inst.Call, data);
+    const dest_reg = b.resolve(dest);
     const callee_reg = b.resolve(extra.data.callee);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
@@ -1551,15 +1604,16 @@ fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Ins
     try b.emit(.{
         .tag = if (strict) .call_direct_eval_strict else .call_direct_eval,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             callee_reg,
             args_reg,
         } },
     });
 }
 
-fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.Construct, data);
+    const dest_reg = b.resolve(dest);
     const constructor_reg = b.resolve(extra.data.constructor);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
@@ -1573,9 +1627,9 @@ fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
 
     if (args.len <= 2 and !has_spread) {
         try b.emit(switch (args.len) {
-            0 => .{ .tag = .construct0, .data = .{ .reg_reg = .{ dest, constructor_reg } } },
-            1 => .{ .tag = .construct1, .data = .{ .reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]) } } },
-            2 => .{ .tag = .construct2, .data = .{ .reg_reg_reg_reg = .{ dest, constructor_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
+            0 => .{ .tag = .construct0, .data = .{ .reg_reg = .{ dest_reg, constructor_reg } } },
+            1 => .{ .tag = .construct1, .data = .{ .reg_reg_reg = .{ dest_reg, constructor_reg, b.resolve(args[0]) } } },
+            2 => .{ .tag = .construct2, .data = .{ .reg_reg_reg_reg = .{ dest_reg, constructor_reg, b.resolve(args[0]), b.resolve(args[1]) } } },
             else => unreachable,
         });
         return;
@@ -1588,22 +1642,23 @@ fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
     try b.emit(.{
         .tag = .construct,
         .data = .{ .reg_reg_reg = .{
-            dest,
+            dest_reg,
             constructor_reg,
             args_reg,
         } },
     });
 }
 
-fn lowerGetTemplateObject(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetTemplateObject(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.GetTemplateObject, extra_index);
+    const dest_reg = b.resolve(dest);
     const cooked_reg = b.resolve(extra.data.cooked);
     const raw_reg = b.resolve(extra.data.raw);
 
     try b.emit(.{
         .tag = .get_template_object,
         .data = .{ .reg_reg_reg_u16 = .{
-            dest,
+            dest_reg,
             cooked_reg,
             raw_reg,
             @intCast(extra.data.id),
@@ -1611,105 +1666,112 @@ fn lowerGetTemplateObject(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: By
     });
 }
 
-fn lowerGetIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const value_reg = b.resolve(ref);
+fn lowerGetIterator(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .get_iterator,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             value_reg,
         } },
     });
 }
 
-fn lowerGetAsyncIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const value_reg = b.resolve(ref);
+fn lowerGetAsyncIterator(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .get_async_iterator,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             value_reg,
         } },
     });
 }
 
-fn lowerGetForInIterator(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const value_reg = b.resolve(ref);
+fn lowerGetForInIterator(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .get_for_in_iterator,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             value_reg,
         } },
     });
 }
 
-fn lowerIteratorStep(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorStep(b: *Builder, iterator: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_step,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             iterator_reg,
         } },
     });
 }
 
-fn lowerIteratorStepValue(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorStepValue(b: *Builder, iterator: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_step_value,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             iterator_reg,
         } },
     });
 }
 
-fn lowerIteratorStepValueAsync(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorStepValueAsync(b: *Builder, iterator: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_step_value_async,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             iterator_reg,
         } },
     });
 }
 
-fn lowerIteratorClose(b: *Builder, ref: Ir.Inst.Ref) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorClose(b: *Builder, iterator: Ir.Inst.Ref) Error!void {
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_close,
         .data = .{ .reg = iterator_reg },
     });
 }
 
-fn lowerIteratorIsDone(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorIsDone(b: *Builder, iterator: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_is_done,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             iterator_reg,
         } },
     });
 }
 
-fn lowerIteratorCollect(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iterator_reg = b.resolve(ref);
+fn lowerIteratorCollect(b: *Builder, iterator: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const iterator_reg = b.resolve(iterator);
     try b.emit(.{
         .tag = .iterator_collect,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             iterator_reg,
         } },
     });
 }
 
-fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    _ = dest;
-    const value_reg = b.resolve(ref);
+fn lowerThrow(b: *Builder, value: Ir.Inst.Ref) Error!void {
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .throw,
         .data = .{ .reg = value_reg },
@@ -1717,8 +1779,7 @@ fn lowerThrow(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void
     b.noreturn();
 }
 
-fn lowerThrowReferenceError(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
-    _ = dest;
+fn lowerThrowReferenceError(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .throw_reference_error,
         .data = .{ .none = {} },
@@ -1726,9 +1787,11 @@ fn lowerThrowReferenceError(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
     b.noreturn();
 }
 
-fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    _ = dest;
-    const ret_reg = if (ref == .none) Bytecode.Inst.Reg.none else b.resolve(ref);
+fn lowerReturn(b: *Builder, value: Ir.Inst.Ref) Error!void {
+    const ret_reg = switch (value) {
+        .none => .none,
+        _ => b.resolve(value),
+    };
     try b.emit(.{
         .tag = .@"return",
         .data = .{ .reg = ret_reg },
@@ -1736,108 +1799,131 @@ fn lowerReturn(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!voi
     b.noreturn();
 }
 
-fn lowerAwait(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    try b.emitMoveIfNeeded(ref, dest);
+fn lowerAwait(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    try b.emitMoveIfNeeded(value, dest);
     try b.emit(.{
         .tag = .await,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerYield(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    if (ref == .none) {
-        try b.emit(.{
-            .tag = .yield,
-            .data = .{ .reg = .none },
-        });
-    } else {
-        try b.emitMoveIfNeeded(ref, dest);
-        try b.emit(.{
-            .tag = .yield,
-            .data = .{ .reg = dest },
-        });
+fn lowerYield(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    switch (value) {
+        .none => {
+            try b.emit(.{
+                .tag = .yield,
+                .data = .{ .reg = .none },
+            });
+        },
+        _ => {
+            const value_reg = b.resolve(value);
+            try b.emitMoveIfNeeded(value, dest);
+            try b.emit(.{
+                .tag = .yield,
+                .data = .{ .reg = value_reg },
+            });
+        },
     }
 }
 
-fn lowerYieldStar(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const iter_reg = b.resolve(ref);
+fn lowerYieldStar(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const value_reg = b.resolve(value);
     try b.emit(.{
         .tag = .load_undefined,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
     try b.emit(.{
         .tag = .yield_star,
-        .data = .{ .reg_reg = .{ dest, iter_reg } },
+        .data = .{ .reg_reg = .{
+            dest_reg,
+            value_reg,
+        } },
     });
 }
 
-fn lowerCreateFunction(b: *Builder, function_index: Ir.Inst.FunctionIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_function_index: Bytecode.Inst.FunctionIndex = @enumFromInt(@intFromEnum(function_index));
+fn lowerCreateFunction(b: *Builder, function: Ir.Inst.FunctionIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const function_index: Bytecode.Inst.FunctionIndex = @enumFromInt(@intFromEnum(function));
     try b.emit(.{
         .tag = .create_function,
         .data = .{ .reg_function = .{
-            dest,
-            bytecode_function_index,
+            dest_reg,
+            function_index,
         } },
     });
 }
 
-fn lowerCreateClass(b: *Builder, class_index: Ir.Inst.ClassIndex, dest: Bytecode.Inst.Reg) Error!void {
-    const bytecode_class_index: Bytecode.Inst.ClassIndex = @enumFromInt(@intFromEnum(class_index));
+fn lowerCreateClass(b: *Builder, class: Ir.Inst.ClassIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const class_index: Bytecode.Inst.ClassIndex = @enumFromInt(@intFromEnum(class));
     try b.emit(.{
         .tag = .create_class,
         .data = .{ .reg_class = .{
-            dest,
-            bytecode_class_index,
+            dest_reg,
+            class_index,
         } },
     });
 }
 
-fn lowerCreateUnmappedArgumentsObject(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerCreateUnmappedArgumentsObject(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .create_unmapped_arguments_object,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerCreateMappedArgumentsObject(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerCreateMappedArgumentsObject(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .create_mapped_arguments_object,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerGetArgument(b: *Builder, arg_index: u16, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetArgument(b: *Builder, arg_index: u16, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .get_argument,
-        .data = .{ .reg_u16 = .{ dest, arg_index } },
+        .data = .{ .reg_u16 = .{
+            dest_reg,
+            arg_index,
+        } },
     });
 }
 
-fn lowerGetRestArguments(b: *Builder, start_index: u16, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetRestArguments(b: *Builder, start_index: u16, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .get_rest_arguments,
-        .data = .{ .reg_u16 = .{ dest, start_index } },
+        .data = .{ .reg_u16 = .{
+            dest_reg,
+            start_index,
+        } },
     });
 }
 
-fn lowerGetNewTarget(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetNewTarget(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .get_new_target,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
 
-fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
 }
 
-fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
 }
 
-fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SuperCall, data);
+    const dest_reg = b.resolve(dest);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
     const args_reg = try b.lsra.allocateTemp(b.gpa);
@@ -1847,30 +1933,40 @@ fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg
     try b.emit(.{
         .tag = .super_call,
         .data = .{ .reg_reg = .{
-            dest,
+            dest_reg,
             args_reg,
         } },
     });
 }
 
-fn lowerGetSuperProperty(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetSuperProperty(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .get_super_property,
-        .data = .{ .reg_string = .{ dest, @as(Bytecode.Inst.StringIndex, @enumFromInt(@intFromEnum(string_index))) } },
+        .data = .{ .reg_string = .{
+            dest_reg,
+            name_index,
+        } },
     });
 }
 
-fn lowerGetSuperPropertyComputed(b: *Builder, ref: Ir.Inst.Ref, dest: Bytecode.Inst.Reg) Error!void {
-    const property_reg = b.resolve(ref);
+fn lowerGetSuperPropertyComputed(b: *Builder, property: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const property_reg = b.resolve(property);
     try b.emit(.{
         .tag = .get_super_property_computed,
-        .data = .{ .reg_reg = .{ dest, property_reg } },
+        .data = .{ .reg_reg = .{
+            dest_reg,
+            property_reg,
+        } },
     });
 }
 
-fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
     const value_reg = b.resolve(extra.data.value);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_super_property_strict
     else
@@ -1879,13 +1975,13 @@ fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict:
         .tag = tag,
         .data = .{ .reg_string = .{
             value_reg,
-            @enumFromInt(@intFromEnum(extra.data.name)),
+            name_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetSuperPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetSuperPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
     const property_reg = b.resolve(extra.data.property);
     const value_reg = b.resolve(extra.data.value);
@@ -1917,73 +2013,82 @@ fn lowerPopPrivateScope(b: *Builder) Error!void {
     });
 }
 
-fn lowerCreatePrivateElement(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerCreatePrivateElement(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .create_private_element,
         .data = .{ .reg_string = .{
-            dest,
-            @enumFromInt(@intFromEnum(string_index)),
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerResolvePrivateElement(b: *Builder, string_index: Ir.Inst.StringIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerResolvePrivateElement(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(name));
     try b.emit(.{
         .tag = .resolve_private_element,
         .data = .{ .reg_string = .{
-            dest,
-            @enumFromInt(@intFromEnum(string_index)),
+            dest_reg,
+            name_index,
         } },
     });
 }
 
-fn lowerGetPrivateElement(b: *Builder, data: Ir.Inst.GetProperty, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetPrivateElement(b: *Builder, data: Ir.Inst.GetProperty, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
     try b.emit(.{
         .tag = .get_private_element,
         .data = .{ .reg_reg_string = .{
-            dest,
+            dest_reg,
             base_reg,
-            @enumFromInt(@intFromEnum(data.name)),
+            name_index,
         } },
     });
 }
 
-fn lowerSetPrivateElement(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerSetPrivateElement(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
     const base_reg = b.resolve(extra.data.base);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const value_reg = b.resolve(extra.data.value);
     try b.emit(.{
         .tag = .set_private_element,
         .data = .{ .reg_string_reg = .{
             base_reg,
-            @enumFromInt(@intFromEnum(extra.data.name)),
+            name_index,
             value_reg,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerHasPrivateElement(b: *Builder, data: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerHasPrivateElement(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
     try b.emitBinaryOp(.has_private_element, data.lhs, data.rhs, dest);
 }
 
-fn lowerImportCall(b: *Builder, binary: Ir.Inst.Binary, dest: Bytecode.Inst.Reg) Error!void {
-    const specifier = b.resolve(binary.lhs);
-    const options = b.resolve(binary.rhs);
+fn lowerImportCall(b: *Builder, binary: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
+    const specifier_reg = b.resolve(binary.lhs);
+    const options_reg = b.resolve(binary.rhs);
     try b.emit(.{
         .tag = .import_call,
         .data = .{ .reg_reg_reg = .{
-            dest,
-            specifier,
-            options,
+            dest_reg,
+            specifier_reg,
+            options_reg,
         } },
     });
 }
 
-fn lowerGetImportMeta(b: *Builder, dest: Bytecode.Inst.Reg) Error!void {
+fn lowerGetImportMeta(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+    const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .get_import_meta,
-        .data = .{ .reg = dest },
+        .data = .{ .reg = dest_reg },
     });
 }
