@@ -7,6 +7,7 @@
 [![Zig](https://img.shields.io/badge/Zig-0.16-f7a41d)](https://ziglang.org/download/)
 [![License](https://img.shields.io/badge/License-MIT-d63e97)](https://codeberg.org/kiesel-js/kiesel/src/branch/main/LICENSE)
 [![CI](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcodeberg.org%2Fapi%2Fv1%2Frepos%2Fkiesel-js%2Fkiesel%2Fcommits%2Fmain%2Fstatus&query=statuses%5B0%5D.status&label=CI&labelColor=gray&color=blue)](https://codeberg.org/kiesel-js/kiesel/actions?workflow=ci.yml)
+[![Matrix](https://img.shields.io/matrix/kiesel-development:matrix.org?logo=matrix)](https://matrix.to/#/#kiesel-development:matrix.org)
 
 <img src="https://kiesel.dev/kiesel.svg" height="200" alt="logo">
 
