@@ -128,7 +128,7 @@ fn compileRegexp(
 
     // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
     const buf = switch (pattern.asAsciiOrUtf16()) {
-        .ascii => |ascii| try gpa.dupeZ(u8, ascii),
+        .ascii => |ascii| try gpa.dupeSentinel(u8, ascii, 0),
         .utf16 => |utf16| try std.fmt.allocPrintSentinel(
             gpa,
             "{f}",

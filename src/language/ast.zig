@@ -482,7 +482,7 @@ pub const RegularExpressionLiteral = struct {
         var re_bytecode_len: c_int = undefined;
         var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
-        const buf = try allocator.dupeZ(u8, self.pattern);
+        const buf = try allocator.dupeSentinel(u8, self.pattern, 0);
         defer allocator.free(buf);
         var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
