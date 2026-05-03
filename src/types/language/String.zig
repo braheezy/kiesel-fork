@@ -884,7 +884,7 @@ pub fn HashMapUnmanaged(comptime V: type) type {
 }
 
 pub fn ArrayHashMapUnmanaged(comptime V: type) type {
-    return std.ArrayHashMapUnmanaged(*const String, V, struct {
+    return std.array_hash_map.Custom(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u32 {
             return @truncate(key.hash);
         }

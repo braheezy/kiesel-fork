@@ -68,7 +68,7 @@ pub const ModuleRequest = struct {
     }
 
     pub fn ArrayHashMapUnmanaged(comptime V: type) type {
-        return std.ArrayHashMapUnmanaged(ModuleRequest, V, struct {
+        return std.array_hash_map.Custom(ModuleRequest, V, struct {
             pub fn hash(_: @This(), key: ModuleRequest) u32 {
                 // The order of import attributes doesn't matter so we force a hash collision for
                 // equal specifiers and defer to eql() for the final decision.

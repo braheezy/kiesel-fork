@@ -62,7 +62,7 @@ const StringContext = struct {
 };
 
 fn StringArrayHashMapUnmanaged(comptime V: type) type {
-    return std.ArrayHashMapUnmanaged(StringKey, V, StringContext, true);
+    return std.array_hash_map.Custom(StringKey, V, StringContext, true);
 }
 
 const BigIntContext = struct {
@@ -81,7 +81,7 @@ const BigIntContext = struct {
 };
 
 fn BigIntArrayHashMapUnmanaged(comptime V: type) type {
-    return std.ArrayHashMapUnmanaged(std.math.big.int.Const, V, BigIntContext, true);
+    return std.array_hash_map.Custom(std.math.big.int.Const, V, BigIntContext, true);
 }
 
 const BreakableContext = struct {
@@ -565,7 +565,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; else let
     //    hasDuplicates be false.
     const has_duplicates = blk: {
-        var seen: std.StringArrayHashMapUnmanaged(void) = .empty;
+        var seen: std.array_hash_map.String(void) = .empty;
         defer seen.deinit(b.gpa);
         for (parameter_names.items) |name| {
             const gop = try seen.getOrPut(b.gpa, name);
@@ -596,7 +596,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     try function_body.collectLexicallyDeclaredNames(b.gpa, &lexical_names);
 
     // 12. Let functionNames be a new empty List.
-    var function_names: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var function_names: std.array_hash_map.String(void) = .empty;
     defer function_names.deinit(b.gpa);
 
     // 13. Let functionsToInitialize be a new empty List.
@@ -685,7 +685,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // NOTE: This is handled by `push_scope`.
     }
 
-    var already_declared: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var already_declared: std.array_hash_map.String(void) = .empty;
     defer already_declared.deinit(b.gpa);
 
     // 21. For each String paramName of parameterNames, do
@@ -859,7 +859,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
 
         // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names: std.StringArrayHashMapUnmanaged(void) = .empty;
+        var instantiated_var_names: std.array_hash_map.String(void) = .empty;
         defer instantiated_var_names.deinit(b.gpa);
         for (parameter_names.items) |name| {
             try instantiated_var_names.put(b.gpa, name, {});
@@ -914,7 +914,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         b.scope_depth += 1;
 
         // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names: std.StringArrayHashMapUnmanaged(void) = .empty;
+        var instantiated_var_names: std.array_hash_map.String(void) = .empty;
         defer instantiated_var_names.deinit(b.gpa);
 
         // e. For each element n of varNames, do

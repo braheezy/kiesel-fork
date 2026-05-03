@@ -196,7 +196,7 @@ pub const PropertyKey = union(enum) {
     }
 
     pub fn ArrayHashMapUnmanaged(comptime V: type) type {
-        return std.ArrayHashMapUnmanaged(PropertyKey, V, struct {
+        return std.array_hash_map.Custom(PropertyKey, V, struct {
             pub fn hash(_: @This(), property_key: PropertyKey) u32 {
                 return @truncate(property_key.hash());
             }

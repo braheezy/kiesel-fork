@@ -2406,7 +2406,7 @@ pub fn toIntegerIfIntegral(self: Value, agent: *Agent) Agent.Error!f64 {
 }
 
 pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
-    return std.ArrayHashMapUnmanaged(Value, V, struct {
+    return std.array_hash_map.Custom(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {
             const value_hash = switch (key.type()) {
                 .undefined, .null => 0,

@@ -10,7 +10,7 @@ const String = types.String;
 
 const Cache = @This();
 
-pub const Entries = std.ArrayHashMapUnmanaged(*Entry.Link, void, struct {
+pub const Entries = std.array_hash_map.Custom(*Entry.Link, void, struct {
     cache: *Cache,
     pub fn hash(ctx: @This(), link: *Entry.Link) u32 {
         if (link.entry == null) {

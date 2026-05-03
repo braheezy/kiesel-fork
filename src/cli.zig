@@ -35,7 +35,7 @@ const regExpCreateFast = kiesel.builtins.regExpCreateFast;
 const regExpExec = kiesel.builtins.regExpExec;
 const temporaryChange = kiesel.utils.temporaryChange;
 
-var tracked_promise_rejections: std.AutoArrayHashMapUnmanaged(
+var tracked_promise_rejections: std.array_hash_map.Auto(
     *kiesel.builtins.Promise,
     HostHooks.PromiseRejectionTrackerOperation,
 ) = .empty;
