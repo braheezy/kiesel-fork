@@ -99,7 +99,7 @@ pub const default: *const InternalMethods = &.{
     .ownPropertyKeys = builtins.ordinary.internal_methods.ownPropertyKeys,
     .call = null,
     .construct = null,
-    .flags = .initFull(),
+    .flags = .full,
 };
 
 const Overwrites = struct {

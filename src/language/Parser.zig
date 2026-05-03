@@ -633,7 +633,7 @@ fn ensureUniquePrivateClassElementNames(
 
         const result = try seen_private_names.getOrPut(self.allocator, private_identifier);
         if (!result.found_existing) {
-            result.value_ptr.* = .initEmpty();
+            result.value_ptr.* = .empty;
         }
         const seen = result.value_ptr;
 
