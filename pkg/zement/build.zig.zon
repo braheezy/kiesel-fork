@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .build_crab = .{
-            .url = "git+https://github.com/linusg/build.crab#c577ae2feb554f4d0a5ae040f0b1baaf0fbc2a89",
-            .hash = "build_crab-0.2.1-U0id_yWfAAB_NYIQyQtHEkey22ve3MxcyXF0DKL9GybE",
+            .url = "git+https://github.com/linusg/build.crab#8592bb943546f1b08cdcb3a23701750737f40af5",
+            .hash = "build_crab-0.3.0-U0id_xWbAAD_ILwDslPuOn6XptkUzaGgJqRtO8aV_naN",
         },
     },
     .paths = .{

@@ -9,18 +9,18 @@
             .hash = "args-0.0.0-CiLiqmvgAADyJmrzcQTP9IOYNvTzR_KGrg3ZNNsH2Qv0",
         },
         .bdwgc_zig = .{
-            .url = "git+https://github.com/bdwgc/bdwgc-zig#946159a3e470a9f0df6cf53697ab290eda47409d",
-            .hash = "bdwgc_zig-0.1.0-ffcEgZp8AAAt9ub7vBOnk0hGK5XB-ocp5o0ofTb7wDCt",
+            .url = "git+https://github.com/bdwgc/bdwgc-zig#1cfcd9ea8947e172f20b028fbc52e778632fa407",
+            .hash = "bdwgc_zig-0.1.0-ffcEgVh8AAAhDLt3oykzvhRx_WDGdHCoqmswDTnmei6b",
             .lazy = true,
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linus/icu4zig#bc79765907d6900122cddb3623ec1be9c78f1427",
-            .hash = "icu4zig-0.1.0-IT7GrJalAgDqj5Od_0nlLHoYcwSDRmXqzGbd4B6aA1E_",
+            .url = "git+https://codeberg.org/linus/icu4zig#13caca132022c0acd9a0c04356ebf7d758340b8a",
+            .hash = "icu4zig-0.1.0-IT7GrJalAgC00wqxu8c6JBs8A580wS-QrXBE7FJ1ZVaz",
             .lazy = true,
         },
         .known_folders = .{
-            .url = "git+https://github.com/ziglibs/known-folders#d6d03830968cca6b7b9f24fd97ee348346a6905d",
-            .hash = "known_folders-0.0.0-Fy-PJk3KAACzUg2us_0JvQQmod1ZA8jBt7MuoKCihq88",
+            .url = "git+https://github.com/ziglibs/known-folders#207c34a16e4365edc20d92c7892f962b3bed46e8",
+            .hash = "known_folders-0.0.0-Fy-PJsbKAACbDh9bBxR0MMThxZSS6A9RH4apWphNHY70",
         },
         .libregexp = .{
             .path = "./pkg/libregexp",
@@ -44,9 +44,8 @@
             .lazy = true,
         },
         .unicode_id = .{
-            // TODO: Update once https://codeberg.org/injuly/unicode-id/pulls/6 is merged
-            .url = "git+https://codeberg.org/linus/unicode-id#54d5c7e358b8611d51eac6e267f1c09e82b22da3",
-            .hash = "unicode_id-0.0.1-u-LDL5GDAQCa9YKe-BPODc1rWKVdccVj3In-sKQ-wzeh",
+            .url = "git+https://codeberg.org/linus/unicode-id#107488ed2dea04ef30a79538ded406d84a164901",
+            .hash = "unicode_id-0.0.1-u-LDL5CDAQArdOvYpoHk9jOi8A9QbZwUD0JB3CjZ7i6O",
         },
         .zement = .{
             .path = "./pkg/zement",

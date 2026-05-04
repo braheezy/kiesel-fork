@@ -659,7 +659,7 @@ const GetHistoryPathError =
     std.Io.File.OpenError;
 
 fn getHistoryPath(gpa: std.mem.Allocator, io: std.Io, environ_map: *const std.process.Environ.Map) GetHistoryPathError![]const u8 {
-    const data_path = try known_folders.getPath(io, gpa, environ_map.*, .data) orelse ".";
+    const data_path = try known_folders.getPath(io, gpa, environ_map, .data) orelse ".";
     defer gpa.free(data_path);
 
     const kiesel_data_path = try std.Io.Dir.path.join(gpa, &.{ data_path, "kiesel" });
