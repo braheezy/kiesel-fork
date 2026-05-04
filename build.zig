@@ -92,7 +92,7 @@ pub fn build(b: *std.Build) void {
     const zigline = b.dependency("zigline", .{});
 
     const kiesel = b.addModule("kiesel", .{
-        .root_source_file = b.path("src/kiesel.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .imports = &.{
             .{ .name = "build-options", .module = options.createModule() },
             .{ .name = "ptk", .module = parser_toolkit.module("parser-toolkit") },
