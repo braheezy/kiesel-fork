@@ -89,11 +89,18 @@ fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
     // Polyfill a basic console.log, too many things expect it to exist.
     // We can't invoke eval() directly as functions need an active script or module.
     const script = Script.parse(
-        \\globalThis.console = {
-        \\    log(...args) {
-        \\        Kiesel.print(args.join(" "));
+        \\Object.defineProperties(globalThis, {
+        \\    console: {
+        \\        value: {
+        \\            log(...args) {
+        \\                Kiesel.print(args.join(" "));
+        \\            },
+        \\        },
+        \\        writable: true,
+        \\        enumerable: false,
+        \\        configurable: true,
         \\    },
-        \\};
+        \\});
     , realm, null, .{}) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         error.ParseError => unreachable,
