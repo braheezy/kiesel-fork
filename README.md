@@ -90,7 +90,7 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | `enable-temporal`   | `true`                                       | Enables support for [Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal), depends on `cargo` |
 | `strip`             | `true` for release builds, `false` otherwise | Whether or not to strip debug symbols                                                                                                         |
 | `use-llvm`          | `true`                                       | Whether or not to use Zig's LLVM backend                                                                                                      |
-| `version-string`    | `0.1.0-dev+<commit>`                         | Version string override                                                                                                                       |
+| `version-string`    | Read from git                                | Version string override                                                                                                                       |
 
 ## Usage
 

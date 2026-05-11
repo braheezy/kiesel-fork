@@ -1,7 +1,11 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+const manifest = @import("build.zig.zon");
+
+const kiesel_version = std.SemanticVersion.parse(manifest.version) catch unreachable;
+
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -56,23 +60,65 @@ pub fn build(b: *std.Build) void {
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
     // Defaults to true for now as the self-hosted backend in 0.16 fails with a linker error.
     const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend") orelse true;
-    const version_string = b.option(
-        []const u8,
-        "version-string",
-        "Version string, read from git by default",
-    ) orelse blk: {
-        const base_version: []const u8 = "0.1.0";
-        var code: u8 = undefined;
-        const output = b.runAllowFail(
-            &.{ "git", "-C", b.build_root.path orelse ".", "rev-parse", "--short=9", "HEAD" },
-            &code,
-            .ignore,
-        ) catch break :blk base_version;
-        const git_revision = std.mem.trim(u8, output, "\n");
-        break :blk b.fmt("{s}-dev+{s}", .{ base_version, git_revision });
-    };
+    const maybe_version_string = b.option([]const u8, "version-string", "Version string, read from git by default");
 
-    const version = std.SemanticVersion.parse(version_string) catch @panic("Invalid version");
+    // https://codeberg.org/ziglang/zig/src/commit/9787df9421ad9d3fcb08cc7b394656542b16cfae/build.zig#L254-L309
+    const version_string = maybe_version_string orelse v: {
+        const version_string = b.fmt("{d}.{d}.{d}", .{ kiesel_version.major, kiesel_version.minor, kiesel_version.patch });
+
+        var code: u8 = undefined;
+        const git_describe_untrimmed = b.runAllowFail(&.{
+            "git",
+            "-C", b.build_root.path orelse ".", // affects the --git-dir argument
+            "--git-dir", ".git", // affected by the -C argument
+            "describe", "--match",    "*.*.*", //
+            "--tags",   "--abbrev=9",
+        }, &code, .ignore) catch {
+            break :v version_string;
+        };
+        const git_describe = std.mem.trim(u8, git_describe_untrimmed, " \n\r");
+
+        switch (std.mem.countScalar(u8, git_describe, '-')) {
+            0 => {
+                // Tagged release version (e.g. 0.10.0).
+                if (!std.mem.eql(u8, git_describe, version_string)) {
+                    std.debug.print("Kiesel version '{s}' does not match Git tag '{s}'\n", .{ version_string, git_describe });
+                    std.process.exit(1);
+                }
+                break :v version_string;
+            },
+            2 => {
+                // Untagged development build (e.g. 0.10.0-dev.2025+ecf0050a9).
+                var it = std.mem.splitScalar(u8, git_describe, '-');
+                const tagged_ancestor = it.first();
+                const commit_height = it.next().?;
+                const commit_id = it.next().?;
+
+                const ancestor_ver = try std.SemanticVersion.parse(tagged_ancestor);
+                if (kiesel_version.order(ancestor_ver) != .gt) {
+                    std.debug.print("Kiesel version '{f}' must be greater than tagged ancestor '{f}'\n", .{ kiesel_version, ancestor_ver });
+                    std.process.exit(1);
+                }
+
+                // Check that the commit hash is prefixed with a 'g' (a Git convention).
+                if (commit_id.len < 1 or commit_id[0] != 'g') {
+                    std.debug.print("Unexpected `git describe` output: {s}\n", .{git_describe});
+                    break :v version_string;
+                }
+
+                // The version is reformatted in accordance with the https://semver.org specification.
+                break :v b.fmt("{s}-dev.{s}+{s}", .{ version_string, commit_height, commit_id[1..] });
+            },
+            else => {
+                std.debug.print("Unexpected `git describe` output: {s}\n", .{git_describe});
+                break :v version_string;
+            },
+        }
+    };
+    const version = std.SemanticVersion.parse(version_string) catch {
+        std.debug.print("Invalid version string: {s}\n", .{version_string});
+        std.process.exit(1);
+    };
 
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
@@ -117,11 +163,11 @@ pub fn build(b: *std.Build) void {
         const cflags_extra: []const u8 = blk: {
             var cflags: std.ArrayList([]const u8) = .empty;
             defer cflags.deinit(b.allocator);
-            cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR") catch @panic("OOM");
+            try cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR");
             if (optimize != .Debug) {
-                cflags.append(b.allocator, "-DNO_GETENV") catch @panic("OOM");
+                try cflags.append(b.allocator, "-DNO_GETENV");
             }
-            break :blk std.mem.join(b.allocator, " ", cflags.items) catch @panic("OOM");
+            break :blk try std.mem.join(b.allocator, " ", cflags.items);
         };
         if (b.lazyDependency("bdwgc_zig", .{
             .target = target,
