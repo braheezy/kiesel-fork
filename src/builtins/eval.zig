@@ -100,7 +100,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         .state = .{
             // e-h.
             .in_strict_mode = strict_caller,
-            .in_function_body_eval = in_function,
+            .new_target_allowed = in_function,
             .in_method_definition = in_method,
             // TODO: The state should track whether we're in a *derived* constructor
             .in_class_constructor = in_derived_constructor,

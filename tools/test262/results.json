@@ -40405,7 +40405,7 @@
   "test/language/global-code/invalid-private-names-call-expression-this.js": "PASS",
   "test/language/global-code/invalid-private-names-member-expression-bad-reference.js": "PASS",
   "test/language/global-code/invalid-private-names-member-expression-this.js": "PASS",
-  "test/language/global-code/new.target-arrow.js": "FAIL",
+  "test/language/global-code/new.target-arrow.js": "PASS",
   "test/language/global-code/new.target.js": "PASS",
   "test/language/global-code/return.js": "PASS",
   "test/language/global-code/script-decl-func-dups.js": "PASS",

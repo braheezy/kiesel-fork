@@ -36,12 +36,12 @@ pub const State = struct {
     in_default_export: bool = false,
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
-    in_function_body_eval: bool = false,
     in_generator_function: bool = false,
     in_iteration_statement: bool = false,
     in_labelled_statement: bool = false,
     in_method_definition: bool = false,
     in_module: bool = false,
+    new_target_allowed: bool = false,
     in_strict_mode: bool = false,
     arguments_object_needed: bool = false,
 };
@@ -1224,11 +1224,7 @@ pub fn acceptNewTarget(self: *Parser) AcceptError!void {
     _ = try self.core.accept(RuleSet.is(.@"."));
     _ = try self.acceptKeyword("target");
 
-    if (!(self.state.in_formal_parameters or
-        self.state.in_function_body or
-        self.state.in_function_body_eval or
-        self.state.in_class_static_block))
-    {
+    if (!self.state.new_target_allowed) {
         try self.emitErrorAt(token.location, "'new.target' is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
@@ -3230,6 +3226,9 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     const tmp4 = temporaryChange(&self.state.in_generator_function, false);
     defer tmp4.restore();
 
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3279,6 +3278,9 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
 
     const tmp4 = temporaryChange(&self.state.in_generator_function, false);
     defer tmp4.restore();
+
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -3374,9 +3376,8 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     defer tmp2.restore();
 
     var start_offset: usize = undefined;
-    var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
-    if (self.acceptBindingIdentifier()) |binding_identifier| {
+    var formal_parameters: ast.FormalParameters = if (self.acceptBindingIdentifier()) |binding_identifier| blk: {
         // We need to do this after consuming the identifier token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - binding_identifier.len;
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
@@ -3393,28 +3394,34 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
                 },
             },
         });
-        formal_parameters = .{
+        break :blk .{
             .items = try formal_parameters_items.toOwnedSlice(self.allocator),
             .arguments_object_needed = false,
         };
-    } else |_| {
+    } else |_| blk: {
         _ = try self.core.accept(RuleSet.is(.@"("));
         // We need to do this after consuming the '(' token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - (comptime "(".len);
-        formal_parameters = try self.acceptFormalParameters();
-        formal_parameters.arguments_object_needed = false;
+        const formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
-    }
+        break :blk formal_parameters;
+    };
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
-    const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
-        var function_body = try self.acceptFunctionBody(.normal);
-        function_body.arguments_object_needed = false;
+    var function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+        const function_body = try self.acceptFunctionBody(.normal);
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
+        // Mirrors acceptFunctionBody()
+        const tmp3 = temporaryChange(&self.state.in_function_body, true);
+        defer tmp3.restore();
+
+        const tmp4 = temporaryChange(&self.state.arguments_object_needed, false);
+        defer tmp4.restore();
+
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
@@ -3429,9 +3436,17 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
             .type = .normal,
             .statement_list = statement_list,
             .strict = self.state.in_strict_mode,
-            .arguments_object_needed = false,
+            .arguments_object_needed = self.state.arguments_object_needed,
         };
     };
+    // Even though the arrow function itself never needs an arguments object, it might affect an
+    // outer function so we need to propagate that information up.
+    self.state.arguments_object_needed =
+        self.state.arguments_object_needed or
+        formal_parameters.arguments_object_needed or
+        function_body.arguments_object_needed;
+    formal_parameters.arguments_object_needed = false;
+    function_body.arguments_object_needed = false;
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
     if (function_body.strict) {
         try self.ensureAllowedParameterNames(formal_parameters, location);
@@ -3541,6 +3556,9 @@ pub fn acceptMethodDefinition(
     });
     defer tmp6.restore();
 
+    const tmp7 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp7.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3590,6 +3608,9 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
 
     const tmp4 = temporaryChange(&self.state.in_generator_function, true);
     defer tmp4.restore();
+
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -3641,6 +3662,9 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
 
     const tmp4 = temporaryChange(&self.state.in_generator_function, true);
     defer tmp4.restore();
+
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -3732,6 +3756,9 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     const tmp4 = temporaryChange(&self.state.in_generator_function, true);
     defer tmp4.restore();
 
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3786,6 +3813,9 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
 
     const tmp4 = temporaryChange(&self.state.in_generator_function, true);
     defer tmp4.restore();
+
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -4032,6 +4062,7 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     self.state.in_iteration_statement = false;
     self.state.in_labelled_statement = false;
     self.state.in_class_constructor = false;
+    self.state.new_target_allowed = true;
 
     const token = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList(.{});
@@ -4150,6 +4181,9 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     const tmp4 = temporaryChange(&self.state.in_generator_function, false);
     defer tmp4.restore();
 
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -4203,6 +4237,9 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
 
     const tmp4 = temporaryChange(&self.state.in_generator_function, false);
     defer tmp4.restore();
+
+    const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
+    defer tmp5.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -4282,9 +4319,8 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     const tmp4 = temporaryChange(&self.state.in_generator_function, false);
     defer tmp4.restore();
 
-    var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
-    if (self.acceptBindingIdentifier()) |binding_identifier| {
+    var formal_parameters: ast.FormalParameters = if (self.acceptBindingIdentifier()) |binding_identifier| blk: {
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
@@ -4299,16 +4335,16 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
                 },
             },
         });
-        formal_parameters = .{
+        break :blk .{
             .items = try formal_parameters_items.toOwnedSlice(self.allocator),
             .arguments_object_needed = false,
         };
-    } else |_| {
+    } else |_| blk: {
         _ = try self.core.accept(RuleSet.is(.@"("));
-        formal_parameters = try self.acceptFormalParameters();
-        formal_parameters.arguments_object_needed = false;
+        const formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
-    }
+        break :blk formal_parameters;
+    };
     _ = self.core.accept(RuleSet.is(.@"=>")) catch |err| {
         // If parsing the async arrow function failed we may have emitted an 'invalid binding
         // identifier' error, e.g. for `async (await)` - get rid of those
@@ -4318,12 +4354,17 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
-    const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
-        var function_body = try self.acceptFunctionBody(.async);
-        function_body.arguments_object_needed = false;
+    var function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+        const function_body = try self.acceptFunctionBody(.async);
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
+        const tmp5 = temporaryChange(&self.state.in_function_body, true);
+        defer tmp5.restore();
+
+        const tmp6 = temporaryChange(&self.state.arguments_object_needed, false);
+        defer tmp6.restore();
+
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
@@ -4338,9 +4379,17 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
             .type = .async,
             .statement_list = statement_list,
             .strict = self.state.in_strict_mode,
-            .arguments_object_needed = false,
+            .arguments_object_needed = self.state.arguments_object_needed,
         };
     };
+    // Even though the arrow function itself never needs an arguments object, it might affect an
+    // outer function so we need to propagate that information up.
+    self.state.arguments_object_needed =
+        self.state.arguments_object_needed or
+        formal_parameters.arguments_object_needed or
+        function_body.arguments_object_needed;
+    formal_parameters.arguments_object_needed = false;
+    function_body.arguments_object_needed = false;
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
     if (function_body.strict) {
         try self.ensureAllowedParameterNames(formal_parameters, location);
