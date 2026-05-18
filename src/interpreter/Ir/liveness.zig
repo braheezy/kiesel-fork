@@ -55,11 +55,11 @@ fn markReachable(
 
     for (ir.instructions.items(.tag), ir.instructions.items(.data)) |tag, data| {
         if (tag != .exception_handler) continue;
-        const extra = ir.extraData(Ir.Inst.ExceptionHandler, data.exception_handler).data;
+        const extra = ir.extraData(Ir.Inst.ExceptionHandler, data.exception_handler);
         try exception_handlers.append(gpa, .{
-            .start = extra.start.toIndex().?,
-            .end = extra.end.toIndex().?,
-            .target = extra.target.toIndex().?,
+            .start = extra.data.start.toIndex().?,
+            .end = extra.data.end.toIndex().?,
+            .target = extra.data.target.toIndex().?,
         });
     }
 

@@ -847,13 +847,13 @@ fn lowerObjectCreate(b: *Builder, dest: Ir.Inst.Ref) Error!void {
     });
 }
 
-fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex) Error!void {
-    const data = b.ir.extraData(Ir.Inst.SetProperty, extra).data;
-    const object_reg = b.resolve(data.base);
-    const value_reg = b.resolve(data.value);
-    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(data.name));
+fn lowerObjectSet(b: *Builder, extra_index: Ir.Inst.ExtraIndex) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, extra_index);
+    const object_reg = b.resolve(extra.data.base);
+    const value_reg = b.resolve(extra.data.value);
+    const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
 
-    const value_index = data.value.toIndex().?;
+    const value_index = extra.data.value.toIndex().?;
     const value_tag = b.ir.instructions.items(.tag)[@intFromEnum(value_index)];
 
     switch (value_tag) {
@@ -883,8 +883,8 @@ fn lowerObjectSet(b: *Builder, extra: Ir.Inst.ExtraIndex) Error!void {
     });
 }
 
-fn lowerObjectSetComputed(b: *Builder, data: Ir.Inst.ExtraIndex) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
+fn lowerObjectSetComputed(b: *Builder, extra_index: Ir.Inst.ExtraIndex) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, extra_index);
     const object_reg = b.resolve(extra.data.base);
     const key_reg = b.resolve(extra.data.property);
     const value_reg = b.resolve(extra.data.value);
@@ -979,26 +979,27 @@ fn lowerBr(b: *Builder, data: Ir.Inst.Br) Error!void {
     b.jump(target_block);
 }
 
-fn lowerBrCond(b: *Builder, data: Ir.Inst.ExtraIndex) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.BrCond, data);
+fn lowerBrCond(b: *Builder, extra_index: Ir.Inst.ExtraIndex) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.BrCond, extra_index);
     const then_block = b.label_blocks.get(extra.data.then_target).?;
     const else_block = b.label_blocks.get(extra.data.else_target).?;
     const cond_reg = b.resolve(extra.data.condition);
     b.branch(.truthy, cond_reg, then_block, else_block);
 }
 
-fn lowerExceptionHandler(b: *Builder, exception_handler: Ir.Inst.ExtraIndex, exception_ref: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.ExceptionHandler, exception_handler).data;
-    const start_block = b.label_blocks.get(extra.start).?;
-    const end_block = b.label_blocks.get(extra.end).?;
-    const target_block = b.label_blocks.get(extra.target).?;
+fn lowerExceptionHandler(b: *Builder, extra_index: Ir.Inst.ExtraIndex, exception_ref: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.ExceptionHandler, extra_index);
+    const start_block = b.label_blocks.get(extra.data.start).?;
+    const end_block = b.label_blocks.get(extra.data.end).?;
+    const target_block = b.label_blocks.get(extra.data.target).?;
     const exception_reg = b.resolve(exception_ref);
+    const scope_depth = extra.data.scope_depth;
     try b.exception_handlers.append(b.gpa, .{
         .start = start_block,
         .end = end_block,
         .target = target_block,
         .exception_reg = exception_reg,
-        .scope_depth = extra.scope_depth,
+        .scope_depth = scope_depth,
     });
 }
 
@@ -1284,8 +1285,8 @@ fn lowerSetBinding(b: *Builder, name: Ir.Inst.StringIndex, value: Ir.Inst.Ref, s
     try b.emitMoveIfNeeded(value, dest);
 }
 
-fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
+fn lowerSetProperty(b: *Builder, extra_index: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, extra_index);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
     const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
@@ -1306,8 +1307,8 @@ fn lowerSetProperty(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: I
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
+fn lowerSetPropertyComputed(b: *Builder, extra_index: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, extra_index);
     const base_reg = b.resolve(extra.data.base);
     const property_reg = b.resolve(extra.data.property);
     const value_reg = b.resolve(extra.data.value);
@@ -1326,8 +1327,8 @@ fn lowerSetPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool,
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetPropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetPropertyIndexed, data);
+fn lowerSetPropertyIndexed(b: *Builder, extra_index: Ir.Inst.ExtraIndex, strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyIndexed, extra_index);
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
     const tag: Bytecode.Inst.Tag = if (strict)
@@ -1363,8 +1364,8 @@ fn lowerUpdateBinding(b: *Builder, name: Ir.Inst.StringIndex, dest: Ir.Inst.Ref,
     });
 }
 
-fn lowerUpdateProperty(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.UpdateProperty, data);
+fn lowerUpdateProperty(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.UpdateProperty, extra_index);
     const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
     const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
@@ -1384,8 +1385,8 @@ fn lowerUpdateProperty(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref,
     });
 }
 
-fn lowerUpdatePropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.UpdatePropertyComputed, data);
+fn lowerUpdatePropertyComputed(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.UpdatePropertyComputed, extra_index);
     const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
     const property_reg = b.resolve(extra.data.property);
@@ -1405,8 +1406,8 @@ fn lowerUpdatePropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.I
     });
 }
 
-fn lowerUpdatePropertyIndexed(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.UpdatePropertyIndexed, data);
+fn lowerUpdatePropertyIndexed(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.UpdatePropertyIndexed, extra_index);
     const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(extra.data.base);
     const tag: Bytecode.Inst.Tag = switch (extra.data.update_op) {
@@ -1490,8 +1491,8 @@ fn lowerDeletePropertyIndexed(b: *Builder, data: Ir.Inst.DeletePropertyIndexed, 
     });
 }
 
-fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.CopyDataProperties, data);
+fn lowerCopyDataProperties(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.CopyDataProperties, extra_index);
     const dest_reg = b.resolve(dest);
     const source_reg = b.resolve(extra.data.source);
     const excluded = b.ir.refSlice(extra.end, extra.data.excluded_len);
@@ -1538,8 +1539,8 @@ fn lowerCopyDataProperties(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.
     });
 }
 
-fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.Call, data);
+fn lowerCall(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.Call, extra_index);
     const dest_reg = b.resolve(dest);
     const callee_reg = b.resolve(extra.data.callee);
     const this_reg = switch (extra.data.this_value) {
@@ -1599,8 +1600,8 @@ fn lowerCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!voi
     }
 }
 
-fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.Call, data);
+fn lowerCallDirectEval(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref, strict: bool) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.Call, extra_index);
     const dest_reg = b.resolve(dest);
     const callee_reg = b.resolve(extra.data.callee);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
@@ -1619,8 +1620,8 @@ fn lowerCallDirectEval(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref,
     });
 }
 
-fn lowerConstruct(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.Construct, data);
+fn lowerConstruct(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.Construct, extra_index);
     const dest_reg = b.resolve(dest);
     const constructor_reg = b.resolve(extra.data.constructor);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
@@ -1935,8 +1936,8 @@ fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
 }
 
-fn lowerSuperCall(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SuperCall, data);
+fn lowerSuperCall(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SuperCall, extra_index);
     const dest_reg = b.resolve(dest);
     const args = b.ir.refSlice(extra.end, extra.data.args_len);
 
@@ -1977,8 +1978,8 @@ fn lowerGetSuperPropertyComputed(b: *Builder, property: Ir.Inst.Ref, dest: Ir.In
     });
 }
 
-fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
+fn lowerSetSuperProperty(b: *Builder, extra_index: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, extra_index);
     const value_reg = b.resolve(extra.data.value);
     const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const tag: Bytecode.Inst.Tag = if (strict)
@@ -1995,8 +1996,8 @@ fn lowerSetSuperProperty(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict:
     try b.emitMoveIfNeeded(extra.data.value, dest);
 }
 
-fn lowerSetSuperPropertyComputed(b: *Builder, data: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, data);
+fn lowerSetSuperPropertyComputed(b: *Builder, extra_index: Ir.Inst.ExtraIndex, comptime strict: bool, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetPropertyComputed, extra_index);
     const property_reg = b.resolve(extra.data.property);
     const value_reg = b.resolve(extra.data.value);
     const tag: Bytecode.Inst.Tag = if (strict)
@@ -2065,8 +2066,8 @@ fn lowerGetPrivateElement(b: *Builder, data: Ir.Inst.GetProperty, dest: Ir.Inst.
     });
 }
 
-fn lowerSetPrivateElement(b: *Builder, data: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
-    const extra = b.ir.extraData(Ir.Inst.SetProperty, data);
+fn lowerSetPrivateElement(b: *Builder, extra_index: Ir.Inst.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
+    const extra = b.ir.extraData(Ir.Inst.SetProperty, extra_index);
     const base_reg = b.resolve(extra.data.base);
     const name_index: Bytecode.Inst.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
     const value_reg = b.resolve(extra.data.value);
