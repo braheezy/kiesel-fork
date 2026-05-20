@@ -32,8 +32,9 @@ pub fn createArrayIterator(
 
     // 1. Let iterator be OrdinaryObjectCreate(%ArrayIteratorPrototype%, « [[IteratedArrayLike]],
     //    [[ArrayLikeNextIndex]], [[ArrayLikeIterationKind]] »).
-    const iterator = try ArrayIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%ArrayIteratorPrototype%"(),
+    const shape = try realm.shapes.arrayIterator();
+    const iterator = try ArrayIterator.createWithShape(agent, .{
+        .shape = shape,
         .fields = .{
             .state = .{
                 // 2. Set iterator.[[IteratedArrayLike]] to array.

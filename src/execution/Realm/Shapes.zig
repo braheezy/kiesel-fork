@@ -14,6 +14,7 @@ const Shapes = @This();
 realm: *Realm,
 lazy_shapes: struct {
     array: ?*Object.Shape = null,
+    array_iterator: ?*Object.Shape = null,
     ordinary_object: ?*Object.Shape = null,
     ordinary_function: ?*Object.Shape = null,
     ordinary_function_prototype: ?*Object.Shape = null,
@@ -34,6 +35,18 @@ pub fn array(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
         const shape = try Object.Shape.init(agent.gc_allocator);
         shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Array.prototype%"());
         self.lazy_shapes.array = shape;
+        break :blk shape;
+    };
+    return shape;
+}
+
+pub fn arrayIterator(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
+    const shape = self.lazy_shapes.array_iterator orelse blk: {
+        const realm = self.realm;
+        const agent = realm.agent;
+        const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%ArrayIteratorPrototype%"());
+        self.lazy_shapes.array_iterator = shape;
         break :blk shape;
     };
     return shape;
