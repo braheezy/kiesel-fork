@@ -70,6 +70,7 @@ pub fn compileAndRun(
     },
     name: []const u8,
 ) Agent.Error!?Value {
+    // The same lifetime assumptions mentioned in `compile()` apply here.
     var bc = try compile(agent, name, switch (ast_node) {
         .script => |s| .{ .script = s },
         .module => |m| .{ .module = m },
@@ -78,7 +79,6 @@ pub fn compileAndRun(
             .strict = e.strict,
         } },
     });
-    errdefer bc.deinit(agent.gc_allocator);
 
     var vm: Vm = try .init(agent, &bc);
     defer vm.deinit();
