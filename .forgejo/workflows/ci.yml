@@ -44,6 +44,10 @@ jobs:
         run: |
           zig build -Dtarget=arm-linux-musleabihf -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-arm
+      - name: Build kiesel-linux-loongarch64
+        run: |
+          zig build -Dtarget=loongarch64-linux-musl -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-loongarch64
       - name: Build kiesel-linux-mips
         run: |
           zig build -Dtarget=mips-linux-musleabi -Doptimize=ReleaseSafe
