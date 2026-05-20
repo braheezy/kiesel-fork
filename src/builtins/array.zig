@@ -105,7 +105,11 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
     }
 
     // 2. If proto is not present, set proto to %Array.prototype%.
-    const prototype_ = maybe_prototype orelse try realm.intrinsics.@"%Array.prototype%"();
+    const prototype_ = maybe_prototype orelse {
+        // OPTIMIZATION: When no custom prototype is provided we can use the default array shape.
+        const shape = try realm.shapes.array();
+        return arrayCreateFastWithShape(agent, @intCast(length), shape);
+    };
 
     // 3. Let A be MakeBasicObject(« [[Prototype]], [[Extensible]] »).
     const array = try Array.create(agent, .{
@@ -121,7 +125,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
         //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
         //    }).
         .fields = .{
-            .length = @as(u32, @intCast(length)),
+            .length = @intCast(length),
             .length_writable = true,
         },
     });
