@@ -133,6 +133,8 @@ pub const Inst = struct {
         to_numeric,
         to_string,
         to_object,
+        increment,
+        decrement,
         negate,
         bitwise_not,
         logical_not,
@@ -186,14 +188,6 @@ pub const Inst = struct {
         set_property_computed_strict,
         set_property_indexed,
         set_property_indexed_strict,
-        update_binding,
-        update_binding_strict,
-        update_property,
-        update_property_strict,
-        update_property_computed,
-        update_property_computed_strict,
-        update_property_indexed,
-        update_property_indexed_strict,
         delete_binding,
         delete_property,
         delete_property_strict,
@@ -278,10 +272,6 @@ pub const Inst = struct {
         set_property: ExtraIndex,
         set_property_computed: ExtraIndex,
         set_property_indexed: ExtraIndex,
-        update_binding: UpdateBinding,
-        update_property: ExtraIndex,
-        update_property_computed: ExtraIndex,
-        update_property_indexed: ExtraIndex,
         delete_property: DeleteProperty,
         delete_property_computed: DeletePropertyComputed,
         delete_property_indexed: DeletePropertyIndexed,
@@ -333,6 +323,8 @@ pub const Inst = struct {
         .to_numeric = .ref,
         .to_string = .ref,
         .to_object = .ref,
+        .increment = .ref,
+        .decrement = .ref,
         .negate = .ref,
         .bitwise_not = .ref,
         .logical_not = .ref,
@@ -381,14 +373,6 @@ pub const Inst = struct {
         .set_property_computed_strict = .set_property_computed,
         .set_property_indexed = .set_property_indexed,
         .set_property_indexed_strict = .set_property_indexed,
-        .update_binding = .update_binding,
-        .update_binding_strict = .update_binding,
-        .update_property = .update_property,
-        .update_property_strict = .update_property,
-        .update_property_computed = .update_property_computed,
-        .update_property_computed_strict = .update_property_computed,
-        .update_property_indexed = .update_property_indexed,
-        .update_property_indexed_strict = .update_property_indexed,
         .delete_binding = .string,
         .delete_property = .delete_property,
         .delete_property_strict = .delete_property,
@@ -453,7 +437,6 @@ pub const Inst = struct {
     pub const GetPropertyComputed = struct { base: Ref, property: Ref };
     pub const GetPropertyIndexed = struct { base: Ref, index: u32 };
     pub const SetBinding = struct { name: StringIndex, value: Ref };
-    pub const UpdateBinding = struct { name: StringIndex, update_op: UpdateOp };
     pub const DeleteProperty = struct { base: Ref, name: StringIndex };
     pub const DeletePropertyComputed = struct { base: Ref, property: Ref };
     pub const DeletePropertyIndexed = struct { base: Ref, index: u32 };
@@ -464,21 +447,11 @@ pub const Inst = struct {
     pub const SetProperty = struct { base: Ref, name: StringIndex, value: Ref };
     pub const SetPropertyComputed = struct { base: Ref, property: Ref, value: Ref };
     pub const SetPropertyIndexed = struct { base: Ref, index: u32, value: Ref };
-    pub const UpdateProperty = struct { base: Ref, name: StringIndex, update_op: UpdateOp };
-    pub const UpdatePropertyComputed = struct { base: Ref, property: Ref, update_op: UpdateOp };
-    pub const UpdatePropertyIndexed = struct { base: Ref, index: u32, update_op: UpdateOp };
     pub const CopyDataProperties = struct { source: Ref, excluded_len: u32 };
     pub const Call = struct { callee: Ref, this_value: Ref, args_len: u32 };
     pub const Construct = struct { constructor: Ref, args_len: u32 };
     pub const GetTemplateObject = struct { cooked: Ref, raw: Ref, id: u32 };
     pub const SuperCall = struct { args_len: u32 };
-
-    pub const UpdateOp = enum(u32) {
-        increment_prefix,
-        increment_postfix,
-        decrement_prefix,
-        decrement_postfix,
-    };
 
     pub const Ref = enum(u32) {
         none,
@@ -587,9 +560,6 @@ pub const Inst = struct {
                         .set_property => SetProperty,
                         .set_property_computed => SetPropertyComputed,
                         .set_property_indexed => SetPropertyIndexed,
-                        .update_property => UpdateProperty,
-                        .update_property_computed => UpdatePropertyComputed,
-                        .update_property_indexed => UpdatePropertyIndexed,
                         else => unreachable,
                     };
                     const extra = ir.extraData(ExtraType, field_data);
@@ -640,7 +610,6 @@ pub fn extraData(ir: *const Ir, comptime T: type, extra_index: ExtraIndex) Extra
             u32 => ir.extra[i],
             Inst.Ref,
             StringIndex,
-            Inst.UpdateOp,
             => @enumFromInt(ir.extra[i]),
             else => unreachable,
         };
@@ -786,9 +755,6 @@ fn printData(
                     .set_property => Inst.SetProperty,
                     .set_property_computed => Inst.SetPropertyComputed,
                     .set_property_indexed => Inst.SetPropertyIndexed,
-                    .update_property => Inst.UpdateProperty,
-                    .update_property_computed => Inst.UpdatePropertyComputed,
-                    .update_property_indexed => Inst.UpdatePropertyIndexed,
                     else => unreachable,
                 };
                 const extra = ir.extraData(ExtraType, field_data);
@@ -873,11 +839,6 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
         => {
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});
-            try terminal.setColor(.reset);
-        },
-        Inst.UpdateOp => {
-            try terminal.setColor(.blue);
-            try terminal.writer.print("{t}", .{value});
             try terminal.setColor(.reset);
         },
         else => comptime unreachable,

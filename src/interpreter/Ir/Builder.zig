@@ -321,7 +321,6 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
             u32 => value,
             Ir.Inst.Ref,
             Ir.StringIndex,
-            Ir.Inst.UpdateOp,
             => @intFromEnum(value),
             else => unreachable,
         });
@@ -3633,205 +3632,96 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
 }
 
 fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) Error!Ir.Inst.Ref {
-    const update_op: Ir.Inst.UpdateOp = switch (update_expr.operator) {
-        .@"++" => switch (update_expr.type) {
-            .prefix => .increment_prefix,
-            .postfix => .increment_postfix,
-        },
-        .@"--" => switch (update_expr.type) {
-            .prefix => .decrement_prefix,
-            .postfix => .decrement_postfix,
-        },
+    const Lhs = union(enum) {
+        binding: Ir.StringIndex,
+        property: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
+        property_indexed: struct { base: Ir.Inst.Ref, index: u32 },
+        property_computed: struct { base: Ir.Inst.Ref, property: Ir.Inst.Ref },
+        private_element: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
+        super_property: Ir.StringIndex,
+        super_property_computed: Ir.Inst.Ref,
     };
-    switch (update_expr.expression.*) {
+
+    var lhs: Lhs = undefined;
+    const current_value = switch (update_expr.expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
-            .identifier_reference => |identifier| {
+            .identifier_reference => |identifier| blk: {
                 const string_index = try b.internString(identifier, .literal);
-                const tag: Ir.Inst.Tag = if (b.in_strict_mode) .update_binding_strict else .update_binding;
-                return b.addInst(.{
-                    .tag = tag,
-                    .data = .{ .update_binding = .{
-                        .name = string_index,
-                        .update_op = update_op,
-                    } },
+                lhs = .{ .binding = string_index };
+                break :blk try b.addInst(.{
+                    .tag = .get_binding,
+                    .data = .{ .string = string_index },
                 });
             },
             else => unreachable,
         },
-        .member_expression => |*member_expr| {
+        .member_expression => |*member_expr| blk: {
             const base = try b.lowerExpression(member_expr.expression);
             switch (member_expr.property) {
                 .identifier => |identifier| {
                     const string_index = try b.internString(identifier, .literal);
-                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
-                        .update_property_strict
-                    else
-                        .update_property;
-                    const extra_index = try b.addExtra(Ir.Inst.UpdateProperty, .{
-                        .base = base,
-                        .name = string_index,
-                        .update_op = update_op,
-                    });
-                    return b.addInst(.{
-                        .tag = tag,
-                        .data = .{ .update_property = extra_index },
+                    lhs = .{ .property = .{ .base = base, .name = string_index } };
+                    break :blk try b.addInst(.{
+                        .tag = .get_property,
+                        .data = .{ .get_property = .{
+                            .base = base,
+                            .name = string_index,
+                        } },
                     });
                 },
                 .expression => |expr| {
                     if (try constantFold(b.gpa, expr)) |constant| {
                         defer constant.deinit(b.gpa);
                         if (constant.toIndex()) |index| {
-                            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
-                                .update_property_indexed_strict
-                            else
-                                .update_property_indexed;
-                            const extra_index = try b.addExtra(Ir.Inst.UpdatePropertyIndexed, .{
-                                .base = base,
-                                .index = index,
-                                .update_op = update_op,
-                            });
-                            return b.addInst(.{
-                                .tag = tag,
-                                .data = .{ .update_property_indexed = extra_index },
+                            lhs = .{ .property_indexed = .{ .base = base, .index = index } };
+                            break :blk try b.addInst(.{
+                                .tag = .get_property_indexed,
+                                .data = .{ .get_property_indexed = .{
+                                    .base = base,
+                                    .index = index,
+                                } },
                             });
                         }
                     }
                     const property = try b.lowerExpression(expr);
-                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
-                        .update_property_computed_strict
-                    else
-                        .update_property_computed;
-                    const extra_index = try b.addExtra(Ir.Inst.UpdatePropertyComputed, .{
-                        .base = base,
-                        .property = property,
-                        .update_op = update_op,
-                    });
-                    return b.addInst(.{
-                        .tag = tag,
-                        .data = .{ .update_property_computed = extra_index },
+                    lhs = .{ .property_computed = .{ .base = base, .property = property } };
+                    break :blk try b.addInst(.{
+                        .tag = .get_property_computed,
+                        .data = .{ .get_property_computed = .{
+                            .base = base,
+                            .property = property,
+                        } },
                     });
                 },
                 .private_identifier => |private_identifier| {
                     const string_index = try b.internString(private_identifier, .literal);
-                    const current_value = try b.addInst(.{
+                    lhs = .{ .private_element = .{ .base = base, .name = string_index } };
+                    break :blk try b.addInst(.{
                         .tag = .get_private_element,
                         .data = .{ .get_property = .{
                             .base = base,
                             .name = string_index,
                         } },
                     });
-                    const to_numeric = try b.addInst(.{
-                        .tag = .to_numeric,
-                        .data = .{ .ref = current_value },
-                    });
-                    const one = try b.addInst(.{
-                        .tag = .one,
-                        .data = .{ .none = {} },
-                    });
-                    const tag: Ir.Inst.Tag = switch (update_expr.operator) {
-                        .@"++" => .add,
-                        .@"--" => .sub,
-                    };
-                    const new_value = try b.addInst(.{
-                        .tag = tag,
-                        .data = .{ .binary = .{
-                            .lhs = to_numeric,
-                            .rhs = one,
-                        } },
-                    });
-                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
-                        .base = base,
-                        .name = string_index,
-                        .value = new_value,
-                    });
-                    _ = try b.addInst(.{
-                        .tag = .set_private_element,
-                        .data = .{ .set_property = extra_index },
-                    });
-                    return if (update_expr.type == .prefix) new_value else to_numeric;
                 },
             }
         },
         .super_property => |super_prop| switch (super_prop) {
-            .identifier => |identifier| {
+            .identifier => |identifier| blk: {
                 const string_index = try b.internString(identifier, .literal);
-                const current_value = try b.addInst(.{
+                lhs = .{ .super_property = string_index };
+                break :blk try b.addInst(.{
                     .tag = .get_super_property,
                     .data = .{ .string = string_index },
                 });
-                const to_numeric = try b.addInst(.{
-                    .tag = .to_numeric,
-                    .data = .{ .ref = current_value },
-                });
-                const one = try b.addInst(.{
-                    .tag = .one,
-                    .data = .{ .none = {} },
-                });
-                const tag: Ir.Inst.Tag = switch (update_expr.operator) {
-                    .@"++" => .add,
-                    .@"--" => .sub,
-                };
-                const new_value = try b.addInst(.{
-                    .tag = tag,
-                    .data = .{ .binary = .{
-                        .lhs = to_numeric,
-                        .rhs = one,
-                    } },
-                });
-                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
-                    .base = .none,
-                    .name = string_index,
-                    .value = new_value,
-                });
-                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
-                    .set_super_property_strict
-                else
-                    .set_super_property;
-                _ = try b.addInst(.{
-                    .tag = set_tag,
-                    .data = .{ .set_property = extra_index },
-                });
-                return if (update_expr.type == .prefix) new_value else to_numeric;
             },
-            .expression => |expr| {
+            .expression => |expr| blk: {
                 const property = try b.lowerExpression(expr);
-                const current_value = try b.addInst(.{
+                lhs = .{ .super_property_computed = property };
+                break :blk try b.addInst(.{
                     .tag = .get_super_property_computed,
                     .data = .{ .ref = property },
                 });
-                const to_numeric = try b.addInst(.{
-                    .tag = .to_numeric,
-                    .data = .{ .ref = current_value },
-                });
-                const one = try b.addInst(.{
-                    .tag = .one,
-                    .data = .{ .none = {} },
-                });
-                const tag: Ir.Inst.Tag = switch (update_expr.operator) {
-                    .@"++" => .add,
-                    .@"--" => .sub,
-                };
-                const new_value = try b.addInst(.{
-                    .tag = tag,
-                    .data = .{ .binary = .{
-                        .lhs = to_numeric,
-                        .rhs = one,
-                    } },
-                });
-                const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
-                    .base = .none,
-                    .property = property,
-                    .value = new_value,
-                });
-                const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
-                    .set_super_property_computed_strict
-                else
-                    .set_super_property_computed;
-                _ = try b.addInst(.{
-                    .tag = set_tag,
-                    .data = .{ .set_property_computed = extra_index },
-                });
-                return if (update_expr.type == .prefix) new_value else to_numeric;
             },
         },
         .call_expression => |*call_expr| {
@@ -3842,7 +3732,127 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
             });
         },
         else => unreachable,
+    };
+
+    const update_tag: Ir.Inst.Tag = switch (update_expr.operator) {
+        .@"++" => .increment,
+        .@"--" => .decrement,
+    };
+    const numeric_value = try b.addInst(.{
+        .tag = .to_numeric,
+        .data = .{ .ref = current_value },
+    });
+    const updated_value = try b.addInst(.{
+        .tag = update_tag,
+        .data = .{ .ref = numeric_value },
+    });
+
+    switch (lhs) {
+        .binding => |string_index| {
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_binding_strict
+            else
+                .set_binding;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = updated_value,
+                } },
+            });
+        },
+        .property => |property| {
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = property.base,
+                .name = property.name,
+                .value = updated_value,
+            });
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_property_strict
+            else
+                .set_property;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_property = extra_index },
+            });
+        },
+        .property_indexed => |property| {
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                .base = property.base,
+                .index = property.index,
+                .value = updated_value,
+            });
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_property_indexed_strict
+            else
+                .set_property_indexed;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_property_indexed = extra_index },
+            });
+        },
+        .property_computed => |property| {
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                .base = property.base,
+                .property = property.property,
+                .value = updated_value,
+            });
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_property_computed_strict
+            else
+                .set_property_computed;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_property_computed = extra_index },
+            });
+        },
+        .private_element => |property| {
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = property.base,
+                .name = property.name,
+                .value = updated_value,
+            });
+            _ = try b.addInst(.{
+                .tag = .set_private_element,
+                .data = .{ .set_property = extra_index },
+            });
+        },
+        .super_property => |string_index| {
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = .none,
+                .name = string_index,
+                .value = updated_value,
+            });
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_super_property_strict
+            else
+                .set_super_property;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_property = extra_index },
+            });
+        },
+        .super_property_computed => |property| {
+            const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                .base = .none,
+                .property = property,
+                .value = updated_value,
+            });
+            const set_tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                .set_super_property_computed_strict
+            else
+                .set_super_property_computed;
+            _ = try b.addInst(.{
+                .tag = set_tag,
+                .data = .{ .set_property_computed = extra_index },
+            });
+        },
     }
+
+    return switch (update_expr.type) {
+        .prefix => updated_value,
+        .postfix => numeric_value,
+    };
 }
 
 fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Error!Ir.Inst.Ref {
@@ -4551,9 +4561,9 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
         property: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
         property_indexed: struct { base: Ir.Inst.Ref, index: u32 },
         property_computed: struct { base: Ir.Inst.Ref, property: Ir.Inst.Ref },
+        private_element: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
         super_property: Ir.StringIndex,
         super_property_computed: Ir.Inst.Ref,
-        private_element: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
     };
 
     var lhs: Lhs = undefined;
@@ -4752,6 +4762,17 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                 .data = .{ .set_property_computed = extra_index },
             });
         },
+        .private_element => |p| {
+            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                .base = p.base,
+                .name = p.name,
+                .value = rhs,
+            });
+            _ = try b.addInst(.{
+                .tag = .set_private_element,
+                .data = .{ .set_property = extra_index },
+            });
+        },
         .super_property => |string_index| {
             const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                 .set_super_property_strict
@@ -4780,17 +4801,6 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             _ = try b.addInst(.{
                 .tag = tag,
                 .data = .{ .set_property_computed = extra_index },
-            });
-        },
-        .private_element => |p| {
-            const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
-                .base = p.base,
-                .name = p.name,
-                .value = rhs,
-            });
-            _ = try b.addInst(.{
-                .tag = .set_private_element,
-                .data = .{ .set_property = extra_index },
             });
         },
     }
