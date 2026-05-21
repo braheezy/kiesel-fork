@@ -172,6 +172,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .push_var_scope => try b.lowerPushVarScope(),
             .push_with_scope => try b.lowerPushWithScope(data.ref),
             .pop_scope => try b.lowerPopScope(),
+            .create_var_binding => try b.lowerCreateVarBinding(data.string),
             .create_mutable_binding => try b.lowerCreateMutableBinding(data.string),
             .create_immutable_binding => try b.lowerCreateImmutableBinding(data.string),
             .initialize_binding => try b.lowerInitializeBinding(data.set_binding.name, data.set_binding.value, dest),
@@ -1165,6 +1166,14 @@ fn lowerPopScope(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .pop_scope,
         .data = .{ .none = {} },
+    });
+}
+
+fn lowerCreateVarBinding(b: *Builder, name_index: Ir.StringIndex) Error!void {
+    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+    try b.emit(.{
+        .tag = .create_var_binding,
+        .data = .{ .string = name_index_ },
     });
 }
 

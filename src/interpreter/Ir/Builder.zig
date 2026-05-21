@@ -874,25 +874,12 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             const gop = try instantiated_var_names.getOrPut(b.gpa, var_name);
             if (!gop.found_existing) {
                 // 1. Append n to instantiatedVarNames.
-
                 // 2. Perform ! env.CreateMutableBinding(n, false).
+                // 3. Perform ! env.InitializeBinding(n, undefined).
                 const string_index = try b.internString(var_name, .literal);
                 _ = try b.addInst(.{
-                    .tag = .create_mutable_binding,
+                    .tag = .create_var_binding,
                     .data = .{ .string = string_index },
-                });
-
-                // 3. Perform ! env.InitializeBinding(n, undefined).
-                const undefined_ref = try b.addInst(.{
-                    .tag = .undefined,
-                    .data = .{ .none = {} },
-                });
-                _ = try b.addInst(.{
-                    .tag = .initialize_binding,
-                    .data = .{ .set_binding = .{
-                        .name = string_index,
-                        .value = undefined_ref,
-                    } },
                 });
             }
         }
@@ -930,23 +917,11 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                 if (!is_in_parameter_bindings or function_names.contains(var_name)) {
                     // a. Let initialValue be undefined.
                     // 2. Perform ! varEnv.CreateMutableBinding(n, false).
+                    // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
                     const string_index = try b.internString(var_name, .literal);
                     _ = try b.addInst(.{
-                        .tag = .create_mutable_binding,
+                        .tag = .create_var_binding,
                         .data = .{ .string = string_index },
-                    });
-
-                    // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
-                    const undefined_ref = try b.addInst(.{
-                        .tag = .undefined,
-                        .data = .{ .none = {} },
-                    });
-                    _ = try b.addInst(.{
-                        .tag = .initialize_binding,
-                        .data = .{ .set_binding = .{
-                            .name = string_index,
-                            .value = undefined_ref,
-                        } },
                     });
                 } else {
                     // 4. Else,

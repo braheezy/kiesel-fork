@@ -242,6 +242,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .push_var_scope => vm.executePushVarScope(),
                 .push_with_scope => vm.executePushWithScope(data.reg),
                 .pop_scope => vm.executePopScope(),
+                .create_var_binding => vm.executeCreateVarBinding(data.string),
                 .create_mutable_binding => vm.executeCreateMutableBinding(data.string),
                 .create_immutable_binding => vm.executeCreateImmutableBinding(data.string),
                 .initialize_binding => vm.executeInitializeBinding(data.string_reg[0], data.string_reg[1]),
@@ -1286,6 +1287,14 @@ fn executePopScope(vm: *Vm) void {
     const execution_context = vm.agent.runningExecutionContext();
     execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
     vm.frame.scope_depth -= 1;
+}
+
+fn executeCreateVarBinding(vm: *Vm, name_index: Bytecode.StringIndex) Agent.Error!void {
+    const name = try vm.getString(name_index);
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
+    try env.createMutableBinding(vm.agent, name, false);
+    try env.initializeBinding(vm.agent, name, .undefined);
 }
 
 fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.StringIndex) Agent.Error!void {
