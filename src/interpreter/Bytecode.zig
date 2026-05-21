@@ -17,10 +17,38 @@ exception_handlers: []const ExceptionHandler,
 
 pub const Builder = @import("Bytecode/Builder.zig");
 
+pub const Reg = enum(u16) {
+    /// Used for `return`/`yield` instructions to indicate no register
+    none = std.math.maxInt(u16),
+    _,
+};
+
+pub const StringIndex = enum(u32) {
+    _,
+
+    pub fn slice(index: StringIndex, bc: *const Bytecode) []const u8 {
+        return bc.strings[@intFromEnum(index)];
+    }
+
+    pub fn kind(index: StringIndex, bc: *const Bytecode) StringKind {
+        return bc.string_kinds[@intFromEnum(index)];
+    }
+};
+
 pub const StringKind = enum(u1) {
     escaped,
     literal,
 };
+
+pub const BigIntIndex = enum(u16) {
+    _,
+
+    pub fn value(index: BigIntIndex, bc: *const Bytecode) std.math.big.int.Const {
+        return bc.big_ints[@intFromEnum(index)];
+    }
+};
+
+pub const IcIndex = enum(u16) { _ };
 
 pub const Function = struct {
     source_range: ast.SourceRange,
@@ -29,10 +57,18 @@ pub const Function = struct {
     body: ast.FunctionBody,
     kind: Kind,
 
+    pub const Index = enum(u16) {
+        _,
+
+        pub fn ptr(index: Index, bc: *const Bytecode) *const Function {
+            return &bc.functions[@intFromEnum(index)];
+        }
+    };
+
     pub const Name = union(enum) {
         none,
-        identifier: Inst.StringIndex,
-        default: Inst.StringIndex,
+        identifier: StringIndex,
+        default: StringIndex,
     };
 
     pub const Kind = enum {
@@ -49,13 +85,21 @@ pub const Class = struct {
     source_range: ast.SourceRange,
     name: Name,
     class_tail: ast.ClassTail,
-    heritage: Inst.Reg,
-    element_names: []const Inst.Reg,
+    heritage: Reg,
+    element_names: []const Reg,
+
+    pub const Index = enum(u16) {
+        _,
+
+        pub fn ptr(index: Index, bc: *const Bytecode) *const Class {
+            return &bc.classes[@intFromEnum(index)];
+        }
+    };
 
     pub const Name = union(enum) {
         none,
-        identifier: Inst.StringIndex,
-        default: Inst.StringIndex,
+        identifier: StringIndex,
+        default: StringIndex,
     };
 };
 
@@ -63,7 +107,7 @@ pub const ExceptionHandler = struct {
     start: u32,
     end: u32,
     target: u32,
-    exception_reg: Inst.Reg,
+    exception_reg: Reg,
     scope_depth: u16,
 };
 
@@ -287,8 +331,8 @@ pub const Inst = struct {
         reg_string_reg: struct { Reg, StringIndex, Reg },
         reg_string_string: struct { Reg, StringIndex, StringIndex },
         reg_reg_string_ic: struct { Reg, Reg, StringIndex, IcIndex },
-        reg_function: struct { Reg, FunctionIndex },
-        reg_class: struct { Reg, ClassIndex },
+        reg_function: struct { Reg, Function.Index },
+        reg_class: struct { Reg, Class.Index },
         string: StringIndex,
         string_reg: struct { StringIndex, Reg },
     };
@@ -472,18 +516,6 @@ pub const Inst = struct {
         });
     };
 
-    pub const Reg = enum(u16) {
-        /// Used for `return`/`yield` instructions to indicate no register
-        none = std.math.maxInt(u16),
-        _,
-    };
-
-    pub const StringIndex = enum(u32) { _ };
-    pub const BigIntIndex = enum(u16) { _ };
-    pub const FunctionIndex = enum(u16) { _ };
-    pub const ClassIndex = enum(u16) { _ };
-    pub const IcIndex = enum(u16) { _ };
-
     pub fn print(inst: Inst, bc: *const Bytecode, terminal: std.Io.Terminal) PrintError!void {
         try terminal.writer.print("{t}", .{inst.tag});
         try printData(bc, inst.tag, inst.data, terminal);
@@ -544,8 +576,8 @@ pub const Inst = struct {
             Reg => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
             BigIntIndex,
-            FunctionIndex,
-            ClassIndex,
+            Function.Index,
+            Class.Index,
             IcIndex,
             => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             i8 => @bitCast(code[0]),
@@ -585,8 +617,8 @@ pub const Inst = struct {
             Reg => try writer.writeInt(u16, @intFromEnum(value), .little),
             StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
             BigIntIndex,
-            FunctionIndex,
-            ClassIndex,
+            Function.Index,
+            Class.Index,
             IcIndex,
             => try writer.writeInt(u16, @intFromEnum(value), .little),
             i8 => try writer.writeByte(@bitCast(value)),
@@ -776,13 +808,13 @@ fn printField(
             try terminal.writer.print("{}", .{value});
             try terminal.setColor(.reset);
         },
-        Inst.Reg => {
+        Reg => {
             try terminal.setColor(.blue);
             try terminal.writer.print("r{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
         },
-        Inst.StringIndex => {
-            const str = bc.strings[@intFromEnum(value)];
+        StringIndex => {
+            const str = value.slice(bc);
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
@@ -792,8 +824,8 @@ fn printField(
             try terminal.setColor(.reset);
             try terminal.writer.writeByte(')');
         },
-        Inst.BigIntIndex => {
-            const big_int = bc.big_ints[@intFromEnum(value)];
+        BigIntIndex => {
+            const big_int = value.value(bc);
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
@@ -804,9 +836,9 @@ fn printField(
             try terminal.setColor(.reset);
             try terminal.writer.writeByte(')');
         },
-        Inst.FunctionIndex,
-        Inst.ClassIndex,
-        Inst.IcIndex,
+        Function.Index,
+        Class.Index,
+        IcIndex,
         => {
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});

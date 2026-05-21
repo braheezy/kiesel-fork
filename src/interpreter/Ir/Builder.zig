@@ -286,12 +286,12 @@ fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferr
     const data: Ir.Inst.Data = switch (tag) {
         .br => .{ .br = undefined },
         .br_cond => blk: {
-            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
             try b.extra.appendNTimes(b.gpa, undefined, 3);
             break :blk .{ .br_cond = extra_index };
         },
         .exception_handler => blk: {
-            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
             try b.extra.appendNTimes(b.gpa, undefined, 4);
             break :blk .{ .exception_handler = extra_index };
         },
@@ -311,8 +311,8 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
     });
 }
 
-fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.Inst.ExtraIndex {
-    const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.ExtraIndex {
+    const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
     const fields = @typeInfo(T).@"struct".fields;
     try b.extra.ensureUnusedCapacity(b.gpa, fields.len);
     inline for (fields) |field| {
@@ -320,7 +320,7 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
         b.extra.appendAssumeCapacity(switch (field.type) {
             u32 => value,
             Ir.Inst.Ref,
-            Ir.Inst.StringIndex,
+            Ir.StringIndex,
             Ir.Inst.UpdateOp,
             => @intFromEnum(value),
             else => unreachable,
@@ -329,19 +329,19 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
     return extra_index;
 }
 
-fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Inst.FunctionIndex {
-    const index: Ir.Inst.FunctionIndex = @enumFromInt(b.functions.items.len);
+fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Function.Index {
+    const index: Ir.Function.Index = @enumFromInt(b.functions.items.len);
     try b.functions.append(b.gpa, function);
     return index;
 }
 
-fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Inst.ClassIndex {
-    const index: Ir.Inst.ClassIndex = @enumFromInt(b.classes.items.len);
+fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Class.Index {
+    const index: Ir.Class.Index = @enumFromInt(b.classes.items.len);
     try b.classes.append(b.gpa, class);
     return index;
 }
 
-fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.Inst.StringIndex) void {
+fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.StringIndex) void {
     const index = ref.toIndex().?;
     const inst = b.instructions.get(@intFromEnum(index));
     switch (inst.tag) {
@@ -392,7 +392,7 @@ fn findBreakableContext(b: *Builder, label: ?[]const u8) *BreakableContext {
     return b.breakable_stack.items[b.breakable_stack.items.len - 1];
 }
 
-fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Allocator.Error!Ir.Inst.StringIndex {
+fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Allocator.Error!Ir.StringIndex {
     const canonical_kind: Ir.StringKind = switch (kind) {
         .literal => .literal,
         .escaped => if (std.mem.findScalar(u8, string, '\\') == null)
@@ -407,7 +407,7 @@ fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Alloc
     return @enumFromInt(gop.index);
 }
 
-fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.Error!Ir.Inst.BigIntIndex {
+fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.Error!Ir.BigIntIndex {
     const gop = try b.big_ints.getOrPut(b.gpa, big_int);
     if (!gop.found_existing) {
         gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
@@ -2542,7 +2542,7 @@ fn lowerPropertyName(b: *Builder, property_name: *const ast.PropertyName) Error!
     };
 }
 
-fn lowerDefaultExpression(b: *Builder, value: Ir.Inst.Ref, default_expr: ?*const ast.Expression, anonymous_function_name: ?Ir.Inst.StringIndex) Error!Ir.Inst.Ref {
+fn lowerDefaultExpression(b: *Builder, value: Ir.Inst.Ref, default_expr: ?*const ast.Expression, anonymous_function_name: ?Ir.StringIndex) Error!Ir.Inst.Ref {
     if (default_expr) |expr| {
         const is_undefined = try b.addInst(.{
             .tag = .eq_strict,
@@ -2797,7 +2797,7 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
                 .binding_rest_property => {},
             };
 
-            const extra_index: Ir.Inst.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
             const excluded_len: u32 = @intCast(excluded_names.items.len);
             try b.extra.append(b.gpa, @intFromEnum(object));
             try b.extra.append(b.gpa, excluded_len);
@@ -2942,7 +2942,7 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
 
 fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!Ir.Inst.Ref {
     const Key = union(enum) {
-        string: Ir.Inst.StringIndex,
+        string: Ir.StringIndex,
         computed: Ir.Inst.Ref,
     };
 
@@ -4555,13 +4555,13 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
 
 fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.AssignmentExpression) Error!Ir.Inst.Ref {
     const Lhs = union(enum) {
-        binding: Ir.Inst.StringIndex,
-        property: struct { base: Ir.Inst.Ref, name: Ir.Inst.StringIndex },
+        binding: Ir.StringIndex,
+        property: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
         property_indexed: struct { base: Ir.Inst.Ref, index: u32 },
         property_computed: struct { base: Ir.Inst.Ref, property: Ir.Inst.Ref },
-        super_property: Ir.Inst.StringIndex,
+        super_property: Ir.StringIndex,
         super_property_computed: Ir.Inst.Ref,
-        private_element: struct { base: Ir.Inst.Ref, name: Ir.Inst.StringIndex },
+        private_element: struct { base: Ir.Inst.Ref, name: Ir.StringIndex },
     };
 
     var lhs: Lhs = undefined;
@@ -4889,9 +4889,9 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     const template_literal = &tagged_template.template_literal;
 
-    var cooked_indices: std.ArrayList(Ir.Inst.StringIndex) = .empty;
+    var cooked_indices: std.ArrayList(Ir.StringIndex) = .empty;
     defer cooked_indices.deinit(b.gpa);
-    var raw_indices: std.ArrayList(Ir.Inst.StringIndex) = .empty;
+    var raw_indices: std.ArrayList(Ir.StringIndex) = .empty;
     defer raw_indices.deinit(b.gpa);
 
     for (template_literal.spans, 0..) |span, i| {

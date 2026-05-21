@@ -19,9 +19,31 @@ live_ranges: []const LiveRange,
 pub const Builder = @import("Ir/Builder.zig");
 pub const LiveRange = @import("Ir/live_ranges.zig").LiveRange;
 
+pub const ExtraIndex = enum(u32) { _ };
+
+pub const StringIndex = enum(u32) {
+    _,
+
+    pub fn slice(index: StringIndex, ir: *const Ir) []const u8 {
+        return ir.strings[@intFromEnum(index)];
+    }
+
+    pub fn kind(index: StringIndex, ir: *const Ir) StringKind {
+        return ir.string_kinds[@intFromEnum(index)];
+    }
+};
+
 pub const StringKind = enum(u1) {
     escaped,
     literal,
+};
+
+pub const BigIntIndex = enum(u16) {
+    _,
+
+    pub fn value(index: BigIntIndex, ir: *const Ir) std.math.big.int.Const {
+        return ir.big_ints[@intFromEnum(index)];
+    }
 };
 
 pub const Function = struct {
@@ -31,10 +53,18 @@ pub const Function = struct {
     body: ast.FunctionBody,
     kind: Kind,
 
+    pub const Index = enum(u16) {
+        _,
+
+        pub fn ptr(index: Index, ir: *const Ir) *const Function {
+            return &ir.functions[@intFromEnum(index)];
+        }
+    };
+
     pub const Name = union(enum) {
         none,
-        identifier: Inst.StringIndex,
-        default: Inst.StringIndex,
+        identifier: StringIndex,
+        default: StringIndex,
     };
 
     pub const Kind = enum {
@@ -54,10 +84,18 @@ pub const Class = struct {
     heritage: Inst.Ref,
     element_names: []const Inst.Ref,
 
+    pub const Index = enum(u16) {
+        _,
+
+        pub fn ptr(index: Index, ir: *const Ir) *const Class {
+            return &ir.classes[@intFromEnum(index)];
+        }
+    };
+
     pub const Name = union(enum) {
         none,
-        identifier: Inst.StringIndex,
-        default: Inst.StringIndex,
+        identifier: StringIndex,
+        default: StringIndex,
     };
 };
 
@@ -252,8 +290,8 @@ pub const Inst = struct {
         call: ExtraIndex,
         construct: ExtraIndex,
         get_template_object: ExtraIndex,
-        create_function: FunctionIndex,
-        create_class: ClassIndex,
+        create_function: Function.Index,
+        create_class: Class.Index,
         argument: u16,
         super_call: ExtraIndex,
 
@@ -408,12 +446,6 @@ pub const Inst = struct {
         .get_import_meta = .none,
     });
 
-    pub const StringIndex = enum(u32) { _ };
-    pub const BigIntIndex = enum(u16) { _ };
-    pub const FunctionIndex = enum(u16) { _ };
-    pub const ClassIndex = enum(u16) { _ };
-    pub const ExtraIndex = enum(u32) { _ };
-
     // Inline data types (8 bytes)
     pub const Array = packed struct(u32) { len: u31, has_spread: bool };
     pub const RegExp = struct { pattern: StringIndex, flags: StringIndex };
@@ -465,6 +497,18 @@ pub const Inst = struct {
     pub const Index = enum(u32) {
         start,
         _,
+
+        pub fn inst(index: Index, ir: *const Ir) Inst {
+            return ir.instructions.get(@intFromEnum(index));
+        }
+
+        pub fn liveness(index: Index, ir: *const Ir) bool {
+            return ir.liveness.isSet(@intFromEnum(index));
+        }
+
+        pub fn liveRange(index: Index, ir: *const Ir) LiveRange {
+            return ir.live_ranges[@intFromEnum(index)];
+        }
 
         pub fn toRef(index: Index) Inst.Ref {
             return @enumFromInt(Ref.static_len + @intFromEnum(index));
@@ -585,10 +629,10 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
 }
 
 pub fn ExtraData(comptime T: type) type {
-    return struct { data: T, end: Inst.ExtraIndex };
+    return struct { data: T, end: ExtraIndex };
 }
 
-pub fn extraData(ir: *const Ir, comptime T: type, extra_index: Inst.ExtraIndex) ExtraData(T) {
+pub fn extraData(ir: *const Ir, comptime T: type, extra_index: ExtraIndex) ExtraData(T) {
     const fields = @typeInfo(T).@"struct".fields;
     var i: usize = @intFromEnum(extra_index);
     var result: T = undefined;
@@ -597,7 +641,7 @@ pub fn extraData(ir: *const Ir, comptime T: type, extra_index: Inst.ExtraIndex) 
             u16 => @intCast(ir.extra[i]),
             u32 => ir.extra[i],
             Inst.Ref,
-            Inst.StringIndex,
+            StringIndex,
             Inst.UpdateOp,
             => @enumFromInt(ir.extra[i]),
             else => unreachable,
@@ -610,7 +654,7 @@ pub fn extraData(ir: *const Ir, comptime T: type, extra_index: Inst.ExtraIndex) 
     };
 }
 
-pub fn refSlice(ir: *const Ir, start: Inst.ExtraIndex, len: u32) []const Inst.Ref {
+pub fn refSlice(ir: *const Ir, start: ExtraIndex, len: u32) []const Inst.Ref {
     return @ptrCast(ir.extra[@intFromEnum(start)..][0..len]);
 }
 
@@ -711,7 +755,7 @@ fn printData(
             try printField(ir, extra.data.id, terminal);
         },
         .create_class => {
-            const class = ir.classes[@intFromEnum(data.create_class)];
+            const class = data.create_class.ptr(ir);
             try printField(ir, data.create_class, terminal);
             try terminal.writer.writeAll(", ");
             try printField(ir, class.heritage, terminal);
@@ -737,7 +781,7 @@ fn printData(
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
             const FieldType = @TypeOf(field_data);
-            if (FieldType == Inst.ExtraIndex) {
+            if (FieldType == ExtraIndex) {
                 const ExtraType = switch (dt) {
                     .br_cond => Inst.BrCond,
                     .exception_handler => Inst.ExceptionHandler,
@@ -803,8 +847,8 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
             }
         },
         // ExtraIndex should be handled in `printData()`
-        Inst.StringIndex => {
-            const str = ir.strings[@intFromEnum(value)];
+        StringIndex => {
+            const str = value.slice(ir);
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
@@ -814,8 +858,8 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
             try terminal.setColor(.reset);
             try terminal.writer.writeByte(')');
         },
-        Inst.BigIntIndex => {
-            const big_int = ir.big_ints[@intFromEnum(value)];
+        BigIntIndex => {
+            const big_int = value.value(ir);
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
@@ -826,8 +870,8 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
             try terminal.setColor(.reset);
             try terminal.writer.writeByte(')');
         },
-        Inst.FunctionIndex,
-        Inst.ClassIndex,
+        Function.Index,
+        Class.Index,
         => {
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});

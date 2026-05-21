@@ -11,7 +11,7 @@ const Ir = interpreter.Ir;
 
 const LinearScanRegisterAllocation = @This();
 
-allocations: []Bytecode.Inst.Reg,
+allocations: []Bytecode.Reg,
 num_allocations: u16,
 free_temp_regs: std.DynamicBitSetUnmanaged,
 
@@ -24,7 +24,7 @@ pub fn init(
     gpa: std.mem.Allocator,
     live_ranges: []const Ir.LiveRange,
 ) std.mem.Allocator.Error!LinearScanRegisterAllocation {
-    var allocations = try gpa.alloc(Bytecode.Inst.Reg, live_ranges.len);
+    var allocations = try gpa.alloc(Bytecode.Reg, live_ranges.len);
     errdefer gpa.free(allocations);
     @memset(allocations, .none);
 
@@ -78,7 +78,7 @@ pub fn deinit(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator) void 
     lsra.free_temp_regs.deinit(gpa);
 }
 
-pub fn allocateTemp(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator) std.mem.Allocator.Error!Bytecode.Inst.Reg {
+pub fn allocateTemp(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator) std.mem.Allocator.Error!Bytecode.Reg {
     const reg = lsra.free_temp_regs.findFirstSet() orelse blk: {
         const new_reg = lsra.free_temp_regs.bit_length;
         try lsra.free_temp_regs.resize(gpa, new_reg + 1, true);
@@ -88,7 +88,7 @@ pub fn allocateTemp(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator)
     return @enumFromInt(lsra.num_allocations + @as(u16, @intCast(reg)));
 }
 
-pub fn freeTemp(lsra: *LinearScanRegisterAllocation, reg: Bytecode.Inst.Reg) void {
+pub fn freeTemp(lsra: *LinearScanRegisterAllocation, reg: Bytecode.Reg) void {
     lsra.free_temp_regs.set(@intFromEnum(reg) - lsra.num_allocations);
 }
 

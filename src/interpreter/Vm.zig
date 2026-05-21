@@ -97,7 +97,7 @@ pub const GeneratorSuspension = struct {
     argument_count: u16,
     scope_depth: u16,
     saved_pc: Pc,
-    yield_reg: Bytecode.Inst.Reg,
+    yield_reg: Bytecode.Reg,
 
     pub fn regs(suspension: *const GeneratorSuspension) []Value {
         const regs_start = 1 + suspension.argument_count;
@@ -481,24 +481,24 @@ fn arguments(vm: *Vm) []const Value {
     return vm.stack.items[args_start..][0..vm.frame.argument_count];
 }
 
-fn store(vm: *Vm, reg: Bytecode.Inst.Reg) Value {
+fn store(vm: *Vm, reg: Bytecode.Reg) Value {
     std.debug.assert(reg != .none);
     return vm.regs[@intFromEnum(reg)];
 }
 
-fn load(vm: *Vm, reg: Bytecode.Inst.Reg, value: Value) void {
+fn load(vm: *Vm, reg: Bytecode.Reg, value: Value) void {
     std.debug.assert(reg != .none);
     vm.regs[@intFromEnum(reg)] = value;
 }
 
-fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!*const String {
+fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*const String {
     const cache_index = @intFromEnum(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
-    const utf8 = vm.frame.bytecode.strings[@intFromEnum(index)];
-    const kind = vm.frame.bytecode.string_kinds[@intFromEnum(index)];
+    const utf8 = index.slice(vm.frame.bytecode);
+    const kind = index.kind(vm.frame.bytecode);
     const string = switch (kind) {
         .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
         .literal => try String.fromUtf8(
@@ -510,28 +510,28 @@ fn getString(vm: *Vm, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!
     return string;
 }
 
-fn getBigInt(vm: *Vm, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
+fn getBigInt(vm: *Vm, index: Bytecode.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
     const cache_index = vm.frame.bytecode.strings.len + @intFromEnum(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
-    const @"const" = vm.frame.bytecode.big_ints[@intFromEnum(index)];
+    const @"const" = index.value(vm.frame.bytecode);
     const managed = try @"const".toManaged(vm.agent.gc_allocator);
     const big_int = try BigInt.fromManaged(vm.agent, managed);
     vm.cache_slots[cache_index] = @ptrCast(@alignCast(big_int));
     return big_int;
 }
 
-fn getFunction(vm: *Vm, index: Bytecode.Inst.FunctionIndex) Bytecode.Function {
-    return vm.frame.bytecode.functions[@intFromEnum(index)];
+fn getFunction(vm: *Vm, index: Bytecode.Function.Index) *const Bytecode.Function {
+    return index.ptr(vm.frame.bytecode);
 }
 
-fn getClass(vm: *Vm, index: Bytecode.Inst.ClassIndex) Bytecode.Class {
-    return vm.frame.bytecode.classes[@intFromEnum(index)];
+fn getClass(vm: *Vm, index: Bytecode.Class.Index) *const Bytecode.Class {
+    return index.ptr(vm.frame.bytecode);
 }
 
-fn getInlineCache(vm: *Vm, index: Bytecode.Inst.IcIndex) *InlineCache {
+fn getInlineCache(vm: *Vm, index: Bytecode.IcIndex) *InlineCache {
     return &vm.inline_caches[@intFromEnum(index)];
 }
 
@@ -574,66 +574,66 @@ fn executeJump(_: *Vm, offset: i32, pc: *Pc) void {
     pc.* = pc.offsetBy(offset);
 }
 
-fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *Pc) void {
+fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Reg, offset: i32, pc: *Pc) void {
     if (vm.store(reg).toBoolean()) {
         pc.* = pc.offsetBy(offset);
     }
 }
 
-fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Inst.Reg, offset: i32, pc: *Pc) void {
+fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Reg, offset: i32, pc: *Pc) void {
     if (!vm.store(reg).toBoolean()) {
         pc.* = pc.offsetBy(offset);
     }
 }
 
-fn executeLoadUndefined(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+fn executeLoadUndefined(vm: *Vm, reg: Bytecode.Reg) void {
     vm.load(reg, .undefined);
 }
 
-fn executeLoadNull(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+fn executeLoadNull(vm: *Vm, reg: Bytecode.Reg) void {
     vm.load(reg, .null);
 }
 
-fn executeLoadTrue(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+fn executeLoadTrue(vm: *Vm, reg: Bytecode.Reg) void {
     vm.load(reg, .true);
 }
 
-fn executeLoadFalse(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+fn executeLoadFalse(vm: *Vm, reg: Bytecode.Reg) void {
     vm.load(reg, .false);
 }
 
-fn executeLoadNumberI8(vm: *Vm, reg: Bytecode.Inst.Reg, value: i8) void {
+fn executeLoadNumberI8(vm: *Vm, reg: Bytecode.Reg, value: i8) void {
     vm.load(reg, Value.from(value));
 }
 
-fn executeLoadNumberI32(vm: *Vm, reg: Bytecode.Inst.Reg, value: i32) void {
+fn executeLoadNumberI32(vm: *Vm, reg: Bytecode.Reg, value: i32) void {
     vm.load(reg, Value.from(value));
 }
 
-fn executeLoadNumberF64(vm: *Vm, reg: Bytecode.Inst.Reg, value: f64) void {
+fn executeLoadNumberF64(vm: *Vm, reg: Bytecode.Reg, value: f64) void {
     vm.load(reg, Value.from(value));
 }
 
-fn executeLoadString(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.StringIndex) std.mem.Allocator.Error!void {
+fn executeLoadString(vm: *Vm, reg: Bytecode.Reg, index: Bytecode.StringIndex) std.mem.Allocator.Error!void {
     const string = try vm.getString(index);
     vm.load(reg, Value.from(string));
 }
 
-fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Inst.Reg, index: Bytecode.Inst.BigIntIndex) std.mem.Allocator.Error!void {
+fn executeLoadBigInt(vm: *Vm, reg: Bytecode.Reg, index: Bytecode.BigIntIndex) std.mem.Allocator.Error!void {
     const big_int = try vm.getBigInt(index);
     vm.load(reg, Value.from(big_int));
 }
 
-fn executeMove(vm: *Vm, dest: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
+fn executeMove(vm: *Vm, dest: Bytecode.Reg, src: Bytecode.Reg) void {
     vm.load(dest, vm.store(src));
 }
 
-fn executeCreateArray(vm: *Vm, dst: Bytecode.Inst.Reg, length: u32) std.mem.Allocator.Error!void {
+fn executeCreateArray(vm: *Vm, dst: Bytecode.Reg, length: u32) std.mem.Allocator.Error!void {
     const array = try arrayCreateFast(vm.agent, length);
     vm.load(dst, Value.from(&array.object));
 }
 
-fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Reg, elem_reg: Bytecode.Reg) std.mem.Allocator.Error!void {
     const array_value = vm.store(array_reg);
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
@@ -645,13 +645,13 @@ fn executeArrayPush(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.In
     );
 }
 
-fn executeArrayPushHole(vm: *Vm, array_reg: Bytecode.Inst.Reg) void {
+fn executeArrayPushHole(vm: *Vm, array_reg: Bytecode.Reg) void {
     const array_value = vm.store(array_reg);
     const array = array_value.asObject().as(builtins.Array);
     array.fields.length += 1;
 }
 
-fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Inst.Reg, index: u32) std.mem.Allocator.Error!void {
+fn executeArraySet(vm: *Vm, array_reg: Bytecode.Reg, elem_reg: Bytecode.Reg, index: u32) std.mem.Allocator.Error!void {
     const array_value = vm.store(array_reg);
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
@@ -661,7 +661,7 @@ fn executeArraySet(vm: *Vm, array_reg: Bytecode.Inst.Reg, elem_reg: Bytecode.Ins
     });
 }
 
-fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const array_value = vm.store(array_reg);
     const spread_value = vm.store(value_reg);
     const array = array_value.asObject();
@@ -672,54 +672,54 @@ fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Inst.Reg, value_reg: Bytecode
     }
 }
 
-fn executeObjectCreate(vm: *Vm, dst: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeObjectCreate(vm: *Vm, dst: Bytecode.Reg) std.mem.Allocator.Error!void {
     const object = try ordinaryObjectCreateFast(vm.agent);
     vm.load(dst, Value.from(object));
 }
 
-fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeObjectSet(vm: *Vm, object_reg: Bytecode.Reg, key_index: Bytecode.StringIndex, value_reg: Bytecode.Reg) std.mem.Allocator.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = PropertyKey.from(try vm.getString(key_index));
     const property_value = vm.store(value_reg);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
 }
 
-fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSetComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const property_value = vm.store(value_reg);
     try object.createDataPropertyDirect(vm.agent, property_key, property_value);
 }
 
-fn executeObjectSetGetter(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSetGetter(vm: *Vm, object_reg: Bytecode.Reg, key_index: Bytecode.StringIndex, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .get = function, .enumerable = true, .configurable = true });
 }
 
-fn executeObjectSetGetterComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Bytecode.Inst.Reg, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSetGetterComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: Bytecode.Reg, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .get = function, .enumerable = true, .configurable = true });
 }
 
-fn executeObjectSetSetter(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_index: Bytecode.Inst.StringIndex, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSetSetter(vm: *Vm, object_reg: Bytecode.Reg, key_index: Bytecode.StringIndex, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
 }
 
-fn executeObjectSetSetterComputed(vm: *Vm, object_reg: Bytecode.Inst.Reg, key_reg: Bytecode.Inst.Reg, func_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSetSetterComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: Bytecode.Reg, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const function = vm.store(func_reg).asObject();
     try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
 }
 
-fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytecode.Reg) std.mem.Allocator.Error!void {
     const object = vm.store(object_reg).asObject();
     const prototype_value = vm.store(value_reg);
 
@@ -733,21 +733,21 @@ fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: 
     }
 }
 
-fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const spread_value = vm.store(value_reg);
     const excluded_items: []const PropertyKey = &.{};
     try object.copyDataProperties(vm.agent, spread_value, excluded_items);
 }
 
-fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Inst.Reg, pattern_index: Bytecode.Inst.StringIndex, flags_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Reg, pattern_index: Bytecode.StringIndex, flags_index: Bytecode.StringIndex) Agent.Error!void {
     const pattern = try vm.getString(pattern_index);
     const flags = try vm.getString(flags_index);
     const reg_exp = try builtins.regExpCreateFast(vm.agent, pattern, flags);
     vm.load(dst, Value.from(&reg_exp.object));
 }
 
-fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Reg) Agent.Error!void {
     const cached_this_value = &vm.stack.items[vm.frame.stack_base];
     if (cached_this_value.isUninitialized()) {
         @branchHint(.unlikely);
@@ -756,13 +756,13 @@ fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Inst.Reg) Agent.Error!void {
     vm.load(reg, cached_this_value.*);
 }
 
-fn executeToNumber(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeToNumber(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
     const number = try value.toNumber(vm.agent);
     vm.load(dst, Value.from(number));
 }
 
-fn executeToNumeric(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeToNumeric(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
     const numeric = try value.toNumeric(vm.agent);
     vm.load(dst, switch (numeric) {
@@ -771,19 +771,19 @@ fn executeToNumeric(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Age
     });
 }
 
-fn executeToString(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeToString(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
     const string = try value.toString(vm.agent);
     vm.load(dst, Value.from(string));
 }
 
-fn executeToObject(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeToObject(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
     const object = try value.toObject(vm.agent);
     vm.load(dst, Value.from(object));
 }
 
-fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeNegate(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
 
     // OPTIMIZATION: Fast path for number values
@@ -807,7 +807,7 @@ fn executeNegate(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.
     });
 }
 
-fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(src);
 
     // OPTIMIZATION: Fast path for i32 values
@@ -824,17 +824,17 @@ fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) Ag
     });
 }
 
-fn executeLogicalNot(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
+fn executeLogicalNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
     const value = vm.store(src);
     vm.load(dst, Value.from(!value.toBoolean()));
 }
 
-fn executeTypeof(vm: *Vm, dst: Bytecode.Inst.Reg, src: Bytecode.Inst.Reg) void {
+fn executeTypeof(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
     const value = vm.store(src);
     vm.load(dst, Value.from(value.typeof()));
 }
 
-fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
 
     const execution_context = vm.agent.runningExecutionContext();
@@ -852,7 +852,7 @@ fn executeTypeofBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.In
     }
 }
 
-fn executeAdd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeAdd(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -881,7 +881,7 @@ fn executeAdd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeSub(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeSub(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -902,7 +902,7 @@ fn executeSub(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeMul(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeMul(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -923,7 +923,7 @@ fn executeMul(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeDiv(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -938,7 +938,7 @@ fn executeDiv(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeRem(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeRem(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -962,7 +962,7 @@ fn executeRem(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeExp(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeExp(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -983,7 +983,7 @@ fn executeExp(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byte
     vm.load(dst, result);
 }
 
-fn executeShiftLeft(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeShiftLeft(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -999,7 +999,7 @@ fn executeShiftLeft(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs
     vm.load(dst, result);
 }
 
-fn executeShiftRight(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeShiftRight(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1015,7 +1015,7 @@ fn executeShiftRight(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
     vm.load(dst, result);
 }
 
-fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1031,7 +1031,7 @@ fn executeShiftRightUnsigned(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst
     vm.load(dst, result);
 }
 
-fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1046,7 +1046,7 @@ fn executeBitwiseAnd(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
     vm.load(dst, result);
 }
 
-fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1061,7 +1061,7 @@ fn executeBitwiseOr(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs
     vm.load(dst, result);
 }
 
-fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1076,7 +1076,7 @@ fn executeBitwiseXor(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
     vm.load(dst, result);
 }
 
-fn executeLt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeLt(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1095,7 +1095,7 @@ fn executeLt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytec
     vm.load(dst, Value.from(result orelse false));
 }
 
-fn executeGt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGt(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1114,7 +1114,7 @@ fn executeGt(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytec
     vm.load(dst, Value.from(result orelse false));
 }
 
-fn executeLtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeLtEq(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1133,7 +1133,7 @@ fn executeLtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byt
     vm.load(dst, Value.from(!(result orelse true)));
 }
 
-fn executeGtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGtEq(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1152,7 +1152,7 @@ fn executeGtEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Byt
     vm.load(dst, Value.from(!(result orelse true)));
 }
 
-fn executeInstanceOf(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeInstanceOf(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1160,7 +1160,7 @@ fn executeInstanceOf(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rh
     vm.load(dst, Value.from(result));
 }
 
-fn executeIn(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIn(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1180,7 +1180,7 @@ fn executeIn(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytec
     vm.load(dst, Value.from(result));
 }
 
-fn executeEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeEq(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1199,7 +1199,7 @@ fn executeEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytec
     vm.load(dst, Value.from(result));
 }
 
-fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeNotEq(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) Agent.Error!void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1218,7 +1218,7 @@ fn executeNotEq(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: By
     vm.load(dst, Value.from(result));
 }
 
-fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) void {
+fn executeEqStrict(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1237,7 +1237,7 @@ fn executeEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs:
     vm.load(dst, Value.from(result));
 }
 
-fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Inst.Reg, lhs: Bytecode.Inst.Reg, rhs: Bytecode.Inst.Reg) void {
+fn executeNotEqStrict(vm: *Vm, dst: Bytecode.Reg, lhs: Bytecode.Reg, rhs: Bytecode.Reg) void {
     const lhs_value = vm.store(lhs);
     const rhs_value = vm.store(rhs);
 
@@ -1273,7 +1273,7 @@ fn executePushVarScope(vm: *Vm) std.mem.Allocator.Error!void {
     vm.frame.scope_depth += 1;
 }
 
-fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executePushWithScope(vm: *Vm, object_reg: Bytecode.Reg) std.mem.Allocator.Error!void {
     const object = vm.store(object_reg).asObject();
     const execution_context = vm.agent.runningExecutionContext();
     const old_env = execution_context.ecmascript_code.lexical_environment;
@@ -1288,14 +1288,14 @@ fn executePopScope(vm: *Vm) void {
     vm.frame.scope_depth -= 1;
 }
 
-fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeCreateMutableBinding(vm: *Vm, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
     const execution_context = vm.agent.runningExecutionContext();
     const env = execution_context.ecmascript_code.lexical_environment;
     try env.createMutableBinding(vm.agent, name, false);
 }
 
-fn executeCreateImmutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeCreateImmutableBinding(vm: *Vm, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
     const execution_context = vm.agent.runningExecutionContext();
     const env = execution_context.ecmascript_code.lexical_environment;
@@ -1304,8 +1304,8 @@ fn executeCreateImmutableBinding(vm: *Vm, name_index: Bytecode.Inst.StringIndex)
 
 fn executeInitializeBinding(
     vm: *Vm,
-    name_index: Bytecode.Inst.StringIndex,
-    value_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.StringIndex,
+    value_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const name = try vm.getString(name_index);
     const value = vm.store(value_reg);
@@ -1315,7 +1315,7 @@ fn executeInitializeBinding(
     try env.initializeBinding(vm.agent, name, value);
 }
 
-fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeGetBinding(vm: *Vm, dst: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
 
     const execution_context = vm.agent.runningExecutionContext();
@@ -1338,10 +1338,10 @@ fn executeGetBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.
 
 fn executeGetProperty(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    name_index: Bytecode.Inst.StringIndex,
-    ic_index: Bytecode.Inst.IcIndex,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    name_index: Bytecode.StringIndex,
+    ic_index: Bytecode.IcIndex,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const ic = vm.getInlineCache(ic_index);
@@ -1373,9 +1373,9 @@ fn executeGetProperty(
 
 fn executeGetPropertyComputed(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    property_reg: Bytecode.Inst.Reg,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    property_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
@@ -1417,8 +1417,8 @@ fn executeGetPropertyComputed(
 
 fn executeGetPropertyIndexed(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
     index: u32,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1458,8 +1458,8 @@ fn executeGetPropertyIndexed(
 
 fn executeSetBinding(
     vm: *Vm,
-    name_index: Bytecode.Inst.StringIndex,
-    value_reg: Bytecode.Inst.Reg,
+    name_index: Bytecode.StringIndex,
+    value_reg: Bytecode.Reg,
     comptime strict: bool,
 ) Agent.Error!void {
     const name = try vm.getString(name_index);
@@ -1487,10 +1487,10 @@ fn executeSetBinding(
 
 fn executeSetProperty(
     vm: *Vm,
-    base_reg: Bytecode.Inst.Reg,
-    value_reg: Bytecode.Inst.Reg,
-    name_index: Bytecode.Inst.StringIndex,
-    ic_index: Bytecode.Inst.IcIndex,
+    base_reg: Bytecode.Reg,
+    value_reg: Bytecode.Reg,
+    name_index: Bytecode.StringIndex,
+    ic_index: Bytecode.IcIndex,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1527,9 +1527,9 @@ fn executeSetProperty(
 
 fn executeSetPropertyComputed(
     vm: *Vm,
-    base_reg: Bytecode.Inst.Reg,
-    property_reg: Bytecode.Inst.Reg,
-    value_reg: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Reg,
+    property_reg: Bytecode.Reg,
+    value_reg: Bytecode.Reg,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1563,8 +1563,8 @@ fn executeSetPropertyComputed(
 
 fn executeSetPropertyIndexed(
     vm: *Vm,
-    base_reg: Bytecode.Inst.Reg,
-    value_reg: Bytecode.Inst.Reg,
+    base_reg: Bytecode.Reg,
+    value_reg: Bytecode.Reg,
     index: u32,
     comptime strict: bool,
 ) Agent.Error!void {
@@ -1636,8 +1636,8 @@ inline fn computeUpdateValues(agent: *Agent, old_value: Value, comptime update_o
 
 fn executeUpdateBinding(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    name_index: Bytecode.Inst.StringIndex,
+    dest: Bytecode.Reg,
+    name_index: Bytecode.StringIndex,
     comptime update_op: UpdateOp,
     comptime update_type: UpdateType,
     comptime strict: bool,
@@ -1669,9 +1669,9 @@ fn executeUpdateBinding(
 
 fn executeUpdateProperty(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    name_index: Bytecode.Inst.StringIndex,
+    dest: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    name_index: Bytecode.StringIndex,
     comptime update_op: UpdateOp,
     comptime update_type: UpdateType,
     comptime strict: bool,
@@ -1708,9 +1708,9 @@ fn executeUpdateProperty(
 
 fn executeUpdatePropertyComputed(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    property_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    property_reg: Bytecode.Reg,
     comptime update_op: UpdateOp,
     comptime update_type: UpdateType,
     comptime strict: bool,
@@ -1748,8 +1748,8 @@ fn executeUpdatePropertyComputed(
 
 fn executeUpdatePropertyIndexed(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
     index: u32,
     comptime update_op: UpdateOp,
     comptime update_type: UpdateType,
@@ -1785,7 +1785,7 @@ fn executeUpdatePropertyIndexed(
     vm.load(dest, result);
 }
 
-fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
 
     var env = vm.agent.runningExecutionContext().ecmascript_code.lexical_environment;
@@ -1803,9 +1803,9 @@ fn executeDeleteBinding(vm: *Vm, dst: Bytecode.Inst.Reg, name_index: Bytecode.In
 
 fn executeDeleteProperty(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    name_index: Bytecode.Inst.StringIndex,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    name_index: Bytecode.StringIndex,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1825,9 +1825,9 @@ fn executeDeleteProperty(
 
 fn executeDeletePropertyComputed(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
-    property_reg: Bytecode.Inst.Reg,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
+    property_reg: Bytecode.Reg,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1848,8 +1848,8 @@ fn executeDeletePropertyComputed(
 
 fn executeDeletePropertyIndexed(
     vm: *Vm,
-    dst: Bytecode.Inst.Reg,
-    base_reg: Bytecode.Inst.Reg,
+    dst: Bytecode.Reg,
+    base_reg: Bytecode.Reg,
     index: u32,
     comptime strict: bool,
 ) Agent.Error!void {
@@ -1868,7 +1868,7 @@ fn executeDeletePropertyIndexed(
     vm.load(dst, Value.from(delete_status));
 }
 
-fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytecode.Inst.Reg, excluded_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Reg, source_reg: Bytecode.Reg, excluded_reg: Bytecode.Reg) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const source_value = vm.store(source_reg);
 
@@ -1896,9 +1896,9 @@ fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Inst.Reg, source_reg: Bytec
 
 fn executeCall(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    callee_reg: Bytecode.Inst.Reg,
-    args_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    callee_reg: Bytecode.Reg,
+    args_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
@@ -1921,9 +1921,9 @@ fn executeCall(
 fn executeCallN(
     vm: *Vm,
     comptime N: comptime_int,
-    dest: Bytecode.Inst.Reg,
-    callee_reg: Bytecode.Inst.Reg,
-    arg_regs: [N]Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    callee_reg: Bytecode.Reg,
+    arg_regs: [N]Bytecode.Reg,
 ) Agent.Error!void {
     const callee_value = vm.store(callee_reg);
 
@@ -1936,10 +1936,10 @@ fn executeCallN(
 
 fn executeCallProperty(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    callee_reg: Bytecode.Inst.Reg,
-    this_reg: Bytecode.Inst.Reg,
-    args_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    callee_reg: Bytecode.Reg,
+    this_reg: Bytecode.Reg,
+    args_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
@@ -1963,10 +1963,10 @@ fn executeCallProperty(
 fn executeCallPropertyN(
     vm: *Vm,
     comptime N: comptime_int,
-    dest: Bytecode.Inst.Reg,
-    callee_reg: Bytecode.Inst.Reg,
-    this_reg: Bytecode.Inst.Reg,
-    arg_regs: [N]Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    callee_reg: Bytecode.Reg,
+    this_reg: Bytecode.Reg,
+    arg_regs: [N]Bytecode.Reg,
 ) Agent.Error!void {
     const callee_value = vm.store(callee_reg);
     const this_value = vm.store(this_reg);
@@ -1980,9 +1980,9 @@ fn executeCallPropertyN(
 
 fn executeCallDirectEval(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    callee_reg: Bytecode.Inst.Reg,
-    args_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    callee_reg: Bytecode.Reg,
+    args_reg: Bytecode.Reg,
     strict: bool,
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
@@ -2011,9 +2011,9 @@ fn executeCallDirectEval(
 
 fn executeConstruct(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    constructor_reg: Bytecode.Inst.Reg,
-    args_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    constructor_reg: Bytecode.Reg,
+    args_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const constructor = vm.store(constructor_reg);
@@ -2036,9 +2036,9 @@ fn executeConstruct(
 fn executeConstructN(
     vm: *Vm,
     comptime N: comptime_int,
-    dest: Bytecode.Inst.Reg,
-    constructor_reg: Bytecode.Inst.Reg,
-    arg_regs: [N]Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    constructor_reg: Bytecode.Reg,
+    arg_regs: [N]Bytecode.Reg,
 ) Agent.Error!void {
     const constructor = vm.store(constructor_reg);
 
@@ -2049,7 +2049,7 @@ fn executeConstructN(
     vm.load(dest, result);
 }
 
-fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Bytecode.Inst.Reg, raw_reg: Bytecode.Inst.Reg, template_id: u16) Agent.Error!void {
+fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Reg, cooked_reg: Bytecode.Reg, raw_reg: Bytecode.Reg, template_id: u16) Agent.Error!void {
     const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&vm.frame.bytecode));
     const cooked = vm.store(cooked_reg).asObject().as(builtins.Array);
     const raw = vm.store(raw_reg).asObject().as(builtins.Array);
@@ -2057,21 +2057,21 @@ fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Inst.Reg, cooked_reg: Byteco
     vm.load(dest, Value.from(&template.object));
 }
 
-fn executeGetIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGetIterator(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const iterator = try getIterator(vm.agent, value, .sync);
     const iterator_obj = try iteratorToObject(vm.agent, iterator);
     vm.load(dest, Value.from(iterator_obj));
 }
 
-fn executeGetAsyncIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGetAsyncIterator(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const iterator = try getIterator(vm.agent, value, .async);
     const iterator_obj = try iteratorToObject(vm.agent, iterator);
     vm.load(dest, Value.from(iterator_obj));
 }
 
-fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const object = value.toObject(vm.agent) catch |err| try noexcept(err);
     const for_in_iterator = try createForInIterator(vm.agent, object);
@@ -2080,7 +2080,7 @@ fn executeGetForInIterator(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode
     vm.load(dest, Value.from(iterator_obj));
 }
 
-fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIteratorStep(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     var iterator = objectToIterator(iterator_obj);
 
@@ -2092,7 +2092,7 @@ fn executeIteratorStep(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.
     }
 }
 
-fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     var iterator = objectToIterator(iterator_obj);
 
@@ -2104,7 +2104,7 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byte
     }
 }
 
-fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
     const iterator_inner = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject();
@@ -2150,20 +2150,20 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg:
     vm.load(dest, value);
 }
 
-fn executeIteratorClose(vm: *Vm, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIteratorClose(vm: *Vm, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     var iterator = objectToIterator(iterator_obj);
     if (iterator.done) return;
     try iterator.close(vm.agent, @as(Agent.Error!void, {}));
 }
 
-fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) void {
+fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     const done = iterator_obj.getValueAtPropertyOffset(@enumFromInt(2));
     vm.load(dest, done);
 }
 
-fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
     var iterator = objectToIterator(iterator_obj);
 
@@ -2178,7 +2178,7 @@ fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Inst.Reg, iterator_reg: Byteco
     vm.load(dest, Value.from(&array.object));
 }
 
-fn executeThrow(vm: *Vm, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeThrow(vm: *Vm, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     vm.agent.exception = .{
         .value = value,
@@ -2192,19 +2192,19 @@ fn executeThrowReferenceError(vm: *Vm) Agent.Error!void {
     return vm.agent.throwException(.reference_error, "Invalid assignment to function call", .{});
 }
 
-fn executeReturn(vm: *Vm, reg: Bytecode.Inst.Reg) RunResult {
+fn executeReturn(vm: *Vm, reg: Bytecode.Reg) RunResult {
     const return_value: ?Value = if (reg != .none) vm.store(reg) else null;
     if (vm.call_stack.items.len > 1) vm.popCallFrame();
     return .{ .@"return" = return_value };
 }
 
-fn executeAwait(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeAwait(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     const result = try await(vm.agent, value);
     vm.load(dest, result);
 }
 
-fn executeYield(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!RunResult {
+fn executeYield(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg, pc: Pc) Agent.Error!RunResult {
     // The initial `yield` instruction inserted after FDI doesn't have a register.
     if (dest != .none) {
         const value = vm.store(value_reg);
@@ -2232,7 +2232,7 @@ fn executeYield(vm: *Vm, dest: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg, 
     } };
 }
 
-fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg, pc: Pc) Agent.Error!?RunResult {
+fn executeYieldStar(vm: *Vm, reg: Bytecode.Reg, iter_reg: Bytecode.Reg, pc: Pc) Agent.Error!?RunResult {
     const iterator_obj = vm.store(iter_reg).asObject();
     var iterator = objectToIterator(iterator_obj);
     const received_value = vm.store(reg);
@@ -2266,15 +2266,15 @@ fn executeYieldStar(vm: *Vm, reg: Bytecode.Inst.Reg, iter_reg: Bytecode.Inst.Reg
     } };
 }
 
-fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytecode.Inst.FunctionIndex) Agent.Error!void {
+fn executeCreateFunction(vm: *Vm, dest: Bytecode.Reg, function_index: Bytecode.Function.Index) Agent.Error!void {
     const execution_context = vm.agent.runningExecutionContext();
     const function = vm.getFunction(function_index);
     const identifier: ?[]const u8 = switch (function.name) {
-        .identifier => |name_index| vm.frame.bytecode.strings[@intFromEnum(name_index)],
+        .identifier => |name_index| name_index.slice(vm.frame.bytecode),
         .none, .default => null,
     };
     const default_name: ?[]const u8 = switch (function.name) {
-        .default => |name_index| vm.frame.bytecode.strings[@intFromEnum(name_index)],
+        .default => |name_index| name_index.slice(vm.frame.bytecode),
         .none, .identifier => null,
     };
     const cache_index =
@@ -2374,7 +2374,7 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Inst.Reg, function_index: Bytec
     vm.load(dest, Value.from(&function_obj.object));
 }
 
-fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.Inst.ClassIndex) Agent.Error!void {
+fn executeCreateClass(vm: *Vm, dest: Bytecode.Reg, class_index: Bytecode.Class.Index) Agent.Error!void {
     const execution_context = vm.agent.runningExecutionContext();
     const class = vm.getClass(class_index);
     const class_binding: ?*const String = switch (class.name) {
@@ -2418,19 +2418,19 @@ fn executeCreateClass(vm: *Vm, dest: Bytecode.Inst.Reg, class_index: Bytecode.In
     vm.load(dest, Value.from(class_obj));
 }
 
-fn executeSetHomeObject(vm: *Vm, function_reg: Bytecode.Inst.Reg, home_object_reg: Bytecode.Inst.Reg) void {
+fn executeSetHomeObject(vm: *Vm, function_reg: Bytecode.Reg, home_object_reg: Bytecode.Reg) void {
     const function_value = vm.store(function_reg);
     const home_object_value = vm.store(home_object_reg);
     const function = function_value.asObject().as(builtins.ECMAScriptFunction);
     makeMethod(function, home_object_value.asObject());
 }
 
-fn executeCreateUnmappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeCreateUnmappedArgumentsObject(vm: *Vm, dest: Bytecode.Reg) std.mem.Allocator.Error!void {
     const arguments_object = try createUnmappedArgumentsObject(vm.agent, vm.arguments());
     vm.load(dest, Value.from(&arguments_object.object));
 }
 
-fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Reg) std.mem.Allocator.Error!void {
     const execution_context = vm.agent.runningExecutionContext();
     const function = execution_context.origin.function.as(builtins.ECMAScriptFunction);
     const arguments_object = try createMappedArgumentsObject(
@@ -2443,20 +2443,20 @@ fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.
     vm.load(dest, Value.from(&arguments_object.object));
 }
 
-fn executeGetArgument(vm: *Vm, dest: Bytecode.Inst.Reg, arg_index: u16) void {
+fn executeGetArgument(vm: *Vm, dest: Bytecode.Reg, arg_index: u16) void {
     const args = vm.arguments();
     const value: Value = if (arg_index < args.len) args[arg_index] else .undefined;
     vm.load(dest, value);
 }
 
-fn executeGetRestArguments(vm: *Vm, dest: Bytecode.Inst.Reg, start_index: u16) std.mem.Allocator.Error!void {
+fn executeGetRestArguments(vm: *Vm, dest: Bytecode.Reg, start_index: u16) std.mem.Allocator.Error!void {
     const args = vm.arguments();
     const rest_args = args[@min(start_index, args.len)..];
     const array = try createArrayFromList(vm.agent, rest_args);
     vm.load(dest, Value.from(&array.object));
 }
 
-fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Inst.Reg) void {
+fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Reg) void {
     const value: Value = if (vm.agent.getNewTarget()) |new_target|
         Value.from(new_target)
     else
@@ -2466,8 +2466,8 @@ fn executeGetNewTarget(vm: *Vm, reg: Bytecode.Inst.Reg) void {
 
 fn executeSuperCall(
     vm: *Vm,
-    dest: Bytecode.Inst.Reg,
-    args_reg: Bytecode.Inst.Reg,
+    dest: Bytecode.Reg,
+    args_reg: Bytecode.Reg,
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const args_value = vm.store(args_reg);
@@ -2486,7 +2486,7 @@ fn executeSuperCall(
     vm.load(dest, result);
 }
 
-fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
     const base = try env.function_environment.getSuperBase(vm.agent);
@@ -2500,7 +2500,7 @@ fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecod
     vm.load(dest, result);
 }
 
-fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Inst.Reg, property_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Reg, property_reg: Bytecode.Reg) Agent.Error!void {
     const property_value = vm.store(property_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
@@ -2515,7 +2515,7 @@ fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Inst.Reg, property_re
     vm.load(dest, result);
 }
 
-fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, comptime strict: bool) Agent.Error!void {
+fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Reg, name_index: Bytecode.StringIndex, comptime strict: bool) Agent.Error!void {
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
@@ -2533,7 +2533,7 @@ fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Inst.Reg, name_index: By
     }
 }
 
-fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Inst.Reg, value_reg: Bytecode.Inst.Reg, comptime strict: bool) Agent.Error!void {
+fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Reg, value_reg: Bytecode.Reg, comptime strict: bool) Agent.Error!void {
     const property_value = vm.store(property_reg);
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
@@ -2552,7 +2552,7 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Inst.Reg, val
     }
 }
 
-fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
     const name_utf8 = try name.toUtf8(vm.agent.gc_allocator);
 
@@ -2564,8 +2564,8 @@ fn executeCreatePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Byt
     vm.load(dest, Value.from(private_name.symbol));
 }
 
-fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
-    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
+fn executeResolvePrivateElement(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
+    const name = name_index.slice(vm.frame.bytecode);
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
@@ -2588,9 +2588,9 @@ fn executePopPrivateScope(vm: *Vm) void {
     execution_context.ecmascript_code.private_environment = execution_context.ecmascript_code.private_environment.?.outer_private_environment;
 }
 
-fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex) Agent.Error!void {
+fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Reg, base_reg: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const base_value = vm.store(base_reg);
-    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
+    const name = name_index.slice(vm.frame.bytecode);
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
@@ -2601,10 +2601,10 @@ fn executeGetPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, base_reg: Bytecode
     vm.load(dest, result);
 }
 
-fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: Bytecode.Inst.StringIndex, value_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Reg, name_index: Bytecode.StringIndex, value_reg: Bytecode.Reg) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const value = vm.store(value_reg);
-    const name = vm.frame.bytecode.strings[@intFromEnum(name_index)];
+    const name = name_index.slice(vm.frame.bytecode);
 
     const execution_context = vm.agent.runningExecutionContext();
     const private_env = execution_context.ecmascript_code.private_environment.?;
@@ -2614,7 +2614,7 @@ fn executeSetPrivateElement(vm: *Vm, base_reg: Bytecode.Inst.Reg, name_index: By
     try base_object.privateSet(vm.agent, private_name, value);
 }
 
-fn executeHasPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, symbol_reg: Bytecode.Inst.Reg, object_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeHasPrivateElement(vm: *Vm, dest: Bytecode.Reg, symbol_reg: Bytecode.Reg, object_reg: Bytecode.Reg) Agent.Error!void {
     const symbol_value = vm.store(symbol_reg);
     const object_value = vm.store(object_reg);
 
@@ -2631,14 +2631,14 @@ fn executeHasPrivateElement(vm: *Vm, dest: Bytecode.Inst.Reg, symbol_reg: Byteco
     vm.load(dest, Value.from(result));
 }
 
-fn executeImportCall(vm: *Vm, dest: Bytecode.Inst.Reg, specifier_reg: Bytecode.Inst.Reg, options_reg: Bytecode.Inst.Reg) Agent.Error!void {
+fn executeImportCall(vm: *Vm, dest: Bytecode.Reg, specifier_reg: Bytecode.Reg, options_reg: Bytecode.Reg) Agent.Error!void {
     const specifier = vm.store(specifier_reg);
     const options = vm.store(options_reg);
     const result = try evaluateImportCall(vm.agent, specifier, options);
     vm.load(dest, result);
 }
 
-fn executeGetImportMeta(vm: *Vm, dest: Bytecode.Inst.Reg) std.mem.Allocator.Error!void {
+fn executeGetImportMeta(vm: *Vm, dest: Bytecode.Reg) std.mem.Allocator.Error!void {
     const result = try evaluateImportMeta(vm.agent);
     vm.load(dest, result);
 }
