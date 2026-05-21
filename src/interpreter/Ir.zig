@@ -138,8 +138,6 @@ pub const Inst = struct {
         logical_not,
         typeof,
         typeof_binding,
-        void,
-        delete,
         spread,
 
         add,
@@ -339,8 +337,6 @@ pub const Inst = struct {
         .logical_not = .ref,
         .typeof = .ref,
         .typeof_binding = .string,
-        .void = .ref,
-        .delete = .ref,
         .spread = .ref,
         .add = .binary,
         .sub = .binary,

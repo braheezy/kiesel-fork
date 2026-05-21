@@ -145,8 +145,6 @@ pub fn build(b: *Builder) Error!Bytecode {
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
             .typeof_binding => try b.lowerTypeofBinding(data.string, dest),
-            .void => try b.lowerVoid(data.ref, dest),
-            .delete => try b.lowerDelete(data.ref, dest),
             .spread => try b.lowerSpread(data.ref, dest),
             .add => try b.lowerAdd(data.binary, dest),
             .sub => try b.lowerSub(data.binary, dest),
@@ -1046,22 +1044,6 @@ fn lowerTypeofBinding(b: *Builder, name_index: Ir.StringIndex, dest: Ir.Inst.Ref
             dest_reg,
             name_index_,
         } },
-    });
-}
-
-fn lowerVoid(b: *Builder, _: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
-    const dest_reg = b.resolve(dest);
-    try b.emit(.{
-        .tag = .load_undefined,
-        .data = .{ .reg = dest_reg },
-    });
-}
-
-fn lowerDelete(b: *Builder, _: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
-    const dest_reg = b.resolve(dest);
-    try b.emit(.{
-        .tag = .load_true,
-        .data = .{ .reg = dest_reg },
     });
 }
 

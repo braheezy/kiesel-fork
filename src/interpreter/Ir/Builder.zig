@@ -3945,19 +3945,36 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
         }
     }
     const operand = try b.lowerExpression(unary_expr.expression);
-    const tag: Ir.Inst.Tag = switch (unary_expr.operator) {
-        .@"+" => .to_number,
-        .@"-" => .negate,
-        .@"~" => .bitwise_not,
-        .@"!" => .logical_not,
-        .typeof => .typeof,
-        .void => .void,
-        .delete => .delete,
+    return switch (unary_expr.operator) {
+        .@"+" => b.addInst(.{
+            .tag = .to_number,
+            .data = .{ .ref = operand },
+        }),
+        .@"-" => b.addInst(.{
+            .tag = .negate,
+            .data = .{ .ref = operand },
+        }),
+        .@"~" => b.addInst(.{
+            .tag = .bitwise_not,
+            .data = .{ .ref = operand },
+        }),
+        .@"!" => b.addInst(.{
+            .tag = .logical_not,
+            .data = .{ .ref = operand },
+        }),
+        .typeof => b.addInst(.{
+            .tag = .typeof,
+            .data = .{ .ref = operand },
+        }),
+        .delete => b.addInst(.{
+            .tag = .true,
+            .data = .{ .none = {} },
+        }),
+        .void => b.addInst(.{
+            .tag = .undefined,
+            .data = .{ .none = {} },
+        }),
     };
-    return b.addInst(.{
-        .tag = tag,
-        .data = .{ .ref = operand },
-    });
 }
 
 fn lowerBinaryExpression(b: *Builder, bin_expr: *const ast.BinaryExpression) Error!Ir.Inst.Ref {
