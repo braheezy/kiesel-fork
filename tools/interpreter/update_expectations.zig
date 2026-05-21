@@ -2,25 +2,20 @@ const std = @import("std");
 
 const kiesel = @import("kiesel");
 
-const Bytecode = kiesel.interpreter.Bytecode;
-const Ir = kiesel.interpreter.Ir;
+const Agent = kiesel.execution.Agent;
 const Parser = kiesel.language.Parser;
+const Realm = kiesel.execution.Realm;
+const Script = kiesel.language.Script;
 
 const Edit = struct {
     span: std.zig.Ast.Span,
     replacement: []const u8,
 };
 
-const GeneratedExpectations = struct {
-    ir: []const u8,
-    bc: []const u8,
-};
-
 const TestCase = struct {
     source: std.zig.Zoir.Node.Index,
     expected_result: std.zig.Zoir.Node.Index,
-    expected_ir: std.zig.Zoir.Node.Index,
-    expected_bc: std.zig.Zoir.Node.Index,
+    expected_output: std.zig.Zoir.Node.Index,
 };
 
 pub fn main(init: std.process.Init) !u8 {
@@ -65,18 +60,7 @@ pub fn main(init: std.process.Init) !u8 {
     }
 
     for (test_cases, 0..) |test_case, i| {
-        const expected_ir_ast_node = switch (test_case.expected_ir.get(diag.zoir)) {
-            .null => null,
-            else => test_case.expected_ir.getAstNode(diag.zoir),
-        };
-        const expected_bc_ast_node = switch (test_case.expected_bc.get(diag.zoir)) {
-            .null => null,
-            else => test_case.expected_bc.getAstNode(diag.zoir),
-        };
-
-        if (expected_bc_ast_node == null and expected_ir_ast_node == null) {
-            continue;
-        }
+        const expected_output_ast_node = test_case.expected_output.getAstNode(diag.zoir);
 
         const script_source = try std.zon.parse.fromZoirNodeAlloc(
             []const u8,
@@ -89,32 +73,18 @@ pub fn main(init: std.process.Init) !u8 {
         );
         defer gpa.free(script_source);
 
-        const generated_expectations = generateExpectations(gpa, script_source) catch |err| {
-            std.debug.print("Failed to generate expectations for case {d}: {t}\n", .{ i, err });
+        const output = generateExpectedOutput(gpa, io, script_source) catch |err| {
+            std.debug.print("Failed to generate expected output for case {d}: {t}\n", .{ i, err });
             return 1;
         };
-        defer {
-            gpa.free(generated_expectations.ir);
-            gpa.free(generated_expectations.bc);
-        }
+        defer gpa.free(output);
 
-        if (expected_ir_ast_node) |node| {
-            const span = nodeSpan(diag.ast, zon_source, node);
-            const replacement = try formatMultilineLiteral(gpa, generated_expectations.ir);
-            try edits.append(gpa, .{
-                .span = span,
-                .replacement = replacement,
-            });
-        }
-
-        if (expected_bc_ast_node) |ast_node| {
-            const span = nodeSpan(diag.ast, zon_source, ast_node);
-            const replacement = try formatMultilineLiteral(gpa, generated_expectations.bc);
-            try edits.append(gpa, .{
-                .span = span,
-                .replacement = replacement,
-            });
-        }
+        const span = nodeSpan(diag.ast, zon_source, expected_output_ast_node);
+        const replacement = try formatMultilineLiteral(gpa, output);
+        try edits.append(gpa, .{
+            .span = span,
+            .replacement = replacement,
+        });
     }
 
     var rewritten: std.ArrayList(u8) = .empty;
@@ -144,42 +114,63 @@ pub fn main(init: std.process.Init) !u8 {
     return 0;
 }
 
-fn generateExpectations(gpa: std.mem.Allocator, source: []const u8) !GeneratedExpectations {
+fn generateExpectedOutput(gpa: std.mem.Allocator, io: std.Io, source: []const u8) ![]const u8 {
+    var aw: std.Io.Writer.Allocating = .init(gpa);
+    defer aw.deinit();
+
     var arena_instance: std.heap.ArenaAllocator = .init(gpa);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
 
     const script = try Parser.parse(kiesel.language.ast.Script, arena, source, .{});
 
-    var ir = ir: {
-        var builder: Ir.Builder = .init(gpa, "test", .{ .script = &script });
-        defer builder.deinit();
-        break :ir try builder.build();
+    var environ_map = try std.process.Environ.createMap(.empty, gpa);
+    defer environ_map.deinit();
+
+    var platform: Agent.Platform = .default(io, &environ_map);
+    defer platform.deinit();
+    platform.stdout = &aw.writer;
+    platform.stderr = &aw.writer;
+    platform.terminal_mode = .no_color;
+
+    var agent: Agent = try .init(gpa, io, &platform, .{
+        .debug = .{
+            .print_ir = true,
+            .print_bytecode = true,
+        },
+    });
+    defer agent.deinit();
+
+    try Realm.initializeHostDefinedRealm(&agent, .{});
+
+    const realm = agent.currentRealm();
+    const script_record = try agent.gc_allocator.create(Script);
+    script_record.* = .{
+        .realm = realm,
+        .ecmascript_code = script,
+        .loaded_modules = .empty,
+        .host_defined = null,
+        .source = source,
     };
-    defer ir.deinit(gpa);
 
-    var bc = bc: {
-        var builder: Bytecode.Builder = try .init(gpa, &ir);
-        defer builder.deinit();
-        break :bc try builder.build();
+    const test_context = try agent.gc_allocator.create(kiesel.execution.ExecutionContext);
+    test_context.* = .{
+        .origin = .script,
+        .realm = realm,
+        .script_or_module = .{ .script = script_record },
+        .ecmascript_code = .{
+            .variable_environment = .{ .global_environment = realm.global_env },
+            .lexical_environment = .{ .global_environment = realm.global_env },
+            .private_environment = null,
+        },
     };
-    defer bc.deinit(gpa);
+    try agent.execution_context_stack.append(agent.gc_allocator, test_context);
+    defer _ = agent.execution_context_stack.pop().?;
 
-    var aw: std.Io.Writer.Allocating = .init(gpa);
-    defer aw.deinit();
+    try Script.globalDeclarationInstantiation(&agent, script, realm.global_env, source);
 
-    const terminal: std.Io.Terminal = .{
-        .writer = &aw.writer,
-        .mode = .no_color,
-    };
-
-    try ir.print(terminal);
-    const ir_out = try aw.toOwnedSlice();
-
-    try bc.print(terminal);
-    const bc_out = try aw.toOwnedSlice();
-
-    return .{ .ir = ir_out, .bc = bc_out };
+    _ = try kiesel.interpreter.compileAndRun(&agent, .{ .script = &script }, "test");
+    return aw.toOwnedSlice();
 }
 
 fn formatMultilineLiteral(

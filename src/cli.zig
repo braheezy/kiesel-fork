@@ -497,6 +497,10 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
     const agent = realm.agent;
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
+    const debug_print =
+        agent.options.debug.print_ast or
+        agent.options.debug.print_ir or
+        agent.options.debug.print_bytecode;
 
     const host_defined = try agent.gc_allocator.create(ScriptOrModuleHostDefined);
     host_defined.* = .{ .base_dir = options.base_dir };
@@ -629,12 +633,14 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
         },
     } catch |err| switch (err) {
         error.OutOfMemory => {
+            if (debug_print) try stderr.writeByte('\n');
             try stderr.writeAll("Out of memory\n");
             try stderr.flush();
             return error.AlreadyReported;
         },
         error.ExceptionThrown => {
             const exception = agent.clearException();
+            if (debug_print) try stderr.writeByte('\n');
             try stderr.print("{f}\n", .{exception.fmtPretty(agent)});
             try stderr.flush();
             return error.AlreadyReported;
@@ -753,6 +759,10 @@ fn repl(
 ) !void {
     const agent = realm.agent;
     const stdout = agent.platform.stdout;
+    const debug_print =
+        agent.options.debug.print_ast or
+        agent.options.debug.print_ir or
+        agent.options.debug.print_bytecode;
 
     try stdout.writeAll(repl_preamble);
     try stdout.flush();
@@ -1001,6 +1011,7 @@ fn repl(
             error.AlreadyReported => continue,
             else => return err,
         };
+        if (debug_print) try stdout.writeByte('\n');
         try stdout.print("{f}", .{result.fmtPretty()});
         if (options.debug) {
             const terminal: std.Io.Terminal = .{
@@ -1321,6 +1332,11 @@ pub fn main(init: std.process.Init) !u8 {
     defer gpa.free(cwd);
     std.debug.assert(std.Io.Dir.path.isAbsolute(cwd));
 
+    const debug_print =
+        agent.options.debug.print_ast or
+        agent.options.debug.print_ir or
+        agent.options.debug.print_bytecode;
+
     if (maybe_path) |path| {
         const source_text = try readFile(gpa, io, path);
         defer gpa.free(source_text);
@@ -1337,6 +1353,7 @@ pub fn main(init: std.process.Init) !u8 {
             else => return err,
         };
         if (parsed_args.options.@"print-result") {
+            if (debug_print) try stdout.writeByte('\n');
             try stdout.print("{f}\n", .{result.fmtPretty()});
             try stdout.flush();
         }
@@ -1352,6 +1369,7 @@ pub fn main(init: std.process.Init) !u8 {
             else => return err,
         };
         if (parsed_args.options.@"print-result") {
+            if (debug_print) try stdout.writeByte('\n');
             try stdout.print("{f}\n", .{result.fmtPretty()});
             try stdout.flush();
         }
