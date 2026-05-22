@@ -988,7 +988,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
             // a. Perform AsyncModuleExecutionRejected(module, error).
             try asyncModuleExecutionRejected(agent_, module_, .{
                 .value = @"error",
-                .stack_trace = try agent_.captureStackTrace(),
+                .stack_trace = try agent_.captureStackTrace(.{}),
             });
 
             // b. Return NormalCompletion(undefined).

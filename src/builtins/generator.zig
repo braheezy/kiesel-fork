@@ -194,7 +194,7 @@ pub fn generatorStart(
 
                     agent_.exception = .{
                         .value = value,
-                        .stack_trace = agent_.captureStackTrace() catch &.{},
+                        .stack_trace = agent_.captureStackTrace(.{}) catch &.{},
                     };
                     return error.ExceptionThrown;
                 },
@@ -379,7 +379,7 @@ pub fn generatorResumeAbrupt(
             .throw => |value| {
                 agent.exception = .{
                     .value = value,
-                    .stack_trace = agent.captureStackTrace() catch &.{},
+                    .stack_trace = agent.captureStackTrace(.{}) catch &.{},
                 };
                 return error.ExceptionThrown;
             },

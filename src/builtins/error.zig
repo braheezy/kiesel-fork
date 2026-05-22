@@ -66,7 +66,11 @@ pub const constructor = struct {
             "%Error.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.fromLiteral("Error"), .message = .empty },
+                .name = String.fromLiteral("Error"),
+                .message = .empty,
+                .stack_trace = try agent.captureStackTrace(.{
+                    .limit = agent.activeFunctionObject(),
+                }),
             },
         );
 
@@ -86,7 +90,7 @@ pub const constructor = struct {
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            @"error".fields.error_data.message = msg;
+            @"error".fields.message = msg;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).
@@ -123,9 +127,9 @@ pub fn internalSet(
 ) Agent.Error!bool {
     if (property_key == .string and value.isString()) {
         if (property_key.string.eql(String.fromLiteral("name"))) {
-            object.as(Error).fields.error_data.name = value.asString();
+            object.as(Error).fields.name = value.asString();
         } else if (property_key.string.eql(String.fromLiteral("message"))) {
-            object.as(Error).fields.error_data.message = value.asString();
+            object.as(Error).fields.message = value.asString();
         }
     }
     return builtins.ordinarySet(agent, object, property_key, value, receiver);
@@ -163,7 +167,62 @@ pub const prototype = struct {
             Value.from("Error"),
         );
 
+        try object.defineBuiltinAccessor(agent, "stack", stackGetter, stackSetter, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
+    }
+
+    /// 20.5.3.1.1 get Error.prototype.stack
+    /// https://tc39.es/proposal-error-stack-accessor/#sec-get-error.prototype.stack
+    fn stackGetter(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let E be the this value.
+        // 2. If E is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+
+        // 3. If E does not have an [[ErrorData]] internal slot, return undefined.
+        const @"error" = this_value.asObject().cast(Error) orelse return .undefined;
+
+        // 4. Return an implementation-defined string that represents the stack trace of E.
+        const exception: Agent.Exception = .{
+            .value = Value.from(&@"error".object),
+            .stack_trace = @"error".fields.stack_trace,
+        };
+        const string = try String.fromUtf8(agent, try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{f}",
+            .{exception.fmtPretty(agent, .no_color)},
+        ));
+        return Value.from(string);
+    }
+
+    /// 20.5.3.1.2 set Error.prototype.stack
+    /// https://tc39.es/proposal-error-stack-accessor/#sec-set-error.prototype.stack
+    fn stackSetter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const value = arguments.get(0);
+
+        // 1. Let E be the this value.
+        // 2. If E is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+
+        // 3. If v is not a String, throw a TypeError exception.
+        if (!value.isString()) {
+            return agent.throwException(.type_error, "{f} is not a string", .{value});
+        }
+
+        // 4. Perform ? SetterThatIgnoresPrototypeProperties(this value, %Error.prototype%, "stack", v).
+        try this_value.setterThatIgnoresPrototypeProperties(
+            agent,
+            try realm.intrinsics.@"%Error.prototype%"(),
+            PropertyKey.from("stack"),
+            value,
+        );
+
+        // 5. Return undefined.
+        return .undefined;
     }
 
     /// 20.5.3.4 Error.prototype.toString ( )
@@ -206,12 +265,10 @@ pub const prototype = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-error-instances
 pub const Error = MakeObject(.{
     .Fields = struct {
-        // NOTE: [[ErrorData]] is undefined in the spec, we use it to store the name and message
-        //       for pretty-printing purposes without property lookup.
-        error_data: struct {
-            name: *const String,
-            message: *const String,
-        },
+        // NOTE: We store the name and message separately for pretty-printing without property lookups.
+        name: *const String,
+        message: *const String,
+        stack_trace: Agent.Exception.StackTrace,
     },
     .tag = .@"error",
     .display_name = "Error",
@@ -323,7 +380,11 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 "%" ++ name ++ ".prototype%",
                 .{
                     // Non-standard
-                    .error_data = .{ .name = String.fromLiteral(name), .message = .empty },
+                    .name = String.fromLiteral(name),
+                    .message = .empty,
+                    .stack_trace = try agent.captureStackTrace(.{
+                        .limit = agent.activeFunctionObject(),
+                    }),
                 },
             );
 
@@ -343,7 +404,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
 
-                @"error".fields.error_data.message = msg;
+                @"error".fields.message = msg;
             }
 
             // 4. Perform ? InstallErrorCause(O, options).

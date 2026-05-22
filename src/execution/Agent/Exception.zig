@@ -25,14 +25,16 @@ pub fn format(_: Exception, _: *std.Io.Writer) std.Io.Writer.Error!void {
 }
 
 const FormatPrettyData = struct {
-    agent: *Agent,
     exception: Exception,
+    agent: *Agent,
+    terminal_mode: ?std.Io.Terminal.Mode,
 };
 
 pub fn formatPretty(data: FormatPrettyData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    const mode = data.terminal_mode orelse data.agent.platform.terminal_mode;
     const terminal: std.Io.Terminal = .{
         .writer = writer,
-        .mode = data.agent.platform.terminal_mode,
+        .mode = mode,
     };
     return prettyPrintException(data.agent, data.exception, terminal) catch |err| switch (err) {
         // From `std.Io.Terminal.setColor()`
@@ -41,9 +43,14 @@ pub fn formatPretty(data: FormatPrettyData, writer: *std.Io.Writer) std.Io.Write
     };
 }
 
-pub fn fmtPretty(exception: Exception, agent: *Agent) std.fmt.Alt(FormatPrettyData, formatPretty) {
+pub fn fmtPretty(
+    exception: Exception,
+    agent: *Agent,
+    terminal_mode: ?std.Io.Terminal.Mode,
+) std.fmt.Alt(FormatPrettyData, formatPretty) {
     return .{ .data = .{
-        .agent = agent,
         .exception = exception,
+        .agent = agent,
+        .terminal_mode = terminal_mode,
     } };
 }

@@ -4353,7 +4353,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
-                    .stack_trace = agent.captureStackTrace() catch &.{},
+                    .stack_trace = agent.captureStackTrace(.{}) catch &.{},
                 };
                 return error.ExceptionThrown;
             }
@@ -4406,7 +4406,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
-                    .stack_trace = agent.captureStackTrace() catch &.{},
+                    .stack_trace = agent.captureStackTrace(.{}) catch &.{},
                 };
                 return error.ExceptionThrown;
             }
@@ -4572,7 +4572,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
-                    .stack_trace = agent.captureStackTrace() catch &.{},
+                    .stack_trace = agent.captureStackTrace(.{}) catch &.{},
                 };
                 return error.ExceptionThrown;
             }
@@ -4651,7 +4651,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 // a. Throw result.[[Error]].
                 agent.exception = .{
                     .value = Value.from(&@"error".object),
-                    .stack_trace = agent.captureStackTrace() catch &.{},
+                    .stack_trace = agent.captureStackTrace(.{}) catch &.{},
                 };
                 return error.ExceptionThrown;
             }

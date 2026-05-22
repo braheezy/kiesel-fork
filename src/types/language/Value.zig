@@ -390,20 +390,32 @@ pub fn format(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
     }
 }
 
-fn formatPretty(self: Value, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+const FormatPrettyData = struct {
+    value: Value,
+    terminal_mode: ?std.Io.Terminal.Mode,
+};
+
+fn formatPretty(data: FormatPrettyData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
+    const mode = data.terminal_mode orelse pretty_printing.state.platform.terminal_mode;
     const terminal: std.Io.Terminal = .{
         .writer = writer,
-        .mode = pretty_printing.state.platform.terminal_mode,
+        .mode = mode,
     };
-    return prettyPrintValue(self, terminal) catch |err| switch (err) {
+    return prettyPrintValue(data.value, terminal) catch |err| switch (err) {
         // From `std.Io.Terminal.setColor()`
         error.Canceled, error.Unexpected => {},
         error.WriteFailed => |e| return e,
     };
 }
 
-pub fn fmtPretty(self: Value) std.fmt.Alt(Value, formatPretty) {
-    return .{ .data = self };
+pub fn fmtPretty(
+    self: Value,
+    terminal_mode: ?std.Io.Terminal.Mode,
+) std.fmt.Alt(FormatPrettyData, formatPretty) {
+    return .{ .data = .{
+        .value = self,
+        .terminal_mode = terminal_mode,
+    } };
 }
 
 pub inline fn from(value: anytype) Value {

@@ -444,7 +444,7 @@ fn asyncFromSyncIteratorContinuation(
 
                 agent_.exception = .{
                     .value = @"error",
-                    .stack_trace = try agent_.captureStackTrace(),
+                    .stack_trace = try agent_.captureStackTrace(.{}),
                 };
 
                 // i. Return ? IteratorClose(syncIteratorRecord, ThrowCompletion(error)).

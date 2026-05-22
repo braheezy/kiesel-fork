@@ -68,7 +68,11 @@ pub const constructor = struct {
             "%AggregateError.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.fromLiteral("AggregateError"), .message = .empty },
+                .name = String.fromLiteral("AggregateError"),
+                .message = .empty,
+                .stack_trace = try agent.captureStackTrace(.{
+                    .limit = agent.activeFunctionObject(),
+                }),
             },
         );
 
@@ -88,7 +92,7 @@ pub const constructor = struct {
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            aggregate_error.fields.error_data.message = msg;
+            aggregate_error.fields.message = msg;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).

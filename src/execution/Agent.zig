@@ -197,7 +197,7 @@ pub fn createErrorObject(
     const @"error" = error_object.as(error_type.T());
     if (error_type == .internal_error) {
         // We don't have a dedicated type for this, but let's at least adjust the name
-        @"error".fields.error_data.name = String.fromLiteral("InternalError");
+        @"error".fields.name = String.fromLiteral("InternalError");
     }
     return @"error";
 }
@@ -225,25 +225,31 @@ pub fn throwException(
         Value.from("Out of memory");
     self.exception = .{
         .value = value,
-        .stack_trace = self.captureStackTrace() catch &.{},
+        .stack_trace = self.captureStackTrace(.{}) catch &.{},
     };
     return error.ExceptionThrown;
 }
 
+pub const CaptureStackTraceOptions = struct {
+    limit: ?*Object = null,
+};
+
 /// Capture stack frames for an exception, skipping the Realm's root execution context and the
 /// script or module execution context if present.
-pub fn captureStackTrace(self: *const Agent) std.mem.Allocator.Error!Exception.StackTrace {
+pub fn captureStackTrace(self: *const Agent, options: CaptureStackTraceOptions) std.mem.Allocator.Error!Exception.StackTrace {
     var stack_trace: std.ArrayList(Exception.StackFrame) = .empty;
     errdefer stack_trace.deinit(self.gc_allocator);
     for (self.execution_context_stack.items) |execution_context| {
         switch (execution_context.origin) {
-            .function, .eval => {
-                try stack_trace.append(self.gc_allocator, .{
-                    .origin = execution_context.origin,
-                });
+            .function => |function| if (options.limit) |limit| {
+                if (function == limit) break;
             },
-            .script, .module, .realm => {},
+            .eval => {},
+            .script, .module, .realm => continue,
         }
+        try stack_trace.append(self.gc_allocator, .{
+            .origin = execution_context.origin,
+        });
     }
     return stack_trace.toOwnedSlice(self.gc_allocator);
 }

@@ -307,7 +307,7 @@ const Kiesel = struct {
         const pretty = try options.getOption(agent, "pretty", .boolean, null, false);
         const end = if (newline) "\n" else "";
         if (pretty)
-            stdout.print("{f}{s}", .{ value.fmtPretty(), end }) catch {}
+            stdout.print("{f}{s}", .{ value.fmtPretty(null), end }) catch {}
         else
             stdout.print("{f}{s}", .{ (try value.toString(agent)).fmtRaw(), end }) catch {};
         stdout.flush() catch {};
@@ -540,9 +540,9 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
                 .value = Value.from(&syntax_error.object),
                 .stack_trace = &.{},
             };
-            try stderr.print("{f}\n{f}\n", .{
+            try stderr.print("{f}\nUncaught exception: {f}\n", .{
                 fmtParseErrorHint(parse_error, source_text),
-                exception.fmtPretty(agent),
+                exception.fmtPretty(agent, null),
             });
             try stderr.flush();
             return error.AlreadyReported;
@@ -570,11 +570,11 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
                 switch (operation) {
                     .reject => stderr.print(
                         "A promise was rejected without any handlers: {f}\n",
-                        .{Value.from(&promise.object).fmtPretty()},
+                        .{Value.from(&promise.object).fmtPretty(null)},
                     ) catch {},
                     .handle => stderr.print(
                         "A handler was added to an already rejected promise: {f}\n",
-                        .{Value.from(&promise.object).fmtPretty()},
+                        .{Value.from(&promise.object).fmtPretty(null)},
                     ) catch {},
                 }
                 stderr.flush() catch {};
@@ -641,7 +641,9 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
         error.ExceptionThrown => {
             const exception = agent.clearException();
             if (debug_print) try stderr.writeByte('\n');
-            try stderr.print("{f}\n", .{exception.fmtPretty(agent)});
+            try stderr.print("Uncaught exception: {f}\n", .{
+                exception.fmtPretty(agent, null),
+            });
             try stderr.flush();
             return error.AlreadyReported;
         },
@@ -1012,7 +1014,7 @@ fn repl(
             else => return err,
         };
         if (debug_print) try stdout.writeByte('\n');
-        try stdout.print("{f}", .{result.fmtPretty()});
+        try stdout.print("{f}", .{result.fmtPretty(null)});
         if (options.debug) {
             const terminal: std.Io.Terminal = .{
                 .writer = stdout,
@@ -1354,7 +1356,7 @@ pub fn main(init: std.process.Init) !u8 {
         };
         if (parsed_args.options.@"print-result") {
             if (debug_print) try stdout.writeByte('\n');
-            try stdout.print("{f}\n", .{result.fmtPretty()});
+            try stdout.print("{f}\n", .{result.fmtPretty(null)});
             try stdout.flush();
         }
     } else if (parsed_args.options.command) |source_text| {
@@ -1370,7 +1372,7 @@ pub fn main(init: std.process.Init) !u8 {
         };
         if (parsed_args.options.@"print-result") {
             if (debug_print) try stdout.writeByte('\n');
-            try stdout.print("{f}\n", .{result.fmtPretty()});
+            try stdout.print("{f}\n", .{result.fmtPretty(null)});
             try stdout.flush();
         }
     } else {

@@ -174,9 +174,9 @@ fn mainWithErrorHandling() Error!void {
                     .value = Value.from(&syntax_error.object),
                     .stack_trace = &.{},
                 };
-                try stderr.print("{f}\n{f}\n", .{
+                try stderr.print("{f}\nUncaught exception: {f}\n", .{
                     fmtParseErrorHint(parse_error, source_text),
-                    exception.fmtPretty(&agent),
+                    exception.fmtPretty(&agent, null),
                 });
                 try stderr.flush();
                 continue;
@@ -190,7 +190,9 @@ fn mainWithErrorHandling() Error!void {
             error.OutOfMemory => |e| return e,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                try stderr.print("{f}\n", .{exception.fmtPretty(&agent)});
+                try stderr.print("Uncaught exception: {f}\n", .{
+                    exception.fmtPretty(&agent, null),
+                });
                 try stderr.flush();
             },
         }

@@ -68,7 +68,7 @@ fn prettyPrintArray(
         if (array.object.property_storage.indexed_properties.get(@intCast(i))) |property_descriptor| {
             switch (property_descriptor.value_or_accessor) {
                 .value => |value| {
-                    try terminal.writer.print("{f}", .{value.fmtPretty()});
+                    try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
                 },
                 .accessor => {
                     try terminal.setColor(.dim);
@@ -102,11 +102,11 @@ fn prettyPrintArrayBuffer(
         }
         try terminal.setColor(.reset);
         try terminal.writer.print("byteLength: {f}", .{
-            Value.from(@intFromEnum(array_buffer.fields.byte_length)).fmtPretty(),
+            Value.from(@intFromEnum(array_buffer.fields.byte_length)).fmtPretty(terminal.mode),
         });
         if (array_buffer.fields.max_byte_length.unwrap()) |max_byte_length| {
             try terminal.writer.print(", maxByteLength: {f}", .{
-                Value.from(@intFromEnum(max_byte_length)).fmtPretty(),
+                Value.from(@intFromEnum(max_byte_length)).fmtPretty(terminal.mode),
             });
         }
         if (data_block.bytes.len != 0) {
@@ -146,7 +146,7 @@ fn prettyPrintArrayIterator(
     try terminal.setColor(.reset);
     switch (array_iterator.fields) {
         .state => |state_| {
-            try terminal.writer.print("{f}", .{Value.from(state_.iterated_array_like).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(state_.iterated_array_like).fmtPretty(terminal.mode)});
         },
         .completed => {
             try terminal.setColor(.dim);
@@ -213,12 +213,12 @@ fn prettyPrintDataView(
     try terminal.setColor(.white);
     try terminal.writer.writeAll("DataView(");
     try terminal.setColor(.reset);
-    try terminal.writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty()});
+    try terminal.writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty(terminal.mode)});
     if (date.fields.byte_length.unwrap()) |byte_length| {
-        try terminal.writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty()});
+        try terminal.writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty(terminal.mode)});
     }
     if (byte_offset != .zero) {
-        try terminal.writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty()});
+        try terminal.writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -240,7 +240,7 @@ fn prettyPrintDate(
                 arena.allocator(),
                 "{f}",
                 .{fmtToDateString(platform, date_value)},
-            ) catch return)).fmtPretty(),
+            ) catch return)).fmtPretty(terminal.mode),
         });
     } else {
         try terminal.setColor(.dim);
@@ -256,13 +256,11 @@ fn prettyPrintError(
     @"error": *const builtins.Error,
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const error_data = @"error".fields.error_data;
-
     try terminal.setColor(.white);
-    try terminal.writer.print("{f}(", .{error_data.name.fmtRaw()});
+    try terminal.writer.print("{f}(", .{@"error".fields.name.fmtRaw()});
     try terminal.setColor(.reset);
-    if (!error_data.message.isEmpty()) {
-        try terminal.writer.print("{f}", .{Value.from(error_data.message).fmtPretty()});
+    if (!@"error".fields.message.isEmpty()) {
+        try terminal.writer.print("{f}", .{Value.from(@"error".fields.message).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -336,7 +334,7 @@ fn prettyPrintIteratorHelper(
         .state => |state_| {
             for (state_.underlying_iterators, 0..) |iterator, i| {
                 if (i != 0) try terminal.writer.writeAll(", ");
-                try terminal.writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty()});
+                try terminal.writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty(terminal.mode)});
             }
         },
         .completed => {
@@ -361,7 +359,7 @@ fn prettyPrintMap(
     try terminal.setColor(.reset);
     var it = map_data.iterator();
     while (it.next()) |entry| {
-        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.fmtPretty(), entry.value_ptr.fmtPretty() });
+        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.fmtPretty(terminal.mode), entry.value_ptr.fmtPretty(terminal.mode) });
         if (it.index < map_data.count()) {
             try terminal.writer.writeAll(", ");
         }
@@ -380,7 +378,7 @@ fn prettyPrintMapIterator(
     try terminal.setColor(.reset);
     switch (map_iterator.fields) {
         .state => |state_| {
-            try terminal.writer.print("{f}", .{Value.from(&state_.map.object).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(&state_.map.object).fmtPretty(terminal.mode)});
         },
         .completed => {
             try terminal.setColor(.dim);
@@ -414,14 +412,14 @@ fn prettyPrintPromise(
             try terminal.setColor(.green);
             try terminal.writer.writeAll("<fulfilled>");
             try terminal.setColor(.reset);
-            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
+            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
         },
         .rejected => {
             try terminal.writer.writeAll("state: ");
             try terminal.setColor(.red);
             try terminal.writer.writeAll("<rejected>");
             try terminal.setColor(.reset);
-            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty()});
+            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
         },
     }
     try terminal.setColor(.white);
@@ -441,8 +439,8 @@ fn prettyPrintProxy(
     try terminal.setColor(.reset);
     if (proxy_target != null and proxy_handler != null) {
         try terminal.writer.print("target: {f}, handler: {f}", .{
-            Value.from(proxy_target.?).fmtPretty(),
-            Value.from(proxy_handler.?).fmtPretty(),
+            Value.from(proxy_target.?).fmtPretty(terminal.mode),
+            Value.from(proxy_handler.?).fmtPretty(terminal.mode),
         });
     } else {
         try terminal.setColor(.dim);
@@ -480,8 +478,8 @@ fn prettyPrintRegExpStringIterator(
     switch (reg_exp_string_iterator.fields) {
         .state => |state_| {
             try terminal.writer.print("{f}, {f}", .{
-                Value.from(state_.iterating_reg_exp).fmtPretty(),
-                Value.from(state_.iterated_string).fmtPretty(),
+                Value.from(state_.iterating_reg_exp).fmtPretty(terminal.mode),
+                Value.from(state_.iterated_string).fmtPretty(terminal.mode),
             });
         },
         .completed => {
@@ -506,7 +504,7 @@ fn prettyPrintSet(
     try terminal.setColor(.reset);
     var it = set_data.iterator();
     while (it.next()) |entry| {
-        try terminal.writer.print("{f}", .{entry.key_ptr.fmtPretty()});
+        try terminal.writer.print("{f}", .{entry.key_ptr.fmtPretty(terminal.mode)});
         if (it.index < set_data.count()) {
             try terminal.writer.writeAll(", ");
         }
@@ -525,7 +523,7 @@ fn prettyPrintSetIterator(
     try terminal.setColor(.reset);
     switch (set_iterator.fields) {
         .state => |state_| {
-            try terminal.writer.print("{f}", .{Value.from(&state_.set.object).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(&state_.set.object).fmtPretty(terminal.mode)});
         },
         .completed => {
             try terminal.setColor(.dim);
@@ -547,7 +545,7 @@ fn prettyPrintStringIterator(
     try terminal.setColor(.reset);
     switch (string_iterator.fields) {
         .state => |state_| {
-            try terminal.writer.print("{f}", .{Value.from(state_.string).fmtPretty()});
+            try terminal.writer.print("{f}", .{Value.from(state_.string).fmtPretty(terminal.mode)});
         },
         .completed => {
             try terminal.setColor(.dim);
@@ -574,7 +572,7 @@ fn prettyPrintTypedArray(
         const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
-        try terminal.writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty()});
+        try terminal.writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty(terminal.mode)});
         if (data_block.bytes.len != 0) {
             try terminal.writer.writeAll(", data: ");
             try terminal.setColor(.white);
@@ -595,7 +593,7 @@ fn prettyPrintTypedArray(
                         else
                             Value.from(value);
                         if (i != 0) try terminal.writer.writeAll(", ");
-                        try terminal.writer.print("{f}", .{numeric.fmtPretty()});
+                        try terminal.writer.print("{f}", .{numeric.fmtPretty(terminal.mode)});
                     }
                 },
             }
@@ -606,7 +604,7 @@ fn prettyPrintTypedArray(
         }
     } else {
         // Underlying ArrayBuffer has been detached, mirror behavior of .length getter
-        try terminal.writer.print("length: {f}", .{Value.from(0).fmtPretty()});
+        try terminal.writer.print("length: {f}", .{Value.from(0).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -624,7 +622,7 @@ fn prettyPrintWeakMap(
     try terminal.setColor(.reset);
     var it = weak_map_data.iterator();
     while (it.next()) |entry| {
-        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.get().fmtPretty(), entry.value_ptr.fmtPretty() });
+        try terminal.writer.print("{f} → {f}", .{ entry.key_ptr.get().fmtPretty(terminal.mode), entry.value_ptr.fmtPretty(terminal.mode) });
         if (it.index < weak_map_data.count()) {
             try terminal.writer.writeAll(", ");
         }
@@ -658,7 +656,7 @@ fn prettyPrintWeakSet(
     try terminal.setColor(.reset);
     var it = weak_set_data.iterator();
     while (it.next()) |entry| {
-        try terminal.writer.print("{f}", .{entry.key_ptr.get().fmtPretty()});
+        try terminal.writer.print("{f}", .{entry.key_ptr.get().fmtPretty(terminal.mode)});
         if (it.index < weak_set_data.count()) {
             try terminal.writer.writeAll(", ");
         }
@@ -675,7 +673,7 @@ fn prettyPrintWrapForValidIterator(
     try terminal.setColor(.white);
     try terminal.writer.writeAll("%WrapForValidIterator%(");
     try terminal.setColor(.reset);
-    try terminal.writer.print("{f}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator).fmtPretty()});
+    try terminal.writer.print("{f}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator).fmtPretty(terminal.mode)});
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
     try terminal.setColor(.reset);
@@ -694,13 +692,13 @@ fn prettyPrintIntlCollator(
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, usage: {f}, sensitivity: {f}, ignorePunctuation: " ++
         "{f}, collation: {f}, numeric: {f}, caseFirst: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.usage).fmtPretty(),
-        Value.from(resolved_options.sensitivity).fmtPretty(),
-        Value.from(resolved_options.ignore_punctuation).fmtPretty(),
-        Value.from(resolved_options.collation).fmtPretty(),
-        Value.from(resolved_options.numeric).fmtPretty(),
-        Value.from(resolved_options.case_first).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.usage).fmtPretty(terminal.mode),
+        Value.from(resolved_options.sensitivity).fmtPretty(terminal.mode),
+        Value.from(resolved_options.ignore_punctuation).fmtPretty(terminal.mode),
+        Value.from(resolved_options.collation).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numeric).fmtPretty(terminal.mode),
+        Value.from(resolved_options.case_first).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -719,16 +717,16 @@ fn prettyPrintIntlDateTimeFormat(
     try terminal.writer.writeAll("Intl.DisplayNames(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, calendar: {f}, numberingSystem: {f}, timeZone: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.calendar).fmtPretty(),
-        Value.from(resolved_options.numbering_system).fmtPretty(),
-        Value.from(resolved_options.time_zone).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.calendar).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numbering_system).fmtPretty(terminal.mode),
+        Value.from(resolved_options.time_zone).fmtPretty(terminal.mode),
     });
     if (resolved_options.date_style) |date_style| {
-        try terminal.writer.print(", dateStyle: {f}", .{Value.from(date_style).fmtPretty()});
+        try terminal.writer.print(", dateStyle: {f}", .{Value.from(date_style).fmtPretty(terminal.mode)});
     }
     if (resolved_options.time_style) |time_style| {
-        try terminal.writer.print(", timeStyle: {f}", .{Value.from(time_style).fmtPretty()});
+        try terminal.writer.print(", timeStyle: {f}", .{Value.from(time_style).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -748,18 +746,18 @@ fn prettyPrintIntlDisplayNames(
     try terminal.setColor(.reset);
     if (intl_display_names.fields.type == .language) {
         try terminal.writer.print("{f}, style: {f}, type: {f}, fallback: {f}, languageDisplay: {f}", .{
-            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-            Value.from(resolved_options.style).fmtPretty(),
-            Value.from(resolved_options.type).fmtPretty(),
-            Value.from(resolved_options.fallback).fmtPretty(),
-            Value.from(resolved_options.language_display).fmtPretty(),
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+            Value.from(resolved_options.style).fmtPretty(terminal.mode),
+            Value.from(resolved_options.type).fmtPretty(terminal.mode),
+            Value.from(resolved_options.fallback).fmtPretty(terminal.mode),
+            Value.from(resolved_options.language_display).fmtPretty(terminal.mode),
         });
     } else {
         try terminal.writer.print("{f}, style: {f}, type: {f}, fallback: {f}", .{
-            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-            Value.from(resolved_options.style).fmtPretty(),
-            Value.from(resolved_options.type).fmtPretty(),
-            Value.from(resolved_options.fallback).fmtPretty(),
+            Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+            Value.from(resolved_options.style).fmtPretty(terminal.mode),
+            Value.from(resolved_options.type).fmtPretty(terminal.mode),
+            Value.from(resolved_options.fallback).fmtPretty(terminal.mode),
         });
     }
     try terminal.setColor(.white);
@@ -785,32 +783,32 @@ fn prettyPrintIntlDurationFormat(
         "secondsDisplay: {f}, milliseconds: {f}, millisecondsDisplay: {f}, " ++
         "microseconds: {f}, microsecondsDisplay: {f}, nanoseconds: {f}, " ++
         "nanosecondsDisplay: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.numbering_system).fmtPretty(),
-        Value.from(resolved_options.style).fmtPretty(),
-        Value.from(resolved_options.years).fmtPretty(),
-        Value.from(resolved_options.years_display).fmtPretty(),
-        Value.from(resolved_options.months).fmtPretty(),
-        Value.from(resolved_options.months_display).fmtPretty(),
-        Value.from(resolved_options.weeks).fmtPretty(),
-        Value.from(resolved_options.weeks_display).fmtPretty(),
-        Value.from(resolved_options.days).fmtPretty(),
-        Value.from(resolved_options.days_display).fmtPretty(),
-        Value.from(resolved_options.hours).fmtPretty(),
-        Value.from(resolved_options.hours_display).fmtPretty(),
-        Value.from(resolved_options.minutes).fmtPretty(),
-        Value.from(resolved_options.minutes_display).fmtPretty(),
-        Value.from(resolved_options.seconds).fmtPretty(),
-        Value.from(resolved_options.seconds_display).fmtPretty(),
-        Value.from(resolved_options.milliseconds).fmtPretty(),
-        Value.from(resolved_options.milliseconds_display).fmtPretty(),
-        Value.from(resolved_options.microseconds).fmtPretty(),
-        Value.from(resolved_options.microseconds_display).fmtPretty(),
-        Value.from(resolved_options.nanoseconds).fmtPretty(),
-        Value.from(resolved_options.nanoseconds_display).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numbering_system).fmtPretty(terminal.mode),
+        Value.from(resolved_options.style).fmtPretty(terminal.mode),
+        Value.from(resolved_options.years).fmtPretty(terminal.mode),
+        Value.from(resolved_options.years_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.months).fmtPretty(terminal.mode),
+        Value.from(resolved_options.months_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.weeks).fmtPretty(terminal.mode),
+        Value.from(resolved_options.weeks_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.days).fmtPretty(terminal.mode),
+        Value.from(resolved_options.days_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.hours).fmtPretty(terminal.mode),
+        Value.from(resolved_options.hours_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.minutes).fmtPretty(terminal.mode),
+        Value.from(resolved_options.minutes_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.seconds).fmtPretty(terminal.mode),
+        Value.from(resolved_options.seconds_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.milliseconds).fmtPretty(terminal.mode),
+        Value.from(resolved_options.milliseconds_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.microseconds).fmtPretty(terminal.mode),
+        Value.from(resolved_options.microseconds_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.nanoseconds).fmtPretty(terminal.mode),
+        Value.from(resolved_options.nanoseconds_display).fmtPretty(terminal.mode),
     });
     if (resolved_options.fractional_digits) |fractional_digits| {
-        try terminal.writer.print(", fractionalDigits: {f}", .{Value.from(fractional_digits).fmtPretty()});
+        try terminal.writer.print(", fractionalDigits: {f}", .{Value.from(fractional_digits).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -829,9 +827,9 @@ fn prettyPrintIntlListFormat(
     try terminal.writer.writeAll("Intl.ListFormat(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, type: {f}, style: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.type).fmtPretty(),
-        Value.from(resolved_options.style).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.type).fmtPretty(terminal.mode),
+        Value.from(resolved_options.style).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -848,7 +846,7 @@ fn prettyPrintIntlLocale(
     try terminal.writer.writeAll("Intl.Locale(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -867,57 +865,57 @@ fn prettyPrintIntlNumberFormat(
     try terminal.writer.writeAll("Intl.NumberFormat(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, numberingSystem: {f}, style: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.numbering_system).fmtPretty(),
-        Value.from(resolved_options.style).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numbering_system).fmtPretty(terminal.mode),
+        Value.from(resolved_options.style).fmtPretty(terminal.mode),
     });
     if (resolved_options.currency) |currency| {
-        try terminal.writer.print(", currency: {f}", .{Value.from(currency).fmtPretty()});
+        try terminal.writer.print(", currency: {f}", .{Value.from(currency).fmtPretty(terminal.mode)});
     }
     if (resolved_options.currency_display) |currency_display| {
-        try terminal.writer.print(", currencyDisplay: {f}", .{Value.from(currency_display).fmtPretty()});
+        try terminal.writer.print(", currencyDisplay: {f}", .{Value.from(currency_display).fmtPretty(terminal.mode)});
     }
     if (resolved_options.currency_sign) |currency_sign| {
-        try terminal.writer.print(", currencySign: {f}", .{Value.from(currency_sign).fmtPretty()});
+        try terminal.writer.print(", currencySign: {f}", .{Value.from(currency_sign).fmtPretty(terminal.mode)});
     }
     if (resolved_options.unit) |unit| {
-        try terminal.writer.print(", unit: {f}", .{Value.from(unit).fmtPretty()});
+        try terminal.writer.print(", unit: {f}", .{Value.from(unit).fmtPretty(terminal.mode)});
     }
     if (resolved_options.unit_display) |unit_display| {
-        try terminal.writer.print(", unitDisplay: {f}", .{Value.from(unit_display).fmtPretty()});
+        try terminal.writer.print(", unitDisplay: {f}", .{Value.from(unit_display).fmtPretty(terminal.mode)});
     }
     try terminal.writer.print(", minimumIntegerDigits: {f}", .{
-        Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
+        Value.from(resolved_options.minimum_integer_digits).fmtPretty(terminal.mode),
     });
     if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
-        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
-        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
-        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
-        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty(terminal.mode)});
     }
     try terminal.writer.print(", useGrouping: {f}, notation: {f}", .{
         switch (resolved_options.use_grouping) {
             .false => Value.false,
             .string => |string| Value.from(string),
-        }.fmtPretty(),
-        Value.from(resolved_options.notation).fmtPretty(),
+        }.fmtPretty(terminal.mode),
+        Value.from(resolved_options.notation).fmtPretty(terminal.mode),
     });
     if (resolved_options.compact_display) |compact_display| {
-        try terminal.writer.print(", compactDisplay: {f}", .{Value.from(compact_display).fmtPretty()});
+        try terminal.writer.print(", compactDisplay: {f}", .{Value.from(compact_display).fmtPretty(terminal.mode)});
     }
     try terminal.writer.print(", signDisplay: {f}, roundingIncrement: {f}, roundingMode: {f}, " ++
         "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
-        Value.from(resolved_options.sign_display).fmtPretty(),
-        Value.from(resolved_options.rounding_increment).fmtPretty(),
-        Value.from(resolved_options.rounding_mode).fmtPretty(),
-        Value.from(resolved_options.rounding_priority).fmtPretty(),
-        Value.from(resolved_options.trailing_zero_display).fmtPretty(),
+        Value.from(resolved_options.sign_display).fmtPretty(terminal.mode),
+        Value.from(resolved_options.rounding_increment).fmtPretty(terminal.mode),
+        Value.from(resolved_options.rounding_mode).fmtPretty(terminal.mode),
+        Value.from(resolved_options.rounding_priority).fmtPretty(terminal.mode),
+        Value.from(resolved_options.trailing_zero_display).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -936,36 +934,36 @@ fn prettyPrintIntlPluralRules(
     try terminal.writer.writeAll("Intl.PluralRules(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, type: {f}, notation: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.type).fmtPretty(),
-        Value.from(resolved_options.notation).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.type).fmtPretty(terminal.mode),
+        Value.from(resolved_options.notation).fmtPretty(terminal.mode),
     });
     if (resolved_options.compact_display) |compact_display| {
         try terminal.writer.print(", compactDisplay: {f}", .{
-            Value.from(compact_display).fmtPretty(),
+            Value.from(compact_display).fmtPretty(terminal.mode),
         });
     }
     try terminal.writer.print(", minimumIntegerDigits: {f}", .{
-        Value.from(resolved_options.minimum_integer_digits).fmtPretty(),
+        Value.from(resolved_options.minimum_integer_digits).fmtPretty(terminal.mode),
     });
     if (resolved_options.minimum_fraction_digits) |minimum_fraction_digits| {
-        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", minimumFractionDigits: {f}", .{Value.from(minimum_fraction_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.maximum_fraction_digits) |maximum_fraction_digits| {
-        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty()});
+        try terminal.writer.print(", maximumFractionDigits: {f}", .{Value.from(maximum_fraction_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.minimum_significant_digits) |minimum_significant_digits| {
-        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", minimumSignificantDigits: {f}", .{Value.from(minimum_significant_digits).fmtPretty(terminal.mode)});
     }
     if (resolved_options.maximum_significant_digits) |maximum_significant_digits| {
-        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty()});
+        try terminal.writer.print(", maximumSignificantDigits: {f}", .{Value.from(maximum_significant_digits).fmtPretty(terminal.mode)});
     }
     try terminal.writer.print(", roundingIncrement: {f}, roundingMode: {f}, " ++
         "roundingPriority: {f}, trailingZeroDisplay: {f}", .{
-        Value.from(resolved_options.rounding_increment).fmtPretty(),
-        Value.from(resolved_options.rounding_mode).fmtPretty(),
-        Value.from(resolved_options.rounding_priority).fmtPretty(),
-        Value.from(resolved_options.trailing_zero_display).fmtPretty(),
+        Value.from(resolved_options.rounding_increment).fmtPretty(terminal.mode),
+        Value.from(resolved_options.rounding_mode).fmtPretty(terminal.mode),
+        Value.from(resolved_options.rounding_priority).fmtPretty(terminal.mode),
+        Value.from(resolved_options.trailing_zero_display).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -984,10 +982,10 @@ fn prettyPrintIntlRelativeTimeFormat(
     try terminal.writer.writeAll("Intl.RelativeTimeFormat(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, style: {f}, numeric: {f}, numberingSystem: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.style).fmtPretty(),
-        Value.from(resolved_options.numeric).fmtPretty(),
-        Value.from(resolved_options.numbering_system).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.style).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numeric).fmtPretty(terminal.mode),
+        Value.from(resolved_options.numbering_system).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1006,8 +1004,8 @@ fn prettyPrintIntlSegmenter(
     try terminal.writer.writeAll("Intl.Segmenter(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, granularity: {f}", .{
-        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(),
-        Value.from(resolved_options.granularity).fmtPretty(),
+        Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
+        Value.from(resolved_options.granularity).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1033,16 +1031,16 @@ fn prettyPrintTemporalDuration(
     try terminal.writer.writeAll("Temporal.Duration(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
-        Value.from(@as(f64, @floatFromInt(years))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(months))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(weeks))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(days))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(hours))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(minutes))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(seconds))).fmtPretty(),
-        Value.from(@as(f64, @floatFromInt(milliseconds))).fmtPretty(),
-        Value.from(microseconds).fmtPretty(),
-        Value.from(nanoseconds).fmtPretty(),
+        Value.from(@as(f64, @floatFromInt(years))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(months))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(weeks))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(days))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(hours))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(minutes))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(seconds))).fmtPretty(terminal.mode),
+        Value.from(@as(f64, @floatFromInt(milliseconds))).fmtPretty(terminal.mode),
+        Value.from(microseconds).fmtPretty(terminal.mode),
+        Value.from(nanoseconds).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1061,7 +1059,7 @@ fn prettyPrintTemporalInstant(
     try terminal.writer.writeAll("Temporal.Instant(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}", .{
-        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
+        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1082,10 +1080,10 @@ fn prettyPrintTemporalPlainDate(
     try terminal.writer.writeAll("Temporal.PlainDate(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}, {f}", .{
-        Value.from(year).fmtPretty(),
-        Value.from(month).fmtPretty(),
-        Value.from(day).fmtPretty(),
-        Value.from(asciiString(calendar_id)).fmtPretty(),
+        Value.from(year).fmtPretty(terminal.mode),
+        Value.from(month).fmtPretty(terminal.mode),
+        Value.from(day).fmtPretty(terminal.mode),
+        Value.from(asciiString(calendar_id)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1112,16 +1110,16 @@ fn prettyPrintTemporalPlainDateTime(
     try terminal.writer.writeAll("Temporal.PlainDateTime(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}, {f}", .{
-        Value.from(year).fmtPretty(),
-        Value.from(month).fmtPretty(),
-        Value.from(day).fmtPretty(),
-        Value.from(hour).fmtPretty(),
-        Value.from(minute).fmtPretty(),
-        Value.from(second).fmtPretty(),
-        Value.from(millisecond).fmtPretty(),
-        Value.from(microsecond).fmtPretty(),
-        Value.from(nanosecond).fmtPretty(),
-        Value.from(asciiString(calendar_id)).fmtPretty(),
+        Value.from(year).fmtPretty(terminal.mode),
+        Value.from(month).fmtPretty(terminal.mode),
+        Value.from(day).fmtPretty(terminal.mode),
+        Value.from(hour).fmtPretty(terminal.mode),
+        Value.from(minute).fmtPretty(terminal.mode),
+        Value.from(second).fmtPretty(terminal.mode),
+        Value.from(millisecond).fmtPretty(terminal.mode),
+        Value.from(microsecond).fmtPretty(terminal.mode),
+        Value.from(nanosecond).fmtPretty(terminal.mode),
+        Value.from(asciiString(calendar_id)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1143,9 +1141,9 @@ fn prettyPrintTemporalPlainMonthDay(
     try terminal.writer.writeAll("Temporal.PlainMonthDay(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}", .{
-        Value.from(asciiString(month_code)).fmtPretty(),
-        Value.from(day).fmtPretty(),
-        Value.from(asciiString(calendar_id)).fmtPretty(),
+        Value.from(asciiString(month_code)).fmtPretty(terminal.mode),
+        Value.from(day).fmtPretty(terminal.mode),
+        Value.from(asciiString(calendar_id)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1167,12 +1165,12 @@ fn prettyPrintTemporalPlainTime(
     try terminal.writer.writeAll("Temporal.PlainTime(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}, {f}, {f}, {f}", .{
-        Value.from(hour).fmtPretty(),
-        Value.from(minute).fmtPretty(),
-        Value.from(second).fmtPretty(),
-        Value.from(millisecond).fmtPretty(),
-        Value.from(microsecond).fmtPretty(),
-        Value.from(nanosecond).fmtPretty(),
+        Value.from(hour).fmtPretty(terminal.mode),
+        Value.from(minute).fmtPretty(terminal.mode),
+        Value.from(second).fmtPretty(terminal.mode),
+        Value.from(millisecond).fmtPretty(terminal.mode),
+        Value.from(microsecond).fmtPretty(terminal.mode),
+        Value.from(nanosecond).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1192,9 +1190,9 @@ fn prettyPrintTemporalPlainYearMonth(
     try terminal.writer.writeAll("Temporal.PlainYearMonth(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}", .{
-        Value.from(year).fmtPretty(),
-        Value.from(month).fmtPretty(),
-        Value.from(asciiString(calendar_id)).fmtPretty(),
+        Value.from(year).fmtPretty(terminal.mode),
+        Value.from(month).fmtPretty(terminal.mode),
+        Value.from(asciiString(calendar_id)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1219,9 +1217,9 @@ fn prettyPrintTemporalZonedDateTime(
     try terminal.writer.writeAll("Temporal.ZonedDateTime(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, {f}, {f}", .{
-        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(),
-        Value.from(asciiString(time_zone_id)).fmtPretty(),
-        Value.from(asciiString(calendar_id)).fmtPretty(),
+        Value.from(bigInt(epoch_nanoseconds)).fmtPretty(terminal.mode),
+        Value.from(asciiString(time_zone_id)).fmtPretty(terminal.mode),
+        Value.from(asciiString(calendar_id)).fmtPretty(terminal.mode),
     });
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1246,7 +1244,7 @@ fn prettyPrintPrimitiveWrapper(
     try terminal.writer.writeAll(name);
     try terminal.writer.writeAll("(");
     try terminal.setColor(.reset);
-    try terminal.writer.print("{f}", .{value.fmtPretty()});
+    try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
     try terminal.setColor(.reset);
@@ -1327,7 +1325,7 @@ fn prettyPrintObject(
 
         switch (property_descriptor.value_or_accessor) {
             .value => |value| {
-                try terminal.writer.print("{f}", .{value.fmtPretty()});
+                try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
             },
             .accessor => {
                 try terminal.setColor(.dim);
@@ -1459,20 +1457,19 @@ pub fn prettyPrintException(
 ) PrettyPrintError!void {
     const old_exception = agent.exception;
     defer agent.exception = old_exception;
-    try terminal.writer.writeAll("Uncaught exception: ");
     if (exception.value.toString(agent)) |string| {
         try terminal.setColor(.red);
         try terminal.writer.print("{f}", .{string.fmtRaw()});
         try terminal.setColor(.reset);
     } else |_| {
-        try terminal.writer.print("{f}", .{exception.value.fmtPretty()});
+        try terminal.writer.print("{f}", .{exception.value.fmtPretty(terminal.mode)});
     }
     var it = std.mem.reverseIterator(exception.stack_trace);
     while (it.next()) |stack_frame| {
         try terminal.writer.writeAll("\n  at ");
         switch (stack_frame.origin) {
             .function => |function| {
-                try terminal.writer.print("{f}", .{Value.from(function).fmtPretty()});
+                try terminal.writer.print("{f}", .{Value.from(function).fmtPretty(terminal.mode)});
             },
             .eval => {
                 // Keep this in sync with prettyPrintFunction()

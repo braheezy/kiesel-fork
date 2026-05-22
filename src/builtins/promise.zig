@@ -2052,7 +2052,7 @@ pub const prototype = struct {
                             // 1. Throw reason.
                             agent__.exception = .{
                                 .value = reason_.*,
-                                .stack_trace = try agent__.captureStackTrace(),
+                                .stack_trace = try agent__.captureStackTrace(.{}),
                             };
                             return error.ExceptionThrown;
                         }

@@ -1992,7 +1992,7 @@ fn executeThrow(vm: *Vm, value_reg: Bytecode.Reg) Agent.Error!void {
     const value = vm.store(value_reg);
     vm.agent.exception = .{
         .value = value,
-        .stack_trace = try vm.agent.captureStackTrace(),
+        .stack_trace = try vm.agent.captureStackTrace(.{}),
     };
     return error.ExceptionThrown;
 }
