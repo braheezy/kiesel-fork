@@ -1,45 +1,44 @@
-diff --git a/Sources/FuzzilliCli/Profiles/KieselProfile.swift b/Sources/FuzzilliCli/Profiles/KieselProfile.swift
+diff --git a/Sources/Fuzzilli/Profiles/KieselProfile.swift b/Sources/Fuzzilli/Profiles/KieselProfile.swift
 new file mode 100644
-index 0000000..b349c57
+index 00000000..3bba2368
 --- /dev/null
-+++ b/Sources/FuzzilliCli/Profiles/KieselProfile.swift
-@@ -0,0 +1,31 @@
-+import Fuzzilli
-+
++++ b/Sources/Fuzzilli/Profiles/KieselProfile.swift
+@@ -0,0 +1,30 @@
 +let kieselProfile = Profile(
-+  processArgs: { randomize in return [""] },
-+  processArgsReference: nil,
-+  processEnv: [:],
-+  maxExecsBeforeRespawn: 1000,
-+  timeout: Timeout.value(250),
-+  codePrefix: """
-+    """,
-+  codeSuffix: """
-+    """,
-+  ecmaVersion: ECMAScriptVersion.es6,
-+  startupTests: [
-+    // Check that the fuzzilli integration is available.
-+    ("fuzzilli('FUZZILLI_PRINT', 'test')", .shouldSucceed),
++    processArgs: { randomize in return [""] },
++    processArgsReference: nil,
++    processEnv: [:],
++    maxExecsBeforeRespawn: 1000,
++    timeout: Timeout.value(250),
++    codePrefix: """
++        """,
++    codeSuffix: """
++        """,
++    ecmaVersion: ECMAScriptVersion.es6,
++    startupTests: [
++        // Check that the fuzzilli integration is available.
++        ("fuzzilli('FUZZILLI_PRINT', 'test')", .shouldSucceed),
 +
-+    // Check that common crash types are detected.
-+    ("fuzzilli('FUZZILLI_CRASH', 0)", .shouldCrash),
-+    ("fuzzilli('FUZZILLI_CRASH', 1)", .shouldCrash),
-+    ("fuzzilli('FUZZILLI_CRASH', 2)", .shouldCrash),
-+  ],
-+  additionalCodeGenerators: [],
-+  additionalProgramTemplates: WeightedList<ProgramTemplate>([]),
-+  disabledCodeGenerators: [],
-+  disabledMutators: [],
-+  additionalBuiltins: [:],
-+  additionalObjectGroups: [],
-+  additionalEnumerations: [],
-+  optionalPostProcessor: nil
++        // Check that common crash types are detected.
++        ("fuzzilli('FUZZILLI_CRASH', 0)", .shouldCrash),
++        ("fuzzilli('FUZZILLI_CRASH', 1)", .shouldCrash),
++        ("fuzzilli('FUZZILLI_CRASH', 2)", .shouldCrash),
++    ],
++    additionalCodeGenerators: [],
++    additionalProgramTemplates: WeightedList<ProgramTemplate>([]),
++    disabledCodeGenerators: [],
++    disabledMutators: [],
++    additionalBuiltins: [:],
++    additionalObjectGroups: [],
++    additionalEnumerations: [],
++    additionalOptionsBags: [],
++    optionalPostProcessor: nil
 +)
-diff --git a/Sources/FuzzilliCli/Profiles/Profile.swift b/Sources/FuzzilliCli/Profiles/Profile.swift
-index 8d9d7dc..03eecdd 100644
---- a/Sources/FuzzilliCli/Profiles/Profile.swift
-+++ b/Sources/FuzzilliCli/Profiles/Profile.swift
-@@ -61,4 +61,5 @@ let profiles = [
+diff --git a/Sources/Fuzzilli/Profiles/Profile.swift b/Sources/Fuzzilli/Profiles/Profile.swift
+index 4b5b8e9e..d6b918dc 100644
+--- a/Sources/Fuzzilli/Profiles/Profile.swift
++++ b/Sources/Fuzzilli/Profiles/Profile.swift
+@@ -60,4 +60,5 @@ public let profiles = [
      "v8holefuzzing": v8HoleFuzzingProfile,
      "serenity": serenityProfile,
      "njs": njsProfile,
