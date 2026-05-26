@@ -327,14 +327,14 @@ pub fn newGlobalEnvironment(
 /// https://tc39.es/ecma262/#sec-newmoduleenvironment
 pub fn newModuleEnvironment(
     allocator: std.mem.Allocator,
-    outer_env: Environment,
+    outer_env: *GlobalEnvironment,
 ) std.mem.Allocator.Error!*ModuleEnvironment {
     // 1. Let env be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
     env.* = .{
         // 2. Set env.[[OuterEnv]] to E.
         .declarative_environment = .{
-            .outer_env = outer_env,
+            .outer_env = .{ .global_environment = outer_env },
             .bindings = .empty,
         },
 

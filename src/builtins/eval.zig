@@ -477,7 +477,7 @@ fn evalDeclarationInstantiation(
             try var_env.global_environment.createGlobalFunctionBinding(
                 agent,
                 function_name,
-                Value.from(&function_object.object),
+                function_object,
                 true,
             );
         } else {

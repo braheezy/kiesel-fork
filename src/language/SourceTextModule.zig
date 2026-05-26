@@ -1510,9 +1510,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
 
     // 5. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
     const env: Environment = .{
-        .module_environment = try newModuleEnvironment(agent.gc_allocator, .{
-            .global_environment = realm.global_env,
-        }),
+        .module_environment = try newModuleEnvironment(agent.gc_allocator, realm.global_env),
     };
 
     // 6. Set module.[[Environment]] to env.
@@ -1752,31 +1750,31 @@ fn executeModule(
     // 2. Let moduleContext be module.[[Context]].
     const module_context = self.context.?;
 
-    // 3. Suspend the running execution context.
-
-    // 4. If module.[[HasTLA]] is false, then
+    // 3. If module.[[HasTLA]] is false, then
     if (!self.has_tla) {
         // a. Assert: capability is not present.
         std.debug.assert(capability == null);
 
-        // b. Push moduleContext onto the execution context stack; moduleContext is now the running
+        // b. Suspend the running execution context.
+
+        // c. Push moduleContext onto the execution context stack; moduleContext is now the running
         //    execution context.
         try agent.execution_context_stack.append(agent.gc_allocator, module_context);
 
-        // c. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
+        // d. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
         const result = interpreter.compileAndRun(agent, .{ .module = &self.ecmascript_code }, "<module>");
 
-        // d. Suspend moduleContext and remove it from the execution context stack.
+        // e. Suspend moduleContext and remove it from the execution context stack.
         _ = agent.execution_context_stack.pop().?;
 
-        // e. Resume the context that is now on the top of the execution context stack as the
+        // f. Resume the context that is now on the top of the execution context stack as the
         //    running execution context.
 
-        // f. If result is an abrupt completion, then
+        // g. If result is an abrupt completion, then
         //     i. Return ? result.
         _ = try result;
     } else {
-        // 5. Else,
+        // 4. Else,
         // 1. Assert: capability is a PromiseCapability Record.
         std.debug.assert(capability != null);
 
@@ -1789,5 +1787,5 @@ fn executeModule(
         );
     }
 
-    // 6. Return unused.
+    // 5. Return unused.
 }

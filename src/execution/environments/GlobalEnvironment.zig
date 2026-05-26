@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const builtins = @import("../../builtins.zig");
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -379,7 +380,7 @@ pub fn createGlobalFunctionBinding(
     self: *const GlobalEnvironment,
     agent: *Agent,
     name: *const String,
-    value: Value,
+    value: *builtins.ECMAScriptFunction,
     deletable: bool,
 ) Agent.Error!void {
     const property_key: PropertyKey = .{ .string = name };
@@ -400,18 +401,18 @@ pub fn createGlobalFunctionBinding(
         // a. Let desc be the PropertyDescriptor {
         //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
         //    }.
-        break :blk .{ .value = value, .writable = true, .enumerable = true, .configurable = deletable };
+        break :blk .{ .value = Value.from(&value.object), .writable = true, .enumerable = true, .configurable = deletable };
     } else blk: {
         // 5. Else,
         // a. Let desc be the PropertyDescriptor { [[Value]]: V }.
-        break :blk .{ .value = value };
+        break :blk .{ .value = Value.from(&value.object) };
     };
 
     // 6. Perform ? DefinePropertyOrThrow(globalObject, N, desc).
     try global_object.definePropertyOrThrow(agent, property_key, property_descriptor);
 
     // 7. Perform ? Set(globalObject, N, V, false).
-    try global_object.set(agent, property_key, value, .ignore);
+    try global_object.set(agent, property_key, Value.from(&value.object), .ignore);
 
     // 8. Return unused.
 }

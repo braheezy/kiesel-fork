@@ -264,7 +264,7 @@ pub fn createUnmappedArgumentsObject(
 /// https://tc39.es/ecma262/#sec-createmappedargumentsobject
 pub fn createMappedArgumentsObject(
     agent: *Agent,
-    function: *Object,
+    function: *builtins.ECMAScriptFunction,
     formals: ast.FormalParameters,
     arguments_list: []const Value,
     env: Environment,
@@ -391,7 +391,7 @@ pub fn createMappedArgumentsObject(
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    arguments.object.setValueAtPropertyOffset(offsets.callee, Value.from(function));
+    arguments.object.setValueAtPropertyOffset(offsets.callee, Value.from(&function.object));
 
     // 22. Return obj.
     return arguments;

@@ -157,10 +157,7 @@ pub fn asyncBlockStart(
     async_body: AsyncBody,
     async_context: *ExecutionContext,
 ) std.mem.Allocator.Error!void {
-    // 1. Let runningContext be the running execution context.
-    const running_context = agent.runningExecutionContext();
-
-    // 2. Let closure be a new Abstract Closure with no parameters that captures promiseCapability
+    // 1. Let closure be a new Abstract Closure with no parameters that captures promiseCapability
     //    and asyncBody and performs the following steps when called:
     const closure = struct {
         fn func(
@@ -246,26 +243,21 @@ pub fn asyncBlockStart(
         }
     }.func;
 
-    // 3. Set the code evaluation state of asyncContext such that when evaluation is resumed for
+    // 2. Set the code evaluation state of asyncContext such that when evaluation is resumed for
     //    that execution context, closure will be called with no arguments.
 
-    // 4. Push asyncContext onto the execution context stack; asyncContext is now the running
-    //    execution context.
+    // 3. Let result be ! RunSuspendedContext(asyncContext, NormalCompletion(empty)).
+    const running_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, async_context);
-
-    // 5. Resume the suspended evaluation of asyncContext. Let result be the value returned by the
-    //    resumed computation.
     const result = closure(agent, promise_capability, async_body);
-
-    // 6. Assert: When we return here, asyncContext has already been removed from the execution
-    //    context stack and runningContext is the currently running execution context.
     std.debug.assert(running_context == agent.runningExecutionContext());
 
-    // 7. Assert: result is a normal completion with a value of unused. The possible sources of
-    //    this value are Await or, if the async function doesn't await anything, step 3.h above.
+    // 4. Assert: result is unused.
+    // 5. NOTE: The possible sources of result values are Await or, if the async function doesn't
+    //    await anything, step 1.i above.
     result catch |err| try noexcept(err);
 
-    // 8. Return unused.
+    // 6. Return unused.
 }
 
 /// 27.7.5.3 Await ( value )
@@ -294,15 +286,12 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
             const async_context_ = captures_.async_context;
             const v = arguments_.get(0);
 
-            // a. Let prevContext be the running execution context.
-            const previous_context = agent_.runningExecutionContext();
-
-            // TODO: b-e.
+            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, NormalCompletion(v))).
+            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally ignored.
             _ = v;
             _ = async_context_;
-            _ = previous_context;
 
-            // f. Return NormalCompletion(undefined).
+            // c. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;
@@ -325,15 +314,12 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
             const async_context_ = captures_.async_context;
             const reason = arguments_.get(0);
 
-            // a. Let prevContext be the running execution context.
-            const previous_context = agent_.runningExecutionContext();
-
-            // TODO: b-e.
+            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, ThrowCompletion(reason))).
+            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally ignored.
             _ = reason;
             _ = async_context_;
-            _ = previous_context;
 
-            // f. Return NormalCompletion(undefined).
+            // c. Return NormalCompletion(undefined).
             return .undefined;
         }
     }.func;

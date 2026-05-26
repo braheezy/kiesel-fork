@@ -87,25 +87,21 @@ pub fn isWellFormedUnitIdentifier(unit_identifier: *const String) bool {
         return true;
     }
 
-    // 2. Let i be StringIndexOf(unitIdentifier, "-per-", 0).
-    // 3. If i is not-found or StringIndexOf(unitIdentifier, "-per-", i + 1) is not not-found, then
-    // a. Return false.
-    // 4. Assert: The five-character substring "-per-" occurs exactly once in unitIdentifier, at index i.
+    // 2. Let numeratorAndDenominator be StringSplitToList(unitIdentifier, "-per-").
+    // 3. If numeratorAndDenominator does not have exactly 2 elements, return false.
     var it = std.mem.splitSequence(u8, ascii, "-per-");
-
-    // 5. Let numerator be the substring of unitIdentifier from 0 to i.
     const numerator = it.next() orelse return false;
-
-    // 6. Let denominator be the substring of unitIdentifier from i + 5.
     const denominator = it.next() orelse return false;
+    if (it.peek() != null) return false;
 
-    if (it.next() != null) return false;
+    // 4. If IsSanctionedSingleUnitIdentifier(numeratorAndDenominator[0]) is false, return false.
+    if (!isSanctionedSingleUnitIdentifier(numerator)) return false;
 
-    // 7. If IsSanctionedSingleUnitIdentifier(numerator) and IsSanctionedSingleUnitIdentifier(denominator)
-    //    are both true, then
-    //     a. Return true.
-    // 8. Return false.
-    return isSanctionedSingleUnitIdentifier(numerator) and isSanctionedSingleUnitIdentifier(denominator);
+    // 5. If IsSanctionedSingleUnitIdentifier(numeratorAndDenominator[1]) is false, return false.
+    if (!isSanctionedSingleUnitIdentifier(denominator)) return false;
+
+    // 6. Return true.
+    return true;
 }
 
 /// 6.6.2 IsSanctionedSingleUnitIdentifier ( unitIdentifier )

@@ -693,7 +693,7 @@ fn performPromiseAll(
     constructor_: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
-) Agent.Error!Value {
+) Agent.Error!*Object {
     // 1. Let values be a new empty List.
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
@@ -730,7 +730,7 @@ fn performPromiseAll(
             }
 
             // iii. Return resultCapability.[[Promise]].
-            return Value.from(result_capability.promise);
+            return result_capability.promise;
         };
 
         // c. Append undefined to values.
@@ -851,7 +851,7 @@ fn performPromiseAllSettled(
     constructor_: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
-) Agent.Error!Value {
+) Agent.Error!*Object {
     // 1. Let values be a new empty List.
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
@@ -888,7 +888,7 @@ fn performPromiseAllSettled(
             }
 
             // iii. Return resultCapability.[[Promise]].
-            return Value.from(result_capability.promise);
+            return result_capability.promise;
         };
 
         // c. Append undefined to values.
@@ -1121,7 +1121,7 @@ fn performPromiseAny(
     constructor_: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
-) Agent.Error!Value {
+) Agent.Error!*Object {
     // 1. Let errors be a new empty List.
     var errors = try agent.gc_allocator.create(std.ArrayList(Value));
     errors.* = .empty;
@@ -1174,7 +1174,7 @@ fn performPromiseAny(
             }
 
             // iii. Return resultCapability.[[Promise]].
-            return Value.from(result_capability.promise);
+            return result_capability.promise;
         };
 
         // c. Append undefined to errors.
@@ -1311,14 +1311,14 @@ fn performPromiseRace(
     constructor_: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
-) Agent.Error!Value {
+) Agent.Error!*Object {
     // 1. Repeat,
     while (true) {
         // a. Let next be ? IteratorStepValue(iteratorRecord).
         // b. If next is done, then
         const next = try iterator.stepValue(agent) orelse {
             // i. Return resultCapability.[[Promise]].
-            return Value.from(result_capability.promise);
+            return result_capability.promise;
         };
 
         // c. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
@@ -1601,7 +1601,7 @@ pub const constructor = struct {
         }
 
         // 9. Return ! result.
-        return result;
+        return Value.from(result catch unreachable);
     }
 
     /// 27.2.4.2 Promise.allSettled ( iterable )
@@ -1648,7 +1648,7 @@ pub const constructor = struct {
         }
 
         // 9. Return ! result.
-        return result;
+        return Value.from(result catch unreachable);
     }
 
     /// 27.2.4.3 Promise.any ( iterable )
@@ -1695,7 +1695,7 @@ pub const constructor = struct {
         }
 
         // 9. Return ! result.
-        return result;
+        return Value.from(result catch unreachable);
     }
 
     /// 27.2.4.5 Promise.race ( iterable )
@@ -1742,7 +1742,7 @@ pub const constructor = struct {
         }
 
         // 9. Return ! result.
-        return result;
+        return Value.from(result catch unreachable);
     }
 
     /// 27.2.4.6 Promise.reject ( r )

@@ -554,33 +554,20 @@ pub fn asyncGeneratorResume(
     // 2. Let genContext be generator.[[AsyncGeneratorContext]].
     const generator_context = generator.fields.async_generator_context;
 
-    // 3. Let callerContext be the running execution context.
-    const caller_context = agent.runningExecutionContext();
-
-    // 4. Suspend callerContext.
-
-    // 5. Set generator.[[AsyncGeneratorState]] to executing.
+    // 3. Set generator.[[AsyncGeneratorState]] to executing.
     generator.fields.async_generator_state = .executing;
 
-    // 6. Push genContext onto the execution context stack; genContext is now the running execution
-    //    context.
+    // 4. Perform ! RunSuspendedContext(genContext, completion).
+    const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-
-    // 7. Resume the suspended evaluation of genContext using completion as the result of the
-    //    operation that suspended it. Let result be the Completion Record returned by the resumed
-    //    computation.
-    // 8. Assert: result is never an abrupt completion.
     try generator.fields.evaluation_state.closure(
         agent,
         generator.fields.evaluation_state.generator_function,
         completion,
     );
-
-    // 9. Assert: When we return here, genContext has already been removed from the execution
-    //    context stack and callerContext is the currently running execution context.
     std.debug.assert(caller_context == agent.runningExecutionContext());
 
-    // 10. Return unused.
+    // 5. Return unused.
 }
 
 /// 27.6.3.7 AsyncGeneratorUnwrapYieldResumption ( resumptionValue )

@@ -355,7 +355,7 @@ pub fn globalDeclarationInstantiation(
         try env.createGlobalFunctionBinding(
             agent,
             function_name,
-            Value.from(&function_object.object),
+            function_object,
             false,
         );
     }

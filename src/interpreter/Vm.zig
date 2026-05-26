@@ -1840,7 +1840,7 @@ fn executeConstruct(
     }
 
     const result = try evaluateNew(vm.agent, constructor, args_list.items);
-    vm.load(dest, result);
+    vm.load(dest, Value.from(result));
 }
 
 fn executeConstructN(
@@ -1856,7 +1856,7 @@ fn executeConstructN(
     inline for (0..N) |i| args[i] = vm.store(arg_regs[i]);
 
     const result = try evaluateNew(vm.agent, constructor, &args);
-    vm.load(dest, result);
+    vm.load(dest, Value.from(result));
 }
 
 fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Reg, cooked_reg: Bytecode.Reg, raw_reg: Bytecode.Reg, template_id: u16) Agent.Error!void {
@@ -2245,7 +2245,7 @@ fn executeCreateMappedArgumentsObject(vm: *Vm, dest: Bytecode.Reg) std.mem.Alloc
     const function = execution_context.origin.function.as(builtins.ECMAScriptFunction);
     const arguments_object = try createMappedArgumentsObject(
         vm.agent,
-        &function.object,
+        function,
         function.fields.formal_parameters,
         vm.arguments(),
         execution_context.ecmascript_code.lexical_environment,

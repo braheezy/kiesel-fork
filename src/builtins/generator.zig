@@ -309,32 +309,18 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     // 4. Let genContext be generator.[[GeneratorContext]].
     const generator_context = generator.fields.generator_context;
 
-    // 5. Let methodContext be the running execution context.
-    const method_context = agent.runningExecutionContext();
-
-    // 6. Suspend methodContext.
-
-    // 7. Set generator.[[GeneratorState]] to executing.
+    // 5. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;
 
-    // 8. Push genContext onto the execution context stack; genContext is now the running execution
-    //    context.
+    // 6. Return ? RunSuspendedContext(genContext, NormalCompletion(value)).
+    const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-
-    // 9. Resume the suspended evaluation of genContext using NormalCompletion(value) as the result
-    //    of the operation that suspended it. Let result be the value returned by the resumed
-    //    computation.
     const result = try generator.fields.evaluation_state.closure(
         agent,
         generator.fields.evaluation_state.generator_function,
         .{ .normal = value },
     );
-
-    // 10. Assert: When we return here, genContext has already been removed from the execution
-    //     context stack and methodContext is the currently running execution context.
-    std.debug.assert(method_context == agent.runningExecutionContext());
-
-    // 11. Return ? result.
+    std.debug.assert(caller_context == agent.runningExecutionContext());
     return result;
 }
 
@@ -392,32 +378,18 @@ pub fn generatorResumeAbrupt(
     // 5. Let genContext be generator.[[GeneratorContext]].
     const generator_context = generator.fields.generator_context;
 
-    // 6. Let methodContext be the running execution context.
-    const method_context = agent.runningExecutionContext();
-
-    // 7. Suspend methodContext.
-
-    // 8. Set generator.[[GeneratorState]] to executing.
+    // 6. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;
 
-    // 9. Push genContext onto the execution context stack; genContext is now the running execution
-    //    context.
+    // 7. Return ? RunSuspendedContext(genContext, abruptCompletion).
+    const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-
-    // 10. Resume the suspended evaluation of genContext using abruptCompletion as the result of
-    //     the operation that suspended it. Let result be the Completion Record returned by the
-    //     resumed computation.
     const result = try generator.fields.evaluation_state.closure(
         agent,
         generator.fields.evaluation_state.generator_function,
         abrupt_completion,
     );
-
-    // 11. Assert: When we return here, genContext has already been removed from the execution
-    //     context stack and methodContext is the currently running execution context.
-    std.debug.assert(method_context == agent.runningExecutionContext());
-
-    // 12. Return ? result.
+    std.debug.assert(caller_context == agent.runningExecutionContext());
     return result;
 }
 

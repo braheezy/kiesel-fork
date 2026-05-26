@@ -200,9 +200,7 @@ pub fn link(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!void 
 
     // 2. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
     const env: Environment = .{
-        .module_environment = try newModuleEnvironment(agent.gc_allocator, .{
-            .global_environment = realm.global_env,
-        }),
+        .module_environment = try newModuleEnvironment(agent.gc_allocator, realm.global_env),
     };
 
     // 3. Set module.[[Environment]] to env.

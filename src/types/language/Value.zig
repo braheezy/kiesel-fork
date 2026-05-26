@@ -38,10 +38,6 @@ const safety = switch (builtin.mode) {
     .ReleaseFast, .ReleaseSmall => false,
 };
 
-const pow_2_8 = std.math.pow(f64, 2, 8);
-const pow_2_16 = std.math.pow(f64, 2, 16);
-const pow_2_32 = std.math.pow(f64, 2, 32);
-
 const Value = @This();
 
 pub const PreferredType = enum { string, number };
@@ -905,110 +901,91 @@ pub fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
     return if (truncated == 0) 0 else truncated;
 }
 
-/// 7.1.6 ToInt32 ( argument )
+/// 7.1.6 ToFixedSizeInteger ( int, signed, bitWidth )
+/// https://tc39.es/ecma262/#sec-tofixedsizeinteger
+fn toFixedSizeInteger(int: f64, comptime T: type) T {
+    // 1. If int = +∞ or int = -∞, return 0.
+    if (!std.math.isFinite(int)) return 0;
+
+    // 2. Let fixedInt be int modulo 2**bitWidth.
+    const bit_width = @bitSizeOf(T);
+    const fixed_int: @Int(.unsigned, bit_width) = @intFromFloat(@mod(int, std.math.pow(f64, 2, bit_width)));
+
+    // 3. NOTE: The following step does not change the two's complement representation of fixedInt.
+    // 4. If signed is signed and fixedInt ≥ 2**(bitWidth - 1), set fixedInt to fixedInt - 2**bitWidth.
+    // 5. Return fixedInt.
+    return @bitCast(fixed_int);
+}
+
+/// 7.1.7 ToInt32 ( argument )
 /// https://tc39.es/ecma262/#sec-toint32
 pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: We may already have an i32 :^)
     if (self.__isI32()) return self.__asI32();
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    // 2. If int is not finite, return +0𝔽.
-    // 3. Let int32bit be int modulo 2**32.
-    // 4. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32).
-    // 5. Return 𝔽(int32bit).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 32)).
     const number = try self.toNumber(agent);
     return number.toInt32();
 }
 
-/// 7.1.7 ToUint32 ( argument )
+/// 7.1.8 ToUint32 ( argument )
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: We may already have an i32 that we can bitcast :^)
     if (self.__isI32()) return @bitCast(self.__asI32());
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If int is not finite, return +0𝔽.
-    if (!std.math.isFinite(int)) return 0;
-
-    // 3. Let int32bit be int modulo 2**32.
-    const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
-
-    // 4. Return 𝔽(int32bit).
-    return int32bit;
+    // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 32)).
+    return toFixedSizeInteger(int, u32);
 }
 
-/// 7.1.8 ToInt16 ( argument )
+/// 7.1.9 ToInt16 ( argument )
 /// https://tc39.es/ecma262/#sec-toint16
 pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If int is not finite, return +0𝔽.
-    if (!std.math.isFinite(int)) return 0;
-
-    // 3. Let int16bit be int modulo 2**16.
-    const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
-
-    // 4. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16).
-    // 5. Return 𝔽(int16bit).
-    return @bitCast(int16bit);
+    // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 16)).
+    return toFixedSizeInteger(int, i16);
 }
 
-/// 7.1.9 ToUint16 ( argument )
+/// 7.1.10 ToUint16 ( argument )
 /// https://tc39.es/ecma262/#sec-touint16
 pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If int is not finite, return +0𝔽.
-    if (!std.math.isFinite(int)) return 0;
-
-    // 3. Let int16bit be int modulo 2**16.
-    const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
-
-    // 4. Return 𝔽(int16bit).
-    return int16bit;
+    // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 16)).
+    return toFixedSizeInteger(int, u16);
 }
 
-/// 7.1.10 ToInt8 ( argument )
+/// 7.1.11 ToInt8 ( argument )
 /// https://tc39.es/ecma262/#sec-toint8
 pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If int is not finite, return +0𝔽.
-    if (!std.math.isFinite(int)) return 0;
-
-    // 3. Let int8bit be int modulo 2**8.
-    const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
-
-    // 4. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8).
-    // 5. Return 𝔽(int8bit).
-    return @bitCast(int8bit);
+    // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 8)).
+    return toFixedSizeInteger(int, i8);
 }
 
-/// 7.1.11 ToUint8 ( argument )
+/// 7.1.12 ToUint8 ( argument )
 /// https://tc39.es/ecma262/#sec-touint8
 pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
-    // 2. If int is not finite, return +0𝔽.
-    if (!std.math.isFinite(int)) return 0;
-
-    // 3. Let int8bit be int modulo 2**8.
-    const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
-
-    // 4. Return 𝔽(int8bit).
-    return int8bit;
+    // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 8)).
+    return toFixedSizeInteger(int, u8);
 }
 
-/// 7.1.12 ToUint8Clamp ( argument )
+/// 7.1.13 ToUint8Clamp ( argument )
 /// https://tc39.es/ecma262/#sec-touint8clamp
 pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
-    // 1. Let number be ? ToNumber(argument).
+    // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
     // 2. If number is NaN, return +0𝔽.
@@ -1044,7 +1021,7 @@ pub inline fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     return self.toBigIntImpl(agent);
 }
 
-/// 7.1.13 ToBigInt ( argument )
+/// 7.1.14 ToBigInt ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint
 fn toBigIntImpl(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
@@ -1085,28 +1062,25 @@ fn toBigIntImpl(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     };
 }
 
-/// 7.1.15 ToBigInt64 ( argument )
+/// 7.1.16 ToBigInt64 ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint64
 pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
-    // 1. Let n be ? ToBigInt(argument).
+    // 1. Let int be ℝ(? ToBigInt(argument)).
     const n = try self.toBigInt(agent);
 
-    // 2. Let int64bit be ℝ(n) modulo 2**64.
-    // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64).
-    // 4. Return ℤ(int64bit).
+    // 2. Return ℤ(ToFixedSizeInteger(int, signed, 64)).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
     try int64bit.truncate(&n.managed, .signed, 64);
     return int64bit.toInt(i64) catch unreachable;
 }
 
-/// 7.1.16 ToBigUint64 ( argument )
+/// 7.1.17 ToBigUint64 ( argument )
 /// https://tc39.es/ecma262/#sec-tobiguint64
 pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
-    // 1. Let n be ? ToBigInt(argument).
+    // 1. Let int be ℝ(? ToBigInt(argument)).
     const n = try self.toBigInt(agent);
 
-    // 2. Let int64bit be ℝ(n) modulo 2**64.
-    // 3. Return ℤ(int64bit).
+    // 2. Return ℤ(ToFixedSizeInteger(int, unsigned, 64)).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
     try int64bit.truncate(&n.managed, .unsigned, 64);
     return int64bit.toInt(u64) catch unreachable;
@@ -1121,7 +1095,7 @@ pub inline fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
     return self.toStringImpl(agent);
 }
 
-/// 7.1.17 ToString ( argument )
+/// 7.1.18 ToString ( argument )
 /// https://tc39.es/ecma262/#sec-tostring
 fn toStringImpl(self: Value, agent: *Agent) Agent.Error!*const String {
     return switch (self.type()) {
@@ -1178,7 +1152,7 @@ pub inline fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
     return self.toObjectImpl(agent);
 }
 
-/// 7.1.18 ToObject ( argument )
+/// 7.1.19 ToObject ( argument )
 /// https://tc39.es/ecma262/#sec-toobject
 fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
@@ -1245,7 +1219,7 @@ fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
     };
 }
 
-/// 7.1.19 ToPropertyKey ( argument )
+/// 7.1.20 ToPropertyKey ( argument )
 /// https://tc39.es/ecma262/#sec-topropertykey
 pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
     // 1. Let key be ? ToPrimitive(argument, string).
@@ -1275,7 +1249,7 @@ pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
     return PropertyKey.from(string);
 }
 
-/// 7.1.20 ToLength ( argument )
+/// 7.1.21 ToLength ( argument )
 /// https://tc39.es/ecma262/#sec-tolength
 pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1294,7 +1268,7 @@ pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     return @intFromFloat(@min(length, std.math.maxInt(u53)));
 }
 
-/// 7.1.22 ToIndex ( value )
+/// 7.1.23 ToIndex ( value )
 /// https://tc39.es/ecma262/#sec-toindex
 pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1911,7 +1885,7 @@ pub fn stringToNumber(
         return Number.from(std.math.nan(f64));
 }
 
-/// 7.1.14 StringToBigInt ( str )
+/// 7.1.15 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(
     agent: *Agent,

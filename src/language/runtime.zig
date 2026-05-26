@@ -114,7 +114,7 @@ pub fn getTemplateObject(
 
 /// 13.3.5.1.1 EvaluateNew ( constructExpr, arguments )
 /// https://tc39.es/ecma262/#sec-evaluatenew
-pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) Agent.Error!Value {
+pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) Agent.Error!*Object {
     // 1. Let ref be ? Evaluation of constructExpr.
     // 2. Let constructor be ? GetValue(ref).
     // 3. If arguments is empty, then
@@ -129,7 +129,7 @@ pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) 
     }
 
     // 6. Return ? Construct(constructor, argList).
-    return Value.from(try constructor.asObject().construct(agent, arguments, null));
+    return constructor.asObject().construct(agent, arguments, null);
 }
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )

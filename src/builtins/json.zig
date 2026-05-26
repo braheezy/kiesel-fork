@@ -585,8 +585,11 @@ fn serializeJSONProperty(
             // a. Let isArray be ? IsArray(value).
             const is_array = try value.isArray(agent);
 
-            // b. If isArray is true, return ? SerializeJSONArray(state, value).
-            if (is_array) return try serializeJSONArray(agent, state, value.asObject());
+            // b. If isArray is true, then
+            if (is_array) {
+                // i. Return ? SerializeJSONArray(state, value).
+                return try serializeJSONArray(agent, state, value.asObject());
+            }
 
             // c. Return ? SerializeJSONObject(state, value).
             return try serializeJSONObject(agent, state, value.asObject());
