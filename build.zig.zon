@@ -57,6 +57,7 @@
         },
     },
     .paths = .{
+        "CHANGELOG.md",
         "LICENSE",
         "README.md",
         "build.zig",
