@@ -885,9 +885,18 @@ fn toNumberImpl(self: Value, agent: *Agent) Agent.Error!Number {
     }
 }
 
+pub inline fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
+    // OPTIMIZATION: Inline the fast path.
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return @floatFromInt(self.__asI32());
+    }
+    return self.toIntegerOrInfinityImpl(agent);
+}
+
 /// 7.1.5 ToIntegerOrInfinity ( argument )
 /// https://tc39.es/ecma262/#sec-tointegerorinfinity
-pub fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
+fn toIntegerOrInfinityImpl(self: Value, agent: *Agent) Agent.Error!f64 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
