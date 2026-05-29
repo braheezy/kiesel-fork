@@ -247,8 +247,13 @@ const NanBoxingImpl = enum(u64) {
     /// Otherwise, returns number_f64.
     fn getTag(self: NanBoxingImpl) Tag {
         const bits: u64 = @intFromEnum(self);
-        const tag_bits: u16 = @truncate((bits & ~nan_mask) >> payload_len);
-        return if (bits & nan_mask == nan_mask) @enumFromInt(tag_bits) else .number_f64;
+        // Decode only the top 16-bit header, which generates better assembly than a 64-bit mask.
+        const header_bits: u16 = @truncate(bits >> payload_len);
+        const header_nan_mask: u16 = @truncate(nan_mask >> payload_len);
+        return if (header_bits & header_nan_mask == header_nan_mask)
+            @enumFromInt(header_bits & ~header_nan_mask)
+        else
+            .number_f64;
     }
 
     fn getPayload(self: NanBoxingImpl, comptime tag: Tag) tag.Payload() {
