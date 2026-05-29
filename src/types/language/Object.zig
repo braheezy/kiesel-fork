@@ -239,8 +239,8 @@ pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, v
             dense_i32.items[index] = value.__asI32();
             return true;
         },
-        .dense_f64 => |dense_f64| if (value.__isF64()) {
-            dense_f64.items[index] = value.__asF64();
+        .dense_f64 => |dense_f64| if (value.isNumber()) {
+            dense_f64.items[index] = value.__toF64();
             return true;
         },
         .dense_value => |dense_value| {
