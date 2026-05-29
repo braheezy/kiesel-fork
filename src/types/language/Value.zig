@@ -908,13 +908,27 @@ pub fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
 
 /// 7.1.6 ToFixedSizeInteger ( int, signed, bitWidth )
 /// https://tc39.es/ecma262/#sec-tofixedsizeinteger
-fn toFixedSizeInteger(int: f64, comptime T: type) T {
+pub fn toFixedSizeInteger(int: f64, comptime T: type) T {
+    const info = @typeInfo(T).int;
+    comptime std.debug.assert(info.bits <= 32); // Not used for bigint
+
     // 1. If int = +∞ or int = -∞, return 0.
+    std.debug.assert(!std.math.isNan(int));
     if (!std.math.isFinite(int)) return 0;
 
+    // OPTIMIZATION: Avoid modulo if the number is already in int range.
+    if (info.signedness == .signed) {
+        if (int >= std.math.minInt(T) and int <= std.math.maxInt(T)) {
+            return @intFromFloat(int);
+        }
+    } else {
+        if (int >= 0 and int <= std.math.maxInt(T)) {
+            return @intFromFloat(int);
+        }
+    }
+
     // 2. Let fixedInt be int modulo 2**bitWidth.
-    const bit_width = @bitSizeOf(T);
-    const fixed_int: @Int(.unsigned, bit_width) = @intFromFloat(@mod(int, std.math.pow(f64, 2, bit_width)));
+    const fixed_int: @Int(.unsigned, info.bits) = @intFromFloat(@mod(int, comptime std.math.pow(f64, 2, info.bits)));
 
     // 3. NOTE: The following step does not change the two's complement representation of fixedInt.
     // 4. If signed is signed and fixedInt ≥ 2**(bitWidth - 1), set fixedInt to fixedInt - 2**bitWidth.
@@ -925,8 +939,11 @@ fn toFixedSizeInteger(int: f64, comptime T: type) T {
 /// 7.1.7 ToInt32 ( argument )
 /// https://tc39.es/ecma262/#sec-toint32
 pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
-    // OPTIMIZATION: We may already have an i32 :^)
-    if (self.__isI32()) return self.__asI32();
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return self.__asI32();
+    }
 
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 32)).
@@ -937,8 +954,11 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
 /// 7.1.8 ToUint32 ( argument )
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
-    // OPTIMIZATION: We may already have an i32 that we can bitcast :^)
-    if (self.__isI32()) return @bitCast(self.__asI32());
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return @bitCast(self.__asI32());
+    }
 
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
@@ -950,6 +970,13 @@ pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
 /// 7.1.9 ToInt16 ( argument )
 /// https://tc39.es/ecma262/#sec-toint16
 pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        const fixed_int: u16 = @truncate(@as(u32, @bitCast(self.__asI32())));
+        return @bitCast(fixed_int);
+    }
+
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
@@ -960,6 +987,12 @@ pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
 /// 7.1.10 ToUint16 ( argument )
 /// https://tc39.es/ecma262/#sec-touint16
 pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return @truncate(@as(u32, @bitCast(self.__asI32())));
+    }
+
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
@@ -970,6 +1003,13 @@ pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
 /// 7.1.11 ToInt8 ( argument )
 /// https://tc39.es/ecma262/#sec-toint8
 pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        const fixed_int: u8 = @truncate(@as(u32, @bitCast(self.__asI32())));
+        return @bitCast(fixed_int);
+    }
+
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
@@ -980,6 +1020,12 @@ pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
 /// 7.1.12 ToUint8 ( argument )
 /// https://tc39.es/ecma262/#sec-touint8
 pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
+    // OPTIMIZATION: Fast path for i32 values
+    if (self.__isI32()) {
+        @branchHint(.likely);
+        return @truncate(@as(u32, @bitCast(self.__asI32())));
+    }
+
     // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 

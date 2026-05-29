@@ -10,8 +10,7 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const String = types.String;
-
-const pow_2_32 = std.math.pow(f64, 2, 32);
+const Value = types.Value;
 
 pub const Number = union(enum) {
     f64: f64,
@@ -173,12 +172,8 @@ pub const Number = union(enum) {
                         : [number] "{d1}" (x),
                         : .{});
                 }
-
-                // Excerpt from Value.toInt32()
                 if (!std.math.isFinite(x) or x == 0) return 0;
-                const int = @trunc(x);
-                const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
-                return @bitCast(int32bit);
+                return Value.toFixedSizeInteger(@trunc(x), i32);
             },
             .i32 => |x| return x,
         }
@@ -187,11 +182,8 @@ pub const Number = union(enum) {
     pub fn toUint32(self: Number) u32 {
         switch (self) {
             .f64 => |x| {
-                // Excerpt from Value.toUint32()
                 if (!std.math.isFinite(x) or x == 0) return 0;
-                const int = @trunc(x);
-                const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
-                return int32bit;
+                return Value.toFixedSizeInteger(@trunc(x), u32);
             },
             .i32 => |x| return @bitCast(x),
         }
