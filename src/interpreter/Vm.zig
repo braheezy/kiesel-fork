@@ -1716,8 +1716,11 @@ fn executeCall(
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
-    defer args_list.deinit(gpa);
+    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
+    const sfa = stack_fallback.get();
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    defer args_list.deinit(sfa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1758,8 +1761,11 @@ fn executeCallProperty(
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
-    defer args_list.deinit(gpa);
+    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
+    const sfa = stack_fallback.get();
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    defer args_list.deinit(sfa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1801,8 +1807,11 @@ fn executeCallDirectEval(
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
-    defer args_list.deinit(gpa);
+    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
+    const sfa = stack_fallback.get();
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    defer args_list.deinit(sfa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -1831,8 +1840,11 @@ fn executeConstruct(
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
-    defer args_list.deinit(gpa);
+    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
+    const sfa = stack_fallback.get();
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    defer args_list.deinit(sfa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
@@ -2284,8 +2296,11 @@ fn executeSuperCall(
     const args_object = args_value.asObject();
     const args_len = args_object.as(builtins.Array).fields.length;
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
-    defer args_list.deinit(gpa);
+    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
+    const sfa = stack_fallback.get();
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    defer args_list.deinit(sfa);
     for (0..args_len) |i| {
         const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
