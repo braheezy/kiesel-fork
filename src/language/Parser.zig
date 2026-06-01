@@ -11,7 +11,6 @@ const utils = @import("../utils.zig");
 const String = types.String;
 const TemporaryChange = utils.TemporaryChange;
 const Tokenizer = tokenizer_.Tokenizer;
-const initValidateUtf8 = tokenizer_.initValidateUtf8;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
@@ -261,19 +260,11 @@ pub fn parseNode(
 ) Error!T {
     var new_diagnostics: ptk.Diagnostics = undefined;
     defer if (options.diagnostics == null) new_diagnostics.deinit();
-    var diagnostics = options.diagnostics orelse blk: {
+    const diagnostics = options.diagnostics orelse blk: {
         new_diagnostics = .init(allocator);
         break :blk &new_diagnostics;
     };
-    var tokenizer = initValidateUtf8(source_text, options.file_name) catch {
-        try diagnostics.emit(
-            .{ .source = options.file_name, .line = 1, .column = 1 },
-            .@"error",
-            "invalid UTF-8 source code",
-            .{},
-        );
-        return error.ParseError;
-    };
+    var tokenizer = Tokenizer.init(source_text, options.file_name);
     const core = ParserCore.init(&tokenizer);
     var parser: Parser = .{
         .allocator = allocator,

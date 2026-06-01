@@ -14,6 +14,11 @@ and this project adheres to
   ([#203](https://codeberg.org/kiesel-js/kiesel/issues/203))
 - Added CI builds for `loongarch64-linux-musl`
 
+### Changed
+
+- Normalize invalid UTF-8 input using replacement characters instead of
+  rejecting it outright, thus allowing arbitrary byte sequences in comments
+
 ### Fixed
 
 - Fixed a bytecode use-after-free in exception printing

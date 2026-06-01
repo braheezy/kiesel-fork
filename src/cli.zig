@@ -784,7 +784,8 @@ fn repl(
             const line = self.editor.getBufferedLine() catch return;
             defer self.editor.allocator.free(line);
 
-            var tokenizer = kiesel.language.tokenizer.initValidateUtf8(line, null) catch return;
+            // NOTE: zigline always returns valid UTF-8.
+            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
             const change = kiesel.utils.temporaryChange(
                 &kiesel.language.tokenizer.state,
                 .{
@@ -869,7 +870,8 @@ fn repl(
             const line = self.editor.getBufferedLineUpTo(self.editor.cursor) catch return &.{};
             defer self.editor.allocator.free(line);
 
-            var tokenizer = kiesel.language.tokenizer.initValidateUtf8(line, null) catch return &.{};
+            // NOTE: zigline always returns valid UTF-8.
+            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
             const change = kiesel.utils.temporaryChange(
                 &kiesel.language.tokenizer.state,
                 .{
@@ -1241,13 +1243,18 @@ pub fn main(init: std.process.Init) !u8 {
             const gpa_ = agent_.gpa;
             const io_ = agent_.io;
             const realm = agent_.currentRealm();
-            const source_text = readFile(gpa_, io_, module_path) catch |err| {
+            const raw_source_text = readFile(gpa_, io_, module_path) catch |err| {
                 return agent_.throwException(
                     .internal_error,
                     "Failed to import '{f}': {t}",
                     .{ module_request.specifier.fmtEscaped(), err },
                 );
             };
+            defer gpa_.free(raw_source_text);
+
+            const source_text = try std.fmt.allocPrint(gpa_, "{f}", .{
+                std.unicode.fmtUtf8(raw_source_text),
+            });
             defer gpa_.free(source_text);
 
             for (module_request.attributes) |entry| {
@@ -1340,7 +1347,12 @@ pub fn main(init: std.process.Init) !u8 {
         agent.options.debug.print_bytecode;
 
     if (maybe_path) |path| {
-        const source_text = try readFile(gpa, io, path);
+        const raw_source_text = try readFile(gpa, io, path);
+        defer gpa.free(raw_source_text);
+        // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
+        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+            std.unicode.fmtUtf8(raw_source_text),
+        });
         defer gpa.free(source_text);
         const resolved_path = try std.Io.Dir.path.resolve(gpa, &.{ cwd, path });
         defer gpa.free(resolved_path);
@@ -1359,8 +1371,13 @@ pub fn main(init: std.process.Init) !u8 {
             try stdout.print("{f}\n", .{result.fmtPretty(null)});
             try stdout.flush();
         }
-    } else if (parsed_args.options.command) |source_text| {
+    } else if (parsed_args.options.command) |raw_source_text| {
         std.debug.assert(!run_as_module);
+        // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
+        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+            std.unicode.fmtUtf8(raw_source_text),
+        });
+        defer gpa.free(source_text);
         const result = run(gpa, realm, source_text, .{
             .base_dir = cwd,
             .origin = .command,
