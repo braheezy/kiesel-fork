@@ -82,7 +82,7 @@ fn updateLanguageId(
         };
     }
 
-    // 8. Let variants be ? GetOption(options, "variants", string, empty, GetLocaleVariants(baseName)).
+    // 8. Let variants be ? GetOption(options, "variants", string, empty, GetLocaleVariants(baseName)).
     const maybe_variants = try options.getOption(agent, "variants", .string, null, null);
 
     // 9. If variants is not undefined, then
@@ -300,7 +300,7 @@ pub const constructor = struct {
         // 21. Set opt.[[co]] to collation.
         // NOTE: This is done as part of step 19.a.
 
-        // 22. Let fw be ? GetOption(options, "firstDayOfWeek", string, empty, undefined).
+        // 22. Let fw be ? GetOption(options, "firstDayOfWeek", string, empty, undefined).
         const maybe_fw = try options.getOption(agent, "firstDayOfWeek", .string, null, null);
 
         // 23. If fw is not undefined, then
@@ -756,7 +756,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.variants
     fn variants(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
-        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
         // 3. Return GetLocaleVariants(loc.[[Locale]]).

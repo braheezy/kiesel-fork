@@ -79,7 +79,7 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.ListFormat%,
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.ListFormat%,
         //    %Intl.ListFormat%.[[LocaleData]], locales, options).
         const options_resolution = try resolveOptions(
             agent,

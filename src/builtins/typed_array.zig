@@ -3227,7 +3227,7 @@ fn typedArrayCreateSameType(
         },
     };
 
-    // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, « 𝔽(length) »).
+    // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, « 𝔽(length) »).
     const typed_array = try typedArrayCreateFromConstructor(
         agent,
         constructor_,
@@ -3974,7 +3974,7 @@ fn fromBase64Impl(
 
     // 3. If maxLength = 0, then
     if (max_length == 0) {
-        // a. Return the Record { [[Read]]: 0, [[Bytes]]: « », [[Error]]: none }.
+        // a. Return the Record { [[Read]]: 0, [[Bytes]]: « », [[Error]]: none }.
         return .{ .read = 0, .bytes = &.{}, .@"error" = null };
     }
 
@@ -4065,7 +4065,7 @@ fn fromHexImpl(
             .{},
         );
 
-        // b. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+        // b. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
         return .{ .read = read, .bytes = &.{}, .@"error" = @"error" };
     }
 
@@ -4089,7 +4089,7 @@ fn fromHexImpl(
                 .{},
             );
 
-            // ii. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
+            // ii. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: error }.
             return .{
                 .read = read,
                 .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
@@ -4110,7 +4110,7 @@ fn fromHexImpl(
         bytes.appendAssumeCapacity(byte);
     }
 
-    // 7. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: none }.
+    // 7. Return the Record { [[Read]]: read, [[Bytes]]: bytes, [[Error]]: none }.
     return .{
         .read = read,
         .bytes = try bytes.toOwnedSlice(agent.gc_allocator),
@@ -4310,10 +4310,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 2. Let opts be ? GetOptionsObject(options).
+            // 2. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 3. Let alphabet be ? Get(opts, "alphabet").
+            // 3. Let alphabet be ? Get(opts, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 4. If alphabet is undefined, set alphabet to "base64".
@@ -4327,7 +4327,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4363,7 +4363,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             // 11. Let resultLength be the number of elements in result.[[Bytes]].
             const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
 
-            // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //     "%Uint8Array.prototype%", resultLength).
             const typed_array = try allocateTypedArray(
                 agent,
@@ -4416,7 +4416,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             // 4. Let resultLength be the number of elements in result.[[Bytes]].
             const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
 
-            // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
+            // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //    "%Uint8Array.prototype%", resultLength).
             const typed_array = try allocateTypedArray(
                 agent,
@@ -4488,7 +4488,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const options_value = arguments.get(1);
 
             // 1. Let into be the this value.
-            // 2. Perform ? ValidateUint8Array(into).
+            // 2. Perform ? ValidateUint8Array(into).
             const into = try validateUint8Array(agent, this_value);
 
             // 3. If string is not a String, throw a TypeError exception.
@@ -4497,10 +4497,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 4. Let opts be ? GetOptionsObject(options).
+            // 4. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 5. Let alphabet be ? Get(opts, "alphabet").
+            // 5. Let alphabet be ? Get(opts, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 6. If alphabet is undefined, set alphabet to "base64".
@@ -4514,7 +4514,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 9. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4585,14 +4585,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 try realm.intrinsics.@"%Object.prototype%"(),
             );
 
-            // 22. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            // 22. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("read"),
                 Value.from(@as(u53, @intCast(result.read))),
             );
 
-            // 23. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            // 23. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("written"),
@@ -4610,7 +4610,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const string_value = arguments.get(0);
 
             // 1. Let into be the this value.
-            // 2. Perform ? ValidateUint8Array(into).
+            // 2. Perform ? ValidateUint8Array(into).
             const into = try validateUint8Array(agent, this_value);
 
             // 3. If string is not a String, throw a TypeError exception.
@@ -4664,14 +4664,14 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 try realm.intrinsics.@"%Object.prototype%"(),
             );
 
-            // 15. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
+            // 15. Perform ! CreateDataPropertyOrThrow(resultObject, "read", 𝔽(result.[[Read]])).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("read"),
                 Value.from(@as(u53, @intCast(result.read))),
             );
 
-            // 16. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
+            // 16. Perform ! CreateDataPropertyOrThrow(resultObject, "written", 𝔽(written)).
             try result_object.createDataPropertyDirect(
                 agent,
                 PropertyKey.from("written"),
@@ -4688,13 +4688,13 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const options_value = arguments.get(0);
 
             // 1. Let O be the this value.
-            // 2. Perform ? ValidateUint8Array(O).
+            // 2. Perform ? ValidateUint8Array(O).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let opts be ? GetOptionsObject(options).
+            // 3. Let opts be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 4. Let alphabet be ? Get(opts, "alphabet").
+            // 4. Let alphabet be ? Get(opts, "alphabet").
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
@@ -4711,7 +4711,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
             const omit_padding = (try options.get(agent, PropertyKey.from("omitPadding"))).toBoolean();
 
-            // 8. Let toEncode be ? GetUint8ArrayBytes(O).
+            // 8. Let toEncode be ? GetUint8ArrayBytes(O).
             const to_encode = try getUint8ArrayBytes(agent, typed_array);
 
             // 9. If alphabet is "base64", then
@@ -4743,10 +4743,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
         /// https://tc39.es/ecma262/#sec-uint8array.prototype.tohex
         fn toHex(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
             // 1. Let O be the this value.
-            // 2. Perform ? ValidateUint8Array(O).
+            // 2. Perform ? ValidateUint8Array(O).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let toEncode be ? GetUint8ArrayBytes(O).
+            // 3. Let toEncode be ? GetUint8ArrayBytes(O).
             const to_encode = try getUint8ArrayBytes(agent, typed_array);
 
             // 4. Let out be the empty String.

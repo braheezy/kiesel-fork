@@ -739,7 +739,7 @@ fn makeMatchIndicesIndexPairArray(
                 //    properties are all writable data properties, the call to
                 //    CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
 
-                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
+                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
                 const property_key = PropertyKey.from(
                     try String.fromUtf8(agent, try agent.gc_allocator.dupe(u8, group_name)),
                 );

@@ -106,7 +106,7 @@ pub const constructor = struct {
 
         // TODO: 9-10.
 
-        // 11. Let optionsResolution be ? ResolveOptions(%Intl.Collator%, localeData,
+        // 11. Let optionsResolution be ? ResolveOptions(%Intl.Collator%, localeData,
         //     CreateArrayFromList(requestedLocales), options).
         const array = try createArrayFromListMapToValue(agent, icu4zig.Locale, requested_locales.items, struct {
             fn mapFn(agent_: *Agent, locale: icu4zig.Locale) std.mem.Allocator.Error!Value {
@@ -142,8 +142,8 @@ pub const constructor = struct {
 
         // 19. If usage is "sort", let defaultSensitivity be "variant". Otherwise, let
         //     defaultSensitivity be resolvedLocaleData.[[sensitivity]].
-        // 20. Set collator.[[Sensitivity]] to ? GetOption(options, "sensitivity", string, «
-        //     "base", "accent", "case", "variant" », defaultSensitivity).
+        // 20. Set collator.[[Sensitivity]] to ? GetOption(options, "sensitivity", string, «
+        //     "base", "accent", "case", "variant" », defaultSensitivity).
         var maybe_sensitivity_string = try options.getOption(
             agent,
             "sensitivity",
@@ -175,7 +175,7 @@ pub const constructor = struct {
         }
 
         // 21. Let defaultIgnorePunctuation be resolvedLocaleData.[[ignorePunctuation]].
-        // 22. Set collator.[[IgnorePunctuation]] to ? GetOption(options, "ignorePunctuation",
+        // 22. Set collator.[[IgnorePunctuation]] to ? GetOption(options, "ignorePunctuation",
         //     boolean, empty, defaultIgnorePunctuation).
         const maybe_ignore_punctuation = try options.getOption(
             agent,

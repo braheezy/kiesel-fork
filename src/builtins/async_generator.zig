@@ -557,7 +557,7 @@ pub fn asyncGeneratorResume(
     // 3. Set generator.[[AsyncGeneratorState]] to executing.
     generator.fields.async_generator_state = .executing;
 
-    // 4. Perform ! RunSuspendedContext(genContext, completion).
+    // 4. Perform ! RunSuspendedContext(genContext, completion).
     const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
     try generator.fields.evaluation_state.closure(

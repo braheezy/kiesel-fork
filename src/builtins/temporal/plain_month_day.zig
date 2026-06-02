@@ -130,7 +130,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalMonthDay(item, options).
+        // 1. Return ? ToTemporalMonthDay(item, options).
         const plain_month_day = try toTemporalPlainMonthDay(agent, item, options);
         return Value.from(&plain_month_day.object);
     }
@@ -200,7 +200,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.day
     fn day(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let plainMonthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[Day]]).
@@ -233,7 +233,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainmonthday.prototype.monthcode
     fn monthCode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let plainMonthDay be the this value.
-        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
+        // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
         // 3. Return CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[MonthCode]].

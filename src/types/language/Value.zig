@@ -954,7 +954,7 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
         return self.__asI32();
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 32)).
     const number = try self.toNumber(agent);
     return number.toInt32();
@@ -969,7 +969,7 @@ pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
         return @bitCast(self.__asI32());
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 32)).
@@ -986,7 +986,7 @@ pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
         return @bitCast(fixed_int);
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 16)).
@@ -1002,7 +1002,7 @@ pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
         return @truncate(@as(u32, @bitCast(self.__asI32())));
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 16)).
@@ -1019,7 +1019,7 @@ pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
         return @bitCast(fixed_int);
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 8)).
@@ -1035,7 +1035,7 @@ pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
         return @truncate(@as(u32, @bitCast(self.__asI32())));
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(argument).
     const int = try self.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 8)).
@@ -1045,7 +1045,7 @@ pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
 /// 7.1.13 ToUint8Clamp ( argument )
 /// https://tc39.es/ecma262/#sec-touint8clamp
 pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
-    // 1. Let number be ? ToNumber(argument).
+    // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
     // 2. If number is NaN, return +0𝔽.

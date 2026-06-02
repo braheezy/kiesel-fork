@@ -81,7 +81,7 @@ pub const namespace = struct {
         // 1. Let isoDateTime be ? SystemDateTime(temporalTimeZoneLike).
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
-        // 2. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], "iso8601").
+        // 2. Return ! CreateTemporalDate(isoDateTime.[[ISODate]], "iso8601").
         const temporal_rs_plain_date = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainDate_from_epoch_nanoseconds(epoch_ns, time_zone),
@@ -125,7 +125,7 @@ pub const namespace = struct {
         // 1. Let isoDateTime be ? SystemDateTime(temporalTimeZoneLike).
         const time_zone, const epoch_ns = try systemDateTime(agent, temporal_time_zone_like);
 
-        // 2. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
+        // 2. Return ! CreateTemporalTime(isoDateTime.[[Time]]).
         const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_PlainTime_from_epoch_nanoseconds(epoch_ns, time_zone),

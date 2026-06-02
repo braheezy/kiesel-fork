@@ -1244,14 +1244,14 @@ pub const prototype = struct {
         const locales = arguments.get(1);
         const options = arguments.get(2);
 
-        // 1. Let O be ? RequireObjectCoercible(this value).
+        // 1. Let O be ? RequireObjectCoercible(this value).
         const object = this_value;
         try object.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(O).
+        // 2. Let S be ? ToString(O).
         const string = try object.toString(agent);
 
-        // 3. Let thatValue be ? ToString(that).
+        // 3. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
 
         const realm = agent.currentRealm();
@@ -1441,7 +1441,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         const object = this_value;
 
-        // 2. Perform ? RequireObjectCoercible(O).
+        // 2. Perform ? RequireObjectCoercible(O).
         try this_value.requireObjectCoercible(agent);
 
         // 3. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, end).
@@ -1459,7 +1459,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         const object = this_value;
 
-        // 2. Perform ? RequireObjectCoercible(O).
+        // 2. Perform ? RequireObjectCoercible(O).
         try object.requireObjectCoercible(agent);
 
         // 3. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, start).
@@ -1807,7 +1807,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         const object = this_value;
 
-        // 2. Perform ? RequireObjectCoercible(O).
+        // 2. Perform ? RequireObjectCoercible(O).
         try this_value.requireObjectCoercible(agent);
 
         // 3. If regexp is an Object, then
@@ -2407,7 +2407,7 @@ pub const prototype = struct {
         string_value: Value,
         where: enum { start, end, @"start+end" },
     ) Agent.Error!*const types.String {
-        // 1. Perform ? RequireObjectCoercible(string).
+        // 1. Perform ? RequireObjectCoercible(string).
         try string_value.requireObjectCoercible(agent);
 
         // 2. Let S be ? ToString(string).
@@ -2555,10 +2555,10 @@ pub const prototype = struct {
         tag: []const u8,
         attribute: ?struct { name: []const u8, value: Value },
     ) Agent.Error!*const types.String {
-        // 1. Perform ? RequireObjectCoercible(string).
+        // 1. Perform ? RequireObjectCoercible(string).
         try string_value.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(string).
+        // 2. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
 
         // 3. Let p1 be the string-concatenation of "<" and tag.

@@ -188,7 +188,7 @@ pub fn createResolvingFunctions(
         }
     }.func;
 
-    // 3. Let resolve be CreateBuiltinFunction(resolveSteps, 1, "", « »).
+    // 3. Let resolve be CreateBuiltinFunction(resolveSteps, 1, "", « »).
     const resolve = try createBuiltinFunction(
         agent,
         .{ .function = resolve_steps },
@@ -222,7 +222,7 @@ pub fn createResolvingFunctions(
         }
     }.func;
 
-    // 5. Let reject be CreateBuiltinFunction(rejectSteps, 1, "", « »).
+    // 5. Let reject be CreateBuiltinFunction(rejectSteps, 1, "", « »).
     const reject = try createBuiltinFunction(
         agent,
         .{ .function = reject_steps },
@@ -231,7 +231,7 @@ pub fn createResolvingFunctions(
         .{ .additional_fields = additional_fields },
     );
 
-    // 6. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
+    // 6. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
     return .{ .resolve = resolve, .reject = reject };
 }
 
@@ -701,7 +701,7 @@ fn performPromiseAll(
     // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
     //    is only called once, even in the presence of a misbehaving "then" which calls the passed
     //    callback before the input iterator is exhausted.
-    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
@@ -791,7 +791,7 @@ fn performPromiseAll(
                     // 1. Let valuesArray be CreateArrayFromList(values).
                     const values_array = try createArrayFromList(agent_, values_.items);
 
-                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(result_capability_.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -805,7 +805,7 @@ fn performPromiseAll(
         }.func;
 
         // f. Let onFulfilled be CreateBuiltinFunction(fulfilledSteps, 1, "", « [[AlreadyCalled]],
-        //    [[Index]] »).
+        //    [[Index]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(
             agent,
@@ -834,7 +834,7 @@ fn performPromiseAll(
         // j. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // k. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
+        // k. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
@@ -859,7 +859,7 @@ fn performPromiseAllSettled(
     // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
     //    is only called once, even in the presence of a misbehaving "then" which calls one of the
     //    passed callbacks before the input iterator is exhausted.
-    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
@@ -903,7 +903,7 @@ fn performPromiseAllSettled(
 
         const AlreadyCalled = struct { value: bool };
 
-        // e. Let alreadyCalled be the Record { [[Value]]: false }.
+        // e. Let alreadyCalled be the Record { [[Value]]: false }.
         const already_called = try agent.gc_allocator.create(AlreadyCalled);
         already_called.* = .{ .value = false };
 
@@ -986,7 +986,7 @@ fn performPromiseAllSettled(
         }.func;
 
         // g. Let onFulfilled be CreateBuiltinFunction(fulfilledSteps, 1, "", « [[AlreadyCalled]],
-        //    [[Index]] »).
+        //    [[Index]] »).
         const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(
             agent,
@@ -1037,14 +1037,14 @@ fn performPromiseAllSettled(
                     try realm.intrinsics.@"%Object.prototype%"(),
                 );
 
-                // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
+                // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
                 try object.createDataPropertyDirect(
                     agent_,
                     PropertyKey.from("status"),
                     Value.from("rejected"),
                 );
 
-                // vi. Perform ! CreateDataPropertyOrThrow(obj, "reason", error).
+                // vi. Perform ! CreateDataPropertyOrThrow(obj, "reason", error).
                 try object.createDataPropertyDirect(agent_, PropertyKey.from("reason"), @"error");
 
                 // vii. Let thisIndex be F.[[Index]].
@@ -1061,7 +1061,7 @@ fn performPromiseAllSettled(
                     // 1. Let valuesArray be CreateArrayFromList(values).
                     const values_array = try createArrayFromList(agent_, values_.items);
 
-                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                    // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(result_capability_.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -1075,7 +1075,7 @@ fn performPromiseAllSettled(
         }.func;
 
         // k. Let onRejected be CreateBuiltinFunction(rejectedSteps, 1, "", « [[AlreadyCalled]],
-        //    [[Index]] »).
+        //    [[Index]] »).
         const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_rejected = try createBuiltinFunction(
             agent,
@@ -1104,7 +1104,7 @@ fn performPromiseAllSettled(
         // o. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // p. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+        // p. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
@@ -1129,7 +1129,7 @@ fn performPromiseAny(
     // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Reject]]
     //    is only called once, even in the presence of a misbehaving "then" which calls the passed
     //    callback before the input iterator is exhausted.
-    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
 
@@ -1165,7 +1165,7 @@ fn performPromiseAny(
                     .attributes = .builtin_default,
                 });
 
-                // 3. Perform ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
+                // 3. Perform ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
                 _ = try Value.from(result_capability.reject).callAssumeCallable(
                     agent,
                     .undefined,
@@ -1239,7 +1239,7 @@ fn performPromiseAny(
                         .{},
                     );
 
-                    // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
+                    // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
                     //      [[Value]]: CreateArrayFromList(errors)
                     //    }).
@@ -1251,7 +1251,7 @@ fn performPromiseAny(
                         .attributes = .builtin_default,
                     });
 
-                    // 3. Return ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
+                    // 3. Return ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -1294,7 +1294,7 @@ fn performPromiseAny(
         // j. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // k. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
+        // k. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),

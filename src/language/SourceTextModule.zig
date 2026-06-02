@@ -740,7 +740,7 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
                 else => false,
             });
 
-            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
+            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
                 agent,
                 .undefined,

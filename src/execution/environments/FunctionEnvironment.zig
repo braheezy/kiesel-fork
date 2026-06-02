@@ -121,7 +121,7 @@ pub fn getSuperBase(self: *const FunctionEnvironment, agent: *Agent) std.mem.All
     };
 
     // 3. Assert: home is an ordinary object.
-    // 4. Return ! home.[[GetPrototypeOf]]().
+    // 4. Return ! home.[[GetPrototypeOf]]().
     return .{
         .object = home.internal_methods.getPrototypeOf(
             agent,

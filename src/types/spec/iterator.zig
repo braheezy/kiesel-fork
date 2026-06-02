@@ -292,7 +292,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agen
         return agent.throwException(.type_error, "{f} is not an Object", .{iterator});
     }
 
-    // 3. Return ? GetIteratorDirect(iterator).
+    // 3. Return ? GetIteratorDirect(iterator).
     return getIteratorDirect(agent, iterator.asObject());
 }
 

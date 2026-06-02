@@ -842,7 +842,7 @@ pub const namespace = struct {
             //        only so that implementations may rely on inputs being "reasonably sized"
             //        without violating this specification.
             //     2. Let error be ThrowCompletion(a newly created RangeError object).
-            //     3. Return ? IteratorClose(iteratorRecord, error).
+            //     3. Return ? IteratorClose(iteratorRecord, error).
 
             // ii. If next is not a Number, then
             if (!next.isNumber()) {

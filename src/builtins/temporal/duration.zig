@@ -205,7 +205,7 @@ pub const constructor = struct {
     fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const item = arguments.get(0);
 
-        // 1. Return ? ToTemporalDuration(item).
+        // 1. Return ? ToTemporalDuration(item).
         const duration = try toTemporalDuration(agent, item);
         return Value.from(&duration.object);
     }

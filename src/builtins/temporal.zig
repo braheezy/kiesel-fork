@@ -228,7 +228,7 @@ pub fn canonicalizeCalendar(
 /// 12.2.2 CreateMonthCode ( monthNumber, isLeapMonth )
 /// https://tc39.es/proposal-temporal/#sec-temporal-createmonthcode
 fn parseAndCreateMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
-    // 1. Let monthCode be ? ToPrimitive(argument, string).
+    // 1. Let monthCode be ? ToPrimitive(argument, string).
     const month_code = try argument.toPrimitive(agent, .string);
 
     // 2. If monthCode is not a String, throw a TypeError exception.
@@ -415,7 +415,7 @@ pub fn prepareCalendarFields(
                 .time_zone => "timeZone",
             };
 
-            // b. Let value be ? Get(fields, property).
+            // b. Let value be ? Get(fields, property).
             const value = try fields.get(agent, PropertyKey.from(property_name));
 
             // c. If value is not undefined, then
@@ -1038,11 +1038,11 @@ pub fn validateTemporalUnitValue(
 /// 13.19 GetTemporalRelativeToOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalrelativetooption
 pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!temporal_rs.RelativeTo {
-    // 1. Let value be ? Get(options, "relativeTo").
+    // 1. Let value be ? Get(options, "relativeTo").
     const value = try options.get(agent, PropertyKey.from("relativeTo"));
 
     // 2. If value is undefined, return the Record { [[PlainRelativeTo]]: undefined,
-    //    [[ZonedRelativeTo]]: undefined }.
+    //    [[ZonedRelativeTo]]: undefined }.
     if (value.isUndefined()) return .none;
 
     // 3. Let offsetBehaviour be option.

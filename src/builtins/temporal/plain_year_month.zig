@@ -134,10 +134,10 @@ pub const constructor = struct {
         const one_value = arguments.get(0);
         const two_value = arguments.get(1);
 
-        // 1. Set one to ? ToTemporalYearMonth(one).
+        // 1. Set one to ? ToTemporalYearMonth(one).
         const one = try toTemporalPlainYearMonth(agent, one_value, null);
 
-        // 2. Set two to ? ToTemporalYearMonth(two).
+        // 2. Set two to ? ToTemporalYearMonth(two).
         const two = try toTemporalPlainYearMonth(agent, two_value, null);
 
         // 3. Return 𝔽(CompareISODate(one.[[ISODate]], two.[[ISODate]])).
@@ -152,7 +152,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalYearMonth(item, options).
+        // 1. Return ? ToTemporalYearMonth(item, options).
         const plain_year_month = try toTemporalPlainYearMonth(agent, item, options);
         return Value.from(&plain_year_month.object);
     }
@@ -217,10 +217,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return ? AddDurationToYearMonth(add, plainYearMonth, temporalDurationLike, options).
+        // 3. Return ? AddDurationToYearMonth(add, plainYearMonth, temporalDurationLike, options).
         const new_plain_year_month = try addDurationToYearMonth(
             agent,
             .add,
@@ -254,7 +254,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.daysinmonth
     fn daysInMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[DaysInMonth]]).
@@ -317,7 +317,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.erayear
     fn eraYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Let result be CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[EraYear]].
@@ -378,7 +378,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.plainyearmonth.prototype.monthsinyear
     fn monthsInYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
         // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MonthsInYear]]).
@@ -394,10 +394,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return ? DifferenceTemporalPlainYearMonth(since, plainYearMonth, other, options).
+        // 3. Return ? DifferenceTemporalPlainYearMonth(since, plainYearMonth, other, options).
         const duration = try differenceTemporalPlainYearMonth(
             agent,
             .since,
@@ -415,10 +415,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return ? AddDurationToYearMonth(subtract, plainYearMonth, temporalDurationLike, options).
+        // 3. Return ? AddDurationToYearMonth(subtract, plainYearMonth, temporalDurationLike, options).
         const new_plain_year_month = try addDurationToYearMonth(
             agent,
             .subtract,
@@ -546,10 +546,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainYearMonth be the this value.
-        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
+        // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return ? DifferenceTemporalPlainYearMonth(until, plainYearMonth, other, options).
+        // 3. Return ? DifferenceTemporalPlainYearMonth(until, plainYearMonth, other, options).
         const duration = try differenceTemporalPlainYearMonth(
             agent,
             .until,

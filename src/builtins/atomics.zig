@@ -445,7 +445,7 @@ pub const namespace = struct {
         //    yBytes) that captures typedArray and performs the following steps atomically when
         //    called:
         //     a-j.
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Add);
     }
 
@@ -669,7 +669,7 @@ pub const namespace = struct {
         // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, true).
         const ta = try validateIntegerTypedArray(agent, typed_array_value, true);
 
-        // 2. Let byteIndexInBuffer be ? ValidateAtomicAccess(taRecord, index).
+        // 2. Let byteIndexInBuffer be ? ValidateAtomicAccess(taRecord, index).
         const byte_index_in_buffer = try validateAtomicAccess(agent, ta, index);
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
@@ -810,7 +810,7 @@ pub const namespace = struct {
         //    (xBytes, yBytes) that captures typedArray and performs the following steps atomically
         //    when called:
         //     a-j.
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }
 

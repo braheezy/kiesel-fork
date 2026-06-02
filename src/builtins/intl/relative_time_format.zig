@@ -64,10 +64,10 @@ pub const constructor = struct {
             );
         };
 
-        // 2. Let relativeTimeFormat be ? OrdinaryCreateFromConstructor(NewTarget,
+        // 2. Let relativeTimeFormat be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.RelativeTimeFormat.prototype%", « [[InitializedRelativeTimeFormat]],
         //    [[Locale]], [[LocaleData]], [[Style]], [[Numeric]], [[NumberFormat]],
-        //    [[NumberingSystem]], [[PluralRules]] »).
+        //    [[NumberingSystem]], [[PluralRules]] »).
         const relative_time_format = try ordinaryCreateFromConstructor(
             RelativeTimeFormat,
             agent,
@@ -81,8 +81,8 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.RelativeTimeFormat%,
-        //    %Intl.RelativeTimeFormat%.[[LocaleData]], locales, options, « coerce-options »).
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.RelativeTimeFormat%,
+        //    %Intl.RelativeTimeFormat%.[[LocaleData]], locales, options, « coerce-options »).
         const options_resolution = try resolveOptions(
             agent,
             &.{
@@ -113,7 +113,7 @@ pub const constructor = struct {
             r.options.nu orelse String.fromLiteral("latn");
         relative_time_format.fields.numbering_system = numbering_system;
 
-        // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" », "long").
+        // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" », "long").
         const style_string = try options.getOption(
             agent,
             "style",
@@ -134,7 +134,7 @@ pub const constructor = struct {
         // 11. Set relativeTimeFormat.[[Style]] to style.
         relative_time_format.fields.style = style;
 
-        // 12. Let numeric be ? GetOption(options, "numeric", string, « "always", "auto" », "always").
+        // 12. Let numeric be ? GetOption(options, "numeric", string, « "always", "auto" », "always").
         const numeric_string = try options.getOption(
             agent,
             "numeric",
@@ -154,10 +154,10 @@ pub const constructor = struct {
         relative_time_format.fields.numeric = numeric;
 
         // 14. Let nfOptions be OrdinaryObjectCreate(null).
-        // 15. Perform ! CreateDataPropertyOrThrow(nfOptions, "numberingSystem",
+        // 15. Perform ! CreateDataPropertyOrThrow(nfOptions, "numberingSystem",
         //     relativeTimeFormat.[[NumberingSystem]]).
-        // 16. Let relativeTimeFormat.[[NumberFormat]] be ! Construct(%Intl.NumberFormat%, « locale, nfOptions »).
-        // 17. Let relativeTimeFormat.[[PluralRules]] be ! Construct(%Intl.PluralRules%, « locale »).
+        // 16. Let relativeTimeFormat.[[NumberFormat]] be ! Construct(%Intl.NumberFormat%, « locale, nfOptions »).
+        // 17. Let relativeTimeFormat.[[PluralRules]] be ! Construct(%Intl.PluralRules%, « locale »).
 
         // 18. Return relativeTimeFormat.
         return Value.from(&relative_time_format.object);
@@ -255,16 +255,16 @@ pub const prototype = struct {
         const unit_value = arguments.get(1);
 
         // 1. Let relativeTimeFormat be the this value.
-        // 2. Perform ? RequireInternalSlot(relativeTimeFormat, [[InitializedRelativeTimeFormat]]).
+        // 2. Perform ? RequireInternalSlot(relativeTimeFormat, [[InitializedRelativeTimeFormat]]).
         const relative_time_format = try this_value.requireInternalSlot(agent, RelativeTimeFormat);
 
-        // 3. Let value be ? ToNumber(value).
+        // 3. Let value be ? ToNumber(value).
         const value = try value_value.toNumber(agent);
 
-        // 4. Let unit be ? ToString(unit).
+        // 4. Let unit be ? ToString(unit).
         const unit = try unit_value.toString(agent);
 
-        // 5. Return ? FormatRelativeTime(relativeTimeFormat, value, unit).
+        // 5. Return ? FormatRelativeTime(relativeTimeFormat, value, unit).
         return formatRelativeTime(agent, relative_time_format, value, unit);
     }
 };

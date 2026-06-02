@@ -651,7 +651,7 @@ pub const constructor = struct {
         // 4. Let iteratorRecord be undefined.
         var maybe_iterator: ?Iterator = null;
 
-        // 5. Let usingAsyncIterator be ? GetMethod(items, %Symbol.asyncIterator%).
+        // 5. Let usingAsyncIterator be ? GetMethod(items, %Symbol.asyncIterator%).
         const using_async_iterator = try items.getMethod(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
@@ -659,7 +659,7 @@ pub const constructor = struct {
 
         // 6. If usingAsyncIterator is undefined, then
         if (using_async_iterator == null) {
-            // a. Let usingSyncIterator be ? GetMethod(items, %Symbol.iterator%).
+            // a. Let usingSyncIterator be ? GetMethod(items, %Symbol.iterator%).
             const using_sync_iterator = try items.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
@@ -676,7 +676,7 @@ pub const constructor = struct {
             }
         } else if (using_async_iterator) |async_iterator| {
             // 7. Else,
-            // a. Set iteratorRecord to ? GetIteratorFromMethod(items, usingAsyncIterator).
+            // a. Set iteratorRecord to ? GetIteratorFromMethod(items, usingAsyncIterator).
             maybe_iterator = try getIteratorFromMethod(agent, items, async_iterator);
         } else unreachable;
 
@@ -684,11 +684,11 @@ pub const constructor = struct {
         if (maybe_iterator) |iterator| {
             // a. If IsConstructor(C) is true, then
             const array = if (constructor_.isConstructor()) blk: {
-                // i. Let A be ? Construct(C).
+                // i. Let A be ? Construct(C).
                 break :blk try constructor_.asObject().construct(agent, &.{}, null);
             } else blk: {
                 // b. Else,
-                // i. Let A be ! ArrayCreate(0).
+                // i. Let A be ! ArrayCreate(0).
                 const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
                 break :blk &array.object;
             };
@@ -707,21 +707,21 @@ pub const constructor = struct {
                         .{},
                     );
 
-                    // 2. Return ? AsyncIteratorClose(iteratorRecord, error).
+                    // 2. Return ? AsyncIteratorClose(iteratorRecord, error).
                     return iterator.closeAsync(agent, @as(Agent.Error!Value, @"error"));
                 }
 
-                // ii. Let Pk be ! ToString(𝔽(k)).
+                // ii. Let Pk be ! ToString(𝔽(k)).
                 const property_key = PropertyKey.from(k);
 
-                // iii. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+                // iii. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
                 var next_result_value = try iterator.next_method.callAssumeCallable(
                     agent,
                     Value.from(iterator.iterator),
                     &.{},
                 );
 
-                // iv. Set nextResult to ? Await(nextResult).
+                // iv. Set nextResult to ? Await(nextResult).
                 next_result_value = try await(agent, next_result_value);
 
                 // v. If nextResult is not an Object, throw a TypeError exception.
@@ -730,24 +730,24 @@ pub const constructor = struct {
                 }
                 const next_result = next_result_value.asObject();
 
-                // vi. Let done be ? IteratorComplete(nextResult).
+                // vi. Let done be ? IteratorComplete(nextResult).
                 const done = try Iterator.complete(agent, next_result);
 
                 // vii. If done is true, then
                 if (done) {
-                    // 1. Perform ? Set(A, "length", 𝔽(k), true).
+                    // 1. Perform ? Set(A, "length", 𝔽(k), true).
                     try array.set(agent, PropertyKey.from("length"), Value.from(k), .throw);
 
                     // 2. Return A.
                     return Value.from(array);
                 }
 
-                // viii. Let nextValue be ? IteratorValue(nextResult).
+                // viii. Let nextValue be ? IteratorValue(nextResult).
                 const next_value = try Iterator.value(agent, next_result);
 
                 // ix. If mapping is true, then
                 const mapped_value = if (mapping) blk: {
-                    // 1. Let mappedValue be Completion(Call(mapper, thisArg, « nextValue, 𝔽(k) »)).
+                    // 1. Let mappedValue be Completion(Call(mapper, thisArg, « nextValue, 𝔽(k) »)).
                     var mapped_value = mapper.callAssumeCallable(
                         agent,
                         this_arg,
@@ -792,15 +792,15 @@ pub const constructor = struct {
             // a. NOTE: items is neither async iterable nor iterable so assume it is an array-like
             //    object.
 
-            // b. Let arrayLike be ! ToObject(items).
+            // b. Let arrayLike be ! ToObject(items).
             const array_like = items.toObject(agent) catch |err| try noexcept(err);
 
-            // c. Let len be ? LengthOfArrayLike(arrayLike).
+            // c. Let len be ? LengthOfArrayLike(arrayLike).
             const len = try array_like.lengthOfArrayLike(agent);
 
             // d. If IsConstructor(C) is true, then
             const array = if (constructor_.isConstructor()) blk: {
-                // i. Let A be ? Construct(C, « 𝔽(len) »).
+                // i. Let A be ? Construct(C, « 𝔽(len) »).
                 break :blk try constructor_.asObject().construct(
                     agent,
                     &.{Value.from(len)},
@@ -808,7 +808,7 @@ pub const constructor = struct {
                 );
             } else blk: {
                 // e. Else,
-                // i. Let A be ? ArrayCreate(len).
+                // i. Let A be ? ArrayCreate(len).
                 const array = try arrayCreate(agent, len, null);
                 break :blk &array.object;
             };
@@ -818,25 +818,25 @@ pub const constructor = struct {
 
             // g. Repeat, while k < len,
             while (k < len) : (k += 1) {
-                // i. Let Pk be ! ToString(𝔽(k)).
+                // i. Let Pk be ! ToString(𝔽(k)).
                 const property_key = PropertyKey.from(k);
 
-                // ii. Let kValue be ? Get(arrayLike, Pk).
+                // ii. Let kValue be ? Get(arrayLike, Pk).
                 var k_value = try array_like.get(agent, property_key);
 
-                // iii. Set kValue to ? Await(kValue).
+                // iii. Set kValue to ? Await(kValue).
                 k_value = try await(agent, k_value);
 
                 // iv. If mapping is true, then
                 const mapped_value = if (mapping) blk: {
-                    // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
+                    // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                     var mapped_value = try mapper.callAssumeCallable(
                         agent,
                         this_arg,
                         &.{ k_value, Value.from(k) },
                     );
 
-                    // 2. Set mappedValue to ? Await(mappedValue).
+                    // 2. Set mappedValue to ? Await(mappedValue).
                     mapped_value = try await(agent, mapped_value);
 
                     break :blk mapped_value;
@@ -846,13 +846,13 @@ pub const constructor = struct {
                     break :blk k_value;
                 };
 
-                // vi. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
+                // vi. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
                 try array.createDataPropertyOrThrow(agent, property_key, mapped_value);
 
                 // vii. Set k to k + 1.
             }
 
-            // h. Perform ? Set(A, "length", 𝔽(len), true).
+            // h. Perform ? Set(A, "length", 𝔽(len), true).
             try array.set(agent, PropertyKey.from("length"), Value.from(len), .throw);
 
             // i. Return A.
@@ -3082,7 +3082,7 @@ pub const prototype = struct {
 
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
-                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales, options »)).
+                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales, options »)).
                 const string = try (try element.invoke(
                     agent,
                     PropertyKey.from("toLocaleString"),

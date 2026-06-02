@@ -131,7 +131,7 @@ pub const constructor = struct {
     fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const item = arguments.get(0);
 
-        // 1. Return ? ToTemporalInstant(item).
+        // 1. Return ? ToTemporalInstant(item).
         const instant = try toTemporalInstant(agent, item);
         return Value.from(&instant.object);
     }
@@ -169,14 +169,14 @@ pub const constructor = struct {
     fn fromEpochNanoseconds(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const epoch_nanoseconds_value = arguments.get(0);
 
-        // 1. Set epochNanoseconds to ? ToBigInt(epochNanoseconds).
+        // 1. Set epochNanoseconds to ? ToBigInt(epochNanoseconds).
         const epoch_nanoseconds_bigint = try epoch_nanoseconds_value.toBigInt(agent);
         const epoch_nanoseconds = temporal_rs.toI128Nanoseconds(
             epoch_nanoseconds_bigint.managed.toInt(i128) catch std.math.maxInt(i128),
         );
 
         // 2. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
-        // 3. Return ! CreateTemporalInstant(epochNanoseconds).
+        // 3. Return ! CreateTemporalInstant(epochNanoseconds).
         const temporal_rs_instant = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_try_new(epoch_nanoseconds),
@@ -412,10 +412,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let instant be the this value.
-        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
-        // 3. Return ? DifferenceTemporalInstant(since, instant, other, options).
+        // 3. Return ? DifferenceTemporalInstant(since, instant, other, options).
         const duration = try differenceTemporalInstant(agent, .since, instant, other, options);
         return Value.from(&duration.object);
     }
@@ -516,7 +516,7 @@ pub const prototype = struct {
             .unset,
         );
 
-        // 8. Let timeZone be ? Get(resolvedOptions, "timeZone").
+        // 8. Let timeZone be ? Get(resolvedOptions, "timeZone").
         const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
         // 9. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
@@ -596,10 +596,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let instant be the this value.
-        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
+        // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
-        // 3. Return ? DifferenceTemporalInstant(until, instant, other, options).
+        // 3. Return ? DifferenceTemporalInstant(until, instant, other, options).
         const duration = try differenceTemporalInstant(agent, .until, instant, other, options);
         return Value.from(&duration.object);
     }
@@ -746,13 +746,13 @@ fn differenceTemporalInstant(
     other_value: Value,
     options_value: Value,
 ) Agent.Error!*builtins.temporal.Duration {
-    // 1. Set other to ? ToTemporalInstant(other).
+    // 1. Set other to ? ToTemporalInstant(other).
     const other = try toTemporalInstant(agent, other_value);
 
-    // 2. Let resolvedOptions be ? GetOptionsObject(options).
+    // 2. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
     //    nanosecond, second).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 

@@ -183,7 +183,7 @@ pub const prototype = struct {
         const value = arguments.get(1);
 
         // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
+        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
         const map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.

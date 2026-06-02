@@ -67,12 +67,12 @@ pub const constructor = struct {
             );
         }
 
-        // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
+        // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.PluralRules.prototype%", « [[InitializedPluralRules]], [[Locale]], [[Type]],
         //    [[Notation]], [[CompactDisplay]], [[MinimumIntegerDigits]],
         //    [[MinimumFractionDigits]], [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
         //    [[MaximumSignificantDigits]], [[RoundingType]], [[RoundingIncrement]],
-        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
+        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
         const plural_rules = try ordinaryCreateFromConstructor(
             PluralRules,
             agent,
@@ -96,8 +96,8 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.PluralRules%,
-        //    %Intl.PluralRules%.[[LocaleData]], locales, options, « coerce-options »).
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.PluralRules%,
+        //    %Intl.PluralRules%.[[LocaleData]], locales, options, « coerce-options »).
         const options_resolution = try resolveOptions(
             agent,
             &.{},
@@ -132,8 +132,8 @@ pub const constructor = struct {
         // 8. Set pluralRules.[[Type]] to t.
         plural_rules.fields.type = @"type";
 
-        // 9. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
-        //    "engineering", "compact" », "standard").
+        // 9. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
+        //    "engineering", "compact" », "standard").
         const notation_string = try options.getOption(
             agent,
             "notation",
@@ -156,8 +156,8 @@ pub const constructor = struct {
         // 10. Set pluralRules.[[Notation]] to notation.
         plural_rules.fields.notation = notation;
 
-        // 11. Let compactDisplay be ? GetOption(options, "compactDisplay", string, « "short",
-        //     "long" », "short").
+        // 11. Let compactDisplay be ? GetOption(options, "compactDisplay", string, « "short",
+        //     "long" », "short").
         const compact_display_string = try options.getOption(
             agent,
             "compactDisplay",
@@ -178,7 +178,7 @@ pub const constructor = struct {
             plural_rules.fields.compact_display = compact_display;
         }
 
-        // 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
+        // 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, notation).
         try setNumberFormatDigitOptions(
             PluralRules,
             agent,

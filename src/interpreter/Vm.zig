@@ -1935,13 +1935,13 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Byte
     // Implements steps 6.a-f. of ForIn/OfBodyEvaluation for async iterators.
     // https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
 
-    // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+    // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     const next_result = next_method.call(vm.agent, Value.from(iterator_inner), &.{}) catch |err| {
         iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;
     };
 
-    // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+    // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
     const awaited_result = await(vm.agent, next_result) catch |err| {
         iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;
@@ -1953,7 +1953,7 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Byte
         return vm.agent.throwException(.type_error, "{f} is not an Object", .{awaited_result});
     }
 
-    // d. Let done be ? IteratorComplete(nextResult).
+    // d. Let done be ? IteratorComplete(nextResult).
     const done = try Iterator.complete(vm.agent, awaited_result.asObject());
 
     // e. If done is true, return V.
@@ -1963,7 +1963,7 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Byte
         return;
     }
 
-    // f. Let nextValue be ? IteratorValue(nextResult).
+    // f. Let nextValue be ? IteratorValue(nextResult).
     const value = Iterator.value(vm.agent, awaited_result.asObject()) catch |err| {
         iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
         return err;

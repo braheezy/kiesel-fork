@@ -101,7 +101,7 @@ pub const constructor = struct {
                 return agent.throwException(.type_error, "{f} is not an Object", .{item});
             }
 
-            // b. Let method be ? GetMethod(item, %Symbol.iterator%).
+            // b. Let method be ? GetMethod(item, %Symbol.iterator%).
             const method = try item.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
@@ -114,7 +114,7 @@ pub const constructor = struct {
                 );
             };
 
-            // d. Append the Record { [[OpenMethod]]: method, [[Iterable]]: item } to iterables.
+            // d. Append the Record { [[OpenMethod]]: method, [[Iterable]]: item } to iterables.
             iterables[i] = .{ .open_method = method, .iterable = item.asObject() };
         }
 
@@ -152,7 +152,7 @@ pub const constructor = struct {
                         const iterable = iterables_[index.*];
                         index.* += 1;
 
-                        // i. Let iter be ? Call(iterable.[[OpenMethod]], iterable.[[Iterable]]).
+                        // i. Let iter be ? Call(iterable.[[OpenMethod]], iterable.[[Iterable]]).
                         const iter = try Value.from(iterable.open_method).callAssumeCallable(
                             agent_,
                             Value.from(iterable.iterable),
@@ -164,7 +164,7 @@ pub const constructor = struct {
                             return agent_.throwException(.type_error, "{f} is not an Object", .{iter});
                         }
 
-                        // iii. Let iteratorRecord be ? GetIteratorDirect(iter).
+                        // iii. Let iteratorRecord be ? GetIteratorDirect(iter).
                         inner_iterator_.* = try getIteratorDirect(agent_, iter.asObject());
 
                         continue :loop .inner;
@@ -172,13 +172,13 @@ pub const constructor = struct {
                     .inner => {
                         // iv. Let innerAlive be true.
                         // v. Repeat, while innerAlive is true,
-                        //     1. Let innerValue be ? IteratorStepValue(iteratorRecord).
+                        //     1. Let innerValue be ? IteratorStepValue(iteratorRecord).
                         //     2. If innerValue is done, then
                         //         a. Set innerAlive to false.
                         //     3. Else,
                         //         a. Let completion be Completion(Yield(innerValue)).
                         //         b. If completion is an abrupt completion, then
-                        //             i. Return ? IteratorClose(iteratorRecord, completion).
+                        //             i. Return ? IteratorClose(iteratorRecord, completion).
                         if (try inner_iterator_.*.?.stepValue(agent_)) |value| return value;
                         inner_iterator_.* = null;
                         continue :loop .outer;
@@ -200,7 +200,7 @@ pub const constructor = struct {
         }.func;
 
         // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const gen = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
@@ -846,7 +846,7 @@ pub const constructor = struct {
         }.func;
 
         // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const gen = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
@@ -1074,7 +1074,7 @@ pub const prototype = struct {
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1250,7 +1250,7 @@ pub const prototype = struct {
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1478,7 +1478,7 @@ pub const prototype = struct {
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1647,7 +1647,7 @@ pub const prototype = struct {
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 8. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1927,7 +1927,7 @@ pub const prototype = struct {
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,

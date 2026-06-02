@@ -64,13 +64,13 @@ pub const constructor = struct {
             );
         };
 
-        // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
+        // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.DurationFormatPrototype%", « [[InitializedDurationFormat]], [[Locale]],
         //    [[NumberingSystem]], [[Style]], [[YearsOptions]], [[MonthsOptions]],
         //    [[WeeksOptions]], [[DaysOptions]], [[HoursOptions]], [[MinutesOptions]],
         //    [[SecondsOptions]], [[MillisecondsOptions]], [[MicrosecondsOptions]],
         //    [[NanosecondsOptions]], [[HourMinuteSeparator]], [[MinuteSecondSeparator]],
-        //    [[FractionalDigits]] »).
+        //    [[FractionalDigits]] »).
         const duration_format = try ordinaryCreateFromConstructor(
             DurationFormat,
             agent,
@@ -96,7 +96,7 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DurationFormat%,
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DurationFormat%,
         //    %Intl.DurationFormat%.[[LocaleData]], locales, options).
         const options_resolution = try resolveOptions(
             agent,
@@ -1040,7 +1040,7 @@ fn getDurationUnitOptions(
     prev_style: *const String,
     two_digit_hours: bool,
 ) Agent.Error!DurationUnitOptions {
-    // 1. Let style be ? GetOption(options, unit, string, stylesList, undefined).
+    // 1. Let style be ? GetOption(options, unit, string, stylesList, undefined).
     var style = try options.getOption(agent, @tagName(unit), .string, styles_list, null);
 
     // 2. Let displayDefault be "always".
@@ -1117,7 +1117,7 @@ fn getDurationUnitOptions(
         style = String.fromLiteral("2-digit");
     }
 
-    // 10. Return the Duration Unit Options Record { [[Style]]: style, [[Display]]: display }.
+    // 10. Return the Duration Unit Options Record { [[Style]]: style, [[Display]]: display }.
     return .{ .style = style.?, .display = display };
 }
 

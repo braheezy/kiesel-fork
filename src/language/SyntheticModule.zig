@@ -103,7 +103,7 @@ pub fn createDefaultExportSyntheticModule(
 /// 16.2.1.8.2 ParseJSONModule ( source )
 /// https://tc39.es/ecma262/#sec-parse-json-module
 pub fn parseJSONModule(agent: *Agent, source: []const u8) Agent.Error!*SyntheticModule {
-    // 1. Let parseResult be ? ParseJSON(source).
+    // 1. Let parseResult be ? ParseJSON(source).
     const parse_result = try parseJSON(agent, source);
 
     // 2. Return CreateDefaultExportSyntheticModule(parseResult.[[Value]]).
@@ -147,7 +147,7 @@ pub fn loadRequestedModules(
 
     // 1. NOTE: This implementation of LoadRequestedModules does not use hostDefined.
 
-    // 2. Return ! PromiseResolve(%Promise%, undefined).
+    // 2. Return ! PromiseResolve(%Promise%, undefined).
     const promise = promiseResolve(
         agent,
         try realm.intrinsics.@"%Promise%"(),

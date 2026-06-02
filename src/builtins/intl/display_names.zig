@@ -82,8 +82,8 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DisplayNames%,
-        //    %Intl.DisplayNames%.[[LocaleData]], locales, options, « require-options »).
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.DisplayNames%,
+        //    %Intl.DisplayNames%.[[LocaleData]], locales, options, « require-options »).
         const options_resolution = try resolveOptions(
             agent,
             &.{},
@@ -98,7 +98,7 @@ pub const constructor = struct {
         // 5. Let r be optionsResolution.[[ResolvedLocale]].
         const r = options_resolution.resolved_locale;
 
-        // 6. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
+        // 6. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
         //    "long").
         const style_string = try options.getOption(
             agent,
@@ -120,8 +120,8 @@ pub const constructor = struct {
         // 7. Set displayNames.[[Style]] to style.
         display_names.fields.options.style = style;
 
-        // 8. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
-        //    "currency", "calendar", "dateTimeField" », undefined).
+        // 8. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
+        //    "currency", "calendar", "dateTimeField" », undefined).
         const type_string = try options.getOption(
             agent,
             "type",
@@ -152,7 +152,7 @@ pub const constructor = struct {
         // 10. Set displayNames.[[Type]] to type.
         display_names.fields.type = @"type";
 
-        // 11. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
+        // 11. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback_string = try options.getOption(
             agent,
             "fallback",
@@ -267,7 +267,7 @@ pub const prototype = struct {
         //     a. Let p be the Property value of the current row.
         //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot value of the current row.
         //     c. If v is not undefined, then
-        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = display_names.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,

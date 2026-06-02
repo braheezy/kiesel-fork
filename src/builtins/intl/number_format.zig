@@ -63,14 +63,14 @@ pub const constructor = struct {
         //    newTarget be NewTarget.
         const new_target = maybe_new_target orelse agent.activeFunctionObject();
 
-        // 2. Let numberFormat be ? OrdinaryCreateFromConstructor(newTarget,
+        // 2. Let numberFormat be ? OrdinaryCreateFromConstructor(newTarget,
         //    "%Intl.NumberFormat.prototype%", « [[InitializedNumberFormat]], [[Locale]],
         //    [[LocaleData]], [[NumberingSystem]], [[Style]], [[Unit]], [[UnitDisplay]],
         //    [[Currency]], [[CurrencyDisplay]], [[CurrencySign]], [[MinimumIntegerDigits]],
         //    [[MinimumFractionDigits]], [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
         //    [[MaximumSignificantDigits]], [[RoundingType]], [[Notation]], [[CompactDisplay]],
         //    [[UseGrouping]], [[SignDisplay]], [[RoundingIncrement]], [[RoundingMode]],
-        //    [[ComputedRoundingPriority]], [[TrailingZeroDisplay]], [[BoundFormat]] »).
+        //    [[ComputedRoundingPriority]], [[TrailingZeroDisplay]], [[BoundFormat]] »).
         const number_format = try ordinaryCreateFromConstructor(
             NumberFormat,
             agent,
@@ -103,8 +103,8 @@ pub const constructor = struct {
             },
         );
 
-        // 3. Let optionsResolution be ? ResolveOptions(%Intl.NumberFormat%,
-        //    %Intl.NumberFormat%.[[LocaleData]], locales, options, « coerce-options »).
+        // 3. Let optionsResolution be ? ResolveOptions(%Intl.NumberFormat%,
+        //    %Intl.NumberFormat%.[[LocaleData]], locales, options, « coerce-options »).
         const options_resolution = try resolveOptions(
             agent,
             &.{

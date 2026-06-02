@@ -187,7 +187,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalZonedDateTime(item, options).
+        // 1. Return ? ToTemporalZonedDateTime(item, options).
         const zoned_date_time = try toTemporalZonedDateTime(agent, item, options);
         return Value.from(&zoned_date_time.object);
     }
@@ -297,7 +297,7 @@ pub const prototype = struct {
     /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.calendarid
     fn calendarId(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let zonedDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
         // 3. Return zonedDateTime.[[Calendar]].
@@ -871,10 +871,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let zonedDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Return ? DifferenceTemporalZonedDateTime(since, zonedDateTime, other, options).
+        // 3. Return ? DifferenceTemporalZonedDateTime(since, zonedDateTime, other, options).
         const duration = try differenceTemporalZonedDateTime(
             agent,
             .since,
@@ -1122,7 +1122,7 @@ pub const prototype = struct {
             .unset,
         );
 
-        // 10. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
+        // 10. Let showTimeZone be ? GetTemporalShowTimeZoneNameOption(resolvedOptions).
         const show_time_zone = try getTemporalShowTimeZoneNameOption(agent, options);
 
         // 11. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
@@ -1167,10 +1167,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let zonedDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
+        // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Return ? DifferenceTemporalZonedDateTime(until, zonedDateTime, other, options).
+        // 3. Return ? DifferenceTemporalZonedDateTime(until, zonedDateTime, other, options).
         const duration = try differenceTemporalZonedDateTime(
             agent,
             .until,

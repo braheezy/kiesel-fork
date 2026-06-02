@@ -218,7 +218,7 @@ fn call(
 
     // 8. If result is a return completion, return result.[[Value]].
     // 9. Assert: result is a throw completion.
-    // 10. Return ? result.
+    // 10. Return ? result.
     return result;
 }
 

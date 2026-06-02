@@ -153,7 +153,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalTime(item, options).
+        // 1. Return ? ToTemporalTime(item, options).
         const plain_time = try toTemporalPlainTime(agent, item, options);
         return Value.from(&plain_time.object);
     }
@@ -410,10 +410,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
-        // 3. Return ? DifferenceTemporalPlainTime(since, plainTime, other, options).
+        // 3. Return ? DifferenceTemporalPlainTime(since, plainTime, other, options).
         const duration = try differenceTemporalPlainTime(
             agent,
             .since,
@@ -433,7 +433,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
-        // 3. Return ? AddDurationToTime(subtract, plainTime, temporalDurationLike).
+        // 3. Return ? AddDurationToTime(subtract, plainTime, temporalDurationLike).
         const new_plain_time = try addDurationToTime(
             agent,
             .subtract,
@@ -509,7 +509,7 @@ pub const prototype = struct {
             temporal_rs.c.RoundingMode_Trunc,
         );
 
-        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
+        // 7. Let smallestUnit be ? GetTemporalUnitValuedOption(resolvedOptions, "smallestUnit",
         //    unset).
         const smallest_unit = try getTemporalUnitValuedOption(
             agent,
@@ -518,7 +518,7 @@ pub const prototype = struct {
             .unset,
         );
 
-        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
+        // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
         try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
 
         // 9. If smallestUnit is hour, throw a RangeError exception.
@@ -557,10 +557,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
+        // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
-        // 3. Return ? DifferenceTemporalPlainTime(until, plainTime, other, options).
+        // 3. Return ? DifferenceTemporalPlainTime(until, plainTime, other, options).
         const duration = try differenceTemporalPlainTime(
             agent,
             .until,
@@ -1112,13 +1112,13 @@ fn differenceTemporalPlainTime(
     other_value: Value,
     options_value: Value,
 ) Agent.Error!*builtins.temporal.Duration {
-    // 1. Set other to ? ToTemporalTime(other).
+    // 1. Set other to ? ToTemporalTime(other).
     const other = try toTemporalPlainTime(agent, other_value, null);
 
-    // 2. Let resolvedOptions be ? GetOptionsObject(options).
+    // 2. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
     //    nanosecond, hour).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 

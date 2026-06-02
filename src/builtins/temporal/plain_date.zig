@@ -155,7 +155,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalDate(item, options).
+        // 1. Return ? ToTemporalDate(item, options).
         const plain_date = try toTemporalPlainDate(agent, item, options);
         return Value.from(&plain_date.object);
     }
@@ -466,7 +466,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return ? AddDurationToDate(subtract, plainDate, temporalDurationLike, options).
+        // 3. Return ? AddDurationToDate(subtract, plainDate, temporalDurationLike, options).
         const new_plain_date = try addDurationToDate(
             agent,
             .subtract,

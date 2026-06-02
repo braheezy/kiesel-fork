@@ -117,7 +117,7 @@ pub const prototype = struct {
             break :blk @intFromEnum(typedArrayLength(ta));
         } else blk: {
             // 9. Else,
-            // a. Let len be ? LengthOfArrayLike(array).
+            // a. Let len be ? LengthOfArrayLike(array).
             break :blk try array.lengthOfArrayLike(agent);
         };
 
@@ -142,10 +142,10 @@ pub const prototype = struct {
             break :blk index_number;
         } else blk: {
             // 14. Else,
-            // a. Let elementKey be ! ToString(indexNumber).
+            // a. Let elementKey be ! ToString(indexNumber).
             const element_key = PropertyKey.from(index);
 
-            // b. Let elementValue be ? Get(array, elementKey).
+            // b. Let elementValue be ? Get(array, elementKey).
             const element_value = try array.get(agent, element_key);
 
             // c. If kind is value, then
@@ -157,7 +157,7 @@ pub const prototype = struct {
                 // i. Assert: kind is key+value.
                 std.debug.assert(kind == .key_value);
 
-                // ii. Let result be CreateArrayFromList(« indexNumber, elementValue »).
+                // ii. Let result be CreateArrayFromList(« indexNumber, elementValue »).
                 const result_array = try createArrayFromList(agent, &.{ index_number, element_value });
                 break :blk Value.from(&result_array.object);
             }

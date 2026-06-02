@@ -312,7 +312,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     // 5. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;
 
-    // 6. Return ? RunSuspendedContext(genContext, NormalCompletion(value)).
+    // 6. Return ? RunSuspendedContext(genContext, NormalCompletion(value)).
     const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
     const result = try generator.fields.evaluation_state.closure(
@@ -381,7 +381,7 @@ pub fn generatorResumeAbrupt(
     // 6. Set generator.[[GeneratorState]] to executing.
     generator.fields.generator_state = .executing;
 
-    // 7. Return ? RunSuspendedContext(genContext, abruptCompletion).
+    // 7. Return ? RunSuspendedContext(genContext, abruptCompletion).
     const caller_context = agent.runningExecutionContext();
     try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
     const result = try generator.fields.evaluation_state.closure(

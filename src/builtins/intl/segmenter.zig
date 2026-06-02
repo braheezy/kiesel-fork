@@ -74,7 +74,7 @@ pub const constructor = struct {
             .{ .locale = undefined, .segmenter_granularity = undefined },
         );
 
-        // 4. Let optionsResolution be ? ResolveOptions(%Intl.Segmenter%,
+        // 4. Let optionsResolution be ? ResolveOptions(%Intl.Segmenter%,
         //    %Intl.Segmenter%.[[LocaleData]], locales, options).
         const options_resolution = try resolveOptions(
             agent,

@@ -62,8 +62,8 @@ pub fn createDateTimeFormat(
 
     // TODO: 2-3.
 
-    // 4. Let optionsResolution be ? ResolveOptions(%Intl.DateTimeFormat%,
-    //    %Intl.DateTimeFormat%.[[LocaleData]], locales, options, « coerce-options »,
+    // 4. Let optionsResolution be ? ResolveOptions(%Intl.DateTimeFormat%,
+    //    %Intl.DateTimeFormat%.[[LocaleData]], locales, options, « coerce-options »,
     //    modifyResolutionOptions).
     const options_resolution = try resolveOptions(
         agent,

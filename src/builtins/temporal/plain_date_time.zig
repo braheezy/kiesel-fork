@@ -202,7 +202,7 @@ pub const constructor = struct {
         const item = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Return ? ToTemporalDateTime(item, options).
+        // 1. Return ? ToTemporalDateTime(item, options).
         const plain_date_time = try toTemporalPlainDateTime(agent, item, options);
         return Value.from(&plain_date_time.object);
     }
@@ -284,10 +284,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ? AddDurationToDateTime(add, plainDateTime, temporalDurationLike, options).
+        // 3. Return ? AddDurationToDateTime(add, plainDateTime, temporalDurationLike, options).
         const new_plain_date_time = try addDurationToDateTime(
             agent,
             .add,
@@ -708,10 +708,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ? DifferenceTemporalPlainDateTime(since, plainDateTime, other, options).
+        // 3. Return ? DifferenceTemporalPlainDateTime(since, plainDateTime, other, options).
         const duration = try differenceTemporalPlainDateTime(
             agent,
             .since,
@@ -729,10 +729,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ? AddDurationToDateTime(subtract, plainDateTime, temporalDurationLike, options).
+        // 3. Return ? AddDurationToDateTime(subtract, plainDateTime, temporalDurationLike, options).
         const new_plain_time = try addDurationToDateTime(
             agent,
             .subtract,
@@ -815,7 +815,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ! CreateTemporalTime(plainDateTime.[[ISODateTime]].[[Time]]).
+        // 3. Return ! CreateTemporalTime(plainDateTime.[[ISODateTime]].[[Time]]).
         const temporal_rs_plain_time = temporal_rs.c.temporal_rs_PlainDateTime_to_plain_time(
             plain_date_time.fields.inner,
         );
@@ -947,10 +947,10 @@ pub const prototype = struct {
         const options = arguments.get(1);
 
         // 1. Let plainDateTime be the this value.
-        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
+        // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ? DifferenceTemporalPlainDateTime(until, plainDateTime, other, options).
+        // 3. Return ? DifferenceTemporalPlainDateTime(until, plainDateTime, other, options).
         const duration = try differenceTemporalPlainDateTime(
             agent,
             .until,
