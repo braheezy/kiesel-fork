@@ -593,7 +593,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     }
 }
 
-/// 7.2.8 Static Semantics: IsStringWellFormedUnicode ( string )
+/// 7.2.7 Static Semantics: IsStringWellFormedUnicode ( string )
 /// https://tc39.es/ecma262/#sec-isstringwellformedunicode
 pub fn isWellFormedUnicode(self: *const String) bool {
     if (self.isAscii()) return true;

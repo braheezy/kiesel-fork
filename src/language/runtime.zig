@@ -488,7 +488,7 @@ pub fn applyStringOrNumericBinaryOperator(
     var final_l_val = l_val;
     var final_r_val = r_val;
 
-    // 1. If opText is +, then
+    // 1. If opText is `+`, then
     if (operator == .@"+") {
         // a. Let lPrim be ? ToPrimitive(lVal).
         const l_prim = try l_val.toPrimitive(agent, null);
@@ -534,16 +534,16 @@ pub fn applyStringOrNumericBinaryOperator(
 
     // 6. If lNum is a BigInt, then
     return if (l_num == .big_int) switch (operator) {
-        // a. If opText is **, return ? BigInt::exponentiate(lNum, rNum).
+        // a. If opText is `**`, return ? BigInt::exponentiate(lNum, rNum).
         .@"**" => Value.from(try l_num.big_int.exponentiate(agent, r_num.big_int)),
 
-        // b. If opText is /, return ? BigInt::divide(lNum, rNum).
+        // b. If opText is `/`, return ? BigInt::divide(lNum, rNum).
         .@"/" => Value.from(try l_num.big_int.divide(agent, r_num.big_int)),
 
-        // c. If opText is %, return ? BigInt::remainder(lNum, rNum).
+        // c. If opText is `%`, return ? BigInt::remainder(lNum, rNum).
         .@"%" => Value.from(try l_num.big_int.remainder(agent, r_num.big_int)),
 
-        // d. If opText is >>>, return ? BigInt::unsignedRightShift(lNum, rNum).
+        // d. If opText is `>>>`, return ? BigInt::unsignedRightShift(lNum, rNum).
         .@">>>" => Value.from(try l_num.big_int.unsignedRightShift(agent, r_num.big_int)),
 
         // e. Let operation be the abstract operation associated with opText in the following table:
@@ -1553,9 +1553,9 @@ pub fn evaluateYieldStar(
                     inner_result = try await(agent, inner_result);
                 }
 
-                // 3. NOTE: Exceptions from the inner iterator throw method are propagated. Normal
-                //    completions from an inner throw method are processed similarly to an inner
-                //    next.
+                // 3. NOTE: Exceptions from the inner iterator `throw` method are propagated. Normal
+                //    completions from an inner `throw` method are processed similarly to an inner
+                //    `next`.
 
                 // 4. If innerResult is not an Object, throw a TypeError exception.
                 if (!inner_result.isObject()) {
@@ -1585,8 +1585,8 @@ pub fn evaluateYieldStar(
                 return .yield;
             } else {
                 // iii. Else,
-                // 1. NOTE: If iterator does not have a throw method, this throw is going to
-                //    terminate the yield* loop. But first we need to give iterator a chance to
+                // 1. NOTE: If iterator does not have a `throw` method, this throw is going to
+                //    terminate the `yield*` loop. But first we need to give iterator a chance to
                 //    clean up.
                 // 2. Let closeCompletion be NormalCompletion(empty).
                 const close_completion: Agent.Error!void = {};
@@ -1600,8 +1600,8 @@ pub fn evaluateYieldStar(
                     .non_generator => unreachable,
                 }
 
-                // 5. NOTE: The next step throws a TypeError to indicate that there was a yield*
-                //    protocol violation: iterator does not have a throw method.
+                // 5. NOTE: The next step throws a TypeError to indicate that there was a `yield*`
+                //    protocol violation: iterator does not have a `throw` method.
                 // 6. Throw a TypeError exception.
                 return agent.throwException(
                     .type_error,
@@ -2126,7 +2126,7 @@ fn classElementEvaluation(
 
         // ClassElement : ClassStaticBlock
         .class_static_block => |class_static_block| {
-            // 1. Return ClassStaticBlockDefinitionEvaluation of ClassStaticBlock with argument
+            // 1. Return the ClassStaticBlockDefinitionEvaluation of ClassStaticBlock with argument
             //    object.
             return .{
                 .class_static_block_definition = try classStaticBlockDefinitionEvaluation(
@@ -2285,10 +2285,11 @@ pub fn classDefinitionEvaluation(
 
                 // iv. If F.[[ConstructorKind]] is derived, then
                 var result = if (class_constructor_fields.constructor_kind == .derived) blk: {
-                    // 1. NOTE: This branch behaves similarly to constructor(...args) { super(
-                    //    ...args); }. The most notable distinction is that while the aforementioned
-                    //    ECMAScript source text observably calls the %Symbol.iterator% method on
-                    //    %Array.prototype%, this function does not.
+                    // 1. NOTE: This branch behaves similarly to
+                    //    `constructor(...args) { super(...args); }`. The most notable distinction
+                    //    is that while the aforementioned ECMAScript source text observably calls
+                    //    the %Symbol.iterator% method on `%Array.prototype%`, this function does
+                    //    not.
 
                     // 2. Let func be ! F.[[GetPrototypeOf]]().
                     const prototype_function = function.internal_methods.getPrototypeOf(
@@ -2314,7 +2315,7 @@ pub fn classDefinitionEvaluation(
                     break :blk try prototype_function.?.construct(agent_, args, new_target.?);
                 } else blk: {
                     // v. Else,
-                    // 1. NOTE: This branch behaves similarly to constructor() {}.
+                    // 1. NOTE: This branch behaves similarly to `constructor() {}`.
                     // 2. Let result be ? OrdinaryCreateFromConstructor(NewTarget,
                     //    "%Object.prototype%").
                     const object = try ordinaryCreateFromConstructor(
@@ -2412,7 +2413,7 @@ pub fn classDefinitionEvaluation(
         false,
     ) catch |err| try noexcept(err);
 
-    // 20. If ClassBody[opt] is not present, let elements be a new empty List.
+    // 20. If ClassBody is not present, let elements be a new empty List.
     // 21. Else, let elements be the NonConstructorElements of ClassBody.
     const elements = try class_tail.class_body.nonConstructorElements(agent.gc_allocator);
     defer agent.gc_allocator.free(elements);
@@ -2700,7 +2701,7 @@ pub fn instantiateAsyncFunctionExpression(
         // 2. Set name to the StringValue of BindingIdentifier.
         const name = try String.fromUtf8(agent, identifier);
 
-        // 3. Let outerEnv be the running execution context's LexicalEnvironment.
+        // 3. Let outerEnv be the LexicalEnvironment of the running execution context.
         const outer_env = agent.runningExecutionContext().ecmascript_code.lexical_environment;
 
         // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).

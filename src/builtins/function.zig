@@ -347,7 +347,7 @@ pub fn createDynamicFunction(
     };
 
     // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
-    //     For example, new Function("/*", "*/ ) {") does not evaluate to a function.
+    //     For example, `new Function("/*", "*/ ) {")` does not evaluate to a function.
 
     // 22. NOTE: If this step is reached, sourceText must have the syntax of exprSym (although the
     //     reverse implication does not hold). The purpose of the next two steps is to enforce any
@@ -639,8 +639,7 @@ pub const prototype = struct {
         //    code representation of func. The representation must have the syntax of a
         //    NativeFunction. Additionally, if func has an [[InitialName]] internal slot and
         //    func.[[InitialName]] is a String, the portion of the returned String that would be
-        //    matched by NativeFunctionAccessoropt PropertyName must be the value of
-        //    func.[[InitialName]].
+        //    matched by NativeFunctionAccessor[opt] PropertyName must be func.[[InitialName]].
         if (func.castObject(BuiltinFunction)) |builtin_function| {
             const name: *const String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(

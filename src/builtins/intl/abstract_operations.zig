@@ -418,7 +418,7 @@ pub fn resolveOptions(
         // d. If value is not undefined, then
         if (maybe_value) |value| {
             // i. Set value to ! ToString(value).
-            // ii. If value cannot be matched by the type Unicode locale nonterminal, throw a
+            // ii. If value cannot be matched by the `type` Unicode locale nonterminal, throw a
             //     RangeError exception.
             if (@"type" == .string) {
                 const value_utf8 = try value.toUtf8(gpa);
@@ -454,7 +454,7 @@ pub fn resolveOptions(
     return .{ .options = options, .resolved_locale = resolution };
 }
 
-/// 9.2.13 GetBooleanOrStringNumberFormatOption ( options, property, stringValues, fallback )
+/// 9.2.12 GetBooleanOrStringNumberFormatOption ( options, property, stringValues, fallback )
 /// https://tc39.es/ecma402/#sec-getbooleanorstringnumberformatoption
 pub fn getBooleanOrStringNumberFormatOption(
     agent: *Agent,
@@ -492,7 +492,7 @@ pub fn getBooleanOrStringNumberFormatOption(
     return .{ .string = string_value };
 }
 
-/// 9.2.14 DefaultNumberOption ( value, minimum, maximum, fallback )
+/// 9.2.13 DefaultNumberOption ( value, minimum, maximum, fallback )
 /// https://tc39.es/ecma402/#sec-defaultnumberoption
 pub fn defaultNumberOption(
     agent: *Agent,
@@ -525,7 +525,7 @@ pub fn defaultNumberOption(
     return @intFromFloat(@floor(number.asFloat()));
 }
 
-/// 9.2.15 GetNumberOption ( options, property, minimum, maximum, fallback )
+/// 9.2.14 GetNumberOption ( options, property, minimum, maximum, fallback )
 /// https://tc39.es/ecma402/#sec-getnumberoption
 pub fn getNumberOption(
     agent: *Agent,

@@ -22,7 +22,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Error!*ForInIterator {
     const realm = agent.currentRealm();
 
-    // 1. let iterator be OrdinaryObjectCreate(%ForInIteratorPrototype%, « [[Object]],
+    // 1. Let iterator be OrdinaryObjectCreate(%ForInIteratorPrototype%, « [[Object]],
     //    [[ObjectWasVisited]], [[VisitedKeys]], [[RemainingKeys]] »).
     // 6. Return iterator.
     return ForInIterator.create(agent, .{

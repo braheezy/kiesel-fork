@@ -657,8 +657,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 19. If strict is true or hasParameterExpressions is false, then
     if (strict or !has_parameter_expressions) {
         // a. NOTE: Only a single Environment Record is needed for the parameters, since calls to
-        //    eval in strict mode code cannot create new bindings which are visible outside of the
-        //    eval.
+        //    `eval` in strict mode code cannot create new bindings which are visible outside of the
+        //    `eval`.
 
         // b. Let env be the LexicalEnvironment of calleeContext.
         // NOTE: The function environment created by `prepareForOrdinaryCall()` is used directly.

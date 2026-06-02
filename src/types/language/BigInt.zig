@@ -194,7 +194,7 @@ pub fn subtract(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Alloc
 pub fn leftShift(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!*const BigInt {
     // 1. If y < 0ℤ, then
     //     a. Return ℤ(floor(ℝ(x) / 2**(-ℝ(y)))).
-    // 2. Return x × 2ℤ^y.
+    // 2. Return x × 2ℤ**y.
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.shiftLeft(
         &x.managed,
@@ -253,7 +253,7 @@ pub fn equal(x: *const BigInt, y: *const BigInt) bool {
 /// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseAND
 pub fn bitwiseAND(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
-    // 1. Return BigIntBitwiseOp(&, x, y).
+    // 1. Return BigIntBitwiseOp(`&`, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitAnd(&x.managed, &y.managed);
     return fromManaged(agent, result);
@@ -262,7 +262,7 @@ pub fn bitwiseAND(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
 /// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseXOR
 pub fn bitwiseXOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
-    // 1. Return BigIntBitwiseOp(^, x, y).
+    // 1. Return BigIntBitwiseOp(`^`, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitXor(&x.managed, &y.managed);
     return fromManaged(agent, result);
@@ -271,7 +271,7 @@ pub fn bitwiseXOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
 /// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseOR
 pub fn bitwiseOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
-    // 1. Return BigIntBitwiseOp(|, x, y).
+    // 1. Return BigIntBitwiseOp(`|`, x, y).
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitOr(&x.managed, &y.managed);
     return fromManaged(agent, result);

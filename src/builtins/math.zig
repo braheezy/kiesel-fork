@@ -42,7 +42,7 @@ pub const namespace = struct {
             .none,
         );
 
-        // 21.3.1.2 Math.LN2
+        // 21.3.1.3 Math.LN2
         // https://tc39.es/ecma262/#sec-math.ln2
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -808,7 +808,7 @@ pub const namespace = struct {
         // 1. Perform ? RequireObjectCoercible(items).
         try items.requireObjectCoercible(agent);
 
-        // 2. Let iteratorRecord be ? GetIterator(items, SYNC).
+        // 2. Let iteratorRecord be ? GetIterator(items, sync).
         var iterator = try getIterator(agent, items, .sync);
 
         // 3. Let state be minus-zero.

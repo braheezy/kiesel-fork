@@ -659,7 +659,7 @@ pub fn ordinaryFunctionCreate(
     // 7. Let Strict be IsStrict(Body).
     const strict = body.strict;
 
-    // 1. Let internalSlotsList be the internal slots listed in Table 30.
+    // 1. Let internalSlotsList be the internal slots listed in Table 25.
     // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
     const function = try ECMAScriptFunction.create(agent, .{
         .internal_methods = .initComptime(.{
@@ -915,10 +915,11 @@ pub fn makeClassConstructor(function: *ECMAScriptFunction) void {
 /// 10.2.7 MakeMethod ( F, homeObject )
 /// https://tc39.es/ecma262/#sec-makemethod
 pub fn makeMethod(function: *ECMAScriptFunction, home_object: *Object) void {
-    // 1. Set F.[[HomeObject]] to homeObject.
+    // 1. Assert: homeObject is an ordinary object.
+    // 2. Set F.[[HomeObject]] to homeObject.
     function.fields.home_object = home_object;
 
-    // 2. Return unused.
+    // 3. Return unused.
 }
 
 /// 10.2.8 DefineMethodProperty ( homeObject, key, closure, enumerable )

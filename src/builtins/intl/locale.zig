@@ -37,7 +37,7 @@ fn updateLanguageId(
     //    baseName)).
     const maybe_language = try options.getOption(agent, "language", .string, null, null);
 
-    // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
+    // 3. If language cannot be matched by the `unicode_language_subtag` Unicode locale nonterminal,
     //    throw a RangeError exception.
     if (maybe_language) |language| {
         const language_utf8 = try language.toUtf8(gpa);
@@ -52,7 +52,7 @@ fn updateLanguageId(
 
     // 5. If script is not undefined, then
     if (maybe_script) |script| {
-        // a. If script cannot be matched by the unicode_script_subtag Unicode locale nonterminal,
+        // a. If script cannot be matched by the `unicode_script_subtag` Unicode locale nonterminal,
         //    throw a RangeError exception.
         const script_utf8 = try script.toUtf8(gpa);
         defer gpa.free(script_utf8);
@@ -70,7 +70,7 @@ fn updateLanguageId(
 
     // 7. If region is not undefined, then
     if (maybe_region) |region| {
-        // a. If region cannot be matched by the unicode_region_subtag Unicode locale nonterminal,
+        // a. If region cannot be matched by the `unicode_region_subtag` Unicode locale nonterminal,
         //    throw a RangeError exception.
         const region_utf8 = try region.toUtf8(gpa);
         defer gpa.free(region_utf8);
@@ -108,7 +108,7 @@ fn updateLanguageId(
         // d. For each element variant of variantSubtags, do
         while (it.next()) |variant| {
             const added = new_tag.addVariant(variant) catch {
-                // i. If variant cannot be matched by the unicode_variant_subtag Unicode locale
+                // i. If variant cannot be matched by the `unicode_variant_subtag` Unicode locale
                 //    nonterminal, throw a RangeError exception.
                 return agent.throwException(
                     .range_error,
@@ -198,7 +198,7 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "Locale must be string or object", .{});
         }
 
-        // 8. If tag an is Object and tag has an [[InitializedLocale]] internal slot, then
+        // 8. If tag is an Object and tag has an [[InitializedLocale]] internal slot, then
         const tag_string = if (tag_value.castObject(Locale)) |tag_locale| blk: {
             // a. Let tag be tag.[[Locale]].
             break :blk try String.fromAscii(
@@ -216,7 +216,7 @@ pub const constructor = struct {
 
         // 11. If IsWellFormedLanguageTag(tag) is false, throw a RangeError exception.
         // 12. NOTE: Because LanguageId canonicalization can alter tag in arbitrary ways according
-        //     to Alias Rules from supplementalMetadata.xml, it is necessary to perform such
+        //     to Alias Rules from `supplementalMetadata.xml`, it is necessary to perform such
         //     canonicalization before applying overrides from options.
         // 13. Set tag to CanonicalizeUnicodeLocaleId(tag).
         const tag_utf8 = try tag_string.toUtf8(gpa);
@@ -245,7 +245,7 @@ pub const constructor = struct {
 
         // 17. If calendar is not undefined, then
         if (maybe_calendar) |calendar| {
-            // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
+            // a. If calendar cannot be matched by the `type` Unicode locale nonterminal, throw a
             //    RangeError exception.
             const calendar_utf8 = try calendar.toUtf8(gpa);
             defer gpa.free(calendar_utf8);
@@ -279,7 +279,7 @@ pub const constructor = struct {
 
         // 20. If collation is not undefined, then
         if (maybe_collation) |collation| {
-            // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
+            // a. If collation cannot be matched by the `type` Unicode locale nonterminal, throw a
             //    RangeError exception.
             const collation_utf8 = try collation.toUtf8(gpa);
             defer gpa.free(collation_utf8);
@@ -308,8 +308,8 @@ pub const constructor = struct {
         // 23. If fw is not undefined, then
         if (maybe_fw) |fw| {
             // a. Set fw to WeekdayToUValue(fw).
-            // b. If fw cannot be matched by the type Unicode locale nonterminal, throw a RangeError
-            //    exception.
+            // b. If fw cannot be matched by the `type` Unicode locale nonterminal, throw a
+            //    RangeError exception.
             const fw_utf8 = try fw.toUtf8(gpa);
             defer gpa.free(fw_utf8);
             var value: []const u8 = weekdayToUValue(fw_utf8);
@@ -391,8 +391,8 @@ pub const constructor = struct {
 
         // 33. If numberingSystem is not undefined, then
         if (maybe_numbering_system) |numbering_system| {
-            // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw
-            //    a RangeError exception.
+            // a. If numberingSystem cannot be matched by the `type` Unicode locale nonterminal,
+            //    throw a RangeError exception.
             const numbering_system_utf8 = try numbering_system.toUtf8(gpa);
             defer gpa.free(numbering_system_utf8);
             var value: []const u8 = numbering_system_utf8;
@@ -469,7 +469,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
         );
 
-        // 15.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
+        // 15.3.24 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.locale.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -754,7 +754,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 15.3.16 get Intl.Locale.prototype.variants
+    /// 15.3.23 get Intl.Locale.prototype.variants
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.variants
     fn variants(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.

@@ -728,10 +728,10 @@ pub fn fmtDateString(time_value: f64) std.fmt.Alt(f64, formatDateString) {
 /// 21.4.4.41.2 DateString ( tv )
 /// https://tc39.es/ecma262/#sec-datestring
 fn formatDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    // 1. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
+    // 1. Let weekday be the Name of the entry in Table 60 with the Number WeekDay(tv).
     const weekday = week_day_names[weekDay(time_value)];
 
-    // 2. Let month be the Name of the entry in Table 63 with the Number MonthFromTime(tv).
+    // 2. Let month be the Name of the entry in Table 61 with the Number MonthFromTime(tv).
     const month = month_names[monthFromTime(time_value)];
 
     // 3. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
@@ -925,7 +925,7 @@ pub const constructor = struct {
                     // 1. Assert: The next step never returns an abrupt completion because v is a
                     //    String.
                     // 2. Let tv be the result of parsing v as a date, in exactly the same manner as
-                    //    for the parse method (21.4.3.2).
+                    //    for the `parse` method (21.4.3.2).
                     break :blk_tv parseImpl(primitive_value.asString());
                 } else {
                     // iii. Else,
@@ -2361,9 +2361,9 @@ pub const prototype = struct {
         // 4. If x is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
 
-        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
+        // 5. Let timeFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
         //    time, time).
-        const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
+        const time_format = try builtins.intl.date_time_format.createDateTimeFormat(
             agent,
             try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
             locales,
@@ -2372,8 +2372,8 @@ pub const prototype = struct {
             .time,
         );
 
-        // 6. Return ! FormatDateTime(dateFormat, x).
-        return builtins.intl.date_time_format.formatDateTime(agent, date_format, time_value);
+        // 6. Return ! FormatDateTime(timeFormat, x).
+        return builtins.intl.date_time_format.formatDateTime(agent, time_format, time_value);
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )
@@ -2469,10 +2469,10 @@ pub const prototype = struct {
         // 4. If tv is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
 
-        // 5. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
+        // 5. Let weekday be the Name of the entry in Table 60 with the Number WeekDay(tv).
         const weekday = week_day_names[weekDay(time_value)];
 
-        // 6. Let month be the Name of the entry in Table 63 with the Number MonthFromTime(tv).
+        // 6. Let month be the Name of the entry in Table 61 with the Number MonthFromTime(tv).
         const month = month_names[monthFromTime(time_value)];
 
         // 7. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).

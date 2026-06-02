@@ -561,17 +561,17 @@ pub const Number = union(enum) {
         // 4. Let rBits be the 32-bit two's complement bit string representing ℝ(rNum).
 
         const result = switch (op) {
-            // 5. If op is &, then
+            // 5. If op is `&`, then
             // a. Let result be the result of applying the bitwise AND operation to lBits and rBits.
             .@"&" => l_num & r_num,
 
-            // 6. Else if op is ^, then
+            // 6. Else if op is `^`, then
             // a. Let result be the result of applying the bitwise exclusive OR (XOR) operation to
             //    lBits and rBits.
             .@"^" => l_num ^ r_num,
 
             // 7. Else,
-            // a. Assert: op is |.
+            // a. Assert: op is `|`.
             // b. Let result be the result of applying the bitwise inclusive OR operation to lBits
             //    and rBits.
             .@"|" => l_num | r_num,
@@ -585,21 +585,21 @@ pub const Number = union(enum) {
     /// 6.1.6.1.17 Number::bitwiseAND ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseAND
     pub fn bitwiseAND(x: Number, y: Number) Number {
-        // 1. Return NumberBitwiseOp(&, x, y).
+        // 1. Return NumberBitwiseOp(`&`, x, y).
         return .{ .i32 = numberBitwiseOp(.@"&", x, y) };
     }
 
     /// 6.1.6.1.18 Number::bitwiseXOR ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseXOR
     pub fn bitwiseXOR(x: Number, y: Number) Number {
-        // 1. Return NumberBitwiseOp(^, x, y).
+        // 1. Return NumberBitwiseOp(`^`, x, y).
         return .{ .i32 = numberBitwiseOp(.@"^", x, y) };
     }
 
     /// 6.1.6.1.19 Number::bitwiseOR ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseOR
     pub fn bitwiseOR(x: Number, y: Number) Number {
-        // 1. Return NumberBitwiseOp(|, x, y).
+        // 1. Return NumberBitwiseOp(`|`, x, y).
         return .{ .i32 = numberBitwiseOp(.@"|", x, y) };
     }
 

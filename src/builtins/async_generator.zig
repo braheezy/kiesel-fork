@@ -742,16 +742,13 @@ pub fn asyncGeneratorAwaitReturn(
             const exception = agent.clearException();
             const promise_completion: Completion = .{ .throw = exception.value };
 
-            // a. Set generator.[[AsyncGeneratorState]] to completed.
-            generator.fields.async_generator_state = .completed;
-
-            // b. Perform AsyncGeneratorCompleteStep(generator, promiseCompletion, true).
+            // a. Perform AsyncGeneratorCompleteStep(generator, promiseCompletion, true).
             try asyncGeneratorCompleteStep(agent, generator, promise_completion, true, null);
 
-            // c. Perform AsyncGeneratorDrainQueue(generator).
+            // b. Perform AsyncGeneratorDrainQueue(generator).
             try asyncGeneratorDrainQueue(agent, generator);
 
-            // d. Return unused.
+            // c. Return unused.
             return;
         },
     };

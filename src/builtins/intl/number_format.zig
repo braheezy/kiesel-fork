@@ -480,7 +480,7 @@ pub const constructor = struct {
 
         // 22. If needSd is true, then
         if (need_sd) {
-            // a. If hasSd is true,
+            // a. If hasSd is true, then
             if (has_sd) {
                 // i. Set intlObj.[[MinimumSignificantDigits]] to ? DefaultNumberOption(mnsd, 1, 21,
                 //    1).
@@ -849,7 +849,7 @@ pub const prototype = struct {
             try realm.intrinsics.@"%Object.prototype%"(),
         );
 
-        // 5. For each row of Table 26, except the header row, in table order, do
+        // 5. For each row of Table 28, except the header row, in table order, do
         // a. Let p be the Property value of the current row.
         // b. Let v be the value of nf's internal slot whose name is the Internal Slot value of the
         //    current row.

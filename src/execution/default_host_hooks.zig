@@ -116,7 +116,7 @@ pub fn hostFinalizeImportMeta(_: *Object, _: *SourceTextModule) void {
     // The default implementation of HostFinalizeImportMeta is to return unused.
 }
 
-/// 16.2.1.8 HostLoadImportedModule ( referrer, moduleRequest, hostDefined, payload )
+/// 16.2.1.10 HostLoadImportedModule ( referrer, moduleRequest, hostDefined, payload )
 /// https://tc39.es/ecma262/#sec-HostLoadImportedModule
 pub fn hostLoadImportedModule(
     agent: *Agent,
@@ -129,7 +129,7 @@ pub fn hostLoadImportedModule(
     try finishLoadingImportedModule(agent, referrer, module_request, payload, result);
 }
 
-/// 16.2.1.11.1 HostGetSupportedImportAttributes ( )
+/// 16.2.1.12.1 HostGetSupportedImportAttributes ( )
 /// https://tc39.es/ecma262/#sec-hostgetsupportedimportattributes
 pub fn hostGetSupportedImportAttributes(
     _: *Agent,
@@ -166,7 +166,7 @@ pub fn hostResizeArrayBuffer(
     return .unhandled;
 }
 
-/// 25.2.2.3 HostGrowSharedArrayBuffer ( buffer, newByteLength )
+/// 25.2.2.4 HostGrowSharedArrayBuffer ( buffer, newByteLength )
 /// https://tc39.es/ecma262/#sec-hostgrowsharedarraybuffer
 pub fn hostGrowSharedArrayBuffer(
     _: *builtins.ArrayBuffer,

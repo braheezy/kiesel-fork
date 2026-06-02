@@ -474,7 +474,7 @@ pub const prototype = struct {
     fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
-        // 1. Let lf be the this value.
+        // 1. Let dtf be the this value.
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).

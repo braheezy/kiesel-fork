@@ -555,7 +555,7 @@ pub fn parse(
                 //    form it would have if the binding or namespace object had been re-exported
                 //    directly from the original module rather than imported then exported. This
                 //    allows conflicts which arise from exporting the same binding or namespace
-                //    twice under the same name through export * from to be ignored rather than
+                //    twice under the same name through `export * from` to be ignored rather than
                 //    being treated as ambiguous in step 9.e.iii of the ResolveExport concrete
                 //    method of Source Text Module Records.
                 // 2. Let ie be the element of importEntries whose [[LocalName]] is
@@ -593,7 +593,7 @@ pub fn parse(
         }
     }
 
-    // 11. Let async be body Contains await.
+    // 11. Let async be body Contains `await`.
     const async = body.hasTla();
 
     // 12. Return Source Text Module Record { [[Realm]]: realm, [[Environment]]: empty,
@@ -1269,7 +1269,7 @@ pub fn getExportedNames(
 
     // 3. If exportStarSet contains module, then
     if (export_star_set.contains(export_star_set_key)) {
-        // a. Assert: We've reached the starting point of an export * circularity.
+        // a. Assert: We've reached the starting point of an `export *` circularity.
         // b. Return a new empty List.
         return &.{};
     }
@@ -1412,9 +1412,9 @@ pub fn resolveExport(
 
     // 7. If exportName is "default", then
     if (std.mem.eql(u8, export_name, "default")) {
-        // a. Assert: A default export was not explicitly defined by this module.
+        // a. Assert: A `default` export was not explicitly defined by this module.
         // b. Return null.
-        // c. NOTE: A default export cannot be provided by an export * from "mod" declaration.
+        // c. NOTE: A `default` export cannot be provided by an `export * from "mod"` declaration.
         return null;
     }
 
@@ -1452,7 +1452,7 @@ pub fn resolveExport(
             };
 
             // iii. Else,
-            // 1. Assert: There is more than one * export that includes the requested name.
+            // 1. Assert: There is more than one `*` export that includes the requested name.
 
             // 2. If resolution.[[Module]] and starResolution.[[Module]] are not the same Module
             //    Record, return ambiguous.

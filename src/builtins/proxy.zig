@@ -258,7 +258,7 @@ fn getOwnProperty(
         agent,
         PropertyKey.from("getOwnPropertyDescriptor"),
     ) orelse {
-        // 6. If trap is undefined,
+        // 6. If trap is undefined, then
         //     a. Return ? target.[[GetOwnProperty]](P).
         return target.internal_methods.getOwnProperty(agent, target, property_key);
     };

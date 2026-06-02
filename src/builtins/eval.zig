@@ -35,8 +35,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     if (!x.isString()) return x;
 
     // 3. Let evalRealm be the current Realm Record.
-    // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of eval and
-    //    of the eval function itself.
+    // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of `eval`
+    //    and of the `eval` function itself.
     const eval_realm = agent.currentRealm();
 
     // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
@@ -129,7 +129,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 14. Let runningContext be the running execution context.
     // 15. NOTE: If direct is true, runningContext will be the execution context that performed the
     //     direct eval. If direct is false, runningContext will be the execution context for the
-    //     invocation of the eval function.
+    //     invocation of the `eval` function.
     const running_context = agent.runningExecutionContext();
 
     var lexical_environment: Environment = undefined;
@@ -276,8 +276,8 @@ fn evalDeclarationInstantiation(
                     );
                 }
 
-                // 2. NOTE: eval will not create a global var declaration that would be shadowed by
-                //    a global lexical declaration.
+                // 2. NOTE: `eval` will not create a global var declaration that would be shadowed
+                //    by a global lexical declaration.
             }
         }
 

@@ -440,7 +440,7 @@ fn continueDynamicImport(
     // 9. Return unused.
 }
 
-/// 16.2.1.8 GetImportedModule ( referrer, request )
+/// 16.2.1.9 GetImportedModule ( referrer, request )
 /// https://tc39.es/ecma262/#sec-GetImportedModule
 pub fn getImportedModule(referrer: *const SourceTextModule, request: ModuleRequest) Module {
     // 1. Let records be a List consisting of each LoadedModuleRequest Record r of
@@ -452,7 +452,7 @@ pub fn getImportedModule(referrer: *const SourceTextModule, request: ModuleReque
     return referrer.loaded_modules.get(request).?;
 }
 
-/// 16.2.1.10 FinishLoadingImportedModule ( referrer, moduleRequest, payload, result )
+/// 16.2.1.11 FinishLoadingImportedModule ( referrer, moduleRequest, payload, result )
 /// https://tc39.es/ecma262/#sec-FinishLoadingImportedModule
 pub fn finishLoadingImportedModule(
     agent: *Agent,
@@ -501,7 +501,7 @@ pub fn finishLoadingImportedModule(
     // 4. Return unused.
 }
 
-/// 16.2.1.11 AllImportAttributesSupported ( attributes )
+/// 16.2.1.12 AllImportAttributesSupported ( attributes )
 /// https://tc39.es/ecma262/#sec-AllImportAttributesSupported
 pub fn allImportAttributesSupported(
     agent: *Agent,
@@ -520,7 +520,7 @@ pub fn allImportAttributesSupported(
     return null;
 }
 
-/// 16.2.1.12 GetModuleNamespace ( module )
+/// 16.2.1.13 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
 pub fn getModuleNamespace(
     agent: *Agent,

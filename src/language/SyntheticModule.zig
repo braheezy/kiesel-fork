@@ -123,7 +123,7 @@ fn setSyntheticModuleExport(
     // 3. Assert: envRec is not empty.
     const env = self.environment.?;
 
-    // 4. Perform envRec.SetMutableBinding(exportName, exportValue, true).
+    // 4. Perform ! envRec.SetMutableBinding(exportName, exportValue, true).
     env.setMutableBinding(
         agent,
         try String.fromUtf8(agent, export_name),

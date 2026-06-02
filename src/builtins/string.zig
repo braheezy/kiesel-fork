@@ -391,7 +391,7 @@ fn ownPropertyKeys(
             len,
     );
 
-    // 5. For each integer i such that 0 ≤ i < len, in ascending order,
+    // 5. For each integer i such that 0 ≤ i < len, in ascending order, do
     for (0..len) |i| {
         // a. Append ! ToString(𝔽(i)) to keys.
         keys.appendAssumeCapacity(PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))));
@@ -2590,14 +2590,13 @@ pub const prototype = struct {
                 "&quot;",
             );
 
-            // c. Set p1 to the string-concatenation of:
-            // - p1
-            // - the code unit 0x0020 (SPACE)
-            // - attribute
-            // - the code unit 0x003D (EQUALS SIGN)
-            // - the code unit 0x0022 (QUOTATION MARK)
-            // - escapedV
-            // - the code unit 0x0022 (QUOTATION MARK)
+            // c. Set p1 to the string-concatenation of:- p1
+            //    - the code unit 0x0020 (SPACE)
+            //    - attribute
+            //    - the code unit 0x003D (EQUALS SIGN)
+            //    - the code unit 0x0022 (QUOTATION MARK)
+            //    - escapedV
+            //    - the code unit 0x0022 (QUOTATION MARK)
             return types.String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "<{[tag]s} {[attribute]s}=\"{[value]f}\">{[string]f}</{[tag]s}>",

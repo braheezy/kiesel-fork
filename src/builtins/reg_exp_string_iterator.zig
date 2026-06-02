@@ -88,7 +88,7 @@ pub const prototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         // 3. If O does not have all of the internal slots of a RegExp String Iterator Object
-        //    Instance (see 22.2.9.2.3), throw a TypeError exception.
+        //    Instance (see 22.2.9.3), throw a TypeError exception.
         const reg_exp_string_iterator = try this_value.requireInternalSlot(agent, RegExpStringIterator);
 
         // 4. If O.[[Done]] is true, then
@@ -154,7 +154,7 @@ pub const prototype = struct {
     }
 };
 
-/// 22.2.9.2.3 Properties of RegExp String Iterator Instances
+/// 22.2.9.3 Properties of RegExp String Iterator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-regexp-string-iterator-instances
 pub const RegExpStringIterator = MakeObject(.{
     .Fields = union(enum) {

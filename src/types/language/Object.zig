@@ -14,7 +14,6 @@ const Arguments = types.Arguments;
 const Behaviour = builtins.builtin_function.Behaviour;
 const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
-const Number = types.Number;
 const PreferredType = Value.PreferredType;
 const PrivateElement = types.PrivateElement;
 const PrivateName = types.PrivateName;
@@ -853,7 +852,7 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
     defer agent.gc_allocator.free(keys);
 
     switch (level) {
-        // 4. If level is sealed,
+        // 4. If level is sealed, then
         .sealed => {
             // a. For each element k of keys, do
             for (keys) |property_key| {
@@ -1380,19 +1379,17 @@ pub fn initializeInstanceElements(
 
 pub const OptionType = enum {
     boolean,
-    number,
     string,
 
     pub fn T(self: OptionType) type {
         return switch (self) {
             .boolean => bool,
-            .number => Number,
             .string => *const String,
         };
     }
 };
 
-/// 9.2.13 GetOption ( options, property, type, values, default )
+/// 9.2.11 GetOption ( options, property, type, values, default )
 /// https://tc39.es/ecma402/#sec-getoption
 pub fn getOption(
     self: *Object,
@@ -1431,24 +1428,7 @@ pub fn getOption(
             break :blk value.toBoolean();
         },
 
-        // 4. Else if type is number, then
-        .number => blk: {
-            // a. Set value to ? ToNumber(value).
-            const number = try value.toNumber(agent);
-
-            // b. If value is NaN, throw a RangeError exception.
-            if (number.isNan()) {
-                return agent.throwException(
-                    .range_error,
-                    "Number option '{s}' must not be NaN",
-                    .{property},
-                );
-            }
-
-            break :blk number;
-        },
-
-        // 5. Else,
+        // 4. Else,
         //     a. Assert: type is string.
         .string => blk: {
             // b. Set value to ? ToString(value).
@@ -1456,7 +1436,7 @@ pub fn getOption(
         },
     };
 
-    // 6. If values is not empty and values does not contain value, throw a RangeError exception.
+    // 5. If values is not empty and values does not contain value, throw a RangeError exception.
     if (values != null) {
         for (values.?) |permitted_value| {
             if (sameValue(Value.from(coerced_value), Value.from(permitted_value))) break;
@@ -1469,7 +1449,7 @@ pub fn getOption(
         }
     }
 
-    // 7. Return value.
+    // 6. Return value.
     return coerced_value;
 }
 

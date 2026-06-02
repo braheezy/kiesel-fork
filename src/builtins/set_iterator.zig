@@ -1,4 +1,4 @@
-//! 24.2.5 Set Iterator Objects
+//! 24.2.6 Set Iterator Objects
 //! https://tc39.es/ecma262/#sec-set-iterator-objects
 
 const std = @import("std");
@@ -18,7 +18,7 @@ const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 24.2.5.1 CreateSetIterator ( set, kind )
+/// 24.2.6.1 CreateSetIterator ( set, kind )
 /// https://tc39.es/ecma262/#sec-createsetiterator
 pub fn createSetIterator(
     agent: *Agent,
@@ -41,7 +41,7 @@ pub fn createSetIterator(
     });
 }
 
-/// 24.2.5.2 The %SetIteratorPrototype% Object
+/// 24.2.6.2 The %SetIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -51,7 +51,7 @@ pub const prototype = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
-        // 24.2.5.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
+        // 24.2.6.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-%setiteratorprototype%-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -65,7 +65,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 24.2.5.2.1 %SetIteratorPrototype%.next ( )
+    /// 24.2.6.2.1 %SetIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%setiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%SetIteratorPrototype%").

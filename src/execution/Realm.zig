@@ -116,8 +116,8 @@ pub fn initializeHostDefinedRealm(
     );
     global.shape = try global.shape.makeUnique(agent.gc_allocator);
 
-    // 12. If the host requires that the this binding in realm's global scope return an object other
-    //     than the global object, then
+    // 12. If the host requires that the `this` binding in realm's global scope return an object
+    //     other than the global object, then
     //     a. Let thisValue be such an object created in a host-defined manner.
     // 13. Else,
     //     a. Let thisValue be global.

@@ -82,8 +82,8 @@ pub const prototype = struct {
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
-        // 3. If O does not have all of the internal slots of an Array Iterator Instance
-        //    (23.1.5.2.3), throw a TypeError exception.
+        // 3. If O does not have all of the internal slots of an Array Iterator Instance (23.1.5.3),
+        //    throw a TypeError exception.
         const array_iterator = try this_value.requireInternalSlot(agent, ArrayIterator);
 
         // 5. If array is undefined, return CreateIteratorResultObject(undefined, true).
@@ -168,7 +168,7 @@ pub const prototype = struct {
     }
 };
 
-/// 23.1.5.2.3 Properties of Array Iterator Instances
+/// 23.1.5.3 Properties of Array Iterator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-array-iterator-instances
 pub const ArrayIterator = MakeObject(.{
     .Fields = union(enum) {

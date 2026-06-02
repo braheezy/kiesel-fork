@@ -75,18 +75,7 @@ pub fn hasThisBinding(self: *const FunctionEnvironment) bool {
     return self.this_binding_status != .lexical;
 }
 
-/// 9.1.1.3.3 HasSuperBinding ( )
-/// https://tc39.es/ecma262/#sec-function-environment-records-hassuperbinding
-pub fn hasSuperBinding(self: *const FunctionEnvironment) bool {
-    // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
-    if (self.this_binding_status == .lexical) return false;
-
-    // 2. If envRec.[[FunctionObject]].[[HomeObject]] is undefined, return false.
-    // 3. Return true.
-    return self.function_object.fields.home_object != null;
-}
-
-/// 9.1.1.3.4 GetThisBinding ( )
+/// 9.1.1.3.3 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
 pub fn getThisBinding(self: *const FunctionEnvironment, agent: *Agent) error{ExceptionThrown}!Value {
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
@@ -104,6 +93,17 @@ pub fn getThisBinding(self: *const FunctionEnvironment, agent: *Agent) error{Exc
 
     // 3. Return envRec.[[ThisValue]].
     return self.this_value;
+}
+
+/// 9.1.1.3.4 HasSuperBinding ( )
+/// https://tc39.es/ecma262/#sec-function-environment-records-hassuperbinding
+pub fn hasSuperBinding(self: *const FunctionEnvironment) bool {
+    // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
+    if (self.this_binding_status == .lexical) return false;
+
+    // 2. If envRec.[[FunctionObject]].[[HomeObject]] is undefined, return false.
+    // 3. Return true.
+    return self.function_object.fields.home_object != null;
 }
 
 pub const SuperBase = union(enum) {

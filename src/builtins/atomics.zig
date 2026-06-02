@@ -460,7 +460,7 @@ pub const namespace = struct {
 
         // 1. Let and be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
-        //     a. Return ByteListBitwiseOp(&, xBytes, yBytes).
+        //     a. Return ByteListBitwiseOp(`&`, xBytes, yBytes).
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, and).
         return atomicReadModifyWrite(agent, typed_array, index, value, .And);
     }
@@ -720,7 +720,7 @@ pub const namespace = struct {
 
         // 1. Let or be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
-        //     a. Return ByteListBitwiseOp(|, xBytes, yBytes).
+        //     a. Return ByteListBitwiseOp(`|`, xBytes, yBytes).
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, or).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
     }
@@ -853,7 +853,7 @@ pub const namespace = struct {
 
         // 1. Let xor be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
-        //     a. Return ByteListBitwiseOp(^, xBytes, yBytes).
+        //     a. Return ByteListBitwiseOp(`^`, xBytes, yBytes).
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, xor).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Xor);
     }

@@ -177,7 +177,7 @@ fn getViewValue(
     // 9. Let viewSize be GetViewByteLength(viewRecord).
     const view_size = getViewByteLength(view);
 
-    // 10. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 10. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 11. If getIndex + elementSize > viewSize, throw a RangeError exception.
@@ -252,7 +252,7 @@ fn setViewValue(
     // 11. Let viewSize be GetViewByteLength(viewRecord).
     const view_size = getViewByteLength(view);
 
-    // 12. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 12. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 13. If getIndex + elementSize > viewSize, throw a RangeError exception.
@@ -486,7 +486,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%DataView%"()),
         );
 
-        // 25.3.4.25 DataView.prototype [ %Symbol.toStringTag% ]
+        // 25.3.4.27 DataView.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -591,7 +591,7 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, Float16).
+        // 3. Return ? GetViewValue(view, byteOffset, littleEndian, float16).
         return getViewValue(agent, this_value, byte_offset, little_endian, .float16);
     }
 
@@ -720,7 +720,7 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, Float16, value).
+        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float16, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .float16, value);
     }
 

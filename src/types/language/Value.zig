@@ -1744,7 +1744,7 @@ pub fn groupBy(
     }
 }
 
-/// 7.3.36 SetterThatIgnoresPrototypeProperties ( thisValue, home, p, v )
+/// 7.3.37 SetterThatIgnoresPrototypeProperties ( thisValue, home, p, v )
 /// https://tc39.es/ecma262/#sec-SetterThatIgnoresPrototypeProperties
 pub fn setterThatIgnoresPrototypeProperties(
     self: Value,
@@ -2396,7 +2396,7 @@ pub fn getOptionsObject(self: Value, agent: *Agent) Agent.Error!*Object {
     );
 }
 
-/// 9.2.12 CoerceOptionsToObject ( options )
+/// 9.2.10 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
 pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {
     // 1. If options is undefined, then

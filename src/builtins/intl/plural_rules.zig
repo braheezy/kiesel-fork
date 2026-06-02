@@ -267,7 +267,7 @@ pub const prototype = struct {
         };
         defer plural_categories.deinit(agent.gc_allocator);
 
-        // 5. For each row of Table 25, except the header row, in table order, do
+        // 5. For each row of Table 32, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
         //     b. If p is "pluralCategories", then
         //         i. Let v be CreateArrayFromList(pluralCategories).

@@ -241,7 +241,7 @@ pub const prototype = struct {
             try realm.intrinsics.@"%Object.prototype%"(),
         );
 
-        // 4. For each row of Table 4, except the header row, in table order, do
+        // 4. For each row of Table 3, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
         //     b. Let v be the value of collator's internal slot whose name is the Internal Slot
         //        value of the current row.

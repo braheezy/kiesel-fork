@@ -78,7 +78,7 @@ pub fn boundFunctionCreate(
     const prototype = try target_function.internal_methods.getPrototypeOf(agent, target_function);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
-    //    the internal slots listed in Table 31.
+    //    the internal slots listed in Table 26.
     // 3. Let obj be MakeBasicObject(internalSlotsList).
     const bound_function = try BoundFunction.create(agent, .{
         // 4. Set obj.[[Prototype]] to proto.

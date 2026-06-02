@@ -1129,7 +1129,7 @@ fn getDurationUnitOptions(
     return .{ .style = style.?, .display = display };
 }
 
-/// 13.5.6.1 ValidateDurationUnitStyle ( unit, style, display, prevStyle )
+/// 13.5.6.2 ValidateDurationUnitStyle ( unit, style, display, prevStyle )
 /// https://tc39.es/ecma402/#sec-validatedurationunitstyle
 fn validateDurationUnitStyle(
     agent: *Agent,

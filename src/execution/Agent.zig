@@ -1,4 +1,4 @@
-//! 9.7 Agents
+//! 9.6 Agents
 //! https://tc39.es/ecma262/#sec-agents
 
 const builtin = @import("builtin");
@@ -207,7 +207,7 @@ pub fn clearException(self: *Agent) Exception {
     return self.exception.?;
 }
 
-/// 5.2.3.2 Throw an Exception
+/// 5.2.4.2 Throw
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(
     self: *Agent,

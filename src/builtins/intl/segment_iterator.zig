@@ -76,7 +76,7 @@ pub const prototype = struct {
     /// 19.6.2.1 %IntlSegmentIteratorPrototype%.next ( )
     /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. let iterator be the this value.
+        // 1. Let iterator be the this value.
         // 2. Perform ? RequireInternalSlot(iterator, [[IteratingSegmenter]]).
         const iterator = try this_value.requireInternalSlot(agent, SegmentIterator);
 
@@ -184,7 +184,7 @@ pub fn createSegmentDataObject(
     // 9. Let granularity be segmenter.[[SegmenterGranularity]].
     const granularity = segmenter.fields.segmenter_granularity;
 
-    // 10. If granularity is "word", then
+    // 10. If granularity is `"word"`, then
     if (granularity == .word) {
         // a. Let isWordLike be a Boolean value indicating whether the segment in string is
         //    "word-like" according to locale segmenter.[[Locale]].

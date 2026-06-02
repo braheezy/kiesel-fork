@@ -28,8 +28,8 @@ const sameValue = types.sameValue;
 /// 24.2.1.1 Set Records
 /// https://tc39.es/ecma262/#sec-set-records
 const SetRecord = struct {
-    /// [[Set]]
-    set: *Object,
+    /// [[SetObject]]
+    set_object: *Object,
 
     /// [[Size]]
     size: usize,
@@ -106,10 +106,10 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
         );
     }
 
-    // 12. Return a new Set Record { [[Set]]: obj, [[Size]]: intSize, [[Has]]: has,
+    // 12. Return a new Set Record { [[SetObject]]: obj, [[Size]]: intSize, [[Has]]: has,
     //     [[Keys]]: keys }.
     return .{
-        .set = object,
+        .set_object = object,
         .size = @intFromFloat(int_size),
         .has = has.asObject(),
         .keys = keys.asObject(),
@@ -132,7 +132,7 @@ fn setDataIndex(set_data: SetData, value: Value) ?usize {
     // 3. Let index be 0.
     // 4. Repeat, while index < size,
     //    a. Let e be setData[index].
-    //    b. If e is not empty and SameValue(e, value) is true, then
+    //    b. If e is not empty and e is value, then
     //       i. Return index.
     //    c. Set index to index + 1.
     // 5. Return not-found.
@@ -398,10 +398,11 @@ pub const prototype = struct {
                 const element = result_set_data.keys()[index];
 
                 // ii. If e is not empty, then
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[Set]], « e »)).
+                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
+                //    « e »)).
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set),
+                    Value.from(other_rec.set_object),
                     &.{element},
                 )).toBoolean();
 
@@ -418,10 +419,11 @@ pub const prototype = struct {
             for (indexes_to_remove.items) |i| result_set_data.orderedRemoveAt(i);
         } else {
             // 6. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
+            //    otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set),
+                Value.from(other_rec.set_object),
                 other_rec.keys,
             );
 
@@ -462,11 +464,11 @@ pub const prototype = struct {
     /// 24.2.4.6 Set.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.entries
     fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
-        const map = this_value;
+        // 1. Let S be the this value.
+        const set = this_value;
 
         // 2. Return ? CreateSetIterator(S, key+value).
-        const set_iterator = try createSetIterator(agent, map, .key_value);
+        const set_iterator = try createSetIterator(agent, set, .key_value);
         return Value.from(&set_iterator.object);
     }
 
@@ -568,10 +570,11 @@ pub const prototype = struct {
                 // ii. Set index to index + 1.
                 // iii. If e is not empty, then
 
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[Set]], « e »)).
+                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
+                //    « e »)).
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set),
+                    Value.from(other_rec.set_object),
                     &.{element},
                 )).toBoolean();
 
@@ -580,8 +583,7 @@ pub const prototype = struct {
                     // a. NOTE: It is possible for earlier calls to otherRec.[[Has]] to remove and
                     //    re-add an element of O.[[SetData]], which can cause the same element to be
                     //    visited twice during this iteration.
-                    // b. Let alreadyInResult be SetDataHas(resultSetData, e).
-                    // c. If alreadyInResult is false, then
+                    // b. If SetDataHas(resultSetData, e) is false, then
                     //     i. Append e to resultSetData.
                     // NOTE: We do not need to check because put allows clobbers.
                     try result_set_data.put(agent.gc_allocator, element, {});
@@ -594,10 +596,11 @@ pub const prototype = struct {
             }
         } else {
             // 6. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
+            //    otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set),
+                Value.from(other_rec.set_object),
                 other_rec.keys,
             );
 
@@ -609,18 +612,16 @@ pub const prototype = struct {
                 // 1. Set next to CanonicalizeKeyedCollectionKey(next).
                 const next = next_.canonicalizeKeyedCollectionKey();
 
-                // 2. NOTE: Because other is an arbitrary object, it is possible for its "keys"
-                //    iterator to produce the same value more than once.
+                // 2. Let inThis be SetDataHas(O.[[SetData]], next).
+                const in_this = setDataHas(object.fields.set_data, next);
 
-                // 3. Let alreadyInResult be SetDataHas(resultSetData, next).
-                const already_in_result = setDataHas(result_set_data, next);
-
-                // 4. Let inThis be SetDataHas(O.[[SetData]], next).
-                const in_this = object.fields.set_data.contains(next);
-
-                // 5. If alreadyInResult is false and inThis is true, then
-                if (!already_in_result and in_this) {
-                    // a. Append next to resultSetData.
+                // 3. If inThis is true, then
+                if (in_this) {
+                    // a. NOTE: Because other is an arbitrary object, it is possible for its "keys"
+                    //    iterator to produce the same value more than once.
+                    // b. If SetDataHas(resultSetData, next) is false, then
+                    //     i. Append next to resultSetData.
+                    // NOTE: We do not need to check because put allows clobbers.
                     try result_set_data.put(agent.gc_allocator, next, {});
                 }
             }
@@ -669,10 +670,11 @@ pub const prototype = struct {
                 // ii. Set index to index + 1.
                 // iii. If e is not empty, then
 
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[Set]], « e »)).
+                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
+                //    « e »)).
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set),
+                    Value.from(other_rec.set_object),
                     &.{element},
                 )).toBoolean();
 
@@ -688,10 +690,11 @@ pub const prototype = struct {
             }
         } else {
             // 5. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
+            //    otherRec.[[Keys]]).
             var keys_iter = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set),
+                Value.from(other_rec.set_object),
                 other_rec.keys,
             );
 
@@ -746,10 +749,10 @@ pub const prototype = struct {
             // b. Set index to index + 1.
             // c. If e is not empty, then
 
-            // i. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[Set]], « e »)).
+            // i. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]], « e »)).
             const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                 agent,
-                Value.from(other_rec.set),
+                Value.from(other_rec.set_object),
                 &.{element},
             )).toBoolean();
 
@@ -785,10 +788,10 @@ pub const prototype = struct {
             return .false;
         }
 
-        // 5. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+        // 5. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
         var keys_iter = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set),
+            Value.from(other_rec.set_object),
             other_rec.keys,
         );
 
@@ -837,10 +840,10 @@ pub const prototype = struct {
         // 3. Let otherRec be ? GetSetRecord(other).
         const other_rec = try getSetRecord(agent, other);
 
-        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
         var keys_iter = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set),
+            Value.from(other_rec.set_object),
             other_rec.keys,
         );
 
@@ -902,10 +905,10 @@ pub const prototype = struct {
         // 3. Let otherRec be ? GetSetRecord(other).
         const other_rec = try getSetRecord(agent, other);
 
-        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[Set]], otherRec.[[Keys]]).
+        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
         var keys_iter = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set),
+            Value.from(other_rec.set_object),
             other_rec.keys,
         );
 
@@ -944,11 +947,11 @@ pub const prototype = struct {
     /// 24.2.4.17 Set.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.values
     fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
-        const map = this_value;
+        // 1. Let S be the this value.
+        const set = this_value;
 
         // 2. Return ? CreateSetIterator(S, value).
-        const set_iterator = try createSetIterator(agent, map, .value);
+        const set_iterator = try createSetIterator(agent, set, .value);
         return Value.from(&set_iterator.object);
     }
 };

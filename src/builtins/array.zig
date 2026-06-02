@@ -364,7 +364,7 @@ pub const constructor = struct {
         try object.defineBuiltinFunction(agent, "of", of, 0, realm);
         try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
-        // 23.1.2.4 Array.prototype
+        // 23.1.2.5 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -863,7 +863,7 @@ pub const constructor = struct {
         }
     }
 
-    /// 23.1.2.2 Array.isArray ( arg )
+    /// 23.1.2.3 Array.isArray ( arg )
     /// https://tc39.es/ecma262/#sec-array.isarray
     fn isArray(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const arg = arguments.get(0);
@@ -872,7 +872,7 @@ pub const constructor = struct {
         return Value.from(try arg.isArray(agent));
     }
 
-    /// 23.1.2.3 Array.of ( ...items )
+    /// 23.1.2.4 Array.of ( ...items )
     /// https://tc39.es/ecma262/#sec-array.of
     fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let len be the number of elements in items.
@@ -918,7 +918,7 @@ pub const constructor = struct {
         return Value.from(array);
     }
 
-    /// 23.1.2.5 get Array [ %Symbol.species% ]
+    /// 23.1.2.6 get Array [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-array-%symbol.species%
     fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
@@ -2499,7 +2499,7 @@ pub const prototype = struct {
                 // i. Perform ? Set(O, lowerP, upperValue, true).
                 try object.set(agent, lower_property_key, upper_value, .throw);
 
-                // ii. Perform ? Set(O, upperP, lowerValue, true)
+                // ii. Perform ? Set(O, upperP, lowerValue, true).
                 try object.set(agent, upper_property_key, lower_value, .throw);
             }
             // i. Else if lowerExists is false and upperExists is true, then
@@ -2747,7 +2747,7 @@ pub const prototype = struct {
             // d. Set k to k + 1.
         }
 
-        // 6. Return true.
+        // 6. Return false.
         return .false;
     }
 
@@ -3083,17 +3083,21 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < len,
         while (k < len) : (k += 1) {
-            // a. If k > 0, set R to the string-concatenation of R and separator.
-            if (k > 0) result.appendStringAssumeCapacity(separator);
 
-            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = try array.get(agent, PropertyKey.from(k));
+            // a. If k > 0, then
+            if (k > 0) {
+                // i. Set R to the string-concatenation of R and separator.
+                result.appendStringAssumeCapacity(separator);
+            }
 
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
+            // b. Let nextElement be ? Get(array, ! ToString(𝔽(k))).
+            const next_element = try array.get(agent, PropertyKey.from(k));
+
+            // c. If nextElement is not undefined or null, then
+            if (!next_element.isUndefined() and !next_element.isNull()) {
                 // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales,
                 //    options »)).
-                const string = try (try element.invoke(
+                const string = try (try next_element.invoke(
                     agent,
                     PropertyKey.from("toLocaleString"),
                     &.{ locales, options },

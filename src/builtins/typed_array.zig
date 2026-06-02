@@ -187,7 +187,7 @@ pub const ElementType = enum {
         return @field(Value, field_name);
     }
 
-    /// 25.1.3.10 IsUnclampedIntegerElementType ( type )
+    /// 25.1.3.11 IsUnclampedIntegerElementType ( type )
     /// https://tc39.es/ecma262/#sec-isunclampedintegerelementtype
     pub inline fn isUnclampedIntegerElementType(self: ElementType) bool {
         return switch (self) {
@@ -199,7 +199,7 @@ pub const ElementType = enum {
         };
     }
 
-    /// 25.1.3.11 IsBigIntElementType ( type )
+    /// 25.1.3.12 IsBigIntElementType ( type )
     /// https://tc39.es/ecma262/#sec-isbigintelementtype
     pub inline fn isBigIntElementType(self: ElementType) bool {
         return switch (self) {
@@ -3227,7 +3227,7 @@ fn typedArrayCreateSameType(
     const realm = agent.currentRealm();
 
     // 1. Let constructor be the intrinsic object associated with the constructor name
-    //    exemplar.[[TypedArrayName]] in Table 71.
+    //    exemplar.[[TypedArrayName]] in Table 70.
     const constructor_ = switch (exemplar.fields.element_type) {
         inline else => |element_type| blk: {
             const name = element_type.typedArrayName();
@@ -3260,7 +3260,7 @@ fn typedArraySpeciesCreate(
     const realm = agent.currentRealm();
 
     // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
-    //    exemplar.[[TypedArrayName]] in Table 71.
+    //    exemplar.[[TypedArrayName]] in Table 70.
     const default_constructor = switch (exemplar.fields.element_type) {
         inline else => |element_type| blk: {
             const name = element_type.typedArrayName();

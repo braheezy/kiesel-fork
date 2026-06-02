@@ -43,7 +43,7 @@ pub const constructor = struct {
         try object.defineBuiltinFunction(agent, "zip", zip, 1, realm);
         try object.defineBuiltinFunction(agent, "zipKeyed", zipKeyed, 1, realm);
 
-        // 27.1.3.2.2 Iterator.prototype
+        // 27.1.3.2.3 Iterator.prototype
         // https://tc39.es/ecma262/#sec-iterator.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -219,7 +219,7 @@ pub const constructor = struct {
         return Value.from(&gen.object);
     }
 
-    /// 27.1.3.2.1 Iterator.from ( O )
+    /// 27.1.3.2.2 Iterator.from ( O )
     /// https://tc39.es/ecma262/#sec-iterator.from
     fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();

@@ -15,7 +15,7 @@ const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 27.1.3.2.1.1 The %WrapForValidIteratorPrototype% Object
+/// 27.1.3.2.2.1 The %WrapForValidIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -27,7 +27,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "return", @"return", 0, realm);
     }
 
-    /// 27.1.3.2.1.1.1 %WrapForValidIteratorPrototype%.next ( )
+    /// 27.1.3.2.2.1.1 %WrapForValidIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be this value.
@@ -41,7 +41,7 @@ pub const prototype = struct {
         return iterator.next_method.call(agent, Value.from(iterator.iterator), &.{});
     }
 
-    /// 27.1.3.2.1.1.2 %WrapForValidIteratorPrototype%.return ( )
+    /// 27.1.3.2.2.1.2 %WrapForValidIteratorPrototype%.return ( )
     /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.return
     fn @"return"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be this value.

@@ -323,7 +323,7 @@ pub fn rawBytesToNumeric(
     raw_bytes: []const u8,
     is_little_endian: bool,
 ) @"type".type() {
-    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 1. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     var bytes: [element_size]u8 = undefined;
@@ -345,7 +345,7 @@ pub fn getRawBytesFromSharedBlock(
     is_typed_array: bool,
     order: Order,
 ) [@sizeOf(@"type".type())]u8 {
-    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 1. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // TODO: 2-11.
@@ -375,7 +375,7 @@ pub fn getValueFromBuffer(
     // 3. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 4. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 4. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
@@ -414,7 +414,7 @@ pub fn numericToRawBytes(
     is_little_endian: bool,
 ) std.mem.Allocator.Error![@sizeOf(element_type.type())]u8 {
     var raw_bytes = switch (element_type) {
-        // 1. If type is Float16, then
+        // 1. If type is float16, then
         .float16 => blk: {
             // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
             //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
@@ -429,7 +429,7 @@ pub fn numericToRawBytes(
                     value.asNumber().toFloat16(),
             );
         },
-        // 2. If type is float32, then
+        // 2. Else if type is float32, then
         .float32 => blk: {
             // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
             //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
@@ -460,7 +460,7 @@ pub fn numericToRawBytes(
         },
         // 4. Else,
         else => blk: {
-            // a. Let n be the Element Size value specified in Table 71 for Element Type type.
+            // a. Let n be the Element Size value specified in Table 70 for Element Type type.
 
             // b. Let conversionOperation be the abstract operation named in the “Conversion
             //    Operation” column of Table 70 for Element Type type.
@@ -511,7 +511,7 @@ pub fn setValueInBuffer(
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 5. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 6. Let AR be the Agent Record of the surrounding agent.
@@ -568,7 +568,7 @@ pub fn getModifySetValueInBuffer(
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    // 5. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 6. Let AR be the Agent Record of the surrounding agent.
@@ -737,7 +737,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%ArrayBuffer%"()),
         );
 
-        // 25.1.6.7 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
+        // 25.1.6.10 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,

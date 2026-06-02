@@ -247,7 +247,7 @@ pub const prototype = struct {
         } orelse {
             // 8. If throw is undefined, then
 
-            // a. NOTE: If syncIterator does not have a throw method, close it to give it a chance
+            // a. NOTE: If syncIterator does not have a `throw` method, close it to give it a chance
             //    to clean up before we reject the capability.
 
             // b. Let closeCompletion be NormalCompletion(empty).
@@ -258,7 +258,7 @@ pub const prototype = struct {
             };
 
             // e. NOTE: The next step throws a TypeError to indicate that there was a protocol
-            //    violation: syncIterator does not have a throw method.
+            //    violation: syncIterator does not have a `throw` method.
             // f. NOTE: If closing syncIterator does not throw then the result of that operation is
             //    ignored, even if it yields a rejected promise.
 

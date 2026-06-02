@@ -70,7 +70,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 21.1.2.8 Number.MIN_VALUE
+        // 21.1.2.9 Number.MIN_VALUE
         // https://tc39.es/ecma262/#sec-number.min_value
         try object.defineBuiltinPropertyWithAttributes(
             agent,

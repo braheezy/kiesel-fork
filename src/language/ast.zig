@@ -464,12 +464,13 @@ pub const RegularExpressionLiteral = struct {
         }
 
         // 1. Let flags be the FlagText of literal.
-        // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, return false.
+        // 2. If flags contains any code points other than `d`, `g`, `i`, `m`, `s`, `u`, `v`, or
+        //    `y`, return false.
         // 3. If flags contains any code point more than once, return false.
         const parsed_flags = ParsedFlags.from(self.flags) orelse return .invalid_flags;
 
-        // 4. If flags contains u, let u be true; else let u be false.
-        // 5. If flags contains v, let v be true; else let v be false.
+        // 4. If flags contains `u`, let u be true; else let u be false.
+        // 5. If flags contains `v`, let v be true; else let v be false.
         // 6. Let patternText be the BodyText of literal.
         // 7. If u is false and v is false, then
         //     a. Let stringValue be CodePointsToString(patternText).
@@ -1750,7 +1751,7 @@ pub const BindingProperty = union(enum) {
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
     pub fn containsExpression(self: BindingProperty) bool {
         // BindingProperty : PropertyName : BindingElement
-        // 1. let has be IsComputedPropertyKey of PropertyName.
+        // 1. Let has be IsComputedPropertyKey of PropertyName.
         // 2. If has is true, return true.
         // 3. Return ContainsExpression of BindingElement.
         return switch (self) {
@@ -3665,7 +3666,8 @@ pub const Module = struct {
                     std.debug.assert(module_requests.items.len == 1);
                     const module = module_requests.items[0];
 
-                    // 2. Return ExportEntriesForModule of ExportFromClause with argument module.
+                    // 2. Return the ExportEntriesForModule of ExportFromClause with argument
+                    //    module.
                     try export_from.export_from_clause.collectExportEntriesForModule(
                         allocator,
                         export_entries,
@@ -3675,7 +3677,7 @@ pub const Module = struct {
 
                 // ExportDeclaration : export NamedExports ;
                 .named_exports => |named_exports| {
-                    // 1. Return ExportEntriesForModule of NamedExports with argument null.
+                    // 1. Return the ExportEntriesForModule of NamedExports with argument null.
                     try named_exports.collectExportEntriesForModule(allocator, export_entries, null);
                 },
 
@@ -3926,7 +3928,7 @@ pub const ModuleItem = union(enum) {
 
             // ModuleItem : ExportDeclaration
             .export_declaration => |export_declaration| {
-                // 1. If ExportDeclaration is export VariableStatement, return a new empty List.
+                // 1. If ExportDeclaration is `export` VariableStatement, return a new empty List.
                 if (export_declaration == .variable_statement) return;
 
                 // 2. Return the BoundNames of ExportDeclaration.
@@ -3956,7 +3958,7 @@ pub const ModuleItem = union(enum) {
 
             // ModuleItem : ExportDeclaration
             .export_declaration => |export_declaration| switch (export_declaration) {
-                // 1. If ExportDeclaration is export VariableStatement, return the BoundNames of
+                // 1. If ExportDeclaration is `export` VariableStatement, return the BoundNames of
                 //    ExportDeclaration.
                 .variable_statement => |variable_statement| {
                     try variable_statement.variable_declaration_list.collectBoundNames(allocator, var_declared_names);
@@ -3987,7 +3989,7 @@ pub const ModuleItem = union(enum) {
 
             // ModuleItem : ExportDeclaration
             .export_declaration => |export_declaration| switch (export_declaration) {
-                // 1. If ExportDeclaration is export VariableStatement, return the
+                // 1. If ExportDeclaration is `export` VariableStatement, return the
                 //    VarScopedDeclarations of VariableStatement.
                 .variable_statement => |variable_statement| {
                     try variable_statement.variable_declaration_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);

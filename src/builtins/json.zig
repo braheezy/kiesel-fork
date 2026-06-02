@@ -241,9 +241,9 @@ fn createJSONParseRecord(
             var it = property_nodes.iterator();
             while (it.next()) |entry| {
                 // 1. NOTE: In the case of JSON text specifying multiple name/value pairs with the
-                //    same name for a single object (such as {"a":"lost","a":"kept"}), the value for
-                //    the corresponding property of the resulting ECMAScript object is specified by
-                //    the last pair with that name.
+                //    same name for a single object (such as `{"a":"lost","a":"kept"}`), the value
+                //    for the corresponding property of the resulting ECMAScript object is specified
+                //    by the last pair with that name.
                 // 2. Let propertyDefinition be empty.
                 // 3. For each Parse Node propertyNode of propertyNodes, do
                 //     a. Let propName be the PropName of propertyNode.
@@ -614,7 +614,7 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     // 2. For each code point C of StringToCodePoints(value), do
     var it = value.codeUnitIterator();
     while (it.next()) |c| {
-        // a. If C is listed in the “Code Point” column of Table 76, then
+        // a. If C is listed in the “Code Point” column of Table 77, then
         if (c == 0x08 or c == 0x09 or c == 0x0A or c == 0x0C or c == 0x0D or c == 0x22 or c == 0x5C) {
             // i. Set product to the string-concatenation of product and the escape sequence for C
             //    as specified in the “Escape Sequence” column of the corresponding row.

@@ -254,9 +254,9 @@ fn regExpInitialize(
     // 4. Else, let F be ? ToString(flags).
     const f: *const String = if (flags.isUndefined()) .empty else try flags.toString(agent);
 
-    // 5. If flags contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y",
-    //    throw a SyntaxError exception.
-    // 6. If flags contains any code unit more than once, throw a SyntaxError exception.
+    // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", throw a
+    //    SyntaxError exception.
+    // 6. If F contains any code unit more than once, throw a SyntaxError exception.
     // 7. If F contains "i", let i be true; else let i be false.
     // 8. If F contains "m", let m be true; else let m be false.
     // 9. If F contains "s", let s be true; else let s be false.
@@ -706,7 +706,7 @@ fn makeMatchIndicesIndexPairArray(
         // a. Let matchIndices be indices[i].
         const match_indices = indices[i];
 
-        // b. If matchIndices is not undefined,
+        // b. If matchIndices is not undefined, then
         const match_index_pair: Value = if (match_indices != null) blk: {
             // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
             const match_index_pair = try getMatchIndexPair(agent, string, match_indices.?);
@@ -932,7 +932,7 @@ pub const constructor = struct {
                 return;
             },
 
-            // 2. If cp is a code point listed in the “Code Point” column of Table 67, then
+            // 2. If cp is a code point listed in the “Code Point” column of Table 62, then
             '\t'...'\r' => {
                 // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the string in
                 //    the “ControlEscape” column of the row whose “Code Point” column contains cp.
@@ -1679,11 +1679,11 @@ pub const prototype = struct {
         _: c_int,
     ) std.mem.Allocator.Error!*const String {
         // TODO: 1-4.
-        // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in S
-        //    as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
+        // 5. The code points `/` or any LineTerminator occurring in the pattern shall be escaped in
+        //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
         //    parsed (in an appropriate lexical context) as a RegularExpressionLiteral that behaves
         //    identically to the constructed regular expression. For example, if P is "/", then S
-        //    could be "\/" or "\u002F", among other possibilities, but not "/", because ///
+        //    could be "\/" or "\u002F", among other possibilities, but not "/", because `///`
         //    followed by F would be parsed as a SingleLineComment rather than a
         //    RegularExpressionLiteral. If P is the empty String, this specification can be met by
         //    letting S be "(?:)".
