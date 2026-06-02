@@ -69,7 +69,7 @@ pub const namespace = struct {
         try object.defineBuiltinFunction(agent, "supportedValuesOf", supportedValuesOf, 1, realm);
 
         // 8.1.1 Intl [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma402/#sec-Intl-toStringTag
+        // https://tc39.es/ecma402/#sec-intl-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",

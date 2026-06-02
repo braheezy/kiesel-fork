@@ -81,7 +81,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     // 1. Let globalEnv be scriptRecord.[[Realm]].[[GlobalEnv]].
     const global_env = self.realm.global_env;
 
-    // 1. Let scriptContext be a new ECMAScript code execution context.
+    // 2. Let scriptContext be a new ECMAScript code execution context.
     var script_context: ExecutionContext = .{
         // 3. Set the Function of scriptContext to null.
         .origin = .script,

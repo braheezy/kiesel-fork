@@ -2176,7 +2176,7 @@ pub const prototype = struct {
             return result;
         }
 
-        // If len = 0, then
+        // 3. If len = 0, then
         if (len == 0) {
             // a. Perform ? Set(O, "length", +0𝔽, true).
             try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);

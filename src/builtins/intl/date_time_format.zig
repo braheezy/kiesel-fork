@@ -258,7 +258,7 @@ pub fn createDateTimeFormat(
         }
     }
 
-    //25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
+    // 25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
     //     "best fit").
     const format_matcher = try options.getOption(
         agent,

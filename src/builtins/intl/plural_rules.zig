@@ -215,7 +215,7 @@ pub const prototype = struct {
         );
 
         // 17.3.5 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
+        // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",

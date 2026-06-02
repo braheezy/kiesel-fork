@@ -248,7 +248,7 @@ pub fn getThisBinding(self: *const GlobalEnvironment) Value {
 /// 9.1.1.4.12 HasLexicalDeclaration ( envRec, N )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
 pub fn hasLexicalDeclaration(self: *const GlobalEnvironment, name: *const String) bool {
-    // 1.Let DclRec be envRec.[[DeclarativeRecord]].
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. Return ! DclRec.HasBinding(N).
     return self.declarative_record.hasBinding(name);
 }

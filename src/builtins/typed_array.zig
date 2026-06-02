@@ -1444,7 +1444,7 @@ pub const prototype = struct {
         // 7. Let k be 0.
         var k: u53 = 0;
 
-        // 7. Repeat, while k < len,
+        // 8. Repeat, while k < len,
         while (k < @intFromEnum(len)) : (k += 1) {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -1876,7 +1876,7 @@ pub const prototype = struct {
 
         // 7. If n ≥ 0, then
         //     a. Let k be min(n, len - 1).
-        // 10. Else,
+        // 8. Else,
         //     a. Let k be len + n.
         const k_f64 = if (n >= 0)
             @min(n, @as(f64, @floatFromInt(@intFromEnum(len))) - 1)
@@ -3416,8 +3416,10 @@ pub fn allocateTypedArray(
             .ownPropertyKeys = ownPropertyKeys,
         }),
 
-        // 10. Set A.[[Prototype]] to prototype.
+        // 11. Set A.[[Prototype]] to prototype.
         .prototype = prototype_,
+
+        // 12. Return A.
 
         .fields = .{
             // NOTE: This is either set via allocateTypedArrayBuffer() below, or at the call site.

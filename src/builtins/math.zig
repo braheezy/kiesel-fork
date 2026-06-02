@@ -218,10 +218,9 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
-        // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the inverse sine of
-        //    ℝ(n).
+        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 3. Return an implementation-approximated Number value representing the inverse hyperbolic
+        //    sine of ℝ(n).
         return Value.from(std.math.asinh(n.asFloat()));
     }
 

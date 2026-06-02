@@ -468,7 +468,7 @@ pub const prototype = struct {
         );
 
         // 15.3.15 Intl.Locale.prototype [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
+        // https://tc39.es/ecma402/#sec-intl.locale.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",
@@ -651,7 +651,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
-        // 2. Let minimal be the result of the Remove Likely Subtags algorithm applied to
+        // 3. Let minimal be the result of the Remove Likely Subtags algorithm applied to
         //    loc.[[Locale]]. If an error is signaled, set minimal to loc.[[Locale]].
         const locale_expander = icu4zig.LocaleExpander.init();
         defer locale_expander.deinit();

@@ -59,7 +59,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "next", next, 0, realm);
 
         // 19.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%Symbol.tostringtag%
+        // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",

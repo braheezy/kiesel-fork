@@ -565,6 +565,7 @@ pub const TemplateLiteral = struct {
                 // a. Let string be the TRV of templateToken.
                 break :blk try self.templateRawValue(allocator);
             } else blk: {
+                // 2. Else,
                 // a. Let string be the TV of templateToken.
                 break :blk try self.templateValue(allocator);
             };
@@ -630,7 +631,7 @@ pub const UnaryExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-ExponentiationExpression
 /// https://tc39.es/ecma262/#prod-MultiplicativeExpression
-/// https://tc39.es/ecma262/#prod-AdditiveExpression#
+/// https://tc39.es/ecma262/#prod-AdditiveExpression
 /// https://tc39.es/ecma262/#prod-ShiftExpression
 /// https://tc39.es/ecma262/#prod-BitwiseANDExpression
 /// https://tc39.es/ecma262/#prod-BitwiseXORExpression
@@ -691,7 +692,9 @@ pub const EqualityExpression = struct {
     rhs_expression: *Expression,
 };
 
-/// https://tc39.es/ecma262/#prod-LogicalExpression
+/// https://tc39.es/ecma262/#prod-LogicalANDExpression
+/// https://tc39.es/ecma262/#prod-LogicalORExpression
+/// https://tc39.es/ecma262/#prod-CoalesceExpression
 pub const LogicalExpression = struct {
     pub const Operator = enum {
         @"&&",

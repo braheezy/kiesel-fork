@@ -556,7 +556,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     const search_len = search_value.length;
 
     // 3. Assert: fromIndex + searchLen ≤ len.
-    // 1. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
+    // 4. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
     //     a. Let candidate be the substring of string from i to i + searchLen.
     //     b. If candidate is searchValue, return i.
     // 5. Return not-found.

@@ -46,8 +46,8 @@ pub fn hasBinding(self: *const DeclarativeEnvironment, name: *const String) bool
     return self.bindings.contains(name);
 }
 
-/// 9.1.1.2.2 CreateMutableBinding ( N, D )
-/// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
+/// 9.1.1.1.2 CreateMutableBinding ( N, D )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: *DeclarativeEnvironment,
     agent: *Agent,

@@ -302,7 +302,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
         // d. If attributesObj is not undefined, then
         if (!attributes_object.isUndefined()) {
-            // i. If attributesObj is not an Object, the n
+            // i. If attributesObj is not an Object, then
             if (!attributes_object.isObject()) {
                 const @"error" = try agent.createErrorObject(
                     .type_error,

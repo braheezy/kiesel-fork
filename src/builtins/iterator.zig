@@ -1032,7 +1032,7 @@ pub const prototype = struct {
         };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
-        //    integerLimit and performs the following steps when called:
+        //     integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
@@ -1069,7 +1069,7 @@ pub const prototype = struct {
         }.func;
 
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{
@@ -1211,8 +1211,6 @@ pub const prototype = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
-
-                // a. Let remaining be integerLimit.
                 const predicate_ = captures_.predicate;
 
                 // a. Let counter be 0.
@@ -1888,7 +1886,7 @@ pub const prototype = struct {
         };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
-        //    integerLimit and performs the following steps when called:
+        //     integerLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
@@ -1924,7 +1922,7 @@ pub const prototype = struct {
         }.func;
 
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
-        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
             .fields = .{

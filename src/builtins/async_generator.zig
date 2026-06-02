@@ -53,7 +53,7 @@ pub const prototype = struct {
         );
 
         // 27.6.1.5 %AsyncGeneratorPrototype% [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-tostringtag
+        // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",
@@ -763,7 +763,7 @@ pub fn asyncGeneratorAwaitReturn(
     };
 
     // 11. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
-    //    generator and performs the following steps when called:
+    //     generator and performs the following steps when called:
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
@@ -798,7 +798,7 @@ pub fn asyncGeneratorAwaitReturn(
     );
 
     // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
-    //    generator and performs the following steps when called:
+    //     generator and performs the following steps when called:
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();

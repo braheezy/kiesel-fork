@@ -86,7 +86,7 @@ pub fn asFloat(self: *const BigInt) f64 {
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
 pub fn unaryMinus(x: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
-    // 1.If x = 0ℤ, return 0ℤ.
+    // 1. If x = 0ℤ, return 0ℤ.
     if (x.managed.eqlZero()) return x;
 
     // 2. Return -x.

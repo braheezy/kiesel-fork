@@ -616,7 +616,7 @@ pub const constructor = struct {
     }
 
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
-    /// https://tc39.es/ecma262/#sec-string.fromcharcode
+    /// https://tc39.es/ecma262/#sec-string.fromcodepoint
     fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
 
@@ -2450,7 +2450,7 @@ pub const prototype = struct {
     }
 
     /// 22.1.3.34 String.prototype.trimStart ( )
-    /// https://tc39.es/ecma262/#sec-string.prototype.trimend
+    /// https://tc39.es/ecma262/#sec-string.prototype.trimstart
     fn trimStart(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? TrimString(S, start).

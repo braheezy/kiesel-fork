@@ -366,7 +366,6 @@ fn internalizeJSONProperty(
         // b. If isArray is true, then
         if (is_array) {
             // i. Let elementRecordsLen be the number of elements in elementRecords.
-            // b. Let elementRecords be parseRecord.[[Elements]].
             const element_records = switch (records) {
                 .array => |elements| elements,
                 .object, .none => &.{},

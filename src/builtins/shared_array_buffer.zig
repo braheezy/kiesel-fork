@@ -123,7 +123,7 @@ pub fn isGrowableSharedArrayBuffer(array_buffer: *const ArrayBuffer) bool {
 }
 
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
-/// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
+/// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const builtin_function = try createBuiltinFunction(
@@ -285,7 +285,7 @@ pub const prototype = struct {
         // 8. Let isLittleEndian be AR.[[LittleEndian]].
         // 9. Let byteLengthBlock be O.[[ArrayBufferByteLengthData]].
         // 10. Let currentByteLengthRawBytes be GetRawBytesFromSharedBlock(byteLengthBlock, 0,
-        //    biguint64, true, seq-cst).
+        //     biguint64, true, seq-cst).
         // 11. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
         //     isLittleEndian).
         // 12. Repeat,

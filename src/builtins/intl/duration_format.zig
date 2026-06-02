@@ -50,7 +50,7 @@ pub const constructor = struct {
     }
 
     /// 13.1.1 Intl.DurationFormat ( [ locales [ , options ] ] )
-    /// https://tc39.es/ecma402/#sec-intl-durationformat-constructor
+    /// https://tc39.es/ecma402/#sec-Intl.DurationFormat
     fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
@@ -349,7 +349,7 @@ pub const constructor = struct {
         else
             null;
 
-        //17. Return durationFormat.
+        // 17. Return durationFormat.
         return Value.from(&duration_format.object);
     }
 };

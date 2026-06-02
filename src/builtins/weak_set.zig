@@ -47,7 +47,7 @@ pub const constructor = struct {
     }
 
     /// 24.4.1.1 WeakSet ( [ iterable ] )
-    /// https://tc39.es/ecma262/#sec-weak-ref-target
+    /// https://tc39.es/ecma262/#sec-weakset-iterable
     fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 

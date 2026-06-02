@@ -96,7 +96,7 @@ pub const prototype = struct {
         );
 
         // 27.7.3.2 AsyncFunction.prototype [ %Symbol.toStringTag% ]
-        // https://tc39.es/ecma262/#sec-async-function-prototype-properties-toStringTag
+        // https://tc39.es/ecma262/#sec-async-function-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "%Symbol.toStringTag%",

@@ -229,7 +229,7 @@ fn innerModuleLoading(
 
         // d. For each ModuleRequest Record request of module.[[RequestedModules]], do
         for (module.source_text_module.requested_modules.items) |request| {
-            // a. If AllImportAttributesSupported(request.[[Attributes]]) is false, then
+            // i. If AllImportAttributesSupported(request.[[Attributes]]) is false, then
             if (try allImportAttributesSupported(agent, request.attributes)) |unsupported| {
                 // 1. Let error be ThrowCompletion(a newly created SyntaxError object).
                 const @"error" = agent.throwException(
@@ -1775,7 +1775,7 @@ fn executeModule(
         _ = try result;
     } else {
         // 4. Else,
-        // 1. Assert: capability is a PromiseCapability Record.
+        // a. Assert: capability is a PromiseCapability Record.
         std.debug.assert(capability != null);
 
         // b. Perform AsyncBlockStart(capability, module.[[ECMAScriptCode]], moduleContext).

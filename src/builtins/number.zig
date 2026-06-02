@@ -357,7 +357,7 @@ pub const prototype = struct {
     }
 
     /// 21.1.3.3 Number.prototype.toFixed ( fractionDigits )
-    /// https://tc39.es/ecma262/#sec-number.prototype.toprecision
+    /// https://tc39.es/ecma262/#sec-number.prototype.tofixed
     fn toFixed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const fraction_digits_value = arguments.get(0);
 

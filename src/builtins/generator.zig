@@ -84,7 +84,7 @@ pub const prototype = struct {
     }
 
     /// 27.5.1.4 %GeneratorPrototype%.throw ( exception )
-    /// https://tc39.es/ecma262/#sec-generator.prototype.return
+    /// https://tc39.es/ecma262/#sec-generator.prototype.throw
     fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const exception = arguments.get(0);
 
@@ -237,7 +237,7 @@ pub fn generatorStart(
                     //    associated with acGenerator can be discarded at this point.
                     closure_generator.fields.evaluation_state = undefined;
 
-                    // g. If result is a normal completion, then
+                    // i. If result is a normal completion, then
                     //     i. Let resultValue be undefined.
                     // j. Else if result is a return completion, then
                     //     i. Let resultValue be result.[[Value]].

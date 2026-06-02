@@ -369,6 +369,7 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 4. Else,
+        // a-e.
         // TODO: Implement named time zone offset resolution
         break :blk 0;
     };
@@ -999,7 +1000,7 @@ pub const constructor = struct {
     }
 
     /// 21.4.3.2 Date.parse ( string )
-    /// https://tc39.es/ecma262/#sec-date.now
+    /// https://tc39.es/ecma262/#sec-date.parse
     fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const string = try arguments.get(0).toString(agent);
         return Value.from(parseImpl(string));
@@ -1888,7 +1889,7 @@ pub const prototype = struct {
     }
 
     /// 21.4.4.30 Date.prototype.setUTCHours ( hour [ , min [ , sec [ , ms ] ] ] )
-    /// https://tc39.es/ecma262/#sec-date.prototype.sethours
+    /// https://tc39.es/ecma262/#sec-date.prototype.setutchours
     fn setUTCHours(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hour_value = arguments.get(0);
         const minute_value = arguments.getOrNull(1);
@@ -2322,7 +2323,7 @@ pub const prototype = struct {
     }
 
     /// 21.4.4.40 Date.prototype.toLocaleTimeString ( [ reserved1 [ , reserved2 ] ] )
-    /// https://tc39.es/ecma262/#sec-date.prototype.tolocaledatestring
+    /// https://tc39.es/ecma262/#sec-date.prototype.tolocaletimestring
     fn toLocaleTimeString(
         agent: *Agent,
         this_value: Value,

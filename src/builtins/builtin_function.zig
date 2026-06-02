@@ -1,5 +1,5 @@
 //! 10.3 Built-in Function Objects
-//! https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
+//! https://tc39.es/ecma262/#sec-built-in-function-objects
 
 const std = @import("std");
 

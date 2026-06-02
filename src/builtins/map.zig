@@ -60,7 +60,7 @@ pub fn addEntriesFromIterable(
 
         // f. Let v be Completion(Get(next, "1")).
         const v = next.asObject().get(agent, PropertyKey.from(1)) catch |err| {
-            // h. IfAbruptCloseIterator(v, iteratorRecord).
+            // g. IfAbruptCloseIterator(v, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 

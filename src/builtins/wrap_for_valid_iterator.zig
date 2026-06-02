@@ -27,8 +27,8 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "return", @"return", 0, realm);
     }
 
-    /// 22.1.5.1.1 %StringIteratorPrototype%.next ( )
-    /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%.next
+    /// 27.1.3.2.1.1.1 %WrapForValidIteratorPrototype%.next ( )
+    /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be this value.
         // 2. Perform ? RequireInternalSlot(O, [[Iterated]]).

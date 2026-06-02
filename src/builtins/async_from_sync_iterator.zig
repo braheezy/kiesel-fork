@@ -79,7 +79,7 @@ pub const prototype = struct {
     }
 
     /// 27.1.5.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
-    /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
+    /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);

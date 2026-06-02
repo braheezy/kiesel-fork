@@ -1652,7 +1652,7 @@ pub const constructor = struct {
     }
 
     /// 27.2.4.3 Promise.any ( iterable )
-    /// https://tc39.es/ecma262/#sec-promise.
+    /// https://tc39.es/ecma262/#sec-promise.any
     fn any(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
 

@@ -35,7 +35,7 @@ pub const Order = enum {
     unordered,
 };
 
-/// 25.1.3.1 AllocateArrayBuffer ( constructor, byteLength )
+/// 25.1.3.1 AllocateArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
 pub fn allocateArrayBuffer(
     agent: *Agent,
@@ -99,7 +99,7 @@ pub fn allocateArrayBuffer(
         array_buffer.fields.max_byte_length = max_byte_length;
     }
 
-    // 5. Return obj.
+    // 9. Return obj.
     return array_buffer;
 }
 
@@ -896,7 +896,7 @@ pub const prototype = struct {
         // 11. Let copyLength be min(newByteLength, O.[[ArrayBufferByteLength]]).
         // 12. Perform CopyDataBlockBytes(newBlock, 0, oldBlock, 0, copyLength).
         // 13. NOTE: Neither creation of the new Data Block nor copying from the old Data Block are
-        //    observable. Implementations may implement this method as in-place growth or shrinkage.
+        //     observable. Implementations may implement this method as in-place growth or shrinkage.
         // 14. Set O.[[ArrayBufferData]] to newBlock.
         array_buffer.fields.data_block.?.resize(agent.gc_allocator, new_byte_length) catch {
             return agent.throwException(

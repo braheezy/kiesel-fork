@@ -395,7 +395,7 @@ fn evalDeclarationInstantiation(
                 if (!declared_function_names.contains(var_name)) {
                     // a. If varEnv is a Global Environment Record, then
                     if (var_env == .global_environment) {
-                        // i. Let vnDefinable be ? CanDeclareGlobalVar(varEn, vn).
+                        // i. Let vnDefinable be ? CanDeclareGlobalVar(varEnv, vn).
                         const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(
                             agent,
                             var_name,

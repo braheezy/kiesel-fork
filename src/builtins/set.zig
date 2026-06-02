@@ -858,8 +858,6 @@ pub const prototype = struct {
             //      alreadyInResult be true.
             const maybe_result_index = setDataIndex(result_set_data, next);
 
-            // iii. If resultIndex is not-found, let alreadyInResult be false; else let
-            //      alreadyInResult be true.
             // iv. If SetDataHas(O.[[SetData]], next) is true, then
             if (setDataHas(object.fields.set_data, next)) {
                 // 1. If alreadyInResult is true, set resultSetData[resultIndex] to empty.

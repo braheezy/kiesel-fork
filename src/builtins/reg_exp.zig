@@ -1180,7 +1180,7 @@ pub const prototype = struct {
     }
 
     /// 22.2.6.6 get RegExp.prototype.hasIndices
-    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.global
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.hasIndices
     fn hasIndices(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
@@ -1244,10 +1244,10 @@ pub const prototype = struct {
 
             // b. If result is null, then
             if (result == null) {
-                // 1. If n = 0, return null.
+                // i. If n = 0, return null.
                 if (n == 0) return .null;
 
-                // 2. Return A.
+                // ii. Return A.
                 return Value.from(&array.object);
             }
 

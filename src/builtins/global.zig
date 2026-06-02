@@ -239,7 +239,7 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         .{ "TypeError", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%TypeError%") } },
 
         // 19.3.35 Uint8Array ( . . . )
-        // https://tc39.es/ecma262/#sec-uint8array
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-uint8array
         .{ "Uint8Array", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%Uint8Array%") } },
 
         // 19.3.36 Uint8ClampedArray ( . . . )

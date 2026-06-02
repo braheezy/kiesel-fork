@@ -1481,7 +1481,7 @@ pub fn toTemporalZonedDateTime(
     const options_value: Value = maybe_options_value orelse .undefined;
 
     // 2. Let offsetBehaviour be option.
-    // 2. Let hasUTCDesignator be false.
+    // 3. Let hasUTCDesignator be false.
     // 4. If item is an Object, then
     const temporal_rs_zoned_date_time = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then

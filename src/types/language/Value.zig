@@ -694,7 +694,7 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
     // 15. If desc has a [[Get]] field or desc has a [[Set]] field, then
     if (descriptor.get != null or descriptor.set != null) {
         // a. If desc has a [[Value]] field or desc has a [[Writable]] field, throw a TypeError
-        // exception.
+        //    exception.
         if (descriptor.value != null or descriptor.writable != null) {
             return agent.throwException(
                 .type_error,
