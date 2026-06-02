@@ -262,7 +262,8 @@ fn continueDynamicImport(
         error.ExceptionThrown => {
             const exception = agent.clearException();
 
-            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined,
+            //    « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
@@ -345,7 +346,8 @@ fn continueDynamicImport(
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
-                    // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
+                    // i. Perform ! Call(promiseCapability.[[Reject]], undefined,
+                    //    « link.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -370,7 +372,8 @@ fn continueDynamicImport(
                 .promise_capability = promise_capability_,
             };
 
-            // d. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module and promiseCapability and performs the following steps when called:
+            // d. Let fulfilledClosure be a new Abstract Closure with no parameters that captures
+            //    module and promiseCapability and performs the following steps when called:
             const fulfilled_closure = struct {
                 fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     const function_ = agent__.activeFunctionObject();
@@ -473,10 +476,9 @@ pub fn finishLoadingImportedModule(
                 } else {
                     // b. Else,
                     // i. Append the LoadedModuleRequest Record {
-                    //      [[Specifier]]: moduleRequest.[[Specifier]],
-                    //      [[Attributes]]: moduleRequest.[[Attributes]],
-                    //      [[Module]]: result.[[Value]]
-                    //    } to referrer.[[LoadedModules]].
+                    //    [[Specifier]]: moduleRequest.[[Specifier]],
+                    //    [[Attributes]]: moduleRequest.[[Attributes]],
+                    //    [[Module]]: result.[[Value]] } to referrer.[[LoadedModules]].
                     get_or_put_result.value_ptr.* = module;
                 }
             },
@@ -524,7 +526,8 @@ pub fn getModuleNamespace(
     agent: *Agent,
     module: Module,
 ) std.mem.Allocator.Error!*builtins.ModuleNamespace {
-    // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
+    // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or
+    //    unlinked.
     if (module == .source_text_module) {
         std.debug.assert(switch (module.source_text_module.status) {
             .new, .unlinked => false,

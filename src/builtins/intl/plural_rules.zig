@@ -69,10 +69,10 @@ pub const constructor = struct {
 
         // 2. Let pluralRules be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.PluralRules.prototype%", « [[InitializedPluralRules]], [[Locale]], [[Type]],
-        //    [[Notation]], [[CompactDisplay]], [[MinimumIntegerDigits]],
-        //    [[MinimumFractionDigits]], [[MaximumFractionDigits]], [[MinimumSignificantDigits]],
-        //    [[MaximumSignificantDigits]], [[RoundingType]], [[RoundingIncrement]],
-        //    [[RoundingMode]], [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
+        //    [[Notation]], [[CompactDisplay]], [[MinimumIntegerDigits]], [[MinimumFractionDigits]],
+        //    [[MaximumFractionDigits]], [[MinimumSignificantDigits]], [[MaximumSignificantDigits]],
+        //    [[RoundingType]], [[RoundingIncrement]], [[RoundingMode]],
+        //    [[ComputedRoundingPriority]], [[TrailingZeroDisplay]] »).
         const plural_rules = try ordinaryCreateFromConstructor(
             PluralRules,
             agent,
@@ -272,7 +272,8 @@ pub const prototype = struct {
         //     b. If p is "pluralCategories", then
         //         i. Let v be CreateArrayFromList(pluralCategories).
         //     c. Else,
-        //         i. Let v be the value of pr's internal slot whose name is the Internal Slot value of the current row.
+        //         i. Let v be the value of pr's internal slot whose name is the Internal Slot value
+        //            of the current row.
         //     d. If v is not undefined, then
         //         i. If there is a Conversion value in the current row, then
         //             1. Assert: The Conversion value of the current row is number.

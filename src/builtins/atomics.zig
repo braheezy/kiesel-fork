@@ -42,8 +42,8 @@ fn validateIntegerTypedArray(
     waitable: bool,
 ) Agent.Error!TypedArrayWithBufferWitness {
     // 1. Let taRecord be ? ValidateTypedArray(typedArray, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer
-    //    is a growable SharedArrayBuffer.
+    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer is
+    //    a growable SharedArrayBuffer.
     const ta = try validateTypedArray(agent, typed_array_value, .unordered);
     const typed_array = ta.object;
     const @"type" = typed_array.fields.element_type;
@@ -135,8 +135,8 @@ fn revalidateAtomicAccess(
     byte_index_in_buffer: u53,
 ) Agent.Error!void {
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(typedArray, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer
-    //    is a growable SharedArrayBuffer.
+    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer is
+    //    a growable SharedArrayBuffer.
     const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .unordered);
 
     // 3. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
@@ -248,7 +248,8 @@ fn doWait(
     const w = switch (typed_array.fields.element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| blk: {
-            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true,
+            //     seq-cst).
             const w = getValueFromBuffer(
                 agent,
                 buffer,
@@ -329,7 +330,8 @@ fn doWait(
         .true,
     );
 
-    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
+    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value",
+    //     promiseCapability.[[Promise]]).
     try result_object.createDataPropertyDirect(
         agent,
         PropertyKey.from("value"),
@@ -524,7 +526,8 @@ pub const namespace = struct {
                         .{@"type".typedArrayName()},
                     );
                 }
-                // 11. Let expectedBytes be NumericToRawBytes(elementType, expected, isLittleEndian).
+                // 11. Let expectedBytes be NumericToRawBytes(elementType, expected,
+                //     isLittleEndian).
                 const expected_bytes = try numericToRawBytes(
                     agent,
                     @"type",
@@ -532,7 +535,8 @@ pub const namespace = struct {
                     is_little_endian,
                 );
 
-                // 12. Let replacementBytes be NumericToRawBytes(elementType, replacement, isLittleEndian).
+                // 12. Let replacementBytes be NumericToRawBytes(elementType, replacement,
+                //     isLittleEndian).
                 const replacement_bytes = try numericToRawBytes(
                     agent,
                     @"type",
@@ -562,8 +566,8 @@ pub const namespace = struct {
                     //    sequence of elementSize bytes starting with block[byteIndexInBuffer].
                     // b. If ByteListEqual(rawBytesRead, expectedBytes) is true, then
                     if (std.mem.eql(u8, raw_bytes_read, &expected_bytes)) {
-                        // i. Store the individual bytes of replacementBytes into block, starting
-                        //    at block[byteIndexInBuffer].
+                        // i. Store the individual bytes of replacementBytes into block, starting at
+                        //    block[byteIndexInBuffer].
                         @memcpy(raw_bytes_read, &replacement_bytes);
                     }
                 }
@@ -589,9 +593,9 @@ pub const namespace = struct {
         const index = arguments.get(1);
         const value = arguments.get(2);
 
-        // 1. Let second be a new read-modify-write modification function with parameters
-        //    (oldBytes, newBytes) that captures nothing and performs the following steps
-        //    atomically when called:
+        // 1. Let second be a new read-modify-write modification function with parameters (oldBytes,
+        //    newBytes) that captures nothing and performs the following steps atomically when
+        //    called:
         //     a. Return newBytes.
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, second).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Xchg);
@@ -641,7 +645,8 @@ pub const namespace = struct {
         switch (typed_array.fields.element_type) {
             .uint8_clamped, .float16, .float32, .float64 => unreachable,
             inline else => |@"type"| {
-                // 5. Return GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+                // 5. Return GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true,
+                //    seq-cst).
                 const value = getValueFromBuffer(
                     agent,
                     buffer,
@@ -781,7 +786,8 @@ pub const namespace = struct {
         switch (typed_array.fields.element_type) {
             .uint8_clamped, .float16, .float32, .float64 => unreachable,
             inline else => |@"type"| {
-                // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true, seq-cst).
+                // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true,
+                //    seq-cst).
                 try setValueInBuffer(
                     agent,
                     buffer,
@@ -806,9 +812,9 @@ pub const namespace = struct {
         const index = arguments.get(1);
         const value = arguments.get(2);
 
-        // 1. Let subtract be a new read-modify-write modification function with parameters
-        //    (xBytes, yBytes) that captures typedArray and performs the following steps atomically
-        //    when called:
+        // 1. Let subtract be a new read-modify-write modification function with parameters (xBytes,
+        //    yBytes) that captures typedArray and performs the following steps atomically when
+        //    called:
         //     a-j.
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);

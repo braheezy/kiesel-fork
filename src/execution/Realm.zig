@@ -102,8 +102,8 @@ pub fn initializeHostDefinedRealm(
         .ecmascript_code = undefined,
     };
 
-    // 9. Push newContext onto the execution context stack; newContext is now the running
-    //    execution context.
+    // 9. Push newContext onto the execution context stack; newContext is now the running execution
+    //    context.
     try agent.execution_context_stack.append(agent.gc_allocator, new_context);
 
     // 10. If the host requires use of a specific object to serve as realm's global object, then
@@ -116,8 +116,8 @@ pub fn initializeHostDefinedRealm(
     );
     global.shape = try global.shape.makeUnique(agent.gc_allocator);
 
-    // 12. If the host requires that the this binding in realm's global scope return an object
-    //     other than the global object, then
+    // 12. If the host requires that the this binding in realm's global scope return an object other
+    //     than the global object, then
     //     a. Let thisValue be such an object created in a host-defined manner.
     // 13. Else,
     //     a. Let thisValue be global.
@@ -152,16 +152,17 @@ fn createIntrinsics(self: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
     //    the specification of each object in clauses 19 through 28. All object property values are
     //    newly created object values. All values that are built-in function objects are created by
     //    performing CreateBuiltinFunction(steps, length, name, slots, realmRec, prototype, async)
-    //    where steps is the definition of that function provided by this specification, name is
-    //    the initial value of the function's "name" property, length is the initial value of the
+    //    where steps is the definition of that function provided by this specification, name is the
+    //    initial value of the function's "name" property, length is the initial value of the
     //    function's "length" property, slots is a list of the names, if any, of the function's
-    //    specified internal slots, prototype is the specified value of the function's
-    //    [[Prototype]] internal slot, and async is true if the function is described as “async”
-    //    and false otherwise. The creation of the intrinsics and their properties must be ordered
-    //    to avoid any dependencies upon objects that have not yet been created.
+    //    specified internal slots, prototype is the specified value of the function's [[Prototype]]
+    //    internal slot, and async is true if the function is described as “async” and false
+    //    otherwise. The creation of the intrinsics and their properties must be ordered to avoid
+    //    any dependencies upon objects that have not yet been created.
     // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
-    // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
+    // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]],
+    //    realmRec).
     try addRestrictedFunctionProperties(
         agent,
         try self.intrinsics.@"%Function.prototype%"(),

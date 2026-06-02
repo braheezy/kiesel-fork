@@ -106,7 +106,8 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
         );
     }
 
-    // 12. Return a new Set Record { [[Set]]: obj, [[Size]]: intSize, [[Has]]: has, [[Keys]]: keys }.
+    // 12. Return a new Set Record { [[Set]]: obj, [[Size]]: intSize, [[Has]]: has,
+    //     [[Keys]]: keys }.
     return .{
         .set = object,
         .size = @intFromFloat(int_size),
@@ -185,7 +186,8 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "Set must be constructed with 'new'", .{});
         }
 
-        // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%Set.prototype%", « [[SetData]] »).
+        // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%Set.prototype%",
+        //    « [[SetData]] »).
         const set = try ordinaryCreateFromConstructor(
             Set,
             agent,
@@ -576,8 +578,8 @@ pub const prototype = struct {
                 // 2. If inOther is true, then
                 if (in_other) {
                     // a. NOTE: It is possible for earlier calls to otherRec.[[Has]] to remove and
-                    //    re-add an element of O.[[SetData]], which can cause the same element to
-                    //    be visited twice during this iteration.
+                    //    re-add an element of O.[[SetData]], which can cause the same element to be
+                    //    visited twice during this iteration.
                     // b. Let alreadyInResult be SetDataHas(resultSetData, e).
                     // c. If alreadyInResult is false, then
                     //     i. Append e to resultSetData.

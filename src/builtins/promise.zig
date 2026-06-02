@@ -274,8 +274,8 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
         return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
     }
 
-    // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions
-    //    of the Promise constructor (see 27.2.3.1).
+    // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions of
+    //    the Promise constructor (see 27.2.3.1).
 
     // 3. Let resolvingFunctions be the Record { [[Resolve]]: undefined, [[Reject]]: undefined }.
     // NOTE: This is created later.
@@ -362,8 +362,8 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
         );
     }
 
-    // 9. Return the PromiseCapability Record { [[Promise]]: promise, [[Resolve]]:
-    //    resolvingFunctions.[[Resolve]], [[Reject]]: resolvingFunctions.[[Reject]] }.
+    // 9. Return the PromiseCapability Record { [[Promise]]: promise,
+    //    [[Resolve]]: resolvingFunctions.[[Resolve]], [[Reject]]: resolvingFunctions.[[Reject]] }.
     return .{
         .promise = promise,
         .resolve = resolving_functions.resolve.asObject(),
@@ -396,7 +396,8 @@ pub fn rejectPromise(
     // 6. Set promise.[[PromiseState]] to rejected.
     promise.fields.promise_state = .rejected;
 
-    // 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
+    // 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise,
+    //    "reject").
     if (!promise.fields.promise_is_handled) {
         agent.host_hooks.hostPromiseRejectionTracker(agent, promise, .reject);
     }
@@ -503,7 +504,8 @@ pub fn newPromiseReactionJob(
                 }
             } else blk: {
                 // e. Else,
-                // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined, « argument »)).
+                // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined,
+                //    « argument »)).
                 if (agent_.host_hooks.hostCallJobCallback(
                     agent_,
                     handler.?,
@@ -534,7 +536,8 @@ pub fn newPromiseReactionJob(
             switch (handler_result) {
                 // h. If handlerResult is an abrupt completion, then
                 .reject => |value| {
-                    // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
+                    // i. Return ? Call(promiseCapability.[[Reject]], undefined,
+                    //    « handlerResult.[[Value]] »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -542,7 +545,8 @@ pub fn newPromiseReactionJob(
                     );
                 },
                 .resolve => |value| {
-                    // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
+                    // i. Return ? Call(promiseCapability.[[Resolve]], undefined,
+                    //    « handlerResult.[[Value]] »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -559,7 +563,8 @@ pub fn newPromiseReactionJob(
 
     // 3. If reaction.[[Handler]] is not empty, then
     if (reaction.handler) |handler| {
-        // a. Let getHandlerRealmResult be Completion(GetFunctionRealm(reaction.[[Handler]].[[Callback]])).
+        // a. Let getHandlerRealmResult be Completion(GetFunctionRealm(
+        //    reaction.[[Handler]].[[Callback]])).
         const get_handler_realm_result = handler.callback.getFunctionRealm(agent);
 
         // b. If getHandlerRealmResult is a normal completion, set handlerRealm to
@@ -573,7 +578,8 @@ pub fn newPromiseReactionJob(
         }
 
         // d. NOTE: handlerRealm is never null unless the handler is undefined. When the handler is
-        //    a revoked Proxy and no ECMAScript code runs, handlerRealm is used to create error objects.
+        //    a revoked Proxy and no ECMAScript code runs, handlerRealm is used to create error
+        //    objects.
     }
 
     // 4. Return the Record { [[Job]]: job, [[Realm]]: handlerRealm }.
@@ -660,8 +666,8 @@ pub fn newPromiseResolveThenableJob(
         break :blk agent.currentRealm();
     };
 
-    // 5. NOTE: thenRealm is never null. When then.[[Callback]] is a revoked Proxy and no code
-    //    runs, thenRealm is used to create error objects.
+    // 5. NOTE: thenRealm is never null. When then.[[Callback]] is a revoked Proxy and no code runs,
+    //    thenRealm is used to create error objects.
 
     // 6. Return the Record { [[Job]]: job, [[Realm]]: thenRealm }.
     return .{ .job = job, .realm = then_realm };
@@ -698,9 +704,9 @@ fn performPromiseAll(
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
-    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
-    //    is only called once, even in the presence of a misbehaving "then" which calls the passed
-    //    callback before the input iterator is exhausted.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure
+    //    resultCapability.[[Resolve]] is only called once, even in the presence of a misbehaving
+    //    "then" which calls the passed callback before the input iterator is exhausted.
     // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
@@ -856,9 +862,9 @@ fn performPromiseAllSettled(
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
     values.* = .empty;
 
-    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Resolve]]
-    //    is only called once, even in the presence of a misbehaving "then" which calls one of the
-    //    passed callbacks before the input iterator is exhausted.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure
+    //    resultCapability.[[Resolve]] is only called once, even in the presence of a misbehaving
+    //    "then" which calls one of the passed callbacks before the input iterator is exhausted.
     // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
@@ -1126,9 +1132,9 @@ fn performPromiseAny(
     var errors = try agent.gc_allocator.create(std.ArrayList(Value));
     errors.* = .empty;
 
-    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure resultCapability.[[Reject]]
-    //    is only called once, even in the presence of a misbehaving "then" which calls the passed
-    //    callback before the input iterator is exhausted.
+    // 2. NOTE: remainingElementsCount starts at 1 instead of 0 to ensure
+    //    resultCapability.[[Reject]] is only called once, even in the presence of a misbehaving
+    //    "then" which calls the passed callback before the input iterator is exhausted.
     // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
     var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
     remaining_elements_count.* = .{ .value = 1 };
@@ -1154,9 +1160,8 @@ fn performPromiseAny(
                 );
 
                 // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
-                //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
-                //      [[Value]]: CreateArrayFromList(errors)
-                //    }).
+                //    [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
+                //    [[Value]]: CreateArrayFromList(errors) }).
                 const errors_array = try createArrayFromList(agent, errors.items);
                 try aggregate_error.object.definePropertyDirect(agent, PropertyKey.from("errors"), .{
                     .value_or_accessor = .{
@@ -1239,10 +1244,9 @@ fn performPromiseAny(
                         .{},
                     );
 
-                    // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors", PropertyDescriptor {
-                    //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
-                    //      [[Value]]: CreateArrayFromList(errors)
-                    //    }).
+                    // 2. Perform ! DefinePropertyOrThrow(aggregateError, "errors",
+                    //    PropertyDescriptor { [[Configurable]]: true, [[Enumerable]]: false,
+                    //    [[Writable]]: true, [[Value]]: CreateArrayFromList(errors) }).
                     const errors_list = try createArrayFromList(agent_, errors_.items);
                     try aggregate_error.object.definePropertyDirect(agent_, PropertyKey.from("errors"), .{
                         .value_or_accessor = .{
@@ -1372,18 +1376,16 @@ pub fn performPromiseThen(
         break :blk agent.host_hooks.hostMakeJobCallback(on_rejected.asObject());
     };
 
-    // 7. Let fulfillReaction be the PromiseReaction Record {
-    //      [[Capability]]: resultCapability, [[Type]]: fulfill, [[Handler]]: onFulfilledJobCallback
-    //    }.
+    // 7. Let fulfillReaction be the PromiseReaction Record { [[Capability]]: resultCapability,
+    //    [[Type]]: fulfill, [[Handler]]: onFulfilledJobCallback }.
     const fulfill_reaction: PromiseReaction = .{
         .capability = result_capability,
         .type = .fulfill,
         .handler = on_fulfilled_job_callback,
     };
 
-    // 8. Let rejectReaction be the PromiseReaction Record {
-    //      [[Capability]]: resultCapability, [[Type]]: reject, [[Handler]]: onRejectedJobCallback
-    //    }.
+    // 8. Let rejectReaction be the PromiseReaction Record { [[Capability]]: resultCapability,
+    //    [[Type]]: reject, [[Handler]]: onRejectedJobCallback }.
     const reject_reaction: PromiseReaction = .{
         .capability = result_capability,
         .type = .reject,
@@ -1424,7 +1426,8 @@ pub fn performPromiseThen(
             // b. Let reason be promise.[[PromiseResult]].
             const reason = promise.fields.promise_result;
 
-            // c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
+            // c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(
+            //    promise, "handle").
             if (!promise.fields.promise_is_handled) {
                 agent.host_hooks.hostPromiseRejectionTracker(agent, promise, .handle);
             }
@@ -1528,8 +1531,8 @@ pub const constructor = struct {
         // 9. Let resolvingFunctions be CreateResolvingFunctions(promise).
         const resolving_functions = try createResolvingFunctions(agent, promise);
 
-        // 10. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
-        //     resolvingFunctions.[[Reject]] »)).
+        // 10. Let completion be Completion(Call(executor, undefined,
+        //     « resolvingFunctions.[[Resolve]], resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
             agent,
             .undefined,
@@ -1544,7 +1547,8 @@ pub const constructor = struct {
             error.ExceptionThrown => {
                 const exception = agent.clearException();
 
-                // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
+                // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined,
+                //    « completion.[[Value]] »).
                 _ = try Value.from(&resolving_functions.reject.object).callAssumeCallable(
                     agent,
                     .undefined,
@@ -1580,7 +1584,8 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAll(iteratorRecord, C, promiseCapability, promiseResolve)).
+        // 7. Let result be Completion(PerformPromiseAll(iteratorRecord, C, promiseCapability,
+        //    promiseResolve)).
         var result = performPromiseAll(
             agent,
             &iterator,
@@ -1591,7 +1596,8 @@ pub const constructor = struct {
 
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
-            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(
+            //    iteratorRecord, result)).
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
@@ -1627,7 +1633,8 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAllSettled(iteratorRecord, C, promiseCapability, promiseResolve)).
+        // 7. Let result be Completion(PerformPromiseAllSettled(iteratorRecord, C,
+        //    promiseCapability, promiseResolve)).
         var result = performPromiseAllSettled(
             agent,
             &iterator,
@@ -1638,7 +1645,8 @@ pub const constructor = struct {
 
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
-            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(
+            //    iteratorRecord, result)).
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
@@ -1674,7 +1682,8 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAny(iteratorRecord, C, promiseCapability, promiseResolve)).
+        // 7. Let result be Completion(PerformPromiseAny(iteratorRecord, C, promiseCapability,
+        //    promiseResolve)).
         var result = performPromiseAny(
             agent,
             &iterator,
@@ -1685,7 +1694,8 @@ pub const constructor = struct {
 
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
-            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(
+            //    iteratorRecord, result)).
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
@@ -1721,7 +1731,8 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseRace(iteratorRecord, C, promiseCapability, promiseResolve)).
+        // 7. Let result be Completion(PerformPromiseRace(iteratorRecord, C, promiseCapability,
+        //    promiseResolve)).
         var result = performPromiseRace(
             agent,
             &iterator,
@@ -1732,7 +1743,8 @@ pub const constructor = struct {
 
         // 8. If result is an abrupt completion, then
         if (std.meta.isError(result)) {
-            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(
+            //    iteratorRecord, result)).
             if (!iterator.done) result = iterator.close(agent, result);
 
             // b. IfAbruptRejectPromise(result, promiseCapability).
@@ -1983,8 +1995,8 @@ pub const prototype = struct {
                     const value_capture = try agent_.gc_allocator.create(Value);
                     value_capture.* = value;
 
-                    // iii. Let returnValue be a new Abstract Closure with no parameters that captures
-                    //      value and performs the following steps when called:
+                    // iii. Let returnValue be a new Abstract Closure with no parameters that
+                    //      captures value and performs the following steps when called:
                     const return_value = struct {
                         fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();
@@ -2042,8 +2054,8 @@ pub const prototype = struct {
                     const reason_capture = try agent_.gc_allocator.create(Value);
                     reason_capture.* = reason;
 
-                    // iii. Let throwReason be a new Abstract Closure with no parameters that captures
-                    //      reason and performs the following steps when called:
+                    // iii. Let throwReason be a new Abstract Closure with no parameters that
+                    //      captures reason and performs the following steps when called:
                     const throw_reason = struct {
                         fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();

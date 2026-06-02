@@ -418,8 +418,8 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 3. Let sign be 1.
     var sign: f64 = 1;
 
-    // 4. If S is not empty and the first code unit of S is the code unit 0x002D (HYPHEN-MINUS),
-    //    set sign to -1.
+    // 4. If S is not empty and the first code unit of S is the code unit 0x002D (HYPHEN-MINUS), set
+    //    sign to -1.
     if (std.mem.startsWith(u8, string, "-")) sign = -1;
 
     // 5. If S is not empty and the first code unit of S is either the code unit 0x002B (PLUS SIGN)
@@ -621,7 +621,8 @@ fn encode(
             for (buf[0..size]) |byte| {
                 // 1. Let hex be the String representation of octet, formatted as an uppercase
                 //    hexadecimal number.
-                // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0", start).
+                // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0",
+                //    start).
                 try result.appendString(
                     agent.gc_allocator,
                     try String.fromAscii(agent, try std.fmt.allocPrint(

@@ -72,8 +72,7 @@ pub fn createMutableBinding(
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
-    //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
-    //    }).
+    //    [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D }).
     try self.binding_object.definePropertyOrThrow(agent, property_key, .{
         .value = .undefined,
         .writable = true,

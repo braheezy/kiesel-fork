@@ -190,8 +190,8 @@ pub const namespace = struct {
         // 2. If n is either NaN or +∞𝔽, return n.
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n < 1𝔽, return NaN.
-        // 5. Return an implementation-approximated Number value representing the inverse
-        //    hyperbolic cosine of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the inverse hyperbolic
+        //    cosine of ℝ(n).
         return Value.from(std.math.acosh(n.asFloat()));
     }
 
@@ -235,8 +235,8 @@ pub const namespace = struct {
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is +∞𝔽, return an implementation-approximated Number value representing π / 2.
         // 4. If n is -∞𝔽, return an implementation-approximated Number value representing -π / 2.
-        // 5. Return an implementation-approximated Number value representing the inverse tangent
-        //    of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the inverse tangent of
+        //    ℝ(n).
         return Value.from(std.math.atan(n.asFloat()));
     }
 
@@ -252,8 +252,8 @@ pub const namespace = struct {
         // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
         // 4. If n is 1𝔽, return +∞𝔽.
         // 5. If n is -1𝔽, return -∞𝔽.
-        // 6. Return an implementation-approximated Number value representing the inverse
-        //    hyperbolic tangent of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing the inverse hyperbolic
+        //    tangent of ℝ(n).
         return Value.from(std.math.atanh(n.asFloat()));
     }
 
@@ -271,12 +271,16 @@ pub const namespace = struct {
 
         // 3. If ny is NaN or nx is NaN, return NaN.
         // 4. If ny is +∞𝔽, then
-        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing π / 4.
-        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing 3π / 4.
+        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing
+        //        π / 4.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing
+        //        3π / 4.
         //     c. Return an implementation-approximated Number value representing π / 2.
         // 5. If ny is -∞𝔽, then
-        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing -π / 4.
-        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing -3π / 4.
+        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing
+        //        -π / 4.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing
+        //        -3π / 4.
         //     c. Return an implementation-approximated Number value representing -π / 2.
         // 6. If ny is +0𝔽, then
         //     a. If nx > +0𝔽 or nx is +0𝔽, return +0𝔽.
@@ -315,8 +319,7 @@ pub const namespace = struct {
         const n = try x.toNumber(agent);
 
         // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
-        // 3. Return an implementation-approximated Number value representing the cube root of
-        //    ℝ(n).
+        // 3. Return an implementation-approximated Number value representing the cube root of ℝ(n).
         return Value.from(std.math.cbrt(n.asFloat()));
     }
 
@@ -343,7 +346,8 @@ pub const namespace = struct {
         // 1. Let n be ? ToUint32(x).
         const n = try x.toUint32(agent);
 
-        // 2. Let p be the number of leading zero bits in the unsigned 32-bit binary representation of n.
+        // 2. Let p be the number of leading zero bits in the unsigned 32-bit binary representation
+        //    of n.
         const p = @clz(n);
 
         // 3. Return 𝔽(p).
@@ -439,7 +443,8 @@ pub const namespace = struct {
         // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
         if (n.isZero() or !n.isFinite()) return Value.from(n);
 
-        // 4. Let n32 be the result of converting n to IEEE 754-2019 binary32 format using roundTiesToEven mode.
+        // 4. Let n32 be the result of converting n to IEEE 754-2019 binary32 format using
+        //    roundTiesToEven mode.
         const n32: f32 = @floatCast(n.asFloat());
 
         // 5. Let n64 be the result of converting n32 to IEEE 754-2019 binary64 format.
@@ -509,8 +514,8 @@ pub const namespace = struct {
         // 6. If onlyZero is true, return +0𝔽.
         if (only_zero) return Value.from(0);
 
-        // 7. Return an implementation-approximated Number value representing the square root of
-        //    the sum of squares of the mathematical values of the elements of coerced.
+        // 7. Return an implementation-approximated Number value representing the square root of the
+        //    sum of squares of the mathematical values of the elements of coerced.
         var sum_of_squares: f64 = 0;
         for (coerced.items) |number| {
             sum_of_squares += number.asFloat() * number.asFloat();
@@ -717,7 +722,8 @@ pub const namespace = struct {
         // 2. If n is not finite or n is an integral Number, return n.
         // 3. If n < 0.5𝔽 and n > +0𝔽, return +0𝔽.
         // 4. If n < -0𝔽 and n ≥ -0.5𝔽, return -0𝔽.
-        // 5. Return the integral Number closest to n, preferring the Number closer to +∞ in the case of a tie.
+        // 5. Return the integral Number closest to n, preferring the Number closer to +∞ in the
+        //    case of a tie.
         var rounded = n.ceil();
         if (rounded.asFloat() - 0.5 > n.asFloat()) {
             rounded = rounded.subtract(.{ .i32 = 1 });
@@ -764,8 +770,8 @@ pub const namespace = struct {
         const n = try x.toNumber(agent);
 
         // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
-        // 3. Return an implementation-approximated Number value representing the hyperbolic sine
-        //    of ℝ(n).
+        // 3. Return an implementation-approximated Number value representing the hyperbolic sine of
+        //    ℝ(n).
         return Value.from(std.math.sinh(n.asFloat()));
     }
 
@@ -838,9 +844,9 @@ pub const namespace = struct {
         //    b. If next is not done, then
         while (try iterator.stepValue(agent)) |next| {
             // i. If count ≥ 2**53 - 1, then
-            //     1. NOTE: This step is not expected to be reached in practice and is included
-            //        only so that implementations may rely on inputs being "reasonably sized"
-            //        without violating this specification.
+            //     1. NOTE: This step is not expected to be reached in practice and is included only
+            //        so that implementations may rely on inputs being "reasonably sized" without
+            //        violating this specification.
             //     2. Let error be ThrowCompletion(a newly created RangeError object).
             //     3. Return ? IteratorClose(iteratorRecord, error).
 
@@ -1026,8 +1032,8 @@ pub const namespace = struct {
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is +∞𝔽, return 1𝔽.
         // 4. If n is -∞𝔽, return -1𝔽.
-        // 5. Return an implementation-approximated Number value representing the hyperbolic
-        //    tangent of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the hyperbolic tangent
+        //    of ℝ(n).
         return Value.from(std.math.tanh(n.asFloat()));
     }
 

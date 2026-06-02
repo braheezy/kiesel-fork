@@ -237,8 +237,8 @@ pub const constructor = struct {
 
         // 19. NOTE: For historical reasons, the strings "true" and "false" are accepted and
         //     replaced with the default value.
-        // 20. Let useGrouping be ? GetBooleanOrStringNumberFormatOption(options, "useGrouping", «
-        //     "min2", "auto", "always", "true", "false" », defaultUseGrouping).
+        // 20. Let useGrouping be ? GetBooleanOrStringNumberFormatOption(options, "useGrouping",
+        //     « "min2", "auto", "always", "true", "false" », defaultUseGrouping).
         var use_grouping_boolean_or_string = try getBooleanOrStringNumberFormatOption(
             agent,
             options,
@@ -310,7 +310,8 @@ pub const constructor = struct {
         // 25. Set numberFormat.[[SignDisplay]] to signDisplay.
         number_format.fields.sign_display = sign_display;
 
-        // 26. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 26. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //     then
         //     a. Let this be the this value.
         //     b. Return ? ChainNumberFormat(numberFormat, NewTarget, this).
 
@@ -420,8 +421,8 @@ pub const constructor = struct {
             .{ "lessPrecision", .less_precision },
         }).get(rounding_priority_string.asAscii()).?;
 
-        // 11. Let trailingZeroDisplay be ? GetOption(options, "trailingZeroDisplay", string, «
-        //     "auto", "stripIfInteger" », "auto").
+        // 11. Let trailingZeroDisplay be ? GetOption(options, "trailingZeroDisplay", string,
+        //     « "auto", "stripIfInteger" », "auto").
         const trailing_zero_display_string = try options.getOption(
             agent,
             "trailingZeroDisplay",
@@ -451,10 +452,12 @@ pub const constructor = struct {
         // 16. Set intlObj.[[TrailingZeroDisplay]] to trailingZeroDisplay.
         intl_object.fields.trailing_zero_display = trailing_zero_display;
 
-        // 17. If mnsd is undefined and mxsd is undefined, let hasSd be false. Otherwise, let hasSd be true.
+        // 17. If mnsd is undefined and mxsd is undefined, let hasSd be false. Otherwise, let hasSd
+        //     be true.
         const has_sd = if (mnsd_value.isUndefined() and mxsd_value.isUndefined()) false else true;
 
-        // 18. If mnfd is undefined and mxfd is undefined, let hasFd be false. Otherwise, let hasFd be true.
+        // 18. If mnfd is undefined and mxfd is undefined, let hasFd be false. Otherwise, let hasFd
+        //     be true.
         const has_fd = if (mnfd_value.isUndefined() and mxfd_value.isUndefined()) false else true;
 
         // 19. Let needSd be true.
@@ -479,8 +482,8 @@ pub const constructor = struct {
         if (need_sd) {
             // a. If hasSd is true,
             if (has_sd) {
-                // i. Set intlObj.[[MinimumSignificantDigits]] to ? DefaultNumberOption(mnsd, 1,
-                //    21, 1).
+                // i. Set intlObj.[[MinimumSignificantDigits]] to ? DefaultNumberOption(mnsd, 1, 21,
+                //    1).
                 intl_object.fields.minimum_significant_digits = @intCast((try defaultNumberOption(
                     agent,
                     mnsd_value,
@@ -647,8 +650,8 @@ pub const constructor = struct {
     /// 16.1.3 SetNumberFormatUnitOptions ( intlObj, options )
     /// https://tc39.es/ecma402/#sec-setnumberformatunitoptions
     fn setNumberFormatUnitOptions(agent: *Agent, number_format: *NumberFormat, options: *Object) Agent.Error!void {
-        // 1. Let style be ? GetOption(options, "style", string, « "decimal", "percent",
-        //    "currency", "unit" », "decimal").
+        // 1. Let style be ? GetOption(options, "style", string, « "decimal", "percent", "currency",
+        //    "unit" », "decimal").
         const style_string = try options.getOption(
             agent,
             "style",
@@ -834,7 +837,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
 
         // 1. Let nf be the this value.
-        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //    then
         //     a. Set nf to ? UnwrapNumberFormat(nf).
         // 3. Perform ? RequireInternalSlot(nf, [[InitializedNumberFormat]]).
         const number_format = try this_value.requireInternalSlot(agent, NumberFormat);
@@ -847,7 +851,8 @@ pub const prototype = struct {
 
         // 5. For each row of Table 26, except the header row, in table order, do
         // a. Let p be the Property value of the current row.
-        // b. Let v be the value of nf's internal slot whose name is the Internal Slot value of the current row.
+        // b. Let v be the value of nf's internal slot whose name is the Internal Slot value of the
+        //    current row.
         // c. If v is not undefined, then
         //     i. If there is a Conversion value in the current row, then
         //             1. Assert: The Conversion value of the current row is number.
@@ -996,14 +1001,16 @@ pub const prototype = struct {
     /// https://tc39.es/ecma402/#sec-intl.numberformat.prototype.format
     fn format(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let nf be the this value.
-        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //    then
         //     a. Set nf to ? UnwrapNumberFormat(nf).
         // 3. Perform ? RequireInternalSlot(nf, [[InitializedNumberFormat]]).
         const number_format = try this_value.requireInternalSlot(agent, NumberFormat);
 
         // 4. If nf.[[BoundFormat]] is undefined, then
         if (number_format.fields.bound_format == null) {
-            // a. Let F be a new built-in function object as defined in Number Format Functions (16.5.2).
+            // a. Let F be a new built-in function object as defined in Number Format Functions
+            //    (16.5.2).
             // b. Set F.[[NumberFormat]] to nf.
             const Captures = struct {
                 number_format: *NumberFormat,
@@ -1020,8 +1027,8 @@ pub const prototype = struct {
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
 
                     // 1. Let nf be F.[[NumberFormat]].
-                    // 2. Assert: nf is an Object and nf has an [[InitializedNumberFormat]]
-                    //    internal slot.
+                    // 2. Assert: nf is an Object and nf has an [[InitializedNumberFormat]] internal
+                    //    slot.
                     const number_format_ = captures_.number_format;
 
                     // 3. If value is not provided, let value be undefined.

@@ -60,7 +60,8 @@ pub const constructor = struct {
             );
         };
 
-        // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakMap.prototype%", « [[WeakMapData]] »).
+        // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakMap.prototype%",
+        //    « [[WeakMapData]] »).
         const map = try ordinaryCreateFromConstructor(
             WeakMap,
             agent,
@@ -192,7 +193,8 @@ pub const prototype = struct {
         }
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
+        //        p.[[Value]].
         const weak_map_data = &map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
         const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
@@ -228,7 +230,8 @@ pub const prototype = struct {
         }
 
         // 5. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
+        //        p.[[Value]].
         const weak_map_data = &map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
         if (weak_map_data.get(weak_key)) |value| return value;

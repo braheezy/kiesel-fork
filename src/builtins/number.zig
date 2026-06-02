@@ -161,7 +161,8 @@ pub const constructor = struct {
         // 3. If NewTarget is undefined, return n.
         if (new_target == null) return Value.from(n);
 
-        // 4. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Number.prototype%", « [[NumberData]] »).
+        // 4. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Number.prototype%",
+        //    « [[NumberData]] »).
         const object = try ordinaryCreateFromConstructor(
             Number,
             agent,
@@ -408,8 +409,8 @@ pub const prototype = struct {
         // 11. Else,
         //     a. Let n be an integer for which n / 10**f - x is as close to zero as possible. If
         //        there are two such n, pick the larger n.
-        //     b. If n = 0, let m be "0"; else let m be the String value consisting of the digits
-        //        of the decimal representation of n (in order, with no leading zeroes).
+        //     b. If n = 0, let m be "0"; else let m be the String value consisting of the digits of
+        //        the decimal representation of n (in order, with no leading zeroes).
         //     c. If f ≠ 0, then
         //         i. Let k be the length of m.
         //         ii. If k ≤ f, then
@@ -484,7 +485,8 @@ pub const prototype = struct {
 
         // 9. If x = 0, then
         if (x == 0) {
-            // a. Let m be the String value consisting of p occurrences of the code unit 0x0030 (DIGIT ZERO).
+            // a. Let m be the String value consisting of p occurrences of the code unit 0x0030
+            //    (DIGIT ZERO).
             number_string = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s:0>[1]}",
@@ -587,8 +589,8 @@ pub const prototype = struct {
         } else {
             // 13. Else,
             // a. Set m to the string-concatenation of the code unit 0x0030 (DIGIT ZERO), the code
-            //    unit 0x002E (FULL STOP), -(e + 1) occurrences of the code unit 0x0030 (DIGIT ZERO),
-            //    and the String m.
+            //    unit 0x002E (FULL STOP), -(e + 1) occurrences of the code unit 0x0030 (DIGIT
+            //    ZERO), and the String m.
             number_string = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "0.{s:0>[2]}{s}",
@@ -618,7 +620,8 @@ pub const prototype = struct {
         // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
         const radix_mv = if (radix.isUndefined()) 10 else try radix.toIntegerOrInfinity(agent);
 
-        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
+        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError
+        //    exception.
         if (radix_mv < 2 or radix_mv > 36) {
             return agent.throwException(.range_error, "Radix must be in range 2-36", .{});
         }

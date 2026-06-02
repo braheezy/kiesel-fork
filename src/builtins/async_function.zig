@@ -215,7 +215,8 @@ pub fn asyncBlockStart(
                 // f. If result is a normal completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
                 // g. Else if result is a return completion, then
-                //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « result.[[Value]] »).
+                //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined,
+                //        « result.[[Value]] »).
                 _ = Value.from(promise_capability_.resolve).callAssumeCallable(
                     agent_,
                     .undefined,
@@ -230,7 +231,8 @@ pub fn asyncBlockStart(
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
-                    // ii. Perform ! Call(promiseCapability.[[Reject]], undefined, « result.[[Value]] »).
+                    // ii. Perform ! Call(promiseCapability.[[Reject]], undefined,
+                    //     « result.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
                         agent_,
                         .undefined,
@@ -287,7 +289,8 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
             const v = arguments_.get(0);
 
             // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, NormalCompletion(v))).
-            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally ignored.
+            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally
+            //    ignored.
             _ = v;
             _ = async_context_;
 
@@ -314,8 +317,10 @@ pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
             const async_context_ = captures_.async_context;
             const reason = arguments_.get(0);
 
-            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, ThrowCompletion(reason))).
-            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally ignored.
+            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, ThrowCompletion(
+            //          reason))).
+            // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally
+            //    ignored.
             _ = reason;
             _ = async_context_;
 

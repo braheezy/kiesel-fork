@@ -60,7 +60,8 @@ pub const constructor = struct {
         //    newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
-        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%", « [[ErrorData]] »).
+        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%",
+        //    « [[ErrorData]] »).
         const aggregate_error = try ordinaryCreateFromConstructor(
             AggregateError,
             agent,
@@ -104,9 +105,8 @@ pub const constructor = struct {
         defer agent.gc_allocator.free(errors_list);
 
         // 6. Perform ! DefinePropertyOrThrow(O, "errors", PropertyDescriptor {
-        //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
-        //      [[Value]]: CreateArrayFromList(errorsList)
-        //    }).
+        //    [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
+        //    [[Value]]: CreateArrayFromList(errorsList) }).
         const errors_list_array = try createArrayFromList(agent, errors_list);
         try aggregate_error.object.definePropertyDirect(
             agent,

@@ -225,8 +225,8 @@ pub fn generatorStart(
                     //    performed either an implicit or explicit return.
 
                     // f. Remove acGenContext from the execution context stack and restore the
-                    //    execution context that is at the top of the execution context stack as
-                    //    the running execution context.
+                    //    execution context that is at the top of the execution context stack as the
+                    //    running execution context.
                     _ = agent_.execution_context_stack.pop().?;
 
                     // g. Set acGenerator.[[GeneratorState]] to completed.
@@ -341,9 +341,9 @@ pub fn generatorResumeAbrupt(
         // a. Set generator.[[GeneratorState]] to completed.
         generator.fields.generator_state = .completed;
 
-        // b. NOTE: Once a generator enters the completed state it never leaves it and its associated
-        //    execution context is never resumed. Any execution state associated with generator can be
-        //    discarded at this point.
+        // b. NOTE: Once a generator enters the completed state it never leaves it and its
+        //    associated execution context is never resumed. Any execution state associated with
+        //    generator can be discarded at this point.
         generator.fields.evaluation_state = undefined;
 
         // c. Set state to completed.
@@ -443,7 +443,8 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
     //    resumed again, let resumptionValue be the Completion Record with which it is resumed.
     generator.fields.evaluation_state.suspension_result = Value.from(iterator_result);
 
-    // TODO: 9. Assert: If control reaches here, then genContext is the running execution context again.
+    // TODO: 9. Assert: If control reaches here, then genContext is the running execution context
+    //          again.
     // TODO: 10. Return resumptionValue.
     return .{ .normal = .undefined };
 }

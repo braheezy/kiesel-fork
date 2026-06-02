@@ -347,8 +347,8 @@ fn validateAndApplyPropertyDescriptor(
             // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is true, return false.
             if (descriptor.writable) |writable| if (writable) return false;
 
-            // ii. NOTE: SameValue returns true for NaN values which may be distinguishable by
-            //     other means. Returning here ensures that any existing property of O remains unmodified.
+            // ii. NOTE: SameValue returns true for NaN values which may be distinguishable by other
+            //     means. Returning here ensures that any existing property of O remains unmodified.
             // iii. If Desc has a [[Value]] field, return SameValue(Desc.[[Value]],
             //      current.[[Value]]).
             if (descriptor.value) |value| return sameValue(value, current.value.?);
@@ -386,7 +386,8 @@ fn validateAndApplyPropertyDescriptor(
                 },
             };
         } else if (current.isAccessorDescriptor() and descriptor.isDataDescriptor()) blk: {
-            // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true, then
+            // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true,
+            //    then
             // i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
             //    else let configurable be current.[[Configurable]].
             const configurable = descriptor.configurable orelse current.configurable.?;
@@ -701,9 +702,8 @@ pub fn ordinarySetWithOwnDescriptor(
             );
         }
 
-        // c. Set ownDesc to the PropertyDescriptor {
-        //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
-        //    }.
+        // c. Set ownDesc to the PropertyDescriptor { [[Value]]: undefined, [[Writable]]: true,
+        //    [[Enumerable]]: true, [[Configurable]]: true }.
         break :blk PropertyDescriptor{
             .value = .undefined,
             .writable = true,
@@ -829,8 +829,8 @@ pub fn ordinaryOwnPropertyKeys(
             @intFromBool(object.is(builtins.Array)),
     );
 
-    // 2. For each own property key P of O such that P is an array index, in ascending numeric
-    //    index order, do
+    // 2. For each own property key P of O such that P is an array index, in ascending numeric index
+    //    order, do
     //     a. Append P to keys.
     switch (object.property_storage.indexed_properties.storage) {
         .none => {},
@@ -871,8 +871,8 @@ pub fn ordinaryOwnPropertyKeys(
         }
     }
 
-    // 4. For each own property key P of O such that P is a Symbol, in ascending chronological
-    //    order of property creation, do
+    // 4. For each own property key P of O such that P is a Symbol, in ascending chronological order
+    //    of property creation, do
     for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
@@ -928,9 +928,9 @@ pub fn ordinaryCreateFromConstructor(
     comptime intrinsic_default_proto: []const u8,
     fields: T.Fields,
 ) Agent.Error!*T {
-    // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
-    //    object. The corresponding object must be an intrinsic that is intended to be used
-    //    as the [[Prototype]] value of an object.
+    // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
+    //    corresponding object must be an intrinsic that is intended to be used as the [[Prototype]]
+    //    value of an object.
     comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? GetPrototypeFromConstructor(constructor, intrinsicDefaultProto).
@@ -950,8 +950,8 @@ pub fn getPrototypeFromConstructor(
     comptime intrinsic_default_proto: []const u8,
 ) Agent.Error!*Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
-    //    corresponding object must be an intrinsic that is intended to be used as the
-    //    [[Prototype]] value of an object.
+    //    corresponding object must be an intrinsic that is intended to be used as the [[Prototype]]
+    //    value of an object.
     comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? Get(constructor, "prototype").

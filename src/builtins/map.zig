@@ -112,7 +112,8 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "Map must be constructed with 'new'", .{});
         }
 
-        // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%Map.prototype%", « [[MapData]] »).
+        // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%Map.prototype%",
+        //    « [[MapData]] »).
         const map = try ordinaryCreateFromConstructor(
             Map,
             agent,
@@ -357,7 +358,8 @@ pub const prototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
+        //        p.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 5. Return undefined.
@@ -378,7 +380,8 @@ pub const prototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
+        //        p.[[Value]].
         const gop = try map.fields.map_data.getOrPut(agent.gc_allocator, key);
         if (gop.found_existing) return gop.value_ptr.*;
 
@@ -409,7 +412,8 @@ pub const prototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 5. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
+        //        p.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 6. Let value be ? Call(callback, undefined, « key »).

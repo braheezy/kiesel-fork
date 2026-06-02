@@ -648,13 +648,15 @@ pub fn codePointAt(self: *const String, position: u32) CodePoint {
 
             // 5. If first is neither a leading surrogate nor a trailing surrogate, then
             if (!std.unicode.utf16IsHighSurrogate(first) and !std.unicode.utf16IsLowSurrogate(first)) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1, [[IsUnpairedSurrogate]]: false }.
+                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                //    [[IsUnpairedSurrogate]]: false }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = false };
             }
 
             // 6. If first is a trailing surrogate or position + 1 = size, then
             if (std.unicode.utf16IsLowSurrogate(first) or position + 1 == size) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1, [[IsUnpairedSurrogate]]: true }.
+                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                //    [[IsUnpairedSurrogate]]: true }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = true };
             }
 
@@ -663,14 +665,16 @@ pub fn codePointAt(self: *const String, position: u32) CodePoint {
 
             // 8. If second is not a trailing surrogate, then
             if (!std.unicode.utf16IsLowSurrogate(second)) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1, [[IsUnpairedSurrogate]]: true }.
+                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                //    [[IsUnpairedSurrogate]]: true }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = true };
             }
 
             // 9. Set cp to UTF16SurrogatePairToCodePoint(first, second).
             code_point = std.unicode.utf16DecodeSurrogatePair(&.{ first, second }) catch unreachable;
 
-            // 10. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 2, [[IsUnpairedSurrogate]]: false }.
+            // 10. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 2,
+            //     [[IsUnpairedSurrogate]]: false }.
             return .{ .code_point = code_point, .code_unit_count = 2, .is_unpaired_surrogate = false };
         },
     }

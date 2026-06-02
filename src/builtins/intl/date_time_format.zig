@@ -150,7 +150,8 @@ pub fn createDateTimeFormat(
     // 18. If IsTimeZoneOffsetString(timeZone) is true, then
     //     a. Let parseResult be ParseText(StringToCodePoints(timeZone), UTCOffset).
     //     b. Assert: parseResult is a Parse Node.
-    //     c. If parseResult contains more than one MinuteSecond Parse Node, throw a RangeError exception.
+    //     c. If parseResult contains more than one MinuteSecond Parse Node, throw a RangeError
+    //        exception.
     //     d. Let offsetNanoseconds be ParseTimeZoneOffsetString(timeZone).
     //     e. Let offsetMinutes be offsetNanoseconds / (6 × 10**10).
     //     f. Assert: offsetMinutes is an integer.
@@ -232,7 +233,8 @@ pub fn createDateTimeFormat(
 
         // b. If prop is "fractionalSecondDigits", then
         const value = if (comptime std.mem.eql(u8, property, "fractionalSecondDigits")) blk: {
-            // i. Let value be ? GetNumberOption(options, "fractionalSecondDigits", 1, 3, undefined).
+            // i. Let value be ? GetNumberOption(options, "fractionalSecondDigits", 1, 3,
+            //    undefined).
             break :blk try getNumberOption(
                 agent,
                 options,
@@ -258,8 +260,8 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // 25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic", "best fit" »,
-    //     "best fit").
+    // 25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic",
+    //     "best fit" », "best fit").
     const format_matcher = try options.getOption(
         agent,
         "formatMatcher",
@@ -423,7 +425,8 @@ pub const constructor = struct {
             .date,
         );
 
-        // 3. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 3. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //    then
         //    a. Let this be the this value.
         //    b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
 
@@ -472,7 +475,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
 
         // 1. Let lf be the this value.
-        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
         const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
@@ -486,10 +490,12 @@ pub const prototype = struct {
         // 5. For each row of Table 15, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
         //     b. If there is an Internal Slot value in the current row, then
-        //         i. Let v be the value of dtf's internal slot whose name is the Internal Slot value of the current row.
+        //         i. Let v be the value of dtf's internal slot whose name is the Internal Slot
+        //            value of the current row.
         //     c. Else,
         //         i. Let format be dtf.[[DateTimeFormat]].
-        //         ii. If format has a field [[<p>]] and dtf.[[DateStyle]] is undefined and dtf.[[TimeStyle]] is undefined, then
+        //         ii. If format has a field [[<p>]] and dtf.[[DateStyle]] is undefined and
+        //             dtf.[[TimeStyle]] is undefined, then
         //             1. Let v be format.[[<p>]].
         //         iii. Else,
         //             1. Let v be undefined.
@@ -553,14 +559,16 @@ pub const prototype = struct {
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.format
     fn format(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dtf be the this value.
-        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
+        //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
         const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
 
         // 4. If dtf.[[BoundFormat]] is undefined, then
         if (date_time_format.fields.bound_format == null) {
-            // a. Let F be a new built-in function object as defined in DateTime Format Functions (11.5.4).
+            // a. Let F be a new built-in function object as defined in DateTime Format Functions
+            //    (11.5.4).
             // b. Set F.[[DateTimeFormat]] to dtf.
             const Captures = struct {
                 date_time_format: *DateTimeFormat,

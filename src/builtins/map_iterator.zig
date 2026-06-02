@@ -33,7 +33,8 @@ pub fn createMapIterator(
     // 2. Let closure be a new Abstract Closure with no parameters that captures map and kind and
     //    performs the following steps when called:
     //    [...]
-    // 3. Return CreateIteratorFromClosure(closure, "%MapIteratorPrototype%", %MapIteratorPrototype%).
+    // 3. Return CreateIteratorFromClosure(closure, "%MapIteratorPrototype%",
+    //    %MapIteratorPrototype%).
     return MapIterator.create(agent, .{
         .prototype = try realm.intrinsics.@"%MapIteratorPrototype%"(),
         .fields = .{ .state = .{ .map = map, .kind = kind, .index = 0 } },

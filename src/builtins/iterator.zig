@@ -239,7 +239,8 @@ pub const constructor = struct {
             return Value.from(iterator.iterator);
         }
 
-        // 4. Let wrapper be OrdinaryObjectCreate(%WrapForValidIteratorPrototype%, « [[Iterated]] »).
+        // 4. Let wrapper be OrdinaryObjectCreate(%WrapForValidIteratorPrototype%,
+        //    « [[Iterated]] »).
         const wrapper = try builtins.WrapForValidIterator.create(agent, .{
             .prototype = try realm.intrinsics.@"%WrapForValidIteratorPrototype%"(),
             .fields = .{
@@ -971,9 +972,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1099,9 +1099,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1141,7 +1140,8 @@ pub const prototype = struct {
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
-            // e. If ToBoolean(result) is false, return ? IteratorClose(iterated, NormalCompletion(false)).
+            // e. If ToBoolean(result) is false, return ? IteratorClose(iterated, NormalCompletion(
+            //    false)).
             if (!result.toBoolean()) {
                 return try iterated.close(agent, @as(Agent.Error!Value, .false));
             }
@@ -1165,9 +1165,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1220,7 +1219,8 @@ pub const prototype = struct {
                 //     i. Let value be ? IteratorStepValue(iterated).
                 //     ii. If value is done, return ReturnCompletion(undefined).
                 while (try iterated_.stepValue(agent_)) |value| {
-                    // iii. Let selected be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
+                    // iii. Let selected be Completion(Call(predicate, undefined, « value,
+                    //      𝔽(counter) »)).
                     const selected = predicate_.callAssumeCallable(
                         agent_,
                         .undefined,
@@ -1275,9 +1275,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1317,7 +1316,8 @@ pub const prototype = struct {
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
-            // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(value)).
+            // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(
+            //    value)).
             if (result.toBoolean()) {
                 return iterated.close(agent, @as(Agent.Error!Value, value));
             }
@@ -1341,9 +1341,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1408,7 +1407,8 @@ pub const prototype = struct {
                         // ii. If value is done, return ReturnCompletion(undefined).
                         const value = (try iterated_.stepValue(agent_)) orelse return null;
 
-                        // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
+                        // iii. Let mapped be Completion(Call(mapper, undefined, « value,
+                        //      𝔽(counter) »)).
                         const mapped = mapper_.callAssumeCallable(
                             agent_,
                             .undefined,
@@ -1418,7 +1418,8 @@ pub const prototype = struct {
                             return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                         };
 
-                        // v. Let innerIterator be Completion(GetIteratorFlattenable(mapped, reject-primitives)).
+                        // v. Let innerIterator be Completion(GetIteratorFlattenable(mapped,
+                        //    reject-primitives)).
                         inner_iterator_.* = getIteratorFlattenable(
                             agent_,
                             mapped,
@@ -1445,7 +1446,8 @@ pub const prototype = struct {
                         // 4. Else,
                         //     a. Let completion be Completion(Yield(innerValue)).
                         //     b. If completion is an abrupt completion, then
-                        //         i. Let backupCompletion be Completion(IteratorClose(innerIterator, completion)).
+                        //         i. Let backupCompletion be Completion(IteratorClose(
+                        //            innerIterator, completion)).
                         //         ii. IfAbruptCloseIterator(backupCompletion, iterated).
                         //         iii. Return ? IteratorClose(iterated, completion).
                         if (inner_value) |value| return value;
@@ -1504,9 +1506,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1565,9 +1566,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1673,9 +1673,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1728,7 +1727,8 @@ pub const prototype = struct {
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return accumulator.
         while (try iterated.stepValue(agent)) |value| {
-            // c. Let result be Completion(Call(reducer, undefined, « accumulator, value, 𝔽(counter) »)).
+            // c. Let result be Completion(Call(reducer, undefined, « accumulator, value,
+            //    𝔽(counter) »)).
             const result = reducer.callAssumeCallable(
                 agent,
                 .undefined,
@@ -1759,9 +1759,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,
@@ -1801,7 +1800,8 @@ pub const prototype = struct {
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
-            // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(true)).
+            // e. If ToBoolean(result) is true, return ? IteratorClose(iterated, NormalCompletion(
+            //    true)).
             if (result.toBoolean()) {
                 return try iterated.close(agent, @as(Agent.Error!Value, .true));
             }
@@ -1825,9 +1825,8 @@ pub const prototype = struct {
         }
         const object = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record {
-        //      [[Iterator]]: O, [[NextMethod]]: undefined, [[Done]]: false
-        //    }.
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = object,
             .next_method = .undefined,

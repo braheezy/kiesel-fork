@@ -31,8 +31,8 @@ pub fn createRegExpStringIterator(
 ) std.mem.Allocator.Error!*RegExpStringIterator {
     const realm = agent.currentRealm();
 
-    // 1. Let iterator be OrdinaryObjectCreate(%RegExpStringIteratorPrototype%, «
-    //    [[IteratingRegExp]], [[IteratedString]], [[Global]], [[Unicode]], [[Done]] »).
+    // 1. Let iterator be OrdinaryObjectCreate(%RegExpStringIteratorPrototype%,
+    //    « [[IteratingRegExp]], [[IteratedString]], [[Global]], [[Unicode]], [[Done]] »).
     const iterator = try RegExpStringIterator.create(agent, .{
         .prototype = try realm.intrinsics.@"%RegExpStringIteratorPrototype%"(),
         .fields = .{

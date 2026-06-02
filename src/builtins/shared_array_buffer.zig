@@ -57,7 +57,8 @@ pub fn allocateSharedArrayBuffer(
     // 4. Else,
     //     a. Append [[ArrayBufferByteLength]] to slots.
 
-    // 5. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%SharedArrayBuffer.prototype%", slots).
+    // 5. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%SharedArrayBuffer.prototype%",
+    //    slots).
     const array_buffer = try ordinaryCreateFromConstructor(
         builtins.ArrayBuffer,
         agent,
@@ -289,9 +290,9 @@ pub const prototype = struct {
         // 11. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
         //     isLittleEndian).
         // 12. Repeat,
-        // a. NOTE: This is a compare-and-exchange loop to ensure that parallel, racing grows of
-        //    the same buffer are totally ordered, are not lost, and do not silently do nothing.
-        //    The loop exits if it was able to attempt to grow uncontended.
+        // a. NOTE: This is a compare-and-exchange loop to ensure that parallel, racing grows of the
+        //    same buffer are totally ordered, are not lost, and do not silently do nothing. The
+        //    loop exits if it was able to attempt to grow uncontended.
         // b. Let currentByteLength be ℝ(RawBytesToNumeric(biguint64, currentByteLengthRawBytes,
         //    isLittleEndian)).
         const ptr: *usize = @ptrCast(&array_buffer.fields.byte_length);
@@ -300,8 +301,8 @@ pub const prototype = struct {
         // c. If newByteLength = currentByteLength, return undefined.
         if (new_byte_length == current_byte_length) return .undefined;
 
-        // d. If newByteLength < currentByteLength or newByteLength > O.[[ArrayBufferMaxByteLength]],
-        //    throw a RangeError exception.
+        // d. If newByteLength < currentByteLength or
+        //    newByteLength > O.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
         if (@intFromEnum(new_byte_length) < @intFromEnum(current_byte_length)) {
             return agent.throwException(.range_error, "Cannot shrink buffer", .{});
         }

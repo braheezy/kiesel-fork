@@ -60,7 +60,8 @@ pub const constructor = struct {
             );
         };
 
-        // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakSet.prototype%", « [[WeakSetData]] »).
+        // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakSet.prototype%",
+        //    « [[WeakSetData]] »).
         const set = try ordinaryCreateFromConstructor(
             WeakSet,
             agent,
@@ -208,7 +209,8 @@ pub const prototype = struct {
 
         // 4. For each element e of S.[[WeakSetData]], do
         //     a. If e is not empty and SameValue(e, value) is true, then
-        //         i. Replace the element of S.[[WeakSetData]] whose value is e with an element whose value is empty.
+        //         i. Replace the element of S.[[WeakSetData]] whose value is e with an element
+        //            whose value is empty.
         //         ii. Return true.
         // 5. Return false.
         const is_removed = set.fields.weak_set_data.remove(Value.Weak.init(value));

@@ -197,7 +197,8 @@ pub const prototype = struct {
         // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
         const radix_mv = if (radix.isUndefined()) 10 else try radix.toIntegerOrInfinity(agent);
 
-        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
+        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError
+        //    exception.
         if (radix_mv < 2 or radix_mv > 36) {
             return agent.throwException(.range_error, "Radix must be in range 2-36", .{});
         }

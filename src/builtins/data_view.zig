@@ -58,9 +58,8 @@ fn makeDataViewWithBufferWitnessRecord(
         break :blk arrayBufferByteLength(buffer, order).toDetached();
     };
 
-    // 4. Return the DataView With Buffer Witness Record {
-    //      [[Object]]: obj, [[CachedBufferByteLength]]: byteLength
-    //    }.
+    // 4. Return the DataView With Buffer Witness Record { [[Object]]: obj,
+    //    [[CachedBufferByteLength]]: byteLength }.
     return .{ .object = object, .cached_buffer_byte_length = byte_length };
 }
 

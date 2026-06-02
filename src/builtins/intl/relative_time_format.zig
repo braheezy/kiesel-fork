@@ -113,7 +113,8 @@ pub const constructor = struct {
             r.options.nu orelse String.fromLiteral("latn");
         relative_time_format.fields.numbering_system = numbering_system;
 
-        // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" », "long").
+        // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
+        //     "long").
         const style_string = try options.getOption(
             agent,
             "style",
@@ -134,7 +135,8 @@ pub const constructor = struct {
         // 11. Set relativeTimeFormat.[[Style]] to style.
         relative_time_format.fields.style = style;
 
-        // 12. Let numeric be ? GetOption(options, "numeric", string, « "always", "auto" », "always").
+        // 12. Let numeric be ? GetOption(options, "numeric", string, « "always", "auto" »,
+        //     "always").
         const numeric_string = try options.getOption(
             agent,
             "numeric",
@@ -156,8 +158,10 @@ pub const constructor = struct {
         // 14. Let nfOptions be OrdinaryObjectCreate(null).
         // 15. Perform ! CreateDataPropertyOrThrow(nfOptions, "numberingSystem",
         //     relativeTimeFormat.[[NumberingSystem]]).
-        // 16. Let relativeTimeFormat.[[NumberFormat]] be ! Construct(%Intl.NumberFormat%, « locale, nfOptions »).
-        // 17. Let relativeTimeFormat.[[PluralRules]] be ! Construct(%Intl.PluralRules%, « locale »).
+        // 16. Let relativeTimeFormat.[[NumberFormat]] be ! Construct(%Intl.NumberFormat%, « locale,
+        //     nfOptions »).
+        // 17. Let relativeTimeFormat.[[PluralRules]] be ! Construct(%Intl.PluralRules%,
+        //     « locale »).
 
         // 18. Return relativeTimeFormat.
         return Value.from(&relative_time_format.object);
@@ -214,7 +218,8 @@ pub const prototype = struct {
 
         // 4. For each row of Table 31, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of relativeTimeFormat's internal slot whose name is the Internal Slot value of the current row.
+        //     b. Let v be the value of relativeTimeFormat's internal slot whose name is the
+        //        Internal Slot value of the current row.
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = relative_time_format.fields.resolvedOptions();

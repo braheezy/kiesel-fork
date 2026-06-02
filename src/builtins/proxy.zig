@@ -50,7 +50,8 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
         &.{Value.from(target)},
     );
 
-    // 8. If handlerProto is not an Object and handlerProto is not null, throw a TypeError exception.
+    // 8. If handlerProto is not an Object and handlerProto is not null, throw a TypeError
+    //    exception.
     if (!handler_prototype.isObject() and !handler_prototype.isNull()) {
         return agent.throwException(
             .type_error,
@@ -269,7 +270,8 @@ fn getOwnProperty(
         &.{ Value.from(target), try property_key.toValue(agent) },
     );
 
-    // 8. If trapResultObj is not an Object and trapResultObj is not undefined, throw a TypeError exception.
+    // 8. If trapResultObj is not an Object and trapResultObj is not undefined, throw a TypeError
+    //    exception.
     if (!trap_result_obj.isObject() and !trap_result_obj.isUndefined()) {
         return agent.throwException(
             .type_error,
@@ -483,8 +485,8 @@ fn defineOwnProperty(
         if (target_descriptor.?.isDataDescriptor() and
             target_descriptor.?.configurable == false and
             target_descriptor.?.writable == true and
-            // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, throw a
-            //    TypeError exception.
+            // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, throw a TypeError
+            //    exception.
             property_descriptor.writable == false)
         {
             return agent.throwException(
@@ -611,7 +613,8 @@ fn get(
     if (target_descriptor != null and target_descriptor.?.configurable == false) {
         // a. If IsDataDescriptor(targetDesc) is true and targetDesc.[[Writable]] is false, then
         if (target_descriptor.?.isDataDescriptor() and target_descriptor.?.writable == false) {
-            // i. If SameValue(trapResult, targetDesc.[[Value]]) is false, throw a TypeError exception.
+            // i. If SameValue(trapResult, targetDesc.[[Value]]) is false, throw a TypeError
+            //    exception.
             if (!sameValue(trap_result, target_descriptor.?.value.?)) {
                 return agent.throwException(
                     .type_error,
@@ -1056,7 +1059,8 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Proxy 
             .proxy_handler = handler.asObject(),
         },
 
-        // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the definitions specified in 10.5.
+        // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the
+        //    definitions specified in 10.5.
         .internal_methods = proxyInternalMethods(false, false),
     });
 

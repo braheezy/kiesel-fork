@@ -78,7 +78,8 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
         .captures = cell,
         .func = struct {
             fn cleanupJob(captures: *anyopaque) Agent.Error!Value {
-                // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(finalizationRegistry)).
+                // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(
+                //    finalizationRegistry)).
                 const cell_: *Cell = @ptrCast(@alignCast(captures));
                 cleanupFinalizationRegistry(cell_) catch |err| switch (err) {
                     error.OutOfMemory => |e| return e,

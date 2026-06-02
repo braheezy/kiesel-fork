@@ -299,8 +299,8 @@ pub fn createDynamicFunction(
     );
     defer gpa.free(body_parse_string);
 
-    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
-    //     (LINE FEED), ") {", bodyParseString, and "}".
+    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A (LINE
+    //     FEED), ") {", bodyParseString, and "}".
     // 16. Let sourceText be StringToCodePoints(sourceString).
     const source_text = try std.fmt.allocPrint(
         agent.gc_allocator,
@@ -347,11 +347,11 @@ pub fn createDynamicFunction(
     };
 
     // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
-    //           For example, new Function("/*", "*/ ) {") does not evaluate to a function.
+    //     For example, new Function("/*", "*/ ) {") does not evaluate to a function.
 
     // 22. NOTE: If this step is reached, sourceText must have the syntax of exprSym (although the
-    //           reverse implication does not hold). The purpose of the next two steps is to
-    //           enforce any Early Error rules which apply to exprSym directly.
+    //     reverse implication does not hold). The purpose of the next two steps is to enforce any
+    //     Early Error rules which apply to exprSym directly.
 
     // 23. Let expr be ParseText(sourceText, exprSym).
     _ = Parser.parseNode(expr_sym.type, expr_sym.acceptFn, agent.gc_allocator, source_text, .{
@@ -375,7 +375,8 @@ pub fn createDynamicFunction(
     // 27. Let privateEnv be null.
     const private_env = null;
 
-    // 28. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
+    // 28. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this,
+    //     env, privateEnv).
     const source = try String.fromUtf8(agent, source_text);
     const function = try ordinaryFunctionCreate(
         agent,
@@ -401,8 +402,8 @@ pub fn createDynamicFunction(
             );
 
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
+            //    [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false,
+            //    [[Configurable]]: false }).
             try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype_),
@@ -424,8 +425,8 @@ pub fn createDynamicFunction(
             );
 
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
+            //    [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false,
+            //    [[Configurable]]: false }).
             try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
                     .value = Value.from(prototype_),
@@ -445,7 +446,7 @@ pub fn createDynamicFunction(
         },
 
         // 33. NOTE: Functions whose kind is async are not constructable and do not have a
-        //           [[Construct]] internal method or a "prototype" property.
+        //     [[Construct]] internal method or a "prototype" property.
         .async => {},
     }
 

@@ -49,9 +49,8 @@ pub fn createAsyncFromSyncIterator(
         PropertyKey.from("next"),
     ) catch |err| try noexcept(err);
 
-    // 4. Let iteratorRecord be the Iterator Record {
-    //      [[Iterator]]: asyncIterator, [[NextMethod]]: nextMethod, [[Done]]: false
-    //    }.
+    // 4. Let iteratorRecord be the Iterator Record { [[Iterator]]: asyncIterator,
+    //    [[NextMethod]]: nextMethod, [[Done]]: false }.
     const iterator: Iterator = .{
         .iterator = &async_iterator.object,
         .next_method = next_method,
@@ -269,7 +268,8 @@ pub const prototype = struct {
                 .{},
             );
 
-            // g. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created TypeError object »).
+            // g. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
+            //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
@@ -321,7 +321,8 @@ pub const prototype = struct {
             return Value.from(promise_capability.promise);
         }
 
-        // 13. Return AsyncFromSyncIteratorContinuation(result, promiseCapability, syncIteratorRecord, true).
+        // 13. Return AsyncFromSyncIteratorContinuation(result, promiseCapability,
+        //     syncIteratorRecord, true).
         return Value.from(
             try asyncFromSyncIteratorContinuation(
                 agent,
@@ -374,7 +375,8 @@ fn asyncFromSyncIteratorContinuation(
 
     // 6. Let valueWrapper be Completion(PromiseResolve(%Promise%, value)).
     const value_wrapper = promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value) catch |err| {
-        // 7. If valueWrapper is an abrupt completion, done is false, and closeOnRejection is true, then
+        // 7. If valueWrapper is an abrupt completion, done is false, and closeOnRejection is true,
+        //    then
         if (!done and close_on_rejection) {
             // a. Set valueWrapper to Completion(IteratorClose(syncIteratorRecord, valueWrapper)).
             _ = sync_iterator.close(agent, @as(Agent.Error!Value, err)) catch |err_| {

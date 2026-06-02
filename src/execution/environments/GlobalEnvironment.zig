@@ -332,8 +332,8 @@ pub fn canDeclareGlobalFunction(
     // 5. If existingProp.[[Configurable]] is true, return true.
     if (existing_prop.configurable == true) return true;
 
-    // 6. If IsDataDescriptor(existingProp) is true and existingProp has attribute values
-    //    { [[Writable]]: true, [[Enumerable]]: true }, return true.
+    // 6. If IsDataDescriptor(existingProp) is true and existingProp has attribute values {
+    //    [[Writable]]: true, [[Enumerable]]: true }, return true.
     if (existing_prop.isDataDescriptor() and
         existing_prop.writable == true and
         existing_prop.enumerable == true) return true;
@@ -398,9 +398,8 @@ pub fn createGlobalFunctionBinding(
 
     // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
     const property_descriptor: PropertyDescriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {
-        // a. Let desc be the PropertyDescriptor {
-        //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
-        //    }.
+        // a. Let desc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
+        //    [[Enumerable]]: true, [[Configurable]]: D }.
         break :blk .{ .value = Value.from(&value.object), .writable = true, .enumerable = true, .configurable = deletable };
     } else blk: {
         // 5. Else,

@@ -191,7 +191,8 @@ pub fn getBindingValue(
     // 1. Assert: envRec has a binding for N.
     const binding = self.bindings.get(name).?;
 
-    // 2. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError exception.
+    // 2. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError
+    //    exception.
     if (!binding.initialized) {
         @branchHint(.unlikely);
         return agent.throwException(

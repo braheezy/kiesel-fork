@@ -64,8 +64,10 @@ pub const constructor = struct {
             );
         }
 
-        // 2. Let internalSlotsList be « [[InitializedSegmenter]], [[Locale]], [[SegmenterGranularity]] ».
-        // 3. Let segmenter be ? OrdinaryCreateFromConstructor(NewTarget, "%Intl.Segmenter.prototype%", internalSlotsList).
+        // 2. Let internalSlotsList be « [[InitializedSegmenter]], [[Locale]],
+        //    [[SegmenterGranularity]] ».
+        // 3. Let segmenter be ? OrdinaryCreateFromConstructor(NewTarget,
+        //    "%Intl.Segmenter.prototype%", internalSlotsList).
         const segmenter = try ordinaryCreateFromConstructor(
             Segmenter,
             agent,
@@ -95,7 +97,7 @@ pub const constructor = struct {
         segmenter.fields.locale = locale;
 
         // 8. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
-        //     "sentence" », "grapheme").
+        //    "sentence" », "grapheme").
         const granularity_string = try options.getOption(
             agent,
             "granularity",
@@ -173,7 +175,8 @@ pub const prototype = struct {
 
         // 4. For each row of Table 28, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of segmenter's internal slot whose name is the Internal Slot value of the current row.
+        //     b. Let v be the value of segmenter's internal slot whose name is the Internal Slot
+        //        value of the current row.
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = segmenter.fields.resolvedOptions();

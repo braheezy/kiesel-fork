@@ -33,7 +33,8 @@ pub fn createSetIterator(
     // 2. Let closure be a new Abstract Closure with no parameters that captures set and kind and
     //    performs the following steps when called:
     //    [...]
-    // 3. Return CreateIteratorFromClosure(closure, "%SetIteratorPrototype%", %SetIteratorPrototype%).
+    // 3. Return CreateIteratorFromClosure(closure, "%SetIteratorPrototype%",
+    //    %SetIteratorPrototype%).
     return SetIterator.create(agent, .{
         .prototype = try realm.intrinsics.@"%SetIteratorPrototype%"(),
         .fields = .{ .state = .{ .set = set, .kind = kind, .index = 0 } },

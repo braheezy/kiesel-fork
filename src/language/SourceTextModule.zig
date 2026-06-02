@@ -181,10 +181,9 @@ pub fn loadRequestedModules(
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 3. Let state be the GraphLoadingState Record {
-    //      [[IsLoading]]: true, [[PendingModulesCount]]: 1, [[Visited]]: « »,
-    //      [[PromiseCapability]]: pc, [[HostDefined]]: hostDefined
-    //    }.
+    // 3. Let state be the GraphLoadingState Record { [[IsLoading]]: true,
+    //    [[PendingModulesCount]]: 1, [[Visited]]: « », [[PromiseCapability]]: pc,
+    //    [[HostDefined]]: hostDefined }.
     const state = try agent.gc_allocator.create(GraphLoadingState);
     state.* = .{
         .is_loading = true,
@@ -223,8 +222,8 @@ fn innerModuleLoading(
         // b. Let requestedModulesCount be the number of elements in module.[[RequestedModules]].
         const requested_modules_count = module.source_text_module.requested_modules.items.len;
 
-        // c. Set state.[[PendingModulesCount]] to state.[[PendingModulesCount]] +
-        //    requestedModulesCount.
+        // c. Set state.[[PendingModulesCount]] to
+        //    state.[[PendingModulesCount]] + requestedModulesCount.
         state.pending_modules_count += requested_modules_count;
 
         // d. For each ModuleRequest Record request of module.[[RequestedModules]], do
@@ -321,7 +320,8 @@ pub fn continueModuleLoading(
             // a. Set state.[[IsLoading]] to false.
             state.is_loading = false;
 
-            // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
+            // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined,
+            //    « moduleCompletion.[[Value]] »).
             _ = Value.from(state.promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
@@ -551,20 +551,20 @@ pub fn parse(
             } else {
                 // ii. Else,
                 // 1. NOTE: When exporting a binding or namespace object which was originally
-                //    imported from another module, the ExportEntry Record is rewritten to match
-                //    the form it would have if the binding or namespace object had been
-                //    re-exported directly from the original module rather than imported then
-                //    exported. This allows conflicts which arise from exporting the same binding
-                //    or namespace twice under the same name through export * from to be ignored
-                //    rather than being treated as ambiguous in step 9.e.iii of the ResolveExport
-                //    concrete method of Source Text Module Records.
-                // 2. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
+                //    imported from another module, the ExportEntry Record is rewritten to match the
+                //    form it would have if the binding or namespace object had been re-exported
+                //    directly from the original module rather than imported then exported. This
+                //    allows conflicts which arise from exporting the same binding or namespace
+                //    twice under the same name through export * from to be ignored rather than
+                //    being treated as ambiguous in step 9.e.iii of the ResolveExport concrete
+                //    method of Source Text Module Records.
+                // 2. Let ie be the element of importEntries whose [[LocalName]] is
+                //    ee.[[LocalName]].
                 const import_entry = import_entry_with_bound_name.?;
 
-                // 3. Append the ExportEntry Record {
-                //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
-                //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
-                //    } to indirectExportEntries.
+                // 3. Append the ExportEntry Record { [[ModuleRequest]]: ie.[[ModuleRequest]],
+                //    [[ImportName]]: ie.[[ImportName]], [[LocalName]]: null,
+                //    [[ExportName]]: ee.[[ExportName]] } to indirectExportEntries.
                 try indirect_export_entries.append(agent.gc_allocator, .{
                     .module_request = import_entry.module_request,
                     .import_name = if (import_entry.import_name) |import_name|
@@ -596,16 +596,16 @@ pub fn parse(
     // 11. Let async be body Contains await.
     const async = body.hasTla();
 
-    // 12. Return Source Text Module Record {
-    //       [[Realm]]: realm, [[Environment]]: empty, [[Namespace]]: empty, [[CycleRoot]]: empty,
-    //       [[HasTLA]]: async, [[AsyncEvaluationOrder]]: unset, [[TopLevelCapability]]: empty,
-    //       [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: empty, [[Status]]: new,
-    //       [[EvaluationError]]: empty, [[HostDefined]]: hostDefined, [[ECMAScriptCode]]: body,
-    //       [[Context]]: empty, [[ImportMeta]]: empty, [[RequestedModules]]: requestedModules,
-    //       [[LoadedModules]]: « », [[ImportEntries]]: importEntries, [[LocalExportEntries]]: localExportEntries,
-    //       [[IndirectExportEntries]]: indirectExportEntries, [[StarExportEntries]]: starExportEntries,
-    //       [[DFSAncestorIndex]]: empty
-    //     }.
+    // 12. Return Source Text Module Record { [[Realm]]: realm, [[Environment]]: empty,
+    //     [[Namespace]]: empty, [[CycleRoot]]: empty, [[HasTLA]]: async,
+    //     [[AsyncEvaluationOrder]]: unset, [[TopLevelCapability]]: empty,
+    //     [[AsyncParentModules]]: « », [[PendingAsyncDependencies]]: empty, [[Status]]: new,
+    //     [[EvaluationError]]: empty, [[HostDefined]]: hostDefined, [[ECMAScriptCode]]: body,
+    //     [[Context]]: empty, [[ImportMeta]]: empty, [[RequestedModules]]: requestedModules,
+    //     [[LoadedModules]]: « », [[ImportEntries]]: importEntries,
+    //     [[LocalExportEntries]]: localExportEntries,
+    //     [[IndirectExportEntries]]: indirectExportEntries,
+    //     [[StarExportEntries]]: starExportEntries, [[DFSAncestorIndex]]: empty }.
     const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(SourceTextModule);
     self.* = .{
@@ -866,7 +866,8 @@ fn innerModuleEvaluation(
 
             // v. If requiredModule.[[AsyncEvaluationOrder]] is an integer, then
             if (required_module.async_evaluation_order == .integer) {
-                // 1. Set module.[[PendingAsyncDependencies]] to module.[[PendingAsyncDependencies]] + 1.
+                // 1. Set module.[[PendingAsyncDependencies]] to
+                //    module.[[PendingAsyncDependencies]] + 1.
                 module.pending_async_dependencies.? += 1;
 
                 // 2. Append module to requiredModule.[[AsyncParentModules]].
@@ -912,7 +913,8 @@ fn innerModuleEvaluation(
             std.debug.assert(required_module.async_evaluation_order == .integer or
                 required_module.async_evaluation_order == .unset);
 
-            // v. If requiredModule.[[AsyncEvaluationOrder]] is unset, set requiredModule.[[Status]] to evaluated.
+            // v. If requiredModule.[[AsyncEvaluationOrder]] is unset, set requiredModule.[[Status]]
+            //    to evaluated.
             // vi. Else, set requiredModule.[[Status]] to evaluating-async.
             required_module.status = if (required_module.async_evaluation_order == .unset) .evaluated else .evaluating_async;
 
@@ -951,8 +953,8 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     const captures = try agent.gc_allocator.create(Captures);
     captures.* = .{ .module = module };
 
-    // 4. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module
-    //    and performs the following steps when called:
+    // 4. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module and
+    //    performs the following steps when called:
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
@@ -976,8 +978,8 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
         .{ .additional_fields = captures },
     );
 
-    // 6. Let rejectedClosure be a new Abstract Closure with parameters (error) that captures
-    //    module and performs the following steps when called:
+    // 6. Let rejectedClosure be a new Abstract Closure with parameters (error) that captures module
+    //    and performs the following steps when called:
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
@@ -1123,8 +1125,8 @@ fn asyncModuleExecutionFulfilled(
         std.debug.assert(m.evaluation_error == null);
     }
 
-    // 11. Let sortedExecList be a List whose elements are the elements of execList, sorted by
-    //     their [[AsyncEvaluationOrder]] field in ascending order.
+    // 11. Let sortedExecList be a List whose elements are the elements of execList, sorted by their
+    //     [[AsyncEvaluationOrder]] field in ascending order.
     std.mem.sort(*SourceTextModule, exec_list.items, {}, struct {
         fn lessThanFn(_: void, lhs: *SourceTextModule, rhs: *SourceTextModule) bool {
             return lhs.async_evaluation_order.integer < rhs.async_evaluation_order.integer;
@@ -1171,7 +1173,8 @@ fn asyncModuleExecutionFulfilled(
                 // a. Assert: m.[[CycleRoot]] and m are the same Module Record.
                 std.debug.assert(m.cycle_root == m);
 
-                // b. Perform ! Call(m.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
+                // b. Perform ! Call(m.[[TopLevelCapability]].[[Resolve]], undefined,
+                //    « undefined »).
                 _ = Value.from(top_level_capability.resolve).callAssumeCallable(
                     agent,
                     .undefined,
@@ -1346,7 +1349,8 @@ pub fn resolveExport(
     };
 
     // 3. For each Record { [[Module]], [[ExportName]] } r of resolveSet, do
-    //     a. If module and r.[[Module]] are the same Module Record and exportName is r.[[ExportName]], then
+    //     a. If module and r.[[Module]] are the same Module Record and exportName is
+    //        r.[[ExportName]], then
     if (resolve_set.contains(resolve_set_key)) {
         // i. Assert: This is a circular import request.
         // ii. Return null.
@@ -1361,9 +1365,8 @@ pub fn resolveExport(
         // a. If e.[[ExportName]] is exportName, then
         if (std.mem.eql(u8, export_entry.export_name.?, export_name)) {
             // i. Assert: module provides the direct binding for this export.
-            // ii. Return ResolvedBinding Record {
-            //       [[Module]]: module, [[BindingName]]: e.[[LocalName]]
-            //     }.
+            // ii. Return ResolvedBinding Record { [[Module]]: module,
+            //     [[BindingName]]: e.[[LocalName]] }.
             return .{
                 .resolved_binding = .{
                     .module = .{ .source_text_module = self },
@@ -1386,7 +1389,8 @@ pub fn resolveExport(
             // iii. If e.[[ImportName]] is namespace, then
             if (export_entry.import_name != null and export_entry.import_name.? == .namespace) {
                 // 1. Assert: module does not provide the direct binding for this export.
-                // 2. Return ResolvedBinding Record { [[Module]]: importedModule, [[BindingName]]: namespace }.
+                // 2. Return ResolvedBinding Record { [[Module]]: importedModule,
+                //    [[BindingName]]: namespace }.
                 return .{
                     .resolved_binding = .{
                         .module = imported_module,
@@ -1456,7 +1460,8 @@ pub fn resolveExport(
                 return .ambiguous;
             }
 
-            // 3. If resolution.[[BindingName]] is not starResolution.[[BindingName]], return ambiguous.
+            // 3. If resolution.[[BindingName]] is not starResolution.[[BindingName]], return
+            //    ambiguous.
             if ((resolution.binding_name == .namespace and star_resolution.binding_name == .string) or
                 (resolution.binding_name == .string and star_resolution.binding_name == .namespace) or
                 (resolution.binding_name == .string and star_resolution.binding_name == .string and
@@ -1591,8 +1596,8 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                     },
                     .string => |binding_name| {
                         // v. Else,
-                        // 1. Perform CreateImportBinding(env, in.[[LocalName]], resolution.[[Module]],
-                        //    resolution.[[BindingName]]).
+                        // 1. Perform CreateImportBinding(env, in.[[LocalName]],
+                        //    resolution.[[Module]], resolution.[[BindingName]]).
                         try env.module_environment.createImportBinding(
                             agent,
                             local_name,

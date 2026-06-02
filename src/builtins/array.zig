@@ -122,8 +122,8 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
         }),
 
         // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
-        //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-        //    }).
+        //    [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false,
+        //    [[Configurable]]: false }).
         .fields = .{
             .length = @intCast(length),
             .length_writable = true,
@@ -276,8 +276,8 @@ fn arraySetLength(
     array.fields.length = new_len;
 
     if (new_len < old_len) {
-        // 18. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥
-        //     newLen, in descending numeric index order, do
+        // 18. For each own property key P of A such that P is an array index and ! ToUint32(
+        //     P) ≥ newLen, in descending numeric index order, do
         //     a. Let deleteSucceeded be ! A.[[Delete]](P).
         switch (array.object.property_storage.indexed_properties.storage) {
             .none => {},
@@ -334,8 +334,7 @@ fn arraySetLength(
     // 19. If newWritable is false, then
     if (!new_writable) {
         // a. Set succeeded to ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
-        //      [[Writable]]: false
-        //    }).
+        //    [[Writable]]: false }).
         // b. Assert: succeeded is true.
         array.fields.length_writable = false;
     }
@@ -378,7 +377,8 @@ pub const constructor = struct {
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
+        // 1. If NewTarget is undefined, let newTarget be the active function object; else let
+        //    newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let proto be ? GetPrototypeFromConstructor(newTarget, "%Array.prototype%").
@@ -558,7 +558,8 @@ pub const constructor = struct {
                     break :blk next;
                 };
 
-                // vii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
+                // vii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk,
+                //      mappedValue)).
                 _ = array.createDataPropertyOrThrow(agent, property_key, mapped_value) catch |err| {
                     // viii. IfAbruptCloseIterator(defineStatus, iteratorRecord).
                     return iterator.close(agent, @as(Agent.Error!Value, err));
@@ -714,7 +715,8 @@ pub const constructor = struct {
                 // ii. Let Pk be ! ToString(𝔽(k)).
                 const property_key = PropertyKey.from(k);
 
-                // iii. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+                // iii. Let nextResult be ? Call(iteratorRecord.[[NextMethod]],
+                //      iteratorRecord.[[Iterator]]).
                 var next_result_value = try iterator.next_method.callAssumeCallable(
                     agent,
                     Value.from(iterator.iterator),
@@ -776,7 +778,8 @@ pub const constructor = struct {
                     break :blk next_value;
                 };
 
-                // xi. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
+                // xi. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk,
+                //     mappedValue)).
                 array.createDataPropertyOrThrow(agent, property_key, mapped_value) catch |err| switch (err) {
                     error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
@@ -1662,8 +1665,8 @@ pub const prototype = struct {
         mapper_function: ?*Object,
         this_arg: ?Value,
     ) Agent.Error!f64 {
-        // 1. Assert: If mapperFunction is present, then IsCallable(mapperFunction) is true,
-        //    thisArg is present, and depth is 1.
+        // 1. Assert: If mapperFunction is present, then IsCallable(mapperFunction) is true, thisArg
+        //    is present, and depth is 1.
         if (mapper_function != null) {
             std.debug.assert(Value.from(mapper_function.?).isCallable());
             std.debug.assert(this_arg != null);
@@ -1691,7 +1694,8 @@ pub const prototype = struct {
 
                 // ii. If mapperFunction is present, then
                 if (mapper_function != null) {
-                    // 1. Set element to ? Call(mapperFunction, thisArg, « element, sourceIndex, source »).
+                    // 1. Set element to ? Call(mapperFunction, thisArg, « element, sourceIndex,
+                    //    source »).
                     element = try Value.from(mapper_function.?).callAssumeCallable(
                         agent,
                         this_arg.?,
@@ -1742,7 +1746,8 @@ pub const prototype = struct {
                         return agent.throwException(.type_error, "Maximum array length exceeded", .{});
                     }
 
-                    // 2. Perform ? CreateDataPropertyOrThrow(target, ! ToString(𝔽(targetIndex)), element).
+                    // 2. Perform ? CreateDataPropertyOrThrow(target, ! ToString(𝔽(targetIndex)),
+                    //    element).
                     try target.createDataPropertyOrThrow(
                         agent,
                         PropertyKey.from(@as(PropertyKey.IntegerIndex, @intFromFloat(target_index))),
@@ -2058,7 +2063,8 @@ pub const prototype = struct {
         // 3. If len = 0, return -1𝔽.
         if (len == 0) return Value.from(-1);
 
-        // 4. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be len - 1.
+        // 4. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be
+        //    len - 1.
         const n = if (arguments.count() > 1)
             try from_index.toIntegerOrInfinity(agent)
         else
@@ -2326,7 +2332,8 @@ pub const prototype = struct {
                 // i. Let kValue be ? Get(O, Pk).
                 const k_value = try object.get(agent, property_key);
 
-                // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
+                // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+                //     O »).
                 accumulator = try callback.callAssumeCallable(
                     agent,
                     .undefined,
@@ -2422,7 +2429,8 @@ pub const prototype = struct {
                 // i. Let kValue be ? Get(O, Pk).
                 const k_value = try object.get(agent, property_key);
 
-                // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
+                // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+                //     O »).
                 accumulator = try callback.callAssumeCallable(
                     agent,
                     .undefined,
@@ -2856,7 +2864,8 @@ pub const prototype = struct {
             // a. Let dc be ? ToIntegerOrInfinity(deleteCount).
             const delete_count_f64 = try delete_count.?.toIntegerOrInfinity(agent);
 
-            // b. Let actualDeleteCount be the result of clamping dc between 0 and len - actualStart.
+            // b. Let actualDeleteCount be the result of clamping dc between 0 and
+            //    len - actualStart.
             break :blk @as(u53, @intFromFloat(
                 std.math.clamp(delete_count_f64, 0, len_f64 - actual_start_f64),
             ));
@@ -3082,7 +3091,8 @@ pub const prototype = struct {
 
             // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
-                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales, options »)).
+                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString", « locales,
+                //    options »)).
                 const string = try (try element.invoke(
                     agent,
                     PropertyKey.from("toLocaleString"),
@@ -3320,7 +3330,8 @@ pub const prototype = struct {
         // 2. Let func be ? Get(array, "join").
         var func = try array.get(agent, PropertyKey.from("join"));
 
-        // 3. If IsCallable(func) is false, set func to the intrinsic function %Object.prototype.toString%.
+        // 3. If IsCallable(func) is false, set func to the intrinsic function
+        //    %Object.prototype.toString%.
         if (!func.isCallable()) func = Value.from(try realm.intrinsics.@"%Object.prototype.toString%"());
 
         // 4. Return ? Call(func, array).
@@ -3527,7 +3538,8 @@ pub fn findViaPredicate(
         // a. Let Pk be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(k.?);
 
-        // b. NOTE: If O is a TypedArray, the following invocation of Get will return a normal completion.
+        // b. NOTE: If O is a TypedArray, the following invocation of Get will return a normal
+        //    completion.
         // c. Let kValue be ? Get(O, Pk).
         const k_value = try object.get(agent, property_key);
 
@@ -3538,7 +3550,8 @@ pub fn findViaPredicate(
             &.{ k_value, Value.from(k.?), Value.from(object) },
         );
 
-        // e. If ToBoolean(testResult) is true, return the Record { [[Index]]: 𝔽(k), [[Value]]: kValue }.
+        // e. If ToBoolean(testResult) is true, return the Record { [[Index]]: 𝔽(k),
+        //    [[Value]]: kValue }.
         if (test_result.toBoolean()) return .{ .index = Value.from(k.?), .value = k_value };
     }
 
@@ -3621,8 +3634,8 @@ pub fn sortIndexedProperties(
     }
 
     // 4. Sort items using an implementation-defined sequence of calls to SortCompare. If any such
-    //    call returns an abrupt completion, stop before performing any further calls to
-    //    SortCompare and return that Completion Record.
+    //    call returns an abrupt completion, stop before performing any further calls to SortCompare
+    //    and return that Completion Record.
     try insertionSort(agent, items.items, sort_compare);
 
     // 5. Return items.

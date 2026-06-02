@@ -164,7 +164,8 @@ pub fn getSubstitution(
 
             break :blk .{ ref, ref_replacement };
         } else if (template_reminder.startsWith(types.String.fromLiteral("$'"))) blk: {
-            // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by 0x0027 (APOSTROPHE)), then
+            // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by
+            //    0x0027 (APOSTROPHE)), then
             // i. Let ref be "$'".
             const ref = types.String.fromLiteral("$'");
 
@@ -189,7 +190,8 @@ pub fn getSubstitution(
             template_reminder.codeUnitAt(0) == '$' and
             std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))))
         blk: {
-            // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
+            // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits,
+            //    then
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
             //    digitCount be 2; else let digitCount be 1.
             var digit_count: u2 = if (template_reminder.length >= 3 and
@@ -214,9 +216,9 @@ pub fn getSubstitution(
 
             // vi. If index > captureLen and digitCount = 2, then
             if (index > capture_len and digit_count == 2) {
-                // 1. NOTE: When a two-digit replacement pattern specifies an index exceeding the count
-                //    of capturing groups, it is treated as a one-digit replacement pattern followed by
-                //    a literal digit.
+                // 1. NOTE: When a two-digit replacement pattern specifies an index exceeding the
+                //    count of capturing groups, it is treated as a one-digit replacement pattern
+                //    followed by a literal digit.
 
                 // 2. Set digitCount to 1.
                 digit_count = 1;
@@ -395,8 +397,8 @@ fn ownPropertyKeys(
         keys.appendAssumeCapacity(PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))));
     }
 
-    // 6. For each own property key P of O such that P is an array index and
-    //    ! ToIntegerOrInfinity(P) ≥ len, in ascending numeric index order, do
+    // 6. For each own property key P of O such that P is an array index and ! ToIntegerOrInfinity(
+    //    P) ≥ len, in ascending numeric index order, do
     //     a. Append P to keys.
     switch (object.property_storage.indexed_properties.storage) {
         .none => {},
@@ -432,8 +434,8 @@ fn ownPropertyKeys(
         }
     }
 
-    // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
-    //    order of property creation, do
+    // 8. For each own property key P of O such that P is a Symbol, in ascending chronological order
+    //    of property creation, do
     for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
@@ -477,9 +479,8 @@ pub fn stringCreate(
     // 7. Let length be the length of value.
     const length = value.length;
 
-    // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
-    //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
-    //    }).
+    // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor { [[Value]]: 𝔽(length),
+    //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false }).
     try string.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(length),
@@ -519,9 +520,8 @@ fn stringGetOwnProperty(
     // 9. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
     const result_str = try str.substring(agent, index, index + 1);
 
-    // 10. Return the PropertyDescriptor {
-    //       [[Value]]: resultStr, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
-    //     }.
+    // 10. Return the PropertyDescriptor { [[Value]]: resultStr, [[Writable]]: false,
+    //     [[Enumerable]]: true, [[Configurable]]: false }.
     return .{ .value = Value.from(result_str), .writable = false, .enumerable = true, .configurable = false };
 }
 
@@ -566,7 +566,8 @@ pub const constructor = struct {
                 break :blk .empty;
             } else {
                 // 2. Else,
-                // a. If NewTarget is undefined and value is a Symbol, return SymbolDescriptiveString(value).
+                // a. If NewTarget is undefined and value is a Symbol, return
+                //    SymbolDescriptiveString(value).
                 if (new_target == null and value.isSymbol()) {
                     return Value.from(try value.asSymbol().descriptiveString(agent));
                 }
@@ -579,7 +580,8 @@ pub const constructor = struct {
         // 3. If NewTarget is undefined, return s.
         if (new_target == null) return Value.from(s);
 
-        // 4. Return StringCreate(s, ? GetPrototypeFromConstructor(NewTarget, "%String.prototype%")).
+        // 4. Return StringCreate(s, ? GetPrototypeFromConstructor(NewTarget,
+        //    "%String.prototype%")).
         const string = try stringCreate(
             agent,
             s,
@@ -652,7 +654,8 @@ pub const constructor = struct {
                 );
             }
 
-            // d. Set result to the string-concatenation of result and UTF16EncodeCodePoint(ℝ(nextCP)).
+            // d. Set result to the string-concatenation of result and UTF16EncodeCodePoint(
+            //    ℝ(nextCP)).
             result.appendCodePointAssumeCapacity(@intFromFloat(next_code_point.asFloat()));
         }
 
@@ -1016,7 +1019,8 @@ pub const prototype = struct {
         // 7. Let len be the length of S.
         const len = string.length;
 
-        // 8. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(endPosition).
+        // 8. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(
+        //    endPosition).
         const pos = if (end_position.isUndefined())
             @as(f64, @floatFromInt(len))
         else
@@ -1970,7 +1974,8 @@ pub const prototype = struct {
             // c. Let head be the substring of S from 0 to outLen.
             const head = try string.substring(agent, 0, out_len);
 
-            // d. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
+            // d. Let codeUnits be a List consisting of the sequence of code units that are the
+            //    elements of head.
             const code_units = try head.toUtf16(gpa);
             defer gpa.free(code_units);
 
@@ -2016,7 +2021,8 @@ pub const prototype = struct {
             // b. Append T to substrings.
             try substrings.append(agent.gc_allocator, tail);
 
-            // c. If the number of elements in substrings is lim, return CreateArrayFromList(substrings).
+            // c. If the number of elements in substrings is lim, return CreateArrayFromList(
+            //    substrings).
             if (substrings.items.len == limit) {
                 const array = try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
                     fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
@@ -2081,7 +2087,8 @@ pub const prototype = struct {
         // 7. Let len be the length of S.
         const len = string.length;
 
-        // 8. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(position).
+        // 8. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(
+        //    position).
         const pos = if (position.isUndefined()) 0 else try position.toIntegerOrInfinity(agent);
 
         // 9. Let start be the result of clamping pos between 0 and len.
@@ -2199,10 +2206,10 @@ pub const prototype = struct {
         else
             agent.platform.default_locale;
 
-        // 4. Let availableLocales be an Available Locales List which includes the language tags
-        //    for which the Unicode Character Database contains language-sensitive case mappings.
-        //    If the implementation supports additional locale-sensitive case mappings,
-        //    availableLocales should also include their corresponding language tags.
+        // 4. Let availableLocales be an Available Locales List which includes the language tags for
+        //    which the Unicode Character Database contains language-sensitive case mappings. If the
+        //    implementation supports additional locale-sensitive case mappings, availableLocales
+        //    should also include their corresponding language tags.
         // 5. Let match be LookupMatchingLocaleByPrefix(availableLocales, « requestedLocale »).
         // 6. If match is not undefined, let locale be match.[[locale]]; else let locale be "und".
         // 7. Let codePoints be StringToCodePoints(S).
@@ -2269,8 +2276,8 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let sText be StringToCodePoints(S).
-        // 5. Let lowerText be toLowercase(sText), according to the Unicode Default
-        //    Case Conversion algorithm.
+        // 5. Let lowerText be toLowercase(sText), according to the Unicode Default Case Conversion
+        //    algorithm.
         // 6. Let L be CodePointsToString(lowerText).
         const lower = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
@@ -2315,8 +2322,8 @@ pub const prototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let sText be StringToCodePoints(S).
-        // 5. Let upperText be toUppercase(sText), according to the Unicode Default
-        //    Case Conversion algorithm.
+        // 5. Let upperText be toUppercase(sText), according to the Unicode Default Case Conversion
+        //    algorithm.
         // 6. Let U be CodePointsToString(upperText).
         const upper = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
@@ -2374,13 +2381,13 @@ pub const prototype = struct {
 
             // b. If cp.[[IsUnpairedSurrogate]] is true, then
             if (code_point.is_unpaired_surrogate) {
-                // i. Set result to the string-concatenation of result and 0xFFFD
-                //    (REPLACEMENT CHARACTER).
+                // i. Set result to the string-concatenation of result and 0xFFFD (REPLACEMENT
+                //    CHARACTER).
                 result.appendCodePointAssumeCapacity(std.unicode.replacement_character);
             } else {
                 // c. Else,
-                // i. Set result to the string-concatenation of result and
-                //    UTF16EncodeCodePoint(cp.[[CodePoint]]).
+                // i. Set result to the string-concatenation of result and UTF16EncodeCodePoint(
+                //    cp.[[CodePoint]]).
                 result.appendCodePointAssumeCapacity(code_point.code_point);
             }
 
@@ -2481,7 +2488,8 @@ pub const prototype = struct {
         // 4. Let closure be a new Abstract Closure with no parameters that captures s and performs
         //    the following steps when called:
         //    [...]
-        // 5. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%", %StringIteratorPrototype%).
+        // 5. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%",
+        //    %StringIteratorPrototype%).
         const string_iterator = try StringIterator.create(agent, .{
             .prototype = try realm.intrinsics.@"%StringIteratorPrototype%"(),
             .fields = .{
@@ -2525,7 +2533,8 @@ pub const prototype = struct {
             int_start = @min(int_start, size);
         }
 
-        // 9. If length is undefined, let intLength be size; else let intLength be ? ToIntegerOrInfinity(length).
+        // 9. If length is undefined, let intLength be size; else let intLength be
+        //    ? ToIntegerOrInfinity(length).
         var int_length = if (length.isUndefined())
             size
         else
@@ -2572,9 +2581,9 @@ pub const prototype = struct {
             // a. Let V be ? ToString(value).
             const value_string = try attr.value.toString(agent);
 
-            // b. Let escapedV be the String value that is the same as V except that each
-            //    occurrence of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with
-            //    the six code unit sequence "&quot;".
+            // b. Let escapedV be the String value that is the same as V except that each occurrence
+            //    of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with the six code
+            //    unit sequence "&quot;".
             const value_string_escaped = try value_string.replace(
                 agent,
                 "\"",

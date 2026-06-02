@@ -699,9 +699,8 @@ pub fn set(
 /// 7.3.5 CreateDataProperty ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdataproperty
 pub fn createDataProperty(self: *Object, agent: *Agent, property_key: PropertyKey, value: Value) Agent.Error!bool {
-    // 1. Let newDesc be the PropertyDescriptor {
-    //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
-    //    }.
+    // 1. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
+    //    [[Enumerable]]: true, [[Configurable]]: true }.
     const new_descriptor: PropertyDescriptor = .{
         .value = value,
         .writable = true,
@@ -754,9 +753,8 @@ pub fn createNonEnumerableDataPropertyOrThrow(
         },
     );
 
-    // 2. Let newDesc be the PropertyDescriptor {
-    //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //    }.
+    // 2. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
+    //    [[Enumerable]]: false, [[Configurable]]: true }.
     const new_descriptor: PropertyStorage.CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .value = value,
@@ -859,7 +857,8 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
         .sealed => {
             // a. For each element k of keys, do
             for (keys) |property_key| {
-                // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor { [[Configurable]]: false }).
+                // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor {
+                //    [[Configurable]]: false }).
                 try self.definePropertyOrThrow(agent, property_key, .{ .configurable = false });
             }
         },
@@ -887,9 +886,8 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
                         descriptor = .{ .configurable = false };
                     } else {
                         // 2. Else,
-                        // a. Let desc be the PropertyDescriptor {
-                        //      [[Configurable]]: false, [[Writable]]: false
-                        //    }.
+                        // a. Let desc be the PropertyDescriptor { [[Configurable]]: false,
+                        //    [[Writable]]: false }.
                         descriptor = .{ .configurable = false, .writable = false };
                     }
 
@@ -1168,7 +1166,8 @@ pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, 
         );
     }
 
-    // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
+    // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to
+    //    O.[[PrivateElements]].
     try self.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.

@@ -32,11 +32,13 @@ pub const Iterator = struct {
     pub fn next(self: *Iterator, agent: *Agent, value_: ?Value) Agent.Error!*Object {
         // 1. If value is not present, then
         const result_completion = if (value_ == null) blk: {
-            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]])).
+            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]],
+            //    iteratorRecord.[[Iterator]])).
             break :blk self.next_method.call(agent, Value.from(self.iterator), &.{});
         } else blk: {
             // 2. Else,
-            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »)).
+            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]],
+            //    iteratorRecord.[[Iterator]], « value »)).
             break :blk self.next_method.call(agent, Value.from(self.iterator), &.{value_.?});
         };
 
@@ -221,8 +223,8 @@ pub const Iterator = struct {
                 &.{},
             );
 
-            // d. If innerResult is a normal completion, set innerResult to
-            //    Completion(Await(innerResult.[[Value]])).
+            // d. If innerResult is a normal completion, set innerResult to Completion(Await(
+            //    innerResult.[[Value]])).
             break :blk if (inner_result) |value_| await(agent, value_) else |err| err;
         } else |err| err;
 
@@ -270,7 +272,8 @@ pub fn getIteratorDirect(agent: *Agent, object: *Object) Agent.Error!Iterator {
     // 1. Let nextMethod be ? Get(obj, "next").
     const next_method = try object.get(agent, PropertyKey.from("next"));
 
-    // 2. Let iteratorRecord be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: nextMethod, [[Done]]: false }.
+    // 2. Let iteratorRecord be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: nextMethod,
+    //    [[Done]]: false }.
     const iterator: Iterator = .{
         .iterator = object,
         .next_method = next_method,

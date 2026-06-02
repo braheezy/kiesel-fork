@@ -656,9 +656,9 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
 
     // 19. If strict is true or hasParameterExpressions is false, then
     if (strict or !has_parameter_expressions) {
-        // a. NOTE: Only a single Environment Record is needed for the parameters, since calls
-        //    to eval in strict mode code cannot create new bindings which are visible outside
-        //    of the eval.
+        // a. NOTE: Only a single Environment Record is needed for the parameters, since calls to
+        //    eval in strict mode code cannot create new bindings which are visible outside of the
+        //    eval.
 
         // b. Let env be the LexicalEnvironment of calleeContext.
         // NOTE: The function environment created by `prepareForOrdinaryCall()` is used directly.
@@ -692,8 +692,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
         const gop = try already_declared.getOrPut(b.gpa, param_name);
 
-        // b. NOTE: Early errors ensure that duplicate parameter names can only occur in
-        //    non-strict functions that do not have parameter default values or rest parameters.
+        // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
+        //    functions that do not have parameter default values or rest parameters.
 
         // c. If alreadyDeclared is false, then
         if (!gop.found_existing) {
@@ -797,7 +797,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     //     completion can arise in expression position is by use of YieldExpression, which is
     //     forbidden in parameter lists by Early Error rules in 15.5.1 and 15.6.1.
 
-    // 28. Perform ? IteratorBindingInitialization of formals with arguments iteratorRecord and usedEnv.
+    // 28. Perform ? IteratorBindingInitialization of formals with arguments iteratorRecord and
+    //     usedEnv.
     for (formal_parameters.items, 0..) |item, i| switch (item) {
         .formal_parameter => |param| switch (param.binding_element) {
             .single_name_binding => |binding| {
@@ -855,7 +856,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
 
     // 29. If hasParameterExpressions is false, then
     if (!has_parameter_expressions) {
-        // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
+        // a. NOTE: Only a single Environment Record is needed for the parameters and top-level
+        //    vars.
 
         // b. Let instantiatedVarNames be a copy of the List parameterBindings.
         var instantiated_var_names: std.array_hash_map.String(void) = .empty;
@@ -888,8 +890,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     } else {
         // 30. Else,
         // a. NOTE: A separate Environment Record is needed to ensure that closures created by
-        //    expressions in the formal parameter list do not have visibility of declarations in
-        //    the function body.
+        //    expressions in the formal parameter list do not have visibility of declarations in the
+        //    function body.
 
         // b. Let varEnv be NewDeclarativeEnvironment(env).
         // c. Set the VariableEnvironment of calleeContext to varEnv.

@@ -109,8 +109,8 @@ pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, order: Order) Byt
     // 1. If IsGrowableSharedArrayBuffer(arrayBuffer) is true, then
     if (isGrowableSharedArrayBuffer(array_buffer)) {
         // a. Let bufferByteLengthBlock be arrayBuffer.[[ArrayBufferByteLengthData]].
-        // b. Let rawLength be GetRawBytesFromSharedBlock(bufferByteLengthBlock, 0, biguint64,
-        //    true, order).
+        // b. Let rawLength be GetRawBytesFromSharedBlock(bufferByteLengthBlock, 0, biguint64, true,
+        //    order).
         // c. Let AR be the Agent Record of the surrounding agent.
         // d. Let isLittleEndian be AR.[[LittleEndian]].
         // e. Return ℝ(RawBytesToNumeric(biguint64, rawLength, isLittleEndian)).
@@ -418,8 +418,8 @@ pub fn numericToRawBytes(
         .float16 => blk: {
             // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
             //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
-            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set
-            //    to any implementation chosen IEEE 754-2019 binary16 format NaN encoding. An
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
+            //    any implementation chosen IEEE 754-2019 binary16 format NaN encoding. An
             //    implementation must always choose the same encoding for each implementation
             //    distinguishable NaN value.
             break :blk std.mem.toBytes(
@@ -433,8 +433,8 @@ pub fn numericToRawBytes(
         .float32 => blk: {
             // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
             //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
-            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set
-            //    to any implementation chosen IEEE 754-2019 binary32 format NaN encoding. An
+            //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
+            //    any implementation chosen IEEE 754-2019 binary32 format NaN encoding. An
             //    implementation must always choose the same encoding for each implementation
             //    distinguishable NaN value.
             break :blk std.mem.toBytes(
@@ -470,8 +470,8 @@ pub fn numericToRawBytes(
             const int_value = conversionOperation(value, agent) catch |err| try noexcept(err);
 
             // d. If intValue ≥ 0, then
-            //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.
-            //        The bytes are ordered in little endian order.
+            //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of
+            //        intValue. The bytes are ordered in little endian order.
             // e. Else,
             //     i. Let rawBytes be a List whose elements are the n-byte binary two's complement
             //        encoding of intValue. The bytes are ordered in little endian order.
@@ -613,7 +613,8 @@ pub fn getModifySetValueInBuffer(
         // a. Let rawBytesRead be a List of length elementSize whose elements are the sequence of
         //    elementSize bytes starting with block[byteIndex].
         // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
-        // c. Store the individual bytes of rawBytesModified into block, starting at block[byteIndex].
+        // c. Store the individual bytes of rawBytesModified into block, starting at
+        //    block[byteIndex].
         const ptr = std.mem.bytesAsValue(
             @"type".type(),
             block.bytes[@intCast(byte_index)..@intCast(byte_index + element_size)],
@@ -896,7 +897,8 @@ pub const prototype = struct {
         // 11. Let copyLength be min(newByteLength, O.[[ArrayBufferByteLength]]).
         // 12. Perform CopyDataBlockBytes(newBlock, 0, oldBlock, 0, copyLength).
         // 13. NOTE: Neither creation of the new Data Block nor copying from the old Data Block are
-        //     observable. Implementations may implement this method as in-place growth or shrinkage.
+        //     observable. Implementations may implement this method as in-place growth or
+        //     shrinkage.
         // 14. Set O.[[ArrayBufferData]] to newBlock.
         array_buffer.fields.data_block.?.resize(agent.gc_allocator, new_byte_length) catch {
             return agent.throwException(

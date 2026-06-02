@@ -141,14 +141,8 @@ pub fn fromPropertyDescriptor(
 /// 6.2.6.6 CompletePropertyDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-completepropertydescriptor
 pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
-    // 1. Let like be the Record {
-    //      [[Value]]: undefined,
-    //      [[Writable]]: false,
-    //      [[Get]]: undefined,
-    //      [[Set]]: undefined,
-    //      [[Enumerable]]: false,
-    //      [[Configurable]]: false
-    //    }.
+    // 1. Let like be the Record { [[Value]]: undefined, [[Writable]]: false, [[Get]]: undefined,
+    //    [[Set]]: undefined, [[Enumerable]]: false, [[Configurable]]: false }.
     const like: PropertyDescriptor = .{
         .value = .undefined,
         .writable = false,
@@ -161,7 +155,8 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
         // a. If Desc does not have a [[Value]] field, set Desc.[[Value]] to like.[[Value]].
         if (self.value == null) self.value = like.value;
 
-        // b. If Desc does not have a [[Writable]] field, set Desc.[[Writable]] to like.[[Writable]].
+        // b. If Desc does not have a [[Writable]] field, set Desc.[[Writable]] to
+        //    like.[[Writable]].
         if (self.writable == null) self.writable = like.writable;
     } else {
         // 3. Else,
@@ -170,10 +165,12 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
         // NOTE: These are no-ops, the fields can't be missing.
     }
 
-    // 4. If Desc does not have an [[Enumerable]] field, set Desc.[[Enumerable]] to like.[[Enumerable]].
+    // 4. If Desc does not have an [[Enumerable]] field, set Desc.[[Enumerable]] to
+    //    like.[[Enumerable]].
     if (self.enumerable == null) self.enumerable = like.enumerable;
 
-    // 5. If Desc does not have a [[Configurable]] field, set Desc.[[Configurable]] to like.[[Configurable]].
+    // 5. If Desc does not have a [[Configurable]] field, set Desc.[[Configurable]] to
+    //    like.[[Configurable]].
     if (self.configurable == null) self.configurable = like.configurable;
 
     // 6. Return unused.

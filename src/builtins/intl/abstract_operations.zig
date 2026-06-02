@@ -375,8 +375,8 @@ pub fn resolveOptions(
         return agent.throwException(.type_error, "Options object must not be undefined", .{});
     }
 
-    // 3. If specialBehaviours is present and contains coerce-options, set options to ?
-    //    CoerceOptionsToObject(options). Otherwise, set options to ? GetOptionsObject(options).
+    // 3. If specialBehaviours is present and contains coerce-options, set options to
+    //    ? CoerceOptionsToObject(options). Otherwise, set options to ? GetOptionsObject(options).
     const options = if (special_behaviours.coerce_options)
         try options_value.coerceOptionsToObject(agent)
     else
@@ -399,11 +399,13 @@ pub fn resolveOptions(
     // 5. Let opt be the Record { [[localeMatcher]]: matcher }.
     var resolution_options: ResolutionOptions(resolution_option_descriptors) = undefined;
 
-    // 6. For each Resolution Option Descriptor desc of constructor.[[ResolutionOptionDescriptors]], do
+    // 6. For each Resolution Option Descriptor desc of constructor.[[ResolutionOptionDescriptors]],
+    //    do
     inline for (resolution_option_descriptors) |desc| {
         const Desc = @TypeOf(desc);
 
-        // a. If desc has a [[Type]] field, let type be desc.[[Type]]. Otherwise, let type be string.
+        // a. If desc has a [[Type]] field, let type be desc.[[Type]]. Otherwise, let type be
+        //    string.
         const @"type": Object.OptionType = if (@hasField(Desc, "type")) desc.type else .string;
 
         // b. If desc has a [[Values]] field, let values be desc.[[Values]]. Otherwise, let values

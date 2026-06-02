@@ -179,9 +179,9 @@ pub fn builtinCallOrConstruct(
 
                 // i. Let result be the Completion Record that is the result of evaluating F in a
                 //    manner that conforms to the specification of F. If thisArgument is
-                //    uninitialized, the this value is uninitialized; else thisArgument provides
-                //    the this value. argumentsList provides the named parameters. newTarget
-                //    provides the NewTarget value.
+                //    uninitialized, the this value is uninitialized; else thisArgument provides the
+                //    this value. argumentsList provides the named parameters. newTarget provides
+                //    the NewTarget value.
                 // ii. NOTE: If F is defined in this document, “the specification of F” is the
                 //     behaviour specified for it via algorithm steps or other means.
                 const result = switch (builtin_function_.fields.behaviour) {
@@ -202,8 +202,8 @@ pub fn builtinCallOrConstruct(
             },
         });
 
-        // d. Remove calleeContext from the execution context stack and restore callerContext as
-        //    the running execution context.
+        // d. Remove calleeContext from the execution context stack and restore callerContext as the
+        //    running execution context.
         _ = agent.execution_context_stack.pop().?;
 
         // e. Return promiseCapability.[[Promise]].
@@ -221,8 +221,8 @@ pub fn builtinCallOrConstruct(
         .constructor => |constructor| constructor(agent, arguments_list, new_target),
     };
 
-    // 13. Remove calleeContext from the execution context stack and restore callerContext as
-    //     the running execution context.
+    // 13. Remove calleeContext from the execution context stack and restore callerContext as the
+    //     running execution context.
     _ = agent.execution_context_stack.pop().?;
 
     // 14. Return ? result.
@@ -249,7 +249,8 @@ pub fn createBuiltinFunction(
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 
-    // 2. If prototype is not present, set prototype to realm.[[Intrinsics]].[[%Function.prototype%]].
+    // 2. If prototype is not present, set prototype to
+    //    realm.[[Intrinsics]].[[%Function.prototype%]].
     const prototype = args.prototype orelse try realm.intrinsics.@"%Function.prototype%"();
 
     // 3. If async is not present, set async to false.

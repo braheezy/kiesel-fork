@@ -216,8 +216,8 @@ pub const ElementType = enum {
 /// https://tc39.es/ecma262/#sec-typedarray-preventextensions
 fn preventExtensions(agent: *Agent, object: *Object) std.mem.Allocator.Error!bool {
     // 1. NOTE: The extensibility-related invariants specified in 6.1.7.3 do not allow this method
-    //    to return true when O can gain (or lose and then regain) properties, which might occur
-    //    for properties with integer index names when its underlying buffer is resized.
+    //    to return true when O can gain (or lose and then regain) properties, which might occur for
+    //    properties with integer index names when its underlying buffer is resized.
 
     // 2. If IsTypedArrayFixedLength(O) is false, return false.
     if (!isTypedArrayFixedLength(object.as(TypedArray))) return false;
@@ -243,9 +243,8 @@ fn getOwnProperty(
         // ii. If value is undefined, return undefined.
         if (value.isUndefined()) return null;
 
-        // iii. Return the PropertyDescriptor {
-        //        [[Value]]: value, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
-        //      }.
+        // iii. Return the PropertyDescriptor { [[Value]]: value, [[Writable]]: true,
+        //      [[Enumerable]]: true, [[Configurable]]: true }.
         return .{ .value = value, .writable = true, .enumerable = true, .configurable = true };
     }
 
@@ -282,7 +281,8 @@ fn defineOwnProperty(
         // i. If IsValidIntegerIndex(O, numericIndex) is false, return false.
         if (!isValidIntegerIndex(object.as(TypedArray), numeric_index)) return false;
 
-        // ii. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is false, return false.
+        // ii. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is false, return
+        //     false.
         if (property_descriptor.configurable == false) return false;
 
         // iii. If Desc has an [[Enumerable]] field and Desc.[[Enumerable]] is false, return false.
@@ -410,8 +410,8 @@ fn ownPropertyKeys(
         }
     }
 
-    // 4. For each own property key P of O such that P is a String and P is not an integer index,
-    //    in ascending chronological order of property creation, do
+    // 4. For each own property key P of O such that P is a String and P is not an integer index, in
+    //    ascending chronological order of property creation, do
     for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string) {
             // a. Append P to keys.
@@ -419,8 +419,8 @@ fn ownPropertyKeys(
         }
     }
 
-    // 5. For each own property key P of O such that P is a Symbol, in ascending chronological
-    //    order of property creation, do
+    // 5. For each own property key P of O such that P is a Symbol, in ascending chronological order
+    //    of property creation, do
     for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
@@ -461,9 +461,8 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
         break :blk arrayBufferByteLength(buffer, order).toDetached();
     };
 
-    // 4. Return the TypedArray With Buffer Witness Record {
-    //      [[Object]]: obj, [[CachedBufferByteLength]]: byteLength
-    //    }.
+    // 4. Return the TypedArray With Buffer Witness Record { [[Object]]: obj,
+    //    [[CachedBufferByteLength]]: byteLength }.
     return .{ .object = object, .cached_buffer_byte_length = byte_length };
 }
 
@@ -487,8 +486,8 @@ pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) ByteLength {
     // 5. Let elementSize be TypedArrayElementSize(O).
     const element_size = typedArrayElementSize(typed_array);
 
-    // 6. NOTE: The returned byte length is always an integer multiple of elementSize, even when
-    //    the underlying buffer has been resized to a non-integer multiple.
+    // 6. NOTE: The returned byte length is always an integer multiple of elementSize, even when the
+    //    underlying buffer has been resized to a non-integer multiple.
     // 7. Return length × elementSize.
     return @enumFromInt(@intFromEnum(length) * element_size);
 }
@@ -596,7 +595,8 @@ fn isTypedArrayFixedLength(typed_array: *const TypedArray) bool {
     // 2. Let buffer be O.[[ViewedArrayBuffer]].
     const buffer = typed_array.fields.viewed_array_buffer;
 
-    // 3. If IsFixedLengthArrayBuffer(buffer) is false and IsSharedArrayBuffer(buffer) is false, return false.
+    // 3. If IsFixedLengthArrayBuffer(buffer) is false and IsSharedArrayBuffer(buffer) is false,
+    //    return false.
     if (!isFixedLengthArrayBuffer(buffer) and !isSharedArrayBuffer(buffer)) return false;
 
     // 4. Return true.
@@ -656,8 +656,8 @@ fn typedArrayGetElement(
     // 5. Let elementType be TypedArrayElementType(O).
     switch (typed_array.fields.element_type) {
         inline else => |@"type"| {
-            // 6. Return GetValueFromBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
-            //    elementType, true, unordered).
+            // 6. Return GetValueFromBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer, elementType,
+            //    true, unordered).
             const value = getValueFromBuffer(
                 agent,
                 typed_array.fields.viewed_array_buffer,
@@ -1228,7 +1228,8 @@ pub const prototype = struct {
 
             // o. Repeat, while countBytes > 0,
             while (count_bytes > 0) {
-                // i. Let value be GetValueFromBuffer(buffer, fromByteIndex, uint8, true, unordered).
+                // i. Let value be GetValueFromBuffer(buffer, fromByteIndex, uint8, true,
+                //    unordered).
                 const value = getValueFromBuffer(
                     agent,
                     buffer_,
@@ -1865,7 +1866,8 @@ pub const prototype = struct {
         // 4. If len = 0, return -1𝔽.
         if (len == .zero) return Value.from(-1);
 
-        // 5. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be len - 1.
+        // 5. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be
+        //    len - 1.
         const n = if (arguments.count() > 1)
             try from_index.toIntegerOrInfinity(agent)
         else
@@ -2444,7 +2446,8 @@ pub const prototype = struct {
                 src_byte_index += 1;
                 target_byte_index += 1;
             }) {
-                // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, uint8, true, unordered).
+                // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, uint8, true,
+                //    unordered).
                 const value = getValueFromBuffer(
                     agent,
                     src_buffer,
@@ -2455,7 +2458,8 @@ pub const prototype = struct {
                     null,
                 );
 
-                // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, uint8, value, true, unordered).
+                // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, uint8, value, true,
+                //     unordered).
                 try setValueInBuffer(
                     agent,
                     target_buffer,
@@ -2479,7 +2483,8 @@ pub const prototype = struct {
             }) {
                 const value = switch (src_type) {
                     inline else => |@"type"| value: {
-                        // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, srcType, true, unordered).
+                        // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, srcType,
+                        //    true, unordered).
                         const value = getValueFromBuffer(
                             agent,
                             src_buffer,
@@ -2498,7 +2503,8 @@ pub const prototype = struct {
 
                 switch (target_type) {
                     inline else => |@"type"| {
-                        // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, targetType, value, true, unordered).
+                        // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, targetType,
+                        //     value, true, unordered).
                         try setValueInBuffer(
                             agent,
                             target_buffer,
@@ -2541,7 +2547,8 @@ pub const prototype = struct {
         const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         } else if (relative_start < 0) blk: {
-            // 6. Else if relativeStart < 0, let startIndex be max(srcArrayLength + relativeStart, 0).
+            // 6. Else if relativeStart < 0, let startIndex be max(srcArrayLength + relativeStart,
+            //    0).
             break :blk @max(src_array_length + relative_start, 0);
         } else blk: {
             // 7. Else, let startIndex be min(relativeStart, srcArrayLength).
@@ -3182,7 +3189,8 @@ fn typedArrayCreateFromConstructor(
     // 2. Let taRecord be ? ValidateTypedArray(newTypedArray, seq-cst).
     const ta = try validateTypedArray(agent, Value.from(new_typed_array), .seq_cst);
 
-    // 3. Assert: newTypedArray has all the internal slots mentioned in Properties of TypedArray Instances.
+    // 3. Assert: newTypedArray has all the internal slots mentioned in Properties of TypedArray
+    //    Instances.
     std.debug.assert(new_typed_array.is(TypedArray));
 
     // 4. If the number of elements in argumentList is 1 and argumentList[0] is a Number, then
@@ -3388,7 +3396,8 @@ pub fn allocateTypedArray(
         // 10.4.5.11 TypedArrayCreate ( prototype )
         // https://tc39.es/ecma262/#sec-typedarraycreate
         // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]], [[ViewedArrayBuffer]],
-        //    [[TypedArrayName]], [[ContentType]], [[ByteLength]], [[ByteOffset]], [[ArrayLength]] ».
+        //    [[TypedArrayName]], [[ContentType]], [[ByteLength]], [[ByteOffset]],
+        //    [[ArrayLength]] ».
         // 2. Let A be MakeBasicObject(internalSlotsList).
         .internal_methods = .initComptime(.{
             // 3. Set A.[[PreventExtensions]] as specified in 10.4.5.1.
@@ -3549,7 +3558,8 @@ fn initializeTypedArrayFromTypedArray(
         while (count > 0) : (count -= 1) {
             const value = switch (src_type) {
                 inline else => |@"type"| value: {
-                    // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true, unordered).
+                    // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true,
+                    //    unordered).
                     const value = getValueFromBuffer(
                         agent,
                         src_data,
@@ -3568,7 +3578,8 @@ fn initializeTypedArrayFromTypedArray(
 
             switch (element_type) {
                 inline else => |@"type"| {
-                    // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true, unordered).
+                    // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true,
+                    //     unordered).
                     try setValueInBuffer(
                         agent,
                         array_buffer,
@@ -3916,7 +3927,8 @@ fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void 
         // b. Let byteIndexInBuffer be index + offset.
         const byte_index_in_buffer = @as(u53, @intCast(index)) + @intFromEnum(offset);
 
-        // c. Perform SetValueInBuffer(into.[[ViewedArrayBuffer]], byteIndexInBuffer, uint8, 𝔽(byte), true, unordered).
+        // c. Perform SetValueInBuffer(into.[[ViewedArrayBuffer]], byteIndexInBuffer, uint8,
+        //    𝔽(byte), true, unordered).
         setValueInBuffer(
             agent,
             into.fields.viewed_array_buffer,
@@ -4173,8 +4185,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 );
             }
 
-            // 2. Let constructorName be the String value of the Constructor Name value specified
-            //    in Table 70 for this TypedArray constructor.
+            // 2. Let constructorName be the String value of the Constructor Name value specified in
+            //    Table 70 for this TypedArray constructor.
 
             // 3. Let proto be "%TypedArray.prototype%".
             const prototype_ = "%" ++ name ++ ".prototype%";
@@ -4220,13 +4232,15 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 }
                 // c. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
                 else if (first_argument.asObject().cast(builtins.ArrayBuffer)) |array_buffer| {
-                    // i. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset be undefined.
+                    // i. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset be
+                    //    undefined.
                     const byte_offset = arguments.get(1);
 
                     // ii. If numberOfArgs > 2, let length be args[2]; else let length be undefined.
                     const length = arguments.get(2);
 
-                    // iii. Perform ? InitializeTypedArrayFromArrayBuffer(O, firstArgument, byteOffset, length).
+                    // iii. Perform ? InitializeTypedArrayFromArrayBuffer(O, firstArgument,
+                    //      byteOffset, length).
                     try initializeTypedArrayFromArrayBuffer(
                         agent,
                         typed_array,
@@ -4252,7 +4266,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
                     // iii. If usingIterator is not undefined, then
                     if (using_iterator != null) {
-                        // 1. Let values be ? IteratorToList(? GetIteratorFromMethod(firstArgument, usingIterator)).
+                        // 1. Let values be ? IteratorToList(? GetIteratorFromMethod(firstArgument,
+                        //    usingIterator)).
                         var iterator = try getIteratorFromMethod(
                             agent,
                             first_argument,
@@ -4265,8 +4280,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                         try initializeTypedArrayFromList(agent, typed_array, values);
                     } else {
                         // iv. Else,
-                        // 1. NOTE: firstArgument is not an iterable object, so assume it is
-                        //    already an array-like object.
+                        // 1. NOTE: firstArgument is not an iterable object, so assume it is already
+                        //    an array-like object.
                         // 2. Perform ? InitializeTypedArrayFromArrayLike(O, firstArgument).
                         try initializeTypedArrayFromArrayLike(
                             agent,
@@ -4432,8 +4447,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 @intFromEnum(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
             );
 
-            // 7. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
-            //    the value at the corresponding index of result.[[Bytes]].
+            // 7. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to the
+            //    value at the corresponding index of result.[[Bytes]].
             const block = typed_array.fields.viewed_array_buffer.fields.data_block.?;
             @memcpy(block.bytes, result.bytes);
 
@@ -4718,8 +4733,8 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const codecs = switch (alphabet) {
                 .base64 => blk: {
                     // a. Let outAscii be the sequence of code points which results from encoding
-                    //    toEncode according to the base64 encoding specified in section 4 of RFC
-                    //    4648. Padding is included if and only if omitPadding is false.
+                    //    toEncode according to the base64 encoding specified in section 4 of
+                    //    RFC 4648. Padding is included if and only if omitPadding is false.
                     break :blk if (omit_padding) std.base64.standard_no_pad else std.base64.standard;
                 },
                 // 10. Else,

@@ -83,9 +83,8 @@ fn getOwnProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Age
     // 4. Let value be ? O.[[Get]](P, O).
     const value = try object.internal_methods.get(agent, object, property_key, Value.from(object));
 
-    // 5. Return PropertyDescriptor {
-    //      [[Value]]: value, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: false
-    //    }.
+    // 5. Return PropertyDescriptor { [[Value]]: value, [[Writable]]: true, [[Enumerable]]: true,
+    //    [[Configurable]]: false }.
     return .{ .value = value, .writable = true, .enumerable = true, .configurable = false };
 }
 

@@ -354,9 +354,8 @@ pub fn newPrivateEnvironment(
     // 1. Let names be a new empty List.
     const names: std.StringHashMapUnmanaged(PrivateName) = .empty;
 
-    // 2. Return the PrivateEnvironment Record {
-    //      [[OuterPrivateEnvironment]]: outerPrivateEnv, [[Names]]: names
-    //    }.
+    // 2. Return the PrivateEnvironment Record { [[OuterPrivateEnvironment]]: outerPrivateEnv,
+    //    [[Names]]: names }.
     const env = try allocator.create(PrivateEnvironment);
     env.* = .{
         .outer_private_environment = outer_private_env,

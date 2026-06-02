@@ -58,9 +58,8 @@ pub fn parse(
     // 2. If script is a List of errors, return script.
     const script = try Parser.parse(ast.Script, agent.gc_allocator, source_text, options);
 
-    // 3. Return Script Record {
-    //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
-    //    }.
+    // 3. Return Script Record { [[Realm]]: realm, [[ECMAScriptCode]]: script,
+    //    [[LoadedModules]]: « », [[HostDefined]]: hostDefined }.
     const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(Script);
     self.* = .{
@@ -106,7 +105,8 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
 
     // 9. Suspend the running execution context.
 
-    // 10. Push scriptContext onto the execution context stack; scriptContext is now the running execution context.
+    // 10. Push scriptContext onto the execution context stack; scriptContext is now the running
+    //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &script_context);
 
     // 11. Let script be scriptRecord.[[ECMAScriptCode]].
@@ -173,9 +173,8 @@ pub fn globalDeclarationInstantiation(
         // b. Let hasRestrictedGlobal be ? HasRestrictedGlobalProperty(env, name).
         const has_restricted_global = try env.hasRestrictedGlobalProperty(agent, name);
 
-        // c. NOTE: Global var and function bindings (except those that are introduced by
-        //    non-strict direct eval) are non-configurable and are therefore restricted global
-        //    properties.
+        // c. NOTE: Global var and function bindings (except those that are introduced by non-strict
+        //    direct eval) are non-configurable and are therefore restricted global properties.
 
         // d. If hasRestrictedGlobal is true, throw a SyntaxError exception.
         if (has_restricted_global) {
@@ -297,9 +296,9 @@ pub fn globalDeclarationInstantiation(
         }
     }
 
-    // 11. NOTE: No abnormal terminations occur after this algorithm step if the global object is
-    //     an ordinary object. However, if the global object is a Proxy exotic object it may
-    //     exhibit behaviours that cause abnormal terminations in some of the following steps.
+    // 11. NOTE: No abnormal terminations occur after this algorithm step if the global object is an
+    //     ordinary object. However, if the global object is a Proxy exotic object it may exhibit
+    //     behaviours that cause abnormal terminations in some of the following steps.
 
     // 12. If the host is a web browser or otherwise supports Block-Level Function Declarations Web
     //     Legacy Compatibility Semantics, then

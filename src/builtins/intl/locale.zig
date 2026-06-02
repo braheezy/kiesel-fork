@@ -33,7 +33,8 @@ fn updateLanguageId(
     var new_tag = tag.clone();
 
     // 1. Let baseName be GetLocaleBaseName(tag).
-    // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(baseName)).
+    // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(
+    //    baseName)).
     const maybe_language = try options.getOption(agent, "language", .string, null, null);
 
     // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
@@ -82,7 +83,8 @@ fn updateLanguageId(
         };
     }
 
-    // 8. Let variants be ? GetOption(options, "variants", string, empty, GetLocaleVariants(baseName)).
+    // 8. Let variants be ? GetOption(options, "variants", string, empty, GetLocaleVariants(
+    //    baseName)).
     const maybe_variants = try options.getOption(agent, "variants", .string, null, null);
 
     // 9. If variants is not undefined, then
@@ -306,8 +308,8 @@ pub const constructor = struct {
         // 23. If fw is not undefined, then
         if (maybe_fw) |fw| {
             // a. Set fw to WeekdayToUValue(fw).
-            // b. If fw cannot be matched by the type Unicode locale nonterminal, throw a
-            //    RangeError exception.
+            // b. If fw cannot be matched by the type Unicode locale nonterminal, throw a RangeError
+            //    exception.
             const fw_utf8 = try fw.toUtf8(gpa);
             defer gpa.free(fw_utf8);
             var value: []const u8 = weekdayToUValue(fw_utf8);
@@ -389,8 +391,8 @@ pub const constructor = struct {
 
         // 33. If numberingSystem is not undefined, then
         if (maybe_numbering_system) |numbering_system| {
-            // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
-            //    throw a RangeError exception.
+            // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal, throw
+            //    a RangeError exception.
             const numbering_system_utf8 = try numbering_system.toUtf8(gpa);
             defer gpa.free(numbering_system_utf8);
             var value: []const u8 = numbering_system_utf8;

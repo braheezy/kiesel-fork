@@ -58,7 +58,8 @@ pub const constructor = struct {
         //    newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
-        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%", « [[ErrorData]] »).
+        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%",
+        //    « [[ErrorData]] »).
         const @"error" = try ordinaryCreateFromConstructor(
             Error,
             agent,
@@ -370,9 +371,8 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             //    newTarget be NewTarget.
             const new_target_ = new_target orelse agent.activeFunctionObject();
 
-            // 2. Let O be ? OrdinaryCreateFromConstructor(
-            //      newTarget, "%NativeError.prototype%", « [[ErrorData]] »
-            //    ).
+            // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%NativeError.prototype%",
+            //    « [[ErrorData]] »).
             const @"error" = try ordinaryCreateFromConstructor(
                 T,
                 agent,

@@ -64,8 +64,8 @@ pub const constructor = struct {
         }
 
         // 2. Let displayNames be ? OrdinaryCreateFromConstructor(NewTarget,
-        //    "%Intl.DisplayNames.prototype%", « [[InitializedDisplayNames]], [[Locale]],
-        //    [[Style]], [[Type]], [[Fallback]], [[LanguageDisplay]], [[Fields]] »).
+        //    "%Intl.DisplayNames.prototype%", « [[InitializedDisplayNames]], [[Locale]], [[Style]],
+        //    [[Type]], [[Fallback]], [[LanguageDisplay]], [[Fields]] »).
         const display_names = try ordinaryCreateFromConstructor(
             DisplayNames,
             agent,
@@ -265,7 +265,8 @@ pub const prototype = struct {
 
         // 4. For each row of Table 18, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot value of the current row.
+        //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot
+        //        value of the current row.
         //     c. If v is not undefined, then
         //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = display_names.fields.resolvedOptions();

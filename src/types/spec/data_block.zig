@@ -119,7 +119,7 @@ pub fn copyDataBlockBytes(
 
     // 6. Repeat, while count > 0,
     //     TODO: a. If fromBlock is a Shared Data Block, then
-    //         [...]
+    //              [...]
     //     b. Else,
     //         i. Assert: toBlock is not a Shared Data Block.
     //         ii. Set toBlock[toIndex] to fromBlock[fromIndex].

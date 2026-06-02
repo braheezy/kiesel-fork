@@ -118,7 +118,8 @@ pub const prototype = struct {
                             {},
                         );
 
-                        // b. If desc.[[Enumerable]] is true, return CreateIteratorResultObject(r, false).
+                        // b. If desc.[[Enumerable]] is true, return CreateIteratorResultObject(r,
+                        //    false).
                         if (descriptor.?.enumerable == true) {
                             return Value.from(
                                 try createIteratorResultObject(

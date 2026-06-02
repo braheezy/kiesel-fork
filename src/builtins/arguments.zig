@@ -221,9 +221,8 @@ pub fn createUnmappedArgumentsObject(
         },
     });
 
-    // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
-    //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor { [[Value]]: 𝔽(len),
+    //    [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(offsets.length, Value.from(@as(u53, @intCast(len))));
 
     // 5. Let index be 0.
@@ -241,16 +240,16 @@ pub fn createUnmappedArgumentsObject(
     }
 
     // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
-    //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    //    [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false,
+    //    [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(
         offsets.@"%Symbol.iterator%",
         Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
     );
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
-    //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false
-    //    }).
+    //    [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false,
+    //    [[Configurable]]: false }).
     arguments.object.setAccessorAtPropertyOffset(offsets.callee, .{
         .get = try realm.intrinsics.@"%ThrowTypeError%"(),
         .set = try realm.intrinsics.@"%ThrowTypeError%"(),
@@ -337,9 +336,8 @@ pub fn createMappedArgumentsObject(
         // c. Set index to index + 1.
     }
 
-    // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
-    //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //     }).
+    // 16. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor { [[Value]]: 𝔽(len),
+    //     [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(offsets.length, Value.from(@as(u53, @intCast(len))));
 
     // 17. Let mappedNames be a new empty List.
@@ -370,8 +368,7 @@ pub fn createMappedArgumentsObject(
                 // 1. Let g be MakeArgGetter(name, env).
                 // 2. Let p be MakeArgSetter(name, env).
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
-                //      [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true
-                //    }).
+                //    [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true }).
                 // NOTE: The getter and setter are implemented via the ParameterMap methods.
                 map.items[index] = name;
             }
@@ -381,16 +378,15 @@ pub fn createMappedArgumentsObject(
     }
 
     // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
-    //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //     }).
+    //     [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false,
+    //     [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(
         offsets.@"%Symbol.iterator%",
         Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
     );
 
-    // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
-    //       [[Value]]: func, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
-    //     }).
+    // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor { [[Value]]: func,
+    //     [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(offsets.callee, Value.from(&function.object));
 
     // 22. Return obj.

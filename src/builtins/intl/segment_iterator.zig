@@ -28,7 +28,8 @@ pub fn createSegmentIterator(
 ) std.mem.Allocator.Error!*SegmentIterator {
     const realm = agent.currentRealm();
 
-    // 1. Let internalSlotsList be « [[IteratingSegmenter]], [[IteratedString]], [[IteratedStringNextSegmentCodeUnitIndex]] ».
+    // 1. Let internalSlotsList be « [[IteratingSegmenter]], [[IteratedString]],
+    //    [[IteratedStringNextSegmentCodeUnitIndex]] ».
     // 2. Let iterator be OrdinaryObjectCreate(%IntlSegmentIteratorPrototype%, internalSlotsList).
     const iterator = SegmentIterator.create(agent, .{
         .prototype = try realm.intrinsics.@"%IntlSegmentIteratorPrototype%"(),

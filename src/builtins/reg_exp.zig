@@ -217,9 +217,8 @@ fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
         },
     );
 
-    // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor {
-    //      [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-    //    }).
+    // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor { [[Writable]]: true,
+    //    [[Enumerable]]: false, [[Configurable]]: false }).
     try reg_exp.object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
         .value_or_accessor = .{
             .value = .undefined,
@@ -266,8 +265,8 @@ fn regExpInitialize(
     // TODO: 12. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).
     // 13. Else,
-    //     a. Let patternText be the result of interpreting each of P's 16-bit elements as a
-    //        Unicode BMP code point. UTF-16 decoding is not applied to the elements.
+    //     a. Let patternText be the result of interpreting each of P's 16-bit elements as a Unicode
+    //        BMP code point. UTF-16 decoding is not applied to the elements.
     // 14. Let parseResult be ParsePattern(patternText, u, v).
     // 15. If parseResult is a non-empty List of SyntaxError objects, throw a SyntaxError exception.
     // 16. Assert: parseResult is a Pattern Parse Node.
@@ -280,10 +279,8 @@ fn regExpInitialize(
     reg_exp.fields.original_flags = f;
 
     // 19. Let capturingGroupsCount be CountLeftCapturingParensWithin(parseResult).
-    // 20. Let rer be the RegExp Record {
-    //       [[IgnoreCase]]: i, [[Multiline]]: m, [[DotAll]]: s, [[Unicode]]: u, [[UnicodeSets]]: v,
-    //       [[CapturingGroupsCount]]: capturingGroupsCount
-    //     }.
+    // 20. Let rer be the RegExp Record { [[IgnoreCase]]: i, [[Multiline]]: m, [[DotAll]]: s,
+    //     [[Unicode]]: u, [[UnicodeSets]]: v, [[CapturingGroupsCount]]: capturingGroupsCount }.
     // 21. Set obj.[[RegExpRecord]] to rer.
     // 22. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
     reg_exp.fields.re_bytecode = re_bytecode;
@@ -521,7 +518,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             // iii. If fullUnicode is true, then
             //     1. Set captureStart to GetStringIndex(S, captureStart).
             //     2. Set captureEnd to GetStringIndex(S, captureEnd).
-            // iv. Let capture be the Match Record { [[StartIndex]]: captureStart, [[EndIndex]]: captureEnd }.
+            // iv. Let capture be the Match Record { [[StartIndex]]: captureStart,
+            //     [[EndIndex]]: captureEnd }.
             const capture = capture_i.?;
 
             // v. Let capturedValue be GetMatchString(S, capture).
@@ -906,7 +904,8 @@ pub const constructor = struct {
                 );
             } else {
                 // b. Else,
-                // i. Set escaped to the string-concatenation of escaped and EncodeForRegExpEscape(cp).
+                // i. Set escaped to the string-concatenation of escaped and EncodeForRegExpEscape(
+                //    cp).
                 try encodeForRegExpEscape(agent.gc_allocator, &escaped, cp);
             }
         }
@@ -935,9 +934,8 @@ pub const constructor = struct {
 
             // 2. If cp is a code point listed in the “Code Point” column of Table 67, then
             '\t'...'\r' => {
-                // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the
-                //    string in the “ControlEscape” column of the row whose “Code Point” column
-                //    contains cp.
+                // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the string in
+                //    the “ControlEscape” column of the row whose “Code Point” column contains cp.
                 try escaped.appendChar(allocator, '\\');
                 try escaped.appendChar(
                     allocator,
@@ -946,8 +944,8 @@ pub const constructor = struct {
                 return;
             },
 
-            // 3. Let otherPunctuators be the string-concatenation of ",-=<>#&!%:;@~'`" and the
-            //    code unit 0x0022 (QUOTATION MARK).
+            // 3. Let otherPunctuators be the string-concatenation of ",-=<>#&!%:;@~'`" and the code
+            //    unit 0x0022 (QUOTATION MARK).
             // 4. Let toEscape be StringToCodePoints(otherPunctuators).
             ',', '-', '=', '<', '>', '#', '&', '!', '%', ':', ';', '@', '~', '\'', '`', '"' => {
                 hex_escape = true;
@@ -1083,7 +1081,8 @@ pub const prototype = struct {
         var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
 
         // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
-        // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to codeUnits.
+        // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to
+        //    codeUnits.
         if ((try reg_exp.get(agent, PropertyKey.from("hasIndices"))).toBoolean()) {
             code_units.appendAssumeCapacity('d');
         }
@@ -1095,13 +1094,15 @@ pub const prototype = struct {
         }
 
         // 8. Let ignoreCase be ToBoolean(? Get(R, "ignoreCase")).
-        // 9. If ignoreCase is true, append the code unit 0x0069 (LATIN SMALL LETTER I) to codeUnits.
+        // 9. If ignoreCase is true, append the code unit 0x0069 (LATIN SMALL LETTER I) to
+        //    codeUnits.
         if ((try reg_exp.get(agent, PropertyKey.from("ignoreCase"))).toBoolean()) {
             code_units.appendAssumeCapacity('i');
         }
 
         // 10. Let multiline be ToBoolean(? Get(R, "multiline")).
-        // 11. If multiline is true, append the code unit 0x006D (LATIN SMALL LETTER M) to codeUnits.
+        // 11. If multiline is true, append the code unit 0x006D (LATIN SMALL LETTER M) to
+        //     codeUnits.
         if ((try reg_exp.get(agent, PropertyKey.from("multiline"))).toBoolean()) {
             code_units.appendAssumeCapacity('m');
         }
@@ -1119,7 +1120,8 @@ pub const prototype = struct {
         }
 
         // 16. Let unicodeSets be ToBoolean(? Get(R, "unicodeSets")).
-        // 17. If unicodeSets is true, append the code unit 0x0076 (LATIN SMALL LETTER V) to codeUnits.
+        // 17. If unicodeSets is true, append the code unit 0x0076 (LATIN SMALL LETTER V) to
+        //     codeUnits.
         if ((try reg_exp.get(agent, PropertyKey.from("unicodeSets"))).toBoolean()) {
             code_units.appendAssumeCapacity('v');
         }
@@ -1425,8 +1427,8 @@ pub const prototype = struct {
                 // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
                 const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
-                // b. If flags contains "u" or flags contains "v", let fullUnicode be true; else
-                //    let fullUnicode be false.
+                // b. If flags contains "u" or flags contains "v", let fullUnicode be true; else let
+                //    fullUnicode be false.
                 const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
                     flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
@@ -1500,9 +1502,9 @@ pub const prototype = struct {
                 // iii. Append capN to captures.
                 captures.appendAssumeCapacity(capture_n_string);
 
-                // iv. NOTE: When n = 1, the preceding step puts the first element into captures
-                //     (at index 0). More generally, the nth capture (the characters captured by
-                //     the nth set of capturing parentheses) is at captures[n - 1].
+                // iv. NOTE: When n = 1, the preceding step puts the first element into captures (at
+                //     index 0). More generally, the nth capture (the characters captured by the nth
+                //     set of capturing parentheses) is at captures[n - 1].
 
                 // v. Set n to n + 1.
             }
@@ -1549,7 +1551,7 @@ pub const prototype = struct {
                 } else null;
 
                 // ii. Let replacementString be ? GetSubstitution(matched, S, position, captures,
-                //           namedCaptures, replaceValue).
+                //     namedCaptures, replaceValue).
                 break :blk try getSubstitution(
                     agent,
                     matched,
@@ -1677,13 +1679,14 @@ pub const prototype = struct {
         _: c_int,
     ) std.mem.Allocator.Error!*const String {
         // TODO: 1-4.
-        // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in
-        //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
+        // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in S
+        //    as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
         //    parsed (in an appropriate lexical context) as a RegularExpressionLiteral that behaves
         //    identically to the constructed regular expression. For example, if P is "/", then S
-        //    could be "\/" or "\u002F", among other possibilities, but not "/", because /// followed
-        //    by F would be parsed as a SingleLineComment rather than a RegularExpressionLiteral.
-        //    If P is the empty String, this specification can be met by letting S be "(?:)".
+        //    could be "\/" or "\u002F", among other possibilities, but not "/", because ///
+        //    followed by F would be parsed as a SingleLineComment rather than a
+        //    RegularExpressionLiteral. If P is the empty String, this specification can be met by
+        //    letting S be "(?:)".
         // 6. Return S.
         if (pattern.isEmpty()) return String.fromLiteral("(?:)");
         var escaped = pattern;
@@ -1843,7 +1846,8 @@ pub const prototype = struct {
                         // a. Let nextCapture be ? Get(z, ! ToString(𝔽(i))).
                         const next_capture = try z.?.get(agent, PropertyKey.from(i));
 
-                        // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), nextCapture).
+                        // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)),
+                        //    nextCapture).
                         try array.object.createDataPropertyDirect(
                             agent,
                             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),

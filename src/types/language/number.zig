@@ -331,8 +331,8 @@ pub const Number = union(enum) {
         if (base.asFloat() < 0 and !exponent.isIntegral())
             return .{ .f64 = std.math.nan(f64) };
 
-        // 13. Return an implementation-approximated Number value representing the result of
-        //     raising ℝ(base) to the ℝ(exponent) power.
+        // 13. Return an implementation-approximated Number value representing the result of raising
+        //     ℝ(base) to the ℝ(exponent) power.
         return from(std.math.pow(f64, base.asFloat(), exponent.asFloat()));
     }
 
@@ -441,8 +441,8 @@ pub const Number = union(enum) {
         const shift_count: u5 = @intCast(@mod(r_num, 32));
 
         // 4. Return the result of performing a sign-extending right shift of lNum by shiftCount
-        //    bits. The most significant bit is propagated. The mathematical value of the result
-        //    is exactly representable as a 32-bit two's complement bit string.
+        //    bits. The most significant bit is propagated. The mathematical value of the result is
+        //    exactly representable as a 32-bit two's complement bit string.
         return .{ .i32 = l_num >> shift_count };
     }
 
@@ -458,9 +458,9 @@ pub const Number = union(enum) {
         // 3. Let shiftCount be ℝ(rNum) modulo 32.
         const shift_count: u5 = @intCast(@mod(r_num, 32));
 
-        // 4. Return the result of performing a zero-filling right shift of lNum by shiftCount
-        //    bits. Vacated bits are filled with zero. The mathematical value of the result is
-        //    exactly representable as a 32-bit unsigned bit string.
+        // 4. Return the result of performing a zero-filling right shift of lNum by shiftCount bits.
+        //    Vacated bits are filled with zero. The mathematical value of the result is exactly
+        //    representable as a 32-bit unsigned bit string.
         return from(l_num >> shift_count);
     }
 
@@ -577,8 +577,8 @@ pub const Number = union(enum) {
             .@"|" => l_num | r_num,
         };
 
-        // 8. Return the Number value for the integer represented by the 32-bit two's complement
-        //    bit string result.
+        // 8. Return the Number value for the integer represented by the 32-bit two's complement bit
+        //    string result.
         return result;
     }
 

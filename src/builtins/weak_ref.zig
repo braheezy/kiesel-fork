@@ -67,7 +67,8 @@ pub const constructor = struct {
             );
         }
 
-        // 3. Let weakRef be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakRef.prototype%", « [[WeakRefTarget]] »).
+        // 3. Let weakRef be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakRef.prototype%",
+        //    « [[WeakRefTarget]] »).
         const weak_ref = try ordinaryCreateFromConstructor(
             WeakRef,
             agent,

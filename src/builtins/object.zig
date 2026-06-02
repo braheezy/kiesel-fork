@@ -418,7 +418,8 @@ pub const constructor = struct {
                 // b. Let descriptor be FromPropertyDescriptor(desc).
                 const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
 
-                // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(descriptors, key, descriptor).
+                // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(
+                //    descriptors, key, descriptor).
                 try descriptors.createDataPropertyDirect(agent, key, Value.from(descriptor));
             }
         }
@@ -947,9 +948,8 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
-        // 3. Let desc be PropertyDescriptor {
-        //      [[Get]]: getter, [[Enumerable]]: true, [[Configurable]]: true
-        //    }.
+        // 3. Let desc be PropertyDescriptor { [[Get]]: getter, [[Enumerable]]: true,
+        //    [[Configurable]]: true }.
         const property_descriptor: PropertyDescriptor = .{
             .get = getter.asObject(),
             .enumerable = true,
@@ -980,9 +980,8 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
-        // 3. Let desc be PropertyDescriptor {
-        //      [[Set]]: setter, [[Enumerable]]: true, [[Configurable]]: true
-        //    }.
+        // 3. Let desc be PropertyDescriptor { [[Set]]: setter, [[Enumerable]]: true,
+        //    [[Configurable]]: true }.
         const property_descriptor: PropertyDescriptor = .{
             .set = setter.asObject(),
             .enumerable = true,

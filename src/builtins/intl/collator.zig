@@ -142,8 +142,8 @@ pub const constructor = struct {
 
         // 19. If usage is "sort", let defaultSensitivity be "variant". Otherwise, let
         //     defaultSensitivity be resolvedLocaleData.[[sensitivity]].
-        // 20. Set collator.[[Sensitivity]] to ? GetOption(options, "sensitivity", string, «
-        //     "base", "accent", "case", "variant" », defaultSensitivity).
+        // 20. Set collator.[[Sensitivity]] to ? GetOption(options, "sensitivity", string, « "base",
+        //     "accent", "case", "variant" », defaultSensitivity).
         var maybe_sensitivity_string = try options.getOption(
             agent,
             "sensitivity",
@@ -243,10 +243,12 @@ pub const prototype = struct {
 
         // 4. For each row of Table 4, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of collator's internal slot whose name is the Internal Slot value of the current row.
+        //     b. Let v be the value of collator's internal slot whose name is the Internal Slot
+        //        value of the current row.
         //     c. If the current row has an Extension Key value, then
         //         i. Let extensionKey be the Extension Key value of the current row.
-        //         ii. If %Intl.Collator%.[[RelevantExtensionKeys]] does not contain extensionKey, then
+        //         ii. If %Intl.Collator%.[[RelevantExtensionKeys]] does not contain extensionKey,
+        //             then
         //             1. Set v to undefined.
         //     d. If v is not undefined, then
         //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).

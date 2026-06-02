@@ -79,7 +79,8 @@ pub const constructor = struct {
                 // 5. Set finalizationRegistry.[[Realm]] to fn.[[Realm]].
                 .realm = function.as(builtins.BuiltinFunction).fields.realm,
 
-                // 6. Set finalizationRegistry.[[CleanupCallback]] to HostMakeJobCallback(cleanupCallback).
+                // 6. Set finalizationRegistry.[[CleanupCallback]] to HostMakeJobCallback(
+                //    cleanupCallback).
                 .cleanup_callback = agent.host_hooks.hostMakeJobCallback(cleanup_callback.asObject()),
 
                 // 7. Set finalizationRegistry.[[Cells]] to a new empty List.
@@ -170,7 +171,8 @@ pub const prototype = struct {
             maybe_unregister_token = null;
         }
 
-        // 6. Let cell be the Record { [[WeakRefTarget]]: target, [[HeldValue]]: heldValue, [[UnregisterToken]]: unregisterToken }.
+        // 6. Let cell be the Record { [[WeakRefTarget]]: target, [[HeldValue]]: heldValue,
+        //    [[UnregisterToken]]: unregisterToken }.
         const cell: Cell = .{
             .agent = agent,
             .is_unregistered = false,
@@ -242,14 +244,14 @@ pub const prototype = struct {
         // 4. Let removed be false.
         var removed = false;
 
-        // 5. For each Record { [[WeakRefTarget]], [[HeldValue]], [[UnregisterToken]] } cell
-        //    of finalizationRegistry.[[Cells]], do
+        // 5. For each Record { [[WeakRefTarget]], [[HeldValue]], [[UnregisterToken]] } cell of
+        //    finalizationRegistry.[[Cells]], do
         var index = finalization_registry.fields.cells.items.len;
         while (index > 0) {
             index -= 1;
             const cell = finalization_registry.fields.cells.items[index];
-            // a. If cell.[[UnregisterToken]] is not empty and
-            //    SameValue(cell.[[UnregisterToken]], unregisterToken) is true, then
+            // a. If cell.[[UnregisterToken]] is not empty and SameValue(cell.[[UnregisterToken]],
+            //    unregisterToken) is true, then
             if (cell.unregister_token) |cell_unregister_token| {
                 if (cell_unregister_token.get().sameValue(unregister_token)) {
                     // i. Remove cell from finalizationRegistry.[[Cells]].
@@ -278,7 +280,8 @@ pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
     // 2. Let callback be finalizationRegistry.[[CleanupCallback]].
     const callback = finalization_registry.fields.cleanup_callback;
 
-    // 3. While finalizationRegistry.[[Cells]] contains a Record cell such that cell.[[WeakRefTarget]] is empty, an implementation may perform the following steps:
+    // 3. While finalizationRegistry.[[Cells]] contains a Record cell such that
+    //    cell.[[WeakRefTarget]] is empty, an implementation may perform the following steps:
     //    a. Choose any such cell.
     // NOTE: Steps 3 and 3.a are completed by libgc which is why this function takes
     //       a single cell instead.

@@ -52,7 +52,8 @@ pub const constructor = struct {
         // 2. If NewTarget is undefined, return b.
         if (new_target == null) return Value.from(b);
 
-        // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%", « [[BooleanData]] »).
+        // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%",
+        //    « [[BooleanData]] »).
         const boolean = try ordinaryCreateFromConstructor(
             Boolean,
             agent,

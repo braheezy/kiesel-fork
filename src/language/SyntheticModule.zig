@@ -83,11 +83,9 @@ pub fn createDefaultExportSyntheticModule(
         }
     }.func;
 
-    // 3. Return the Synthetic Module Record {
-    //      [[Realm]]: realm, [[Environment]]: empty, [[Namespace]]: empty,
-    //      [[HostDefined]]: undefined, [[ExportNames]]: « "default" »,
-    //      [[EvaluationSteps]]: setDefaultExport
-    //    }.
+    // 3. Return the Synthetic Module Record { [[Realm]]: realm, [[Environment]]: empty,
+    //    [[Namespace]]: empty, [[HostDefined]]: undefined, [[ExportNames]]: « "default" »,
+    //    [[EvaluationSteps]]: setDefaultExport }.
     const self = try agent.gc_allocator.create(SyntheticModule);
     self.* = .{
         .realm = realm,

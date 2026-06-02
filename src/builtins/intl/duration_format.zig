@@ -66,11 +66,10 @@ pub const constructor = struct {
 
         // 2. Let durationFormat be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%Intl.DurationFormatPrototype%", « [[InitializedDurationFormat]], [[Locale]],
-        //    [[NumberingSystem]], [[Style]], [[YearsOptions]], [[MonthsOptions]],
-        //    [[WeeksOptions]], [[DaysOptions]], [[HoursOptions]], [[MinutesOptions]],
-        //    [[SecondsOptions]], [[MillisecondsOptions]], [[MicrosecondsOptions]],
-        //    [[NanosecondsOptions]], [[HourMinuteSeparator]], [[MinuteSecondSeparator]],
-        //    [[FractionalDigits]] »).
+        //    [[NumberingSystem]], [[Style]], [[YearsOptions]], [[MonthsOptions]], [[WeeksOptions]],
+        //    [[DaysOptions]], [[HoursOptions]], [[MinutesOptions]], [[SecondsOptions]],
+        //    [[MillisecondsOptions]], [[MicrosecondsOptions]], [[NanosecondsOptions]],
+        //    [[HourMinuteSeparator]], [[MinuteSecondSeparator]], [[FractionalDigits]] »).
         const duration_format = try ordinaryCreateFromConstructor(
             DurationFormat,
             agent,
@@ -129,7 +128,8 @@ pub const constructor = struct {
         // 9. Set durationFormat.[[HourMinuteSeparator]] to digitalFormat.[[HourMinuteSeparator]].
         duration_format.fields.hour_minute_separator = digital_format.hour_minute_separator;
 
-        // 10. Set durationFormat.[[MinuteSecondSeparator]] to digitalFormat.[[MinuteSecondSeparator]].
+        // 10. Set durationFormat.[[MinuteSecondSeparator]] to
+        //     digitalFormat.[[MinuteSecondSeparator]].
         duration_format.fields.minute_second_separator = digital_format.minute_second_separator;
 
         // 11. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
@@ -908,7 +908,8 @@ const Duration = struct {
         // 7. Let microseconds be ? Get(input, "microseconds").
         const microseconds = try input.get(agent, PropertyKey.from("microseconds"));
 
-        // 8. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
+        // 8. If microseconds is not undefined, set result.[[Microseconds]] to
+        //    ? ToIntegerIfIntegral(microseconds).
         if (!microseconds.isUndefined()) {
             result.microseconds = try toIntegerIfIntegral(agent, microseconds);
         }
@@ -916,7 +917,8 @@ const Duration = struct {
         // 9. Let milliseconds be ? Get(input, "milliseconds").
         const milliseconds = try input.get(agent, PropertyKey.from("milliseconds"));
 
-        // 10. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
+        // 10. If milliseconds is not undefined, set result.[[Milliseconds]] to
+        //     ? ToIntegerIfIntegral(milliseconds).
         if (!milliseconds.isUndefined()) {
             result.milliseconds = try toIntegerIfIntegral(agent, milliseconds);
         }
@@ -924,7 +926,8 @@ const Duration = struct {
         // 11. Let minutes be ? Get(input, "minutes").
         const minutes = try input.get(agent, PropertyKey.from("minutes"));
 
-        // 12. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(minutes).
+        // 12. If minutes is not undefined, set result.[[Minutes]] to ? ToIntegerIfIntegral(
+        //     minutes).
         if (!minutes.isUndefined()) {
             result.minutes = try toIntegerIfIntegral(agent, minutes);
         }
@@ -940,7 +943,8 @@ const Duration = struct {
         // 15. Let nanoseconds be ? Get(input, "nanoseconds").
         const nanoseconds = try input.get(agent, PropertyKey.from("nanoseconds"));
 
-        // 16. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
+        // 16. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(
+        //     nanoseconds).
         if (!nanoseconds.isUndefined()) {
             result.nanoseconds = try toIntegerIfIntegral(agent, nanoseconds);
         }
@@ -948,7 +952,8 @@ const Duration = struct {
         // 17. Let seconds be ? Get(input, "seconds").
         const seconds = try input.get(agent, PropertyKey.from("seconds"));
 
-        // 18. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(seconds).
+        // 18. If seconds is not undefined, set result.[[Seconds]] to ? ToIntegerIfIntegral(
+        //     seconds).
         if (!seconds.isUndefined()) {
             result.seconds = try toIntegerIfIntegral(agent, seconds);
         }
@@ -973,9 +978,9 @@ const Duration = struct {
         //     and nanoseconds are all undefined, throw a TypeError exception.
 
         // TODO: 24. If IsValidDuration( result.[[Years]], result.[[Months]], result.[[Weeks]],
-        //            result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
-        //            result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]) is false,
-        //            then
+        //           result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
+        //           result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]) is
+        //           false, then
         //     a. Throw a RangeError exception.
 
         // 25. Return result.
@@ -1053,7 +1058,8 @@ fn getDurationUnitOptions(
             // i. Set style to digitalBase.
             style = digital_base;
 
-            // ii. If unit is not one of "hours", "minutes", or "seconds", set displayDefault to "auto".
+            // ii. If unit is not one of "hours", "minutes", or "seconds", set displayDefault to
+            //     "auto".
             if (!(unit == .hours or unit == .minutes or unit == .seconds)) {
                 display_default = String.fromLiteral("auto");
             }
@@ -1093,7 +1099,8 @@ fn getDurationUnitOptions(
     // 5. Let displayField be the string-concatenation of unit and "Display".
     const display_field = std.fmt.comptimePrint("{t}Display", .{unit});
 
-    // 6. Let display be ? GetOption(options, displayField, string, « "auto", "always" », displayDefault).
+    // 6. Let display be ? GetOption(options, displayField, string, « "auto", "always" »,
+    //    displayDefault).
     const display = try options.getOption(
         agent,
         display_field,
@@ -1110,7 +1117,8 @@ fn getDurationUnitOptions(
         style = String.fromLiteral("2-digit");
     }
 
-    // 9. If unit is "minutes" or "seconds" and prevStyle is "numeric" or "2-digit", set style to "2-digit".
+    // 9. If unit is "minutes" or "seconds" and prevStyle is "numeric" or "2-digit", set style to
+    //    "2-digit".
     if ((unit == .minutes or unit == .seconds) and
         (prev_style.eql(String.fromLiteral("numeric")) or prev_style.eql(String.fromLiteral("2-digit"))))
     {

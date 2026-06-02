@@ -199,8 +199,8 @@ fn call(
         // b. NOTE: error is created in calleeContext with F's associated Realm Record.
         const err = agent.throwException(.type_error, "{f} is not callable", .{object});
 
-        // c. Remove calleeContext from the execution context stack and restore callerContext as
-        //    the running execution context.
+        // c. Remove calleeContext from the execution context stack and restore callerContext as the
+        //    running execution context.
         _ = agent.execution_context_stack.pop().?;
 
         // d. Throw error.
@@ -213,7 +213,8 @@ fn call(
     // 6. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
     const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
 
-    // 7. Remove calleeContext from the execution context stack and restore callerContext as the running execution context.
+    // 7. Remove calleeContext from the execution context stack and restore callerContext as the
+    //    running execution context.
     _ = agent.execution_context_stack.pop().?;
 
     // 8. If result is a return completion, return result.[[Value]].
@@ -262,7 +263,8 @@ fn prepareForOrdinaryCall(
 
     // 11. If callerContext is not already suspended, suspend callerContext.
 
-    // 12. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
+    // 12. Push calleeContext onto the execution context stack; calleeContext is now the running
+    //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, callee_context);
 
     // 13. NOTE: Any exception objects produced after this point are associated with calleeRealm.
@@ -336,23 +338,29 @@ pub fn ordinaryCallEvaluateBody(
     // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatebody
     return switch (function_body.type) {
         // FunctionBody : FunctionStatementList
-        // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and
+        //    argumentsList.
         // ConciseBody : ExpressionBody
-        // 1. Return ? EvaluateConciseBody of ConciseBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateConciseBody of ConciseBody with arguments functionObject and
+        //    argumentsList.
         .normal => evaluateFunctionBody(agent, function, arguments_list),
 
         // GeneratorBody : FunctionBody
-        // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments functionObject and
+        //    argumentsList.
         .generator => evaluateGeneratorBody(agent, function, arguments_list),
 
         // AsyncGeneratorBody : FunctionBody
-        // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments
+        //    functionObject and argumentsList.
         .async_generator => evaluateAsyncGeneratorBody(agent, function, arguments_list),
 
         // AsyncFunctionBody : FunctionBody
-        // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments functionObject
+        //    and argumentsList.
         // AsyncConciseBody : ExpressionBody
-        // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments functionObject and argumentsList.
+        // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments functionObject
+        //    and argumentsList.
         .async => evaluateAsyncFunctionBody(agent, function, arguments_list),
     };
 }
@@ -518,7 +526,8 @@ fn evaluateAsyncFunctionBody(
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
+    // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject,
+    //    argumentsList)).
     // 3. If completion is an abrupt completion, then
     //     a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
     // 4. Else,
@@ -586,8 +595,8 @@ fn construct(
 
         // c. If initializeResult is an abrupt completion, then
         initialize_result catch |err| {
-            // i. Remove calleeContext from the execution context stack and restore callerContext
-            //    as the running execution context.
+            // i. Remove calleeContext from the execution context stack and restore callerContext as
+            //    the running execution context.
             _ = agent.execution_context_stack.pop().?;
 
             // ii. Return ? initializeResult.
@@ -791,18 +800,16 @@ pub fn addRestrictedFunctionProperties(
         .attributes = .builtin_default,
     };
 
-    // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor {
-    //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor { [[Get]]: thrower,
+    //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
     try function.definePropertyDirect(
         agent,
         PropertyKey.from("caller"),
         property_descriptor,
     );
 
-    // 4. Perform ! DefinePropertyOrThrow(F, "arguments", PropertyDescriptor {
-    //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    // 4. Perform ! DefinePropertyOrThrow(F, "arguments", PropertyDescriptor { [[Get]]: thrower,
+    //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
     try function.definePropertyDirect(
         agent,
         PropertyKey.from("arguments"),
@@ -861,8 +868,8 @@ pub fn makeConstructor(
         const prototype = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
         // b. Perform ! DefinePropertyOrThrow(prototype, "constructor", PropertyDescriptor {
-        //      [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: true
-        //    }).
+        //    [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false,
+        //    [[Configurable]]: true }).
         try prototype.definePropertyDirect(agent, PropertyKey.from("constructor"), .{
             .value_or_accessor = .{
                 .value = Value.from(function),
@@ -877,9 +884,8 @@ pub fn makeConstructor(
         break :blk prototype;
     };
 
-    // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-    //      [[Value]]: prototype, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false
-    //    }).
+    // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor { [[Value]]: prototype,
+    //    [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false }).
     try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
         .value_or_accessor = .{
             .value = Value.from(prototype),
@@ -928,16 +934,14 @@ pub fn defineMethodProperty(
 
     switch (key) {
         .private_name => |private_name| {
-            // 2. If key is a Private Name, return PrivateElement {
-            //      [[Key]]: key, [[Kind]]: method, [[Value]]: closure
-            //    }.
+            // 2. If key is a Private Name, return PrivateElement { [[Key]]: key, [[Kind]]: method,
+            //    [[Value]]: closure }.
             const private_element: PrivateElement = .{ .method = closure };
             return .{ .private_name = private_name, .private_element = private_element };
         },
         .property_key => |property_key| {
-            // 3. Let desc be the PropertyDescriptor {
-            //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
-            //    }.
+            // 3. Let desc be the PropertyDescriptor { [[Value]]: closure, [[Writable]]: true,
+            //    [[Enumerable]]: enumerable, [[Configurable]]: true }.
             const property_descriptor: PropertyDescriptor = .{
                 .value = Value.from(closure),
                 .writable = true,
@@ -1028,9 +1032,8 @@ pub fn setFunctionName(
         }
     }
 
-    // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
-    //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor { [[Value]]: name,
+    //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }).
     try function.definePropertyDirect(agent, PropertyKey.from("name"), .{
         .value_or_accessor = .{
             .value = Value.from(name),
@@ -1058,9 +1061,8 @@ pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.
         function.extensible() and !function.property_storage.contains(function, PropertyKey.from("length")),
     );
 
-    // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
-    //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
-    //    }).
+    // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor { [[Value]]: 𝔽(length),
+    //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }).
     try function.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(length),

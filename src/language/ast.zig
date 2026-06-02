@@ -473,9 +473,9 @@ pub const RegularExpressionLiteral = struct {
         // 6. Let patternText be the BodyText of literal.
         // 7. If u is false and v is false, then
         //     a. Let stringValue be CodePointsToString(patternText).
-        //     b. Set patternText to the sequence of code points resulting from interpreting each
-        //        of the 16-bit elements of stringValue as a Unicode BMP code point. UTF-16
-        //        decoding is not applied to the elements.
+        //     b. Set patternText to the sequence of code points resulting from interpreting each of
+        //        the 16-bit elements of stringValue as a Unicode BMP code point. UTF-16 decoding is
+        //        not applied to the elements.
         // 8. Let parseResult be ParsePattern(patternText, u, v).
         // 9. If parseResult is a Parse Node, return true.
         // 10. Return false.
@@ -834,9 +834,8 @@ pub const Expression = union(enum) {
             //     CoverCallExpressionAndAsyncArrowHead
             //     CallExpression Arguments
             .call_expression => {
-                // 1. If the host is a web browser or otherwise supports Runtime Errors for
-                //    Function Call Assignment Targets and IsStrict(this CallExpression) is false,
-                //    then
+                // 1. If the host is a web browser or otherwise supports Runtime Errors for Function
+                //    Call Assignment Targets and IsStrict(this CallExpression) is false, then
                 //     a. Return web-compat.
                 // The strictness is passed as a nullable boolean as we only have to check it
                 // during parsing, in codegen we know the assignment target type is simple or
@@ -2264,10 +2263,12 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let names1 be the LexicallyDeclaredNames of the first CaseClauses.
+        // 1. If the first CaseClauses is present, let names1 be the LexicallyDeclaredNames of the
+        //    first CaseClauses.
         // 2. Else, let names1 be a new empty List.
         // 3. Let names2 be the LexicallyDeclaredNames of DefaultClause.
-        // 4. If the second CaseClauses is present, let names3 be the LexicallyDeclaredNames of the second CaseClauses.
+        // 4. If the second CaseClauses is present, let names3 be the LexicallyDeclaredNames of the
+        //    second CaseClauses.
         // 5. Else, let names3 be a new empty List.
         // 6. Return the list-concatenation of names1, names2, and names3.
         // CaseClauses : CaseClauses CaseClause
@@ -2289,10 +2290,12 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let declarations1 be the LexicallyScopedDeclarations of the first CaseClauses.
+        // 1. If the first CaseClauses is present, let declarations1 be the
+        //    LexicallyScopedDeclarations of the first CaseClauses.
         // 2. Else, let declarations1 be a new empty List.
         // 3. Let declarations2 be the LexicallyScopedDeclarations of DefaultClause.
-        // 4. If the second CaseClauses is present, let declarations3 be the LexicallyScopedDeclarations of the second CaseClauses.
+        // 4. If the second CaseClauses is present, let declarations3 be the
+        //    LexicallyScopedDeclarations of the second CaseClauses.
         // 5. Else, let declarations3 be a new empty List.
         // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // CaseClauses : CaseClauses CaseClause
@@ -2314,10 +2317,12 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let names1 be the VarDeclaredNames of the first CaseClauses.
+        // 1. If the first CaseClauses is present, let names1 be the VarDeclaredNames of the first
+        //    CaseClauses.
         // 2. Else, let names1 be a new empty List.
         // 3. Let names2 be the VarDeclaredNames of DefaultClause.
-        // 4. If the second CaseClauses is present, let names3 be the VarDeclaredNames of the second CaseClauses.
+        // 4. If the second CaseClauses is present, let names3 be the VarDeclaredNames of the second
+        //    CaseClauses.
         // 5. Else, let names3 be a new empty List.
         // 6. Return the list-concatenation of names1, names2, and names3.
         // CaseClauses : CaseClauses CaseClause
@@ -2339,10 +2344,12 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let declarations1 be the VarScopedDeclarations of the first CaseClauses.
+        // 1. If the first CaseClauses is present, let declarations1 be the VarScopedDeclarations of
+        //    the first CaseClauses.
         // 2. Else, let declarations1 be a new empty List.
         // 3. Let declarations2 be the VarScopedDeclarations of DefaultClause.
-        // 4. If the second CaseClauses is present, let declarations3 be the VarScopedDeclarations of the second CaseClauses.
+        // 4. If the second CaseClauses is present, let declarations3 be the VarScopedDeclarations
+        //    of the second CaseClauses.
         // 5. Else, let declarations3 be a new empty List.
         // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // CaseClauses : CaseClauses CaseClause
@@ -2381,7 +2388,8 @@ pub const CaseClause = struct {
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
-        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
+        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of
+        //    StatementList.
         // 2. Return a new empty List.
         try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
@@ -2438,7 +2446,8 @@ pub const DefaultClause = struct {
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
-        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
+        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of
+        //    StatementList.
         // 2. Return a new empty List.
         try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
@@ -3206,7 +3215,8 @@ pub const ClassBody = struct {
                     switch (method_definition.class_element_name) {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
-                            // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
+                            // 1. Return a List whose sole element is the StringValue of
+                            //    PrivateIdentifier.
                             try private_bound_identifiers.append(allocator, private_identifier);
                         },
                         // ClassElementName : PropertyName
@@ -3222,7 +3232,8 @@ pub const ClassBody = struct {
                     switch (field_definition.class_element_name) {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
-                            // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
+                            // 1. Return a List whose sole element is the StringValue of
+                            //    PrivateIdentifier.
                             try private_bound_identifiers.append(allocator, private_identifier);
                         },
                         // ClassElementName : PropertyName
@@ -3263,7 +3274,8 @@ pub const ClassElement = union(enum) {
         switch (self) {
             // ClassElement : MethodDefinition
             .method_definition => |method_definition| {
-                // 1. If the PropName of MethodDefinition is "constructor", return constructor-method.
+                // 1. If the PropName of MethodDefinition is "constructor", return
+                //    constructor-method.
                 if (method_definition.class_element_name == .property_name and
                     method_definition.class_element_name.property_name == .literal_property_name and
                     method_definition.class_element_name.property_name.literal_property_name == .identifier and
@@ -3679,10 +3691,9 @@ pub const Module = struct {
 
                     // 3. For each element name of names, do
                     for (names.items) |name| {
-                        // a. Append the ExportEntry Record {
-                        //      [[ModuleRequest]]: null, [[ImportName]]: null, [[LocalName]]: name,
-                        //      [[ExportName]]: name
-                        //    } to entries.
+                        // a. Append the ExportEntry Record { [[ModuleRequest]]: null,
+                        //    [[ImportName]]: null, [[LocalName]]: name, [[ExportName]]: name } to
+                        //    entries.
                         export_entries.appendAssumeCapacity(.{
                             .module_request = null,
                             .import_name = null,
@@ -3706,10 +3717,9 @@ pub const Module = struct {
 
                     // 3. For each element name of names, do
                     for (names.items) |name| {
-                        // a. Append the ExportEntry Record {
-                        //      [[ModuleRequest]]: null, [[ImportName]]: null,
-                        //      [[LocalName]]: name, [[ExportName]]: name
-                        //    } to entries.
+                        // a. Append the ExportEntry Record { [[ModuleRequest]]: null,
+                        //    [[ImportName]]: null, [[LocalName]]: name, [[ExportName]]: name } to
+                        //    entries.
                         export_entries.appendAssumeCapacity(.{
                             .module_request = null,
                             .import_name = null,
@@ -3733,9 +3743,8 @@ pub const Module = struct {
                     const local_name = names.items[0];
 
                     // 3. Return a List whose sole element is a new ExportEntry Record {
-                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
-                    //      [[LocalName]]: localName, [[ExportName]]: "default"
-                    //    }.
+                    //    [[ModuleRequest]]: null, [[ImportName]]: null, [[LocalName]]: localName,
+                    //    [[ExportName]]: "default" }.
                     try export_entries.append(allocator, .{
                         .module_request = null,
                         .import_name = null,
@@ -3756,9 +3765,8 @@ pub const Module = struct {
                     const local_name = names.items[0];
 
                     // 3. Return a List whose sole element is a new ExportEntry Record {
-                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
-                    //      [[LocalName]]: localName, [[ExportName]]: "default"
-                    //    }.
+                    //    [[ModuleRequest]]: null, [[ImportName]]: null, [[LocalName]]: localName,
+                    //    [[ExportName]]: "default" }.
                     try export_entries.append(allocator, .{
                         .module_request = null,
                         .import_name = null,
@@ -3769,10 +3777,9 @@ pub const Module = struct {
 
                 // ExportDeclaration : export default AssignmentExpression ;
                 .default_expression => {
-                    // 1. Let entry be the ExportEntry Record {
-                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
-                    //      [[LocalName]]: "*default*", [[ExportName]]: "default"
-                    //    }.
+                    // 1. Let entry be the ExportEntry Record { [[ModuleRequest]]: null,
+                    //    [[ImportName]]: null, [[LocalName]]: "*default*",
+                    //    [[ExportName]]: "default" }.
                     // 2. Return « entry ».
                     try export_entries.append(allocator, .{
                         .module_request = null,
@@ -3844,7 +3851,8 @@ pub const ModuleItemList = struct {
 
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
-                    // 1. Return a List whose sole element is the DeclarationPart of HoistableDeclaration.
+                    // 1. Return a List whose sole element is the DeclarationPart of
+                    //    HoistableDeclaration.
                     try lexically_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration });
                 },
 
@@ -4034,25 +4042,21 @@ pub const ImportDeclaration = struct {
         // ImportDeclaration : import ImportClause FromClause ;
         // 1. Let specifier be the SV of FromClause.
         // 2. Return a List whose sole element is the ModuleRequest Record {
-        //      [[Specifier]]: specifier, [[Attributes]]: « »
-        //    }.
+        //    [[Specifier]]: specifier, [[Attributes]]: « » }.
         // ImportDeclaration : import ImportClause FromClause WithClause ;
         // 1. Let specifier be the SV of FromClause.
         // 2. Let attributes be WithClauseToAttributes of WithClause.
         // 3. Return a List whose sole element is the ModuleRequest Record {
-        //      [[Specifier]]: specifier, [[Attributes]]: attributes
-        //    }.
+        //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
         // ImportDeclaration : import ModuleSpecifier ;
         // 1. Let specifier be the SV of ModuleSpecifier.
         // 2. Return a List whose sole element is the ModuleRequest Record {
-        //      [[Specifier]]: specifier, [[Attributes]]: « »
-        //    }.
+        //    [[Specifier]]: specifier, [[Attributes]]: « » }.
         // ImportDeclaration : import ModuleSpecifier WithClause ;
         // 1. Let specifier be the SV of ModuleSpecifier.
         // 2. Let attributes be WithClauseToAttributes of WithClause.
         // 3. Return a List whose sole element is the ModuleRequest Record {
-        //      [[Specifier]]: specifier, [[Attributes]]: attributes
-        //    }.
+        //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
         const specifier = try self.module_specifier.stringValue(allocator);
         const attributes = if (self.with_clause) |with_clause|
             try with_clause.toAttributes(allocator)
@@ -4127,9 +4131,8 @@ pub const ImportClause = union(enum) {
                 // 1. Let localName be the sole element of the BoundNames of ImportedBinding.
                 const local_name = imported_binding;
 
-                // 2. Let defaultEntry be the ImportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: "default", [[LocalName]]: localName
-                //    }.
+                // 2. Let defaultEntry be the ImportEntry Record { [[ModuleRequest]]: module,
+                //    [[ImportName]]: "default", [[LocalName]]: localName }.
                 const default_entry: ImportEntry = .{
                     .module_request = module,
                     .import_name = .{ .string = "default" },
@@ -4145,9 +4148,8 @@ pub const ImportClause = union(enum) {
                 // 1. Let localName be the StringValue of ImportedBinding.
                 const local_name = imported_binding;
 
-                // 2. Let entry be the ImportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: namespace, [[LocalName]]: localName
-                //    }.
+                // 2. Let entry be the ImportEntry Record { [[ModuleRequest]]: module,
+                //    [[ImportName]]: namespace, [[LocalName]]: localName }.
                 const entry: ImportEntry = .{
                     .module_request = module,
                     .import_name = .namespace,
@@ -4178,9 +4180,8 @@ pub const ImportClause = union(enum) {
                     // 2. Let localName be the StringValue of ImportedBinding.
                     const local_name = import_specifier.imported_binding;
 
-                    // 3. Let entry be the ImportEntry Record {
-                    //      [[ModuleRequest]]: module, [[ImportName]]: importName, [[LocalName]]: localName
-                    //    }.
+                    // 3. Let entry be the ImportEntry Record { [[ModuleRequest]]: module,
+                    //    [[ImportName]]: importName, [[LocalName]]: localName }.
                     const entry: ImportEntry = .{
                         .module_request = module,
                         .import_name = .{ .string = import_name },
@@ -4195,9 +4196,8 @@ pub const ImportClause = union(enum) {
                     // 1. Let localName be the sole element of the BoundNames of ImportedBinding.
                     const local_name = import_specifier.imported_binding;
 
-                    // 2. Let entry be the ImportEntry Record {
-                    //      [[ModuleRequest]]: module, [[ImportName]]: localName, [[LocalName]]: localName
-                    //    }.
+                    // 2. Let entry be the ImportEntry Record { [[ModuleRequest]]: module,
+                    //    [[ImportName]]: localName, [[LocalName]]: localName }.
                     const entry: ImportEntry = .{
                         .module_request = module,
                         .import_name = .{ .string = local_name },
@@ -4211,8 +4211,10 @@ pub const ImportClause = union(enum) {
 
             // ImportClause : ImportedDefaultBinding , NameSpaceImport
             .imported_default_binding_and_namespace_import => |x| {
-                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with argument module.
-                // 2. Let entries2 be the ImportEntriesForModule of NameSpaceImport with argument module.
+                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with
+                //    argument module.
+                // 2. Let entries2 be the ImportEntriesForModule of NameSpaceImport with argument
+                //    module.
                 // 3. Return the list-concatenation of entries1 and entries2.
                 try collectImportEntriesForModule(
                     .{ .imported_default_binding = x.imported_default_binding },
@@ -4230,8 +4232,10 @@ pub const ImportClause = union(enum) {
 
             // ImportClause : ImportedDefaultBinding , NamedImports
             .imported_default_binding_and_named_imports => |x| {
-                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with argument module.
-                // 2. Let entries2 be the ImportEntriesForModule of NamedImports with argument module.
+                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with
+                //    argument module.
+                // 2. Let entries2 be the ImportEntriesForModule of NamedImports with argument
+                //    module.
                 // 3. Return the list-concatenation of entries1 and entries2.
                 try collectImportEntriesForModule(
                     .{ .imported_default_binding = x.imported_default_binding },
@@ -4317,11 +4321,13 @@ pub const WithClause = struct {
         // 3. Return attributes.
         // WithEntries : AttributeKey : StringLiteral
         // 1. Let key be the PropName of AttributeKey.
-        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of StringLiteral }.
+        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of
+        //    StringLiteral }.
         // 3. Return « entry ».
         // WithEntries : AttributeKey : StringLiteral , WithEntries
         // 1. Let key be the PropName of AttributeKey.
-        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of StringLiteral }.
+        // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of
+        //    StringLiteral }.
         // 3. Let rest be WithClauseToAttributes of WithEntries.
         // 4. Return the list-concatenation of « entry » and rest.
         var attributes: std.ArrayList(ImportAttribute) = .empty;
@@ -4453,14 +4459,12 @@ pub const ExportDeclaration = union(enum) {
             // ExportDeclaration : export ExportFromClause FromClause ;
             // 1. Let specifier be the SV of FromClause.
             // 2. Return a List whose sole element is the ModuleRequest Record {
-            //      [[Specifier]]: specifier, [[Attributes]]: « »
-            //    }.
+            //    [[Specifier]]: specifier, [[Attributes]]: « » }.
             // ExportDeclaration : export ExportFromClause FromClause WithClause ;
             // 1. Let specifier be the SV of FromClause.
             // 2. Let attributes be WithClauseToAttributes of WithClause.
             // 3. Return a List whose sole element is the ModuleRequest Record {
-            //      [[Specifier]]: specifier, [[Attributes]]: attributes
-            //    }.
+            //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
             .export_from => |export_from| {
                 const specifier = try export_from.module_specifier.stringValue(allocator);
                 const attributes = if (export_from.with_clause) |with_clause|
@@ -4511,10 +4515,8 @@ pub const ExportFromClause = union(enum) {
         switch (self) {
             // ExportFromClause : *
             .star => {
-                // 1. Let entry be the ExportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: all-but-default,
-                //      [[LocalName]]: null, [[ExportName]]: null
-                //    }.
+                // 1. Let entry be the ExportEntry Record { [[ModuleRequest]]: module,
+                //    [[ImportName]]: all-but-default, [[LocalName]]: null, [[ExportName]]: null }.
                 const entry: ExportEntry = .{
                     .module_request = module,
                     .import_name = .all_but_default,
@@ -4533,10 +4535,8 @@ pub const ExportFromClause = union(enum) {
                     .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
                 };
 
-                // 2. Let entry be the ExportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: namespace, [[LocalName]]: null,
-                //      [[ExportName]]: exportName
-                //    }.
+                // 2. Let entry be the ExportEntry Record { [[ModuleRequest]]: module,
+                //    [[ImportName]]: namespace, [[LocalName]]: null, [[ExportName]]: exportName }.
                 const entry: ExportEntry = .{
                     .module_request = module,
                     .import_name = .namespace,
@@ -4597,9 +4597,8 @@ pub const NamedExports = struct {
                 };
 
                 // 4. Return a List whose sole element is a new ExportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: importName,
-                //      [[LocalName]]: localName, [[ExportName]]: sourceName
-                //    }.
+                //    [[ModuleRequest]]: module, [[ImportName]]: importName,
+                //    [[LocalName]]: localName, [[ExportName]]: sourceName }.
                 export_entries.appendAssumeCapacity(.{
                     .module_request = module,
                     .import_name = if (import_name) |string| .{ .string = string } else null,
@@ -4634,9 +4633,8 @@ pub const NamedExports = struct {
                 };
 
                 // 5. Return a List whose sole element is a new ExportEntry Record {
-                //      [[ModuleRequest]]: module, [[ImportName]]: importName,
-                //      [[LocalName]]: localName, [[ExportName]]: exportName
-                //    }.
+                //    [[ModuleRequest]]: module, [[ImportName]]: importName,
+                //    [[LocalName]]: localName, [[ExportName]]: exportName }.
                 export_entries.appendAssumeCapacity(.{
                     .module_request = module,
                     .import_name = if (import_name) |string| .{ .string = string } else null,

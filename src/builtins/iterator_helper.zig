@@ -97,8 +97,8 @@ pub const prototype = struct {
             iterator_helper.fields = .completed;
 
             // b. NOTE: Once a generator enters the completed state it never leaves it and its
-            //    associated execution context is never resumed. Any execution state associated
-            //    with O can be discarded at this point.
+            //    associated execution context is never resumed. Any execution state associated with
+            //    O can be discarded at this point.
 
             // c. Perform ? IteratorCloseAll(O.[[UnderlyingIterators]], NormalCompletion(unused)).
             _ = try Iterator.closeAll(agent, underlying_iterators, @as(Agent.Error!void, {}));

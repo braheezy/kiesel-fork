@@ -36,7 +36,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
     // 3. Let evalRealm be the current Realm Record.
     // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of eval and
-    //          of the eval function itself.
+    //    of the eval function itself.
     const eval_realm = agent.currentRealm();
 
     // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
@@ -128,8 +128,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 
     // 14. Let runningContext be the running execution context.
     // 15. NOTE: If direct is true, runningContext will be the execution context that performed the
-    //           direct eval. If direct is false, runningContext will be the execution context for
-    //           the invocation of the eval function.
+    //     direct eval. If direct is false, runningContext will be the execution context for the
+    //     invocation of the eval function.
     const running_context = agent.runningExecutionContext();
 
     var lexical_environment: Environment = undefined;
@@ -201,7 +201,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &eval_context);
 
-    // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv, strictEval)).
+    // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv,
+    //     strictEval)).
     const result_no_value = evalDeclarationInstantiation(
         agent,
         body,
@@ -299,8 +300,8 @@ fn evalDeclarationInstantiation(
                     if (this_env.hasBinding(agent, name) catch |err| try noexcept(err)) {
                         // i. If the host is a web browser or otherwise supports VariableStatements
                         //    in Catch Blocks, then
-                        //     i. If thisEnv is not the Environment Record for a Catch clause,
-                        //        throw a SyntaxError exception.
+                        //     i. If thisEnv is not the Environment Record for a Catch clause, throw
+                        //        a SyntaxError exception.
                         // ii. Else,
                         //     i. Throw a SyntaxError exception.
                         return agent.throwException(.syntax_error, "idk", .{});

@@ -394,8 +394,8 @@ pub fn asyncGeneratorStart(
                     //    or performed either an implicit or explicit return.
 
                     // f. Remove acGenContext from the execution context stack and restore the
-                    //    execution context that is at the top of the execution context stack as
-                    //    the running execution context.
+                    //    execution context that is at the top of the execution context stack as the
+                    //    running execution context.
                     _ = agent_.execution_context_stack.pop().?;
 
                     // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
@@ -403,8 +403,10 @@ pub fn asyncGeneratorStart(
 
                     closure_generator.fields.evaluation_state = undefined;
 
-                    // h. If result is a normal completion, set result to NormalCompletion(undefined).
-                    // i. If result is a return completion, set result to NormalCompletion(result.[[Value]]).
+                    // h. If result is a normal completion, set result to NormalCompletion(
+                    //    undefined).
+                    // i. If result is a return completion, set result to NormalCompletion(
+                    //    result.[[Value]]).
                     const result_value: Value = value orelse .undefined;
 
                     // j. Perform AsyncGeneratorCompleteStep(acGenerator, result, true).
@@ -461,9 +463,8 @@ pub fn asyncGeneratorEnqueue(
     completion: Completion,
     promise_capability: PromiseCapability,
 ) std.mem.Allocator.Error!void {
-    // 1. Let request be AsyncGeneratorRequest {
-    //      [[Completion]]: completion, [[Capability]]: promiseCapability
-    //    }.
+    // 1. Let request be AsyncGeneratorRequest { [[Completion]]: completion,
+    //    [[Capability]]: promiseCapability }.
     const request: AsyncGeneratorRequest = .{
         .completion = completion,
         .capability = promise_capability,
@@ -640,8 +641,8 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     // 12. Set generator.[[AsyncGeneratorState]] to suspended-yield.
     generator.fields.async_generator_state = .suspended_yield;
 
-    // 13. Remove genContext from the execution context stack and restore the execution context
-    //     that is at the top of the execution context stack as the running execution context.
+    // 13. Remove genContext from the execution context stack and restore the execution context that
+    //     is at the top of the execution context stack as the running execution context.
     _ = agent.execution_context_stack.pop().?;
 
     // 14. Let callerContext be the running execution context.
@@ -649,7 +650,8 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     //     resumptionValue be the Completion Record with which it is resumed.
     generator.fields.evaluation_state.suspension_result = .undefined;
 
-    // TODO: 16. Assert: If control reaches here, then genContext is the running execution context again.
+    // TODO: 16. Assert: If control reaches here, then genContext is the running execution context
+    //           again.
     // TODO: 17. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
     return .{ .normal = .undefined };
 }

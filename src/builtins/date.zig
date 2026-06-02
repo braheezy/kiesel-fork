@@ -119,10 +119,9 @@ pub fn daysInYear(year: Year) DaysInYear {
 /// https://tc39.es/ecma262/#sec-dayfromyear
 pub fn dayFromYear(year: Year) f64 {
     // 1. Let ry be ℝ(y).
-    // 2. NOTE: In the following steps, numYears1, numYears4, numYears100, and numYears400
-    //    represent the number of years divisible by 1, 4, 100, and 400, respectively, that occur
-    //    between the epoch and the start of year y. The number is negative if y is before the
-    //    epoch.
+    // 2. NOTE: In the following steps, numYears1, numYears4, numYears100, and numYears400 represent
+    //    the number of years divisible by 1, 4, 100, and 400, respectively, that occur between the
+    //    epoch and the start of year y. The number is negative if y is before the epoch.
 
     // 3. Let numYears1 be (ry - 1970).
     const num_years_1: f64 = @floatFromInt(year - 1970);
@@ -341,7 +340,8 @@ pub fn localTime(platform: *const Agent.Platform, t: f64) f64 {
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
-        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(t) × 10**6)).
+        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
+        //    ℤ(ℝ(t) × 10**6)).
         break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, t * 1_000_000);
     };
 
@@ -384,7 +384,8 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
 /// 21.4.1.27 MakeTime ( hour, min, sec, ms )
 /// https://tc39.es/ecma262/#sec-maketime
 pub fn makeTime(hour: f64, minute: f64, second: f64, millisecond: f64) f64 {
-    // 1. If hour is not finite, min is not finite, sec is not finite, or ms is not finite, return NaN.
+    // 1. If hour is not finite, min is not finite, sec is not finite, or ms is not finite, return
+    //    NaN.
     if (!std.math.isFinite(hour) or
         !std.math.isFinite(minute) or
         !std.math.isFinite(second) or
@@ -780,7 +781,8 @@ pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writ
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
-        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(tv) × 10**6)).
+        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
+        //    ℤ(ℝ(tv) × 10**6)).
         break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, time_value * 1_000_000);
     };
 
@@ -922,8 +924,8 @@ pub const constructor = struct {
                 if (primitive_value.isString()) {
                     // 1. Assert: The next step never returns an abrupt completion because v is a
                     //    String.
-                    // 2. Let tv be the result of parsing v as a date, in exactly the same manner
-                    //    as for the parse method (21.4.3.2).
+                    // 2. Let tv be the result of parsing v as a date, in exactly the same manner as
+                    //    for the parse method (21.4.3.2).
                     break :blk_tv parseImpl(primitive_value.asString());
                 } else {
                     // iii. Else,
@@ -973,7 +975,8 @@ pub const constructor = struct {
             break :blk timeClip(utc(agent.platform, final_date));
         };
 
-        // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%", « [[DateValue]] »).
+        // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%",
+        //    « [[DateValue]] »).
         const date = try ordinaryCreateFromConstructor(
             Date,
             agent,
@@ -1459,7 +1462,8 @@ pub const prototype = struct {
         // 6. Set t to LocalTime(t).
         time_value = localTime(agent.platform, time_value);
 
-        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
+        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(
+        //    t)).
         const new_date = makeDate(
             makeDay(
                 @floatFromInt(yearFromTime(time_value)),
@@ -1823,7 +1827,8 @@ pub const prototype = struct {
         // 5. If t is NaN, return NaN.
         if (std.math.isNan(time_value)) return .nan;
 
-        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
+        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(
+        //    t)).
         const new_date = makeDate(
             makeDay(
                 @floatFromInt(yearFromTime(time_value)),
@@ -2307,8 +2312,8 @@ pub const prototype = struct {
         // 4. If x is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
 
-        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options,
-        //    any, all).
+        // 5. Let dateFormat be ? CreateDateTimeFormat(%Intl.DateTimeFormat%, locales, options, any,
+        //    all).
         const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
             agent,
             try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
@@ -2476,8 +2481,7 @@ pub const prototype = struct {
         // 8. Let yv be YearFromTime(tv).
         const year = yearFromTime(time_value);
 
-        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; else let yearSign
-        //    be "-".
+        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; else let yearSign be "-".
         const year_sign = if (year >= 0) "" else "-";
 
         // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).

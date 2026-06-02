@@ -569,7 +569,8 @@ pub fn typeof(self: Value) *const String {
 
         // 11. Assert: val is an Object.
         .object => blk: {
-            // 12. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal Slot, then
+            // 12. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal
+            //     Slot, then
             if (build_options.enable_annex_b) {
                 // a. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
                 if (self.asObject().isHTMLDDA()) break :blk String.fromLiteral("undefined");
@@ -940,7 +941,8 @@ pub fn toFixedSizeInteger(int: f64, comptime T: type) T {
     const fixed_int: @Int(.unsigned, info.bits) = @intFromFloat(@mod(int, comptime std.math.pow(f64, 2, info.bits)));
 
     // 3. NOTE: The following step does not change the two's complement representation of fixedInt.
-    // 4. If signed is signed and fixedInt ≥ 2**(bitWidth - 1), set fixedInt to fixedInt - 2**bitWidth.
+    // 4. If signed is signed and fixedInt ≥ 2**(bitWidth - 1), set fixedInt to
+    //    fixedInt - 2**bitWidth.
     // 5. Return fixedInt.
     return @bitCast(fixed_int);
 }
@@ -1231,8 +1233,8 @@ fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
             return &boolean.object;
         },
 
-        // 3. If argument is a Number, return a new Number object whose [[NumberData]] internal
-        //    slot is set to argument. See 21.1 for a description of Number objects.
+        // 3. If argument is a Number, return a new Number object whose [[NumberData]] internal slot
+        //    is set to argument. See 21.1 for a description of Number objects.
         .number => {
             const number = try builtins.Number.create(agent, .{
                 .fields = .{ .number_data = self.asNumber() },
@@ -1241,8 +1243,8 @@ fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
             return &number.object;
         },
 
-        // 4. If argument is a String, return a new String object whose [[StringData]] internal
-        //    slot is set to argument. See 22.1 for a description of String objects.
+        // 4. If argument is a String, return a new String object whose [[StringData]] internal slot
+        //    is set to argument. See 22.1 for a description of String objects.
         .string => {
             const string = try stringCreate(
                 agent,
@@ -1252,8 +1254,8 @@ fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
             return &string.object;
         },
 
-        // 5. If argument is a Symbol, return a new Symbol object whose [[SymbolData]] internal
-        //    slot is set to argument. See 20.4 for a description of Symbol objects.
+        // 5. If argument is a Symbol, return a new Symbol object whose [[SymbolData]] internal slot
+        //    is set to argument. See 20.4 for a description of Symbol objects.
         .symbol => {
             const symbol = try builtins.Symbol.create(agent, .{
                 .fields = .{ .symbol_data = self.asSymbol() },
@@ -1262,8 +1264,8 @@ fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
             return &symbol.object;
         },
 
-        // 6. If argument is a BigInt, return a new BigInt object whose [[BigIntData]] internal
-        //    slot is set to argument. See 21.2 for a description of BigInt objects.
+        // 6. If argument is a BigInt, return a new BigInt object whose [[BigIntData]] internal slot
+        //    is set to argument. See 21.2 for a description of BigInt objects.
         .big_int => {
             const big_int = try builtins.BigInt.create(agent, .{
                 .fields = .{ .big_int_data = self.asBigInt() },
@@ -1340,7 +1342,8 @@ pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
     // 1. Let integer be ? ToIntegerOrInfinity(value).
     const integer = try self.toIntegerOrInfinity(agent);
 
-    // 2. If integer is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError exception.
+    // 2. If integer is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError
+    //    exception.
     if (integer < 0 or integer > std.math.maxInt(u53))
         return agent.throwException(.range_error, "Value is not not a valid index", .{});
 
@@ -1543,8 +1546,8 @@ pub fn createListFromArrayLike(
         // b. Let next be ? Get(obj, indexName).
         const next = try self.get(agent, index_name);
 
-        // c. If validElementTypes is property-key and next is not a property key, throw a
-        //    TypeError exception.
+        // c. If validElementTypes is property-key and next is not a property key, throw a TypeError
+        //    exception.
         if (valid_element_types == .property_key and switch (next.type()) {
             .string, .symbol => false,
             else => true,
@@ -2089,7 +2092,7 @@ pub fn isLessThan(
     } else {
         // 2. Else,
         // a. NOTE: The order of evaluation needs to be reversed to preserve left to right
-        //          evaluation.
+        //    evaluation.
 
         // b. Let py be ? ToPrimitive(y, number).
         py = try y.toPrimitive(agent, .number);

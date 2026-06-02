@@ -122,7 +122,7 @@ pub const constructor = struct {
         list_format.fields.type = @"type";
 
         // 9. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
-        //     "long").
+        //    "long").
         const style_string = try options.getOption(
             agent,
             "style",
@@ -202,7 +202,8 @@ pub const prototype = struct {
 
         // 4. For each row of Table 20, except the header row, in table order, do
         //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of lf's internal slot whose name is the Internal Slot value of the current row.
+        //     b. Let v be the value of lf's internal slot whose name is the Internal Slot value of
+        //        the current row.
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
         const resolved_options = list_format.fields.resolvedOptions();
